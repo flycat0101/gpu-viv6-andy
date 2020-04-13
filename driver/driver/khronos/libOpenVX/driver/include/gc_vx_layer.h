@@ -3985,6 +3985,15 @@ vxnne_shader_executable vxnneGetGPUL2NormAxis2ShaderExecutable(
     vx_tensor               output
     );
 
+vxnne_shader_executable vxnneGetGPUReorgShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_scalar               stride,
+    vx_scalar               outc,
+    vx_tensor               output);
+
 vxnne_shader_executable vxnneGetGPUL2PoolingShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,

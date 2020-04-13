@@ -27458,10 +27458,10 @@ vxnne_shader_executable vxnneGetTFAvgPoolingShaderExecutable(
     vx_uint32    in_width           = TENSOR_VIEW_SIZE_INDEX(input, 0);
     vx_uint32    in_height          = TENSOR_VIEW_SIZE_INDEX(input, 1);
     vx_uint32    depth              = TENSOR_VIEW_SIZE_INDEX(input, 2);
-    vx_int32     input_ZP           = TENSOR_TF_ZEROPOINT(input);
+    vx_int32     input_ZP           = 0;
     vx_uint32    out_width          = TENSOR_VIEW_SIZE_INDEX(output, 0);
     vx_uint32    out_height         = TENSOR_VIEW_SIZE_INDEX(output, 1);
-    vx_int32     output_ZP          = TENSOR_TF_ZEROPOINT(output);
+    vx_int32     output_ZP          = 0;
     vx_uint32    stride_x           = stride_x_s->value->u32;
     vx_uint32    stride_y           = stride_y_s->value->u32;
     vx_uint32    kernel_size_x      = poolSizeX->value->u32;
@@ -27497,7 +27497,7 @@ vxnne_shader_executable vxnneGetTFAvgPoolingShaderExecutable(
 
     parameters[2] = (vx_reference)in_heights;
 
-    if (inputFormat == VX_TYPE_INT8)
+    if (TENSOR_QUANT_TYPE(input) == VX_QUANT_DYNAMIC_FIXED_POINT)
     {
         if (srcFixPointPos >= 0)
         {
@@ -27507,38 +27507,39 @@ vxnne_shader_executable vxnneGetTFAvgPoolingShaderExecutable(
         {
             scaleIn *= (vx_float32)(1 << -srcFixPointPos);
         }
+        input_ZP = 0;
     }
-    else if (inputFormat == VX_TYPE_UINT8)
+    else if (TENSOR_QUANT_TYPE(input) == VX_QUANT_AFFINE_SCALE)
     {
-        scaleIn *= TENSOR_TF_SCALE(input);
+        scaleIn  *= TENSOR_TF_SCALE(input);
+        input_ZP  = TENSOR_TF_ZEROPOINT(input);
     }
 
-    if (outputFormat == VX_TYPE_INT8)
+    if (TENSOR_QUANT_TYPE(output) == VX_QUANT_DYNAMIC_FIXED_POINT)
     {
         if (dstFixPointPos >= 0)
         {
-            scaleOut *= (vx_float32) (1 << dstFixPointPos);
+            scaleOut *= 1.0f / (vx_float32) (1 << dstFixPointPos);
         }
         else if (dstFixPointPos < 0)
         {
-            scaleOut *= 1.0f / (vx_float32) (1 << -dstFixPointPos);
+            scaleOut *= (vx_float32) (1 << -dstFixPointPos);
         }
+        output_ZP = 0;
     }
-    else if (outputFormat == VX_TYPE_UINT8)
+    else if (TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE)
     {
-        scaleOut *= TENSOR_TF_SCALE(output);
+        scaleOut  *= TENSOR_TF_SCALE(output);
+        output_ZP  = TENSOR_TF_ZEROPOINT(output);
     }
 
     borderMode->mode = VX_BORDER_CONSTANT;
-    if (inputFormat == VX_TYPE_INT8)
-    {
-        borderMode->constant_value.U8 = 0;
-    }
-    else if (inputFormat == VX_TYPE_UINT8)
+
+    if ((inputFormat == VX_TYPE_UINT8 || inputFormat == VX_TYPE_INT8) && TENSOR_QUANT_TYPE(input) == VX_QUANT_AFFINE_SCALE)
     {
         borderMode->constant_value.U8 = (vx_uint8)input_ZP;
     }
-    else if (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_BFLOAT16)
+    else
     {
         borderMode->constant_value.S16 = 0;
         borderMode->constant_value.U8 = 0;
@@ -27704,7 +27705,8 @@ vxnne_shader_executable vxnneGetTFAvgPoolingShaderExecutable(
     }
     else if (inputFormat == VX_TYPE_FLOAT16 && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_INT8))
     {
-        vx_float32    genericAvgScale     = scaleOut;
+        vx_float32    genericAvgScale     = 1.0f / scaleOut;
+        vx_float32    output_ZP_f         = (vx_float32)output_ZP;
         vx_int32 kernelsize[2]            = {kernel_size_x, kernel_size_y};
         vx_int32 padding[2]               = {pad_left, pad_top};
         vx_int32 stride[2]                = {stride_x, stride_y};
@@ -27752,11 +27754,12 @@ vxnne_shader_executable vxnneGetTFAvgPoolingShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "x_len_remain", 1, &x_len_remain);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "enable_int8_format", 1, &enable_int8_format);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "genericAvgScale", 1, &genericAvgScale);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "output_ZP", 1, &output_ZP_f);
         if (status != VX_SUCCESS) goto OnError;
     }
     else if (VX_TYPE_BFLOAT16 == inputFormat && VX_TYPE_BFLOAT16 == outputFormat)
     {
-        vx_float32    genericAvgScale     = scaleOut;
+        vx_float32    genericAvgScale     = 1.0f / scaleOut;
         vx_int32 kernelsize[2]            = {kernel_size_x, kernel_size_y};
         vx_int32 padding[2]               = {pad_left, pad_top};
         vx_int32 stride[2]                = {stride_x, stride_y};
