@@ -3193,10 +3193,6 @@ _ConvShaderVariable2Vir(
                     if(arrayStructElem->firstChild != -1) {
                         gcmVERIFY_OK(gcSHADER_GetVariable(Shader, arrayStructElem->firstChild, &firstChild));
                     }
-                    else
-                    {
-                        gcmVERIFY_OK(gcSHADER_GetVariable(Shader, variable->firstChild, &firstChild));
-                    }
                 }
                 else
                 {

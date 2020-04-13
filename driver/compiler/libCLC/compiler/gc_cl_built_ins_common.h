@@ -5296,9 +5296,6 @@ OnError:
                                gcvNULL,
                                gcvTRUE,
                                tempRegIndex,
-                               gcvNULL,
-                               -1,
-                               -1,
                                gcvNULL);
 
         clsROPERAND_InitializeTempReg(Compiler,
@@ -5636,9 +5633,6 @@ _GenShufflePtrCode(
                                    gcvNULL,
                                    gcvTRUE,
                                    tempRegIndex,
-                                   gcvNULL,
-                                   -1,
-                                   -1,
                                    gcvNULL);
         clsROPERAND_InitializeTempReg(Compiler,
                                       &intermROperands[17],
@@ -5933,9 +5927,6 @@ _GenShufflePtr1Code(
                                    gcvNULL,
                                    gcvTRUE,
                                    tempRegIndex,
-                                   gcvNULL,
-                                   -1,
-                                   -1,
                                    gcvNULL);
         clsROPERAND_InitializeTempReg(Compiler,
                                       &intermROperands[17],
@@ -6322,9 +6313,6 @@ OnError:
                               gcvNULL,
                               gcvTRUE,
                               tempRegIndex,
-                              gcvNULL,
-                              -1,
-                              -1,
                               gcvNULL);
        clsROPERAND_InitializeTempReg(Compiler,
                                      &intermROperands[59],
@@ -6727,9 +6715,6 @@ _GenShuffle2PtrCode(
                                    gcvNULL,
                                    gcvTRUE,
                                    tempRegIndex,
-                                   gcvNULL,
-                                   -1,
-                                   -1,
                                    gcvNULL);
         clsROPERAND_InitializeTempReg(Compiler,
                                       &intermROperands[79],
@@ -7085,9 +7070,6 @@ _GenShuffle2Ptr1Code(
                                    gcvNULL,
                                    gcvTRUE,
                                    tempRegIndex,
-                                   gcvNULL,
-                                   -1,
-                                   -1,
                                    gcvNULL);
         clsROPERAND_InitializeTempReg(Compiler,
                                       &intermROperands[59],

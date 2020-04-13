@@ -4036,9 +4036,6 @@ IN clsNAME * Name,
 IN clsNAME * ParentName,
 IN gctCONST_STRING Symbol,
 IN clsDECL * Decl,
-IN gctINT16 parent,
-IN gctINT16 prevSibling,
-OUT gctINT16* ThisVarIndex,
 OUT clsLOGICAL_REG * LogicalRegs,
 IN OUT gctUINT * Start,
 IN OUT gctUINT * Available,
@@ -4100,8 +4097,7 @@ OUT gctUINT *NumRegNeeded
           clmGetArrayElementCount(Decl->array, 0, logicalRegCount);
           isArray = gcvTRUE;
        }
-       else
-          logicalRegCount = 1;
+       else logicalRegCount = 1;
     }
 
     if(isUniformForAddressSpace ||
@@ -4288,10 +4284,7 @@ OUT gctUINT *NumRegNeeded
                                           &Decl->array,
                                           isArray,
                                           tempRegIndex,
-                                          &variable,
-                                          parent,
-                                          prevSibling,
-                                          ThisVarIndex);
+                                          &variable);
                    if (gcmIS_ERROR(status)) return status;
 
                    status = _SetVariableQualifiers(Compiler,
@@ -4396,11 +4389,7 @@ OUT gctUINT *NumRegNeeded
                                               &Decl->array,
                                               isArray,
                                               tempRegIndex,
-                                              &variable,
-                                              parent,
-                                              prevSibling,
-                                              ThisVarIndex
-                                              );
+                                              &variable);
                        if (gcmIS_ERROR(status)) return status;
 
                        status = _SetVariableQualifiers(Compiler,
@@ -4430,10 +4419,7 @@ OUT gctUINT *NumRegNeeded
                                               &Decl->array,
                                               isArray,
                                               tempRegIndex,
-                                              &variable,
-                                              parent,
-                                              prevSibling,
-                                              ThisVarIndex);
+                                              &variable);
                        if (gcmIS_ERROR(status)) return status;
                    }
                    if(variable) {
@@ -4490,10 +4476,7 @@ OUT gctUINT *NumRegNeeded
                                    &Decl->array,
                                    isArray,
                                    tempRegIndex,
-                                   &variable,
-                                   parent,
-                                   prevSibling,
-                                   ThisVarIndex);
+                                   &variable);
             if (gcmIS_ERROR(status)) return status;
 
             status = _SetVariableQualifiers(Compiler,
@@ -4601,10 +4584,7 @@ OUT gctUINT *NumRegNeeded
                                   &Decl->array,
                                   isArray,
                                   tempRegIndex,
-                                  &variable,
-                                  parent,
-                                  prevSibling,
-                                  ThisVarIndex);
+                                  &variable);
            if (gcmIS_ERROR(status)) return status;
 
            status = _SetVariableQualifiers(Compiler,
@@ -4920,9 +4900,6 @@ IN clsNAME * ParentName,
 IN gctCONST_STRING Symbol,
 IN clsDECL * Decl,
 IN gctBOOL   addDieFlag,
-IN gctINT16 Parent,
-IN gctINT16 PrevSibling,
-OUT gctINT16* ThisVarIndex,
 IN OUT clsLOGICAL_REG * LogicalRegs,
 IN OUT gctUINT * Start,
 IN OUT gctUINT * Available,
@@ -4935,11 +4912,6 @@ IN OUT gctUINT *NumTempRegNeeded
     gctUINT    offset;
     gctUINT regAllocated;
     gctUINT16   dieTmp = ParentName->die;
-    gctINT16 preVarIndex = -1;
-    gctINT16 mainIdx = -1;
-    gctINT16 thisVarIndex = 0;
-    gctINT16 structEleParent = -1;
-    gctINT16 arrayElePrevSibling = -1;
 
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
@@ -4961,9 +4933,6 @@ IN OUT gctUINT *NumTempRegNeeded
         gctSIZE_T maxFieldLength = 1;
         gctSTRING symbol;
         clsARRAY arrayRef;
-        gcVARIABLE   variable = gcvNULL;
-        gctINT regOfFirststructEle = -1;
-        gctINT  regOfFirstArrayEle = -1;
 
         gctUINT16   die = VSC_DI_INVALIDE_DIE;
 
@@ -5001,85 +4970,12 @@ IN OUT gctUINT *NumTempRegNeeded
                           (gctPOINTER *) &symbol);
         if (gcmIS_ERROR(status)) return status;
 
-        status = clNewStructIntermediateElementSymbol(Compiler,
-                               Symbol,
-                               _ConvElementDataTypeForRegAlloc(Compiler, Name),
-                               1,
-                               &Decl->array,
-                               clmDECL_IsArray(Decl),
-                               regOfFirststructEle,
-                               gcSHADER_VAR_CATEGORY_STRUCT,
-                               0,
-                               Parent,
-                               PrevSibling,
-                               &mainIdx);
-        if (gcmIS_ERROR(status)) return status;
-
-        structEleParent = mainIdx;
-        if(ThisVarIndex != gcvNULL)
-            *ThisVarIndex = mainIdx;
-
-        regOfFirstArrayEle = -1;
         for (i = 0; i < count; i++) {
             gcmASSERT(Name->decl.dataType->u.fieldSpace);
 
             curStart = *Start;
             newStart = *Start;
             regAllocated = 0;
-
-
-            if (count > 1)
-            {
-                int j;
-
-                offset = 0;
-                gcmVERIFY_OK(gcoOS_PrintStrSafe(symbol,
-                                len,
-                                &offset,
-                                "%s[%d]",
-                                Symbol,
-                                arrayRef.length[0]));
-                for(j = 1; j < Decl->array.numDim; j++)
-                {
-                    gcmVERIFY_OK(gcoOS_PrintStrSafe(symbol,
-                                    len,
-                                    &offset,
-                                    "[%d]",
-                                    arrayRef.length[i]));
-                }
-
-                /*status = _NewStructIntermediateElementSymbol(Compiler,
-                                                             Name,
-                                                             symbol,
-                                                             gcSHADER_FLOAT_X1, /* It is dummy for struct
-                                                             0,
-                                                             gcvNULL,
-                                                             (gctREG_INDEX)-1, /* Will resolve it when trasersing back
-                                                             gcSHADER_VAR_CATEGORY_STRUCT,
-                                                             structEleCount,
-                                                             mainIdx,
-                                                             arrayElePrevSibling,
-                                                             &arrayElePrevSibling);*/
-
-                status = clNewStructIntermediateElementSymbol(Compiler,
-                               Symbol,
-                               _ConvElementDataTypeForRegAlloc(Compiler, Name),
-                               1,
-                               gcvNULL,
-                               0,
-                               regOfFirststructEle,
-                               gcSHADER_VAR_CATEGORY_STRUCT,
-                               0,
-                               mainIdx,
-                               arrayElePrevSibling,
-                               &arrayElePrevSibling);
-                if (gcmIS_ERROR(status)) return status;
-
-                structEleParent = arrayElePrevSibling;
-            }
-
-            preVarIndex = -1;
-            regOfFirststructEle = -1;
             FOR_EACH_DLINK_NODE(&Decl->dataType->u.fieldSpace->names, clsNAME, fieldName) {
                 gcmASSERT(fieldName->decl.dataType);
                 fieldLength = gcoOS_StrLen(fieldName->symbol, gcvNULL);
@@ -5132,38 +5028,10 @@ IN OUT gctUINT *NumTempRegNeeded
                                symbol,
                                &fieldName->decl,
                                gcvTRUE,
-                               structEleParent,
-                               preVarIndex,
-                               &thisVarIndex,
                                LogicalRegs,
                                Start,
                                Available,
                                NumTempRegNeeded);
-                preVarIndex = thisVarIndex;
-
-                if(regOfFirststructEle == -1)
-                {
-                    gcSHADER binary;
-                    gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
-                    regOfFirststructEle = LogicalRegs->regIndex;
-                    status = gcSHADER_UpdateVariable(binary,
-                                                     structEleParent,
-                                                     gcvVARIABLE_UPDATE_TEMPREG,
-                                                     (gctUINT)regOfFirststructEle);
-                    if (gcmIS_ERROR(status)) return status;
-                }
-                if(regOfFirstArrayEle == -1 && count > 1)
-                {
-                    gcSHADER binary;
-                    gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
-                    regOfFirstArrayEle = LogicalRegs->regIndex;
-                    status = gcSHADER_UpdateVariable(binary,
-                                                     mainIdx,
-                                                     gcvVARIABLE_UPDATE_TEMPREG,
-                                                     (gctUINT)regOfFirstArrayEle);
-                    if (gcmIS_ERROR(status)) return status;
-                }
-
                 if (gcmIS_ERROR(status)) return status;
                 if(Decl->dataType->elementType == clvTYPE_UNION) {
                    if(*Start > newStart) newStart = *Start;
@@ -5209,9 +5077,6 @@ IN OUT gctUINT *NumTempRegNeeded
                         ParentName,
                         Symbol,
                         Decl,
-                        Parent,
-                        PrevSibling,
-                        ThisVarIndex,
                         LogicalRegs,
                         Start,
                         Available,
@@ -5271,7 +5136,6 @@ IN clsNAME * Name
     gctUINT    start = 0;
     gctBOOL    addDieFlag = gcvFALSE;
     gctUINT    numTempRegNeeded = 0;
-    gctINT16   tempVarIndex = 0;
 
     /*gcmHEADER_ARG("Compiler=0x%x CodeGenerator=0x%x Name=0x%x",
               Compiler, CodeGenerator, Name);*/
@@ -5319,9 +5183,6 @@ IN clsNAME * Name
                                    Name->symbol,
                                    &Name->decl,
                                    addDieFlag,
-                                   -1,
-                                   -1,
-                                   &tempVarIndex,
                                    logicalRegs,
                                    &start,
                                    gcvNULL,
