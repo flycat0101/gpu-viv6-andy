@@ -89,6 +89,15 @@ static gctFLOAT _SincFilter(
     return result;
 }
 
+gctBOOL _IsDEC400EXAvaiable(gcoHARDWARE Hardware,gce2D_TILE_STATUS_CONFIG tsConfig)
+{
+    if(Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION] &&
+        (tsConfig & gcv2D_TSC_DEC_COMPRESSED))
+        return gcvTRUE;
+    else
+        return gcvFALSE;
+}
+
 /*******************************************************************************
 **
 **  _CalculateSyncTable
@@ -595,7 +604,7 @@ static gceSTATUS _CheckOPFBlock(
         res = gcvTRUE;
     }
     else if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
-        Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
+        _IsDEC400EXAvaiable(Hardware, DstSurface->tileStatusConfig))
     {
         res = gcvTRUE;
     }
@@ -687,7 +696,7 @@ static gceSTATUS _SetOPFBlockSize(
     do
     {
         if ((!Hardware->features[gcvFEATURE_DEC400_COMPRESSION] &&
-            !Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION]) ||
+            !_IsDEC400EXAvaiable(Hardware, DstSurface->tileStatusConfig)) ||
             DstSurface->tiling == gcvLINEAR)
         {
             gcmONERROR(gcoHARDWARE_ConvertFormat(SrcSurface->format, &srcBPP, gcvNULL));
