@@ -1564,7 +1564,9 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
         {
             if(inst_dest_enable & (1 << channel))
             {
-                if((VIR_Swizzle)channel != VIR_Swizzle_GetChannel(inst_src0_swizzle, channel))
+                if((VIR_Swizzle)channel != VIR_Swizzle_GetChannel(inst_src0_swizzle, channel) &&
+                   (!VIR_OPCODE_isComponentwise(opcode) ||
+                    VIR_Enable_Channel_Count(inst_dest_enable) != VIR_Enable_Channel_Count(def_inst_enable)))
                 {
                     invalid_case = gcvTRUE;
                     break;
@@ -1581,7 +1583,7 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
                 opcode != VIR_OP_CMADCJ &&
                 opcode != VIR_OP_CMULCJ &&
                 opcode != VIR_OP_CADDCJ &&
-                opcode != VIR_OP_CSUBCJ )
+                opcode != VIR_OP_CSUBCJ)
             {
                 if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
                               VSC_OPTN_CPPOptions_TRACE_BACKWARD_OPT))
@@ -1625,14 +1627,16 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
         }
 
         /* inst_enable should cover def_dest_enable */
-        if (!VIR_Enable_Covers(inst_dest_enable, def_inst_enable) &&
+        if ((!VIR_Enable_Covers(inst_dest_enable, def_inst_enable)) &&
             opcode != VIR_OP_CMAD   &&
             opcode != VIR_OP_CMUL   &&
             opcode != VIR_OP_CADD   &&
             opcode != VIR_OP_CMADCJ &&
             opcode != VIR_OP_CMULCJ &&
             opcode != VIR_OP_CADDCJ &&
-            opcode != VIR_OP_CSUBCJ )
+            opcode != VIR_OP_CSUBCJ &&
+            !(VIR_OPCODE_isComponentwise(opcode) &&
+              (VIR_Enable_Channel_Count(inst_dest_enable) == VIR_Enable_Channel_Count(def_inst_enable))))
         {
             if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
                               VSC_OPTN_CPPOptions_TRACE_BACKWARD_OPT))
@@ -1884,8 +1888,9 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
             VIR_Inst_GetOpcode(def_inst) != VIR_OP_CMADCJ &&
             VIR_Inst_GetOpcode(def_inst) != VIR_OP_CMULCJ &&
             VIR_Inst_GetOpcode(def_inst) != VIR_OP_CADDCJ &&
-            VIR_Inst_GetOpcode(def_inst) != VIR_OP_CSUBCJ
-            )
+            VIR_Inst_GetOpcode(def_inst) != VIR_OP_CSUBCJ &&
+            !(VIR_OPCODE_isComponentwise(VIR_Inst_GetOpcode(def_inst)) &&
+              (VIR_Enable_Channel_Count(inst_dest_enable) == VIR_Enable_Channel_Count(def_inst_enable))))
         {
             if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
                               VSC_OPTN_CPPOptions_TRACE_BACKWARD_OPT))
@@ -1990,6 +1995,13 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
                     VIR_Operand_GetEnable(inst_dest) == VIR_ENABLE_ZW)
                 {
                     def_inst_enable = VIR_ENABLE_ZW;
+                }
+                else if (def_inst_enable != inst_dest_enable &&
+                         (VIR_Enable_Channel_Count(inst_dest_enable) == VIR_Enable_Channel_Count(def_inst_enable)))
+                {
+                    /*keep original MOV dest enable mask */
+                    gcmASSERT(VIR_OPCODE_isComponentwise(VIR_Inst_GetOpcode(def_inst)));
+                    def_inst_enable = inst_dest_enable;
                 }
 
                 /* keep the def_inst_dest's type:
