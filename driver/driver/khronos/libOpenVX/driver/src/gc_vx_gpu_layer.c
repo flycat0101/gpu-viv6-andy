@@ -3386,6 +3386,10 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
                         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_4X", borderMode);
                     else
                         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_sym_per_channel_4X", borderMode);
+                    if (!shaderExecutable) goto OnError;
+
+                    status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 8, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+                    if (status != VX_SUCCESS) goto OnError;
                 }
                 else
                 {
