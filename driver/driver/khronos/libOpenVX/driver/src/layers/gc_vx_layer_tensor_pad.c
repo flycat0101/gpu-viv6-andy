@@ -1091,6 +1091,11 @@ VX_PRIVATE_API vx_bool vxoNNTensorPad2_SH_EVIS_Support(vx_node node, const vx_re
         shader_flag = vx_true_e;
         whc_flag = vx_true_e;
     }
+    else if(pad_mode == VX_PAD_MIRROR_SYMMETRIC
+        || pad_mode == VX_PAD_MIRROR_REFLECT)
+    {
+        shader_flag = vx_true_e;
+    }
 
     support = support && shader_flag && dataFormatFlag;
 
@@ -1198,7 +1203,25 @@ VX_PRIVATE_API vx_status vxoNNTensorPad2_SH_EVIS_Initialize(vxnne_layer ops_laye
     }
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
-    if(pad_flag)
+    if(pad_mode == VX_PAD_MIRROR_SYMMETRIC)
+    {
+        shaderExecutable = vxnneGetTensorPadSymShaderExecutable(ops_layer->node->base.context,
+            VXNNE_KERNEL_TENSOR_PAD,
+            &ops_layer->node->kernelAttributes.borderMode,
+            src,
+            dst,
+            pad_base);
+    }
+    else if(pad_mode == VX_PAD_MIRROR_REFLECT)
+    {
+        shaderExecutable = vxnneGetTensorPadRefShaderExecutable(ops_layer->node->base.context,
+            VXNNE_KERNEL_TENSOR_PAD,
+            &ops_layer->node->kernelAttributes.borderMode,
+            src,
+            dst,
+            pad_base);
+    }
+    else if(pad_flag)
     {
         vx_scalar padLeft = vxCreateScalar(ops_layer->node->base.context, VX_TYPE_FLOAT32, &pad_base[0]);
         vx_scalar padRight = vxCreateScalar(ops_layer->node->base.context, VX_TYPE_FLOAT32, &pad_base[1]);
