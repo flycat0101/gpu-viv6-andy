@@ -1369,6 +1369,7 @@ _AllocateLinearMemory(
     gceVIDMEM_TYPE type = (Interface->u.AllocateLinearVideoMemory.type & 0xFF);
     gctUINT32 flag = Interface->u.AllocateLinearVideoMemory.flag;
     gctUINT64 mappingInOne  = 1;
+    gctBOOL isContiguous;
 
     gcmkHEADER_ARG("Kernel=%p pool=%d bytes=%lu alignment=%lu type=%d",
                    Kernel, pool, bytes, alignment, type);
@@ -1426,6 +1427,32 @@ _AllocateLinearMemory(
                                    gcmINT2PTR(handle),
                                    gcvNULL,
                                    bytes));
+
+    gcmkONERROR(gckVIDMEM_NODE_IsContiguous(Kernel, nodeObject, &isContiguous));
+
+    if (isContiguous)
+    {
+        /* Record in process db. */
+        gcmkONERROR(
+                gckKERNEL_AddProcessDB(Kernel,
+                                       ProcessID,
+                                       gcvDB_CONTIGUOUS,
+                                       gcmINT2PTR(handle),
+                                       gcvNULL,
+                                       bytes));
+    }
+
+    if (type & gcvVIDMEM_TYPE_COMMAND)
+    {
+        /* Record in process db. */
+        gcmkONERROR(
+                gckKERNEL_AddProcessDB(Kernel,
+                                       ProcessID,
+                                       gcvDB_COMMAND_BUFFER,
+                                       gcmINT2PTR(handle),
+                                       gcvNULL,
+                                       bytes));
+    }
 
     /* Return status. */
     gcmkFOOTER_ARG("pool=%d node=0x%x", pool, handle);
@@ -1496,6 +1523,16 @@ _ReleaseVideoMemory(
             ProcessID,
             type,
             gcmINT2PTR(Handle)));
+
+    gckKERNEL_RemoveProcessDB(Kernel,
+        ProcessID,
+        gcvDB_CONTIGUOUS,
+        gcmINT2PTR(Handle));
+
+    gckKERNEL_RemoveProcessDB(Kernel,
+        ProcessID,
+        gcvDB_COMMAND_BUFFER,
+        gcmINT2PTR(Handle));
 
     gckVIDMEM_HANDLE_Dereference(Kernel, ProcessID, Handle);
 
@@ -2117,6 +2154,14 @@ gckKERNEL_QueryDatabase(
                                  !Interface->u.Database.validProcessID,
                                  gcvDB_NON_PAGED,
                                  &Interface->u.Database.nonPaged));
+
+    /* Query contiguous memory. */
+    gcmkONERROR(
+        gckKERNEL_QueryProcessDB(Kernel,
+                                 Interface->u.Database.processID,
+                                 !Interface->u.Database.validProcessID,
+                                 gcvDB_CONTIGUOUS,
+                                 &Interface->u.Database.contiguous));
 
     /* Query GPU idle time. */
     gcmkONERROR(
