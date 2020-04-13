@@ -122,6 +122,7 @@ GLint __glElementsPerGroup(GLenum format, GLenum type)
     case GL_BLUE_INTEGER_EXT:
     case GL_ALPHA_INTEGER_EXT:
     case GL_LUMINANCE_INTEGER_EXT:
+    case GL_COLOR_INDEX:
         return (1);
 
     case GL_RG:

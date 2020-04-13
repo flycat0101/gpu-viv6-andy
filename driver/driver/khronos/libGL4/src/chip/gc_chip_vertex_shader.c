@@ -2005,7 +2005,7 @@ static gceSTATUS assign_vPosition(
         gcSHADER_FLOAT_X4,
         1,
         TempRegister,
-        gcSHADER_PRECISION_DEFAULT
+        gcSHADER_PRECISION_HIGH
         );
     gcmFOOTER();
     return status;
@@ -2025,7 +2025,7 @@ static gceSTATUS assign_vEyePosition(
         gcSHADER_FLOAT_X1,
         1,
         TempRegister,
-        gcSHADER_PRECISION_DEFAULT
+        gcSHADER_PRECISION_HIGH
         );
     gcmFOOTER();
     return status;
@@ -2056,7 +2056,7 @@ static gceSTATUS assign_vColor(
         ShaderControl->i->shader,
         vName[OutputIndex],
         gcSHADER_FLOAT_X4,
-        gcSHADER_PRECISION_DEFAULT,
+        gcSHADER_PRECISION_HIGH,
         gcvFALSE,
         1,
         ShaderControl->vColor[OutputIndex],
@@ -2096,7 +2096,7 @@ static gceSTATUS assign_vColor2(
         ShaderControl->i->shader,
         vName[OutputIndex],
         gcSHADER_FLOAT_X4,
-        gcSHADER_PRECISION_DEFAULT,
+        gcSHADER_PRECISION_HIGH,
         gcvFALSE,
         1,
         ShaderControl->vColor2[OutputIndex],
@@ -2138,7 +2138,7 @@ static gceSTATUS assign_vTexCoord(
         chipCtx->texture.sampler[Sampler].coordType,
         1,
         ShaderControl->vTexCoord[Sampler],
-        gcSHADER_PRECISION_DEFAULT
+        gcSHADER_PRECISION_HIGH
         );
     gcmFOOTER();
     return status;
@@ -2168,7 +2168,7 @@ static gceSTATUS assign_vClipPlane(
         gcSHADER_FLOAT_X1,
         1,
         ShaderControl->vClipPlane[ClipPlane],
-        gcSHADER_PRECISION_DEFAULT
+        gcSHADER_PRECISION_HIGH
         );
     gcmFOOTER();
     return status;
@@ -2189,7 +2189,7 @@ static gceSTATUS assign_vPointSize(
         gcSHADER_FLOAT_X1,
         1,
         TempRegister,
-        gcSHADER_PRECISION_DEFAULT
+        gcSHADER_PRECISION_HIGH
         );
     gcmFOOTER();
     return status;
@@ -2210,7 +2210,7 @@ static gceSTATUS assign_vPointFade(
         gcSHADER_FLOAT_X1,
         1,
         TempRegister,
-        gcSHADER_PRECISION_DEFAULT
+        gcSHADER_PRECISION_HIGH
         );
     gcmFOOTER();
     return status;
@@ -2231,7 +2231,7 @@ static gceSTATUS assign_vPointSmooth(
         gcSHADER_FLOAT_X3,
         1,
         TempRegister,
-        gcSHADER_PRECISION_DEFAULT
+        gcSHADER_PRECISION_HIGH
         );
 
     gcmFOOTER();
