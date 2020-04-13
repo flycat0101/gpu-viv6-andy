@@ -2913,7 +2913,7 @@ _FillInFeatureTable(
     /* AIGPU */
     Features[gcvFEATURE_AI_GPU] = database->AI_GPU;
 
-#ifdef GC_MINOR_FEATURES6_DISABLE_VIP_AVAILABLE
+#ifdef GC_MINOR_FEATURES6_DISABLE_VIP
     if (Features[gcvFEATURE_AI_GPU])
     {
         Hardware->config->disableVIP = ((((gctUINT32) (Hardware->config->chipMinorFeatures6)) >> (0 ?
