@@ -496,14 +496,16 @@ vx_bool calcFitZdp3N(vx_context context,vx_uint32 inputX, vx_uint32 inputY, vx_u
 
     if ((sliceSize % 64) == 0)
     {
+        vx_uint32 tempX;
+        vx_uint32 tempY;
         /* do 64xN rehape */
-        vx_uint32 tempX = 64 * 1;
-        vx_uint32 tempY = sliceSize / tempX;
-        i = 1;
+        i = stride;
+        tempX = 64 * i;
+        tempY = sliceSize / tempX;
 
-        while ((tempY > maxInImageYSize) && (tempX < maxInImageXSize))
+        while ((tempY > 0) && (tempY > maxInImageYSize) && (tempX < maxInImageXSize))
         {
-            i++;
+            i = i + stride;
             tempX = 64 * i;
             if ((sliceSize % tempX) == 0)
             {
@@ -511,7 +513,7 @@ vx_bool calcFitZdp3N(vx_context context,vx_uint32 inputX, vx_uint32 inputY, vx_u
             }
         }
 
-        if ((tempX < maxInImageXSize) && (tempY < maxInImageYSize))
+        if ((tempX > 0) && (tempX < maxInImageXSize) && (tempY > 0) && (tempY < maxInImageYSize))
         {
             *fitN = tempY;
             return vx_true_e;
@@ -524,13 +526,15 @@ vx_bool calcFitZdp3N(vx_context context,vx_uint32 inputX, vx_uint32 inputY, vx_u
     if ((sliceSize % 16) == 0)
     {
         /* do 16xN rehape */
-        vx_uint32 tempX = 16 * 1;
-        vx_uint32 tempY = sliceSize / tempX;
-        i = 1;
+        vx_uint32 tempX;
+        vx_uint32 tempY;
+        i = stride;
+        tempX = 16 * i;
+        tempY = sliceSize / tempX;
 
         while ((tempY > maxInImageYSize) && (tempX < maxInImageXSize))
         {
-            i++;
+            i = i + stride;
             tempX = 16 * i;
             if ((sliceSize % tempX) == 0)
             {
