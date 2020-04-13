@@ -26,9 +26,9 @@ include $(AQROOT)/makefile.linux.def
 ifeq ($(gcdSTATIC_LINK),1)
   TARGET_MODULE     := $(OBJ_DIR)/libGLESv2.a
 else
-  TARGET_MODULE     := $(OBJ_DIR)/libGLESv2.so
-  TARGET_SONAME     := libGLESv2.so
-  TARGET_LINKS      :=
+  TARGET_MODULE     := $(OBJ_DIR)/libGLESv2.so.2.0.0
+  TARGET_SONAME     := libGLESv2.so.2
+  TARGET_LINKS      := libGLESv2.so.2 libGLESv2.so
 endif
 
 ################################################################################

@@ -22,6 +22,7 @@
 
 #include "gralloc_vivante.h"
 #include "gralloc_util.h"
+#include <gralloc_handle.h>
 
 /* required by trace functions. */
 uint32_t __gralloc_traceEnabled;
@@ -213,6 +214,34 @@ static int gralloc_lock_ycbcr(struct gralloc_module_t const* module,
     return 0;
 }
 
+static int gralloc_validate_buffer_size(struct gralloc_module_t const* module,
+                buffer_handle_t handle, uint32_t w, uint32_t h, int32_t format,
+                int usage,uint32_t stride)
+{
+    int err;
+    struct vivante_module_t *mod = (struct vivante_module_t *)module;
+
+    gralloc_trace_init();
+    gralloc_trace(0, "module=%p handle=%p w=%d h=%d format=%d usage=0x%x",
+            module, handle,w, h, format, usage);
+
+    buffer_handle_t v_handle;
+    v_handle = gralloc_handle_create(w, h, format, usage);
+    if (!v_handle) {
+        gralloc_trace_error(1, "out of memory");
+        return -ENOMEM;
+    }
+
+    uint32_t v_size;
+    err = gralloc_vivante_validate_buffer_size(v_handle,&v_size,NULL,NULL,NULL);
+    if (err) {
+        gralloc_trace_error(1, "err=%d", err);
+        return err;
+    }
+
+    return v_size != (uint32_t)gralloc_handle_size(handle);
+}
+
 static int gralloc_close_gpu0(struct hw_device_t *dev)
 {
     struct vivante_module_t *mod = (struct vivante_module_t *)dev->module;
@@ -301,13 +330,17 @@ static struct hw_module_methods_t gralloc_methods = {
     .open = gralloc_open
 };
 
+#ifndef GRALLOC_VIV_HARDWARE_MODULE_ID
+#  define GRALLOC_VIV_HARDWARE_MODULE_ID "gralloc_viv"
+#endif
+
 struct vivante_module_t HAL_MODULE_INFO_SYM = {
     .base = {
         .common = {
             .tag = HARDWARE_MODULE_TAG,
             .version_major = 1,
             .version_minor = 0,
-            .id = GRALLOC_HARDWARE_MODULE_ID,
+            .id = GRALLOC_VIV_HARDWARE_MODULE_ID,
             .name = "Vivante DRM Memory Allocator",
             .author = "Zongzong Yan",
             .methods = &gralloc_methods
@@ -318,6 +351,9 @@ struct vivante_module_t HAL_MODULE_INFO_SYM = {
         .unlock = gralloc_unlock,
         .perform = gralloc_perform,
         .lock_ycbcr = gralloc_lock_ycbcr,
+#if ANDROID_SDK_VERSION >= 29
+        .validateBufferSize = gralloc_validate_buffer_size,
+#endif
     },
     .mutex = PTHREAD_MUTEX_INITIALIZER,
     .viv_gr = NULL,

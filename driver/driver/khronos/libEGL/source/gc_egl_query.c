@@ -11,6 +11,10 @@
 *****************************************************************************/
 
 
+#ifndef _GNU_SOURCE
+#  define _GNU_SOURCE
+#endif
+
 #include "gc_egl_precomp.h"
 
 /* Zone used for header/footer. */

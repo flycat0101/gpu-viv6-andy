@@ -724,6 +724,7 @@ typedef enum _gceSURF_TYPE
     gcvSURF_TFBHEADER,
     gcvSURF_NUM_TYPES, /* Make sure this is the last one! */
 
+    gcvSURF_CMA_LIMIT               = 0x80000000,
     /* Combinations. */
     gcvSURF_NO_TILE_STATUS          = 0x100,
     gcvSURF_NO_VIDMEM               = 0x200, /* Used to allocate surfaces with no underlying vidmem node.

@@ -600,8 +600,6 @@ hwcInitDisplays(
 
         dpy->device.framebuffer = dev;
 
-        ALOGW("TODO (Soc-vendor): HWC integration: display!");
-
         ALOGI("Default primary display\n"
               "xres         = %d px\n"
               "yres         = %d px\n"
@@ -615,6 +613,81 @@ hwcInitDisplays(
                dpy->device.fps);
 
         Context->displays[0] = dpy;
+    }
+    while (0);
+
+    /* External display. */
+    do
+    {
+        static const char * externalDpy = "/dev/graphics/fb2";
+
+        int fd = open(externalDpy, O_RDWR);
+
+        if (fd < 0)
+        {
+            ALOGE("open %s failed", externalDpy);
+            break;
+        }
+
+        struct fb_var_screeninfo info;
+
+        if (ioctl(fd, FBIOGET_VSCREENINFO, &info) == -1)
+        {
+            ALOGE("FBIOGET_VSCREENINFO ioctl failed: %s", strerror(errno));
+            close(fd);
+            break;
+        }
+
+        int refreshRate = 1000000000000LLU /
+            (
+             uint64_t( info.upper_margin + info.lower_margin + info.yres + info.vsync_len)
+             * ( info.left_margin  + info.right_margin + info.xres + info.hsync_len)
+             * info.pixclock
+            );
+
+        if (refreshRate == 0)
+        {
+            ALOGW("invalid refresh rate, assuming 60 Hz");
+            refreshRate = 60;
+        }
+
+        hwcDisplay * dpy = (hwcDisplay *) malloc(sizeof (hwcDisplay));
+        memset(dpy, 0, sizeof (hwcDisplay));
+
+        dpy->disp = 1;
+
+        dpy->device.name      = externalDpy;
+        dpy->device.fd        = fd;
+
+        dpy->device.connected = 1;
+        dpy->device.actived   = 1;
+
+        if (int(info.width) <= 0 || int(info.height) <= 0) {
+            // the driver doesn't return that information
+            // default to 160 dpi
+            info.width  = ((info.xres * 25.4f)/160.0f + 0.5f);
+            info.height = ((info.yres * 25.4f)/160.0f + 0.5f);
+        }
+
+        dpy->device.xres      = info.xres;
+        dpy->device.yres      = info.yres;
+        dpy->device.xdpi      = 1000 * (info.xres * 25.4f) / info.width;
+        dpy->device.ydpi      = 1000 * (info.yres * 25.4f) / info.height;
+        dpy->device.fps       = refreshRate;
+
+        ALOGI("External display\n"
+              "xres         = %d px\n"
+              "yres         = %d px\n"
+              "xdpi         = %.1f dpi\n"
+              "ydpi         = %.1f dpi\n"
+              "refresh rate = %.1f Hz\n",
+               dpy->device.xres,
+               dpy->device.yres,
+               dpy->device.xdpi / 1000.0f,
+               dpy->device.ydpi / 1000.0f,
+               dpy->device.fps);
+
+        Context->displays[1] = dpy;
     }
     while (0);
 
@@ -644,9 +717,6 @@ hwcFinishDisplays(
 
         if (dpy == NULL) continue;
 
-        /*
-         * TODO (Soc-vendor): Close display.
-         */
         if (dpy->device.framebuffer)
         {
             framebuffer_close(dpy->device.framebuffer);
@@ -746,6 +816,8 @@ hwcDisplayFrame(
     /* cursor. */
     hwcCursorFrame(Context, Display, HwDisplay);
 
+#if 0
+    /* Already done in fsl hwcomposer wrapper. */
     /*
      * Replace on-screen for physical displays for fbdev device.
      */
@@ -762,6 +834,7 @@ hwcDisplayFrame(
             dev->post(dev, fbTarget->handle);
         }
     }
+#endif
 
     /*
      * TODO (Soc-vendor): If DC (Overlay, Cursor, etc) is used for composition, please

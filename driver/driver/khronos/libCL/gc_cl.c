@@ -162,6 +162,9 @@ const char * clgVersion = "\n\0$VERSION$"
                            gcmTXT2STR(gcvVERSION_MINOR) "."
                            gcmTXT2STR(gcvVERSION_PATCH) ":"
                            gcmTXT2STR(gcvVERSION_BUILD)
+#ifdef GIT_STRING
+                           ":"gcmTXT2STR(GIT_STRING)
+#endif
                            "$\n";
 
 /******************************************************************************\

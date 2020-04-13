@@ -2203,6 +2203,15 @@ gcSHADER_Construct(
 
     /* halti extras */
 
+#if defined(ANDROID)
+    shader->bCutUniformLimit   = gcvFALSE;
+
+    if (gcoOS_DetectProcessByName("com.trendy.ddapp"))
+    {
+        shader->bCutUniformLimit = gcvTRUE;
+    }
+#endif
+
     /* transform feedback supporting field members */
     shader->transformFeedback.bufferMode      = gcvFEEDBACK_INTERLEAVED;
     shader->transformFeedback.shaderTempCount = -1;
@@ -18271,6 +18280,28 @@ gcSHADER_AddUniformEx(
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Shader, gcvOBJ_SHADER);
+
+#if defined(ANDROID)
+    if(Shader->bCutUniformLimit)
+    {
+        if (Shader->type == gcSHADER_TYPE_VERTEX)
+        {
+            if (Type == gcSHADER_FLOAT_4X4)
+            {
+                if (Length > 20)
+                {
+                    Length = 20;
+                }
+            }
+            else if (Length > 140) Length = 140;
+        }
+        else
+        {
+            if (Length > 44) Length = 44;
+        }
+    }
+#endif
+
 
     /* Check array count. */
     if (Shader->uniformArraySize <= Shader->uniformCount)

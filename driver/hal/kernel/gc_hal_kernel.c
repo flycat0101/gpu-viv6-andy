@@ -2505,6 +2505,9 @@ _Commit(
             command  = kernel->command;
             eventObj = kernel->eventObj;
         }
+        gcmkONERROR(gckOS_Broadcast(kernel->os,
+                                    kernel->hardware,
+                                    gcvBROADCAST_GPU_COMMIT));
 
         {
             /* Commit command buffers. */

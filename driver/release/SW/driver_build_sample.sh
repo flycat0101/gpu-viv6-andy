@@ -6,9 +6,8 @@ set -e
 # establish build environment and build options value
 # Please modify the following items according your build environment
 
-ARCH=arm
-if [ ! -z $1 ]; then
-    ARCH=$1
+if [ -z $ARCH ]; then
+ARCH=arm-yocto
 fi
 
 export AQROOT=`pwd`
@@ -300,9 +299,9 @@ esac;
 #                                      gcdENABLE_BANK_ALIGNMENT is enabled.
 #
 #    DIRECTFB_MAJOR_VERSION     1
-#    DIRECTFB_MINOR_VERSION     4
-#    DIRECTFB_MICRO_VERSION     0      DirectFB version supported by GFX driver.
-#                                      Currentlly we support DirectFB-1.4.0.
+#    DIRECTFB_MINOR_VERSION     7
+#    DIRECTFB_MICRO_VERSION     4      DirectFB version supported by GFX driver.
+#                                     Currentlly we support DirectFB-1.7.4.
 #
 #   USE_POWER_MANAGEMENT        1      Enable GPU power managment code;                  1
 #                               0      Disable GPU power management code; Should set
@@ -356,12 +355,12 @@ fi
 
 BUILD_OPTION_CONFIG_DOVEXC5_BOARD=0
 BUILD_OPTION_FPGA_BUILD=0
-BUILD_OPTION_VIVANTE_ENABLE_VG=0
+BUILD_OPTION_VIVANTE_ENABLE_VG=1
 BUILD_OPTION_VIVANTE_ENABLE_3D=1
 BUILD_OPTION_VIVANTE_ENABLE_2D=1
 BUILD_OPTION_DIRECTFB_MAJOR_VERSION=1
-BUILD_OPTION_DIRECTFB_MINOR_VERSION=4
-BUILD_OPTION_DIRECTFB_MICRO_VERSION=0
+BUILD_OPTION_DIRECTFB_MINOR_VERSION=7
+BUILD_OPTION_DIRECTFB_MICRO_VERSION=4
 
 BUILD_OPTIONS="NO_DMA_COHERENT=$BUILD_OPTION_NO_DMA_COHERENT"
 BUILD_OPTIONS="$BUILD_OPTIONS USE_VDK=$BUILD_OPTION_USE_VDK"
@@ -393,16 +392,27 @@ BUILD_OPTIONS="$BUILD_OPTIONS DIRECTFB_MAJOR_VERSION=$BUILD_OPTION_DIRECTFB_MAJO
 BUILD_OPTIONS="$BUILD_OPTIONS DIRECTFB_MINOR_VERSION=$BUILD_OPTION_DIRECTFB_MINOR_VERSION"
 BUILD_OPTIONS="$BUILD_OPTIONS DIRECTFB_MICRO_VERSION=$BUILD_OPTION_DIRECTFB_MICRO_VERSION"
 BUILD_OPTIONS="$BUILD_OPTIONS YOCTO_DRI_BUILD=$BUILD_YOCTO_DRI_BUILD"
+BUILD_OPTIONS="$BUILD_OPTIONS -j4"
 
-export PATH=$TOOLCHAIN/bin:$PATH
+#export PATH=$TOOLCHAIN/bin:$PATH
+COMMITNR=`git log -n 1 --format=%h`
+if [ "x$COMMITNR" != "x" ]; then
+  DIRTY=`git diff --quiet HEAD || echo '-dirty'`
+  export CFLAGS="$CFLAGS -DGIT_STRING='$COMMITNR$DIRTY'"
+fi
 
 ########################################################
 # clean/build driver and samples
 # build results will save to $SDK_DIR/
 #
-cd $AQROOT; make -j1 -f makefile.linux $BUILD_OPTIONS clean
-cd $AQROOT; make -j1 -f makefile.linux $BUILD_OPTIONS install 2>&1 | tee $AQROOT/linux_build.log
-
+(
+set -o pipefail
+if [ "clean" == "$1" ]; then
+cd $AQROOT; make -f makefile.linux $BUILD_OPTIONS clean
+else
+cd $AQROOT; make -f makefile.linux $BUILD_OPTIONS install 2>&1 | tee $AQROOT/linux_build.log
+fi
+)
 ########################################################
 # other build/clean commands to build/clean specified items, eg.
 #

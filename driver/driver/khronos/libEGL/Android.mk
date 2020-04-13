@@ -82,6 +82,17 @@ LOCAL_C_INCLUDES += \
 endif
 
 ifeq ($(DRM_GRALLOC),1)
+
+ifeq ($(LIBDRM_IMX),1)
+LOCAL_C_INCLUDES += \
+	$(IMX_PATH)/libdrm-imx/vivante \
+	$(IMX_PATH)/libdrm-imx/include/drm \
+	$(AQROOT)/driver/android/gralloc_drm
+
+LOCAL_SHARED_LIBRARIES += \
+	libdrm_android \
+	libdrm_vivante
+else
 LOCAL_C_INCLUDES += \
 	external/libdrm/vivante \
 	external/libdrm/include/drm \
@@ -90,6 +101,7 @@ LOCAL_C_INCLUDES += \
 LOCAL_SHARED_LIBRARIES += \
 	libdrm \
 	libdrm_vivante
+endif
 
 LOCAL_CFLAGS += \
 	-DDRM_GRALLOC
@@ -103,6 +115,14 @@ LOCAL_C_INCLUDES += \
    frameworks/native/include
 endif
 
+# imx specific
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 25),1)
+  ifneq ($(findstring x7.1.1,x$(PLATFORM_VERSION)), x7.1.1)
+    LOCAL_C_INCLUDES += $(IMX_PATH)/imx/include
+    LOCAL_CFLAGS += -DFSL_YUV_EXT
+  endif
+endif
+
 ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 21),1)
   LOCAL_MODULE_RELATIVE_PATH := egl
 else
@@ -112,6 +132,9 @@ endif
 LOCAL_MODULE         := libEGL_$(GPU_VENDOR)
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 27),1)
+LOCAL_VENDOR_MODULE  := true
+endif
 include $(BUILD_SHARED_LIBRARY)
 
 include $(AQROOT)/copy_installed_module.mk

@@ -62,6 +62,10 @@
 #  include <gc_gralloc_priv.h>
 #endif
 
+#ifdef FSL_YUV_EXT
+#  include <graphics_ext.h>
+#endif
+
 typedef struct ANativeWindow *       PlatformWindowType;
 typedef struct egl_native_pixmap_t * PlatformPixmapType;
 typedef void *                       PlatformDisplayType;
@@ -599,6 +603,23 @@ _TranslateFormat(
 #if ANDROID_SDK_VERSION >= 17
         case HAL_PIXEL_FORMAT_BLOB:
             return gcvSURF_A8;
+#endif
+        /* graphics_ext. */
+#ifdef FSL_YUV_EXT
+        case HAL_PIXEL_FORMAT_YCbCr_422_P:
+            return gcvSURF_UNKNOWN;
+        case HAL_PIXEL_FORMAT_YCbCr_420_P:
+            return gcvSURF_I420;
+        case HAL_PIXEL_FORMAT_CbYCrY_422_I:
+            return gcvSURF_UYVY;
+        case HAL_PIXEL_FORMAT_YCbCr_420_SP:
+#if ANDROID_SDK_VERSION >= 27
+        case HAL_PIXEL_FORMAT_NV12_TILED:
+        case HAL_PIXEL_FORMAT_NV12_G1_TILED:
+        case HAL_PIXEL_FORMAT_NV12_G2_TILED:
+        case HAL_PIXEL_FORMAT_NV12_G2_TILED_COMPRESSED:
+#endif
+            return gcvSURF_NV12;
 #endif
         default:
             LOGE("%s: unknown android format=%x", __func__, Format);
@@ -2060,17 +2081,23 @@ _QueryRenderMode(
             break;
         }
 
-        if (info->hwFramebuffer)
+         /*
+         * XXX: currently there's no hardware feature check for imx8mscale
+         * DEC400 framebuffer compression. Use android property to get this
+         * information.
+         */
+        if (info->hwFramebuffer || patchId == gcvPATCH_ANDROID_COMPOSITOR)
         {
-            /* Nothing to do for Framebuffer. */
-            renderMode = VEGL_INDIRECT_RENDERING;
-            break;
-        }
+            gctSTRING fbTileSupport = gcvNULL;
+            if (!gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "ro.boot.fbTileSupport", &fbTileSupport)) ||
+                !fbTileSupport ||
+                !gcmIS_SUCCESS(gcoOS_StrCmp(fbTileSupport, "enable")))
+            {
+                /* Indirect rendering for Framebuffer. */
+                renderMode = VEGL_INDIRECT_RENDERING;
+                break;
+            }
 
-        if (patchId == gcvPATCH_ANDROID_COMPOSITOR)
-        {
-            renderMode = VEGL_INDIRECT_RENDERING;
-            break;
         }
 
         if ((info->consumerUsage & GRALLOC_USAGE_SW_WRITE_MASK) ||
@@ -2217,6 +2244,17 @@ _QueryRenderMode(
                 mode2D = VEGL_DIRECT_RENDERING_FC_NOCC;
             }
 
+            /* Query 2D FC: fast clear support. */
+            status = gcoHAL_IsFeatureAvailable(
+                gcvNULL,
+                gcvFEATURE_2D_FAST_CLEAR
+                );
+
+            if (status == gcvSTATUS_TRUE)
+            {
+                mode2D = VEGL_DIRECT_RENDERING_FC_NOCC;
+            }
+
             /* Query 2D FC: full tile status support. */
             status = gcoHAL_IsFeatureAvailable(
                 gcvNULL,
@@ -2296,6 +2334,19 @@ _QueryRenderMode(
             gcoHAL_SetHardwareType(gcvNULL, currentType);
         }
 
+        /*XXX: use 'direct rendering without tile status' by default for imx845s and imx7ulp. */
+        {
+            gcsHAL_CHIPIDENTITY chipIdentity;
+            gctUINT32 sizeOfParam = gcmSIZEOF(gcsHAL_CHIPIDENTITY);
+
+            gcoHAL_QueryChipIdentityEx(gcvNULL, sizeOfParam, &chipIdentity);
+
+            if (chipIdentity.platformFlagBits == gcvPLATFORM_FLAG_IMX_MM)
+            {
+                renderMode = VEGL_DIRECT_RENDERING_NOFC;
+            }
+        }
+
         /* Determine render into window mode. */
         if ((mode3D >= VEGL_DIRECT_RENDERING_NOFC) &&
             ((mode2D >= VEGL_DIRECT_RENDERING_NOFC) || (mode2D == -1)) &&
@@ -2356,6 +2407,22 @@ _QueryRenderMode(
             if (Surface->swapBehavior == EGL_BUFFER_PRESERVED)
             {
                 renderMode = 0;
+            }
+        }
+
+        /* If use DPU 2D HWC on 8qm or 8qxp, set renderMode to DIRECT_RENDERING_NOFC */
+        {
+           gctSTRING socType = gcvNULL;
+            gctSTRING useHWC = gcvNULL;
+
+            if((renderMode != VEGL_INDIRECT_RENDERING) &&
+                (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "ro.boot.soc_type", &socType)) &&
+                socType && (gcmIS_SUCCESS(gcoOS_StrCmp(socType, "imx8qm")) ||
+                (gcmIS_SUCCESS(gcoOS_StrCmp(socType, "imx8qxp"))))) &&
+                !(gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "sys.hwc.disable", &useHWC)) &&
+                useHWC && !gcmIS_SUCCESS(gcoOS_StrCmp(useHWC, "0"))))
+            {
+                renderMode = VEGL_DIRECT_RENDERING_NOFC;
             }
         }
     }

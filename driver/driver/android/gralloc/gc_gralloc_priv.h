@@ -24,10 +24,11 @@
  * TODO (Soc-vendor): Soc-vendor please determine the values. Make sure the
  * bits are not conflicted with other usage bits.
  */
-#define GRALLOC_USAGE_PRIVATE_0_VIV         0x01000000
-#define GRALLOC_USAGE_PRIVATE_1_VIV         0x02000000
-#define GRALLOC_USAGE_PRIVATE_2_VIV         0x04000000
-#define GRALLOC_USAGE_PRIVATE_3_VIV         0x08000000
+/* XXX: nxp: use gralloc private usage bits. */
+#define GRALLOC_USAGE_PRIVATE_0_VIV         0x10000000
+#define GRALLOC_USAGE_PRIVATE_1_VIV         0x20000000
+#define GRALLOC_USAGE_PRIVATE_2_VIV         0x40000000
+#define GRALLOC_USAGE_PRIVATE_3_VIV         0x80000000
 
 
 /* Buffer types combined from private gralloc usage bits. */

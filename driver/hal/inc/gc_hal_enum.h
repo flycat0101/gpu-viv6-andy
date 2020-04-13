@@ -2109,6 +2109,10 @@ enum
 /* Alloc with memory limit. */
 #define gcvALLOC_FLAG_MEMLIMIT              0x02000000
 
+/* CMA allocator only */
+#define gcvALLOC_FLAG_CMA_LIMIT             0x04000000
+
+#define gcvALLOC_FLAG_CMA_PREEMPT           0x08000000
 
 /* GL_VIV internal usage */
 #ifndef GL_MAP_BUFFER_OBJ_VIV

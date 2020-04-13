@@ -25,6 +25,7 @@
 #include <wl-viv-buffer.h>
 
 #include "gc_egl_platform.h"
+#include "gc_hal_user_precomp.h"
 
 /* Private data of struct wl_viv_buffer. */
 struct wl_viv_buffer_private
@@ -116,6 +117,31 @@ viv_handle_create_buffer(struct wl_client *client,
     /* Switch to an available hardware type. */
     priv->hwType = !gcoHAL_Is3DAvailable(gcvNULL) ? gcvHARDWARE_VG
                    : gcoHAL_QueryHybrid2D(gcvNULL) ? gcvHARDWARE_3D2D : gcvHARDWARE_3D;
+    if (gcoHAL_QuerySeparated2D(gcvNULL))
+    {
+        char *path = gcvNULL;
+        char *dir = getenv("XDG_RUNTIME_DIR");
+
+        if (dir)
+        {
+            path = (char*)malloc(strlen(dir) + 32);
+        }
+
+        if (path)
+        {
+            int ret = -1;
+
+            strcpy(path, dir);
+            strcat(path, "/use-g2d-renderer");
+            ret = access(path, F_OK);
+            if (ret)
+            {
+                priv->hwType = gcvHARDWARE_2D;
+            }
+
+            free(path);
+        }
+    }
 
     gcoHAL_SetHardwareType(gcvNULL, priv->hwType);
 
@@ -164,6 +190,20 @@ viv_handle_create_buffer(struct wl_client *client,
     buffer->surface = surface;
     buffer->width   = width;
     buffer->height  = height;
+
+    /* These fields are used by freescale 2D composition. */
+    gcmONERROR(gcoSURF_Lock(surface, buffer->physical, gcvNULL));
+    gcmONERROR(gcoSURF_Unlock(surface, gcvNULL));
+    gcmONERROR(gcoOS_GetBaseAddress(gcvNULL, &buffer->gpuBaseAddr));
+    gcmONERROR(gcoSURF_GetTiling(surface, &buffer->tiling));
+    gcmONERROR(gcoSURF_GetAlignedSize(surface, &buffer->alignedWidth, &buffer->alignedHeight, gcvNULL));
+    buffer->format = format;
+
+    if(tsNode)
+    {
+        gcmGETHARDWAREADDRESS(surface->tileStatusNode, buffer->ts_addr);
+    }
+    /* End freescale 2D composition. */
 
     buffer->fd = (gctINT32)fd;
 
@@ -225,6 +265,12 @@ enable_tile_status(struct wl_client *client,
     surface->fcValue[0] = fc_value;
     surface->fcValueUpper[0] = fc_value_upper;
     surface->compressed = compressed;
+
+    buffer->fc_enabled= enabled;
+    buffer->fcValue = fc_value;
+    buffer->fcValueUpper = fc_value_upper;
+    buffer->compressed = compressed;
+    buffer->tileStatus_enabled = enabled;
 #endif
 }
 

@@ -1,0 +1,26 @@
+if [ -z $YOCTO_BUILD ] || [ ! "$YOCTO_BUILD" = "1" ]; then
+export TOOLCHAIN=/home/software/Linux/freescale/fsl-imx-internal-xwayland/4.1.15-2.0.0/sysroots/x86_64-pokysdk-linux/usr
+export PATH=$TOOLCHAIN/bin:$TOOLCHAIN/bin/aarch64-poky-linux:$PATH
+export CROSS_COMPILE=aarch64-poky-linux-
+export KERNEL_DIR=/home/software/Linux/freescale/8DV_Beta_RC2/linux-2.6-testbuild
+else
+echo user exported YOCTO_BUILD=1
+. /home/software/Linux/freescale/fsl-imx-internal-xwayland/4.1.15-2.0.0/environment-setup-aarch64-poky-linux
+#
+# LDFLAGS exported in 'environment-setup-aarch64-poky-linux' as following will cause galcore build error
+# export LDFLAGS="-Wl,-O1 -Wl,--hash-style=gnu -Wl,--as-needed"
+# Error Message: aarch64-poky-linux-ld: unrecognized option '-Wl,-O1'
+# So skip build for galcore.ko when YOCTO_BUILD=1
+#
+#export KERNEL_DIR=/home/software/Linux/freescale/8DV_Beta_RC2/linux-2.6-testbuild
+fi
+export ROOTFS=/home/software/Linux/freescale/fsl-imx-internal-xwayland/4.1.15-2.0.0/sysroots/aarch64-poky-linux
+export ROOTFS_USR=$ROOTFS/usr
+export X11_ARM_DIR=$ROOTFS/usr
+#export DFB_DIR=/home/software/Linux/YOCTO/dfb_sp_yocto
+#export WAYLAND_DIR=/home/software/Linux/wayland
+export CFLAGS="--sysroot=$ROOTFS -D__arm64"
+export LDFLAGS="--sysroot=$ROOTFS"
+export PFLAGS="--sysroot=$ROOTFS"
+export BUILD_HARD_VFP=1
+export HAVE_G2D=1

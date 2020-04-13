@@ -217,6 +217,8 @@ struct _gckOS
 
     gcsDEBUGFS_DIR              allocatorDebugfsDir;
 
+    gctBOOL                     allocatorLimitMarker;
+
     /* Lock for register access check. */
     spinlock_t                  registerAccessLock;
 

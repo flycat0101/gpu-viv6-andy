@@ -349,23 +349,14 @@ gbm_viv_bo_get_fd(struct gbm_bo *_bo)
 static void *
 gbm_viv_bo_map_fd(struct gbm_viv_bo *bo)
 {
-   struct drm_mode_map_dumb map_arg;
-   int ret;
+   gceSTATUS status = gcvSTATUS_OK;
 
    if (bo->map != NULL)
       return bo->map;
 
-   memset(&map_arg, 0, sizeof(map_arg));
-   map_arg.handle = bo->base.handle.u32;
+   status = gcoSURF_Lock(bo->surface, gcvNULL, &bo->map);
 
-   ret = drmIoctl(bo->base.gbm->fd, DRM_IOCTL_MODE_MAP_DUMB, &map_arg);
-   if (ret)
-      return NULL;
-
-   bo->map = mmap(0, bo->size, PROT_WRITE,
-                  MAP_SHARED, bo->base.gbm->fd, map_arg.offset);
-
-   if (bo->map == MAP_FAILED)
+   if (status < 0)
    {
       bo->map = NULL;
       return NULL;
@@ -377,8 +368,50 @@ gbm_viv_bo_map_fd(struct gbm_viv_bo *bo)
 static void
 gbm_viv_bo_unmap_fd(struct gbm_viv_bo *bo)
 {
-   munmap(bo->map, bo->size);
+   if (bo->map == NULL)
+     return;
+
+   gcoSURF_Unlock(bo->surface, &bo->map);
    bo->map = NULL;
+}
+
+static uint32_t
+gbm_query_enable_overlay_view(void)
+{
+    char *path = gcvNULL;
+    char *dir = getenv("XDG_RUNTIME_DIR");
+    int ret = -1;
+
+    if (dir)
+    {
+        path = (char*)malloc(strlen(dir) + 32);
+    }
+
+    if (path)
+    {
+        strcpy(path, dir);
+        strcat(path, "/enable-overlay-view");
+        ret = access(path, F_OK);
+        free(path);
+    }
+
+    if (ret == 0)
+    {
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
+}
+
+static uint32_t
+gbm_viv_enable_import_wl_buffer(void)
+{
+     if(gbm_query_enable_overlay_view())
+        return 1;
+     else
+        return 0;
 }
 
 static struct gbm_bo *
@@ -398,7 +431,8 @@ gbm_viv_bo_import(
     gceTILING tiling = 0;
     int ret;
 
-    if (type == GBM_BO_IMPORT_EGL_IMAGE)
+    if (type == GBM_BO_IMPORT_EGL_IMAGE ||
+        (type == GBM_BO_IMPORT_WL_BUFFER && !gbm_viv_enable_import_wl_buffer()))
     {
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
@@ -454,11 +488,6 @@ gbm_viv_bo_import(
         bo->base.stride = fd_data->stride;
         bo->base.format = fd_data->format;
         bo->size = fd_data->height * fd_data->stride;
-
-        if (gbm_viv_bo_map_fd(bo) == NULL)
-        {
-            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-        }
     }
     else
     {
@@ -490,9 +519,7 @@ gbm_viv_bo_import(
     switch (tiling)
     {
     case gcvSUPERTILED:
-        bo->base.width  = gcmALIGN(bo->base.width , 64);
-        bo->base.height = gcmALIGN(bo->base.height, 64);
-        bo->modifier = DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_FC;
+        bo->modifier = DRM_FORMAT_MOD_VIVANTE_SUPER_TILED;
         break;
     default:
         bo->modifier = DRM_FORMAT_MOD_LINEAR;
@@ -736,7 +763,7 @@ gbm_viv_bo_create(
         surfType =  gcvSURF_BITMAP;
         break;
     }
-    surfType |= (gcvSURF_DMABUF_EXPORTABLE | gcvSURF_CACHE_MODE_128);
+    surfType |= (gcvSURF_DMABUF_EXPORTABLE | gcvSURF_CACHE_MODE_128 | gcvSURF_CMA_LIMIT);
 
     bo = calloc(1, sizeof *bo);
     if (bo == NULL)

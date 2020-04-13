@@ -468,7 +468,7 @@ gcoSURF_AllocateTileStatus(
     &&  !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MC_FCCACHE_BYTEMASK)) || (chipModel == gcv7000 && chipRevision == 0x6203))
     {
         bytes += 128;
-        allocFlags |= gcvALLOC_FLAG_CONTIGUOUS;
+        allocFlags |= gcvALLOC_FLAG_CMA_LIMIT;
     }
 
     if (Surface->hints & gcvSURF_PROTECTED_CONTENT)
@@ -479,6 +479,11 @@ gcoSURF_AllocateTileStatus(
     if (Surface->hints & gcvSURF_DMABUF_EXPORTABLE)
     {
         allocFlags |= gcvALLOC_FLAG_DMABUF_EXPORTABLE;
+    }
+
+    if (Surface->hints & gcvSURF_CMA_LIMIT)
+    {
+        allocFlags |= gcvALLOC_FLAG_CMA_LIMIT;
     }
 
     /* Copy filler. */
@@ -1914,6 +1919,43 @@ _AllocateSurface(
     Surface->superTiled = gcvFALSE;
 #endif
 
+    if (Format == gcvSURF_YV12 || Format == gcvSURF_I420)
+    {
+        static gctINT has3D = -1;
+
+        if (has3D < 0)
+        {
+            gcsHAL_INTERFACE iface;
+            gctINT i;
+
+            /* Query chip info */
+            iface.ignoreTLS = gcvFALSE;
+            iface.command = gcvHAL_CHIP_INFO;
+            gcmVERIFY_OK(gcoOS_DeviceControl(gcvNULL,
+                                             IOCTL_GCHAL_INTERFACE,
+                                             &iface, gcmSIZEOF(iface),
+                                             &iface, gcmSIZEOF(iface)));
+
+            has3D = 0;
+
+            for (i = 0; i < iface.u.ChipInfo.count; i++)
+            {
+                if (iface.u.ChipInfo.types[i] & gcvHARDWARE_3D)
+                {
+                    has3D = 1;
+                    break;
+                }
+            }
+        }
+
+        if (!has3D)
+        {
+            /* Align to 32 for 420P. */
+            Surface->alignedW = gcmALIGN(Width, 32);
+        }
+    }
+
+
     /* User pool? */
     if (Pool == gcvPOOL_USER)
     {
@@ -2274,6 +2316,10 @@ _AllocateSurface(
         if (Surface->hints & gcvSURF_DMABUF_EXPORTABLE)
         {
             allocFlags |= gcvALLOC_FLAG_DMABUF_EXPORTABLE;
+        }
+        if (Surface->hints & gcvSURF_CMA_LIMIT)
+        {
+            allocFlags |= gcvALLOC_FLAG_CMA_LIMIT;
         }
 
         if (Format & gcvSURF_FORMAT_OCL)
@@ -10885,6 +10931,11 @@ gcoSURF_SetSamples(
 {
     gctUINT samples;
     gceSTATUS status = gcvSTATUS_OK;
+#if gcdENABLE_3D
+    gcePATCH_ID patchId = gcvPATCH_INVALID;
+    gceCHIPMODEL chipModel;
+    gctUINT32 chipRevision;
+#endif
 
     gcmHEADER_ARG("Surface=0x%x Samples=%u", Surface, Samples);
 
@@ -10892,11 +10943,27 @@ gcoSURF_SetSamples(
     gcmVERIFY_OBJECT(Surface, gcvOBJ_SURF);
 
 
+#if gcdENABLE_3D
+    gcoHARDWARE_GetPatchID(gcvNULL, &patchId);
+    gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
+#endif
+
     /* Make sure this is not user-allocated surface. */
     if (Surface->node.pool == gcvPOOL_USER)
     {
         gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
     }
+
+#if gcdENABLE_3D
+    if ((patchId == gcvPATCH_CHROME || patchId == gcvPATCH_FIREFOX) &&
+        !(chipModel == gcv7000) &&
+        Samples == 4 &&
+        Surface->requestW >= 1024 &&
+        Surface->requestH >= 1024)
+    {
+        gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
+    }
+#endif
 
     samples = (Samples == 0) ? 1 : Samples;
 

@@ -8716,6 +8716,11 @@ gckHARDWARE_EnablePowerManagement(
     /* Verify the arguments. */
     gcmkVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
 
+    if (_IsHardwareMatch(Hardware, gcv7000, 0x6008))
+    {
+        Enable = gcvFALSE;
+    }
+
     gcmkVERIFY_OK(
         gckOS_AcquireMutex(Hardware->os, Hardware->powerMutex, gcvINFINITE));
 
@@ -8819,7 +8824,11 @@ gckHARDWARE_SetFscaleValue(
         gckOS_AcquireMutex(Hardware->os, Hardware->powerMutex, gcvINFINITE));
     acquired =  gcvTRUE;
 
+    Hardware->kernel->timeOut = Hardware->kernel->timeOut * Hardware->powerOnFscaleVal / 64;
+
     Hardware->powerOnFscaleVal = FscaleValue;
+
+    Hardware->kernel->timeOut = Hardware->kernel->timeOut * 64 / Hardware->powerOnFscaleVal;
 
     if (Hardware->chipPowerState == gcvPOWER_ON)
     {

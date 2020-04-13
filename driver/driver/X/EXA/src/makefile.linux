@@ -63,7 +63,8 @@ OBJS := vivante_gal/vivante_gal_blit.o \
 	vivante_exa/vivante_composite.o \
 	vivante_exa/vivante_pixmap.o \
 	vivante_extension/vivante_ext.o \
-	vivante_fbdev/vivante_dri.o
+	vivante_fbdev/vivante_dri.o \
+	vivante_fbdev/imx_display.o
 
 endif
 
@@ -83,7 +84,7 @@ CFLAGS += -DUSE_PROBE_VIV_FBDEV_DRIVER
 endif
 
 CFLAGS += -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast -Wno-maybe-uninitialized -Wno-unused-function -Wno-unused-variable -Wno-return-type
-CFLAGS += -DSMALL_THRESHOLD
+CFLAGS += -DSMALL_THRESHOLD -DADD_FSL_XRANDR
 CFLAGS += -fvisibility=hidden -fPIC -DPIC
 CFLAGS += -I. -I.. -I$(ROOTFS_USR)/include -I$(ROOTFS_USR)/include/xorg \
           -I$(ROOTFS_USR)/include/X11/dri -I$(ROOTFS_USR)/include/$(PIXMAN)
@@ -97,8 +98,7 @@ endif
 LDFLAGS += -L$(SDK_DIR)/drivers -lGAL -lm -ldl -Wl,-soname -Wl,vivante_drv.so
 
 ifeq ($(X11_DRI3),1)
-CFLAGS += -I$(AQROOT)/driver/X/libdrm-2.4.91/include/drm \
-          -I$(AQROOT)/driver/X/libdrm-2.4.91/vivante
+CFLAGS += -I$(ROOTFS_USR)/include/libdrm
 LDFLAGS += -ldrm -ldrm_vivante
 else
 CFLAGS += -I$(ROOTFS_USR)/include/libdrm

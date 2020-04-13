@@ -452,7 +452,7 @@ _FillIn(
             gctSTRING env;
             static gctBOOL printed = gcvFALSE;
             gcoOS_GetEnv(gcvNULL, "VIV_EGL_ALL_CONFIG", &env);
-            if (!env)
+            if (1 && !env)
             {
                 if (!printed)
                 {

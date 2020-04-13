@@ -36,6 +36,10 @@
 #include <pthread.h>
 #include <signal.h>
 
+/* FSL: external resolve. */
+#include "mxcfb.h"
+#include "ipu.h"
+
 #define gcdUSE_PIXMAP_SURFACE 1
 
 
@@ -81,6 +85,10 @@ struct _FBDisplay
 
     struct _FBDisplay *     next;
     gctBOOL                 serverSide;
+
+    /* FSL: external resolve and special PAN timing. */
+    gctBOOL                 fbPrefetch;
+    gctUINT32               bufferStatus;
 };
 
 /* Structure that defines a window. */
@@ -305,6 +313,7 @@ fbdev_GetDisplayByIndex(
         display->file     = -1;
         display->tiling   = gcvLINEAR;
         display->serverSide = gcvFALSE;
+        display->bufferStatus = 0;
 
         p = getenv("FB_MULTI_BUFFER");
         if (p == NULL)
@@ -317,6 +326,11 @@ fbdev_GetDisplayByIndex(
             if (display->multiBuffer < 1)
             {
                 display->multiBuffer = 1;
+            }
+            /* FSL: limit max buffer count. */
+            else if (display->multiBuffer > 8)
+            {
+                display->multiBuffer = 8;
             }
         }
 
@@ -362,6 +376,55 @@ fbdev_GetDisplayByIndex(
 
         /* Default aligned height, equals to y resolution. */
         display->alignedHeight = display->varInfo.yres;
+
+        /* FSL: external resolve. */
+        /* Check if prefetch feature exists. */
+        do
+        {
+            int prefetch = 0;
+            display->fbPrefetch = gcvFALSE;
+
+            p = getenv("GPU_VIV_EXT_RESOLVE");
+            if ((p != gcvNULL) && (p[0] == '0'))
+            {
+                /* Disable resolve requested. */
+                break;
+            }
+
+            /* Check if FSL fbdev external resolve (PRE) exists. */
+            if (ioctl(display->file, MXCFB_GET_PREFETCH, &prefetch) < 0)
+            {
+                break;
+            }
+
+            if (prefetch > 0)
+            {
+                /* Feature exists. */
+                display->fbPrefetch = gcvTRUE;
+                break;
+            }
+        }
+        while (0);
+
+        /* Enable aligned size if prefetch exists. */
+        if (display->fbPrefetch)
+        {
+            display->alignedHeight = (display->varInfo.yres + 0x3F) & ~0x3F;
+        }
+        else
+        {
+            display->varInfo.nonstd = 0;
+        }
+
+        p = getenv("FB_MULTI_BUFFER");
+        if (p == NULL)
+        {
+            if (display->fbPrefetch)
+            {
+                /* Set default multiBuffer to 4 if prefetch. */
+                display->multiBuffer = 4;
+            }
+        }
 
         for (i = display->multiBuffer; i >= 1; --i)
         {
@@ -470,6 +533,41 @@ fbdev_GetDisplayByIndex(
         {
             status = gcvSTATUS_NOT_SUPPORTED;
             break;
+        }
+
+        /* FSL: external resolve. */
+        if (display->fbPrefetch)
+        {
+            switch (display->varInfo.nonstd)
+            {
+            case IPU_PIX_FMT_GPU16_ST:
+            case IPU_PIX_FMT_GPU32_ST:
+                display->tiling = gcvTILED;
+                break;
+
+            case IPU_PIX_FMT_GPU16_SRT:
+            case IPU_PIX_FMT_GPU32_SRT:
+                display->tiling = gcvSUPERTILED;
+                break;
+
+            case IPU_PIX_FMT_GPU16_SB_ST:
+            case IPU_PIX_FMT_GPU32_SB_ST:
+                display->tiling = gcvMULTI_TILED;
+                break;
+
+            case IPU_PIX_FMT_GPU16_SB_SRT:
+            case IPU_PIX_FMT_GPU32_SB_SRT:
+                display->tiling = gcvMULTI_SUPERTILED;
+                break;
+
+            default:
+                display->tiling = gcvLINEAR;
+                break;
+            }
+        }
+        else
+        {
+            display->tiling = gcvLINEAR;
         }
 
         /* Get the color info. */
@@ -760,6 +858,7 @@ fbdev_GetDisplayBackbuffer(
     gceSTATUS status = gcvSTATUS_OK;
     struct _FBDisplay* display;
     struct _FBWindow* window;
+    gctINT curIndex, panIndex;
 
     gcmHEADER_ARG("Display=%p Window=%p", Display, Window);
 
@@ -787,12 +886,23 @@ fbdev_GetDisplayBackbuffer(
     *X = 0;
     *Y = display->backBufferY;
 
+    /* FSL: need wait next two PANs to ensure the buffer is not in use. */
+    curIndex = display->backBufferY / display->alignedHeight;
+    panIndex = (curIndex + 2) % display->multiBuffer;
+
     /* if swap interval is zero do not wait for the back buffer to change */
     if (window->swapInterval != 0)
     {
-        while (display->backBufferY == (volatile int) (display->varInfo.yoffset))
+        /* For multiBuffer <3, the work flow will be in the same thread */
+        /* There is no need to check the status. */
+        if (display->multiBuffer >= 3)
         {
-            pthread_cond_wait(&(display->cond), &(display->condMutex));
+            while ((display->bufferStatus & (1 << panIndex)) != 0)
+            {
+                pthread_cond_wait(&(display->cond), &(display->condMutex));
+            }
+
+            display->bufferStatus |= 1 << curIndex;
         }
     }
 
@@ -859,6 +969,20 @@ fbdev_SetDisplayVirtual(
         return status;
     }
 
+    if (display->varInfo.nonstd != 0 || display->multiBuffer > 1)
+    {
+        struct fb_var_screeninfo varInfo;
+
+        /* Restore the tile format after suspend/resume test */
+        if (ioctl(display->file, FBIOGET_VSCREENINFO, &varInfo) >= 0)
+        {
+            if (varInfo.nonstd != display->varInfo.nonstd || varInfo.yres_virtual != display->varInfo.yres_virtual)
+            {
+                ioctl(display->file, FBIOPUT_VSCREENINFO, &display->varInfo);
+            }
+        }
+    }
+
     if (display->multiBuffer > 1)
     {
         /* clamp swap interval to be safe */
@@ -887,7 +1011,25 @@ fbdev_SetDisplayVirtual(
             display->varInfo.xoffset  = X;
             display->varInfo.yoffset  = Y;
             display->varInfo.activate = FB_ACTIVATE_VBL;
+
+            /* FSL: ywrap required. */
+            if (display->varInfo.yoffset % display->varInfo.yres != 0)
+            {
+                display->varInfo.vmode |= FB_VMODE_YWRAP;
+            }
+            else
+            {
+                display->varInfo.vmode &= ~FB_VMODE_YWRAP;
+            }
+
             ioctl(display->file, FBIOPAN_DISPLAY, &display->varInfo);
+
+            {
+                /* FSL: buffer PAN'ed. */
+                gctINT index;
+                index = display->varInfo.yoffset / display->alignedHeight;
+                display->bufferStatus &= ~(1<<index);
+            }
 
             pthread_cond_broadcast(&display->cond);
             pthread_mutex_unlock(&display->condMutex);
@@ -958,9 +1100,10 @@ fbdev_CancelDisplayBackbuffer(
     if (display->multiBuffer > 1)
     {
         gctINT next;
+        gctINT index;
         pthread_mutex_lock(&display->condMutex);
 
-        next = (Y + display->height);
+        next = (Y + display->alignedHeight);
         if (next >= (int) display->varInfo.yres_virtual)
         {
             next = 0;
@@ -973,6 +1116,9 @@ fbdev_CancelDisplayBackbuffer(
 
         /* Roll back the buffer. */
         display->backBufferY = Y;
+
+        index = Y / display->alignedHeight;
+        display->bufferStatus &= ~(1<<index);
 
         pthread_cond_broadcast(&display->cond);
         pthread_mutex_unlock(&display->condMutex);
@@ -1197,6 +1343,69 @@ fbdev_CreateWindow(
         if (X + Width  > display->width)  Width  = display->width  - X;
         if (Y + Height > display->height) Height = display->height - Y;
     }
+
+    /* FSL: external resolve. */
+    do
+    {
+        int err;
+        int nonstd = 0;
+        int extResolve = 1;
+        struct fb_var_screeninfo varInfo;
+
+        if (!display->fbPrefetch)
+        {
+            /* No prefetch in hardware. */
+            break;
+        }
+
+        if ((X != 0) || (Y != 0) ||
+            (Width != display->width) || (Height != display->height))
+        {
+            /* Not full screen, can not enable. */
+            extResolve = 0;
+        }
+
+        /* Check window size alignment. */
+        if ((display->varInfo.xres_virtual & 0x3F) ||
+            (display->varInfo.yres_virtual & 0x3F))
+        {
+            extResolve = 0;
+        }
+
+        if (extResolve)
+        {
+            switch (display->bpp)
+            {
+            case 16:
+                nonstd = IPU_PIX_FMT_GPU16_SRT;
+                break;
+            case 32:
+                nonstd = IPU_PIX_FMT_GPU32_SRT;
+                break;
+            default:
+                /* Unknown pixel format. */
+                extResolve = 0;
+                break;
+            }
+        }
+
+        /* Set requested tiling. */
+        varInfo        = display->varInfo;
+        varInfo.nonstd = nonstd;
+
+        err = ioctl(display->file, FBIOPUT_VSCREENINFO, &varInfo);
+
+        if (err < 0)
+        {
+            /* Not changed. */
+            break;
+        }
+
+        /* Prefetch mode/display tiling changed. */
+        display->varInfo.nonstd = nonstd;
+        display->tiling  = extResolve ? gcvSUPERTILED : gcvLINEAR;
+    }
+    while (0);
 
     do
     {
@@ -1849,7 +2058,16 @@ fbdev_GetWindowInfoEx(
 
     if (Type != gcvNULL)
     {
-        *Type = gcvSURF_BITMAP;
+        /* FSL: tiling. */
+        switch (display->tiling)
+        {
+        case gcvLINEAR:
+            *Type = gcvSURF_BITMAP;
+            break;
+        default:
+            *Type = gcvSURF_RENDER_TARGET_NO_TILE_STATUS;
+            break;
+        }
     }
 
     /* Success. */
@@ -1891,14 +2109,142 @@ fbdev_SetWindowFormat(
     IN gceSURF_FORMAT Format
     )
 {
-    /*
-     * Possiable types:
-     *   gcvSURF_BITMAP
-     *   gcvSURF_RENDER_TARGET
-     *   gcvSURF_RENDER_TARGET_NO_COMPRESSION
-     *   gcvSURF_RENDER_TARGET_NO_TILE_STATUS
-     */
-    return gcvSTATUS_NOT_SUPPORTED;
+    /* FSL: external resolve. */
+    gceSTATUS status = gcvSTATUS_OK;
+    struct _FBDisplay* display;
+    struct _FBWindow* window;
+    int nonstd = 0;
+    struct fb_var_screeninfo varInfo;
+    gceTILING tiling = gcvINVALIDTILED;
+    gcoSURF tmpSurface = gcvNULL;
+    gctUINT width;
+    gctUINT height;
+    int err;
+
+    display = (struct _FBDisplay*)Display;
+    if (display == gcvNULL)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    if (!display->fbPrefetch)
+    {
+        return gcvSTATUS_NOT_SUPPORTED;
+    }
+
+    window = (struct _FBWindow*)Window;
+    if (window == gcvNULL)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    if (Format != window->format)
+    {
+        /* Can not change format. */
+        return gcvSTATUS_NOT_SUPPORTED;
+    }
+
+    switch ((int) Type)
+    {
+    case gcvSURF_RENDER_TARGET:
+        return gcvSTATUS_NOT_SUPPORTED;
+
+    case gcvSURF_RENDER_TARGET_NO_TILE_STATUS:
+        if ((window->width  != display->width) ||
+            (window->height != display->height))
+        {
+            return gcvSTATUS_NOT_SUPPORTED;
+        }
+
+        width  = (gctUINT) window->width;
+        height = (gctUINT) window->height;
+
+        status = gcoSURF_Construct(gcvNULL,
+                                   width, height, 1,
+                                   gcvSURF_RENDER_TARGET | gcvSURF_NO_VIDMEM,
+                                   window->format,
+                                   gcvPOOL_DEFAULT,
+                                   &tmpSurface);
+
+        if (gcmIS_SUCCESS(status))
+        {
+            gcoSURF_GetTiling(tmpSurface, &tiling);
+            gcoSURF_Destroy(tmpSurface);
+        }
+        break;
+
+    case gcvSURF_BITMAP:
+        tiling = gcvLINEAR;
+        break;
+
+    default:
+        return gcvSTATUS_NOT_SUPPORTED;
+    }
+
+    /* Translate tiling to nonstd. */
+    switch (tiling)
+    {
+    case gcvTILED:
+        if (display->bpp == 16)
+        {
+            nonstd = IPU_PIX_FMT_GPU16_ST;
+        }
+        else if (display->bpp == 32)
+        {
+            nonstd = IPU_PIX_FMT_GPU32_ST;
+        }
+        else
+        {
+            return gcvSTATUS_INVALID_ARGUMENT;
+        }
+        break;
+
+    case gcvSUPERTILED:
+        if (display->bpp == 16)
+        {
+            nonstd = IPU_PIX_FMT_GPU16_SRT;
+        }
+        else if (display->bpp == 32)
+        {
+            nonstd = IPU_PIX_FMT_GPU32_SRT;
+        }
+        else
+        {
+            return gcvSTATUS_INVALID_ARGUMENT;
+        }
+        break;
+
+    case gcvLINEAR:
+        nonstd = 0;
+        break;
+
+    default:
+        return gcvSTATUS_NOT_SUPPORTED;
+    }
+
+    if ((display->varInfo.nonstd == nonstd) &&
+        (display->tiling == tiling))
+    {
+        return gcvSTATUS_OK;
+    }
+
+    /* Set requested tiling. */
+    varInfo        = display->varInfo;
+    varInfo.nonstd = nonstd;
+
+    err = ioctl(display->file, FBIOPUT_VSCREENINFO, &varInfo);
+
+    if (err < 0)
+    {
+        /* Not changed. */
+        return gcvSTATUS_NOT_SUPPORTED;
+    }
+
+    /* Prefetch mode/display tiling changed. */
+    display->varInfo.nonstd = nonstd;
+    display->tiling = tiling;
+
+    return gcvSTATUS_OK;
 }
 
 gceSTATUS
@@ -2294,6 +2640,9 @@ _CreateWindowBuffers(
             gceSURF_TYPE baseType;
             gctUINT i;
 
+            gctSTRING disableClear = gcvNULL;
+            gcoOS_GetEnv(gcvNULL, "GPU_VIV_DISABLE_CLEAR_FB", &disableClear);
+
             baseType = (gceSURF_TYPE) ((gctUINT32) Info->type & 0xFF);
 
             /* Lock. */
@@ -2356,8 +2705,11 @@ _CreateWindowBuffers(
                                              logical,
                                              physical));
 
-                /* For a new surface, clear it to get rid of noises. */
-                gcoOS_ZeroMemory(logical, alignedHeight * Info->stride);
+                if (disableClear != gcvNULL)
+                {
+                    /* For a new surface, clear it to get rid of noises. */
+                    gcoOS_ZeroMemory(logical, alignedHeight * Info->stride);
+                }
 
                 gcmONERROR(gcoSURF_SetWindow(buffer->surface,
                                              0, 0,

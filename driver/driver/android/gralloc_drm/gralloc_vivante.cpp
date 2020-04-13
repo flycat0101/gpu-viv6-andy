@@ -26,6 +26,7 @@
 
 #include <hardware/hardware.h>
 #include <hardware/gralloc.h>
+#include <graphics_ext.h>
 
 /* from libdrm. */
 #include <vivante_drm.h>
@@ -40,6 +41,8 @@
 #include "gralloc_vivante.h"
 
 #define ALIGN(val, align) (((val) + (align) - 1) & ~((align) - 1))
+
+static int Skip_lastpixel = -1;
 
 struct gralloc_vivante_t {
     gralloc_module_t *module;
@@ -97,6 +100,13 @@ static int gralloc_vivante_get_bpp(int format)
     // case HAL_PIXEL_FORMAT_DRM_NV12:
         bpp = 1;
         break;
+    case HAL_PIXEL_FORMAT_CbYCrY_422_I: /* UYVY, graphics_ext */
+        bpp = 2;
+        break;
+    case HAL_PIXEL_FORMAT_YCbCr_420_P: /* I420, graphics_ext */
+    case HAL_PIXEL_FORMAT_YCbCr_420_SP: /* NV12, graphics_ext */
+        bpp = 1;
+        break;
     default:
         bpp = 0;
         break;
@@ -105,15 +115,35 @@ static int gralloc_vivante_get_bpp(int format)
     return bpp;
 }
 
-static struct gralloc_vivante_bo_t *
-gralloc_vivante_alloc_bo(struct gralloc_vivante_t *drv, buffer_handle_t handle)
+static void buffer_size_quirk(buffer_handle_t handle, size_t size)
 {
-    struct gralloc_vivante_bo_t *bo;
-    int align_w, align_h, bpp, stride;
+    gralloc_handle_t *hnd = (gralloc_handle_t *)handle;
+    hnd->size = (int)size;
+}
+
+static void baseaddr_quirk(buffer_handle_t handle,
+                struct gralloc_vivante_bo_t *bo)
+{
+    const int sw_usage = GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK;
+    if (gralloc_handle_usage(handle) & sw_usage) {
+        if (!bo->vaddr) {
+            gralloc_trace(2, "do mmap");
+            /* the driver is supposed to wait for the bo */
+            drm_vivante_bo_mmap(bo->bo, &bo->vaddr);
+        }
+
+        gralloc_handle_t *hnd = (gralloc_handle_t *)handle;
+        hnd->base = (uintptr_t)bo->vaddr;
+    }
+}
+
+int gralloc_vivante_validate_buffer_size(buffer_handle_t handle,uint32_t *v_size,
+                    uint32_t *v_tiling,int *v_create_ts,int *v_stride)
+{
     uint32_t size;
+    int align_w, align_h, bpp, stride;
     uint32_t flags = 0;
     uint32_t tiling = 0;
-    uint32_t gem_handle;
     int create_ts = 0;
     int err;
 
@@ -133,24 +163,13 @@ gralloc_vivante_alloc_bo(struct gralloc_vivante_t *drv, buffer_handle_t handle)
         align_h = 4;
     }
 
-    /* flags. */
-    if ((gralloc_handle_usage(handle) & GRALLOC_USAGE_SW_WRITE_OFTEN) ||
-            (gralloc_handle_usage(handle) & GRALLOC_USAGE_SW_READ_OFTEN))
-        flags |= DRM_VIV_GEM_CACHED;
-
-    if (gralloc_handle_usage(handle) & GRALLOC_USAGE_PROTECTED)
-        flags |= DRM_VIV_GEM_SECURE;
-
-    if (gralloc_handle_usage(handle) & GRALLOC_USAGE_HW_FB)
-        flags |= DRM_VIV_GEM_CONTIGUOUS;
-
     /* format & bpp. */
     bpp = gralloc_vivante_get_bpp(gralloc_handle_format(handle));
     if (!bpp) {
         /* not supported. */
         gralloc_trace_error(1, "unknown format=%x",
             gralloc_handle_format(handle));
-        return NULL;
+        return -1;
     }
 
     if (bpp == 3)
@@ -183,10 +202,79 @@ gralloc_vivante_alloc_bo(struct gralloc_vivante_t *drv, buffer_handle_t handle)
         size += size / 2;
         size += 64;
         break;
-    default:
-        /* In case there is NO SH_IMAGE_LD_LAST_PIXEL_FIX. */
+    case HAL_PIXEL_FORMAT_YCbCr_420_P: /* I420, graphics_ext */
+        size += ALIGN(stride / 2, 16) *
+                ALIGN(gralloc_handle_height(handle), align_h);
         size += 64;
         break;
+    case HAL_PIXEL_FORMAT_YCbCr_420_SP: /* NV12, grapphics_ext */
+        size += size / 2;
+        size += 64;
+        break;
+    default:
+        /* In case there is NO SH_IMAGE_LD_LAST_PIXEL_FIX. */
+        /*On chipModel=gc3000 && ChipRevision=0x5450 SOC, don't need allocate more 64bytes,
+        * otherwise, there is little square on the upper left corner.
+        */
+        if(Skip_lastpixel < 0)
+            size += 64;
+
+        break;
+    }
+
+    gralloc_handle_set_stride(handle, stride / bpp);
+
+    if (v_size != NULL) {
+        *v_size = size;
+    }
+    if (v_tiling != NULL) {
+        *v_tiling = tiling;
+    }
+    if (v_create_ts != NULL) {
+        *v_create_ts = create_ts;
+    }
+    if (v_stride != NULL) {
+        *v_stride = stride;
+    }
+
+    return 0;
+}
+
+static struct gralloc_vivante_bo_t *
+gralloc_vivante_alloc_bo(struct gralloc_vivante_t *drv, buffer_handle_t handle)
+{
+    struct gralloc_vivante_bo_t *bo;
+    int stride;
+    uint32_t size;
+    uint32_t flags = 0;
+    uint32_t tiling = 0;
+    uint32_t gem_handle;
+    int create_ts = 0;
+    int err;
+
+    gralloc_trace(0, "handle=%p usage=0x%x", handle, gralloc_handle_usage(handle));
+
+    err = gralloc_vivante_validate_buffer_size(handle,&size,&tiling,&create_ts,&stride);
+    if (err) {
+        gralloc_trace_error(1, "err=%d", err);
+        return NULL;
+    }
+
+    /* flags. */
+    if ((gralloc_handle_usage(handle) & GRALLOC_USAGE_SW_WRITE_OFTEN) ||
+            (gralloc_handle_usage(handle) & GRALLOC_USAGE_SW_READ_OFTEN))
+        flags |= DRM_VIV_GEM_CACHED;
+
+    if (gralloc_handle_usage(handle) & GRALLOC_USAGE_PROTECTED)
+        flags |= DRM_VIV_GEM_SECURE;
+
+    if (gralloc_handle_usage(handle) & GRALLOC_USAGE_HW_FB)
+        flags |= DRM_VIV_GEM_CONTIGUOUS;
+
+    if (gralloc_handle_usage(handle) & GRALLOC_USAGE_HW_COMPOSER) {
+        /* Ignore cache for layer buffer */
+        flags &= ~DRM_VIV_GEM_CACHED;
+        flags |= DRM_VIV_GEM_CMA_LIMIT;
     }
 
     bo = (struct gralloc_vivante_bo_t *)calloc(1, sizeof(*bo));
@@ -258,7 +346,7 @@ gralloc_vivante_alloc_bo(struct gralloc_vivante_t *drv, buffer_handle_t handle)
     gralloc_trace(2, "fd=%d drm-bo=%p gem_handle=%d",
         gralloc_handle_fd(handle), bo->bo, gem_handle);
 
-    gralloc_handle_set_stride(handle, stride / bpp);
+    buffer_size_quirk(handle, size);
 
     bo->magic = GRALLOC_VIVANTE_BO_MAGIC;
     bo->fb_handle = gem_handle;
@@ -354,6 +442,15 @@ int gralloc_vivante_create(gralloc_module_t const *module,
         }
     }
 
+    memset(path, 0, sizeof path);
+    property_get("ro.boot.soc_type", path, "");
+
+    if(path[0] != '\0')
+    {
+        if(strcmp(path, "imx6qp") == 0)
+            Skip_lastpixel = 1;
+    }
+
     if (err) {
         gralloc_trace_error(2, "failed to create vivante drm");
         goto error;
@@ -413,6 +510,8 @@ int gralloc_vivante_alloc(struct gralloc_vivante_t *drv, int w, int h,
 
     *pHandle = handle;
     *pStride = gralloc_handle_stride(handle);
+
+    baseaddr_quirk(handle, bo);
 
     gralloc_trace(1, "ok: out handle=%p stride=%d", *pHandle, *pStride);
     return 0;
@@ -478,6 +577,8 @@ int gralloc_vivante_register_buffer(struct gralloc_vivante_t *drv,
         bo->refcount++;
         gralloc_trace(2, "bo=%p refcount=%d", bo, bo->refcount);
     }
+
+    baseaddr_quirk(handle, bo);
 
     gralloc_trace(1, "ok");
     return 0;
@@ -551,6 +652,8 @@ int gralloc_vivante_lock(struct gralloc_vivante_t *drv, buffer_handle_t handle,
             }
         }
         *vaddr = bo->vaddr;
+
+        baseaddr_quirk(handle, bo);
     } else {
         /* kernel handles the synchronization here */
         *vaddr = NULL;
@@ -588,9 +691,11 @@ int gralloc_vivante_unlock(struct gralloc_vivante_t *drv,
 
     if (!--bo->lock_count) {
         if (bo->vaddr) {
+            /*
             gralloc_trace(2, "do munmap");
             drm_vivante_bo_munmap(bo->bo);
             bo->vaddr = NULL;
+             */
         }
         bo->locked_for = 0;
     }
@@ -625,6 +730,10 @@ int gralloc_vivante_lock_ycbcr(struct gralloc_vivante_t *drv,
     case HAL_PIXEL_FORMAT_YCbCr_420_888:
     case HAL_PIXEL_FORMAT_YCbCr_422_SP:
     case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        break;
+    /* graphics_ext. */
+    case HAL_PIXEL_FORMAT_YCbCr_420_P:
+    case HAL_PIXEL_FORMAT_YCbCr_420_SP:
         break;
     default:
         gralloc_trace_error(1, "not supported format=%x",
@@ -673,6 +782,23 @@ int gralloc_vivante_lock_ycbcr(struct gralloc_vivante_t *drv,
         ycbcr->ystride = stride;
         ycbcr->cstride = stride;
         ycbcr->chroma_step = 2;
+        break;
+    case HAL_PIXEL_FORMAT_YCbCr_420_P: /* graphics_ext. */
+        ycbcr->y = ptr;
+        ycbcr->cb = (uint8_t *)ptr + stride * vstride;
+        ycbcr->cr = (uint8_t *)ycbcr->cb + ALIGN(stride / 2, 16) * vstride / 2;
+        ycbcr->ystride = stride;
+        ycbcr->cstride = ALIGN(stride / 2, 16);
+        ycbcr->chroma_step = 1;
+        break;
+    case HAL_PIXEL_FORMAT_YCbCr_420_SP: /* graphics_ext. */
+        ycbcr->y = ptr;
+        ycbcr->cb = (uint8_t *)ptr + stride * vstride;
+        ycbcr->cr = (uint8_t *)ycbcr->cb + 1;
+        ycbcr->ystride = stride;
+        ycbcr->cstride = stride;
+        ycbcr->chroma_step = 2;
+        break;
     default:
         break;
     }
