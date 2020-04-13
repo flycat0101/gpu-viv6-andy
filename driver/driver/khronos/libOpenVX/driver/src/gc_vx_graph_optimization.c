@@ -18,11 +18,37 @@
 
 #define _GC_OBJ_ZONE            gcdZONE_VX_GRAPH
 #define QUANT_BIT_WIDTH         (8)
-#define HW_KERNEL_SIZE          15
 
 static vx_uint32 optPhase = 1;
 
 extern vx_int16 Fp32toBF16(vx_float32 val);
+
+VX_INTERNAL_API vx_uint32 vxoGraphOptimization_getMaxKernelSizeX(vx_context ctxt)
+{
+    return ctxt->nnConfig.fixedFeature.nnMaxKXSize;
+}
+
+VX_INTERNAL_API vx_uint32 vxoGraphOptimization_getMaxKernelSizeY(vx_context ctxt)
+{
+    return ctxt->nnConfig.fixedFeature.nnMaxKYSize;
+}
+
+VX_INTERNAL_API vx_uint32 vxoGraphOptimization_getMaxKernelSizeZ(vx_context ctxt)
+{
+    return ctxt->nnConfig.fixedFeature.nnMaxKZSize;
+}
+
+VX_INTERNAL_API void vxoGraphOptimization_getMaxKernelSize(vx_context ctxt, vx_uint32 *xKernelSize, vx_uint32 *yKernelSize, vx_uint32 *zKernelSize)
+{
+    vxmASSERT(ctxt);
+
+    if(VX_NULL != xKernelSize)
+        *xKernelSize = vxoGraphOptimization_getMaxKernelSizeX(ctxt);
+    if(VX_NULL != yKernelSize)
+        *yKernelSize = vxoGraphOptimization_getMaxKernelSizeY(ctxt);
+    if(VX_NULL != zKernelSize)
+        *yKernelSize = vxoGraphOptimization_getMaxKernelSizeZ(ctxt);
+}
 
 VX_INTERNAL_API void vxoGraphOptimization_printTensorData(vx_char *name, vx_tensor tensor)
 {
@@ -377,6 +403,10 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
 
             vx_tensor inputTensor = (vx_tensor)node->paramTable[0];
 
+            vx_uint32 maxKernelSizeX = 0;
+            vx_uint32 maxKernelSizeY = 0;
+            vxoGraphOptimization_getMaxKernelSize(node->base.context, &maxKernelSizeX, &maxKernelSizeY, VX_NULL);
+
             weightX = vxoGraphOptimization_computeFinalKernelSize(weightX, strideX);
             weightY = vxoGraphOptimization_computeFinalKernelSize(weightY, strideY);
 
@@ -387,10 +417,11 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
             if(gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1) &&
                 (TENSOR_SIZE_INDEX(inputTensor,0) > NN_IMAGE_XSIZE_MAX || TENSOR_SIZE_INDEX(inputTensor, 1) > NN_IMAGE_YSIZE_MAX) )
                 break;
+            if(weightX > maxKernelSizeX || weightY > maxKernelSizeY )
+                break;
 
             if(VX_TENSOR_LIFE_TIME_STATIC == TENSOR_DATA_LIFETIME(weight) &&
                  (node->paramTable[2] != VX_NULL ? VX_TENSOR_LIFE_TIME_STATIC == TENSOR_DATA_LIFETIME((vx_tensor)node->paramTable[2]) : vx_true_e) &&
-                 weightX <= 15 && weightY <= 15 &&
                 SCALAR_VALUE(node->paramTable[PARAM_CONV_DILATION_INDEX],u32) == 0
                 )
             {
@@ -432,7 +463,6 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
                     if(SCALAR_VALUE(node->paramTable[PARAM_CONV_DEPTH_MULTIPLIER_INDEX], u32) == 1 &&
                         vxoGraphOptimization_dwConvHalSupport(weight) &&
                         (TENSOR_SIZE_INDEX(weight, 0) != 1 || TENSOR_SIZE_INDEX(weight, 1) != 1 ) &&
-                        (TENSOR_SIZE_INDEX(weight, 0) < 15 && TENSOR_SIZE_INDEX(weight, 1) < 15) &&
                         (strideX <= 2 && strideY <=2)
                         )
                     {
@@ -2834,8 +2864,14 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_ConvertAvgPool2Conv(vx_graph grap
     vx_int32 nodeIndex;
     vx_int32 nodeCount = graph->nodeCount;
     vx_node* nodeTable = graph->nodeTable;
+
+    vx_uint32 maxKernelSizeX = 0;
+    vx_uint32 maxKernelSizeY = 0;
+
     gcmHEADER_ARG("graph=%p", graph);
     vxmASSERT(graph);
+
+    vxoGraphOptimization_getMaxKernelSize(graph->base.context, &maxKernelSizeX, &maxKernelSizeY, VX_NULL);
 
     for (nodeIndex = 0; nodeIndex < nodeCount; nodeIndex++)
     {
@@ -2877,7 +2913,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_ConvertAvgPool2Conv(vx_graph grap
             /*V8 support depwiseConv hardware feature*/
             if(vxoGraphOptimization_dwConvHalSupport(input))
             {
-                if(kernel_x > 15 || kernel_y>15)
+                if(kernel_x > maxKernelSizeX || kernel_y>maxKernelSizeY)
                     continue;
                 if(stride_x > 2 || stride_y > 2)
                     continue;
@@ -5353,14 +5389,18 @@ VX_INTERNAL_API vx_bool vxoGraphOptimization_avgPoolAnd1x1Conv_isValid(vx_node a
     {
         vx_uint32 acutalKernelX = vxoGraphOptimization_computeFinalKernelSize(avgPoolSize[0], avgPoolStride[0]);
         vx_uint32 acutalKernelY = vxoGraphOptimization_computeFinalKernelSize(avgPoolSize[1], avgPoolStride[1]);
-        if(acutalKernelX > HW_KERNEL_SIZE || acutalKernelY > HW_KERNEL_SIZE)
+        if(acutalKernelX > vxoGraphOptimization_getMaxKernelSizeX(graph->base.context) ||
+            acutalKernelY > vxoGraphOptimization_getMaxKernelSizeY(graph->base.context)
+          )
             goto out;
     }
     else
     {
         /*for depthwise conv, reshuffle should not be taken into account*/
         if((avgPoolStride[0] > 2 || avgPoolStride[1] >2) ||
-            (avgPoolSize[0] > HW_KERNEL_SIZE || avgPoolSize[1] > HW_KERNEL_SIZE))
+            (avgPoolSize[0] > vxoGraphOptimization_getMaxKernelSizeX(graph->base.context) ||
+             avgPoolSize[1] > vxoGraphOptimization_getMaxKernelSizeY(graph->base.context) )
+          )
             goto out;
     }
 
