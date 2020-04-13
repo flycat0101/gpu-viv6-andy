@@ -3683,6 +3683,7 @@ OUT gctBOOL *HasImplicitConversion
   }
   else if(clmIsElementTypeImageGeneric(paramDecl->dataType->elementType) &&
      clmIsElementTypeImage(rDecl->dataType->elementType)) {
+      *HasImplicitConversion = gcvTRUE;
       sameType = gcvTRUE;
   }
   else if(!cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_CL_KHR_FP16) &&
@@ -4653,8 +4654,6 @@ IN OUT cloIR_POLYNARY_EXPR PolynaryExpr
 
     FOR_EACH_DLINK_NODE(bucket, clsNAME_NODE, node) {
         name = node->name;
-        if (name->symbol != PolynaryExpr->funcSymbol)
-            continue;
         hasGenType = gcvFALSE;
         if (((name->type == clvFUNC_NAME) || (name->type == clvKERNEL_FUNC_NAME))) {
 
