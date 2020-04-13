@@ -90,7 +90,6 @@ ifeq ($(EGL_API_GBM),1)
   endif
 endif
 
-
 ifeq ($(EGL_API_DFB), 1)
   INCLUDE += -I$(DFB_DIR)/usr/include
   INCLUDE += -I$(DFB_DIR)/include
@@ -133,15 +132,13 @@ else
   LDFLAGS += -Wall -Wl,-z,defs -shared -Wl,-soname,$(TARGET_SONAME)
 endif
 
-
 ################################################################################
 # Supply necessary libraries.
 
 LDLIBS := -L$(SDK_DIR)/drivers -L$(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR) -lEGL -ldl
 
 ifeq ($(EGL_API_WL),1)
-  LDLIBS += -L$(WAYLAND_DIR)/lib -lwayland-client -lwayland-cursor
-  LDLIBS += -pthread
+  LDLIBS += -L$(WAYLAND_DIR)/lib -lwayland-client -lwayland-cursor -lpthread
 else
   ifeq ($(EGL_API_DRI), 1)
     LDLIBS += -L$(X11_ARM_DIR)/lib -lXdamage -lXfixes -lXext -lXau -lXdmcp -lX11
@@ -163,8 +160,6 @@ ifeq ($(EGL_API_GBM),1)
     LDLIBS += -lgbm
   endif
 endif
-
-
 
 ################################################################################
 # Describe object files.
@@ -225,11 +220,9 @@ endif
 endif
 
 ifeq ($(DYNAMIC),1)
-
 # module dependencies
 $(TARGET_MODULES): $(wildcard $(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR)/libEGL.so \
                               $(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR)/libEGL.a)
-
 
 $(TARGET_MODULE): $(OBJECTS)
 	@echo "  LINK    \033[1m$(notdir $@)\033[0m"

@@ -1613,7 +1613,7 @@ GLboolean __glMakeCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdr
     retVal = (*gc->dp.makeCurrent)(gc);
 
 #if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
-    if (gc->imports.conformGLSpec)
+    if (gc->imports.conformGLSpec && !gc->imports.fromEGL)
     {
         /* Get the latest drawable information */
         LINUX_LOCK_FRAMEBUFFER(gc);

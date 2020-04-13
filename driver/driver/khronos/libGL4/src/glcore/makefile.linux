@@ -22,17 +22,17 @@ else
     DYNAMIC = 1
 endif
 
-ifeq ($(EGL_API_FB), 1)
-ifeq ($(STATIC), 1)
-    TARGET_NAME = libGL.a
-else
-    TARGET_NAME = libGL.so.1.2
-endif
-else
+ifeq ($(YOCTO_DRI_BUILD),1)
 ifeq ($(STATIC), 1)
     TARGET_NAME = vivante_dri.a
 else
     TARGET_NAME = vivante_dri.so
+endif
+else
+ifeq ($(STATIC), 1)
+    TARGET_NAME = libGL.a
+else
+    TARGET_NAME = libGL.so.1.2
 endif
 endif
 
@@ -78,6 +78,7 @@ OBJECTS :=  \
 
 
 CFLAGS += -D_GNU_SOURCE
+LDFLAGS += -Wl,--version-script=GL4SymExport
 
 # Specify Vivante library paths.
 LIBS += -L $(ROOTDIR)/src/chip/$(OBJ_DIR)
@@ -85,23 +86,20 @@ LIBS += -L $(ROOTDIR)/src/glcore/api/$(OBJ_DIR)
 LIBS += -L $(ROOTDIR)/src/glcore/display_list/$(OBJ_DIR)
 LIBS += -lgl4chip -lgl4display_list -lgl4api
 
-ifeq ($(EGL_API_FB), 1)
-LIBS += -lVSC -lGAL -lm -lpthread
-LDFLAGS += -Wl,--version-script=GL4SymExport
+ifeq ($(YOCTO_DRI_BUILD),1)
+LIBS += -L $(ROOTDIR)/src/GLX/client/$(OBJ_DIR) -lGL
+LIBS += -lGAL -lVSC -lXext -lX11 -lXfixes -lXdamage -ldrm -lm -lpthread
+INSTALL_DIR = $(SDK_DIR)/drivers/dri
+else
+LIBS += -lGAL -lVSC -lm -lpthread
 INSTALL_DIR = $(SDK_DIR)/drivers
 
 install: extra_install
-else
-LIBS += -L $(ROOTDIR)/src/GLX/client/$(OBJ_DIR) -lGL
-LIBS += -lGAL -lVSC -lXext -lX11 -lXfixes -lXdamage -ldrm -lm -lpthread
-LFLAGS += -Wl,--version-script=GL4SymExport
-INSTALL_DIR = $(SDK_DIR)/drivers/dri
 endif
 
 include $(AQROOT)/common.target
 
-ifeq ($(EGL_API_FB), 1)
-
+ifneq ($(YOCTO_DRI_BUILD),1)
 .PHONY: extra_install
 extra_install: $(TARGET_OUTPUT)
 	@mkdir -p $(SDK_DIR)/include/GL

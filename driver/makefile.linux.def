@@ -325,7 +325,11 @@ ifeq ($(EGL_API_FB),1)
 endif
 
 ifeq ($(EGL_API_WL),1)
-  CFLAGS            += -DEGL_API_WL -DWL_EGL_PLATFORM -Wno-deprecated-declarations -DOPENGL40
+  CFLAGS            += -DEGL_API_WL -DWL_EGL_PLATFORM -Wno-deprecated-declarations
+  ifeq ($(YOCTO_DRI_BUILD),1)
+    CFLAGS            += -DDRI_PIXMAPRENDER_ASYNC
+    CFLAGS            += -DDRI_PIXMAPRENDER_GL
+  endif
 else
   ifeq ($(EGL_API_DRI),1)
   ifeq ($(YOCTO_DRI_BUILD),1)
@@ -333,7 +337,7 @@ else
   endif
   CFLAGS            += -DDRI_PIXMAPRENDER_ASYNC
   CFLAGS            += -DDRI_PIXMAPRENDER_GL
-  CFLAGS            += -DEGL_API_DRI -DOPENGL40
+  CFLAGS            += -DEGL_API_DRI
   CFLAGS            += -I$(X11_ARM_DIR)/include
   endif
 
@@ -343,7 +347,7 @@ else
   endif
   CFLAGS            += -DDRI_PIXMAPRENDER_ASYNC
   CFLAGS            += -DDRI_PIXMAPRENDER_GL
-  CFLAGS            += -DX11_DRI3 -DOPENGL40
+  CFLAGS            += -DX11_DRI3
   CFLAGS            += -I$(X11_ARM_DIR)/include
   endif
 endif

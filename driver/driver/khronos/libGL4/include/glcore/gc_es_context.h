@@ -1351,7 +1351,7 @@ __GL_INLINE GLvoid __glEvaluateDrawableChange(__GLcontext *gc, GLbitfield flags)
     }
 
 #if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
-    if (gc->imports.conformGLSpec)
+    if (gc->imports.conformGLSpec && !gc->imports.fromEGL)
     {
         /* Get the latest drawable information */
         LINUX_LOCK_FRAMEBUFFER(gc);
