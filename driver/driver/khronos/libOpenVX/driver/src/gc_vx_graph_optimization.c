@@ -618,14 +618,28 @@ VX_INTERNAL_API vx_bool vxoGraphOptimization_isSameShapeTensor(vx_tensor tensor1
 
     return vx_true_e;
 }
+VX_PRIVATE_API vx_tensor vxoGraphOptimization_CreateShareTensor(vx_tensor orginalTensor, vx_int32 *reshapeDims, vx_uint32 dimCount)
+{
+    vx_tensor reshapeTensor = vxReshapeTensor(orginalTensor, reshapeDims, dimCount);
+    gcmHEADER_ARG("orginalTensor=%p, reshapeDims=%p, dimCount=0x%x", orginalTensor, reshapeDims, dimCount);
+
+    TENSOR_DATA_LIFETIME(reshapeTensor)  = TENSOR_DATA_LIFETIME(orginalTensor);
+    TENSOR_PRECISION(reshapeTensor)      = TENSOR_PRECISION(orginalTensor);
+    TENSOR_VALUED(reshapeTensor)         = TENSOR_VALUED(orginalTensor);
+    reshapeTensor->reshape = orginalTensor;
+
+    /*vxoReference_Increment((vx_reference)orginalTensor, VX_REF_INTERNAL);*/
+
+    gcmFOOTER_ARG("reshapeTensor=%p", reshapeTensor);
+    return reshapeTensor;
+}
 
 VX_PRIVATE_API vx_tensor vxoGraphOptimization_reshapeTensorAsOld(vx_tensor oldTensor, vx_tensor newTensor)
 {
     vx_tensor tmpTensor = newTensor;
     if(!vxoGraphOptimization_isSameShapeTensor(oldTensor, newTensor))
     {
-        tmpTensor = vxReshapeTensor(newTensor, (vx_int32 *)TENSOR_SIZES(oldTensor), TENSOR_DIM_NUM(oldTensor));
-        tmpTensor->reshape = oldTensor;
+        tmpTensor = vxoGraphOptimization_CreateShareTensor(newTensor, (vx_int32 *)TENSOR_SIZES(oldTensor), TENSOR_DIM_NUM(oldTensor));
     }
 
     return tmpTensor;
@@ -1708,7 +1722,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeConvolutionNodes(vx_node nod
     finalOutTensor = (vx_tensor)nodes[lastNode]->paramTable[lastNodeOutputIndex];
     if(!vxoGraphOptimization_isSameShapeTensor(finalOutTensor, convOutputTensor) && pool_type != VX_NN_POOLING_MAX)
     {
-        finalOutTensor = vxReshapeTensor(finalOutTensor, (vx_int32 *)TENSOR_SIZES(convOutputTensor), TENSOR_DIM_NUM(convOutputTensor));
+        finalOutTensor = vxoGraphOptimization_CreateShareTensor(finalOutTensor, (vx_int32 *)TENSOR_SIZES(convOutputTensor), TENSOR_DIM_NUM(convOutputTensor));
         CHECK_NULL(finalOutTensor);
         finalOutTensor->reshape = (vx_tensor)nodes[lastNode]->paramTable[lastNodeOutputIndex];
     }
@@ -2197,22 +2211,6 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_DeleteReshape(vx_graph graph)
     gcmFOOTER_ARG("%d", VX_SUCCESS);
 
     return VX_SUCCESS;
-}
-
-VX_PRIVATE_API vx_tensor vxoGraphOptimization_CreateShareTensor(vx_tensor orginalTensor, vx_int32 *reshapeDims, vx_uint32 dimCount)
-{
-    vx_tensor reshapeTensor = vxReshapeTensor(orginalTensor, reshapeDims, dimCount);
-    gcmHEADER_ARG("orginalTensor=%p, reshapeDims=%p, dimCount=0x%x", orginalTensor, reshapeDims, dimCount);
-    orginalTensor->reshape = reshapeTensor;
-    TENSOR_DATA_LIFETIME(reshapeTensor)  = TENSOR_DATA_LIFETIME(orginalTensor);
-    TENSOR_PRECISION(reshapeTensor)      = TENSOR_PRECISION(orginalTensor);
-    TENSOR_VALUED(reshapeTensor)         = TENSOR_VALUED(orginalTensor);
-    reshapeTensor->reshape = orginalTensor;
-
-    /*vxoReference_Increment((vx_reference)orginalTensor, VX_REF_INTERNAL);*/
-
-    gcmFOOTER_ARG("reshapeTensor=%p", reshapeTensor);
-    return reshapeTensor;
 }
 
 VX_PRIVATE_API vx_tensor vxoGraphOptimization_GetShareTensor(vx_tensor orginalTensor)
@@ -3255,13 +3253,12 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_TensorAdd2Conv(vx_graph graph)
                 convDims[0] = convW;
                 convDims[1] = size / convW;
                 convDims[2] = 2 * core;
-                convInTensor = vxReshapeTensor(bigTensor, convDims, 3);
+                convInTensor =   vxoGraphOptimization_CreateShareTensor(bigTensor, convDims, 3);
                 CHECK_NULL(convInTensor);
                 vxReleaseTensor(&bigTensor);
 
                 convDims[2] /= 2;
-                convOutTensor = vxReshapeTensor(output, convDims, 3);
-                convOutTensor->reshape = output;
+                convOutTensor = vxoGraphOptimization_CreateShareTensor(output, convDims, 3);
                 CHECK_NULL(convOutTensor);
             }
 
@@ -3541,7 +3538,7 @@ VX_PRIVATE_API vx_status vxoGraphOptimization_adjustFC_reshuffleWeightAndUpdateN
     }
     {
         vx_uint32 whcnWeightDims[2] = {size, outChannel};
-        vx_tensor whcnWight = vxReshapeTensor(weight, (vx_int32 *)whcnWeightDims, 2);
+        vx_tensor whcnWight = vxoGraphOptimization_CreateShareTensor(weight, (vx_int32 *)whcnWeightDims, 2);
         vxoNode_SetParameter(*FCnode, 1, (vx_reference)whcnWight);
         TENSOR_RANK(whcnWight) = VX_TENSOR_RANK_WHCN;
         vxReleaseTensor(&whcnWight);
@@ -3581,7 +3578,7 @@ VX_PRIVATE_API vx_status vxoGraphOptimization_adjustFC_adjustInput(vx_node *node
         dimNum  = 2;
 
     {
-        vx_tensor newInput = vxReshapeTensor(input, (vx_int32*)dims, dimNum);
+        vx_tensor newInput = vxoGraphOptimization_CreateShareTensor(input, (vx_int32*)dims, dimNum);
         TENSOR_RANK(newInput) = VX_TENSOR_RANK_WHCN;
 
         vxoNode_SetParameter(*node, 0, (vx_reference)newInput);
@@ -3766,7 +3763,7 @@ VX_PRIVATE_API vx_tensor vxoGraphOptimization_conv2fc_reshapeTensor(vx_tensor ol
     for(i = 0; i < 3; i++)
         reshapeDims[0] *= TENSOR_SIZE_INDEX(oldTensor, i);
     gcmFOOTER_NO();
-    return vxReshapeTensor(oldTensor, (vx_int32 *)reshapeDims, 2);
+    return vxoGraphOptimization_CreateShareTensor(oldTensor, (vx_int32 *)reshapeDims, 2);
 }
 
 VX_INTERNAL_API vx_status vxoGraphOptimization_conv2fc(vx_graph graph)
@@ -3854,7 +3851,7 @@ VX_INTERNAL_API vx_tensor * vxoGraphOptimization_unrollDWConv_multC21_unrollBias
     vx_size     view_start[2] = {0, 0};
     vx_size     view_end[2] = {reshapeDims[0], reshapeDims[1]};
 
-    reshapeBias = vxReshapeTensor(bias, (vx_int32 *)reshapeDims, 2);
+    reshapeBias = vxoGraphOptimization_CreateShareTensor(bias, (vx_int32 *)reshapeDims, 2);
     CHECK_NULL(reshapeBias);
     for(i = 0; i < depth_mult; i++)
     {
@@ -3862,7 +3859,7 @@ VX_INTERNAL_API vx_tensor * vxoGraphOptimization_unrollDWConv_multC21_unrollBias
         tmpTensor = vxCreateTensorFromView(reshapeBias, 2,view_start, view_end);
         CHECK_NULL(tmpTensor);
 
-        unrollBias[i] = vxReshapeTensor(tmpTensor, (vx_int32 *)rollDims, 1);
+        unrollBias[i] = vxoGraphOptimization_CreateShareTensor(tmpTensor, (vx_int32 *)rollDims, 1);
         CHECK_NULL(unrollBias[i]);
     }
 
@@ -3880,7 +3877,7 @@ VX_INTERNAL_API vx_tensor * vxoGraphOptimization_unrollDWConv_multC21_unroll4DTe
     vx_size view_end[4] = {reshapeDims[0], reshapeDims[1], 0, reshapeDims[3]};
     vx_tensor tt;
 
-    tmpTensor = vxReshapeTensor(tensor, (vx_int32 *)reshapeDims, 4);
+    tmpTensor = vxoGraphOptimization_CreateShareTensor(tensor, (vx_int32 *)reshapeDims, 4);
     CHECK_NULL(tmpTensor);
 
     for(i = 0; i < depth_mult; i++)
@@ -3890,7 +3887,7 @@ VX_INTERNAL_API vx_tensor * vxoGraphOptimization_unrollDWConv_multC21_unroll4DTe
         tt = vxCreateTensorFromView(tmpTensor, 4, view_start, view_end);
         CHECK_NULL(tt);
 
-        unrollTensor[i] = vxReshapeTensor(tt, (vx_int32 *)rollDims, 4);
+        unrollTensor[i] = vxoGraphOptimization_CreateShareTensor(tt, (vx_int32 *)rollDims, 4);
         CHECK_NULL(unrollTensor[i]);
 
         vxReleaseTensor(&tt);
