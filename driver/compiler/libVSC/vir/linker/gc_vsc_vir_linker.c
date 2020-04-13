@@ -6595,6 +6595,7 @@ _AddYcbcrPlanesToSampler(
     IN VIR_Function*    pFunc,
     IN VIR_Symbol*      pSamplerSym,
     IN VIR_Uniform*     pSamplerUniform,
+    IN VIR_ImageFormat  imageFormat,
     IN gctUINT          arrayIndex,
     OUT VIR_Symbol**    ppPlanesImageSym
     )
@@ -6642,7 +6643,15 @@ _AddYcbcrPlanesToSampler(
         VIR_Symbol_SetUniformKind(pPlanesImageSym, VIR_UNIFORM_YCBCR_PLANES);
         VIR_Symbol_SetAddrSpace(pPlanesImageSym, VIR_AS_CONSTANT);
         VIR_Symbol_SetTyQualifier(pPlanesImageSym, VIR_Symbol_GetTyQualifier(pSamplerSym));
+
+        /* Copy the layout from the sampler symbol. */
         pPlanesImageSym->layout = pSamplerSym->layout;
+
+        /* Set the specified image format. */
+        if (imageFormat != VIR_IMAGE_FORMAT_NONE)
+        {
+            VIR_Symbol_SetImageFormat(pPlanesImageSym, imageFormat);
+        }
 
         pPlanesImage = VIR_Symbol_GetImage(pPlanesImageSym);
         pPlanesImage->u.samplerOrImageAttr.parentSamplerSymId = VIR_Symbol_GetIndex(pSamplerSym);
@@ -6696,6 +6705,7 @@ _InsertCallYcbcrTexture(
                                        pFunc,
                                        pSamplerSym,
                                        pSamplerUniform,
+                                       (VIR_ImageFormat)((gctUINTPTR_T)pContext->linkPoint->u.resource.pPrivData),
                                        pContext->linkPoint->u.resource.arrayIndex,
                                        &pPlanesImageSym);
     ON_ERROR(errCode, "Add ycbcr planes uniform.");
