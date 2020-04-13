@@ -177,7 +177,7 @@ ifeq ($(KERNELRELEASE), )
 
 # Define targets.
 all:
-	@$(MAKE) V=$(V) ARCH=$(ARCH_TYPE) -C $(KERNEL_DIR) SUBDIRS=`pwd` modules
+	@$(MAKE) V=$(V) ARCH=$(ARCH_TYPE) -C $(KERNEL_DIR) M=`pwd` modules
 
 clean:
 	@rm -rf $(OBJS)
