@@ -3277,7 +3277,12 @@ static VSC_ErrCode _RemoveRedundantExpressions(VIR_VECTORIZER_INFO* pVectorizerI
                 (VIR_Operand_GetSymbol(pUsageOpnd) != VIR_Operand_GetSymbol(VIR_Inst_GetDest(pSeedInst))))
             {
                 VIR_Operand_SetOpKind(pUsageOpnd, VIR_Operand_GetOpKind(VIR_Inst_GetDest(pSeedInst)));
-                VIR_Operand_SetTypeId(pUsageOpnd, VIR_Operand_GetTypeId(VIR_Inst_GetDest(pSeedInst)));
+                if(VIR_Operand_GetTypeId(VIR_Inst_GetDest(pSeedInst)) == VIR_TYPE_FLOAT16)
+                {
+                    VIR_Operand_SetTypeId(pUsageOpnd, VIR_TYPE_UINT16);
+                }
+                else
+                    VIR_Operand_SetTypeId(pUsageOpnd, VIR_Operand_GetTypeId(VIR_Inst_GetDest(pSeedInst)));
                 VIR_Operand_SetSym(pUsageOpnd, VIR_Operand_GetSymbol(VIR_Inst_GetDest(pSeedInst)));
             }
 
