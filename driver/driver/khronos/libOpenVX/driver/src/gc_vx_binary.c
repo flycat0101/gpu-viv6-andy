@@ -11665,17 +11665,24 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNodeParametersValue(
             }
 
             /* pad */
-            *buffer = SCALAR_VALUE(node->paramTable[3], u32); buffer++;
+            if (node->paramTable[3] != VX_NULL)
+                *buffer = SCALAR_VALUE(node->paramTable[3], u32); buffer++;
             /* stride*/
-            *buffer = SCALAR_VALUE(node->paramTable[11], u32); buffer++;
+            if (node->paramTable[11] != VX_NULL)
+                *buffer = SCALAR_VALUE(node->paramTable[11], u32); buffer++;
             /* dilationXScalar */
-            *buffer = SCALAR_VALUE(node->paramTable[9], u32); buffer++;
-            /* input w */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 0); buffer++;
-            /* input h */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1); buffer++;
+            if (node->paramTable[9] != VX_NULL)
+                *buffer = SCALAR_VALUE(node->paramTable[9], u32); buffer++;
 
-            vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
+            if (node->paramTable[0] != VX_NULL)
+            {
+                /* input w */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 0); buffer++;
+                /* input h */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1); buffer++;
+
+                vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
+            }
             break;
         }
         case VX_KERNEL_NN_CONVOLUTION_RELU_LAYER:
@@ -11686,16 +11693,22 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNodeParametersValue(
                 *buffer = WB_KERNEL_X(wb); buffer++;
             }
             /* pad */
-            *buffer = SCALAR_VALUE(node->paramTable[2], u32); buffer++;
+            if (node->paramTable[2] != VX_NULL)
+                *buffer = SCALAR_VALUE(node->paramTable[2], u32); buffer++;
             /* enable relu */
-            *buffer = SCALAR_VALUE(node->paramTable[8], u32); buffer++;
-            /* input w */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 0); buffer++;
-            /* input h */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1); buffer++;
+            if (node->paramTable[8] != VX_NULL)
+                *buffer = SCALAR_VALUE(node->paramTable[8], u32); buffer++;
+            if (node->paramTable[0] != VX_NULL)
+            {
+                /* input w */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 0); buffer++;
+                /* input h */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1); buffer++;
+                vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer); buffer++;
+            }
             /* output w */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 0); buffer++;
-            vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
+            if (node->paramTable[node->numParameters - 1] != VX_NULL)
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 0);
             break;
         }
         case VX_KERNEL_NN_CONVOLUTION_RELU_POOLING_LAYER:
@@ -11706,16 +11719,22 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNodeParametersValue(
                 *buffer = WB_KERNEL_X(wb); buffer++;
             }
             /* pad */
-            *buffer = SCALAR_VALUE(node->paramTable[3], u32); buffer++;
+            if (node->paramTable[3] != VX_NULL)
+                *buffer = SCALAR_VALUE(node->paramTable[3], u32); buffer++;
             /* stride*/
-            *buffer = SCALAR_VALUE(node->paramTable[8], u32);; buffer++;
+            if (node->paramTable[8] != VX_NULL)
+                *buffer = SCALAR_VALUE(node->paramTable[8], u32);; buffer++;
             /* enable relu */
-            *buffer = SCALAR_VALUE(node->paramTable[10], u32); buffer++;
-            /* input w */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 0); buffer++;
-            /* input h */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1); buffer++;
-            vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
+            if (node->paramTable[10] != VX_NULL)
+                *buffer = SCALAR_VALUE(node->paramTable[10], u32); buffer++;
+            if (node->paramTable[0] != VX_NULL)
+            {
+                /* input w */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 0); buffer++;
+                /* input h */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1); buffer++;
+                vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
+            }
             break;
         }
         case VX_KERNEL_NN_CONVOLUTION_RELU_POOLING_LAYER2:
@@ -11726,99 +11745,147 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNodeParametersValue(
                 *buffer = WB_KERNEL_X(wb); buffer++;
             }
             /* pad */
-            *buffer = SCALAR_VALUE(node->paramTable[4], u32); buffer++;
+            if (node->paramTable[4] != VX_NULL)
+                *buffer = SCALAR_VALUE(node->paramTable[4], u32); buffer++;
             /* enable relu*/
-            *buffer = SCALAR_VALUE(node->paramTable[12], u32); buffer++;
+            if (node->paramTable[12] != VX_NULL)
+                *buffer = SCALAR_VALUE(node->paramTable[12], u32); buffer++;
             /* pool size */
-            *buffer = SCALAR_VALUE(node->paramTable[14], u32); buffer++;
+            if (node->paramTable[14] != VX_NULL)
+                *buffer = SCALAR_VALUE(node->paramTable[14], u32); buffer++;
             /* input w */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 0); buffer++;
-            /* input h */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1); buffer++;
-            vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
+            if (node->paramTable[0] != VX_NULL)
+            {
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 0); buffer++;
+                /* input h */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1); buffer++;
+                vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
+            }
             break;
         }
         case VX_KERNEL_NN_FULLY_CONNECTED_LAYER:
         {
-            /* input w */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 0); buffer++;
-            /* input h */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1); buffer++;
+            if (node->paramTable[0] != VX_NULL)
+            {
+                /* input w */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 0); buffer++;
+                /* input h */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1); buffer++;
+            }
             /* pad*/
-            *buffer = SCALAR_VALUE(node->paramTable[3], u32); buffer++;
-            /* output w */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 0); buffer++;
-            /* output h */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 1); buffer++;
-            vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
+            if (node->paramTable[3] != VX_NULL)
+                *buffer = SCALAR_VALUE(node->paramTable[3], u32); buffer++;
+            if (node->paramTable[node->numParameters - 1] != VX_NULL)
+            {
+                /* output w */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 0); buffer++;
+                /* output h */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 1); buffer++;
+            }
+            if (node->paramTable[0] != VX_NULL)
+                vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
             break;
         }
         case VX_KERNEL_NN_FULLY_CONNECTED_RELU_LAYER:
         {
-            /* input w */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 0); buffer++;
-            /* input h */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1); buffer++;
+            if (node->paramTable[0] != VX_NULL)
+            {
+                /* input w */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 0); buffer++;
+                /* input h */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1); buffer++;
+            }
             /* pad*/
-            *buffer = SCALAR_VALUE(node->paramTable[2], u32); buffer++;
+            if (node->paramTable[2] != VX_NULL)
+                *buffer = SCALAR_VALUE(node->paramTable[2], u32); buffer++;
             /* enable relu */
-            *buffer = SCALAR_VALUE(node->paramTable[7], u32); buffer++;
-            /* output w */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 0); buffer++;
-            /* output h */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 1); buffer++;
-            vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
+            if (node->paramTable[7] != VX_NULL)
+                *buffer = SCALAR_VALUE(node->paramTable[7], u32); buffer++;
+            if (node->paramTable[node->numParameters - 1] != VX_NULL)
+            {
+                /* output w */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 0); buffer++;
+                /* output h */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 1); buffer++;
+            }
+            if (node->paramTable[0] != VX_NULL)
+                vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
             break;
         }
         case VX_KERNEL_POOLING_LAYER:
         {
-            /* input w */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 0); buffer++;
-            /* input h */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1); buffer++;
+            if (node->paramTable[0] != VX_NULL)
+            {
+                /* input w */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 0); buffer++;
+                /* input h */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1); buffer++;
+            }
             /* pool type */
-            *buffer = SCALAR_VALUE(node->paramTable[1], u32); buffer++;
+            if (node->paramTable[1] != VX_NULL)
+                *buffer = SCALAR_VALUE(node->paramTable[1], u32); buffer++;
             /* pool size */
-            *buffer = SCALAR_VALUE(node->paramTable[2], u32); buffer++;
-            /* output w */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 0); buffer++;
-            /* output h */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 1); buffer++;
-            vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
+            if (node->paramTable[2] != VX_NULL)
+                *buffer = SCALAR_VALUE(node->paramTable[2], u32); buffer++;
+            if (node->paramTable[node->numParameters - 1] != VX_NULL)
+            {
+                /* output w */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 0); buffer++;
+                /* output h */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 1); buffer++;
+            }
+            if (node->paramTable[0] != VX_NULL)
+                vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
             break;
         }
         case VX_KERNEL_NN_POOLING_LAYER2:
         {
-            /* input w */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 0); buffer++;
-            /* input h */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1); buffer++;
+            if (node->paramTable[0] != VX_NULL)
+            {
+                /* input w */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 0); buffer++;
+                /* input h */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1); buffer++;
+            }
             /* pool type */
-            *buffer = SCALAR_VALUE(node->paramTable[1], u32); buffer++;
+            if (node->paramTable[1] != VX_NULL)
+                *buffer = SCALAR_VALUE(node->paramTable[1], u32); buffer++;
             /* pool size */
-            *buffer = SCALAR_VALUE(node->paramTable[2], u32); buffer++;
-            /* output w */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 0); buffer++;
-            /* output h */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 1); buffer++;
-            vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
+            if (node->paramTable[2] != VX_NULL)
+                *buffer = SCALAR_VALUE(node->paramTable[2], u32); buffer++;
+            if (node->paramTable[node->numParameters - 1] != VX_NULL)
+            {
+                /* output w */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 0); buffer++;
+                /* output h */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 1); buffer++;
+            }
+            if (node->paramTable[0] != VX_NULL)
+                vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
             break;
         }
         case VX_KERNEL_ACTIVATION_LAYER:
         {
-            /* input w */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 0); buffer++;
-            /* input h */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1); buffer++;
-            /* input c */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 3); buffer++;
+            if (node->paramTable[0] != VX_NULL)
+            {   /* input w */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 0); buffer++;
+                /* input h */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1); buffer++;
+                /* input c */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 3); buffer++;
+            }
             /* type */
-            *buffer = SCALAR_VALUE(node->paramTable[1], u32); buffer++;
-            /* output w */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 0); buffer++;
-            /* output h */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 1); buffer++;
-            vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
+            if (node->paramTable[1] != VX_NULL)
+                *buffer = SCALAR_VALUE(node->paramTable[1], u32); buffer++;
+            if (node->paramTable[node->numParameters - 1] != VX_NULL)
+            {
+                /* output w */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 0); buffer++;
+                /* output h */
+                *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 1); buffer++;
+            }
+            if (node->paramTable[0] != VX_NULL)
+                vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
             break;
         }
         default:
@@ -11833,7 +11900,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNodeParametersValue(
                 *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 2); buffer++;
                 /* input n */
                 *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 3);
-                if (node->paramTable[node->numParameters - 1]->type == VX_TYPE_TENSOR)
+                if ((node->paramTable[node->numParameters - 1] != VX_NULL) && (node->paramTable[node->numParameters - 1]->type == VX_TYPE_TENSOR))
                 {
                     buffer++;
                     /* output w */
@@ -11846,7 +11913,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNodeParametersValue(
             }
             else
             {
-                if (node->paramTable[node->numParameters - 1]->type == VX_TYPE_TENSOR)
+                if ((node->paramTable[node->numParameters - 1] != VX_NULL) && (node->paramTable[node->numParameters - 1]->type == VX_TYPE_TENSOR))
                 {
                     /* output w */
                     *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 0); buffer++;
@@ -11857,7 +11924,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNodeParametersValue(
                     /* output n */
                     *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 3);
                     buffer++;
-                    vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
+                    if (node->paramTable[0] != VX_NULL)
+                        vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
                 }
             }
             break;
