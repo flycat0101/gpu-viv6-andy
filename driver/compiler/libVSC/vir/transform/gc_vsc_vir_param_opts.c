@@ -1810,6 +1810,12 @@ DEF_QUERY_PASS_PROP(VSC_PARAM_Optimization_PerformOnShader)
 
 DEF_SH_NECESSITY_CHECK(VSC_PARAM_Optimization_PerformOnShader)
 {
+    VIR_Shader *pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    /* if shader has only one shader, skip this pass here */
+    if (pShader && VIR_Shader_GetFunctionCount(pShader) == 1)
+    {
+        return gcvFALSE;
+    }
     return gcvTRUE;
 }
 
