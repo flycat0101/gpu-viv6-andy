@@ -2183,6 +2183,10 @@ vxCreateTensorAddressing(
     for (i = 0; i < numViewDimensions; i++)
     {
         addressing->dimSizesUser[i]   = addressing_array_dimension[i];
+    }
+
+    for (i = 0; i < VX_CONTEXT_TENSOR_MAX_DIMENSION; i++)
+    {
         addressing->dimStridesUser[i] = addressing_array_stride[i];
     }
 
