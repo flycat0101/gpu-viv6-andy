@@ -609,6 +609,7 @@ gcfVX_GetImageInfoFromTensor(
     switch (TENSOR_DATA_TYPE(tensor))
     {
     case VX_TYPE_INT8:
+    case VX_TYPE_BOOL8:
         Info->format = 0x4;
         Info->planes = 1;
         Info->bpp = 8;
