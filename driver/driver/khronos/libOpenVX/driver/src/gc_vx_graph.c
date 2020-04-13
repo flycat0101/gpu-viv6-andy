@@ -8871,8 +8871,8 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyAllNodeParameters(vx_graph graph)
                 if (validationStatus != VX_SUCCESS)
                 {
                     status = validationStatus;
-                    vxError("Node %p(\"%s\"): No.%d parameter output validation failure (status = %d)",
-                        node, node->kernel->name, paramIndex, validationStatus);
+                    vxError("Node %p(\"%s\"):validate function failure (status = %d)",
+                        node, node->kernel->name, validationStatus);
                 }
             }
 
