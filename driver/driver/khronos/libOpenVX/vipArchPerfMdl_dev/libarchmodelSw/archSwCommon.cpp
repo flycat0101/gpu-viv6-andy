@@ -1547,21 +1547,28 @@ arch_status archCalculateArchPerf(
                                 x,
                                 pArchNnConfig->unifiedFeature.maxTileSize,
                                 kernelXSize,
-                                kernelYSize,
                                 vip7_16bit,
-                                interleave8,
-                                isV8
+                                interleave8
                                 );
 
                             tmpCovMode = inputBuffDepthForOneTile * interleaveMode;
                             tmpCovAccuMode = adjustAccuBuffDepth * interleaveMode;
 
-                            if ((interleaveMode > 1 ) && (tmpCovMode < kernelYSize))
+
+                            if ( !isV8 && (tmpCovMode < kernelYSize))
                             {
+                                // V6 or V7 has this limitation,V8, V9 and later version do not have
                                 break;
                             }
 
-                            tmpMaxOutTileYSize = archMIN(127, archMIN(tmpCovMode-kernelYSize+1, archMIN(tmpCovAccuMode, inYSize)));
+                            if (!isV8 || ((kernelXSize == 1) && (kernelYSize == 1)))
+                            {
+                                tmpMaxOutTileYSize = archMIN(127, archMIN(tmpCovMode-kernelYSize+1, archMIN(tmpCovAccuMode, inYSize)));
+                            }
+                            else
+                            {
+                                tmpMaxOutTileYSize = archMIN(127, inYSize);
+                            }
 
                             if (tmpMaxOutTileYSize < minOutTileYSize)
                             {
@@ -1866,10 +1873,8 @@ arch_status archCalculateArchPerf(
                 perf->resultInfo.outImageTileXSize,
                 pArchNnConfig->unifiedFeature.maxTileSize,
                 kernelXSize,
-                kernelYSize,
                 vip7_16bit,
-                interleave8,
-                isV8);
+                interleave8);
 
             memset(&inPerfParams,0,sizeof(APM_IN_PERF_PARAMS));
             memset(&outBandWidth, 0, sizeof(outBandWidth));

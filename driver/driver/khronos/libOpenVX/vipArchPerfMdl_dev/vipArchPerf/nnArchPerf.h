@@ -494,11 +494,9 @@ ARCH_PERF_MODEL_API double APMCalcTPCycleCountCore(
 ARCH_PERF_MODEL_API unsigned int APMCalcImageInterleaveMode(
     unsigned int x,
     unsigned int mad_per_core,
-    unsigned int kernelXsize,
-    unsigned int kernelYsize,
+    unsigned int kxy,
     unsigned int vip7_fp16,
-    unsigned int interleave8,
-    unsigned int isV8);
+    unsigned int interleave8);
 
 ARCH_PERF_MODEL_API unsigned int APMCalcNumOfKernel(
     unsigned int tile_xsize,
