@@ -1186,6 +1186,8 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint
 
     vxmONERROR(gcoOS_Allocate(gcvNULL, sizeof(vxnne_operation) * (itemCount + 1), (gctPOINTER*)operations));
 
+    gcoOS_ZeroMemory(operations, sizeof(vxnne_operation) * (itemCount + 1));
+
 OnError:
     return status;
 }
