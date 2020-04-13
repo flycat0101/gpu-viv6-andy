@@ -958,6 +958,8 @@ _Pattern_NotExpandForSameComponentValue(
         VIR_Swizzle     swiz, currentChannelSwizzle, prevEnableSwizzle = VIR_SWIZZLE_X;
         gctBOOL         bFirstEnable = gcvTRUE;
         VIR_Operand*    pSrcOpnd = VIR_Inst_GetSource(pInst, i);
+        gctBOOL         bVecConst = gcvFALSE;
+        VIR_Const*      pConst = gcvNULL;
 
         VIR_Operand_GetOperandInfo(pInst, pSrcOpnd, &opndInfo);
 
@@ -966,11 +968,7 @@ _Pattern_NotExpandForSameComponentValue(
             continue;
         }
 
-        if (opndInfo.isVecConst)
-        {
-            return gcvFALSE;
-        }
-
+        bVecConst = opndInfo.isVecConst;
         swiz = VIR_Operand_GetSwizzle(pSrcOpnd);
 
         for (j = 0; j < VIR_CHANNEL_COUNT; j++)
@@ -989,6 +987,20 @@ _Pattern_NotExpandForSameComponentValue(
             }
             else if (currentChannelSwizzle != prevEnableSwizzle)
             {
+                /*
+                ** For a vector constant, if two different channels have the same constant value,
+                ** we can still treat it as non-expand.
+                */
+                if (bVecConst)
+                {
+                    pConst = VIR_Shader_GetConstFromId(pShader, VIR_Operand_GetConstId(pSrcOpnd));
+                    gcmASSERT(pConst);
+                    if (pConst->value.vecVal.u32Value[currentChannelSwizzle] == pConst->value.vecVal.u32Value[prevEnableSwizzle])
+                    {
+                        continue;
+                    }
+                }
+
                 bShouldExpand = gcvTRUE;
                 break;
             }
