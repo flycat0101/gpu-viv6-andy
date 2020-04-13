@@ -137,14 +137,27 @@ static unsigned int _calcOutImageInterleaveMode(
 unsigned int _calcImageInterleaveMode(
     unsigned int x,
     unsigned int mad_per_core,
-    unsigned int kxy,
-    unsigned int         vip7_fp16,
-    unsigned int         interleave8)
+    unsigned int kx, /* V7 kx equals to V8 */
+    unsigned int ky,
+    unsigned int vip7_fp16,
+    unsigned int interleave8,
+    unsigned int isV8)
 {
     /*mad_per_core = 64;*/
-    return min(_calcOutImageInterleaveMode(x, mad_per_core, vip7_fp16, interleave8),
-               _calcInImageInterleaveMode(x, mad_per_core, kxy, vip7_fp16, interleave8));
+    unsigned int interleaveMode = 1;
+    if (isV8 && (kx != 1 || ky != 1))
+    {
+        return interleaveMode;
+    }
+    else
+    {
+        interleaveMode = min(_calcOutImageInterleaveMode(x, mad_per_core, vip7_fp16, interleave8),
+                             _calcInImageInterleaveMode(x, mad_per_core, kx, vip7_fp16, interleave8));
+    }
+
+    return interleaveMode;
 }
+
 static double _calcPartialAlignedBW(
     unsigned int size,
     unsigned int PPC,
@@ -5262,11 +5275,14 @@ void DestroyAPModel(
 unsigned int APMCalcImageInterleaveMode(
     unsigned int x,
     unsigned int mad_per_core,
-    unsigned int kxy,
+    unsigned int kx,
+    unsigned int ky,
     unsigned int vip7_fp16,
-    unsigned int interleave8)
+    unsigned int interleave8,
+    unsigned int isV8
+    )
 {
-    return _calcImageInterleaveMode(x, mad_per_core, kxy, vip7_fp16, interleave8);
+    return _calcImageInterleaveMode(x, mad_per_core, kx, ky, vip7_fp16, interleave8, isV8);
 }
 
 unsigned int APMCalcNumOfKernel(

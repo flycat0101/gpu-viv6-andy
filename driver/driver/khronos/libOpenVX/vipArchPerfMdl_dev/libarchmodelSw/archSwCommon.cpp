@@ -1520,8 +1520,6 @@ arch_status archCalculateArchPerf(
 
                 if (perf->resultInfo.calculated != HALF_DONE)
                 {
-                    perf->resultInfo.outImageTileXSize = 0;
-                    perf->resultInfo.outImageTileYSize = 0;
                     perf->resultInfo.kernelsPerCore    = 0;
                     minCycleCount    = ~0ULL;
                     minRDBandWidth   = ~0ULL;
@@ -1531,6 +1529,8 @@ arch_status archCalculateArchPerf(
                     maxOutTileXSize = archMIN(archMIN(inXSize, maxOutTileXSize), maxInTileXSize - kernelXSize + 1);
                     minOutTileXSize = archMAX((arch_int32)poolingSize, archMAX(-xOffSet - (arch_int32)kernelXSize + 1 + 1, 0));
                     minOutTileYSize = archMAX((arch_int32)poolingSize, archMAX(-yOffSet - (arch_int32)kernelYSize + 1 + 1, 0));
+                    perf->resultInfo.outImageTileXSize = minOutTileXSize;
+                    perf->resultInfo.outImageTileYSize = minOutTileYSize;
                     if (maxOutTileXSize < minOutTileXSize)
                     {
                         archInfo("WARNING: maxOutTileXSize < minOutTileXSize\n");
@@ -1547,13 +1547,16 @@ arch_status archCalculateArchPerf(
                                 x,
                                 pArchNnConfig->unifiedFeature.maxTileSize,
                                 kernelXSize,
+                                kernelYSize,
                                 vip7_16bit,
-                                interleave8);
+                                interleave8,
+                                isV8
+                                );
 
                             tmpCovMode = inputBuffDepthForOneTile * interleaveMode;
                             tmpCovAccuMode = adjustAccuBuffDepth * interleaveMode;
 
-                            if (tmpCovMode < kernelYSize)
+                            if ((interleaveMode > 1 ) && (tmpCovMode < kernelYSize))
                             {
                                 break;
                             }
@@ -1863,8 +1866,10 @@ arch_status archCalculateArchPerf(
                 perf->resultInfo.outImageTileXSize,
                 pArchNnConfig->unifiedFeature.maxTileSize,
                 kernelXSize,
+                kernelYSize,
                 vip7_16bit,
-                interleave8);
+                interleave8,
+                isV8);
 
             memset(&inPerfParams,0,sizeof(APM_IN_PERF_PARAMS));
             memset(&outBandWidth, 0, sizeof(outBandWidth));
