@@ -5238,6 +5238,9 @@ _CalculateSplitSizes(vxnne_tensor_info input,
     return VX_SUCCESS;
 }
 
+#define MIN_TP_UNIT_INIMAGE_X  16
+#define MIN_TP_UNIT_OUTIMAGE_X 16
+
 VX_PRIVATE_API vx_status _SplitInputAndOutputForMultiTPCores(vx_context context,
                                     vxnne_tensor_info input,
                                     vxnne_tensor_info output,
@@ -5276,6 +5279,9 @@ VX_PRIVATE_API vx_status _SplitInputAndOutputForMultiTPCores(vx_context context,
         case TP_TENSOR_COPY:
         case TP_TENSOR_COPY4CONCAT:
         {
+            vx_uint32 unit_input_size_x, unit_output_size_x;
+            vx_bool check_x;
+
             /* Don't split if the size is too small. */
             if (mult && (output_size_x * output_size_y * output_size_z) > MULTI_TP_RESHUFFLE_SIZE)
             {
@@ -5285,6 +5291,16 @@ VX_PRIVATE_API vx_status _SplitInputAndOutputForMultiTPCores(vx_context context,
             {
                 num_slice = 1;
             }
+
+            /*
+             * To use cache more efficiently, we need to make sure
+             * unit_input_size_x >= 16 and unit_output_size_x >= 16.
+             */
+            unit_output_size_x = output_size_x / num_slice;
+            unit_input_size_x = unit_output_size_x * stride_x;
+
+            check_x = (unit_input_size_x >= MIN_TP_UNIT_INIMAGE_X) &&
+                      (unit_output_size_x >= MIN_TP_UNIT_OUTIMAGE_X);
 
 #if TP_SPLIT_Z_MAJOR
             if ((output_size_z / stride_x / stride_y) % num_slice == 0)
@@ -5321,7 +5337,8 @@ VX_PRIVATE_API vx_status _SplitInputAndOutputForMultiTPCores(vx_context context,
                 }
             }
 #else
-            if (output_size_x % num_slice == 0 &&
+            if (check_x &&
+                output_size_x % num_slice == 0 &&
                 output_size_x / num_slice > pad_left &&
                 output_size_x / num_slice > pad_right)
             {
@@ -5341,7 +5358,7 @@ VX_PRIVATE_API vx_status _SplitInputAndOutputForMultiTPCores(vx_context context,
             {
                 vx_uint32 max = gcmMAX(gcmMAX(output_size_x, output_size_y), output_size_z / stride_x / stride_y);
 
-                if (output_size_x == max)
+                if (check_x && (output_size_x == max))
                 {
                     div_x = gcmMIN(core, num_slice);
                 }
