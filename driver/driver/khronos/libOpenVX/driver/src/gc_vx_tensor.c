@@ -3557,6 +3557,43 @@ vxoTensor_IsShared(
     return (vx_bool)(tensor1->tensorBuffer == tensor2->tensorBuffer);
 }
 
+VX_INTERNAL_API vx_bool
+vxoTensor_IsViewed(
+    vx_tensor tensor
+    )
+{
+    vx_bool ret = vx_false_e;
+
+    if (tensor->isViewed)
+    {
+        ret = vx_true_e;
+    }
+    else
+    {
+        vx_uint32 i;
+        vx_uint64 mulCurrent = 1, mulOrigin = 1;
+
+        for (i = 0; i < TENSOR_DIM_NUM(tensor); i++)
+        {
+            mulCurrent *= TENSOR_VIEW_SIZE_INDEX(tensor, i);
+        }
+
+        for (i = 0; i < TENSOR_ORIG_DIM_NUM(tensor); i++)
+        {
+            mulOrigin *= tensor->tensorBuffer->memory.dims[0][i];
+        }
+
+        vxmASSERT(mulCurrent <= mulOrigin);
+
+        if (mulCurrent < mulOrigin)
+        {
+            ret = vx_true_e;
+        }
+    }
+
+    return ret;
+}
+
 VX_INTERNAL_API void vxoTensor_FreeWrappedMemory(vx_tensor tensor)
 {
     vxmASSERT(tensor);

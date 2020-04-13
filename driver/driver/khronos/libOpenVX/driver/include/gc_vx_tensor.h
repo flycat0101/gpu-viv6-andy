@@ -145,6 +145,11 @@ vxoTensor_IsShared(
     vx_tensor tensor2
     );
 
+VX_INTERNAL_API vx_bool
+vxoTensor_IsViewed(
+    vx_tensor tensor
+    );
+
 VX_INTERNAL_API vx_status
 vxoTensor_GetTensorViewMemory(
     vx_tensor tensor,
