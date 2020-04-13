@@ -4308,7 +4308,10 @@ vx_status vxnneOperation_InitializeCommand(
             {
                 command->cmdInfo.tpTransposeSize = 0;
             }
-
+        }
+        else
+        {
+            command->cmdInfo.tpTransposeSize = 0;
         }
 
     }
