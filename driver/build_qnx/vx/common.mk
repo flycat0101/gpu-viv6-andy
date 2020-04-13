@@ -134,6 +134,7 @@ SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_nn_en
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_nn_wb.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_nn_command.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_binary.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_sys.o
 
 #SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/extension/gc_vxc_interface.o
 # Kernels

@@ -134,6 +134,7 @@ OBJECTS         +=    \
                     $(OBJ_DIR)/gc_vx_nn_encoder.o \
                     $(OBJ_DIR)/gc_vx_nn_wb.o \
                     $(OBJ_DIR)/gc_vx_nn_command.o   \
+                    $(OBJ_DIR)/gc_vx_sys.o
 
 # Kernels
 OBJECTS         +=  \

@@ -54,7 +54,8 @@ LOCAL_SRC_FILES := \
     driver/src/gc_vx_target.c \
     driver/src/gc_vx_tensor.c \
     driver/src/gc_vx_threshold.c \
-    driver/src/gc_vx_gpu_layer.c
+    driver/src/gc_vx_gpu_layer.c \
+    driver/src/gc_vx_sys.c
 
 # Operations
 LOCAL_SRC_FILES += \
