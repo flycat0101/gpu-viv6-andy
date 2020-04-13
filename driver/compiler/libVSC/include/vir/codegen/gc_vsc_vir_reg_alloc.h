@@ -24,10 +24,10 @@ BEGIN_EXTERN_C()
 
 #define VIR_RS_LS_MEM_BLK_SIZE      2048
 
-#define VIR_RA_LS_POS_MAX           (2048*6)
+#define VIR_RA_LS_POS_MAX           gcvMAXUINT32
 #define VIR_RA_LS_POS_MIN           0
 
-#define VIR_RA_LS_REG_MAX           0xFFFFFFFF
+#define VIR_RA_LS_REG_MAX           gcvMAXUINT32
 
 /* the color is assigned as attribute */
 #define VIR_RA_LS_ATTRIBUTE_FUNC    (VIR_Function*)(-1)
