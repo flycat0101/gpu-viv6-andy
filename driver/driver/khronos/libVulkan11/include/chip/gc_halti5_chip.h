@@ -233,6 +233,9 @@ typedef struct
     uint32_t originalWidth;
     uint32_t originalHeight;
 
+    uint32_t hwTxSamplerYUVControl;
+    uint32_t hwTxSamplerYUVStride;
+
     struct
     {
         uint32_t hwSamplerMode_p1;

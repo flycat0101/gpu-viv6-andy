@@ -847,25 +847,39 @@ __vkFormatInfo g_vkFormatInfoTable[] =
     {0,
     __VK_FORMAT_DEPTH_FEATURES,
     0}},
+    /*  __VK_FORMAT_G8B8G8R8_422_RGB_IDENTITY_UNORM, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 1, 1}, 32, 1, __VK_FORMAT_G8B8G8R8_422_RGB_IDENTITY_UNORM,
+    {0,
+    __VK_FORMAT_DEPTH_FEATURES,
+    0}},
+    /*  __VK_FORMAT_B8G8R8G8_422_RGB_IDENTITY_UNORM, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 1, 1}, 32, 1, __VK_FORMAT_B8G8R8G8_422_RGB_IDENTITY_UNORM,
+    {0,
+    __VK_FORMAT_DEPTH_FEATURES,
+    0}},
 };
 
 __vkFormatInfo g_vkFormatInfoTable1000156[] =
 {
     /*   VK_FORMAT_G8B8G8R8_422_UNORM, */
     {__VK_FMT_CATEGORY_UNORM, VK_TRUE, {2, 1}, 32, 1, VK_FORMAT_G8B8G8R8_422_UNORM,
-    {0, 0, 0}},
+    {__VK_FORMAT_YCBCR_CONVERSION_FEATURES | VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT,
+     __VK_FORMAT_YCBCR_CONVERSION_FEATURES | VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT,
+     0}},
     /*   VK_FORMAT_B8G8R8G8_422_UNORM, */
     {__VK_FMT_CATEGORY_UNORM, VK_TRUE, {2, 1}, 32, 1, VK_FORMAT_B8G8R8G8_422_UNORM,
-    {0, 0, 0}},
+    {__VK_FORMAT_YCBCR_CONVERSION_FEATURES | VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT,
+     __VK_FORMAT_YCBCR_CONVERSION_FEATURES | VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT,
+     0}},
     /*   VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM, */
     {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {2, 1}, 32, 1, VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM,
-    {__VK_FORMAT_SAMPLE_IMAGE_FEATURES | VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT,
-     __VK_FORMAT_SAMPLE_IMAGE_FEATURES | VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT,
+    {__VK_FORMAT_YCBCR_CONVERSION_FEATURES | VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT,
+     __VK_FORMAT_YCBCR_CONVERSION_FEATURES | VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT,
      0}},
     /*   VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, */
     {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {2, 1}, 32, 1, VK_FORMAT_G8_B8R8_2PLANE_420_UNORM,
-    {__VK_FORMAT_SAMPLE_IMAGE_FEATURES | VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT,
-     __VK_FORMAT_SAMPLE_IMAGE_FEATURES | VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT,
+    {__VK_FORMAT_YCBCR_CONVERSION_FEATURES | VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT,
+     __VK_FORMAT_YCBCR_CONVERSION_FEATURES | VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT,
      0}},
     /*   VK_FORMAT_G8_B8_R8_3PLANE_422_UNORM, */
     {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {2, 1}, 32, 1, VK_FORMAT_G8_B8_R8_3PLANE_422_UNORM,
@@ -3034,8 +3048,50 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImageView(
     __vkDevContext *devCtx = (__vkDevContext*)device;
     __vkImageView *imv = VK_NULL_HANDLE;
     uint32_t residentFormat = __vk_GetVkFormatInfo(pCreateInfo->format)->residentImgFormat;
+
+    VkBaseInStructure *baseIn = (VkBaseInStructure *)pCreateInfo->pNext;
+
     /* Set the allocator to the parent allocator or API defined allocator if valid */
     __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
+
+    while (baseIn)
+    {
+        switch (baseIn->sType)
+        {
+        case VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO:
+            {
+                VkSamplerYcbcrConversionInfo *conversionInfo = (VkSamplerYcbcrConversionInfo *)baseIn;
+                __vkSamplerYcbcrConversion *ycbcrConversion = (__vkSamplerYcbcrConversion*)conversionInfo->conversion;
+
+                if (ycbcrConversion->createInfo.ycbcrModel == VK_SAMPLER_YCBCR_MODEL_CONVERSION_RGB_IDENTITY &&
+                    (residentFormat == VK_FORMAT_G8B8G8R8_422_UNORM || residentFormat == VK_FORMAT_B8G8R8G8_422_UNORM))
+                {
+                    residentFormat = residentFormat - VK_FORMAT_G8B8G8R8_422_UNORM + __VK_FORMAT_G8B8G8R8_422_RGB_IDENTITY_UNORM;
+                }
+                else if ((ycbcrConversion->createInfo.ycbcrModel == VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_601 ||
+                     ycbcrConversion->createInfo.ycbcrModel == VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_709) &&
+                     ycbcrConversion->createInfo.ycbcrRange == VK_SAMPLER_YCBCR_RANGE_ITU_NARROW &&
+                    (residentFormat == VK_FORMAT_G8B8G8R8_422_UNORM || residentFormat == VK_FORMAT_B8G8R8G8_422_UNORM))
+                {
+                    /* native support */
+                }
+                else
+                {
+                    /* not support */
+                    result = VK_ERROR_FEATURE_NOT_PRESENT;
+                    goto OnError;
+                }
+                baseIn = (VkBaseInStructure *)conversionInfo->pNext;
+            }
+            break;
+        default:
+            {
+                baseIn = VK_NULL_HANDLE;
+                __VK_ASSERT(!"unknown pNext in imageView createInfo ");
+            }
+            break;
+        }
+    }
 
     do {
         __VK_ONERROR(__vk_CreateObject(devCtx, __VK_OBJECT_IMAGE_VIEW, sizeof(__vkImageView), (__vkObject**)&imv));

@@ -1496,7 +1496,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceFormatProperties(
     VkFormatProperties* pFormatProperties
     )
 {
-    if (format <= VK_FORMAT_END_RANGE)
+    if ((format <= VK_FORMAT_END_RANGE)
+        )
     {
         *pFormatProperties = __vk_GetVkFormatInfo((VkFormat) format)->formatProperties;
     }
@@ -1891,6 +1892,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_GetPhysicalDeviceImageFormatProperties2(
     VkPhysicalDeviceExternalImageFormatInfo * externalInfo = (VkPhysicalDeviceExternalImageFormatInfo *)pImageFormatInfo->pNext;
     VkExternalImageFormatProperties * extImgFormatProp = (VkExternalImageFormatProperties *)pImageFormatProperties->pNext;
     VkExternalMemoryProperties * extMemProp = &extImgFormatProp->externalMemoryProperties;
+    VkSamplerYcbcrConversionImageFormatProperties *ycbcrProperties = VK_NULL_HANDLE;
 #if (ANDROID_SDK_VERSION >= 26)
     VkAndroidHardwareBufferUsageANDROID* output_ahw_usage = VK_NULL_HANDLE;
 #endif
@@ -1912,6 +1914,11 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_GetPhysicalDeviceImageFormatProperties2(
         if (pBaseIn->sType == VK_STRUCTURE_TYPE_EXTERNAL_IMAGE_FORMAT_PROPERTIES)
         {
             extImgFormatProp = (VkExternalImageFormatProperties *)pBaseIn;
+        }
+        else if (pBaseIn->sType == VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_IMAGE_FORMAT_PROPERTIES)
+        {
+            ycbcrProperties = (VkSamplerYcbcrConversionImageFormatProperties *)pBaseIn;
+            ycbcrProperties->combinedImageSamplerDescriptorCount = 3;
         }
 #if (ANDROID_SDK_VERSION >= 26)
         else if (pBaseIn->sType == VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_USAGE_ANDROID)
