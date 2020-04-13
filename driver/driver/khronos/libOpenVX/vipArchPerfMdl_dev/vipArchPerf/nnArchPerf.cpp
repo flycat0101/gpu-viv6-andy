@@ -2221,8 +2221,6 @@ double rw_accum_bubble(
     double new3DCCWithBubble = org3DCC;
 
     double rotate_num = kernel_per_core * ceilf((float)kx * ky / zdp) * non_zero_ratio;
-
-    int cycle_per_2dtile     = (int) ceilf((float)tile_ysize / interleave_mode);
     double bubble_per_2dtile = max(3 + rotate_num - org3DCC, 0);
     new3DCCWithBubble = org3DCC * (1 + ((double)bubble_per_2dtile / org3DCC));
 
