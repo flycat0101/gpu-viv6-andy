@@ -1575,14 +1575,20 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
                     {
                         if (dataBias != VX_NULL)
                         {
-                            if ((biasFormat == VX_TYPE_INT32 && TENSOR_QUANT_TYPE(biases) == VX_QUANT_AFFINE_SCALE) || (biasFormat == VX_TYPE_INT32 && TENSOR_QUANT_TYPE(biases) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL) )
+                            if (biasFormat == VX_TYPE_INT32 && TENSOR_QUANT_TYPE(biases) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
                             {
                                 vxmASSERT(gcmABS(TENSOR_TF_SCALES_WITH_INDEX(biases,p) - TENSOR_TF_SCALE(inputs) * TENSOR_TF_SCALES_WITH_INDEX(weights, p)) < 0.000001);
                                 sum += vxnneGetDataExt(biasFormat, TENSOR_QUANT_TYPE(biases), indexBias, (vx_uint8_ptr)dataBias, TENSOR_POS(biases), TENSOR_TF_ZEROPOINTS_WITH_INDEX(biases,p), TENSOR_TF_SCALES_WITH_INDEX(biases,p));
                                 printf("\n bias:%0.9f",vxnneGetDataExt(biasFormat, TENSOR_QUANT_TYPE(biases), indexBias, (vx_uint8_ptr)dataBias, TENSOR_POS(biases), TENSOR_TF_ZEROPOINTS_WITH_INDEX(biases,p), TENSOR_TF_SCALES_WITH_INDEX(biases,p)));
                             }
                             else
+                            {
+                                if (biasFormat == VX_TYPE_INT32 && TENSOR_QUANT_TYPE(biases) == VX_QUANT_AFFINE_SCALE)
+                                {
+                                    vxmASSERT(gcmABS(TENSOR_TF_SCALE(biases) - TENSOR_TF_SCALE(inputs) * TENSOR_TF_SCALE(weights)) < 0.000001);
+                                }
                                 sum += vxnneGetDataExt(biasFormat, TENSOR_QUANT_TYPE(biases), indexBias, (vx_uint8_ptr)dataBias, TENSOR_POS(biases), TENSOR_TF_ZEROPOINT(biases), TENSOR_TF_SCALE(biases));
+                            }
                         }
                     }
                     else

@@ -1132,7 +1132,7 @@ vx_float32 vxnneGetDataExt(vx_type_e format, vx_enum quant_format, vx_int32 inde
 
 vx_status vxnneSaveDataExt(vx_type_e format, vx_enum quant_format, vx_int32 index, vx_float64 data, vx_ptr dst_data, vx_int8 fixedPointPos, vx_int32 zeroPoint, vx_float32 scale, vx_enum roundMode)
 {
-    if ((quant_format == VX_QUANT_AFFINE_SCALE  && (format == VX_TYPE_UINT8 || format == VX_TYPE_INT32))|| quant_format == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
+    if ((quant_format == VX_QUANT_AFFINE_SCALE  && (format == VX_TYPE_UINT8 || format == VX_TYPE_INT8 || format == VX_TYPE_INT32))|| quant_format == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
         return vxnneSaveDataQuant(format, index, data, dst_data, zeroPoint, scale, roundMode);
     else
         return vxnneSaveData(format, index, data, dst_data, fixedPointPos, roundMode);
