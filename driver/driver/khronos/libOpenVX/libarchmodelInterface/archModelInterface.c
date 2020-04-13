@@ -1430,6 +1430,8 @@ static vx_status initConfigration(arch_nn_config *pArchNnConfig,arch_drv_option 
     pArchOptions->enableOpsDebugInfo = pContextOptions->enableOpsDebugInfo;
     //pArchOptions->enableMemOptimization = pContextOptions->enableMemOptimization;
 
+    /* default set pArchOptions->enableSubnetworkSplitting to 1 */
+    pArchOptions->enableSubnetworkSplitting = 1;
     return 0;
 }
 
