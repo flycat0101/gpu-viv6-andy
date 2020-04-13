@@ -506,7 +506,8 @@ gceSTATUS;
 #define gcmIS_ERROR(status)         (status < 0)
 #define gcmNO_ERROR(status)         (status >= 0)
 #define gcmIS_SUCCESS(status)       (status == gcvSTATUS_OK)
-
+#define gcmERROR2PTR(err)           ((gctPOINTER)(err))
+#define gcmPTR2ERROR(ptr)           ((gctINT64)(ptr))
 /******************************************************************************\
 ********************************* Field Macros *********************************
 \******************************************************************************/
