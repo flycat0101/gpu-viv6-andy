@@ -24,7 +24,11 @@ BEGIN_EXTERN_C()
 
 #define VIR_RS_LS_MEM_BLK_SIZE      2048
 
-#define VIR_RA_LS_POS_MAX           gcvMAXUINT32
+/*
+** The max position number, use a large unsigned number which won't cause any overflow.
+** And make sure that Only a unsigned integer variable can use this macro.
+*/
+#define VIR_RA_LS_POS_MAX           (0x0fffffff)
 #define VIR_RA_LS_POS_MIN           0
 
 #define VIR_RA_LS_REG_MAX           gcvMAXUINT32
@@ -177,7 +181,7 @@ struct VIR_RA_LS_LIVERANGE
     gctFLOAT                weight;         /* the weight for LR, used for spill selection */
 
     gctUINT                 currDef;
-    gctINT                  minDefPos;     /* earliest define pos in the liverange */
+    gctUINT                 minDefPos;     /* earliest define pos in the liverange */
 
     VIR_Instruction         *pLDSTInst;
 } ;

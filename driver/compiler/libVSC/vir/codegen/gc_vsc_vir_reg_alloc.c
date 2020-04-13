@@ -962,9 +962,9 @@ void _VIR_RA_LRTable_ClearColor(
             {
                 pDef = GET_DEF_BY_IDX(&pRA->pLvInfo->pDuInfo->defTable, defIdx);
                 pDefInst = pDef->defKey.pDefInst;
-                if (!VIR_IS_IMPLICIT_DEF_INST(pDefInst) && (pLR->minDefPos > VIR_Inst_GetId(pDefInst)))
+                if (!VIR_IS_IMPLICIT_DEF_INST(pDefInst) && (pLR->minDefPos > (gctUINT)VIR_Inst_GetId(pDefInst)))
                 {
-                    pLR->minDefPos = VIR_Inst_GetId(pDefInst); /* find early define pos of current webIdx */
+                    pLR->minDefPos = (gctUINT)VIR_Inst_GetId(pDefInst); /* find early define pos of current webIdx */
                 }
                 defIdx = pDef->nextDefInWebIdx;
             }
@@ -1311,9 +1311,9 @@ static void _VIR_RA_LS_Init(
         {
             pDef = GET_DEF_BY_IDX(&pLvInfo->pDuInfo->defTable, defIdx);
             pDefInst = pDef->defKey.pDefInst;
-            if (!VIR_IS_IMPLICIT_DEF_INST(pDefInst) && (pLR->minDefPos > VIR_Inst_GetId(pDefInst)))
+            if (!VIR_IS_IMPLICIT_DEF_INST(pDefInst) && (pLR->minDefPos > (gctUINT)VIR_Inst_GetId(pDefInst)))
             {
-                pLR->minDefPos = VIR_Inst_GetId(pDefInst); /* find early define pos of current webIdx */
+                pLR->minDefPos = (gctUINT)VIR_Inst_GetId(pDefInst); /* find early define pos of current webIdx */
             }
             /* check symbol of destOper is highpvec2 and set flag */
             if (VIR_Shader_isDual16Mode(pShader) && !isLRHighpVec2(pLR) &&
@@ -3134,7 +3134,7 @@ void _VIR_RA_LS_MarkDef(
                             }
                             else if ((pLR->regNoRange == 1) &&
                                      (defEnableMask == pLR->channelMask) &&
-                                     (pLR->minDefPos == VIR_Inst_GetId(pInst))) /*visted all channels in curr def and find early define to set startPoint */
+                                     (pLR->minDefPos == (gctUINT)VIR_Inst_GetId(pInst))) /*visted all channels in curr def and find early define to set startPoint */
                             {
                                 /* check regNo is not in the inFlow of first define inst's BB
                                    if there's partial define, regNo should be in the inFlow of first defined inst's BB */
