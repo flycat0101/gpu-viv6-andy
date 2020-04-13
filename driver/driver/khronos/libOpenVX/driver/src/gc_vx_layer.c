@@ -7639,7 +7639,7 @@ vxnne_shader_executable vxnneGetAvgPoolingShaderExecutable(
         execution_parameters.globalWorkOffset[0] = 0;
         execution_parameters.globalWorkOffset[1] = 0;
         execution_parameters.globalWorkOffset[2] = 0;
-        execution_parameters.globalWorkSize[0]   = gcmALIGN((out_width  + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
+        execution_parameters.globalWorkSize[0]   = (out_width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0];
         execution_parameters.globalWorkSize[1]   = globalWorkSize1 == 1 ? 1 : (globalWorkSize1  + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1];
         execution_parameters.globalWorkSize[2]   = depth;
     }
@@ -8131,7 +8131,7 @@ vxnne_shader_executable vxnneGetAvgPooling_Int16ShaderExecutable(
         execution_parameters.globalWorkOffset[0] = 0;
         execution_parameters.globalWorkOffset[1] = 0;
         execution_parameters.globalWorkOffset[2] = 0;
-        execution_parameters.globalWorkSize[0]   = gcmALIGN((out_width  + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
+        execution_parameters.globalWorkSize[0]   = (out_width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0];
         execution_parameters.globalWorkSize[1]   = globalWorkSize1 == 1 ? 1 : (globalWorkSize1  + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1];
         execution_parameters.globalWorkSize[2]   = depth;
     }
@@ -8734,7 +8734,7 @@ vxnne_shader_executable vxnneGetAvgPooling_UInt8ShaderExecutable(
         execution_parameters.globalWorkOffset[0] = 0;
         execution_parameters.globalWorkOffset[1] = 0;
         execution_parameters.globalWorkOffset[2] = 0;
-        execution_parameters.globalWorkSize[0]   = gcmALIGN((out_width  + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
+        execution_parameters.globalWorkSize[0]   = (out_width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0];
         execution_parameters.globalWorkSize[1]   = globalWorkSize1 == 1 ? 1 : (globalWorkSize1  + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1];
         execution_parameters.globalWorkSize[2]   = depth;
     }
