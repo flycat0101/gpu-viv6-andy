@@ -32,7 +32,6 @@
 
 #define BF16_BIAS_SIZE 3
 
-#define FEATURE_BFP16_ZRL_ENABLE 0
 
 #define SET_1_LOG (1) /*Default is 1, can be 0, 1, 2, 0 is the best (small win), but can only put in 3 bit Huffman code*/
 #define SET_1_SIZE (1<<SET_1_LOG)
@@ -4687,6 +4686,7 @@ void reorderTPKernelBufferHuffman(
     vx_uint8* kernelBufferInt8Ptr   = reorder_stream;
     vx_uint16* kernelBufferInt16Ptr = (vx_uint16*)reorder_stream;
     vx_uint32 filterIndex, sliceIndex;
+    vx_bool kernelCompressZrlFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcFEATURE_BIT_BFLOAT_KERNEL_COMPRESSION_ZERO_SKIP_FIX);
 #if DUMP_TP_ENC
     static vx_uint32 n = 0;
     vx_char fileName[128];
@@ -4740,9 +4740,10 @@ void reorderTPKernelBufferHuffman(
                         signedBit = 0;
 
                     /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
-#if !FEATURE_BFP16_ZRL_ENABLE
-                    exp = exp ^ 0x80; /*~OrgValue[14]*/
-#endif
+                    if(!kernelCompressZrlFix)
+                    {
+                        exp = exp ^ 0x80; /*~OrgValue[14]*/
+                    }
                     temp = (exp << 8) | (mantissa << 1) | signedBit;
 
                     weight = temp;
@@ -4833,7 +4834,7 @@ void reorderDepthWiseKernelBufferV8Huffman(
     vx_uint32 limitIndex = 0;
     vx_bool isBias = vx_false_e;
     vx_uint32 biasIdx = 0;
-
+    vx_bool kernelCompressZrlFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcFEATURE_BIT_BFLOAT_KERNEL_COMPRESSION_ZERO_SKIP_FIX);
 #if DUMP_BF16_ENC
     static vx_uint32 n = 0;
     vx_char fileName[128];
@@ -4966,9 +4967,10 @@ void reorderDepthWiseKernelBufferV8Huffman(
                                             signedBit = 0;
 
                                         /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
-#if !FEATURE_BFP16_ZRL_ENABLE
-                                        expH = expH ^ 0x80; /*~OrgValue[14]*/
-#endif
+                                        if(!kernelCompressZrlFix)
+                                        {
+                                            expH = expH ^ 0x80; /*~OrgValue[14]*/
+                                        }
                                         biasH = (expH << 8) | (mantissaH << 1) | signedBit;
 #if DUMP_BF16_ENC
                                         if(pfile1 != NULL)
@@ -5026,9 +5028,10 @@ void reorderDepthWiseKernelBufferV8Huffman(
                                         }
 #endif
                                         /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
-#if !FEATURE_BFP16_ZRL_ENABLE
-                                        expM = expM ^ 0x80; /*~OrgValue[14]*/
-#endif
+                                        if(!kernelCompressZrlFix)
+                                        {
+                                            expM = expM ^ 0x80; /*~OrgValue[14]*/
+                                        }
                                         biasM = (expM << 8) | mantissaM | signedBit;
                                     }
 
@@ -5085,9 +5088,10 @@ void reorderDepthWiseKernelBufferV8Huffman(
                                             fprintf(pfile1, "vz:%d, biasL: 0x%x\n", filterIndex, biasL);
                                         }
 #endif
-#if !FEATURE_BFP16_ZRL_ENABLE
-                                        expL = expL ^ 0x80; /*~OrgValue[14]*/
-#endif
+                                        if(!kernelCompressZrlFix)
+                                        {
+                                            expL = expL ^ 0x80; /*~OrgValue[14]*/
+                                        }
                                         biasL = (expL << 8) | mantissaL | signedBit;
                                     }
 
@@ -5169,9 +5173,10 @@ void reorderDepthWiseKernelBufferV8Huffman(
                                     signedBit = 0;
 
                                 /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
-#if !FEATURE_BFP16_ZRL_ENABLE
-                                exp = exp ^ 0x80; /*~OrgValue[14]*/
-#endif
+                                if(!kernelCompressZrlFix)
+                                {
+                                    exp = exp ^ 0x80; /*~OrgValue[14]*/
+                                }
                                 temp = (exp << 8) | (mantissa << 1) | signedBit;
 
                                 *kernelBufferInt16Ptr = temp;
@@ -5257,6 +5262,7 @@ void reorderKernelBufferV8Huffman(
     vx_uint32 nonCoefIndex = 0, idx = 0, elementIndex = 0;
     vx_bool isBias = vx_false_e;
     vx_uint32 biasIdx = 0;
+    vx_bool kernelCompressZrlFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcFEATURE_BIT_BFLOAT_KERNEL_COMPRESSION_ZERO_SKIP_FIX);
 #if DUMP_BF16_ENC
     static vx_uint32 n = 0, offset = 0;
     vx_char fileName[128];
@@ -5400,9 +5406,10 @@ void reorderKernelBufferV8Huffman(
                                             signedBit = 0;
 
                                         /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
-#if !FEATURE_BFP16_ZRL_ENABLE
-                                        expH = expH ^ 0x80; /*~OrgValue[14]*/
-#endif
+                                        if(!kernelCompressZrlFix)
+                                        {
+                                            expH = expH ^ 0x80; /*~OrgValue[14]*/
+                                        }
                                         biasH = (expH << 8) | (mantissaH << 1) | signedBit;
 #if DUMP_BF16_ENC
                                         if(pfile1 != NULL)
@@ -5460,9 +5467,10 @@ void reorderKernelBufferV8Huffman(
                                         }
 #endif
                                         /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
-#if !FEATURE_BFP16_ZRL_ENABLE
-                                        expM = expM ^ 0x80; /*~OrgValue[14]*/
-#endif
+                                        if(!kernelCompressZrlFix)
+                                        {
+                                            expM = expM ^ 0x80; /*~OrgValue[14]*/
+                                        }
                                         biasM = (expM << 8) | mantissaM | signedBit;
                                     }
 
@@ -5519,9 +5527,10 @@ void reorderKernelBufferV8Huffman(
                                             fprintf(pfile1, "vz:%d, biasL: 0x%x\n", filterIndex, biasL);
                                         }
 #endif
-#if !FEATURE_BFP16_ZRL_ENABLE
-                                        expL = expL ^ 0x80; /*~OrgValue[14]*/
-#endif
+                                        if(!kernelCompressZrlFix)
+                                        {
+                                            expL = expL ^ 0x80; /*~OrgValue[14]*/
+                                        }
                                         biasL = (expL << 8) | mantissaL | signedBit;
                                     }
 
@@ -5603,9 +5612,10 @@ void reorderKernelBufferV8Huffman(
                                     signedBit = 0;
 
                                 /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
-#if !FEATURE_BFP16_ZRL_ENABLE
-                                exp = exp ^ 0x80; /*~OrgValue[14]*/
-#endif
+                                if(!kernelCompressZrlFix)
+                                {
+                                    exp = exp ^ 0x80; /*~OrgValue[14]*/
+                                }
                                 temp = (exp << 8) | (mantissa << 1) | signedBit;
 
                                 *kernelBufferInt16Ptr = temp;
@@ -11043,7 +11053,7 @@ vx_uint32 fillinTPKernelBuffer(
     vx_uint8_ptr kernelStreamBasePtr = VX_NULL;
     vx_uint32 filterIndex, sliceIndex;
     vx_uint32 rsvWeightCount = 0;
-
+    vx_bool kernelCompressZrlFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcFEATURE_BIT_BFLOAT_KERNEL_COMPRESSION_ZERO_SKIP_FIX);
     if (weightFomat == VX_TYPE_INT8 || weightFomat == VX_TYPE_UINT8)
     {
         if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VIP_V7))
@@ -11151,9 +11161,10 @@ vx_uint32 fillinTPKernelBuffer(
                         signedBit = 0;
 
                     /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
-#if !FEATURE_BFP16_ZRL_ENABLE
-                    exp = exp ^ 0x80; /*~OrgValue[14]*/
-#endif
+                    if(!kernelCompressZrlFix)
+                    {
+                        exp = exp ^ 0x80; /*~OrgValue[14]*/
+                    }
                     temp = (exp << 8) | (mantissa << 1) | signedBit;
 
                     weight = temp;
@@ -11250,6 +11261,7 @@ vx_uint32 fillinTPKernelBufferHuffman(
     vx_uint32 dummyStage[3] = {0};
     vx_uint32 dummyBitLength[3] = {0};
     vx_bool setDummy = vx_false_e;
+    vx_bool isTpFc1ByteAlign = gcoHAL_IsFeatureAvailable(gcvNULL, gcFEATURE_BIT_TP_KERNEL_1BYTE_ALGIN);
 
     vxmASSERT(huffmanConfig != VX_NULL);
 
@@ -11699,7 +11711,23 @@ vx_uint32 fillinTPKernelBufferHuffman(
         /* Go back to update kernelStreamSize. */
         writeBits(&kernelStreamSizePtr, &streamSizeBitOffset, kernelStreamSize*8 + bit_offset, 14);
         /*align to 64 byte after each kz*/
-        packZeros(&kernelBufferPtr, &bit_offset, alignedOffset);
+
+        /* 1. Only real data need to do 1 byte align
+           2. Only TP FC need to try 1 byte align. For TP case, according to out split strategy, it will be split to a lot of small pieces;
+               TP case will also split in vz size and since the size limitation is 512 bytes, the 512 bytes will be split to several part and
+               it will cause every part become small. So when we use 64 bytes align, there will be a lot of pad. That why we need to try 1 byte
+               align on TP FC. However, for NN case, the pieces are some so small, and the HW prefer 64 bytes align, so there is no need to do
+               1 byte align on NN case*/
+        if (isTpFc1ByteAlign)
+        {
+            vx_uint32 byteCount = (bit_offset % 8 == 0) ? (bit_offset / 8) : (bit_offset / 8 + 1);
+            kernelBufferPtr = (vx_uint32*)((vx_uint8*)kernelBufferPtr + byteCount);
+            bit_offset = 0;
+        }
+        else
+        {
+            packZeros(&kernelBufferPtr, &bit_offset, alignedOffset);
+        }
         prev = 0;
 
     }

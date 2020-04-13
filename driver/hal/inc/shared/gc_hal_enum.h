@@ -613,6 +613,9 @@ typedef enum _gceFEATURE
 
     gcvFEATURE_FORMAT_YUV_I010, /*support YUVI010 & P010_LSB format*/
 
+    gcFEATURE_BIT_NN_COMPRESSION_BYPASSS,
+    gcFEATURE_BIT_BFLOAT_KERNEL_COMPRESSION_ZERO_SKIP_FIX,
+    gcFEATURE_BIT_TP_KERNEL_1BYTE_ALGIN,
     /* Insert features above this comment only. */
     gcvFEATURE_COUNT                /* Not a feature. */
 }
