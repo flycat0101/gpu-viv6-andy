@@ -7522,6 +7522,9 @@ VX_INTERNAL_API void vxoGraph_GenerateOperationTable(vx_graph graph)
             vxmONERROR(VX_ERROR_INVALID_NODE);
         }
 
+        if (node->layer->num_operations == 0)
+            vxError("No operation found(%s)! \n", node->layer->name);
+
         for (j = 0; j < node->layer->num_operations; j++)
         {
             if ((gpuCount > 1) && enableMultiVIPCombined &&
