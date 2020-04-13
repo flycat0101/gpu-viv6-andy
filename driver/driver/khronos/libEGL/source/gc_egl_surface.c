@@ -498,11 +498,13 @@ _DestroySurfaceObjects(
         if (Surface->renderTarget != gcvNULL)
         {
 #if gcdENABLE_3D
+#if !gcdCAPTURE_ONLY_MODE
             surfView.surf = Surface->renderTarget;
             /* Flush pixels and disable the tile status. */
             gcmERR_BREAK(gcoSURF_DisableTileStatus(
                 &surfView, gcvFALSE
                 ));
+#endif
 #endif
 
             /* Destroy the render target. */
