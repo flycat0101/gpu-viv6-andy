@@ -9938,7 +9938,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
     #else
         vipSramInfo.sramBase = context->vipSRAM.physical;
     #endif
-        vipSramInfo.sramSize = context->vipSRAM.size;
+        vipSramInfo.sramSize = context->vipSRAM.size + VX_VIP_SRAM_IMAGE_STREAM_SIZE;
     }
     status = vxoBinaryGraph_Write(binarySave, currPos, sizeof(vx_binary_vip_sram_info_s), &vipSramInfo);
     WRITE_NBG_STATUS_CHECK();
