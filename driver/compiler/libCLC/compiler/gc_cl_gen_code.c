@@ -5076,8 +5076,6 @@ IN OUT gctUINT *NumTempRegNeeded
                 if (gcmIS_ERROR(status)) return status;
 
                 structEleParent = arrayElePrevSibling;
-
-                //gcmVERIFY_OK(_FreeStructElementAggregatedSymbol(Compiler, CodeGenerator, symbol));
             }
 
             preVarIndex = -1;
