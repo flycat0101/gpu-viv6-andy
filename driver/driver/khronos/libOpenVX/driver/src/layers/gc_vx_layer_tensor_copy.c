@@ -198,7 +198,8 @@ VX_PRIVATE_API vx_bool vxoNNTensorCopy_SH_EVIS_Support_Ext(vx_node node, const v
             || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16)
             || (inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16)
             || enable_dataConv2F32)
-            && src_elementCount == dst_elementCount);
+            && src_elementCount == dst_elementCount
+            && outputFormat != VX_TYPE_INT32);
     }
     else
     {
