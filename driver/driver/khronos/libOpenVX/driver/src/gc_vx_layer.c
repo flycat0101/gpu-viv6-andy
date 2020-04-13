@@ -17626,7 +17626,10 @@ vxnne_shader_executable vxnneGemmShaderExecutable(
 
         if (enable_2dTensor)
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_BF16", borderMode);
+            if (outputFormat == VX_TYPE_BFLOAT16)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_BF16", borderMode);
+            else
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_BF16toF32", borderMode);
             if (!shaderExecutable) goto OnError;
 
             execution_parameters.globalWorkScale[0]  = 4;
@@ -17635,13 +17638,21 @@ vxnne_shader_executable vxnneGemmShaderExecutable(
         {
             if (depth % 4 == 0)
             {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Tensor_BF16_4x", borderMode);
+                if (outputFormat == VX_TYPE_BFLOAT16)
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Tensor_BF16_4x", borderMode);
+                else
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Tensor_BF16toF32_4x", borderMode);
                 if (!shaderExecutable) goto OnError;
 
                 execution_parameters.globalWorkScale[2]  = 4;
             }
             else
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Tensor_BF16", borderMode);
+            {
+                if (outputFormat == VX_TYPE_BFLOAT16)
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Tensor_BF16", borderMode);
+                else
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Tensor_BF16toF32", borderMode);
+            }
             if (!shaderExecutable) goto OnError;
         }
 
