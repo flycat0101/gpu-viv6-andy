@@ -1330,16 +1330,6 @@ static int isrRoutinePoll(void *ctxt)
             return 0;
         }
 
-        if (unlikely(device->parkIsrThread))
-        {
-            /* The daemon exits. */
-            while (!kthread_should_park())
-            {
-                gckOS_Delay(device->os, 1);
-            }
-            kthread_parkme();
-        }
-
         if (core == gcvCORE_VG)
         {
             isrRoutineVG(-1, gcvNULL);
@@ -1389,7 +1379,6 @@ _SetupIsr(
             struct task_struct * task;
 
             Device->killIsrThread = gcvFALSE;
-            Device->parkIsrThread = gcvFALSE;
 
             task = kthread_run(isrRoutinePoll, (gctPOINTER)Core, "%s_poll", isrNames[Core]);
 
