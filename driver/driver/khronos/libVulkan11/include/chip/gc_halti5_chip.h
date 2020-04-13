@@ -314,11 +314,17 @@ typedef struct
     halti5_patch_key patchKey;
 } halti5_sampler;
 
+/* for ycbcr format, resue imgDesc
+   compatible with old pass, different with data layout, see create image !
+   image desc memory layout:
+   | part | part | part | part |
+   |    plane    |     plane   |
+*/
 typedef struct
 {
     HwTxDesc txDesc[__VK_MAX_PARTS];
     HwPEDesc peDesc;
-    HwImgDesc imgDesc[__VK_MAX_PARTS];
+    HwImgDesc imgDesc[__VK_MAX_PARTS * __VK_MAX_PLANE];
     uint32_t patchFormat;
     halti5_patch_key patchKey;
     HwResourceViewUsage usedUsageMask;
@@ -328,7 +334,7 @@ typedef struct
 
 typedef struct
 {
-    HwImgDesc imgDesc[__VK_MAX_PARTS];
+    HwImgDesc imgDesc[__VK_MAX_PARTS * __VK_MAX_PLANE];
     HwTxDesc txDesc[__VK_MAX_PARTS];
     HwSamplerDesc samplerDesc;
     uint32_t  patchFormat;
@@ -645,6 +651,7 @@ enum halti_patch_type
     HALTI5_PATCH_STORAGE_IMAGE_FORMAT    = 8,
     HALTI5_PATCH_SAMPLED_IMAGRE_FORMAT   = 9,
     HALTI5_PATCH_COMBINED_IMAGE_FORMAT   = 10,
+    HALTI5_PATCH_YCBCR_SAMPLER           = 11,
 };
 
 enum
@@ -660,6 +667,7 @@ enum
     HALTI5_PATCH_SORAGE_IMAGE_FORMAT_BIT      = 1 << HALTI5_PATCH_STORAGE_IMAGE_FORMAT,
     HALTI5_PATCH_SAMPLED_IMAGRE_FORMAT_BIT    = 1 << HALTI5_PATCH_SAMPLED_IMAGRE_FORMAT,
     HALTI5_PATCH_COMBINED_IMAGE_FORAMT_BIT    = 1 << HALTI5_PATCH_COMBINED_IMAGE_FORMAT,
+    HALTI5_PATCH_YCBCR_SAMPLER_BIT            = 1 << HALTI5_PATCH_YCBCR_SAMPLER,
 
     HALTI5_PATCHKEY_ALL_BITS                = 0xFFFF,
 };
@@ -674,6 +682,18 @@ typedef struct
     SwizzleComponent swizzles[4];
     VkImageViewType viewType;
     VkCompareOp   compareOp;
+
+    /* for ycbcr recompile */
+    HwImgDesc     *imgDesc;
+    int32_t       standard;
+    int32_t       range;
+    int32_t       channel;
+    int32_t       mode;
+    int32_t       bits;
+    int32_t       xChromaOffset;
+    int32_t       yChromaOffset;
+    int32_t       swapUV;
+    int32_t       chromaFilter;
 } halti5_patch_info;
 
 typedef struct

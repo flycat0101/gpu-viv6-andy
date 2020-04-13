@@ -1762,6 +1762,9 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBindDescriptorSets(
     {
         (*cmdBuf->devCtx->chipFuncs->BindDescritptors)(commandBuffer, pipelineBindPoint, firstSet, setCount);
     }
+
+    result = result;
+
     return;
 
 }
@@ -2178,7 +2181,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImage(
 #endif
                 }
             } while (VK_FALSE);
-
+#if !__VK_RESOURCE_INFO
             if (srcTmpImg != VK_NULL_HANDLE)
             {
                 __vk_DestroyImage((VkDevice)devCtx, srcTmpImg, VK_NULL_HANDLE);
@@ -2188,6 +2191,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImage(
             {
                 __vk_DestroyImage((VkDevice)devCtx, dstTmpImg, VK_NULL_HANDLE);
             }
+#endif
 
             __VK_ONERROR(result);
 
@@ -2461,7 +2465,8 @@ OnError:
             dstLayers = pRegions[ir].imageSubresource.layerCount;
         }
 
-        fmtInfo = __vk_GetVkFormatInfo(pDstImg->createInfo.format);
+        fmtInfo = __vk_GetPlaneFormatInfo(pDstImg, dstRes.u.img.subRes.aspectMask);
+        fmtInfo = fmtInfo ? fmtInfo : __vk_GetVkFormatInfo(pDstImg->createInfo.format);
         srcWidth  = (pRegions[ir].bufferRowLength != 0)   ? pRegions[ir].bufferRowLength   : pRegions[ir].imageExtent.width;
         srcHeight = (pRegions[ir].bufferImageHeight != 0) ? pRegions[ir].bufferImageHeight : pRegions[ir].imageExtent.height;
         srcWidth = gcmALIGN_NP2(srcWidth, fmtInfo->blockSize.width);

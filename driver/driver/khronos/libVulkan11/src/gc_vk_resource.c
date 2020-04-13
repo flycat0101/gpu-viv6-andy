@@ -848,14 +848,24 @@ __vkFormatInfo g_vkFormatInfoTable[] =
     __VK_FORMAT_DEPTH_FEATURES,
     0}},
     /*  __VK_FORMAT_G8B8G8R8_422_RGB_IDENTITY_UNORM, */
-    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 1, 1}, 32, 1, __VK_FORMAT_G8B8G8R8_422_RGB_IDENTITY_UNORM,
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 2, 1}, 32, 1, __VK_FORMAT_G8B8G8R8_422_RGB_IDENTITY_UNORM,
     {0,
-    __VK_FORMAT_DEPTH_FEATURES,
+    __VK_FORMAT_SAMPLE_IMAGE_FEATURES,
     0}},
     /*  __VK_FORMAT_B8G8R8G8_422_RGB_IDENTITY_UNORM, */
-    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 1, 1}, 32, 1, __VK_FORMAT_B8G8R8G8_422_RGB_IDENTITY_UNORM,
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 2, 1}, 32, 1, __VK_FORMAT_B8G8R8G8_422_RGB_IDENTITY_UNORM,
     {0,
-    __VK_FORMAT_DEPTH_FEATURES,
+    __VK_FORMAT_SAMPLE_IMAGE_FEATURES,
+    0}},
+    /*  __VK_FORMAT_G8B8G8R8_422_NARROW_RANGE_UNORM, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 2, 1}, 32, 1, __VK_FORMAT_G8B8G8R8_422_NARROW_RANGE_UNORM,
+    {0,
+    __VK_FORMAT_SAMPLE_IMAGE_FEATURES,
+    0}},
+    /*  __VK_FORMAT_B8G8R8G8_422_NARROW_RANGE_UNORM, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 2, 1}, 32, 1, __VK_FORMAT_B8G8R8G8_422_NARROW_RANGE_UNORM,
+    {0,
+    __VK_FORMAT_SAMPLE_IMAGE_FEATURES,
     0}},
 };
 
@@ -872,24 +882,30 @@ __vkFormatInfo g_vkFormatInfoTable1000156[] =
      __VK_FORMAT_YCBCR_CONVERSION_FEATURES | VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT,
      0}},
     /*   VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM, */
-    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {2, 1}, 32, 1, VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM,
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {1, 1}, 24, 1, VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM,
     {__VK_FORMAT_YCBCR_CONVERSION_FEATURES | VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT,
      __VK_FORMAT_YCBCR_CONVERSION_FEATURES | VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT,
      0}},
     /*   VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, */
-    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {2, 1}, 32, 1, VK_FORMAT_G8_B8R8_2PLANE_420_UNORM,
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {1, 1}, 16, 1, VK_FORMAT_G8_B8R8_2PLANE_420_UNORM,
     {__VK_FORMAT_YCBCR_CONVERSION_FEATURES | VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT,
      __VK_FORMAT_YCBCR_CONVERSION_FEATURES | VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT,
      0}},
     /*   VK_FORMAT_G8_B8_R8_3PLANE_422_UNORM, */
-    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {2, 1}, 32, 1, VK_FORMAT_G8_B8_R8_3PLANE_422_UNORM,
-    {0, 0, 0}},
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {1, 1}, 24, 1, VK_FORMAT_G8_B8_R8_3PLANE_422_UNORM,
+    {__VK_FORMAT_YCBCR_CONVERSION_FEATURES | VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT,
+     __VK_FORMAT_YCBCR_CONVERSION_FEATURES | VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT,
+     0}},
     /*   VK_FORMAT_G8_B8R8_2PLANE_422_UNORM, */
-    {__VK_FMT_CATEGORY_UNORM, VK_TRUE, {2, 1}, 32, 1, VK_FORMAT_G8_B8R8_2PLANE_422_UNORM,
-    {0, 0, 0}},
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {1, 1}, 16, 1, VK_FORMAT_G8_B8R8_2PLANE_422_UNORM,
+    {__VK_FORMAT_YCBCR_CONVERSION_FEATURES | VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT,
+     __VK_FORMAT_YCBCR_CONVERSION_FEATURES | VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT,
+     0}},
     /*   VK_FORMAT_G8_B8_R8_3PLANE_444_UNORM, */
-    {__VK_FMT_CATEGORY_UNORM, VK_TRUE, {1, 1}, 24, 1, VK_FORMAT_G8_B8_R8_3PLANE_444_UNORM,
-    {0, 0, 0}},
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {1, 1}, 24, 1, VK_FORMAT_G8_B8_R8_3PLANE_444_UNORM,
+    {__VK_FORMAT_YCBCR_CONVERSION_FEATURES | VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT,
+     __VK_FORMAT_YCBCR_CONVERSION_FEATURES | VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT,
+     0}},
     /*   VK_FORMAT_R10X6_UNORM_PACK16, */
     {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {1, 1}, 16, 1, VK_FORMAT_R10X6_UNORM_PACK16,
     {0, 0, 0}},
@@ -993,6 +1009,165 @@ __vkFormatInfo * __vk_GetVkFormatInfo(
     else
     {
         return &g_vkFormatInfoTable[VK_FORMAT_UNDEFINED];
+    }
+}
+
+__vkYCbCrFormatInfo __vk_GetYCbCrFormatInfo(
+    VkFormat format
+    )
+{
+    __vkYCbCrFormatInfo info = {0, 1, 1, 1, 8};
+
+    info.bYUVFormat = format >= VK_FORMAT_G8B8G8R8_422_UNORM && format <= VK_FORMAT_G16_B16_R16_3PLANE_444_UNORM;
+
+    switch (format)
+    {
+    case VK_FORMAT_G8B8G8R8_422_UNORM:
+        info.planeCount     = 1;
+        info.uvHorzSample   = 2;
+        info.uvVertSample   = 1;
+        info.bitsPerChannel = 8;
+        info.planeFormat[0] = VK_FORMAT_R8G8_UNORM;
+        break;
+    case VK_FORMAT_B8G8R8G8_422_UNORM:
+        info.planeCount     = 1;
+        info.uvHorzSample   = 2;
+        info.uvVertSample   = 1;
+        info.bitsPerChannel = 8;
+        info.planeFormat[0] = VK_FORMAT_R8G8_UNORM;
+        break;
+    case VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM:
+        info.planeCount     = 3;
+        info.uvHorzSample   = 2;
+        info.uvVertSample   = 2;
+        info.bitsPerChannel = 8;
+        info.planeFormat[0] = VK_FORMAT_R8_UNORM;
+        info.planeFormat[1] = VK_FORMAT_R8_UNORM;
+        info.planeFormat[2] = VK_FORMAT_R8_UNORM;
+        break;
+    case VK_FORMAT_G8_B8R8_2PLANE_420_UNORM:
+        info.planeCount     = 2;
+        info.uvHorzSample   = 2;
+        info.uvVertSample   = 2;
+        info.bitsPerChannel = 8;
+        info.planeFormat[0] = VK_FORMAT_R8_UNORM;
+        info.planeFormat[1] = VK_FORMAT_R8G8_UNORM;
+        break;
+    case VK_FORMAT_G8_B8_R8_3PLANE_422_UNORM:
+        info.planeCount     = 3;
+        info.uvHorzSample   = 2;
+        info.uvVertSample   = 1;
+        info.bitsPerChannel = 8;
+        info.planeFormat[0] = VK_FORMAT_R8_UNORM;
+        info.planeFormat[1] = VK_FORMAT_R8_UNORM;
+        info.planeFormat[2] = VK_FORMAT_R8_UNORM;
+        break;
+    case VK_FORMAT_G8_B8R8_2PLANE_422_UNORM:
+        info.planeCount     = 2;
+        info.uvHorzSample   = 2;
+        info.uvVertSample   = 1;
+        info.bitsPerChannel = 8;
+        info.planeFormat[0] = VK_FORMAT_R8_UNORM;
+        info.planeFormat[1] = VK_FORMAT_R8G8_UNORM;
+        break;
+    case VK_FORMAT_G8_B8_R8_3PLANE_444_UNORM:
+        info.planeCount     = 3;
+        info.uvHorzSample   = 1;
+        info.uvVertSample   = 1;
+        info.bitsPerChannel = 8;
+        info.planeFormat[0] = VK_FORMAT_R8_UNORM;
+        info.planeFormat[1] = VK_FORMAT_R8_UNORM;
+        info.planeFormat[2] = VK_FORMAT_R8_UNORM;
+        break;
+    case VK_FORMAT_R10X6_UNORM_PACK16:
+    case VK_FORMAT_R10X6G10X6_UNORM_2PACK16:
+    case VK_FORMAT_R10X6G10X6B10X6A10X6_UNORM_4PACK16:
+    case VK_FORMAT_G10X6B10X6G10X6R10X6_422_UNORM_4PACK16:
+    case VK_FORMAT_B10X6G10X6R10X6G10X6_422_UNORM_4PACK16:
+    case VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16:
+    case VK_FORMAT_G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16:
+    case VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16:
+    case VK_FORMAT_G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16:
+    case VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16:
+    case VK_FORMAT_R12X4_UNORM_PACK16:
+    case VK_FORMAT_R12X4G12X4_UNORM_2PACK16:
+    case VK_FORMAT_R12X4G12X4B12X4A12X4_UNORM_4PACK16:
+    case VK_FORMAT_G12X4B12X4G12X4R12X4_422_UNORM_4PACK16:
+    case VK_FORMAT_B12X4G12X4R12X4G12X4_422_UNORM_4PACK16:
+    case VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16:
+    case VK_FORMAT_G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16:
+    case VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16:
+    case VK_FORMAT_G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16:
+    case VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16:
+    case VK_FORMAT_G16B16G16R16_422_UNORM:
+    case VK_FORMAT_B16G16R16G16_422_UNORM:
+    case VK_FORMAT_G16_B16_R16_3PLANE_420_UNORM:
+    case VK_FORMAT_G16_B16R16_2PLANE_420_UNORM:
+    case VK_FORMAT_G16_B16_R16_3PLANE_422_UNORM:
+    case VK_FORMAT_G16_B16R16_2PLANE_422_UNORM:
+    case VK_FORMAT_G16_B16_R16_3PLANE_444_UNORM:
+    default:
+        __VK_ASSERT(0 && "not implement");
+        break;
+    }
+
+    return info;
+}
+
+int32_t __vk_GetPlaneIndex(
+    VkImageAspectFlags flags
+    )
+{
+    int32_t plane = -1;
+    if (flags & VK_IMAGE_ASPECT_PLANE_0_BIT)
+    {
+        plane = 0;
+    }
+    else if (flags & VK_IMAGE_ASPECT_PLANE_1_BIT)
+    {
+        plane = 1;
+    }
+    else if (flags & VK_IMAGE_ASPECT_PLANE_2_BIT)
+    {
+        plane = 2;
+    }
+
+    return plane;
+}
+
+__vkFormatInfo *__vk_GetPlaneFormatInfo(
+    __vkImage *pImage,
+    VkImageAspectFlags flags
+    )
+{
+    int32_t plane = __vk_GetPlaneIndex(flags);
+
+    if (pImage->ycbcrFormatInfo.bYUVFormat)
+    {
+        plane = plane < 0 ? 0 : plane;
+        return __vk_GetVkFormatInfo(pImage->ycbcrFormatInfo.planeFormat[plane]);
+    }
+    else
+    {
+        return VK_NULL_HANDLE;
+    }
+}
+
+VkDeviceSize __vk_GetPlaneOffset(
+    __vkImage *pImage,
+    VkImageAspectFlags flags,
+    int32_t level
+    )
+{
+    int32_t plane = __vk_GetPlaneIndex(flags);
+
+    if (pImage->ycbcrFormatInfo.bYUVFormat && plane > -1)
+    {
+        return pImage->pImgLevels[level].planeOffset[plane];
+    }
+    else
+    {
+        return 0;
     }
 }
 
@@ -2761,6 +2936,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
         img->memCb = __VK_ALLOCATIONCB;
         gcoOS_MemCopy(&img->createInfo, pCreateInfo, gcmSIZEOF(VkImageCreateInfo));
 
+        img->ycbcrFormatInfo = __vk_GetYCbCrFormatInfo(img->createInfo.format);
+
         /* For linear with usage == VK_IMAGE_USAGE_TRANSFER_DST|SRC_BIT use native Vulkan format as resident format */
         if (((pCreateInfo->usage & (~(VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT))) == 0)
             && (pCreateInfo->tiling == VK_IMAGE_TILING_LINEAR))
@@ -2941,6 +3118,71 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
             pLevel->partSize  = pLevel->sliceSize * pLevel->requestD;
             pLevel->size      = pLevel->partSize * pLevel->partCount;
 
+            if (img->ycbcrFormatInfo.bYUVFormat)
+            {
+                int32_t plane = 0;
+                VkDeviceSize planeOffset = 0;
+                int32_t planeCount  = img->ycbcrFormatInfo.planeCount;
+                int32_t w = width;
+                int32_t h = height;
+
+
+                __VK_ASSERT(pLevel->partCount == 1);
+                __VK_ASSERT(img->ycbcrFormatInfo.bYUVFormat);
+
+                w = gcmALIGN_NP2(w, img->formatInfo.blockSize.width);
+                h = gcmALIGN_NP2(h, img->formatInfo.blockSize.height);
+
+                pLevel->planeRequestW[0] = width;
+                pLevel->planeRequestH[0] = height;
+
+                pLevel->planeRequestW[1] = pLevel->planeRequestW[2] = w / img->ycbcrFormatInfo.uvHorzSample;
+                pLevel->planeRequestH[1] = pLevel->planeRequestH[2] = h / img->ycbcrFormatInfo.uvVertSample;
+
+                pLevel->planeAllocedW[0] = w;
+                pLevel->planeAllocedH[0] = h;
+                pLevel->planeAllocedW[1] = pLevel->planeAllocedW[2] = pLevel->planeRequestW[1];
+                pLevel->planeAllocedH[1] = pLevel->planeAllocedH[2] = pLevel->planeRequestH[1];
+
+                /* memory layout of level *******************
+                  | plane | plane | plane | plane |  => plane
+                  |     slice     |     slice     |  => layer
+                  |              part             |  => part
+                *********************************************/
+                for (plane = 0; plane < planeCount; plane++)
+                {
+                    __vkFormatInfo planeInfo = *__vk_GetVkFormatInfo(img->ycbcrFormatInfo.planeFormat[plane]);
+
+                    pLevel->planeAlignedW[plane]    = gcmALIGN_NP2(pLevel->planeAllocedW[plane], alignX);
+                    pLevel->planeAlignedH[plane]    = gcmALIGN_NP2(pLevel->planeAllocedH[plane], alignY);
+
+                    pLevel->planeOffset[plane]  = planeOffset;
+                    pLevel->planeStride[plane]  = pLevel->planeAlignedW[plane] * planeInfo.bitsPerBlock / 8;
+                    pLevel->planeStride[plane] /= pLevel->partCount;
+                    pLevel->planeSize[plane]    = pLevel->planeStride[plane] * pLevel->planeAlignedH[plane];
+
+                    planeOffset += pLevel->planeSize[plane];
+                    planeOffset  = gcmALIGN(planeOffset, alignment);
+                }
+
+                pLevel->sliceSize = planeOffset;
+                pLevel->partSize  = pLevel->sliceSize * pLevel->requestD;
+                pLevel->size      = pLevel->partSize * pLevel->partCount;
+            }
+            else
+            {
+                pLevel->planeRequestW[0] = pLevel->requestW;
+                pLevel->planeRequestH[0] = pLevel->requestH;
+                pLevel->planeAllocedW[0] = pLevel->allocedW;
+                pLevel->planeAllocedH[0] = pLevel->allocedH;
+                pLevel->planeAlignedW[0] = pLevel->alignedW;
+                pLevel->planeAlignedH[0] = pLevel->alignedH;
+
+                pLevel->planeOffset[0]  = 0;
+                pLevel->planeStride[0]  = pLevel->stride;
+                pLevel->planeSize[0]    = pLevel->sliceSize;
+            }
+
             pLevel->offset    = totalBytes;
             totalBytes       += pLevel->size;
 
@@ -3030,11 +3272,19 @@ VKAPI_ATTR void VKAPI_CALL __vk_GetImageSubresourceLayout(
 {
     __vkImage *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, image);
     __vkImageLevel *pLevel = &img->pImgLevels[pSubresource->mipLevel];
+    int32_t planeIdx = __vk_GetPlaneIndex(pSubresource->aspectMask);
 
     pLayout->offset = pLevel->offset + pLevel->sliceSize * pSubresource->arrayLayer;
     pLayout->size = pLevel->sliceSize;
     pLayout->rowPitch = pLevel->stride;
     pLayout->depthPitch = img->createInfo.imageType == VK_IMAGE_TYPE_3D ? pLevel->sliceSize : 0;
+
+    if (planeIdx > -1)
+    {
+        pLayout->offset  += pLevel->planeOffset[planeIdx];
+        pLayout->size     = pLevel->planeSize[planeIdx];
+        pLayout->rowPitch = pLevel->planeStride[planeIdx];
+    }
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImageView(
@@ -3047,7 +3297,13 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImageView(
     VkResult result = VK_SUCCESS;
     __vkDevContext *devCtx = (__vkDevContext*)device;
     __vkImageView *imv = VK_NULL_HANDLE;
+    __vkImage     *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, pCreateInfo->image);
     uint32_t residentFormat = __vk_GetVkFormatInfo(pCreateInfo->format)->residentImgFormat;
+    __vkSamplerYcbcrConversion *ycbcrConversion = VK_NULL_HANDLE;
+
+    /* according to spec, when do YCbCr conversion and aspectMask is VK_IMAGE_ASPECT_COLOR_BIT,
+        format of image view must be identical to image */
+    VkBool32 ycbcrPlaneView = pCreateInfo->format != img->createInfo.format && img->ycbcrFormatInfo.bYUVFormat;
 
     VkBaseInStructure *baseIn = (VkBaseInStructure *)pCreateInfo->pNext;
 
@@ -3061,34 +3317,30 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImageView(
         case VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO:
             {
                 VkSamplerYcbcrConversionInfo *conversionInfo = (VkSamplerYcbcrConversionInfo *)baseIn;
-                __vkSamplerYcbcrConversion *ycbcrConversion = (__vkSamplerYcbcrConversion*)conversionInfo->conversion;
+                ycbcrConversion = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSamplerYcbcrConversion*, conversionInfo->conversion);
 
-                if (ycbcrConversion->createInfo.ycbcrModel == VK_SAMPLER_YCBCR_MODEL_CONVERSION_RGB_IDENTITY &&
-                    (residentFormat == VK_FORMAT_G8B8G8R8_422_UNORM || residentFormat == VK_FORMAT_B8G8R8G8_422_UNORM))
+                __VK_ASSERT((ycbcrPlaneView && __vk_GetPlaneIndex(pCreateInfo->subresourceRange.aspectMask) > -1) ||
+                             (!ycbcrPlaneView && __vk_GetPlaneIndex(pCreateInfo->subresourceRange.aspectMask) == -1) );
+                /* disable this for all YCbCr format go recompile pass */
+                if (!ycbcrPlaneView)
                 {
-                    residentFormat = residentFormat - VK_FORMAT_G8B8G8R8_422_UNORM + __VK_FORMAT_G8B8G8R8_422_RGB_IDENTITY_UNORM;
-                }
-                else if ((ycbcrConversion->createInfo.ycbcrModel == VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_601 ||
-                     ycbcrConversion->createInfo.ycbcrModel == VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_709) &&
-                     ycbcrConversion->createInfo.ycbcrRange == VK_SAMPLER_YCBCR_RANGE_ITU_NARROW &&
-                    (residentFormat == VK_FORMAT_G8B8G8R8_422_UNORM || residentFormat == VK_FORMAT_B8G8R8G8_422_UNORM))
-                {
-                    /* native support */
-                }
-                else
-                {
-                    /* not support */
-                    result = VK_ERROR_FEATURE_NOT_PRESENT;
-                    goto OnError;
+                    if (ycbcrConversion->createInfo.ycbcrModel == VK_SAMPLER_YCBCR_MODEL_CONVERSION_RGB_IDENTITY &&
+                        (residentFormat == VK_FORMAT_G8B8G8R8_422_UNORM || residentFormat == VK_FORMAT_B8G8R8G8_422_UNORM))
+                    {
+                        residentFormat = residentFormat - VK_FORMAT_G8B8G8R8_422_UNORM + __VK_FORMAT_G8B8G8R8_422_RGB_IDENTITY_UNORM;
+                    }
+                    else if ((ycbcrConversion->createInfo.ycbcrModel == VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_601 ||
+                         ycbcrConversion->createInfo.ycbcrModel == VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_709) &&
+                         ycbcrConversion->createInfo.ycbcrRange == VK_SAMPLER_YCBCR_RANGE_ITU_NARROW &&
+                        (residentFormat == VK_FORMAT_G8B8G8R8_422_UNORM || residentFormat == VK_FORMAT_B8G8R8G8_422_UNORM))
+                    {
+                        residentFormat = residentFormat - VK_FORMAT_G8B8G8R8_422_UNORM + __VK_FORMAT_G8B8G8R8_422_NARROW_RANGE_UNORM;
+                    }
                 }
                 baseIn = (VkBaseInStructure *)conversionInfo->pNext;
             }
             break;
         default:
-            {
-                baseIn = VK_NULL_HANDLE;
-                __VK_ASSERT(!"unknown pNext in imageView createInfo ");
-            }
             break;
         }
     }
@@ -3099,6 +3351,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImageView(
         imv->devCtx = devCtx;
         imv->memCb = __VK_ALLOCATIONCB;
         imv->formatInfo = __vk_GetVkFormatInfo((VkFormat) residentFormat);
+        imv->ycbcrConversion = ycbcrConversion;
+        imv->ycbcrPlaneView  = ycbcrPlaneView;
 
         gcoOS_MemCopy(&imv->createInfo, pCreateInfo, gcmSIZEOF(VkImageViewCreateInfo));
 
@@ -3150,15 +3404,37 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateSampler(
     __vkDevContext *devCtx = (__vkDevContext *)device;
     __vkSampler *spl;
     VkResult result;
+    __vkSamplerYcbcrConversion *ycbcrConversion = VK_NULL_HANDLE;
+    VkBaseInStructure *baseIn = (VkBaseInStructure *)pCreateInfo->pNext;
 
     /* Set the allocator to the parent allocator or API defined allocator if valid */
     __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
+
+    while (baseIn)
+    {
+        switch (baseIn->sType)
+        {
+        case VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO:
+            {
+                VkSamplerYcbcrConversionInfo *conversionInfo = (VkSamplerYcbcrConversionInfo *)baseIn;
+                ycbcrConversion = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSamplerYcbcrConversion*, conversionInfo->conversion);
+            }
+            break;
+        default:
+            {
+                __VK_ASSERT(!"unknown pNext in createSampler createInfo ");
+            }
+            break;
+        }
+        baseIn = (VkBaseInStructure *)baseIn->pNext;
+    }
 
     __VK_ONERROR(__vk_CreateObject(devCtx, __VK_OBJECT_SAMPLER, sizeof(__vkSampler), (__vkObject**)&spl));
 
     /* Initialize __vkSampler specific data fields here */
     __VK_MEMCOPY(&spl->createInfo, pCreateInfo, sizeof(VkSamplerCreateInfo));
     spl->memCb = __VK_ALLOCATIONCB;
+    spl->ycbcrConversion = ycbcrConversion;
 
     __VK_ONERROR((*devCtx->chipFuncs->CreateSampler)(device, (VkSampler)(uintptr_t)spl));
 

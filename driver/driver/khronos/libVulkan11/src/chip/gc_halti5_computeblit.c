@@ -206,20 +206,25 @@ static VkResult halti5_program_blit_src_tex(
     uint32_t hwSamplerNo;
     uint32_t tmpFormat;
     uint32_t address;
+    int32_t  planeIdx = 0;
 
     if (srcRes->isImage)
     {
         __vkImage *pSrcImg = srcRes->u.img.pImage;
         __vkImageLevel *pSrcLevel = &pSrcImg->pImgLevels[srcRes->u.img.subRes.mipLevel];
+        planeIdx = __vk_GetPlaneIndex(srcRes->u.img.subRes.aspectMask);
+        planeIdx = planeIdx < 0 ? 0 : planeIdx;
 
         params->srcOffset = srcRes->u.img.offset;
         params->srcExtent = srcRes->u.img.extent;
-        params->srcSize.width  = pSrcLevel->requestW * pSrcImg->sampleInfo.x;
-        params->srcSize.height = pSrcLevel->requestH * pSrcImg->sampleInfo.y;
+
+        params->srcSize.width  = pSrcLevel->planeAllocedW[planeIdx];
+        params->srcSize.height = pSrcLevel->planeAllocedH[planeIdx];
         params->srcSize.depth  = pSrcLevel->requestD;
 
-        fmtInfo = __vk_GetVkFormatInfo((VkFormat) pSrcImg->formatInfo.residentImgFormat);
-        txStride = (uint32_t)pSrcLevel->stride;
+        fmtInfo = __vk_GetPlaneFormatInfo(pSrcImg, srcRes->u.img.subRes.aspectMask);
+        fmtInfo = __vk_GetVkFormatInfo((VkFormat)(fmtInfo == VK_NULL_HANDLE ? pSrcImg->formatInfo.residentImgFormat : fmtInfo->residentImgFormat));
+        txStride = (uint32_t)pSrcLevel->planeStride[planeIdx];
         txSliceSize = (uint32_t)pSrcLevel->sliceSize;
 
         txType = (pSrcImg->createInfo.imageType == VK_IMAGE_TYPE_3D) ? 0x3 : 0x2;
@@ -230,6 +235,7 @@ static VkResult halti5_program_blit_src_tex(
         address = pSrcImg->memory->devAddr;
         address += (uint32_t)(pSrcImg->memOffset + pSrcLevel->offset +
                               srcRes->u.img.subRes.arrayLayer * pSrcLevel->sliceSize);
+        address += (uint32_t)__vk_GetPlaneOffset(pSrcImg, srcRes->u.img.subRes.aspectMask, srcRes->u.img.subRes.mipLevel);
 
         partCount = pSrcImg->formatInfo.partCount;
         partSize = (uint32_t)pSrcLevel->partSize;
@@ -292,6 +298,8 @@ static VkResult halti5_program_blit_src_tex(
         {
             VkExtent2D rect = fmtInfo->blockSize;
 
+            /* GBGR ycbcr fromat is 2X1 compressed, but when do copy and plane view, treat as R8G8_unorm */
+            __VK_ASSERT(fmtInfo->blockSize.width != 2);
             params->srcOffset.x = gcmALIGN_NP2(params->srcOffset.x - rect.width  + 1, rect.width );
             params->srcOffset.y = gcmALIGN_NP2(params->srcOffset.y - rect.height + 1, rect.height);
             params->srcExtent.width  = gcmALIGN_NP2(params->srcExtent.width, rect.width ) / rect.width;
@@ -916,12 +924,15 @@ static VkResult halti5_program_blit_dst_img(
     __vkImageView  *imgView = gcvNULL;
     __vkBufferView *bufView = gcvNULL;
     SHADER_UAV_SLOT_MAPPING *hwMapping = gcvNULL;
-    HwImgDesc hwImgDesc[__VK_MAX_PARTS];
+    HwImgDesc hwImgDesc[__VK_MAX_PARTS * __VK_MAX_PLANE];
     uint32_t hwConstRegAddr;
     uint32_t partCount = 1;
     VkExtent3D *pUserSize = gcvNULL;
     gcsHINT_PTR pHints = &blitProg->hwStates.hints;
     VkResult result = VK_SUCCESS;
+    int32_t planeIdx = 0;
+    __vkFormatInfo *fmtInfo = VK_NULL_HANDLE;
+    VkBool32 bYCbCr = VK_FALSE;
 
     __VK_MEMZERO(hwImgDesc, sizeof(hwImgDesc));
 
@@ -944,8 +955,12 @@ static VkResult halti5_program_blit_dst_img(
         tmpImgView.createInfo.subresourceRange.baseArrayLayer = dstRes->u.img.subRes.arrayLayer;
         tmpImgView.createInfo.subresourceRange.layerCount = 1;
         tmpImgView.createInfo.subresourceRange.aspectMask = dstRes->u.img.subRes.aspectMask;
+        planeIdx = __vk_GetPlaneIndex(dstRes->u.img.subRes.aspectMask);
+        fmtInfo  = planeIdx > -1 ? __vk_GetPlaneFormatInfo(pDstImg, dstRes->u.img.subRes.aspectMask) : &pDstImg->formatInfo;
+        planeIdx = planeIdx < 0 ? 0 : planeIdx;
+        bYCbCr   = pDstImg->ycbcrFormatInfo.bYUVFormat;
 
-        __VK_MEMCOPY(&tmpFormatInfo, &pDstImg->formatInfo, sizeof(tmpFormatInfo));
+        __VK_MEMCOPY(&tmpFormatInfo, fmtInfo, sizeof(tmpFormatInfo));
 
         tmpFormatInfo.residentImgFormat = params->dstFormat;
         switch (tmpFormatInfo.residentImgFormat)
@@ -1052,7 +1067,7 @@ static VkResult halti5_program_blit_dst_img(
     }
     __VK_ONERROR(halti5_helper_convertHwImgDesc(devCtx, imgView, bufView, pUserSize, hwImgDesc));
 
-    if (params->rawCopy && imgView && imgView->formatInfo->compressed)
+    if (params->rawCopy && imgView && imgView->formatInfo->compressed && !bYCbCr)
     {
         VkBool32 srcCompressed = srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed;
         VkExtent2D rect = imgView->formatInfo->blockSize;
@@ -1076,7 +1091,7 @@ static VkResult halti5_program_blit_dst_img(
             params->dstOffset.x *= 2;
             params->dstExtent.width *= 2;
         }
-        hwImgDesc[0].imageInfo[2] = width | (height << 16);
+        hwImgDesc[planeIdx * __VK_MAX_PARTS + 0].imageInfo[2] = width | (height << 16);
     }
 
     hwMapping = &blitProg->dstImgEntry[0]->hwMappings[VSC_SHADER_STAGE_CS];
@@ -1085,7 +1100,7 @@ static VkResult halti5_program_blit_dst_img(
     hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
                    + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
                    + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
-    __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[0].imageInfo);
+    __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[planeIdx * __VK_MAX_PARTS + 0].imageInfo);
 
     if (partCount == 2)
     {
@@ -1095,7 +1110,7 @@ static VkResult halti5_program_blit_dst_img(
         hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
                        + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
                        + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
-        __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[1].imageInfo);
+        __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[planeIdx * __VK_MAX_PARTS + 1].imageInfo);
     }
 
 OnError:
@@ -1115,20 +1130,24 @@ VkResult halti5_program_clear_dst_img(
     __vkImageView  *imgView = gcvNULL;
     __vkBufferView *bufView = gcvNULL;
     SHADER_UAV_SLOT_MAPPING *hwMapping = gcvNULL;
-    HwImgDesc hwImgDesc[__VK_MAX_PARTS];
+    HwImgDesc hwImgDesc[__VK_MAX_PARTS * __VK_MAX_PLANE];
     uint32_t hwConstRegAddr;
     VkExtent3D *pUserSize = gcvNULL;
     gcsHINT_PTR pHints = &blitProg->hwStates.hints;
     VkResult result = VK_SUCCESS;
+    int32_t planeIdx = 0;
 
     __VK_MEMZERO(hwImgDesc, sizeof(hwImgDesc));
 
     if (dstRes->isImage)
     {
+        __vkFormatInfo *fmtInfo = VK_NULL_HANDLE;
         static __vkImageView tmpImgView;
         static __vkFormatInfo tmpFormatInfo;
         __vkImage *pDstImg = dstRes->u.img.pImage;
         uint32_t bitsPerPixel = pDstImg->formatInfo.bitsPerBlock / pDstImg->formatInfo.partCount;
+
+        __VK_ASSERT(!dstRes->u.img.pImage->ycbcrFormatInfo.bYUVFormat);
 
         __VK_MEMZERO(&tmpImgView, sizeof(tmpImgView));
         tmpImgView.obj.sType = __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_IMAGE_VIEW);
@@ -1142,9 +1161,14 @@ VkResult halti5_program_clear_dst_img(
         tmpImgView.createInfo.subresourceRange.levelCount = 1;
         tmpImgView.createInfo.subresourceRange.baseArrayLayer = dstRes->u.img.subRes.arrayLayer;
         tmpImgView.createInfo.subresourceRange.layerCount = 1;
+        tmpImgView.createInfo.subresourceRange.aspectMask = dstRes->u.img.subRes.aspectMask;
+
+        planeIdx = __vk_GetPlaneIndex(dstRes->u.img.subRes.aspectMask);
+        fmtInfo  = planeIdx > -1 ? __vk_GetPlaneFormatInfo(pDstImg, dstRes->u.img.subRes.aspectMask) : &pDstImg->formatInfo;
+        planeIdx = planeIdx < 0 ? 0 : planeIdx;
 
         __VK_MEMZERO(&tmpFormatInfo, sizeof(tmpFormatInfo));
-        __VK_MEMCOPY(&tmpFormatInfo, &pDstImg->formatInfo, sizeof(tmpFormatInfo));
+        __VK_MEMCOPY(&tmpFormatInfo, fmtInfo, sizeof(tmpFormatInfo));
 
         switch (bitsPerPixel)
         {
@@ -1206,7 +1230,7 @@ VkResult halti5_program_clear_dst_img(
     hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
                    + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
                    + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
-    __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[0].imageInfo);
+    __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[planeIdx * __VK_MAX_PARTS + 0].imageInfo);
 
     if (blitProg->kind == HALTI3_CLEAR_TO_2LAYERS_IMG)
     {
@@ -1217,7 +1241,7 @@ VkResult halti5_program_clear_dst_img(
         hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
             + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
             + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
-        __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[1].imageInfo);
+        __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[planeIdx * __VK_MAX_PARTS + 1].imageInfo);
     }
 
 OnError:
@@ -1488,11 +1512,12 @@ static VkResult halti5_program_copy_src_img(
     __vkImageView  *imgView = gcvNULL;
     __vkBufferView *bufView = gcvNULL;
     SHADER_UAV_SLOT_MAPPING *hwMapping = gcvNULL;
-    HwImgDesc hwImgDesc[__VK_MAX_PARTS];
+    HwImgDesc hwImgDesc[__VK_MAX_PARTS * __VK_MAX_PLANE];
     uint32_t hwConstRegAddr;
     VkExtent3D *pUserSize = gcvNULL;
     gcsHINT_PTR pHints = &blitProg->hwStates.hints;
     VkResult result = VK_SUCCESS;
+    int32_t planeIdx = 0;
 
     __VK_MEMZERO(hwImgDesc, sizeof(hwImgDesc));
 
@@ -1501,6 +1526,7 @@ static VkResult halti5_program_copy_src_img(
         static __vkImageView tmpImgView;
         static __vkFormatInfo tmpFormatInfo;
         __vkImage *pSrcImg = srcRes->u.img.pImage;
+        int32_t bpp;
 
         params->srcOffset = srcRes->u.img.offset;
 
@@ -1516,9 +1542,14 @@ static VkResult halti5_program_copy_src_img(
         tmpImgView.createInfo.subresourceRange.levelCount = 1;
         tmpImgView.createInfo.subresourceRange.baseArrayLayer = srcRes->u.img.subRes.arrayLayer;
         tmpImgView.createInfo.subresourceRange.layerCount = 1;
+        tmpImgView.createInfo.subresourceRange.aspectMask = srcRes->u.img.subRes.aspectMask;
+
+        planeIdx = __vk_GetPlaneIndex(srcRes->u.img.subRes.aspectMask);
+        bpp  = planeIdx > -1 ? __vk_GetPlaneFormatInfo(pSrcImg, srcRes->u.img.subRes.aspectMask)->bitsPerBlock : pSrcImg->formatInfo.bitsPerBlock;
+        planeIdx = planeIdx < 0 ? 0 : planeIdx;
 
         __VK_MEMZERO(&tmpFormatInfo, sizeof(tmpFormatInfo));
-        switch (pSrcImg->formatInfo.bitsPerBlock)
+        switch (bpp)
         {
         case 128:
             __VK_MEMCOPY(&tmpFormatInfo, __vk_GetVkFormatInfo(VK_FORMAT_R16G16B16A16_UINT), sizeof(tmpFormatInfo));
@@ -1613,7 +1644,7 @@ static VkResult halti5_program_copy_src_img(
     hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
                    + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
                    + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
-    __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[0].imageInfo);
+    __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[planeIdx * __VK_MAX_PARTS + 0].imageInfo);
 
     if (blitProg->kind == HALTI5_BLIT_2LAYERS_IMG_TO_BUF)
     {
@@ -1623,7 +1654,7 @@ static VkResult halti5_program_copy_src_img(
         hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
                        + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
                        + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
-        __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[1].imageInfo);
+        __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[planeIdx * __VK_MAX_PARTS + 1].imageInfo);
     }
 
 OnError:
@@ -1643,12 +1674,13 @@ static VkResult halti5_program_copy_dst_img(
     __vkImageView  *imgView = gcvNULL;
     __vkBufferView *bufView = gcvNULL;
     SHADER_UAV_SLOT_MAPPING *hwMapping = gcvNULL;
-    HwImgDesc hwImgDesc[__VK_MAX_PARTS];
+    HwImgDesc hwImgDesc[__VK_MAX_PARTS * __VK_MAX_PLANE];
     uint32_t hwConstRegAddr;
     VkExtent3D *pUserSize = gcvNULL;
     __vkImage *pSrcImg = srcRes->u.img.pImage;
     gcsHINT_PTR pHints = &blitProg->hwStates.hints;
     VkResult result = VK_SUCCESS;
+    int32_t  planeIdx = 0;
 
     __VK_MEMZERO(hwImgDesc, sizeof(hwImgDesc));
 
@@ -1659,6 +1691,7 @@ static VkResult halti5_program_copy_dst_img(
         __vkImage *pDstImg = dstRes->u.img.pImage;
         __vkImageLevel *pImgLevel = &pDstImg->pImgLevels[dstRes->u.img.subRes.mipLevel];
         static VkExtent3D userSize;
+        int32_t bpp;
 
         params->dstOffset = dstRes->u.img.offset;
         params->dstExtent = dstRes->u.img.extent;
@@ -1675,9 +1708,14 @@ static VkResult halti5_program_copy_dst_img(
         tmpImgView.createInfo.subresourceRange.levelCount = 1;
         tmpImgView.createInfo.subresourceRange.baseArrayLayer = dstRes->u.img.subRes.arrayLayer;
         tmpImgView.createInfo.subresourceRange.layerCount = 1;
+        tmpImgView.createInfo.subresourceRange.aspectMask = dstRes->u.img.subRes.aspectMask;
+
+        planeIdx = __vk_GetPlaneIndex(dstRes->u.img.subRes.aspectMask);
+        bpp  = planeIdx > -1 ? __vk_GetPlaneFormatInfo(pDstImg, dstRes->u.img.subRes.aspectMask)->bitsPerBlock : pDstImg->formatInfo.bitsPerBlock;
+        planeIdx = planeIdx < 0 ? 0 : planeIdx;
 
         __VK_MEMZERO(&tmpFormatInfo, sizeof(tmpFormatInfo));
-        switch (pDstImg->formatInfo.bitsPerBlock)
+        switch (bpp)
         {
         case 128:
             __VK_MEMCOPY(&tmpFormatInfo, __vk_GetVkFormatInfo(VK_FORMAT_R16G16B16A16_UINT), sizeof(tmpFormatInfo));
@@ -1784,7 +1822,7 @@ static VkResult halti5_program_copy_dst_img(
 
         bufView = &tmpBufView;
 
-        if (pSrcImg->formatInfo.compressed)
+        if (pSrcImg->formatInfo.compressed && !pSrcImg->ycbcrFormatInfo.bYUVFormat)
         {
             VkExtent2D rect = pSrcImg->formatInfo.blockSize;
             __vkImageLevel *pImgLevel = &pSrcImg->pImgLevels[srcRes->u.img.subRes.mipLevel];
@@ -1842,7 +1880,7 @@ static VkResult halti5_program_copy_dst_img(
     hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
                    + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
                    + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
-    __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[0].imageInfo);
+    __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[planeIdx * __VK_MAX_PARTS + 0].imageInfo);
 
     if (blitProg->kind == HALTI5_BLIT_BUF_TO_2LAYERS_IMG)
     {
@@ -1853,7 +1891,7 @@ static VkResult halti5_program_copy_dst_img(
         hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
                        + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
                        + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
-        __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[1].imageInfo);
+        __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[planeIdx * __VK_MAX_PARTS + 1].imageInfo);
     }
 
 OnError:
@@ -2150,12 +2188,14 @@ static uint32_t halti5_detect_blit_kind(
     if (srcRes->isImage)
     {
         pSrcImg = srcRes->u.img.pImage;
+        fmtInfo = __vk_GetPlaneFormatInfo(pSrcImg, srcRes->u.img.subRes.aspectMask);
+        fmtInfo = fmtInfo == VK_NULL_HANDLE ? &pSrcImg->formatInfo : fmtInfo;
 
-        srcFormat = pSrcImg->formatInfo.residentImgFormat;
-        srcParts = pSrcImg->formatInfo.partCount;
-        srcCategory = pSrcImg->formatInfo.category;
+        srcFormat = fmtInfo->residentImgFormat;
+        srcParts = fmtInfo->partCount;
+        srcCategory = fmtInfo->category;
         srcType = pSrcImg->createInfo.imageType;
-        srcBitsPerPixel = pSrcImg->formatInfo.bitsPerBlock;
+        srcBitsPerPixel = fmtInfo->bitsPerBlock;
         srcMsaa = (pSrcImg->sampleInfo.product > 1);
         srcAspect = srcRes->u.img.subRes.aspectMask;
 
@@ -2169,7 +2209,7 @@ static uint32_t halti5_detect_blit_kind(
         }
 
         /* for compressed image, when do copy to buffer, it is R16G16B16A16 format, it must be tile align */
-        if (pSrcImg->formatInfo.compressed)
+        if (pSrcImg->formatInfo.compressed && !pSrcImg->ycbcrFormatInfo.bYUVFormat)
         {
             VkExtent2D rect = pSrcImg->formatInfo.blockSize;
             uint32_t   width  = pSrcImg->createInfo.extent.width;
@@ -2186,7 +2226,8 @@ static uint32_t halti5_detect_blit_kind(
     {
         pDstImg = dstRes->u.img.pImage;
 
-        srcFormat = pDstImg->createInfo.format;
+        fmtInfo = __vk_GetPlaneFormatInfo(pDstImg, dstRes->u.img.subRes.aspectMask);
+        srcFormat = fmtInfo == VK_NULL_HANDLE ? pDstImg->createInfo.format : fmtInfo->residentImgFormat;
         fmtInfo = __vk_GetVkFormatInfo((VkFormat) srcFormat);
         srcParts = fmtInfo->partCount;
         srcCategory = fmtInfo->category;
@@ -2211,8 +2252,8 @@ static uint32_t halti5_detect_blit_kind(
     if (dstRes->isImage)
     {
         pDstImg = dstRes->u.img.pImage;
-
-        dstFormat = pDstImg->formatInfo.residentImgFormat;
+        fmtInfo = __vk_GetPlaneFormatInfo(pDstImg, dstRes->u.img.subRes.aspectMask);
+        dstFormat = fmtInfo == VK_NULL_HANDLE ? pDstImg->formatInfo.residentImgFormat : fmtInfo->residentImgFormat;
         dstParts = pDstImg->formatInfo.partCount;
         dstCategory = pDstImg->formatInfo.category;
         dstBitsPerPixel = pDstImg->formatInfo.bitsPerBlock;
@@ -2231,8 +2272,9 @@ static uint32_t halti5_detect_blit_kind(
     else
     {
         pSrcImg = srcRes->u.img.pImage;
+        fmtInfo = __vk_GetPlaneFormatInfo(pSrcImg, srcRes->u.img.subRes.aspectMask);
 
-        dstFormat = pSrcImg->createInfo.format;
+        dstFormat = fmtInfo == VK_NULL_HANDLE ? pSrcImg->createInfo.format : fmtInfo->residentImgFormat;
         fmtInfo = __vk_GetVkFormatInfo((VkFormat) dstFormat);
         dstParts = fmtInfo->partCount;
         dstCategory = fmtInfo->category;

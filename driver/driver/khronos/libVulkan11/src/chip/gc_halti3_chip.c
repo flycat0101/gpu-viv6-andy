@@ -1095,12 +1095,13 @@ VkResult halti3_program_copy_src_img(
     __vkImageView  *imgView = gcvNULL;
     __vkBufferView *bufView = gcvNULL;
     SHADER_UAV_SLOT_MAPPING *hwMapping = gcvNULL;
-    HwImgDesc hwImgDesc[__VK_MAX_PARTS];
+    HwImgDesc hwImgDesc[__VK_MAX_PARTS * __VK_MAX_PLANE];
     uint32_t hwConstRegAddr;
     VkExtent3D *pBufSize = gcvNULL;
     gcsHINT_PTR pHints = &blitProg->hwStates.hints;
     uint32_t imageDesc = 0;
     VkResult result = VK_SUCCESS;
+    int32_t planeIdx = 0;
 
     __VK_MEMZERO(hwImgDesc, sizeof(hwImgDesc));
 
@@ -1127,8 +1128,13 @@ VkResult halti3_program_copy_src_img(
         tmpImgView.createInfo.subresourceRange.levelCount = 1;
         tmpImgView.createInfo.subresourceRange.baseArrayLayer = srcRes->u.img.subRes.arrayLayer;
         tmpImgView.createInfo.subresourceRange.layerCount = 1;
+        tmpImgView.createInfo.subresourceRange.aspectMask = srcRes->u.img.subRes.aspectMask;
 
-        __VK_MEMCOPY(&tmpFormatInfo, &pSrcImg->formatInfo, sizeof(tmpFormatInfo));
+        planeIdx = __vk_GetPlaneIndex(srcRes->u.img.subRes.aspectMask);
+        fmtInfo  = planeIdx > -1 ? __vk_GetPlaneFormatInfo(pSrcImg, dstRes->u.img.subRes.aspectMask) : &pSrcImg->formatInfo;
+        planeIdx = planeIdx < 0 ? 0 : planeIdx;
+
+        __VK_MEMCOPY(&tmpFormatInfo, &fmtInfo, sizeof(tmpFormatInfo));
 
         tmpFormatInfo.residentImgFormat = params->srcFormat;
 
@@ -1167,7 +1173,7 @@ VkResult halti3_program_copy_src_img(
         __vkImage *pDstImg = dstRes->u.img.pImage;
         const __vkFormatInfo *fmtInfo = gcvNULL;
         uint32_t imgFormat = VK_FORMAT_UNDEFINED;
-
+        __vkYCbCrFormatInfo YCbCrFormatInfo;
         params->srcOffset.x = params->srcOffset.y = params->srcOffset.z = 0;
 
         __VK_MEMZERO(&tmpBufView, sizeof(tmpBufView));
@@ -1195,8 +1201,9 @@ VkResult halti3_program_copy_src_img(
                  : pDstImg->createInfo.format;
 
         fmtInfo = __vk_GetVkFormatInfo((VkFormat) imgFormat);
+        YCbCrFormatInfo = __vk_GetYCbCrFormatInfo((VkFormat)imgFormat);
 
-        if (params->rawCopy && fmtInfo->compressed)
+        if (params->rawCopy && fmtInfo->compressed && !YCbCrFormatInfo.bYUVFormat)
         {
             VkExtent2D rect = fmtInfo->blockSize;
 
@@ -1211,7 +1218,7 @@ VkResult halti3_program_copy_src_img(
     }
     __VK_ONERROR(halti5_helper_convertHwImgDesc(devCtx, imgView, bufView, pBufSize, hwImgDesc));
 
-    imageDesc = hwImgDesc[0].imageInfo[3];
+    imageDesc = hwImgDesc[planeIdx * __VK_MAX_PARTS + 0].imageInfo[3];
 
     if (params->txSwizzles)
     {
@@ -1336,7 +1343,7 @@ VkResult halti3_program_copy_src_img(
  12:12) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 12:12) - (0 ? 12:12) + 1))))))) << (0 ? 12:12)));
 
-        hwImgDesc[0].imageInfo[3] = imageDesc;
+        hwImgDesc[planeIdx * __VK_MAX_PARTS + 0].imageInfo[3] = imageDesc;
     }
 
     hwMapping = &blitProg->srcImgEntry[0]->hwMappings[VSC_SHADER_STAGE_CS];
@@ -1345,7 +1352,7 @@ VkResult halti3_program_copy_src_img(
     hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
                    + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
                    + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
-    __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[0].imageInfo);
+    __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[planeIdx * __VK_MAX_PARTS + 0].imageInfo);
 
 OnError:
     return result;
@@ -1364,11 +1371,13 @@ VkResult halti3_program_copy_dst_img(
     __vkImageView  *imgView = gcvNULL;
     __vkBufferView *bufView = gcvNULL;
     SHADER_UAV_SLOT_MAPPING *hwMapping = gcvNULL;
-    HwImgDesc hwImgDesc[__VK_MAX_PARTS];
+    HwImgDesc hwImgDesc[__VK_MAX_PARTS * __VK_MAX_PLANE];
     uint32_t hwConstRegAddr;
     VkExtent3D *pBufSize = gcvNULL;
     gcsHINT_PTR pHints = &blitProg->hwStates.hints;
     VkResult result = VK_SUCCESS;
+    int32_t planeIdx = 0;
+    VkBool32 bYCbCr = VK_FALSE;
 
     __VK_MEMZERO(hwImgDesc, sizeof(hwImgDesc));
 
@@ -1377,6 +1386,7 @@ VkResult halti3_program_copy_dst_img(
         static __vkImageView tmpImgView;
         static __vkFormatInfo tmpFormatInfo;
         __vkImage *pDstImg = dstRes->u.img.pImage;
+        __vkFormatInfo *fmtInfo = VK_NULL_HANDLE;
 
         params->dstOffset = dstRes->u.img.offset;
 
@@ -1392,8 +1402,13 @@ VkResult halti3_program_copy_dst_img(
         tmpImgView.createInfo.subresourceRange.levelCount = 1;
         tmpImgView.createInfo.subresourceRange.baseArrayLayer = dstRes->u.img.subRes.arrayLayer;
         tmpImgView.createInfo.subresourceRange.layerCount = 1;
+        tmpImgView.createInfo.subresourceRange.aspectMask = dstRes->u.img.subRes.aspectMask;
+        planeIdx = __vk_GetPlaneIndex(dstRes->u.img.subRes.aspectMask);
+        fmtInfo  = planeIdx > -1 ? __vk_GetPlaneFormatInfo(pDstImg, dstRes->u.img.subRes.aspectMask) : &pDstImg->formatInfo;
+        planeIdx = planeIdx < 0 ? 0 : planeIdx;
+        bYCbCr   = pDstImg->ycbcrFormatInfo.bYUVFormat;
 
-        __VK_MEMCOPY(&tmpFormatInfo, &pDstImg->formatInfo, sizeof(tmpFormatInfo));
+        __VK_MEMCOPY(&tmpFormatInfo, fmtInfo, sizeof(tmpFormatInfo));
 
         tmpFormatInfo.residentImgFormat = params->dstFormat;
 
@@ -1464,7 +1479,7 @@ VkResult halti3_program_copy_dst_img(
     }
     __VK_ONERROR(halti5_helper_convertHwImgDesc(devCtx, imgView, bufView, pBufSize, hwImgDesc));
 
-    if (params->rawCopy && imgView && imgView->formatInfo->compressed)
+    if (params->rawCopy && imgView && imgView->formatInfo->compressed && !bYCbCr)
     {
         VkBool32 srcCompressed = srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed;
         VkExtent2D rect = imgView->formatInfo->blockSize;
@@ -1485,7 +1500,7 @@ VkResult halti3_program_copy_dst_img(
             params->dstOffset.x *= 2;
             params->dstExtent.width *= 2;
         }
-        hwImgDesc[0].imageInfo[2] = width | (height << 16);
+        hwImgDesc[planeIdx * __VK_MAX_PARTS + 0].imageInfo[2] = width | (height << 16);
     }
 
     hwMapping = &blitProg->dstImgEntry[0]->hwMappings[VSC_SHADER_STAGE_CS];
@@ -1494,7 +1509,7 @@ VkResult halti3_program_copy_dst_img(
     hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
                    + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
                    + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
-    __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[0].imageInfo);
+    __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[planeIdx * __VK_MAX_PARTS + 0].imageInfo);
 
 OnError:
     return result;

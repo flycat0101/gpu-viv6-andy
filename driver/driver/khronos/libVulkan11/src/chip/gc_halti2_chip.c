@@ -1089,6 +1089,7 @@ VkResult halti2_copyImageWithRS(
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)commandBuffer;
     __vkDevContext *devCtx = cmd->devCtx;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
+    __vkFormatInfo *fmtInfo = VK_NULL_HANDLE;
     VkBool32 flushSHL1 = VK_FALSE;
 
     if (!srcRes->isImage && !dstRes->isImage)
@@ -1102,13 +1103,18 @@ VkResult halti2_copyImageWithRS(
     {
         __vkImage *srcImg = srcRes->u.img.pImage;
         __vkImageLevel *pSrcLevel = &srcImg->pImgLevels[srcRes->u.img.subRes.mipLevel];
+        int32_t planeIdx = 0;
+
+        planeIdx = __vk_GetPlaneIndex(srcRes->u.img.subRes.aspectMask);
+        fmtInfo  = planeIdx > -1 ? __vk_GetPlaneFormatInfo(srcImg, srcRes->u.img.subRes.aspectMask) : &srcImg->formatInfo;
+        planeIdx = planeIdx < 0 ? 0 : planeIdx;
 
         srcOffset = srcRes->u.img.offset;
         srcExtent = srcRes->u.img.extent;
 
         srcStride = (uint32_t)pSrcLevel->stride;
         srcSampleInfo = srcImg->sampleInfo;
-        srcFormat = srcImg->formatInfo.residentImgFormat;
+        srcFormat = fmtInfo->residentImgFormat;
         if (srcImg->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT &&
            (srcImg->createInfo.format == VK_FORMAT_B4G4R4A4_UNORM_PACK16/* ||
            (!devCtx->database->PE_A8B8G8R8 &&
@@ -1125,6 +1131,8 @@ VkResult halti2_copyImageWithRS(
         srcAddress += (uint32_t)(srcImg->memOffset + pSrcLevel->offset +
                                  srcRes->u.img.subRes.arrayLayer * pSrcLevel->sliceSize);
         srcEndAddr = srcAddress + (uint32_t)pSrcLevel->sliceSize - 1;
+        srcAddress += (uint32_t)__vk_GetPlaneOffset(srcImg, srcRes->u.img.subRes.aspectMask, srcRes->u.img.subRes.mipLevel);
+
         srcMsaa = (srcImg->sampleInfo.product > 1);
         rsConfigTiling(srcImg, &srcTiling, &srcSuperTile);
 
@@ -1157,7 +1165,8 @@ VkResult halti2_copyImageWithRS(
         srcSuperTile = 0x0;
         srcMsaa      = VK_FALSE;
 
-        srcFormat = dstImg->createInfo.format;
+        fmtInfo = __vk_GetPlaneFormatInfo(dstImg, dstRes->u.img.subRes.aspectMask);
+        srcFormat = fmtInfo == VK_NULL_HANDLE ? dstImg->createInfo.format : fmtInfo->residentImgFormat;
         fmtInfo = __vk_GetVkFormatInfo((VkFormat) srcFormat);
         srcParts = fmtInfo->partCount;
         srcWidth = srcRes->u.buf.rowLength != 0 ? srcRes->u.buf.rowLength : dstRes->u.img.extent.width;
@@ -1170,13 +1179,18 @@ VkResult halti2_copyImageWithRS(
     {
         __vkImage *dstImg = dstRes->u.img.pImage;
         __vkImageLevel *pDstLevel = &dstImg->pImgLevels[dstRes->u.img.subRes.mipLevel];
+        int32_t planeIdx = 0;
+
+        planeIdx = __vk_GetPlaneIndex(dstRes->u.img.subRes.aspectMask);
+        fmtInfo  = planeIdx > -1 ? __vk_GetPlaneFormatInfo(dstImg, dstRes->u.img.subRes.aspectMask) : &dstImg->formatInfo;
+        planeIdx = planeIdx < 0 ? 0 : planeIdx;
 
         dstOffset = dstRes->u.img.offset;
         dstExtent = dstRes->u.img.extent;
 
         dstStride = (uint32_t)pDstLevel->stride;
         dstSampleInfo = dstImg->sampleInfo;
-        dstFormat = dstImg->formatInfo.residentImgFormat;
+        dstFormat = fmtInfo->residentImgFormat;
         if (dstImg->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT &&
            (dstImg->createInfo.format == VK_FORMAT_B4G4R4A4_UNORM_PACK16/* ||
            (!devCtx->database->PE_A8B8G8R8 &&
@@ -1193,6 +1207,8 @@ VkResult halti2_copyImageWithRS(
         dstAddress += (uint32_t)(dstImg->memOffset + pDstLevel->offset +
                                  dstRes->u.img.subRes.arrayLayer * pDstLevel->sliceSize);
         dstEndAddr = dstAddress + (uint32_t)pDstLevel->sliceSize - 1;
+        dstAddress += (uint32_t)__vk_GetPlaneOffset(dstImg, dstRes->u.img.subRes.aspectMask, dstRes->u.img.subRes.mipLevel);
+
         dstMsaa = (dstImg->sampleInfo.product > 1);
         rsConfigTiling(dstImg, &dstTiling, &dstSuperTile);
 
@@ -1225,7 +1241,8 @@ VkResult halti2_copyImageWithRS(
         dstSuperTile = 0x0;
         dstMsaa      = VK_FALSE;
 
-        dstFormat = srcImg->createInfo.format;
+        fmtInfo = __vk_GetPlaneFormatInfo(srcImg, srcRes->u.img.subRes.aspectMask);
+        dstFormat = fmtInfo == VK_NULL_HANDLE ? srcImg->createInfo.format : fmtInfo->residentImgFormat;
         fmtInfo = __vk_GetVkFormatInfo((VkFormat) dstFormat);
         dstParts = fmtInfo->partCount;
         dstWidth  = dstRes->u.buf.rowLength != 0 ? dstRes->u.buf.rowLength : srcRes->u.img.extent.width;
