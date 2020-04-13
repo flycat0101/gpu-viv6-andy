@@ -3136,7 +3136,7 @@ gckOS_AllocatePagedMemory(
     mdl->numPages   = numPages;
     mdl->contiguous = Flag & gcvALLOC_FLAG_CONTIGUOUS;
     mdl->cacheable  = Flag & gcvALLOC_FLAG_CACHEABLE;
-    mdl->>cpuAccessible = gcvTRUE;
+    mdl->cpuAccessible = gcvTRUE;
 
     /*
      * Add this to a global list.
