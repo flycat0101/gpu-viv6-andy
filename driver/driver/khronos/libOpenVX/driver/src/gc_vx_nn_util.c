@@ -5757,7 +5757,7 @@ vx_status vxoFlushTensorImage(vx_graph graph)
     vxnne_execution_layer   executionLayer = (vxnne_execution_layer)&graph->layer->base;
 
     if(executionLayer == VX_NULL)
-        return vx_false_e;
+        return VX_FAILURE;
 
     for (j = 0; j < executionLayer->swapcount; ++j)
     {
@@ -5770,6 +5770,12 @@ vx_status vxoFlushTensorImage(vx_graph graph)
                 {
                     gcoOS_CacheFlush(gcvNULL, tensor->tensorBuffer->memory.wrappedNode[0], tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.wrappedSize[0]);
                     gcoOS_CacheInvalidate(gcvNULL, tensor->tensorBuffer->memory.wrappedNode[0], tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.wrappedSize[0]);
+
+                    if (tensor->tensorBuffer->memory.nodePtrs[0] != VX_NULL &&
+                    tensor->tensorBuffer->memory.logicals[0] != tensor->tensorBuffer->memory.nodePtrs[0]->logical)
+                    {
+                        gcoOS_MemCopy(tensor->tensorBuffer->memory.nodePtrs[0]->logical, tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.sizes[0]);
+                    }
                 }
             }
             else if(executionLayer->swapHandle[j]->ref->type == VX_TYPE_IMAGE)
@@ -5782,13 +5788,18 @@ vx_status vxoFlushTensorImage(vx_graph graph)
                     {
                         gcoOS_CacheFlush(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
                         gcoOS_CacheInvalidate(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
+
+                        if (image->memory.nodePtrs[p] != VX_NULL && image->memory.logicals[p] != image->memory.nodePtrs[p]->logical)
+                        {
+                            gcoOS_MemCopy(image->memory.nodePtrs[p]->logical, image->memory.logicals[p], image->memory.sizes[p]);
+                        }
                     }
                 }
             }
         }
     }
 
-    return  vx_true_e;
+    return  VX_SUCCESS;
 }
 vx_bool _IsSameDataType(
     vx_tensor src,

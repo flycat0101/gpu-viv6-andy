@@ -2641,7 +2641,28 @@ _ReshapeTensor(
     tensor_create_params.sizes = newDims;
     tensor_create_params.data_format = TENSOR_DATA_TYPE(tensor);
     tensor_create_params.quant_format = TENSOR_QUANT_TYPE(tensor);
-    if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+
+    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT) && TENSOR_QUANT_TYPE(tensor) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL/* && (tensor_create_params->data_format == VX_TYPE_UINT8 || tensor_create_params->data_format == VX_TYPE_INT8)*/)
+    {
+        vx_uint32 channelCount = TENSOR_TF_SCALE_COUNT(tensor);
+
+        tensor_create_params.quant_data.affinePerChannel.scales = (vx_float32 *)vxAllocateAndZeroMemory(channelCount * sizeof(vx_float32));
+        if (TENSOR_TF_SCALE_POINTER(tensor) == VX_NULL)
+        {
+            vxError("vxoTensor_Create: Out of memory");
+        }
+
+        gcoOS_MemCopy(tensor_create_params.quant_data.affinePerChannel.scales, TENSOR_TF_SCALE_POINTER(tensor), channelCount * sizeof(vx_float32));
+
+        tensor_create_params.quant_data.affinePerChannel.zeroPoint = (vx_int32 *)vxAllocateAndZeroMemory(channelCount * sizeof(vx_int32));
+        if (TENSOR_TF_ZEROPOINT_POINTER(tensor) == VX_NULL)
+        {
+            vxError("vxoTensor_Create: Out of memory");
+        }
+
+        gcoOS_MemCopy(tensor_create_params.quant_data.affinePerChannel.zeroPoint, TENSOR_TF_ZEROPOINT_POINTER(tensor), channelCount * sizeof(vx_int32));
+
+    }else if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
     {
         tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(tensor);
     }
@@ -4070,6 +4091,13 @@ VX_API_ENTRY vx_status VX_API_CALL vxFlushHandle(vx_reference ref)
             {
                 gcoOS_CacheFlush(gcvNULL, tensor->tensorBuffer->memory.wrappedNode[0], tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.wrappedSize[0]);
                 gcoOS_CacheInvalidate(gcvNULL, tensor->tensorBuffer->memory.wrappedNode[0], tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.wrappedSize[0]);
+
+                if (tensor->tensorBuffer->memory.nodePtrs[0] != VX_NULL &&
+                    tensor->tensorBuffer->memory.logicals[0] != tensor->tensorBuffer->memory.nodePtrs[0]->logical)
+                {
+                    gcoOS_MemCopy(tensor->tensorBuffer->memory.nodePtrs[0]->logical, tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.sizes[0]);
+                }
+
                 tensor->tensorBuffer->memory.isDirty = vx_false_e;
             }
             status = VX_SUCCESS;
@@ -4089,6 +4117,12 @@ VX_API_ENTRY vx_status VX_API_CALL vxFlushHandle(vx_reference ref)
                 {
                     gcoOS_CacheFlush(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
                     gcoOS_CacheInvalidate(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
+
+                    if (image->memory.nodePtrs[p] != VX_NULL && image->memory.logicals[p] != image->memory.nodePtrs[p]->logical)
+                    {
+                        gcoOS_MemCopy(image->memory.nodePtrs[p]->logical, image->memory.logicals[p], image->memory.sizes[p]);
+                    }
+
                     image->memory.isDirty = vx_false_e;
                 }
             }
