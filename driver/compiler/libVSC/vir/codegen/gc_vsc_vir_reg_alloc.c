@@ -1425,6 +1425,7 @@ static void _VIR_RA_LS_Init(
     VIR_RA_LS_SetExtendLSEndPoint(pRA, gcvFALSE);
     VIR_RA_LS_SetInstIdChanged(pRA, gcvFALSE);
     VIR_RA_LS_SetEnableDebug(pRA, gcvFALSE);
+    VIR_RA_LS_SetDeadInstSet(pRA, gcvNULL);
     VIR_RA_LS_SetDisableDual16AndRecolor(pRA, gcvFALSE);
 
     memset(&pRA->checkRedefinedResInfo, 0, sizeof(VSC_CHECK_REDEFINED_RES));
@@ -1467,6 +1468,34 @@ void VIR_RA_ColorPool_Finalize(
     {
         vscBV_Finalize(&pCP->colorMap[i].usedColor);
     }
+}
+
+static void _VIR_RA_LS_DeleteDeadInsts(
+    VIR_RA_LS*              pRA
+    )
+{
+    VSC_HASH_TABLE*         pDestInstSet = VIR_RA_LS_GetDeadInstSet(pRA);
+    VSC_HASH_ITERATOR       deadInstSetIter;
+    VSC_DIRECT_HNODE_PAIR   deadInstSetPair;
+
+    if (pDestInstSet== gcvNULL)
+    {
+        return;
+    }
+
+    vscHTBLIterator_Init(&deadInstSetIter, pDestInstSet);
+    for(deadInstSetPair = vscHTBLIterator_DirectFirst(&deadInstSetIter);
+        IS_VALID_DIRECT_HNODE_PAIR(&deadInstSetPair);
+        deadInstSetPair = vscHTBLIterator_DirectNext(&deadInstSetIter))
+    {
+        VIR_Instruction*    pDeadInst = (VIR_Instruction*)VSC_DIRECT_HNODE_PAIR_FIRST(&deadInstSetPair);
+        gcmASSERT(VIR_Inst_GetFlags(pDeadInst) & VIR_INSTFLAG_DEAD_INST);
+        VIR_Pass_DeleteInstruction(VIR_Inst_GetFunction(pDeadInst), pDeadInst, gcvNULL);
+    }
+
+    /* Destory the dead instruction set if exist. */
+    vscHTBL_Destroy(pDestInstSet);
+    VIR_RA_LS_SetDeadInstSet(pRA, gcvNULL);
 }
 
 static void _VIR_RA_LS_Final(
@@ -8707,16 +8736,6 @@ _VIR_RA_LS_InsertSpillOffset(
                        VIR_HALF_CHANNEL_MASK_FULL,
                        gcvNULL);
 
-    /* Remove mova if pInst is its only user or there is not user anymore. */
-    if (vscVIR_IsUniqueUsageInstOfDefInst(pLvInfo->pDuInfo, pMovaInst, pInst, gcvNULL, gcvFALSE, gcvNULL, gcvNULL, gcvNULL))
-    {
-        VIR_Pass_DeleteInstruction(pFunc, pMovaInst, gcvNULL);
-        if (pRA->bReservedMovaReg)
-        {
-             _VSC_RA_MOVA_RemoveConstValAllChannel(pRA->movaHash, pMovaInst);
-        }
-    }
-
     /* All data registers that used in MAD instruction are valid now. */
     retErrCode = _VIR_RA_LS_InvalidDataRegisterUsedMask(pRA, pInst);
     if(retErrCode != VSC_ERR_NONE) return retErrCode;
@@ -11264,13 +11283,7 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
         ** If the dest operand of a MOVA is invalid(optimize this in _VIR_RA_LS_AssignColorForA0B0Inst),
         ** then we don't need to write the source operand.
         */
-        if (VIR_Inst_GetFlags(pInst) & VIR_INSTFLAG_DEAD_INST)
-        {
-            gcmASSERT(VIR_Operand_GetHwRegId(VIR_Inst_GetDest(pInst)) == VIR_INVALID_HWREG);
-
-            VIR_Pass_DeleteInstruction(pFunc, pInst, gcvNULL);
-        }
-        else
+        if (VIR_Operand_GetHwRegId(VIR_Inst_GetDest(pInst)) != VIR_INVALID_HWREG)
         {
             _VIR_RA_LS_RewriteColor_Src(pRA, pInst, pInst->src[0], pInst, pInst->src[0]);
         }
@@ -11888,10 +11901,24 @@ VSC_ErrCode _VIR_RA_LS_AssignColorForA0B0Inst(
 
             if (bAllUsageSpilled)
             {
+                VSC_HASH_TABLE*     pDestInstSet = VIR_RA_LS_GetDeadInstSet(pRA);
+
                 _VIR_RA_LS_ExpireActiveLRs(pRA, VIR_Inst_GetId(pInst));
 
                 /* This MOVA is unused and can be deleted. */
                 VIR_Inst_SetFlag(pInst, VIR_INSTFLAG_DEAD_INST);
+                if (pRA->bReservedMovaReg)
+                {
+                     _VSC_RA_MOVA_RemoveConstValAllChannel(pRA->movaHash, pInst);
+                }
+
+                if (pDestInstSet == gcvNULL)
+                {
+                    pDestInstSet = vscHTBL_Create(VIR_RA_LS_GetMM(pRA), vscHFUNC_Default, vscHKCMP_Default, 8);
+                    VIR_RA_LS_SetDeadInstSet(pRA, pDestInstSet);
+                }
+                vscHTBL_DirectSet(pDestInstSet, (void *)pInst, gcvNULL);
+
                 return retValue;
             }
         }
@@ -13504,6 +13531,9 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
     {
         _VIR_RA_LS_WriteDebugInfo(&ra);
     }
+
+    /* Delete the dead instructions. */
+    _VIR_RA_LS_DeleteDeadInsts(&ra);
 
     /* dump after */
     if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption),
