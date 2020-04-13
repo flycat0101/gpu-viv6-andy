@@ -12008,6 +12008,82 @@ VIR_Inst_ChangeSrcNum(
     VIR_Inst_SetSrcNum((Inst), SrcNo);
 }
 
+void
+VIR_Inst_RecordInstStatus(
+    VIR_Instruction*        pInst,
+    VIR_MemoryAccessFlag*   pMemoryAccessFlag,
+    VIR_FlowControlFlag*    pFlowControlFlag,
+    VIR_TexldFlag*          pTexldFlag
+    )
+{
+    VIR_OpCode              opCode = VIR_Inst_GetOpcode(pInst);
+    VIR_MemoryAccessFlag    memoryAccessFlag = VIR_MA_FLAG_NONE;
+    VIR_FlowControlFlag     flowControlFlag = VIR_FC_FLAG_NONE;
+    VIR_TexldFlag           texldFlag = VIR_TEXLD_FLAG_NONE;
+
+    if (VIR_OPCODE_isMemLd(opCode))
+    {
+        memoryAccessFlag = VIR_MA_FLAG_LOAD;
+    }
+    else if (VIR_OPCODE_isMemSt(opCode))
+    {
+        memoryAccessFlag = VIR_MA_FLAG_STORE;
+    }
+    else if (VIR_OPCODE_isImgLd(opCode))
+    {
+        memoryAccessFlag = VIR_MA_FLAG_IMG_READ;
+    }
+    else if (VIR_OPCODE_isImgSt(opCode))
+    {
+        memoryAccessFlag = VIR_MA_FLAG_IMG_WRITE;
+    }
+    else if (VIR_OPCODE_isAtom(opCode))
+    {
+        memoryAccessFlag = VIR_MA_FLAG_ATOMIC;
+    }
+    else if (VIR_OPCODE_isBarrier(opCode))
+    {
+        memoryAccessFlag = VIR_MA_FLAG_BARRIER;
+    }
+    else if (opCode == VIR_OP_VX_ATOMICADD)
+    {
+        memoryAccessFlag = VIR_MA_FLAG_EVIS_ATOMADD;
+    }
+    else if (VIR_OPCODE_isBranch(opCode))
+    {
+        flowControlFlag = VIR_FC_FLAG_JMP;
+    }
+    else if (VIR_OPCODE_isCall(opCode))
+    {
+        flowControlFlag = VIR_FC_FLAG_CALL;
+    }
+    else if (opCode == VIR_OP_KILL)
+    {
+        flowControlFlag = VIR_FC_FLAG_KILL;
+    }
+    else if (VIR_OPCODE_isTexLd(opCode))
+    {
+        texldFlag = VIR_TEXLD_FLAG_TEXLD;
+    }
+
+    if (pMemoryAccessFlag)
+    {
+        *pMemoryAccessFlag |= memoryAccessFlag;
+    }
+
+    if (pFlowControlFlag)
+    {
+        *pFlowControlFlag |= flowControlFlag;
+    }
+
+    if (pTexldFlag)
+    {
+        *pTexldFlag |= texldFlag;
+    }
+
+    return;
+}
+
 gctBOOL
 VIR_Inst_IdenticalExpression(
     IN VIR_Instruction  *Inst0,

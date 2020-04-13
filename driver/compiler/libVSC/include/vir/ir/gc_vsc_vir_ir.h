@@ -7850,6 +7850,14 @@ VIR_Inst_ChangeSrcNum(
     IN     gctUINT           SrcNo
     );
 
+void
+VIR_Inst_RecordInstStatus(
+    VIR_Instruction*        pInst,
+    VIR_MemoryAccessFlag*   pMemoryAccessFlag,
+    VIR_FlowControlFlag*    pFlowControlFlag,
+    VIR_TexldFlag*          pTexldFlag
+    );
+
 typedef struct _VIR_SHADER_IO_BUFFER
 {
     VSC_IO_BUFFER       *ioBuffer;
