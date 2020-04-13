@@ -484,7 +484,7 @@ _ResolveNameClash(
     );
 
 #define _gcmTreatHalfAsFloat(Shader) \
-    (gcmOPT_oclTreatHalfAsFloat() && VIR_Shader_IsCL(Shader) && !VIR_Shader_HasVivVxExtension(Shader))
+    (gcmOPT_oclTreatHalfAsFloat() && VIR_Shader_IsCLFromLanguage(Shader) && !VIR_Shader_HasVivVxExtension(Shader))
 
 static VIR_TypeId
 _ConvScalarFormatToVirVectorTypeId(
@@ -2194,7 +2194,7 @@ _GetTrueUniformArraySize(
     gctINT arraySize = GetUniformArraySize(Uniform);
     gcSL_FORMAT format;
 
-    if(!VIR_Shader_IsCL(VirShader) ||
+    if(!VIR_Shader_IsCLFromLanguage(VirShader) ||
        !isNormalType(Uniform->u.type)) return arraySize;
 
     format = GetUniformFormat(Uniform);
@@ -2568,7 +2568,7 @@ _ConvShaderUniformIdx2Vir(
                     VIR_Symbol_AddFlag(sym, VIR_SYMUNIFORMFLAG_MOVING_TO_DUBO);
                 }
             }
-            if (VIR_Shader_IsCL(VirShader) && Shader->currentKernelFunction &&
+            if (VIR_Shader_IsCLFromLanguage(VirShader) && Shader->currentKernelFunction &&
                 uniform->index < Shader->currentKernelFunction->uniformArgumentCount)
             {
                 virUniform->kernelArgIndex = uniform->index;
@@ -2878,7 +2878,7 @@ _GetTrueVariableArraySize(
 {
     gctINT arraySize = GetVariableArraySize(Variable);
 
-    if(!VIR_Shader_IsCL(VirShader)) return arraySize;
+    if(!VIR_Shader_IsCLFromLanguage(VirShader)) return arraySize;
     if (arraySize != -1)
     {
         if (GetVariableIsExtendedVector(Variable))
@@ -3051,7 +3051,7 @@ _ConvShaderVariable2Vir(
                                                   &symId);
         }
         else {
-            if (VIR_Shader_IsCL(VirShader) && GetShaderMaxLocalTempRegCount(Shader) > 0 &&
+            if (VIR_Shader_IsCLFromLanguage(VirShader) && GetShaderMaxLocalTempRegCount(Shader) > 0 &&
                 variable->tempIndex < _gcdOCL_MaxLocalTempRegs)
             {
                 /* For LocalMemoryAddressReg, we only need to add the baseAddress, no need to add the __local variables. */
@@ -3107,7 +3107,7 @@ _ConvShaderVariable2Vir(
         }
 
         if(virErrCode == VSC_ERR_REDEFINITION) {
-            if (VIR_Shader_IsCL(VirShader) &&
+            if (VIR_Shader_IsCLFromLanguage(VirShader) &&
                 variable->tempIndex == _gcdOCL_PrivateMemoryAddressRegIndex)
             {
                 gcmASSERT(variable->offset != -1);
@@ -5751,7 +5751,7 @@ _ConvSource2VirOperand(
             VIR_Operand_SetRelAddrLevel(VirSrc, srcIndexedLevel);
         }
         else {
-            if (VIR_Shader_IsCL(VirShader))
+            if (VIR_Shader_IsCLFromLanguage(VirShader))
             {
                 VIR_Type *symType = VIR_Symbol_GetType(sym);
                 VIR_TypeId typeId = VIR_Type_GetBaseTypeId(symType);
@@ -8033,7 +8033,7 @@ gcSHADER_Conv2VIR(
         /* Determine if shader is in dual-16 mode. */
         VirShader->__IsDual16Shader = gcvFALSE;
         if(!gcUseFullNewLinker(hwCfg->hwFeatureFlags.hasHalti2) &&
-           !VIR_Shader_IsCL(VirShader) &&
+           !VIR_Shader_IsCLFromLanguage(VirShader) &&
            (GC_ENABLE_DUAL_FP16 > 0 && hwCfg->hwFeatureFlags.supportDual16))
         {
             VirShader->__IsDual16Shader = gcSHADER_IsDual16Shader(Shader, &codeInfo);
@@ -9155,7 +9155,7 @@ _isOCL_VXMode(
     IN VIR_Instruction    *Inst
     )
 {
-    return VIR_Shader_IsCL(Context->shader) &&
+    return VIR_Shader_IsCLFromLanguage(Context->shader) &&
            (VIR_Shader_HasVivVxExtension(Context->shader) || VIR_Shader_HasVivGcslDriverImage(Context->shader)) ;
 }
 

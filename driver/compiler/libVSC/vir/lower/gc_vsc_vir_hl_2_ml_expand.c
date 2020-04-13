@@ -2930,7 +2930,7 @@ VIR_Lower_MiddleLevel_Process_Intrinsics(
     VIR_FunctionNode        *func_node;
     VIR_Function            *func;
 
-    if(!VIR_Shader_IsCL(Shader)) return errCode;
+    if(!VIR_Shader_IsCLFromLanguage(Shader)) return errCode;
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(Shader));
     for (func_node = VIR_FuncIterator_First(&func_iter);
          func_node != gcvNULL;

@@ -1231,7 +1231,7 @@ _DumpSymbol(
 
         VERIFY_OK(
             VIR_LOG(Dumper, "%s%s",
-            VIR_Shader_IsCL(Dumper->Shader) ? "" : symbol_precision[VIR_Symbol_GetPrecision(Sym)],
+            VIR_Shader_IsCLFromLanguage(Dumper->Shader) ? "" : symbol_precision[VIR_Symbol_GetPrecision(Sym)],
             isSymPrecise(Sym) ? "precise " : ""));
 
         if (isSymFlat(Sym))
@@ -1281,7 +1281,7 @@ _DumpSymbol(
     }
     else
     {
-        if (!VIR_Shader_IsCL(Dumper->Shader))
+        if (!VIR_Shader_IsCLFromLanguage(Dumper->Shader))
         {
             str = symbol_precision[VIR_Symbol_GetPrecision(Sym)];
             if (str && str[0] != '\0')
@@ -1594,7 +1594,7 @@ _DumpTypeWithSpace(
     errCode = _DumpType(Dumper, Type, LVal, TypeFormat);
     CHECK_ERROR(errCode, "_DumpTypeWithSpace");
 
-    if(VIR_Shader_IsCL(Dumper->Shader) || (VIR_Type_GetBaseTypeId(Type) != VIR_TYPE_FLOAT32 || !TypeFormat.Ellipsis ))
+    if(VIR_Shader_IsCLFromLanguage(Dumper->Shader) || (VIR_Type_GetBaseTypeId(Type) != VIR_TYPE_FLOAT32 || !TypeFormat.Ellipsis ))
     {
         VERIFY_OK(
             VIR_LOG(Dumper, " "));
@@ -1635,7 +1635,7 @@ _DumpType(
     case VIR_TY_IMAGE_T:
     case VIR_TY_VOID:
         gcmASSERT(VIR_Type_GetFlags(Type) & VIR_TYFLAG_BUILTIN);
-        if (VIR_Shader_IsCL(Dumper->Shader))
+        if (VIR_Shader_IsCLFromLanguage(Dumper->Shader))
         {
             VERIFY_OK(VIR_LOG(Dumper, "%s", VIR_GetOCLTypeName(VIR_Type_GetIndex(Type))));
         }
@@ -2178,7 +2178,7 @@ _DumpOperand(
         )
     {
         /* dump precision info, mediump is default */
-        if (!VIR_Shader_IsCL(Dumper->Shader) &&
+        if (!VIR_Shader_IsCLFromLanguage(Dumper->Shader) &&
             !VIR_Operand_isIntrinsic(Operand) &&
             !VIR_Operand_isParameters(Operand))
         {
