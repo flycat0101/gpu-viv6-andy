@@ -150,6 +150,8 @@ PFLAGS              := $(ORIG_PFLAGS)
 ################################################################
 # Toolchain.
 
+ifeq ($(YOCTO_BUILD),1)
+else
 ifeq ($(USE_ARMCC),1)
   ARM_BASE          ?= /home/software/ARM
   ARM_VERSION       ?= 4.0/650
@@ -161,7 +163,7 @@ ifeq ($(USE_ARMCC),1)
   AS                := $(CROSS_COMPILE)as
   LD                := $(CROSS_COMPILE)link
 else
-  CROSS_COMPILE     ?= arm-none-linux-gnueabi-
+  CROSS_COMPILE     ?= arm-fsl-linux-gnueabi-
   CC                := $(CROSS_COMPILE)gcc
   CXX               := $(CROSS_COMPILE)g++
   AR                := $(CROSS_COMPILE)ar
@@ -170,6 +172,7 @@ else
   RANLIB            := $(CROSS_COMPILE)ranlib
   STRIP             := $(CROSS_COMPILE)strip
 endif
+endif
 
 PKG_CONFIG          ?= $(CROSS_COMPILE)pkg-config
 
@@ -177,11 +180,11 @@ PKG_CONFIG          ?= $(CROSS_COMPILE)pkg-config
 ################################################################
 # Resource.
 
-KERNEL_DIR          ?=
-TOOL_DIR            ?= /home/software/Linux
-X11_ARM_DIR         ?= $(TOOL_DIR)/X11_ARM
-ROOTFS_USR          ?= $(TOOL_DIR)/RootFS/usr
-WAYLAND_DIR         ?= $(TOOL_DIR)/wayland
+#KERNEL_DIR          ?=
+#TOOL_DIR            ?= /home/software/Linux
+#X11_ARM_DIR         ?= $(TOOL_DIR)/X11_ARM
+#ROOTFS_USR          ?= $(TOOL_DIR)/RootFS/usr
+#WAYLAND_DIR         ?= $(TOOL_DIR)/wayland
 
 VIVANTE_SDK_DIR     ?= $(AQROOT)/build/sdk
 VIVANTE_SDK_INC     ?= $(VIVANTE_SDK_DIR)/include
@@ -275,6 +278,8 @@ ifneq ($(FLOAT_ABI),)
 # LDFLAGS           += -mfloat-abi=$(FLOAT_ABI)
   PFLAGS            += -mfloat-abi=$(FLOAT_ABI)
 endif
+
+CFLAGS += -D_GNU_SOURCE
 
 ifeq ($(LINUX_OABI),1)
   CFLAGS            += -DLINUX_OABI
