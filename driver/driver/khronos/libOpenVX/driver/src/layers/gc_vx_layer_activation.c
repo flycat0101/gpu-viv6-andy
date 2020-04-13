@@ -507,7 +507,8 @@ VX_PRIVATE_API vx_bool vxoNNActivationLayer_TP_Support(vx_node node, const vx_re
                          func_s->value->e == VX_NN_ACTIVATION_RELU1 ||
                          func_s->value->e == VX_NN_ACTIVATION_RELU6 ||
                          func_s->value->e == VX_NN_ACTIVATION_LEAKYRELU ||
-                         func_s->value->e == VX_NN_ACTIVATION_HYPERBOLIC_TAN));
+                         func_s->value->e == VX_NN_ACTIVATION_HYPERBOLIC_TAN) &&
+                         (inputs->fixedPointPos != 16));
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
