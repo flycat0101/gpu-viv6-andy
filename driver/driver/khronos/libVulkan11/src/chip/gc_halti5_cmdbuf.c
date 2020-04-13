@@ -6833,6 +6833,7 @@ VkResult halti5_decompressTileStatus(
                 for (j = pRanges->baseArrayLayer; j < (pRanges->baseArrayLayer + pRanges->layerCount); j++)
                 {
                     tsResource->tileStatusDisable[i][j] = VK_TRUE;
+                    tsResource->realClear[i][j] = VK_FALSE;
                 }
             }
         }
@@ -6860,6 +6861,7 @@ VkResult halti5_decompressTileStatus(
                 dstRes.u.img.subRes.arrayLayer = layer;
                 __VK_ONERROR(halti5_3DBlitToSelf(devCtx, commandBuffer, &dstRes, &rect));
                 tsResource->tileStatusDisable[level][layer] = VK_TRUE;
+                tsResource->realClear[level][layer] = VK_FALSE;
             }
         }
     }

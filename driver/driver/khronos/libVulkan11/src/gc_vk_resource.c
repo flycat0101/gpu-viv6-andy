@@ -2090,10 +2090,12 @@ VKAPI_ATTR void VKAPI_CALL __vk_FreeMemory(
             for (i = 0; i < dvm->ts->mipLevels; i++)
             {
                 __VK_FREE(dvm->ts->tileStatusDisable[i]);
+                __VK_FREE(dvm->ts->realClear[i]);
                 __VK_FREE(dvm->ts->fcValue[i]);
                 __VK_FREE(dvm->ts->fcValueUpper[i]);
             }
             __VK_FREE(dvm->ts->tileStatusDisable);
+            __VK_FREE(dvm->ts->realClear);
             __VK_FREE(dvm->ts->fcValue);
             __VK_FREE(dvm->ts->fcValueUpper);
             __VK_FREE(dvm->ts);
@@ -2257,14 +2259,21 @@ VkResult __vki_AllocateTileStatus(
             /* Allocate ts information. */
             tsResource->tileStatusDisable = (VkBool32**)__VK_ALLOC(img->createInfo.mipLevels * sizeof(VkBool32*),
                 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+            tsResource->realClear = (VkBool32**)__VK_ALLOC(img->createInfo.mipLevels * sizeof(VkBool32*),
+                8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
             __VK_ONERROR(tsResource->tileStatusDisable ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+            __VK_ONERROR(tsResource->realClear ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
 
             for (i = 0; i < img->createInfo.mipLevels; i++)
             {
                 *(tsResource->tileStatusDisable + i) = (VkBool32*)__VK_ALLOC(img->createInfo.arrayLayers * sizeof(VkBool32),
                     8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+                *(tsResource->realClear + i) = (VkBool32*)__VK_ALLOC(img->createInfo.arrayLayers * sizeof(VkBool32),
+                    8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
                 __VK_ONERROR(*(tsResource->tileStatusDisable + i) ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+                __VK_ONERROR(*(tsResource->realClear + i) ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
                 __VK_MEMZERO(*(tsResource->tileStatusDisable + i), img->createInfo.arrayLayers * sizeof(VkBool32));
+                __VK_MEMZERO(*(tsResource->realClear + i), img->createInfo.arrayLayers * sizeof(VkBool32));
             }
 
             tsResource->fcValue = (uint32_t**)__VK_ALLOC(img->createInfo.mipLevels * sizeof(uint32_t*),
@@ -2299,6 +2308,7 @@ VkResult __vki_AllocateTileStatus(
                 {
                     /* Set tile status disabled at the beginning to be consistent with POOL value */
                     tsResource->tileStatusDisable[i][j] = VK_FALSE;
+                    tsResource->realClear[i][j] = VK_FALSE;
 
                     /* Set default fill color. */
                     switch (img->formatInfo.residentImgFormat)

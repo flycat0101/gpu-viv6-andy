@@ -86,6 +86,42 @@
     }\
 }\
 
+#define __VK_CanTSEnableForClear(tsResource, pRange, img, clearVals, canTsEnable) \
+{\
+    if (tsResource)\
+    {\
+        uint32_t i1, j1;\
+        uint32_t defValue[2] = {0};\
+        for (i1 = 0; i1 < img->createInfo.mipLevels; i1++)\
+        {\
+            for (j1 = 0; j1 < img->createInfo.arrayLayers; j1++)\
+            {\
+                if (i1 == pRange->baseMipLevel && j1 == pRange->baseArrayLayer)\
+                {\
+                    continue;\
+                }\
+                if (tsResource->tileStatusDisable[i1][j1] == VK_TRUE)\
+                {\
+                    *canTsEnable = VK_FALSE;\
+                    break;\
+                }\
+                if (tsResource->fcValue[i1][j1] != defValue[0] &&\
+                    tsResource->fcValue[i1][j1] != clearVals[0])\
+                {\
+                    *canTsEnable = VK_FALSE;\
+                    break;\
+                }\
+                if (tsResource->fcValueUpper[i1][j1] != defValue[1] &&\
+                    tsResource->fcValueUpper[i1][j1] != clearVals[1])\
+                {\
+                    *canTsEnable = VK_FALSE;\
+                    break;\
+                }\
+            }\
+        }\
+    }\
+}\
+
 #define TX_COMP_RED_SWIZZLE_SHIFT    0
 #define TX_COMP_GREEN_SWIZZLE_SHIFT  3
 #define TX_COMP_BLUE_SWIZZLE_SHIFT   6

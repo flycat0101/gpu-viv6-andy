@@ -2535,6 +2535,9 @@ VkResult halti5_clearImage(
     int32_t compressionFormat = -1;
     uint32_t tileStatusAddress = tsResource ? tsResource->devAddr : VK_NULL_HANDLE;
     VkImageSubresourceRange imgvRange = {subResource->aspectMask, subResource->mipLevel, 1, subResource->arrayLayer, 1};
+    VkBool32 canTsEnable = VK_TRUE;
+    VkImageSubresourceRange *pRange = &imgvRange;
+    uint32_t i0, j0;
 #endif
     VkBool32 forceSGPU = VK_FALSE;
 
@@ -2702,9 +2705,25 @@ VkResult halti5_clearImage(
             fastClear = VK_FALSE;
         }
 
-        if (!fastClear)
+        __VK_CanTSEnableForClear(tsResource, pRange, img, clearVals, &canTsEnable);
+
+        if ((!fastClear) || (fastClear && !canTsEnable))
         {
-            halti5_decompressTileStatus(cmd, &pCmdBuffer, img, &imgvRange);
+            if (tsResource)
+            {
+                for (i0 = 0; i0 < img->createInfo.mipLevels; i0++)
+                {
+                    for (j0 = 0; j0 < img->createInfo.arrayLayers; j0++)
+                    {
+                        if (tsResource->realClear[i0][j0])
+                        {
+                            VkImageSubresourceRange tmpRange = {subResource->aspectMask, i0, 1, j0, 1};
+                            halti5_decompressTileStatus(cmd, &pCmdBuffer, img, &tmpRange);
+                        }
+                    }
+                }
+                fastClear = VK_FALSE;
+            }
         }
         else
         {
@@ -3288,7 +3307,8 @@ VkResult halti5_clearImage(
             tsResource->fcValueUpper[subResource->mipLevel][subResource->arrayLayer] = fcClearValue[1];
 
             /* Turn the tile status on again. */
-            tsResource->tileStatusDisable[subResource->mipLevel][subResource->arrayLayer] = gcvFALSE;
+            tsResource->tileStatusDisable[subResource->mipLevel][subResource->arrayLayer] = VK_FALSE;
+            tsResource->realClear[subResource->mipLevel][subResource->arrayLayer] = VK_TRUE;
 
             halti5_flushCache((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE, HW_CACHE_MCTS_HEADER);
         }
@@ -3420,6 +3440,7 @@ VkResult halti5_copyImage(
                 srcTsResource->fcValueUpper[srcRes->u.img.subRes.mipLevel][srcRes->u.img.subRes.arrayLayer]);
 
             srcFastClear = !srcTsResource->tileStatusDisable[srcRes->u.img.subRes.mipLevel][srcRes->u.img.subRes.arrayLayer];
+            srcFastClear &= srcTsResource->realClear[srcRes->u.img.subRes.mipLevel][srcRes->u.img.subRes.arrayLayer];
             srcCompressionFormat = srcTsResource->compressedFormat;
             srcCompression = srcTsResource->compressed;
         }

@@ -98,6 +98,7 @@ typedef struct __vkTileStatusRec
 
     /* ts related information. */
     VkBool32 **tileStatusDisable;
+    VkBool32 **realClear;
     uint32_t **fcValue;
     uint32_t **fcValueUpper;
     VkBool32 compressed;
