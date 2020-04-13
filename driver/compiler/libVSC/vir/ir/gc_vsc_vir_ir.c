@@ -18526,8 +18526,6 @@ VIR_Shader_GetMaxFreeRegCountPerThread(
             if (!VIR_Shader_IsWorkGroupSizeAdjusted(pShader) &&
                 !VIR_Shader_IsWorkGroupSizeFixed(pShader))
             {
-                gcmASSERT(GetHWMaxWorkGroupSize() == VIR_Shader_GetWorkGroupSize(pShader));
-
                 VIR_Shader_SetWorkGroupSizeAdjusted(pShader, gcvTRUE);
                 VIR_Shader_SetAdjustedWorkGroupSize(pShader, GetHWInitWorkGroupSizeToCalcRegCount());
             }
