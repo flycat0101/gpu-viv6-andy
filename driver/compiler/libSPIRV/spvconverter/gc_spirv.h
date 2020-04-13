@@ -712,6 +712,9 @@ struct _gcSPV
 
     gctBOOL                     isLibraryShader;
 
+    /* The default image format for those image types with the unknown image format.*/
+    VIR_ImageFormat             defaultVIRImageFormat;
+
     gctUINT                     localSize[3];
 
     gctUINT                     tcsInputVertices;

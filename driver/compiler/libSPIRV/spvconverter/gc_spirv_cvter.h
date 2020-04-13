@@ -73,6 +73,8 @@ typedef struct SpvDecodeInfo{
     SpvRenderPassInfo* renderpassInfo;
     gctUINT subPass;
     gctBOOL isLibraryShader;
+    /* The default image format for those image types with the unknown image format.*/
+    VSC_IMAGE_FORMAT defaultImageFormat;
 }SpvDecodeInfo;
 
 gceSTATUS
