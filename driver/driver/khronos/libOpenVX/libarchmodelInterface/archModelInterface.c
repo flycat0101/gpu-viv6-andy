@@ -1241,6 +1241,9 @@ static vx_status initConfigration(arch_nn_config *pArchNnConfig,arch_drv_option 
 {
     vx_nn_config *pContextNnConfig = &(context->nnConfig);
     vx_drv_option *pContextOptions = &(context->options);
+    gceHARDWARE_TYPE hwType = gcvHARDWARE_INVALID;
+    gctUINT chipIDs[32] = {0};
+    gctUINT32 coreCount = 0;
 
     /* set NN config */
     pArchNnConfig->isSet = pContextNnConfig->isSet;            /* NOT */
@@ -1274,6 +1277,11 @@ static vx_status initConfigration(arch_nn_config *pArchNnConfig,arch_drv_option 
     pArchNnConfig->fixedFeature.maxOTNumber = pContextNnConfig->fixedFeature.maxOTNumber;
     pArchNnConfig->fixedFeature.equivalentVipsramWidthInByte = pContextNnConfig->fixedFeature.equivalentVipsramWidthInByte;
     pArchNnConfig->fixedFeature.shaderCoreCount = pContextNnConfig->fixedFeature.shaderCoreCount;
+
+    /* query multi core count */
+    gcmGETCURRENTHARDWARE(hwType);
+    gcoHAL_QueryCoreCount(gcvNULL, hwType, &coreCount, chipIDs);
+    pArchNnConfig->fixedFeature.multiVIPnum = coreCount;
 
     /* archNN_CUSTOMIZED_FEATURE */
     pArchNnConfig->customizedFeature.vipSRAMSize = pContextNnConfig->customizedFeature.vipSRAMSize;
@@ -1425,14 +1433,6 @@ static vx_status initConfigration(arch_nn_config *pArchNnConfig,arch_drv_option 
     return 0;
 }
 
-static arch_uint32 isZeroForFloat(arch_float32 value)
-{
-    if(value > -0.000000001 && value < 0.000000001)
-        return 1;
-    else
-        return 0;
-}
-
 /***********************************************************************************
 * Function:     updateConfigration
 * Description:  Except pArchNnConfig and pArchOptions, there are still some configration defined
@@ -1515,6 +1515,8 @@ static vx_status updateConfigration(archNN_DATABASE_FEATURE *pArchDataFeature,ar
 
     /* tp comp 2pixel per cycle */
     pArchDataFeature->tpComp2pixelPerCycle = 0;;
+
+
     return 0;
 }
 

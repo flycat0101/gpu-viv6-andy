@@ -363,6 +363,9 @@ typedef struct _archNN_FIXED_FEATURE
     arch_uint32  maxOTNumber;
     arch_uint32  equivalentVipsramWidthInByte;
     arch_uint32  shaderCoreCount;
+
+    /*multi Core count*/
+    arch_uint32  multiVIPnum;
 } archNN_FIXED_FEATURE;
 
 /* Features can be customized from outside */
