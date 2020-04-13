@@ -1773,6 +1773,15 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
         if (executionLayer->graph->base.context->options.enableCNNPerf)
         {
             operatorStart = gcfVX_PerfStart((vx_reference)executionLayer->graph);
+
+            if (operation->layer->node->base.context->options.enableWBDump)
+            {
+                vxnneOperation_WBDump(executionLayer, i);
+            }
+            if (operation->layer->node->base.context->options.commandBufferDump)
+            {
+                vxnneOperation_commandBufferDump(executionLayer, i);
+            }
         }
 
 #if gcdFRAMEINFO_STATISTIC

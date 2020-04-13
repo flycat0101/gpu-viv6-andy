@@ -628,6 +628,21 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
         globalData->options.enableCNNPerf = atoi(envctrl);
     }
 
+
+    envctrl = gcvNULL;
+    globalData->options.enableWBDump = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_WB_DUMP", &envctrl)) && envctrl)
+    {
+        globalData->options.enableWBDump = atoi(envctrl);
+    }
+
+    envctrl = gcvNULL;
+    globalData->options.commandBufferDump = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_COMMAND_DUMP", &envctrl)) && envctrl)
+    {
+        globalData->options.commandBufferDump = atoi(envctrl);
+    }
+
     globalData->options.graphPerfLogFile = gcvNULL;
     gcoOS_GetEnv(gcvNULL, "VIV_VX_GRAPH_PERF", &globalData->options.graphPerfLogFile);
 

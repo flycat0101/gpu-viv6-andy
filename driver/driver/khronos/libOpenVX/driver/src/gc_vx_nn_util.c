@@ -4689,6 +4689,83 @@ void* nnGetNCHWStreamFromTanspose(vx_tensor input, vx_uint8 interleave)
     }
 }
 
+vx_status vxnneOperation_WBDump(vxnne_execution_layer   executionLayer, vx_uint32 opIndex)
+{
+    vxnne_operation_command opCommand = &(executionLayer->opIndices[opIndex]);
+    if(opCommand->cmdInfo.wb != VX_NULL || opCommand->parameter.other_ref != VX_NULL )
+    {
+        vx_weights_biases_parameter wb = opCommand->cmdInfo.wb != VX_NULL ? (vx_weights_biases_parameter)opCommand->cmdInfo.wb : (vx_weights_biases_parameter)opCommand->parameter.other_ref;
+
+        if(wb != VX_NULL && (opCommand->operation->target == VXNNE_OPERATION_TARGET_NN || (opCommand->operation->target == VXNNE_OPERATION_TARGET_TP && WB_IS_TP_COMPRESS(wb))))
+        {
+            FILE *fpLayer = VX_NULL;
+            char wbFileName[256] = {'\0'};
+            vx_uint32 offset = 0;
+            vx_uint32 k = 0;
+            vx_uint8 *logicalWB = WB_MEM_LOGICAL_ADDR_INDEX(wb, 0);
+            gcoOS_PrintStrSafe(wbFileName, 256, &offset, "WB_%s_OpsID_%d_opIndices_%d_%x_%x.txt", opCommand->operation->layer->name, opCommand->operationID, opIndex, logicalWB, opCommand);
+            fpLayer = fopen(wbFileName,"w");
+            if(!fpLayer)
+            {
+                vxError("can't open the file %s\n",wbFileName);
+                vxmASSERT(0);
+            }
+            vxInfo("***Before operation execute: WBDump :opID:%d    opIndices : %d***\n",opCommand->operationID, opIndex);
+
+            for(k = 0 ; k < WB_MEMORY_SIZE(wb); ++k)
+            {
+                fprintf(fpLayer, "%02x", *(logicalWB + k));
+                if(k % 4 == 3)
+                    fprintf(fpLayer, "\n");
+            }
+            if (fpLayer)
+                fclose(fpLayer);
+        }
+    }
+
+
+    return vx_true_e;
+
+}
+
+
+vx_status  vxnneOperation_commandBufferDump(vxnne_execution_layer executionLayer, vx_uint32 opIndex)
+{
+    vxnne_operation_command opCommand = &(executionLayer->opIndices[opIndex]);
+
+    vxnne_command_buffer commandBuffer = &opCommand->commandBuffer;
+
+    if(commandBuffer && commandBuffer->logical)
+    {
+        FILE *fpLayer = VX_NULL;
+        char fileName[256] = {"CommandBuffer.txt\0"};
+        vx_uint32 k = 0;
+
+        fpLayer = fopen(fileName,"a+");
+        if(!fpLayer)
+        {
+            vxError("can't open the file %s\n",fileName);
+            vxmASSERT(0);
+        }
+
+        vxInfo("***Before operation execute, commandBuffer Dump :opID:%d    opIndices : %d***\n",opCommand->operationID, opIndex);
+
+        fprintf(fpLayer, "%s\n", opCommand->operation->layer->name);
+        fprintf(fpLayer, "operationID :%d opIndex:%d\n", opCommand->operationID, opIndex);
+
+        for(k = 0 ; k < 128/4; ++k) /*NN TP command always 128 bytes*/
+        {
+            fprintf(fpLayer, "%08x \n", *(((vx_uint32 *)commandBuffer->logical) + k));
+        }
+
+        if (fpLayer)
+            fclose(fpLayer);
+    }
+
+    return vx_true_e;
+
+}
+
 vx_status vxnneOperation_NodeDump(
     vxnne_operation_command opCommand
     )

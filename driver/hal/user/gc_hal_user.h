@@ -3097,6 +3097,8 @@ typedef struct _vx_drv_option
     gctUINT enableAllocateContigousMemForKernel;
     gctUINT enableNNTranspose;
     gctUINT disableTPNNEvis;
+    gctUINT enableWBDump;
+    gctUINT commandBufferDump;
 }
 vx_drv_option;
 

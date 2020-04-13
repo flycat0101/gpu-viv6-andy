@@ -2695,6 +2695,17 @@ vx_status vxnneOperation_ExecuteCommands(
     vxnne_command_buffer commandBuffer
     );
 
+vx_status vxnneOperation_WBDump(
+    vxnne_execution_layer   executionLayer,
+    vx_uint32 index
+    );
+
+vx_status  vxnneOperation_commandBufferDump(
+    vxnne_execution_layer executionLayer,
+    vx_uint32 opIndex
+    );
+
+
 vx_status vxnneOperation_NodeDump(
     vxnne_operation_command opCommand
     );
