@@ -8834,6 +8834,7 @@ VIR_Shader_AddSymbolContents(
     VSC_ErrCode     errCode = VSC_ERR_NONE;
     VIR_SymbolKind  symKind = VIR_Symbol_GetKind(Sym);
     VIR_SymId       symId   = VIR_Symbol_GetIndex(Sym);
+    gctUINT         i;
 
     {
         switch (symKind)
@@ -8887,7 +8888,10 @@ VIR_Shader_AddSymbolContents(
                         uniform->u.samplerOrImageAttr.extraImageLayer = VIR_INVALID_ID;
                         uniform->u.samplerOrImageAttr.texelBufferToImageSymId   = VIR_INVALID_ID;
                         uniform->u.samplerOrImageAttr.sampledImageSymId   = VIR_INVALID_ID;
-                        uniform->u.samplerOrImageAttr.ycbcrPlaneSymId = VIR_INVALID_ID;
+                        for (i = 0; i < __YCBCR_PLANE_COUNT__; i++)
+                        {
+                            uniform->u.samplerOrImageAttr.ycbcrPlaneSymId[i] = VIR_INVALID_ID;
+                        }
                     }
                 }
                 else
@@ -8898,7 +8902,10 @@ VIR_Shader_AddSymbolContents(
                     uniform->u.samplerOrImageAttr.extraImageLayer = VIR_INVALID_ID;
                     uniform->u.samplerOrImageAttr.texelBufferToImageSymId   = VIR_INVALID_ID;
                     uniform->u.samplerOrImageAttr.sampledImageSymId   = VIR_INVALID_ID;
-                    uniform->u.samplerOrImageAttr.ycbcrPlaneSymId = VIR_INVALID_ID;
+                    for (i = 0; i < __YCBCR_PLANE_COUNT__; i++)
+                    {
+                        uniform->u.samplerOrImageAttr.ycbcrPlaneSymId[i] = VIR_INVALID_ID;
+                    }
                 }
                 uniform->auxAddrSymId = VIR_INVALID_ID;
                 if (PresetId == VIR_INVALID_ID)

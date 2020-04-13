@@ -69,7 +69,7 @@ typedef enum SHS_PRIV_MEM_KIND
     SHS_PRIV_MEM_KIND_SHARED_MEMORY             = 5, /* For CL local memory or DirectCompute shared mem */
     SHS_PRIV_MEM_KIND_EXTRA_UAV_LAYER           = 6,
     SHS_PRIV_MEM_KIND_THREAD_ID_MEM_ADDR        = 7, /* The global memory to save the consecutive thread ID. */
-    SHS_PRIV_MEM_KIND_YCBCR_PLANES              = 8, /* The YCBCR planes. */
+    SHS_PRIV_MEM_KIND_YCBCR_PLANE               = 8, /* The YCBCR plane. */
     SHS_PRIV_MEM_KIND_COUNT                     = 9,
 }SHS_PRIV_MEM_KIND;
 

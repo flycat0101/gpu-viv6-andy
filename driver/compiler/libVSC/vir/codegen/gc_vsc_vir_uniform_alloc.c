@@ -1062,7 +1062,7 @@ static gctBOOL _VIR_CG_isUniformAllocable(
         case VIR_UNIFORM_VIEW_INDEX:
         case VIR_UNIFORM_CLIP_DISTANCE_ENABLE:
         case VIR_UNIFORM_THREAD_ID_MEM_ADDR:
-        case VIR_UNIFORM_YCBCR_PLANES:
+        case VIR_UNIFORM_YCBCR_PLANE:
 
             if (isSymUniformMovedToAUBO(pSym))
             {

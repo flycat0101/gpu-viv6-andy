@@ -480,8 +480,8 @@ _GetUniformKindString(
         return "clipDistanceEnable";
     case VIR_UNIFORM_THREAD_ID_MEM_ADDR:
         return "threadIdMemAddr";
-    case VIR_UNIFORM_YCBCR_PLANES:
-        return "ycbcrPlanes";
+    case VIR_UNIFORM_YCBCR_PLANE:
+        return "ycbcrPlane";
     default:
         gcmASSERT(0);
         return "";
