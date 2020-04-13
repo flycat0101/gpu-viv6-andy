@@ -32,6 +32,8 @@
 #define BINARY_FILE_NAME_MAX_SIZE    256
 #define LOAD_WHOLE_BINARY_TO_BUFFER  0
 #define _GC_OBJ_ZONE            gcdZONE_VX_BINARY
+#define TP_MAX_XYSIZE (0x1<<16)
+#define MULTI_TP_RESHUFFLE_SIZE 100
 
 #define WRITE_NBG_STATUS_CHECK()    \
     if (status != VX_SUCCESS)   \
@@ -8778,6 +8780,50 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
                     else
                     {
                         opNum = 1;
+                    }
+                }
+                else if (operation->parameter.tpType == TP_TRANSPOSE)
+                {
+                    vx_tensor otherRef = (vx_tensor)operation->parameter.other_ref;
+                    vx_tp_value_cmd value = operation->parameter.tp_value;
+                    vx_uint32 i, x, y, dnum = value->u32[0], tsize = 1;
+                    vx_uint32 dims[VX_CONTEXT_TENSOR_MAX_DIMENSION], strides[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+
+                    vxmASSERT(otherRef != VX_NULL);
+                    vxoTensor_GetTensorDimStride(otherRef, &dnum, dims, strides);
+                    vxmASSERT(dims[0] < TP_MAX_XYSIZE && dims[1] < TP_MAX_XYSIZE);
+                    for (i = 0; i < TENSOR_DIM_NUM(otherRef); i++)
+                    {
+                        tsize *= dims[i];
+                    }
+                    x = dims[0];
+                    y = tsize / dims[0];
+                    for (i = 1; i < dnum; i++)
+                    {
+                        if (x >= TP_MAX_XYSIZE || y < TP_MAX_XYSIZE)
+                        {
+                            break;
+                        }
+                        else
+                        {
+                            x *= dims[i];
+                            y /= dims[i];
+                        }
+                    }
+                    if (x < TP_MAX_XYSIZE && y < TP_MAX_XYSIZE)
+                    {
+                        opNum = 1;
+                    }
+                    else
+                    {
+                        for (i = dnum - 1; (vx_int32)i >= 0; i--)
+                        {
+                            if (dims[i] > 1) break;
+                        }
+
+                        /* TP X/Y size has max size limitation, must split */
+                        y = tsize / dims[0];
+                        opNum = gcmALIGN_NP2(y, TP_MAX_XYSIZE-1) / (TP_MAX_XYSIZE-1);
                     }
                 }
 
