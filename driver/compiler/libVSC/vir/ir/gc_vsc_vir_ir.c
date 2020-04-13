@@ -12014,10 +12014,11 @@ VIR_Inst_IdenticalExpression(
     IN VIR_Instruction  *Inst1,
     IN VIR_Shader       *Shader,
     IN gctBOOL          bPrecisionMatters,
-    IN gctBOOL          bAllowCommutative
+    IN gctBOOL          bAllowCommutative,
+    IN gctBOOL          bAllowIntrinsic
     )
 {
-    gctUINT             i;
+    gctUINT             i, srcStart = 0;
     gctBOOL             bMatched = gcvTRUE;
 
     if(Inst0 == gcvNULL || Inst1 == gcvNULL)
@@ -12035,8 +12036,16 @@ VIR_Inst_IdenticalExpression(
         return gcvFALSE;
     }
 
-    if(!VIR_OPCODE_IsExpr(VIR_Inst_GetOpcode(Inst0)) ||
-        !VIR_OPCODE_IsExpr(VIR_Inst_GetOpcode(Inst1)))
+    if (bAllowIntrinsic)
+    {
+        if (VIR_Operand_GetIntrinsicKind(VIR_Inst_GetSource(Inst0, 0)) != VIR_Operand_GetIntrinsicKind(VIR_Inst_GetSource(Inst1, 0)))
+        {
+            return gcvFALSE;
+        }
+        srcStart = 1;
+    }
+    else if (!VIR_OPCODE_IsExpr(VIR_Inst_GetOpcode(Inst0)) ||
+             !VIR_OPCODE_IsExpr(VIR_Inst_GetOpcode(Inst1)))
     {
         return gcvFALSE;
     }
@@ -12059,7 +12068,7 @@ VIR_Inst_IdenticalExpression(
 
     /* Check all sources. */
     bMatched = gcvTRUE;
-    for (i = 0; i < VIR_Inst_GetSrcNum(Inst0); i++)
+    for (i = srcStart; i < VIR_Inst_GetSrcNum(Inst0); i++)
     {
         if (!VIR_Operand_Identical(VIR_Inst_GetSource(Inst0, i), VIR_Inst_GetSource(Inst1, i), Shader))
         {
@@ -14239,6 +14248,26 @@ VIR_Operand_Identical(
                 {
                     if(const0->value.vecVal.u32Value[VIR_Swizzle_GetChannel(swizzle0, channel)] !=
                         const1->value.vecVal.u32Value[VIR_Swizzle_GetChannel(swizzle1, channel)])
+                    {
+                        return gcvFALSE;
+                    }
+                }
+                return gcvTRUE;
+            }
+        case VIR_OPND_PARAMETERS:
+            {
+                VIR_ParmPassing *opndParm1 = VIR_Operand_GetParameters(Opnd0);
+                VIR_ParmPassing *opndParm2 = VIR_Operand_GetParameters(Opnd1);
+                gctUINT i;
+                if (opndParm1->argNum != opndParm2->argNum)
+                {
+                    return gcvFALSE;
+                }
+                for (i = 0; i < opndParm1->argNum; i++)
+                {
+                    VIR_Operand *opnd1 = opndParm1->args[i];
+                    VIR_Operand *opnd2 = opndParm2->args[i];
+                    if (!VIR_Operand_Identical(opnd1, opnd2, Shader))
                     {
                         return gcvFALSE;
                     }
