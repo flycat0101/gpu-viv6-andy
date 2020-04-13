@@ -31122,10 +31122,14 @@ cloIR_BINARY_EXPR_GenArithmeticAssignCode(
     else {
        for (i = 0; i < leftParameters.operandCount; i++) {
           gctBOOL useLeftReg = gcvFALSE;
+          gctBOOL needConvToFuncCall = opcode == clvOPCODE_FMOD || opcode == clvOPCODE_DIV ||
+                                       opcode == clvOPCODE_IDIV || opcode == clvOPCODE_MOD ||
+                                       opcode == clvOPCODE_IMUL || opcode == clvOPCODE_FMUL ||
+                                       opcode == clvOPCODE_FADD || opcode == clvOPCODE_FSUB;
 
           /* Generate the arithmetic code */
           useLeftReg = gcmOPT_DriverVIRPath() &&
-                       !(Parameters->hasIOperand || (leftParameters.hint & clvGEN_DEREF_CODE));
+                       !(needConvToFuncCall || Parameters->hasIOperand || (leftParameters.hint & clvGEN_DEREF_CODE));
           if(useLeftReg) {
               clsIOPERAND_InitializeWithComponentSelection(intermIOperand,
                                                            lOperandParameters.rOperands[i].dataType,
@@ -31137,10 +31141,7 @@ cloIR_BINARY_EXPR_GenArithmeticAssignCode(
               clmGEN_CODE_GetParametersIOperand(Compiler, intermIOperand, Parameters, lOperandParameters.dataTypes[i].def);
           }
 
-          if(opcode == clvOPCODE_FMOD || opcode == clvOPCODE_DIV ||
-             opcode == clvOPCODE_IDIV || opcode == clvOPCODE_MOD ||
-             opcode == clvOPCODE_IMUL || opcode == clvOPCODE_FMUL ||
-             opcode == clvOPCODE_FADD || opcode == clvOPCODE_FSUB) {
+          if(needConvToFuncCall) {
              cloIR_POLYNARY_EXPR funcCall;
              clsGEN_CODE_PARAMETERS operandsParameters[2];
 
