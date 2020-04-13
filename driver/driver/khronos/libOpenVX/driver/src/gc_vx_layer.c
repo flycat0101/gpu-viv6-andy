@@ -26710,19 +26710,36 @@ vxnne_shader_executable vxnneGetTensorPad2ShaderExecutable(
             vx_int32   padV = (vx_int32)vxnneRound(data, VX_NN_ROUNDING_MODE_RTNE);
 
             if (inputFormat == VX_TYPE_INT16)
-                borderMode->constant_value.S16 = (vx_int16)(padV > 32767 ? 32767 : (padV < -32768) ? -32768 : padV);
+            {
+                padConstv = (padV > 32767 ? 32767 : (padV < -32768) ? -32768 : padV);
+                borderMode->constant_value.S16 = (vx_int16)padConstv;
+            }
             else
-                borderMode->constant_value.U8 = (vx_uint8)(padV > 127 ? 127 : (padV < -128) ? -128 : padV);
+            {
+                padConstv = (padV > 127 ? 127 : (padV < -128) ? -128 : padV);
+                borderMode->constant_value.U8 = (vx_uint8)padConstv;
+            }
         }
         else if (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT16)
+        {
             borderMode->constant_value.S16 = (vx_int16)padConstv;
+        }
         else if (TENSOR_QUANT_TYPE(inputs) == VX_QUANT_AFFINE_SCALE)
         {
             vx_float32 scale = TENSOR_TF_SCALE(inputs);
             vx_int32 zeroPoint = TENSOR_TF_ZEROPOINT(inputs);
-            vx_int32 padV = (vx_int32)vxnneRound(padConstv / scale  + (vx_uint8)zeroPoint, VX_NN_ROUNDING_MODE_RTNE);
+            vx_int32 padV = (vx_int32)vxnneRound(padConstv / scale  + zeroPoint, VX_NN_ROUNDING_MODE_RTNE);
 
-            borderMode->constant_value.U8 = (vx_uint8)(padV > 255 ? 255 : padV < 0 ? 0 : padV);
+            if (inputFormat == VX_TYPE_UINT8)
+            {
+                padConstv = (padV > 255 ? 255 : padV < 0 ? 0 : padV);
+                borderMode->constant_value.U8 = (vx_uint8)padConstv;
+            }
+            else
+            {
+                padConstv = (padV > 127 ? 127 : padV < -128 ? -128 : padV);
+                borderMode->constant_value.U8 = (vx_uint8)padConstv;
+            }
         }
         else if (inputFormat == VX_TYPE_UINT8 || inputFormat == VX_TYPE_INT8)
             borderMode->constant_value.U8 = (vx_uint8)padConstv;
@@ -26829,6 +26846,7 @@ vxnne_shader_executable vxnneGetTensorPad2ShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "padLeft", 1, &padLeft);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "in_chn_num", 1, &in_chn_num);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "out_chn_num", 1, &out_chn_num);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "padConstVal", 1, &padConstv);
         if (status != VX_SUCCESS) goto OnError;
     }
 
