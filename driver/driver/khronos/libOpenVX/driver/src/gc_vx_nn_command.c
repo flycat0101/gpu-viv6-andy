@@ -29,6 +29,7 @@
 
 #define TP_SPLIT_Z_MAJOR 0
 #define SHOW_TP_SPLITING_INFO 1
+#define MAX_IMAGE_SIZE 65535
 
 VX_PRIVATE_API vx_float32 Fp21toFp32(const vx_uint32 in)
 {
@@ -5342,28 +5343,13 @@ VX_PRIVATE_API vx_status _SplitInputAndOutputForMultiTPCores(vx_context context,
                 }
             }
 #else
-            if (check_x &&
-                output_size_x % num_slice == 0 &&
-                output_size_x / num_slice > pad_left &&
-                output_size_x / num_slice > pad_right)
-            {
-                div_x = num_slice;
-            }
-            else if (output_size_y % num_slice == 0 &&
-                     output_size_y / num_slice > pad_top &&
-                     output_size_y / num_slice > pad_bottom)
-            {
-                div_y = num_slice;
-            }
-            else if ((output_size_z / stride_x / stride_y) % num_slice == 0)
-            {
-                div_z = num_slice;
-            }
-            else
+            if (output_size_x > MAX_IMAGE_SIZE ||
+                output_size_y > MAX_IMAGE_SIZE ||
+                output_size_z / stride_x / stride_y > MAX_IMAGE_SIZE)
             {
                 vx_uint32 max = gcmMAX(gcmMAX(output_size_x, output_size_y), output_size_z / stride_x / stride_y);
 
-                if (check_x && (output_size_x == max))
+                if (output_size_x == max)
                 {
                     div_x = gcmMIN(core, num_slice);
                 }
@@ -5374,6 +5360,43 @@ VX_PRIVATE_API vx_status _SplitInputAndOutputForMultiTPCores(vx_context context,
                 else
                 {
                     div_z = gcmMIN(core, num_slice);
+                }
+            }
+            else
+            {
+                if (check_x &&
+                    output_size_x % num_slice == 0 &&
+                    output_size_x / num_slice > pad_left &&
+                    output_size_x / num_slice > pad_right)
+                {
+                    div_x = num_slice;
+                }
+                else if (output_size_y % num_slice == 0 &&
+                         output_size_y / num_slice > pad_top &&
+                         output_size_y / num_slice > pad_bottom)
+                {
+                    div_y = num_slice;
+                }
+                else if ((output_size_z / stride_x / stride_y) % num_slice == 0)
+                {
+                    div_z = num_slice;
+                }
+                else
+                {
+                    vx_uint32 max = gcmMAX(gcmMAX(output_size_x, output_size_y), output_size_z / stride_x / stride_y);
+
+                    if (check_x && (output_size_x == max))
+                    {
+                        div_x = gcmMIN(core, num_slice);
+                    }
+                    else if (output_size_y == max)
+                    {
+                        div_y = gcmMIN(core, num_slice);
+                    }
+                    else
+                    {
+                        div_z = gcmMIN(core, num_slice);
+                    }
                 }
             }
 #endif
