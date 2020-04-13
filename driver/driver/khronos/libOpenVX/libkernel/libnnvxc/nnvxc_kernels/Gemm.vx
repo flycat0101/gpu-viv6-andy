@@ -130,7 +130,7 @@ _viv_uniform int minData;
 _viv_uniform int maxData;
 #endif
 
-#define GEMM_QUANT_GENERAL(fun_name, src_type, dst_type, conv_mode) \
+#define GEMM_QUANT_GENERAL(fun_name, src_type, dst_type, copy_type, conv_mode) \
 __kernel void gemm_##fun_name \
     ( \
     image2d_array_t input, \
@@ -186,15 +186,15 @@ __kernel void gemm_##fun_name \
  \
     dst.x = dst.x * uint8Scale + outputZP; \
     _viv_asm(conv_mode, val, dst); \
- \
- \
-    VXC_WriteImage(output, coord_in.zy, val, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0)); \
+     copy_type result; \
+    _viv_asm(COPY, result, val, 8); \
+    VXC_WriteImage(output, coord_in.zy, result, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0)); \
 }
 
-GEMM_QUANT_GENERAL(uint8,       vxc_uchar16, vxc_uchar4, CONV_SAT_RTE)
-GEMM_QUANT_GENERAL(uint8tofp16, vxc_uchar16, vxc_half4,  CONV)
-GEMM_QUANT_GENERAL(int8,        vxc_char16,  vxc_char4,  CONV_SAT_RTE)
-GEMM_QUANT_GENERAL(int8tofp16,  vxc_char16,  vxc_half4,  CONV)
+GEMM_QUANT_GENERAL(uint8,       vxc_uchar16, vxc_uchar4, vxc_uchar4, CONV_SAT_RTE)
+GEMM_QUANT_GENERAL(uint8tofp16, vxc_uchar16, vxc_half4,  vxc_short4, CONV)
+GEMM_QUANT_GENERAL(int8,        vxc_char16,  vxc_char4,  vxc_char4,  CONV_SAT_RTE)
+GEMM_QUANT_GENERAL(int8tofp16,  vxc_char16,  vxc_half4,  vxc_short4, CONV)
 
 _viv_uniform int inputSize_aln16;
 _viv_uniform VXC_512Bits uniAccU8MulU8_16x2_b;
@@ -295,7 +295,7 @@ __kernel void gemm_Tensor_fp16
     return;
 }
 
-#define GEMM_TENSOR_QUANT_GENERAL(fun_name, src_type, dst_type, conv_mode) \
+#define GEMM_TENSOR_QUANT_GENERAL(fun_name, src_type, dst_type, copy_type, conv_mode) \
 __kernel void gemm_Tensor_##fun_name \
     ( \
     image2d_array_t input, \
@@ -355,14 +355,16 @@ __kernel void gemm_Tensor_##fun_name \
  \
     dst.x = dst.x * uint8Scale + outputZP; \
     _viv_asm(conv_mode, val, dst); \
+     copy_type result; \
+    _viv_asm(COPY, result, val, 8); \
     coord    = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0); \
-    VXC_WriteImage2DArray(output, coord, val, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0)); \
+    VXC_WriteImage2DArray(output, coord, result, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0)); \
 }
 
-GEMM_TENSOR_QUANT_GENERAL(uint8,       vxc_uchar16, vxc_uchar4, CONV_SAT_RTE)
-GEMM_TENSOR_QUANT_GENERAL(uint8tofp16, vxc_uchar16, vxc_half4,  CONV)
-GEMM_TENSOR_QUANT_GENERAL(int8,        vxc_char16,  vxc_char4,  CONV_SAT_RTE)
-GEMM_TENSOR_QUANT_GENERAL(int8tofp16,  vxc_char16,  vxc_half4,  CONV)
+GEMM_TENSOR_QUANT_GENERAL(uint8,       vxc_uchar16, vxc_uchar4, vxc_uchar4, CONV_SAT_RTE)
+GEMM_TENSOR_QUANT_GENERAL(uint8tofp16, vxc_uchar16, vxc_half4,  vxc_short4, CONV)
+GEMM_TENSOR_QUANT_GENERAL(int8,        vxc_char16,  vxc_char4,  vxc_char4,  CONV_SAT_RTE)
+GEMM_TENSOR_QUANT_GENERAL(int8tofp16,  vxc_char16,  vxc_half4,  vxc_short4, CONV)
 
 #if (VX_VERSION==2)
 _viv_uniform VXC_512Bits uniSumF16MulF16_8x2_b;
