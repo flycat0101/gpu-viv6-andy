@@ -612,12 +612,6 @@ gckOS_DumpParam(
 #else
     printk("  externalBase      = 0x%lX\n",  externalBase);
 #endif
-    printk("  exclusiveSize     = 0x%08lX\n", exclusiveSize);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 17, 0)
-    printk("  exclusiveBase      = 0x%11X\n", exclusiveBase);
-#else
-    printk("  exclusiveBase      = 0x%lX\n", exclusiveBase);
-#endif
     printk("  bankSize          = 0x%08lX\n", bankSize);
     printk("  fastClear         = %d\n",      fastClear);
     printk("  compression       = %d\n",      compression);
