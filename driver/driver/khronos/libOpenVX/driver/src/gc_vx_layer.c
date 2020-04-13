@@ -11552,7 +11552,7 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniGetSubLoInt8toFp32_4x4", 1, uniGetSubLoInt8toFp32_4x4);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniGetSubHiInt8toFp32_4x4", 1, uniGetSubHiInt8toFp32_4x4);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniExtractHalf8_2x8", 1, uniExtractHalf8_2x8);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "scaleLogE", 1, &logE);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "scaleLogE", 1, &scaleLogE);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "depth", 1, &depth);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "scaleLogE_Int8", 1, &scaleLogE_Int8);
         vxmONERROR_STATUS(status);
@@ -11886,7 +11886,7 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniGetSubLoInt8toFp32_4x4", 1, uniGetSubLoInt8toFp32_4x4);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniGetSubHiInt8toFp32_4x4", 1, uniGetSubHiInt8toFp32_4x4);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniExtact8Bit_2x8", 1, uniExtact8Bit_2x8);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "scaleLogE", 1, &logE);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "scaleLogE", 1, &scaleLogE);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "depth", 1, &depth);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "qScaleOut_UInt8", 1, &qScaleOut_UInt8);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uint8_out_ZP", 1, &uint8_out_ZP);
