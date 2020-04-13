@@ -52,7 +52,7 @@ static const char * _driverDlls[] =
     "libEGL.so",                        /* EGL */
     "libGLESv1_CM.so",                  /* OpenGL ES 1.1 Common */
     "libGLESv2.so",                     /* OpenGL ES 2.0/3.x */
-  #if defined(EGL_API_DRI) || defined(X11_DRI3)
+  #if !defined(EGL_API_FB)
     "/usr/lib/dri/vivante_dri.so",      /* OpenGL */
   #else
     "libGL.so",                         /* OpenGL */

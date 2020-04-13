@@ -94,7 +94,7 @@ install: extra_install
 else
 LIBS += -L $(ROOTDIR)/src/GLX/client/$(OBJ_DIR) -lGL
 LIBS += -lGAL -lVSC -lXext -lX11 -lXfixes -lXdamage -ldrm -lm -lpthread
-LFLAGS += -Wl,--version-script=glCoreSymExport
+LFLAGS += -Wl,--version-script=GL4SymExport
 INSTALL_DIR = $(SDK_DIR)/drivers/dri
 endif
 
