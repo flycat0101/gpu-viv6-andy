@@ -11417,7 +11417,7 @@ vxnne_shader_executable vxnneGetSoftmaxAxis0ShaderExecutable(
             status = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvEvenDatatoF32_4x4", 1, uniConvEvenDatatoF32_4x4 );
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvOddDatatoF32_4x4", 1, uniConvOddDatatoF32_4x4 );
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniPackMaxData_2x8", 1, uniPackMaxData_2x8 );
-            if (inputFormat == VX_TYPE_FLOAT16)
+            if (outputFormat == VX_TYPE_FLOAT16)
             {
                 status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniExtractABAB_2x8", 1, uniExtractF16ABAB_2x8 );
             }
