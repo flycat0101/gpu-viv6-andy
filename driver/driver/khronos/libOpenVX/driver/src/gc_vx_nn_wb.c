@@ -419,9 +419,9 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
                     &totalCount,
                     &nonZeroCount,
                     &origKernelBufferSize,
-                    &min_kernel_buffer_sizes[index],
-                    &minZeroRunLens[index],
-                    &max_zero_run_lens[index],
+                    &minKernelBufferSizes[index],
+                    minZeroRunLens != VX_NULL ? &minZeroRunLens[index] : VX_NULL,
+                    max_zero_run_lens != VX_NULL ? &max_zero_run_lens[index] : VX_NULL,
                     wb);
             }
 
