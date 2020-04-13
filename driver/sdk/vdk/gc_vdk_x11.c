@@ -1349,11 +1349,12 @@ vdkGetPixmapInfo(
 
     if (Stride != NULL || Bits != NULL)
     {
+#if defined(EGL_API_DRI) || defined(X11_DRI3)
         if (pix->stride == 0 || pix->memory == NULL)
         {
             _LockPixmap(dpy, pix);
         }
-
+#endif
         if (pix->stride == 0 || pix->memory == NULL)
         {
             /* Can not get stride or Bits from Pixmap. */
@@ -1427,12 +1428,12 @@ vdkDestroyPixmap(
             {
                 prev->next = pix->next;
             }
-
+#if defined(EGL_API_DRI) || defined(X11_DRI3)
             if (pix->stride != 0 || pix->memory != NULL)
             {
                 _UnlockPixmap(dpy, pix);
             }
-
+#endif
             free(pix);
         }
     }
