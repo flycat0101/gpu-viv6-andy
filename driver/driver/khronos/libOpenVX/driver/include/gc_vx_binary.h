@@ -567,6 +567,9 @@ typedef struct _vx_binary_save_s
     vx_uint32                                NBGInMemorySize;
 
     vx_bool                                  supportDynInputShape;
+
+    vx_uint32                                tpOpNum;
+    vx_uint32                                nnOpNum;
 }
 vx_binary_save_s, *vx_binary_save;
 
