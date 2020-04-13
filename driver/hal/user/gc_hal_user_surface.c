@@ -14010,7 +14010,9 @@ gcsSURF_NODE_Construct(
 
         Node->u.normal.node = alvm->node;
         Node->pool          = alvm->pool;
-        Node->size          = ((gctSIZE_T)alvm->bytes) & (~(Alignment - 1));
+
+        gcmASSERT((gctSIZE_T)alvm->bytes >= Bytes);
+        Node->size          = Bytes;
     }
     else
     {
