@@ -10853,6 +10853,30 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_FindNodeIndexForWeight(
     return weight;
  }
 
+
+VX_PRIVATE_API vx_status vxoBinaryGraph_FillQuantParam(
+    vx_tensor tensor,
+    vx_uint32_ptr *info
+    )
+{
+    /* input scale zp or dfp*/
+    vx_uint32_ptr buffer = *info;
+    vx_enum quant_format = TENSOR_QUANT_TYPE(tensor);
+
+    if ((quant_format == VX_QUANT_AFFINE_SCALE || quant_format == VX_QUANT_AFFINE_SCALE_PER_CHANNEL))
+    {
+        *buffer = (vx_uint32)TENSOR_TF_ZEROPOINT(tensor); buffer++;
+        *buffer = (vx_uint32)TENSOR_TF_SCALE(tensor);
+    }
+    else
+    {
+        *buffer = (vx_uint32)TENSOR_POS(tensor); buffer++;
+        *buffer = (vx_uint32)TENSOR_TF_SCALE(tensor);
+    }
+
+    return VX_SUCCESS;
+}
+
 VX_PRIVATE_API vx_status vxoBinaryGraph_GetNodeParametersValue(
     vx_node node,
     vx_uint32_ptr *toplogyInfo
@@ -10867,7 +10891,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNodeParametersValue(
 
     for (i = 0; i < node->numParameters; i++)
     {
-        if (node->paramTable[i]->type == VX_TYPE_WEIGHTS_BIASES_PARAMETER)
+        if ((node->paramTable[i] != VX_NULL) && (node->paramTable[i]->type == VX_TYPE_WEIGHTS_BIASES_PARAMETER))
         {
             wb = (vx_weights_biases_parameter)node->paramTable[i];
             break;
@@ -10883,6 +10907,15 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNodeParametersValue(
             {
                 *buffer = WB_KERNEL_X(wb); buffer++;
             }
+            else if (node->paramTable[1] != VX_NULL)
+            {
+                vx_tensor weight = (vx_tensor)node->paramTable[1];
+                if (weight != VX_NULL)
+                {
+                    *buffer = weight->dims[0]; buffer++;
+                }
+            }
+
             /* pad */
             *buffer = SCALAR_VALUE(node->paramTable[3], u32); buffer++;
             /* stride*/
@@ -10892,7 +10925,9 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNodeParametersValue(
             /* input w */
             *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 0); buffer++;
             /* input h */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1);
+            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1); buffer++;
+
+            vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
             break;
         }
         case VX_KERNEL_NN_CONVOLUTION_RELU_LAYER:
@@ -10911,7 +10946,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNodeParametersValue(
             /* input h */
             *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1); buffer++;
             /* output w */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 0);
+            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 0); buffer++;
+            vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
             break;
         }
         case VX_KERNEL_NN_CONVOLUTION_RELU_POOLING_LAYER:
@@ -10930,7 +10966,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNodeParametersValue(
             /* input w */
             *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 0); buffer++;
             /* input h */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1);
+            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1); buffer++;
+            vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
             break;
         }
         case VX_KERNEL_NN_CONVOLUTION_RELU_POOLING_LAYER2:
@@ -10949,7 +10986,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNodeParametersValue(
             /* input w */
             *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 0); buffer++;
             /* input h */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1);
+            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[0], 1); buffer++;
+            vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
             break;
         }
         case VX_KERNEL_NN_FULLY_CONNECTED_LAYER:
@@ -10963,7 +11001,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNodeParametersValue(
             /* output w */
             *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 0); buffer++;
             /* output h */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 1);
+            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 1); buffer++;
+            vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
             break;
         }
         case VX_KERNEL_NN_FULLY_CONNECTED_RELU_LAYER:
@@ -10979,7 +11018,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNodeParametersValue(
             /* output w */
             *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 0); buffer++;
             /* output h */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 1);
+            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 1); buffer++;
+            vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
             break;
         }
         case VX_KERNEL_POOLING_LAYER:
@@ -10995,7 +11035,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNodeParametersValue(
             /* output w */
             *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 0); buffer++;
             /* output h */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 1);
+            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 1); buffer++;
+            vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
             break;
         }
         case VX_KERNEL_NN_POOLING_LAYER2:
@@ -11011,7 +11052,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNodeParametersValue(
             /* output w */
             *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 0); buffer++;
             /* output h */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 1);
+            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 1); buffer++;
+            vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
             break;
         }
         case VX_KERNEL_ACTIVATION_LAYER:
@@ -11027,7 +11069,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNodeParametersValue(
             /* output w */
             *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 0); buffer++;
             /* output h */
-            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 1);
+            *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 1); buffer++;
+            vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
             break;
         }
         default:
@@ -11050,6 +11093,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNodeParametersValue(
                     /* output h */
                     *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 1);
                 }
+                buffer++;
+                vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
             }
             else
             {
@@ -11063,6 +11108,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNodeParametersValue(
                     *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 2); buffer++;
                     /* output n */
                     *buffer = TENSOR_VIEW_SIZE_INDEX((vx_tensor)node->paramTable[node->numParameters - 1], 3);
+                    buffer++;
+                    vxoBinaryGraph_FillQuantParam((vx_tensor)node->paramTable[0], &buffer);
                 }
             }
             break;
@@ -11208,12 +11255,14 @@ VX_PRIVATE_API vx_uint8_ptr vxoBinaryGraph_GetToplogyParameters(
     vx_uint32 *infoSize
     )
 {
-    #define BYTES_PER_NODE     7
+    #define BYTES_PER_NODE     10
     /* describe graph toplogy information with BYTES_PER_NODE * sizeof(vx_uint32) bytes pre node:
     1. kernel enumeration(1) -- must*
     2. kernel size(1)  -- option    3. pad(1) -- option
     4. stride(1) -- option          5. poolSize(1) -- option
-    6. input_w/h/c --option         7. output_w/h/c -- option */
+    6. input_w/h/c --option         7. output_w/h/c -- option
+    8. input - scale                9. input - zeroPoint or dfp
+    */
     vx_uint32 size = graph->nodeCount * sizeof(vx_uint32) * BYTES_PER_NODE + sizeof(vx_uint32);
     /* sizeof(vx_uint32) is for target id */
     vx_uint32_ptr toplogyInfo = (vx_uint32_ptr)vxAllocate((vx_size)size);
@@ -11238,11 +11287,14 @@ VX_PRIVATE_API vx_uint8_ptr vxoBinaryGraph_GetToplogyParameters(
     for (nodeIndex = 0; nodeIndex < nodeCount; nodeIndex++)
     {
         node = nodeTable[graph->allNodeIndexTable[nodeIndex]];
-        *toplogyInfo = (vx_uint32)node->kernel->enumeration; /* kernel enumeration */
-        toplogyInfo++;
+        if (node != VX_NULL)
+        {
+            *toplogyInfo = (vx_uint32)node->kernel->enumeration; /* kernel enumeration */
+            toplogyInfo++;
 
-        vxoBinaryGraph_GetNodeParametersValue(node, &toplogyInfo);
-        toplogyInfo += BYTES_PER_NODE - 1;
+            vxoBinaryGraph_GetNodeParametersValue(node, &toplogyInfo);
+            toplogyInfo += BYTES_PER_NODE - 1;
+        }
     }
     *infoSize = size;
     gcmFOOTER_ARG("%p", base);
@@ -11719,6 +11771,11 @@ VX_INTERNAL_API void vxoBinaryGraph_CacheOrImport(
 
     INITIALIZE_STRUCT(md5Ctx);
 
+    vxInfo("Start Cache or Import network binary graph...\n");
+    /* sort graph's all nodes */
+    vxmONERROR(vxoGraph_DetectAllHeadNodes(graph));
+    vxoGraph_GenerateAllNodeIndexTable(graph);
+
     /* get graph toplogy and nodes parameter info */
     toplogyInfo = vxoBinaryGraph_GetToplogyParameters(graph, &toplogyInfoSize);
     if ((toplogyInfoSize <= 0) || (toplogyInfo == VX_NULL))
@@ -11773,8 +11830,21 @@ VX_INTERNAL_API void vxoBinaryGraph_CacheOrImport(
     }
     else
     {
+        vx_uint32 nodeIndex;
+
         /* binary doesn't exist, generate binary graph */
         vxInfo("generate binary graph: %s\n", binaryName);
+
+        /* clean up next->visited and ggraph->allNodeIndexTable[] */
+        for (nodeIndex = 0; nodeIndex < graph->nodeCount; nodeIndex++)
+        {
+            graph->nodeTable[nodeIndex]->visited = vx_false_e;
+            graph->allNodeIndexTable[nodeIndex] = 0;
+        }
+
+        graph->headNodeCount = 0;
+        vxZeroMemory(graph->headNodeIndexTable, sizeof(graph->headNodeIndexTable));
+
         goto SaveBin;
     }
 
