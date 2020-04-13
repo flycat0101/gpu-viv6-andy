@@ -1224,6 +1224,8 @@ typedef struct _vxnne_pooling_operation_s
     vx_uint32                        pool_pad_y_top;
     vx_uint32                        pool_pad_y_bottom;
     vx_enum                          rounding;
+    vx_uint32                        stride_x;
+    vx_uint32                        stride_y;
     vx_tensor                        outputs;
     vx_weights_biases_parameter      weights_biases;
 }
