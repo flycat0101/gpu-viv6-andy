@@ -31121,8 +31121,21 @@ cloIR_BINARY_EXPR_GenArithmeticAssignCode(
     }
     else {
        for (i = 0; i < leftParameters.operandCount; i++) {
+          gctBOOL useLeftReg = gcvFALSE;
+
           /* Generate the arithmetic code */
-          clmGEN_CODE_GetParametersIOperand(Compiler, intermIOperand, Parameters, lOperandParameters.dataTypes[i].def);
+          useLeftReg = gcmOPT_DriverVIRPath() &&
+                       !(Parameters->hasIOperand || (leftParameters.hint & clvGEN_DEREF_CODE));
+          if(useLeftReg) {
+              clsIOPERAND_InitializeWithComponentSelection(intermIOperand,
+                                                           lOperandParameters.rOperands[i].dataType,
+                                                           lOperandParameters.rOperands[i].u.reg.dataType,
+                                                           lOperandParameters.rOperands[i].u.reg.regIndex,
+                                                           lOperandParameters.rOperands[i].u.reg.componentSelection);
+          }
+          else {
+              clmGEN_CODE_GetParametersIOperand(Compiler, intermIOperand, Parameters, lOperandParameters.dataTypes[i].def);
+          }
 
           if(opcode == clvOPCODE_FMOD || opcode == clvOPCODE_DIV ||
              opcode == clvOPCODE_IDIV || opcode == clvOPCODE_MOD ||
@@ -31159,60 +31172,61 @@ cloIR_BINARY_EXPR_GenArithmeticAssignCode(
           }
 
           clsROPERAND_InitializeUsingIOperand(intermROperand, intermIOperand);
-
-          gcmONERROR(_GenConvROperandForAssign(Compiler,
-                                               BinaryExpr->exprBase.base.lineNo,
-                                               BinaryExpr->exprBase.base.stringNo,
-                                               leftParameters.dataTypes[i].def,
-                                               intermROperand));
-
-          if(leftParameters.hint & clvGEN_DEREF_CODE)
-          {
-              if (leftParameters.hint & clvGEN_COMPONENT_SELECT_CODE)
-              {
-                  cloIR_UNARY_EXPR unaryExpr = (cloIR_UNARY_EXPR) &leftParameters.expr->base;
-                  clsGEN_CODE_DATA_TYPE storageDataType;
-
-                  clmGEN_CODE_ConvDirectElementDataType(unaryExpr->operand->decl.dataType, storageDataType);
-                  gcmONERROR(_GenSelectiveStoreCode(Compiler,
+          if(!useLeftReg) {
+              gcmONERROR(_GenConvROperandForAssign(Compiler,
                                                    BinaryExpr->exprBase.base.lineNo,
                                                    BinaryExpr->exprBase.base.stringNo,
-                                                   intermROperand,
-                                                   leftParameters.lOperands + i,
                                                    leftParameters.dataTypes[i].def,
-                                                   scaledIndex,
-                                                   storageDataType,
-                                                   &unaryExpr->u.componentSelection));
-              }
-              else
+                                                   intermROperand));
+
+              if(leftParameters.hint & clvGEN_DEREF_CODE)
               {
-                  gcmONERROR(clGenStoreCode(Compiler,
-                                            BinaryExpr->exprBase.base.lineNo,
-                                            BinaryExpr->exprBase.base.stringNo,
-                                            clvOPCODE_STORE1,
-                                            intermROperand,
-                                            leftParameters.lOperands + i,
-                                            leftParameters.dataTypes[i].def,
-                                            scaledIndex));
+                  if (leftParameters.hint & clvGEN_COMPONENT_SELECT_CODE)
+                  {
+                      cloIR_UNARY_EXPR unaryExpr = (cloIR_UNARY_EXPR) &leftParameters.expr->base;
+                      clsGEN_CODE_DATA_TYPE storageDataType;
+
+                      clmGEN_CODE_ConvDirectElementDataType(unaryExpr->operand->decl.dataType, storageDataType);
+                      gcmONERROR(_GenSelectiveStoreCode(Compiler,
+                                                       BinaryExpr->exprBase.base.lineNo,
+                                                       BinaryExpr->exprBase.base.stringNo,
+                                                       intermROperand,
+                                                       leftParameters.lOperands + i,
+                                                       leftParameters.dataTypes[i].def,
+                                                       scaledIndex,
+                                                       storageDataType,
+                                                       &unaryExpr->u.componentSelection));
+                  }
+                  else
+                  {
+                      gcmONERROR(clGenStoreCode(Compiler,
+                                                BinaryExpr->exprBase.base.lineNo,
+                                                BinaryExpr->exprBase.base.stringNo,
+                                                clvOPCODE_STORE1,
+                                                intermROperand,
+                                                leftParameters.lOperands + i,
+                                                leftParameters.dataTypes[i].def,
+                                                scaledIndex));
+                  }
               }
-          }
-          else if(leftParameters.hint & clvGEN_DEREF_STRUCT_CODE) {
-             gcmONERROR(clGenStoreCode(Compiler,
-                                           BinaryExpr->exprBase.base.lineNo,
-                                           BinaryExpr->exprBase.base.stringNo,
-                                           clvOPCODE_STORE1,
-                                           intermROperand,
-                                           leftParameters.lOperands + i,
-                                           leftParameters.dataTypes[i].def,
-                                           leftParameters.elementIndex));
-          }
-          else {
-             /* Generate the assign code */
-             gcmONERROR(clGenAssignCode(Compiler,
-                            BinaryExpr->exprBase.base.lineNo,
-                            BinaryExpr->exprBase.base.stringNo,
-                            leftParameters.lOperands + i,
-                            intermROperand));
+              else if(leftParameters.hint & clvGEN_DEREF_STRUCT_CODE) {
+                 gcmONERROR(clGenStoreCode(Compiler,
+                                               BinaryExpr->exprBase.base.lineNo,
+                                               BinaryExpr->exprBase.base.stringNo,
+                                               clvOPCODE_STORE1,
+                                               intermROperand,
+                                               leftParameters.lOperands + i,
+                                               leftParameters.dataTypes[i].def,
+                                               leftParameters.elementIndex));
+              }
+              else {
+                 /* Generate the assign code */
+                 gcmONERROR(clGenAssignCode(Compiler,
+                                BinaryExpr->exprBase.base.lineNo,
+                                BinaryExpr->exprBase.base.stringNo,
+                                leftParameters.lOperands + i,
+                                intermROperand));
+              }
           }
           if (Parameters->needROperand) {
              Parameters->rOperands[i] = *intermROperand;
