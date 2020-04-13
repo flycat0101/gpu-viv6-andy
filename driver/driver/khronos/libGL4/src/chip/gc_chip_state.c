@@ -4295,13 +4295,14 @@ gcChipValidateMiscState(
             gcmONERROR(gco3D_SetPrimitiveIdEnable(chipCtx->engine, ((psHints->primIdComponent != -1) && !prePAhints->prePaShaderHasPrimitiveId)));
         }
     }
+/*  Comment this for run glxgears hang on IMX6QP_X11.
     else if (pointPrimTypeSwitch && (gc->imports.conformGLSpec && chipCtx->fixProgramFlag == gcvTRUE))
     {
         gctBOOL enable = (GL_POINTS == chipCtx->primitveType) ? gcvTRUE : gcvFALSE;
 
-        /* Enable point size for points. */
         gcmONERROR(gco3D_SetPointSizeEnable(chipCtx->engine, enable));
     }
+*/
 
     /* Save current primitive type. */
     chipCtx->lastPrimitiveType = chipCtx->primitveType;
