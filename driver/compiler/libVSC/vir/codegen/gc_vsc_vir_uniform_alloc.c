@@ -1810,7 +1810,7 @@ static void _VIR_CG_FindPushConstUniform(
                 ** the range size is smaller than the element size if only part of this element is used in the shader,
                 ** for this case we also need to allocate the constant register for this element.
                 */
-                if (VIR_Symbol_GetLayoutOffset(sym) + VIR_Type_GetTypeByteSize(pShader, symType) > rangeStart)
+                if (VIR_Symbol_GetLayoutOffset(sym) + VIR_Type_GetTypeByteSize(pShader, symType) > rangeEnd)
                 {
                 }
 
