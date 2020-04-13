@@ -132,6 +132,13 @@ vx_status vxoFC_GetConfigFromEnv(vx_enum* force_format, vx_int8_ptr force_dfb, v
      }
      break;
      case VX_QUANT_AFFINE_SCALE:
+         {
+             _data_format       = format == VX_TYPE_BFLOAT16? VX_TYPE_BFLOAT16 : VX_TYPE_FLOAT16;
+             _quant_format      = VX_QUANT_NONE;
+             _fixed_point_pos   = 0;
+             _scale             = 1.f;
+             _zeroPoint         = 0;
+         }
      default:
          _fixed_point_pos = 0;
          break;

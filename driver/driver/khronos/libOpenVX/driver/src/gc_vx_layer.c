@@ -25586,7 +25586,7 @@ vxnne_shader_executable vxnneGetLSTMUnitHiddenOutExtShaderExecutable(
     vx_uint32     batch_size        = TENSOR_VIEW_SIZE_INDEX(output, 1);
     vx_int8       dstFixPointPos    = TENSOR_POS(output);
     vx_uint32     paramNum          = 3;
-    vx_float32    outputZP          = (vx_float32)TENSOR_TF_ZEROPOINT(output);
+    vx_float32    outputZP          = 0;
     vx_float32    outputScale       = 1.0f;
 
     if (TENSOR_QUANT_TYPE(output) == VX_QUANT_DYNAMIC_FIXED_POINT)
@@ -25599,6 +25599,7 @@ vxnne_shader_executable vxnneGetLSTMUnitHiddenOutExtShaderExecutable(
     else if (TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE)
     {
         outputScale = 1.0f / TENSOR_TF_SCALE(output);
+        outputZP    = (vx_float32)TENSOR_TF_ZEROPOINT(output);
     }
 
     if (cell_state_out)
@@ -25689,7 +25690,7 @@ vxnne_shader_executable vxnneGetLSTMUnitHiddenOutExtShaderExecutable(
             0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
         };
 
-        if (TENSOR_QUANT_TYPE(output) == VX_QUANT_DYNAMIC_FIXED_POINT)
+        if (output_format == VX_TYPE_INT8 || output_format == VX_TYPE_INT16)
         {
             if (paramNum == 3 && TENSOR_DATA_TYPE(cell_state_in) == VX_TYPE_FLOAT32)
             {
@@ -25737,6 +25738,7 @@ vxnne_shader_executable vxnneGetLSTMUnitHiddenOutExtShaderExecutable(
             }
 
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniExtractInteger_2x8", 1, uniExtractInteger_2x8);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outputZP", 1, &outputZP);
             if (status != VX_SUCCESS) goto OnError;
         }
         else if (TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE && output_format == VX_TYPE_UINT8)
