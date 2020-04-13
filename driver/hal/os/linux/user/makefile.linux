@@ -16,11 +16,6 @@
 #
 
 ################################################################################
-# Include config file
-
-include $(AQROOT)/config
-
-################################################################################
 # Include common definitions.
 
 include $(AQROOT)/makefile.linux.def
@@ -44,8 +39,7 @@ INCLUDE := -I$(AQROOT)/hal/inc \
            -I$(AQROOT)/hal/user \
            -I$(AQROOT)/hal/optimizer \
            -I$(AQROOT)/hal/os/linux/user \
-           -I$(AQROOT)/compiler/libVSC/include \
-           -I$(AQROOT)/hal/os/linux/user/platform/$(soc_vendor)
+           -I$(AQROOT)/compiler/libVSC/include
 
 CFLAGS += $(INCLUDE)
 
@@ -57,10 +51,12 @@ ifneq ($(USE_ARMCC),1)
 endif
 
 ################################################################################
-# Describe object files
+# Describe object files.
 
-platform_option := $(wildcard \
-        platform/$(soc_vendor)/gc_hal_user_platform_$(soc_board).c)
+platform_option := \
+    $(firstword $(wildcard \
+        platform/$(soc_vendor)/gc_hal_user_platform_$(soc_board).c \
+        platform/default/gc_hal_user_platform_default.c))
 
 platform_option_obj := $(patsubst %.c,%.o,$(notdir $(platform_option)))
 
@@ -105,6 +101,7 @@ $(OBJ_DIR)/%.o: %.c
 	@mkdir -p $(OBJ_DIR)
 	@$(CC) -c $(CFLAGS) -MMD -o $@ $<
 
+vpath %.c platform/default
 vpath %.c platform/$(soc_vendor)
 
 # object dependencies.

@@ -2053,7 +2053,6 @@ _SetupSRAMVidMem(
                     Hardware->identity.sRAMSizes[i],
                     sRAMName,
                     sRAMRequested,
-                    gcvTRUE,
                     &Hardware->sRAMPhysical[i]
                     ));
 

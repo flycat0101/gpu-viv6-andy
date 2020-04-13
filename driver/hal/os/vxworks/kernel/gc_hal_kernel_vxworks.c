@@ -464,13 +464,3 @@ gckKERNEL_Notify(
     gcmkFOOTER();
     return status;
 }
-
-gceSTATUS
-gckKERNEL_SyncVideoMemory(
-    IN gckKERNEL Kernel,
-    IN gctUINT32 Node,
-    IN gctUINT32 Reason
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}

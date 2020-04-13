@@ -639,7 +639,6 @@ gckKERNEL_Construct(
 
         kernel->contiguousBaseAddress = kernel->mmu->contiguousBaseAddress;
         kernel->externalBaseAddress   = kernel->mmu->externalBaseAddress;
-        kernel->exclusiveBaseAddress  = kernel->mmu->exclusiveBaseAddress;
 
         /* Construct the gckCOMMAND object, either MCFE or wait-link FE can exist. */
         if (gckHARDWARE_IsFeatureAvailable(kernel->hardware, gcvFEATURE_MCFE))
@@ -1214,14 +1213,19 @@ AllocateMemory:
             if (gcmIS_SUCCESS(status))
             {
                 /* Allocate memory. */
+                if ((Flag & videoMemory->capability) != Flag)
+                {
+                    status = gcvSTATUS_NOT_SUPPORTED;
+
+                }
 #if defined(gcdLINEAR_SIZE_LIMIT)
                 /* 512 KB */
-                if (bytes > gcdLINEAR_SIZE_LIMIT)
+                else if (bytes > gcdLINEAR_SIZE_LIMIT)
                 {
                     status = gcvSTATUS_OUT_OF_MEMORY;
                 }
-                else
 #endif
+                else
                 {
                     hasFastPools = gcvTRUE;
                     status = gckVIDMEM_NODE_AllocateLinear(Kernel,
@@ -1257,11 +1261,9 @@ AllocateMemory:
             /* Advance to external memory. */
             pool = gcvPOOL_LOCAL_EXTERNAL;
         }
-        else if (pool == gcvPOOL_LOCAL_EXTERNAL)
-        {
-            pool = gcvPOOL_LOCAL_EXCLUSIVE;
-        }
-        else if (pool == gcvPOOL_LOCAL_EXCLUSIVE)
+
+        else
+        if (pool == gcvPOOL_LOCAL_EXTERNAL)
         {
             if (Kernel->sRAMLoopMode)
             {
@@ -1274,7 +1276,9 @@ AllocateMemory:
                 pool = gcvPOOL_SYSTEM;
             }
         }
-        else if (pool == gcvPOOL_INTERNAL_SRAM)
+
+        else
+        if (pool == gcvPOOL_INTERNAL_SRAM)
         {
             if (Kernel->sRAMIndex < gcvSRAM_INTER_COUNT - 1 && !Kernel->sRAMPhysFaked[Kernel->sRAMIndex])
             {
@@ -1287,7 +1291,9 @@ AllocateMemory:
                 pool = gcvPOOL_SYSTEM;
             }
         }
-        else if (pool == gcvPOOL_SYSTEM)
+
+        else
+        if (pool == gcvPOOL_SYSTEM)
         {
             /* Do not go ahead to try relative slow pools */
             if (fastPools && hasFastPools)
@@ -1299,6 +1305,7 @@ AllocateMemory:
             /* Advance to virtual memory. */
             pool = gcvPOOL_VIRTUAL;
         }
+
         else
         {
             /* Out of pools. */
@@ -2130,67 +2137,6 @@ OnError:
     return status;
 }
 
-/*******************************************************************************
-**
-**  _LockVideoMemory
-**
-**      Lock a video memory node. It will generate a cpu virtual address used
-**      by software and a GPU address used by GPU.
-**
-**  INPUT:
-**
-**      gckKERNEL Kernel
-**          Pointer to an gckKERNEL object.
-**
-**      gceCORE Core
-**          GPU to which video memory is locked.
-**
-**      gcsHAL_INTERFACE * Interface
-**          Pointer to a gcsHAL_INTERFACE structure that defines the command to
-**          be dispatched.
-**
-**  OUTPUT:
-**
-**      gcsHAL_INTERFACE * Interface
-**          Pointer to a gcsHAL_INTERFACE structure that receives any data to be
-**          returned.
-*/
-static gceSTATUS
-_SyncVidoMemory(
-    IN gckKERNEL Kernel,
-    IN gctUINT32 ProcessID,
-    IN OUT gcsHAL_INTERFACE * Interface
-)
-{
-    gceSTATUS status;
-    gckVIDMEM_NODE nodeObject;
-
-    gcmkHEADER_ARG("Kernel=%p ProcessID=%d",
-                   Kernel, ProcessID);
-
-    gcmkONERROR(gckVIDMEM_HANDLE_Lookup(
-        Kernel,
-        ProcessID,
-        (gctUINT32)Interface->u.SyncVideoMemory.node,
-        &nodeObject
-        ));
-
-    if (nodeObject->pool == gcvPOOL_LOCAL_EXCLUSIVE)
-    {
-        gcmkONERROR(gckKERNEL_SyncVideoMemory(
-            Kernel,
-            (gctUINT32)Interface->u.SyncVideoMemory.node,
-            Interface->u.SyncVideoMemory.reason
-            ));
-    }
-
-    gcmkFOOTER_NO();
-    return gcvSTATUS_OK;
-
-OnError:
-    gcmkFOOTER();
-    return status;
-}
 
 gceSTATUS
 gckKERNEL_QueryDatabase(
@@ -2984,7 +2930,7 @@ gckKERNEL_Dispatch(
             gckOS_AllocateNonPagedMemory(
                 Kernel->os,
                 gcvTRUE,
-                Interface->u.AllocateNonPagedMemory.flags | gcvALLOC_FLAG_CONTIGUOUS,
+                gcvALLOC_FLAG_CONTIGUOUS,
                 &bytes,
                 &physical,
                 &logical));
@@ -3828,10 +3774,6 @@ gckKERNEL_Dispatch(
             gckHARDWARE_QueryChipOptions(
                 Kernel->hardware,
                 &Interface->u.QueryChipOptions));
-        break;
-
-    case gcvHAL_SYNC_VIDEO_MEMORY:
-        gcmkONERROR(_SyncVidoMemory(Kernel, processID, Interface));
         break;
 
     default:

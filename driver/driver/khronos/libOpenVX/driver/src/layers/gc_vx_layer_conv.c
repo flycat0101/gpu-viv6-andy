@@ -2465,7 +2465,6 @@ VX_PRIVATE_API vx_bool vxoNNDilationConvolutionLayer_SH_EVIS_Support_Ext(vx_node
                     || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16  && biasFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
                     || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_INT32 && outputFormat != VX_TYPE_FLOAT32)
                     || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_UINT8 && outputFormat != VX_TYPE_FLOAT32)
-                    || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_INT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_UINT8)
                     || (inputFormat == VX_TYPE_BFLOAT16 && weightFormat == VX_TYPE_BFLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_BFLOAT16));
             }
             else

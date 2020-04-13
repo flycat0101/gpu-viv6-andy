@@ -89,7 +89,6 @@ struct _LINUX_MDL
     gctBOOL                 contiguous;
     dma_addr_t              dmaHandle;
     gctBOOL                 cacheable;
-    gctBOOL                 cpuAccessible;
 
     struct mutex            mapsMutex;
     struct list_head        mapsHead;

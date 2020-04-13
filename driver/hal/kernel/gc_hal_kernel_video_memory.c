@@ -898,7 +898,6 @@ gckVIDMEM_AllocateLinear(
                 node->VidMem.bytes,
                 "gal reserved memory",
                 gcvTRUE,
-                gcvTRUE,
                 &node->VidMem.physical
                 ));
     }
@@ -2169,6 +2168,9 @@ OnError:
 **      gctUINT32 * Address
 **          Pointer to a variable that will hold the hardware specific address.
 **
+**      gctUINT32 * PhysicalAddress
+**          Pointer to a variable that will hold the bus address of a contiguous
+**          video node.
 */
 static gceSTATUS
 gckVIDMEM_Lock(
@@ -2192,9 +2194,6 @@ gckVIDMEM_Lock(
 
         switch (Node->VidMem.pool)
         {
-        case gcvPOOL_LOCAL_EXCLUSIVE:
-            address = Kernel->exclusiveBaseAddress + offset;
-            break;
         case gcvPOOL_LOCAL_EXTERNAL:
             address = Kernel->externalBaseAddress + offset;
             break;
@@ -3004,7 +3003,6 @@ gckVIDMEM_NODE_Construct(
 #endif
 
     node->node = VideoNode;
-    node->transitNode = gcvNULL;
     node->kernel = Kernel;
     node->type = Type;
     node->pool = Pool;
@@ -3079,23 +3077,10 @@ gckVIDMEM_NODE_AllocateLinear(
     gceSTATUS status;
     gctSIZE_T bytes = *Bytes;
     gcuVIDMEM_NODE_PTR node = gcvNULL;
-    gcuVIDMEM_NODE_PTR transitNode = gcvNULL;
     gckVIDMEM_NODE nodeObject = gcvNULL;
 
     gcmkHEADER_ARG("Kernel=%p VideoMemory=%p Pool=%d Alignment=%d Type=%d *Bytes=%u",
                    Kernel, VideoMemory, Pool, Alignment, Type, bytes);
-
-    /* if it is exclusive pool, update Flag */
-    if (Pool == gcvPOOL_LOCAL_EXCLUSIVE)
-    {
-        Flag &= ~gcvALLOC_FLAG_CPU_ACCESS;
-        Flag |= gcvALLOC_FLAG_NON_CPU_ACCESS;
-    }
-
-    if ((Flag & VideoMemory->capability) != Flag)
-    {
-        gcmkONERROR(gcvSTATUS_NOT_SUPPORTED);
-    }
 
     gcmkONERROR(
         gckVIDMEM_AllocateLinear(Kernel,
@@ -3115,13 +3100,6 @@ gckVIDMEM_NODE_AllocateLinear(
     gcmkONERROR(
         gckVIDMEM_NODE_Construct(Kernel, node, Type, Pool, &nodeObject));
 
-    /* allocate virtual mem for dma */
-    if (Pool == gcvPOOL_LOCAL_EXCLUSIVE)
-    {
-        gcmkONERROR(gckVIDMEM_AllocateVirtual(Kernel, Flag, bytes, &transitNode));
-        nodeObject->transitNode = transitNode;
-    }
-
     *Bytes = bytes;
     *NodeObject = nodeObject;
 
@@ -3134,10 +3112,6 @@ OnError:
         gcmkVERIFY_OK(gckVIDMEM_Free(Kernel, node));
     }
 
-    if (nodeObject)
-    {
-        gckVIDMEM_NODE_Dereference(Kernel, nodeObject);
-    }
     gcmkFOOTER();
     return status;
 }
@@ -3287,15 +3261,8 @@ gckVIDMEM_NODE_Dereference(
             gckOS_ReleaseMutex(Kernel->os, Kernel->db->videoMemListMutex));
 
         /* Free gcuVIDMEM_NODE. */
-        if (NodeObject->node)
-        {
-            gcmkVERIFY_OK(gckVIDMEM_Free(Kernel, NodeObject->node));
-        }
+        gcmkVERIFY_OK(gckVIDMEM_Free(Kernel, NodeObject->node));
 
-        if (NodeObject->transitNode)
-        {
-            gcmkVERIFY_OK(gckVIDMEM_Free(Kernel, NodeObject->transitNode));
-        }
         gcmkVERIFY_OK(gckOS_AtomDestroy(Kernel->os, NodeObject->reference));
 
         gcmkVERIFY_OK(gckOS_DeleteMutex(Kernel->os, NodeObject->mutex));
@@ -3585,23 +3552,11 @@ gckVIDMEM_NODE_LockCPU(
     gceSTATUS status;
     gckOS os = Kernel->os;
     gctBOOL acquired = gcvFALSE;
-    gcuVIDMEM_NODE_PTR node;
-    gckVIDMEM_BLOCK vidMemBlock;
+    gcuVIDMEM_NODE_PTR node = NodeObject->node;
+    gckVIDMEM_BLOCK vidMemBlock = node->VirtualChunk.parent;
     gctPOINTER logical = gcvNULL;
 
     gcmkHEADER_ARG("NodeObject=%p", NodeObject);
-
-    if (NodeObject->pool == gcvPOOL_LOCAL_EXCLUSIVE)
-    {
-        node = NodeObject->transitNode;
-
-    }
-    else
-    {
-        node = NodeObject->node;
-    }
-
-    vidMemBlock = node->VirtualChunk.parent;
 
     /* Grab the mutex. */
     gcmkONERROR(gckOS_AcquireMutex(os, NodeObject->mutex, gcvINFINITE));
@@ -3747,22 +3702,10 @@ gckVIDMEM_NODE_UnlockCPU(
     gceSTATUS status;
     gckOS os = Kernel->os;
     gctBOOL acquired = gcvFALSE;
-    gcuVIDMEM_NODE_PTR node;
-    gckVIDMEM_BLOCK vidMemBlock;
+    gcuVIDMEM_NODE_PTR node = NodeObject->node;
+    gckVIDMEM_BLOCK vidMemBlock = node->VirtualChunk.parent;
 
     gcmkHEADER_ARG("NodeObject=%p", NodeObject);
-
-    if (NodeObject->pool == gcvPOOL_LOCAL_EXCLUSIVE)
-    {
-        node = NodeObject->transitNode;
-
-    }
-    else
-    {
-        node = NodeObject->node;
-    }
-
-    vidMemBlock = node->VirtualChunk.parent;
 
     /* Grab the mutex. */
     gcmkONERROR(gckOS_AcquireMutex(os, NodeObject->mutex, gcvINFINITE));

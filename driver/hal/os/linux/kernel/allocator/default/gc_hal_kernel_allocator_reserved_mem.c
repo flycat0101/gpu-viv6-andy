@@ -251,33 +251,25 @@ reserved_mem_mmap(
 
     gcmkHEADER_ARG("Allocator=%p Mdl=%p vma=%p", Allocator, Mdl, vma);
 
-    if (Mdl->cpuAccessible)
+    gcmkASSERT(skipPages + numPages <= Mdl->numPages);
+
+    pfn = (res->start >> PAGE_SHIFT) + skipPages;
+
+    /* Make this mapping non-cached. */
+    vma->vm_flags |= gcdVM_FLAGS;
+    vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+
+    if (remap_pfn_range(vma, vma->vm_start,
+            pfn, numPages << PAGE_SHIFT, vma->vm_page_prot) < 0)
     {
-        gcmkASSERT(skipPages + numPages <= Mdl->numPages);
+        gcmkTRACE(
+            gcvLEVEL_ERROR,
+            "%s(%d): remap_pfn_range error.",
+            __FUNCTION__, __LINE__
+            );
 
-        pfn = (res->start >> PAGE_SHIFT) + skipPages;
-
-        /* Make this mapping non-cached. */
-        vma->vm_flags |= gcdVM_FLAGS;
-        vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
-
-        if (remap_pfn_range(vma, vma->vm_start,
-                pfn, numPages << PAGE_SHIFT, vma->vm_page_prot) < 0)
-        {
-            gcmkTRACE(
-                gcvLEVEL_ERROR,
-                "%s(%d): remap_pfn_range error.",
-                __FUNCTION__, __LINE__
-                );
-
-            status = gcvSTATUS_OUT_OF_MEMORY;
-        }
+        status = gcvSTATUS_OUT_OF_MEMORY;
     }
-    else
-    {
-        status = gcvSTATUS_NOT_SUPPORTED;
-    }
-
 
     gcmkFOOTER();
     return status;
@@ -324,12 +316,6 @@ reserved_mem_map_user(
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmkHEADER_ARG("Allocator=%p Mdl=%p Cacheable=%d", Allocator, Mdl, Cacheable);
-
-    if (!Mdl->cpuAccessible)
-    {
-        status = gcvSTATUS_NOT_SUPPORTED;
-        goto Out;
-    }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 0)
     userLogical = (gctPOINTER)vm_mmap(NULL, 0L, res->size,
@@ -387,7 +373,6 @@ OnError:
     {
         reserved_mem_unmap_user(Allocator, Mdl, userLogical, res->size);
     }
-Out:
     gcmkFOOTER();
     return status;
 }
@@ -403,11 +388,6 @@ reserved_mem_map_kernel(
 {
     struct reserved_mem *res = Mdl->priv;
     void *vaddr;
-
-    if (!Mdl->cpuAccessible)
-    {
-        return gcvSTATUS_NOT_SUPPORTED;
-    }
 
     if (Offset + Bytes > res->size)
     {
@@ -438,11 +418,6 @@ reserved_mem_unmap_kernel(
     IN gctPOINTER Logical
     )
 {
-    if (!Mdl->cpuAccessible)
-    {
-        return gcvSTATUS_NOT_SUPPORTED;
-    }
-
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0)
     memunmap((void *)Logical);
 #else
@@ -553,8 +528,7 @@ _ReservedMemoryAllocatorInit(
 
     allocator->capability = gcvALLOC_FLAG_LINUX_RESERVED_MEM
                           | gcvALLOC_FLAG_CONTIGUOUS
-                          | gcvALLOC_FLAG_CPU_ACCESS
-                          | gcvALLOC_FLAG_NON_CPU_ACCESS;
+                          | gcvALLOC_FLAG_CPU_ACCESS;
 
     *Allocator = allocator;
 

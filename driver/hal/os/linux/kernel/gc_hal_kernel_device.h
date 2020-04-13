@@ -99,13 +99,6 @@ typedef struct _gckGALDEVICE
     gctPOINTER          contiguousLogical;
     gckVIDMEM           contiguousVidMem;
 
-    gctPHYS_ADDR_T      exclusiveBase;
-    gctSIZE_T           exclusiveSize;
-    gctPHYS_ADDR        exclusivePhysical;
-    gctUINT32           exclusivePhysName;
-    gctPOINTER          exclusiveLogical;
-    gckVIDMEM           exclusiveVidMem;
-
     /* By request_mem_region. */
     gctUINT64           requestedContiguousBase;
     gctSIZE_T           requestedContiguousSize;

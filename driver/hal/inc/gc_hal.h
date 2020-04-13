@@ -435,7 +435,6 @@ gckOS_RequestReservedMemory(
     gctSIZE_T Size,
     const char * Name,
     gctBOOL Requested,
-    gctBOOL CpuAccessible,
     gctPOINTER * MemoryHandle
     );
 
@@ -1709,14 +1708,6 @@ gceSTATUS
 gckKERNEL_Notify(
     IN gckKERNEL Kernel,
     IN gceNOTIFY Notifcation
-    );
-
-/* Sync video memory by dma */
-gceSTATUS
-gckKERNEL_SyncVideoMemory(
-    IN gckKERNEL Kernel,
-    IN gctUINT32 Node,
-    IN gctUINT32 Reason
     );
 
 /*******************************************************************************

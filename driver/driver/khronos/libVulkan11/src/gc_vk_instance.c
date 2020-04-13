@@ -260,91 +260,13 @@ static void __vki_InitializeDrvOption(
     return;
 }
 
-static VkBool32 __vki_IsUTF8(const char* str)
-{
-    uint32_t length = strlen(str);
-    uint32_t i = 0;
-    VkBool32 allChinese = VK_TRUE;
-
-    if (length > 1024 || length == 0)
-    {
-        return VK_FALSE;
-    }
-
-    while (i < length)
-    {
-        int step = 0;
-
-        if ((i == length - 1) &&
-            (str[i] == 0x29))
-        {
-            return VK_FALSE;
-        }
-
-        if ((str[i] & 0xfe) == 0xfe)
-        {
-            return VK_FALSE;
-        }
-
-        if ((str[i] & 0x80) == 0x00)
-        {
-            step = 1;
-            if (i != length - 1)
-            {
-                allChinese = VK_FALSE;
-            }
-        }
-        else if ((str[i] & 0xe0) == 0xc0)
-        {
-            if (i + 1 >= length)
-            {
-                return VK_FALSE;
-            }
-            if ((str[i + 1] & 0xc0) != 0x80)
-            {
-                return VK_FALSE;
-            }
-            step = 2;
-            allChinese = VK_FALSE;
-        }
-        else if ((str[i] & 0xf0) == 0xe0)
-        {
-            if (i + 2 >= length)
-            {
-                return VK_FALSE;
-            }
-            if ((str[i + 1] & 0xc0) != 0x80)
-            {
-                return VK_FALSE;
-            }
-            if ((str[i + 2] & 0xc0) != 0x80)
-            {
-                return VK_FALSE;
-            }
-            step = 3;
-        }
-        else
-        {
-            return VK_FALSE;
-        }
-        i += step;
-    }
-
-    if (i == length && !allChinese)
-    {
-        return VK_TRUE;
-    }
-
-    return VK_FALSE;
-}
-
 VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateInstance(
     const VkInstanceCreateInfo* pCreateInfo,
     const VkAllocationCallbacks* pAllocator,
     VkInstance* pInstance
     )
 {
-    uint32_t iExt, iLayer;
+    uint32_t iExt;
     __vkInstance *inst = VK_NULL_HANDLE;
     VkResult result = VK_SUCCESS;
     gcsHAL_INTERFACE iface;
@@ -368,16 +290,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateInstance(
     }
 #endif
 
-
-    for (iLayer = 0; iLayer < pCreateInfo->enabledLayerCount; iLayer++)
-    {
-        const char *pLayerName = pCreateInfo->ppEnabledLayerNames[iLayer];
-
-        if (!__vki_IsUTF8(pLayerName))
-        {
-            __VK_ONERROR(VK_ERROR_LAYER_NOT_PRESENT);
-        }
-    }
 
     for (iExt = 0; iExt < pCreateInfo->enabledExtensionCount; iExt++)
     {

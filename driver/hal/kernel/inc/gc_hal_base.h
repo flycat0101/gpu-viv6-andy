@@ -392,7 +392,6 @@ typedef enum _gcePOOL
     gcvPOOL_LOCAL,
     gcvPOOL_LOCAL_INTERNAL,
     gcvPOOL_LOCAL_EXTERNAL,
-    gcvPOOL_LOCAL_EXCLUSIVE,
     gcvPOOL_UNIFIED,
     gcvPOOL_SYSTEM,
     gcvPOOL_SRAM,
@@ -1108,7 +1107,7 @@ gcoHAL_AllocateVideoMemory(
     IN gctUINT Alignment,
     IN gceVIDMEM_TYPE Type,
     IN gctUINT32 Flag,
-    IN OUT gcePOOL *Pool,
+    IN gcePOOL Pool,
     IN OUT gctSIZE_T * Bytes,
     OUT gctUINT32_PTR Node
     );
@@ -1153,16 +1152,6 @@ gcoHAL_QueryTargetCaps(
     OUT gctUINT * MaxSamples
     );
 #endif
-
-gceSTATUS
-gcoHAL_PrepareVideoMemory(
-    IN gctUINT32 Node
-    );
-
-gceSTATUS
-gcoHAL_FinishVideoMemory(
-    IN gctUINT32 Node
-    );
 
 gceSTATUS
 gcoHAL_WrapUserMemory(

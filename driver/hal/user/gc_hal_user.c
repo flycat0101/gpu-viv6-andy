@@ -2715,7 +2715,7 @@ gcoHAL_AllocateVideoMemory(
     IN gctUINT Alignment,
     IN gceVIDMEM_TYPE Type,
     IN gctUINT32 Flag,
-    IN OUT gcePOOL *Pool,
+    IN gcePOOL Pool,
     IN OUT gctSIZE_T * Bytes,
     OUT gctUINT32_PTR Node
     )
@@ -2726,7 +2726,7 @@ gcoHAL_AllocateVideoMemory(
         = (struct _gcsHAL_ALLOCATE_LINEAR_VIDEO_MEMORY *) &iface.u;
 
     gcmHEADER_ARG("Node=%p, Bytes=%u, Alignement=%d, Type=%d, Flag=%d, Pool=%d",
-                  Node, *Bytes, Alignment, Type, Flag, *Pool);
+                  Node, *Bytes, Alignment, Type, Flag, Pool);
 
     iface.command   = gcvHAL_ALLOCATE_LINEAR_VIDEO_MEMORY;
 
@@ -2734,14 +2734,13 @@ gcoHAL_AllocateVideoMemory(
 
     alvm->alignment = Alignment;
     alvm->type      = (gctUINT32)Type;
-    alvm->pool      = *Pool;
+    alvm->pool      = Pool;
     alvm->flag      = Flag;
 
     gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
 
     *Node  = alvm->node;
     *Bytes = (gctSIZE_T)alvm->bytes;
-    *Pool = alvm->pool;
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -2929,80 +2928,6 @@ gcoHAL_ReleaseVideoMemory(
     /* Release the allocated video memory synchronously. */
     iface.command = gcvHAL_RELEASE_VIDEO_MEMORY;
     iface.u.ReleaseVideoMemory.node = Node;
-
-    /* Call kernel HAL. */
-    gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
-
-OnError:
-    /* Return status. */
-    gcmFOOTER();
-    return status;
-}
-
-/*******************************************************************************
-**
-**  gcoHAL_PrepareVideoMemory
-**
-**  Sync a video buffer before read operation.
-**
-**  INPUT:
-**
-**      gctUINT32 Handle
-**          Handle of video memory.
-**
-**
-**  OUTPUT:
-**
-**      gceSTATUS
-**
-*/
-gceSTATUS gcoHAL_PrepareVideoMemory(gctUINT32 Node)
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gcsHAL_INTERFACE iface;
-
-    gcmHEADER_ARG("Node=0x%x", Node);
-
-    iface.command = gcvHAL_SYNC_VIDEO_MEMORY;
-    iface.u.SyncVideoMemory.node = Node;
-    iface.u.SyncVideoMemory.reason = gcvSYNC_REASON_BEFORE_READ;
-
-    /* Call kernel HAL. */
-    gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
-
-OnError:
-    /* Return status. */
-    gcmFOOTER();
-    return status;
-}
-
-/*******************************************************************************
-**
-**  gcoHAL_FinishVideoMemory
-**
-**  Sync a video buffer after write operation.
-**
-**  INPUT:
-**
-**      gctUINT32 Handle
-**          Handle of video memory.
-**
-**
-**  OUTPUT:
-**
-**      gceSTATUS
-**
-*/
-gceSTATUS gcoHAL_FinishVideoMemory(gctUINT32 Node)
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gcsHAL_INTERFACE iface;
-
-    gcmHEADER_ARG("Node=0x%x", Node);
-
-    iface.command = gcvHAL_SYNC_VIDEO_MEMORY;
-    iface.u.SyncVideoMemory.node = Node;
-    iface.u.SyncVideoMemory.reason = gcvSYNC_REASON_AFTER_WRITE;
 
     /* Call kernel HAL. */
     gcmONERROR(gcoHAL_Call(gcvNULL, &iface));

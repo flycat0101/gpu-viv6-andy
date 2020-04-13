@@ -1416,7 +1416,6 @@ gckOS_AllocateNonPagedMemory(
     mdl->numPages = numPages;
 
     mdl->contiguous = gcvTRUE;
-    mdl->cpuAccessible = gcvTRUE;
 
     gcmkONERROR(gcmALLOCATOR_MapKernel(allocator, mdl, 0, bytes, &addr));
 
@@ -1559,7 +1558,6 @@ gckOS_RequestReservedMemory(
     gctSIZE_T Size,
     const char * Name,
     gctBOOL Requested,
-    gctBOOL CpuAccessible,
     gctPOINTER * MemoryHandle
     )
 {
@@ -1595,14 +1593,13 @@ gckOS_RequestReservedMemory(
     gcmkONERROR(gcmALLOCATOR_Attach(allocator, &desc, mdl));
 
     /* Assign alloator. */
-    mdl->allocator      = allocator;
-    mdl->bytes          = Size;
-    mdl->numPages       = Size >> PAGE_SHIFT;
-    mdl->cpuAccessible  = CpuAccessible;
-    mdl->contiguous     = gcvTRUE;
-    mdl->addr           = gcvNULL;
-    mdl->dmaHandle      = Start;
-    mdl->gid            = 0;
+    mdl->allocator  = allocator;
+    mdl->bytes      = Size;
+    mdl->numPages   = Size >> PAGE_SHIFT;
+    mdl->contiguous = gcvTRUE;
+    mdl->addr       = gcvNULL;
+    mdl->dmaHandle  = Start;
+    mdl->gid        = 0;
 
     /*
      * Add this to a global list.
@@ -3136,7 +3133,7 @@ gckOS_AllocatePagedMemory(
     mdl->numPages   = numPages;
     mdl->contiguous = Flag & gcvALLOC_FLAG_CONTIGUOUS;
     mdl->cacheable  = Flag & gcvALLOC_FLAG_CACHEABLE;
-    mdl->cpuAccessible = gcvTRUE;
+    mdl->>cpuAccessible = gcvTRUE;
 
     /*
      * Add this to a global list.
@@ -7141,16 +7138,6 @@ gckOS_QueryOption(
         *Value = device->externalSize;
         return gcvSTATUS_OK;
     }
-    else if (!strcmp(Option, "exclusiveBase"))
-    {
-        *Value = device->exclusiveBase;
-        return gcvSTATUS_OK;
-    }
-    else if (!strcmp(Option, "exclusiveSize"))
-    {
-        *Value = device->exclusiveSize;
-        return gcvSTATUS_OK;
-    }
     else if (!strcmp(Option, "externalBase"))
     {
         *Value = device->externalBase;
@@ -7485,3 +7472,4 @@ gckOS_GetPolicyID(
 
     return status;
 }
+

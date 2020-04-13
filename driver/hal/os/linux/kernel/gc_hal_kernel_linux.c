@@ -107,10 +107,6 @@ gckKERNEL_QueryVideoMemory(
     Interface->u.QueryVideoMemory.contiguousSize = device->contiguousSize;
     Interface->u.QueryVideoMemory.contiguousPhysName = device->contiguousPhysName;
 
-    /* Get exclusive memory size and physical address. */
-    Interface->u.QueryVideoMemory.exclusiveSize = device->exclusiveSize;
-    Interface->u.QueryVideoMemory.exclusivePhysName = device->exclusivePhysName;
-
     /* Success. */
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;
@@ -172,10 +168,6 @@ gckKERNEL_GetVideoMemoryPool(
         /* System memory. */
         videoMemory = device->contiguousVidMem;
         break;
-
-    case gcvPOOL_LOCAL_EXCLUSIVE:
-        /* gpu exclusive memory. */
-        videoMemory = device->exclusiveVidMem;
 
     case gcvPOOL_INTERNAL_SRAM:
         /* Internal SRAM memory. */
@@ -667,30 +659,3 @@ gckKERNEL_Notify(
     gcmkFOOTER();
     return status;
 }
-
-gceSTATUS
-gckKERNEL_SyncVideoMemory(
-    IN gckKERNEL Kernel,
-    IN gctUINT32 Node,
-    IN gctUINT32 Reason
-    )
-{
-    gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
-    gcsPLATFORM * platform;
-
-    gcmkHEADER();
-
-    /* Verify the arguments. */
-    gcmkVERIFY_OBJECT(Kernel, gcvOBJ_KERNEL);
-
-    platform = Kernel->os->device->platform;
-
-    if (platform && platform->ops->syncMemory)
-    {
-        status = platform->ops->syncMemory(Kernel, Node, Reason);
-    }
-
-    gcmkFOOTER();
-    return status;
-}
-

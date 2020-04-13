@@ -203,7 +203,6 @@ gckOS_RequestReservedMemory(
     unsigned long Size,
     const char * Name,
     gctBOOL Requested,
-    gctBOOL CpuAccessible,
     void ** MemoryHandle
     );
 

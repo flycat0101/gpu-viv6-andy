@@ -219,9 +219,6 @@ typedef enum _gceHAL_COMMAND_CODES
 
     /* Destory MMU. */
     gcvHAL_DESTROY_MMU,
-
-    /* sync video memory for special memory pool */
-    gcvHAL_SYNC_VIDEO_MEMORY,
     /*************** Reserved end ***************/
 }
 gceHAL_COMMAND_CODES;
@@ -286,11 +283,6 @@ typedef struct _gcsHAL_QUERY_VIDEO_MEMORY
     OUT gctUINT32               contiguousPhysName;
     /* Size in bytes of contiguous memory.*/
     OUT gctUINT64               contiguousSize;
-
-    /* Physical memory address of exclusive memory. Just a name. */
-    OUT gctUINT32               exclusivePhysName;
-    /* Size in bytes of exclusive memory.*/
-    OUT gctUINT64               exclusiveSize;
 }
 gcsHAL_QUERY_VIDEO_MEMORY;
 
@@ -1275,19 +1267,6 @@ typedef struct _gcsHAL_DEC300_FLUSH_WAIT
 DEC300FlushWait;
 #endif
 
-typedef enum _gceSYNC_VIDEO_MEMORY_REASON
-{
-    gcvSYNC_REASON_BEFORE_READ = 0,
-    gcvSYNC_REASON_AFTER_WRITE,
-}
-gceSYNC_VIDEO_MEMORY_REASON;
-
-typedef struct _gcsHAL_SYNC_VIDEO_MEMORY
-{
-    IN gctUINT64 node;
-    IN gceSYNC_VIDEO_MEMORY_REASON reason;
-}
-gcsHAL_SYNC_VIDEO_MEMORY;
 
 typedef struct _gcsHAL_INTERFACE
 {
@@ -1419,8 +1398,6 @@ typedef struct _gcsHAL_INTERFACE
         gcsHAL_DEC300_FLUSH                 DEC300Flush;
         gcsHAL_DEC300_FLUSH_WAIT            DEC300FlushWait;
 #endif
-
-        gcsHAL_SYNC_VIDEO_MEMORY            SyncVideoMemory;
     }
     u;
 }

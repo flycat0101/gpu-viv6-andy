@@ -404,14 +404,12 @@ galAllocateBuffer( CoreSurfacePool       *pool,
             (format == gcvSURF_A8R8G8B8 ||
             format == gcvSURF_X8R8G8B8))
         {
-            gcePOOL pool = gcvPOOL_DEFAULT;
-
             alloc->tssize = alloc->size / 64;
             gcmERR_BREAK(gcoHAL_AllocateVideoMemory(
                 256,
                 gcvVIDMEM_TYPE_BITMAP,
                 0,
-                &pool,
+                gcvPOOL_DEFAULT,
                 &alloc->tssize,
                 &alloc->tsnode ));
 

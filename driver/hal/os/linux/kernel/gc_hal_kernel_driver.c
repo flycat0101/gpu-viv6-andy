@@ -157,13 +157,8 @@ static ulong exclusiveSize = 0;
 module_param(exclusiveSize, ulong, 0644);
 MODULE_PARM_DESC(exclusiveSize, "Size of exclusiveSize memory, if it is 0, means there is no exclusive pool");
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 17, 0)
-static gctPHYS_ADDR_T exclusiveBase = 0;
-module_param(exclusiveBase, ullong, 0644);
-#else
 static ulong exclusiveBase = 0;
 module_param(exclusiveBase, ulong, 0644);
-#endif
 MODULE_PARM_DESC(exclusiveBase, "Base address of exclusive memory(GPU access only)");
 
 static int fastClear = -1;
@@ -394,9 +389,6 @@ _InitModuleParam(
     p->externalBase = externalBase;
     p->externalSize = externalSize;
 
-    p->exclusiveBase = exclusiveBase;
-    p->exclusiveSize = exclusiveSize;
-
     for (i = 0; i < gcvCORE_COUNT; i++)
     {
         for (j = 0; j < gcvSRAM_INTER_COUNT; j++)
@@ -520,9 +512,6 @@ _SyncModuleParam(
     externalBase = p->externalBase;
     externalSize = p->externalSize;
 
-    exclusiveBase = p->exclusiveBase;
-    exclusiveSize = p->exclusiveSize;
-
     for (i = 0; i < gcvCORE_COUNT; i++)
     {
         for (j = 0; j < gcvSRAM_INTER_COUNT; j++)
@@ -625,9 +614,9 @@ gckOS_DumpParam(
 #endif
     printk("  exclusiveSize     = 0x%08lX\n", exclusiveSize);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 17, 0)
-    printk("  exclusiveBase     = 0x%llX\n", exclusiveBase);
+    printk("  exclusiveBase      = 0x%11X\n", exclusiveBase);
 #else
-    printk("  exclusiveBase     = 0x%lX\n", exclusiveBase);
+    printk("  exclusiveBase      = 0x%lX\n", exclusiveBase);
 #endif
     printk("  bankSize          = 0x%08lX\n", bankSize);
     printk("  fastClear         = %d\n",      fastClear);

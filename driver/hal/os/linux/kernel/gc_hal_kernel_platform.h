@@ -81,10 +81,6 @@ typedef struct _gcsMODULE_PARAMETERS
     gctPHYS_ADDR_T          externalBase;
     gctSIZE_T               externalSize;
 
-    /* External memory pool. */
-    gctPHYS_ADDR_T          exclusiveBase;
-    gctSIZE_T               exclusiveSize;
-
     /* Per-core SRAM. */
     gctPHYS_ADDR_T          sRAMBases[gcvCORE_COUNT][gcvSRAM_INTER_COUNT];
     gctUINT32               sRAMSizes[gcvCORE_COUNT][gcvSRAM_INTER_COUNT];
@@ -295,19 +291,6 @@ typedef struct _gcsPLATFORM_OPERATIONS
         OUT gctUINT32_PTR PolicyID,
         OUT gctUINT32_PTR AXIConfig
         );
-
-    /*******************************************************************************
-    **
-    ** syncMemory
-    **
-    ** sync invisible memory by dma if support.
-    */
-    gceSTATUS
-    (*syncMemory)(
-        IN gctPOINTER Object,
-        IN gctUINT32 Node,
-        IN gctUINT32 Reason
-    );
 }
 gcsPLATFORM_OPERATIONS;
 

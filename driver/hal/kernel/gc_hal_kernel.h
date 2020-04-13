@@ -622,7 +622,6 @@ struct _gckKERNEL
     gctUINT32                   contiguousBaseAddress;
     gctUINT32                   externalBaseAddress;
     gctUINT32                   internalBaseAddress;
-    gctUINT32                   exclusiveBaseAddress;
 
     /* External shared SRAM. */
     gctUINT32                   extSRAMBaseAddresses[gcvSRAM_EXT_COUNT];
@@ -1301,9 +1300,6 @@ typedef struct _gcsVIDMEM_NODE
     /* Pointer to gcuVIDMEM_NODE. */
     gcuVIDMEM_NODE_PTR          node;
 
-    /* Pointer to gcuVIDMEM_NODE. */
-    gcuVIDMEM_NODE_PTR          transitNode;
-
     /* Pointer to gckKERNEL object. */
     gckKERNEL                   kernel;
 
@@ -1788,7 +1784,6 @@ struct _gckMMU
     gctUINT32                   contiguousBaseAddress;
     gctUINT32                   externalBaseAddress;
     gctUINT32                   internalBaseAddress;
-    gctUINT32                   exclusiveBaseAddress;
 };
 
 
