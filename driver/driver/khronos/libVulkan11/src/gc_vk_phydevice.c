@@ -2222,12 +2222,18 @@ VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceExternalFenceProperties(
     switch (handleType)
     {
     case VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_FD_BIT:
-        pExternalFenceProperties->externalFenceFeatures = 0;
+        pExternalFenceProperties->externalFenceFeatures = 0x0;
         break;
     case VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_WIN32_BIT:
     case VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT:
+        pExternalFenceProperties->externalFenceFeatures = 0x7;
+        break;
     case VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT:
+#if gcdLINUX_SYNC_FILE
         pExternalFenceProperties->externalFenceFeatures = 0xF;
+#else
+        pExternalFenceProperties->externalFenceFeatures = 0x0;
+#endif
         break;
     default:
         __VK_ASSERT(!"invalid external fence handle types");
