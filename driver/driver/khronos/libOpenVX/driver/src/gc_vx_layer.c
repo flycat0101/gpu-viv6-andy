@@ -27947,7 +27947,6 @@ vxnne_shader_executable vxnneGetTensorAddShaderExecutable(
     vx_int32      inputZP0              = 0;
     vx_int32      inputZP1              = 0;
     vx_float32    outputZP              = 0;
-    vx_int8       dstFixPointPos        = 0;
     vx_uint32     paramNum              = 3;
     vx_bool       enable_broadcast      = vx_false_e;
     vx_bool       enable_broadcast_Z    = vx_false_e;
@@ -28024,10 +28023,11 @@ vxnne_shader_executable vxnneGetTensorAddShaderExecutable(
     }
     else if (output_qnt_type == VX_QUANT_DYNAMIC_FIXED_POINT)
     {
-        if (dstFixPointPos >= 0)
-            output_scale = (vx_float32)(1 << dstFixPointPos);
-        else if (dstFixPointPos < 0)
-            output_scale = 1.0f / (vx_float32) (1 << -dstFixPointPos);
+        vx_int8 fl = TENSOR_POS(output);
+        if (fl >= 0)
+            output_scale = (vx_float32)(1 << fl);
+        else if (fl < 0)
+            output_scale = 1.0f / (vx_float32) (1 << -fl);
     }
 
     if (operation == VX_TENSOR_OP_ADD)
@@ -28637,14 +28637,15 @@ vxnne_shader_executable vxnneGetTensorMulShaderExecutable(
 
     if (input0_qnt_type ==VX_QUANT_DYNAMIC_FIXED_POINT)
     {
-        vx_int8 fl = TENSOR_POS(input0);
-        if (fl >= 0)
+        vx_int8 src0FixPointPos = TENSOR_POS(input0);
+
+        if (src0FixPointPos >= 0)
         {
-            input_scale0 = 1.0f / (vx_float32) (1 << fl);
+            input_scale0 = 1.0f / (vx_float32) (1 << src0FixPointPos);
         }
-        else if (fl < 0)
+        else if (src0FixPointPos < 0)
         {
-            input_scale0 = (vx_float32) (1 << -fl);
+            input_scale0 = (vx_float32) (1 << -src0FixPointPos);
         }
     }
     else if (input0_qnt_type == VX_QUANT_AFFINE_SCALE)
@@ -28655,11 +28656,12 @@ vxnne_shader_executable vxnneGetTensorMulShaderExecutable(
 
     if (input1_qnt_type ==VX_QUANT_DYNAMIC_FIXED_POINT)
     {
-        vx_int8 fl = TENSOR_POS(input1);
-        if (fl >= 0)
-            input_scale1 = 1.0f / (vx_float32) (1 << fl);
-        else if (fl < 0)
-            input_scale1 = (vx_float32) (1 << -fl);
+        vx_int8 src1FixPointPos = TENSOR_POS(input1);
+
+        if (src1FixPointPos >= 0)
+            input_scale1 = 1.0f / (vx_float32) (1 << src1FixPointPos);
+        else if (src1FixPointPos < 0)
+            input_scale1 = (vx_float32) (1 << -src1FixPointPos);
     }
     else if (input1_qnt_type == VX_QUANT_AFFINE_SCALE)
     {
@@ -28674,6 +28676,8 @@ vxnne_shader_executable vxnneGetTensorMulShaderExecutable(
     }
     else if (output_qnt_type == VX_QUANT_DYNAMIC_FIXED_POINT)
     {
+        vx_int8 dstFixPointPos = TENSOR_POS(output);
+
         if (dstFixPointPos >= 0)
             output_scale = (vx_float32)(1 << dstFixPointPos);
         else if (dstFixPointPos < 0)
@@ -28719,7 +28723,7 @@ vxnne_shader_executable vxnneGetTensorMulShaderExecutable(
     }
 
     if (input0_format == input1_format && input0_format == VX_TYPE_INT8 && output_format == VX_TYPE_INT8
-        && scale_s->value->f32 == 1.0f )
+        && scale_s->value->f32 == 1.0f && output_qnt_type == VX_QUANT_DYNAMIC_FIXED_POINT)
     {
         if (depth == 1 && (src0FixPointPos + src1FixPointPos >= dstFixPointPos)
             && policyEnum == VX_CONVERT_POLICY_SATURATE)
@@ -29192,6 +29196,8 @@ vxnne_shader_executable vxnneGetTensorDivShaderExecutable(
     }
     else if (output_qnt_type == VX_QUANT_DYNAMIC_FIXED_POINT)
     {
+        dstFixPointPos = TENSOR_POS(output);
+
         if (dstFixPointPos >= 0)
             output_scale = (vx_float32)(1 << dstFixPointPos);
         else if (dstFixPointPos < 0)
@@ -32646,7 +32652,6 @@ vxnne_shader_executable vxnneGetTensor2DAddShaderExecutable(
     vx_float32    input_scale1          = 1.0f;
     vx_int32      inputZP0              = 0;
     vx_int32      inputZP1              = 0;
-    vx_int8       dstFixPointPos        = TENSOR_POS(output);
     vx_float32    outputZP              = 0;
     vx_float32    outputScale           = 1.0f;
     vx_tensor     src0                  = NULL;
@@ -32660,6 +32665,7 @@ vxnne_shader_executable vxnneGetTensor2DAddShaderExecutable(
     if (input0_qnt_type ==VX_QUANT_DYNAMIC_FIXED_POINT)
     {
         vx_int8 fl = TENSOR_POS(input0);
+
         if (fl >= 0)
         {
             input_scale0 = 1.0f / (vx_float32) (1 << fl);
@@ -32678,6 +32684,7 @@ vxnne_shader_executable vxnneGetTensor2DAddShaderExecutable(
     if (input1_qnt_type ==VX_QUANT_DYNAMIC_FIXED_POINT)
     {
         vx_int8 fl = TENSOR_POS(input1);
+
         if (fl >= 0)
             input_scale1 = 1.0f / (vx_float32) (1 << fl);
         else if (fl < 0)
@@ -32696,6 +32703,8 @@ vxnne_shader_executable vxnneGetTensor2DAddShaderExecutable(
     }
     else if (output_qnt_type == VX_QUANT_DYNAMIC_FIXED_POINT)
     {
+        vx_int8 dstFixPointPos = TENSOR_POS(output);
+
         if (dstFixPointPos >= 0)
             outputScale *= (vx_float32)(1 << dstFixPointPos);
         else if (dstFixPointPos < 0)
@@ -33799,16 +33808,19 @@ vxnne_shader_executable vxnneGetTensorMulSatRTEShaderExecutable(
     vx_enum       input0_format         = TENSOR_DATA_TYPE(input0);
     vx_enum       input1_format         = TENSOR_DATA_TYPE(input1);
     vx_enum       output_format         = TENSOR_DATA_TYPE(output);
+    vx_enum       input0_qnt_type       = TENSOR_QUANT_TYPE(input0);
+    vx_enum       input1_qnt_type       = TENSOR_QUANT_TYPE(input1);
+    vx_enum       output_qnt_type       = TENSOR_QUANT_TYPE(output);
     vx_tensor     src0                  = NULL;
     vx_tensor     src1                  = NULL;
     vx_tensor     dst                   = NULL;
     vx_float32    input_scale           = 1.0f;
     vx_float32    input_scale0          = 1.0f;
     vx_float32    input_scale1          = 1.0f;
-    vx_float32    output_scale          = TENSOR_TF_SCALE(output);
+    vx_float32    output_scale          = 1.0f;
     vx_int32      inputZP0              = 0;
     vx_int32      inputZP1              = 0;
-    vx_float32    outputZP              = (vx_float32)TENSOR_TF_ZEROPOINT(output);
+    vx_float32    outputZP              = 0;
     vx_int8       src0FixPointPos       = 0;
     vx_int8       src1FixPointPos       = 0;
     vx_int8       dstFixPointPos        = 0;
@@ -33821,10 +33833,10 @@ vxnne_shader_executable vxnneGetTensorMulSatRTEShaderExecutable(
 
     borderMode->mode = VX_BORDER_REPLICATE;
 
-    if ((input0_format == VX_TYPE_INT8 || input0_format == VX_TYPE_INT16)
-        && TENSOR_QUANT_TYPE(input0) == VX_QUANT_DYNAMIC_FIXED_POINT)
+    if (input0_qnt_type ==VX_QUANT_DYNAMIC_FIXED_POINT)
     {
-        src0FixPointPos    = TENSOR_POS(input0);
+        vx_int8 src0FixPointPos = TENSOR_POS(input0);
+
         if (src0FixPointPos >= 0)
         {
             input_scale0 = 1.0f / (vx_float32) (1 << src0FixPointPos);
@@ -33834,99 +33846,40 @@ vxnne_shader_executable vxnneGetTensorMulSatRTEShaderExecutable(
             input_scale0 = (vx_float32) (1 << -src0FixPointPos);
         }
     }
-    else if (input0_format == VX_TYPE_UINT8)
+    else if (input0_qnt_type == VX_QUANT_AFFINE_SCALE)
     {
-        if (TENSOR_QUANT_TYPE(input0) == VX_QUANT_DYNAMIC_FIXED_POINT) /*For OpenVX dynamic fix point uint8*/
-        {
-            vx_int8   input0_fixedPointPos    = TENSOR_POS(input0);
-            if (input0_fixedPointPos >= 0)
-            {
-                input_scale0 = 1.0f / (vx_float32) (1 << input0_fixedPointPos);
-            }
-            else if (input0_fixedPointPos < 0)
-            {
-                input_scale0 = (vx_float32) (1 << -input0_fixedPointPos);
-            }
-        }
-        else if (TENSOR_QUANT_TYPE(input0) == VX_QUANT_AFFINE_SCALE)
-        {
-            input_scale0 = TENSOR_TF_SCALE(input0);
-            inputZP0 = TENSOR_TF_ZEROPOINT(input0);
-        }
+        input_scale0 = TENSOR_TF_SCALE(input0);
+        inputZP0 = TENSOR_TF_ZEROPOINT(input0);
     }
 
-    if ((input1_format == VX_TYPE_INT8 || input1_format == VX_TYPE_INT16)
-        && TENSOR_QUANT_TYPE(input1) == VX_QUANT_DYNAMIC_FIXED_POINT)
+    if (input1_qnt_type ==VX_QUANT_DYNAMIC_FIXED_POINT)
     {
-        src1FixPointPos    = TENSOR_POS(input1);
+        vx_int8 src1FixPointPos = TENSOR_POS(input1);
+
         if (src1FixPointPos >= 0)
-        {
             input_scale1 = 1.0f / (vx_float32) (1 << src1FixPointPos);
-        }
         else if (src1FixPointPos < 0)
-        {
             input_scale1 = (vx_float32) (1 << -src1FixPointPos);
-        }
     }
-    else if (input1_format == VX_TYPE_UINT8)
+    else if (input1_qnt_type == VX_QUANT_AFFINE_SCALE)
     {
-        if (TENSOR_QUANT_TYPE(input1) == VX_QUANT_DYNAMIC_FIXED_POINT) /*For OpenVX dynamic fix point uint8*/
-        {
-             vx_int8   input1_fixedPointPos    = TENSOR_POS(input1);
-            if (input1_fixedPointPos >= 0)
-            {
-                input_scale1 = 1.0f / (vx_float32) (1 << input1_fixedPointPos);
-            }
-            else if (input1_fixedPointPos < 0)
-            {
-                input_scale1 = (vx_float32) (1 << -input1_fixedPointPos);
-            }
-        }
-        else if (TENSOR_QUANT_TYPE(input1) == VX_QUANT_AFFINE_SCALE)
-        {
-            input_scale1 = TENSOR_TF_SCALE(input1);
-            inputZP1 = TENSOR_TF_ZEROPOINT(input1);
-        }
+        input_scale1 = TENSOR_TF_SCALE(input1);
+        inputZP1 = TENSOR_TF_ZEROPOINT(input1);
     }
 
-    if (output_format == VX_TYPE_INT8 || output_format == VX_TYPE_INT16)
+    if (output_qnt_type == VX_QUANT_AFFINE_SCALE)
     {
-        dstFixPointPos    = TENSOR_POS(output);
+        output_scale = 1.0f / TENSOR_TF_SCALE(output);
+        outputZP = (vx_float32)TENSOR_TF_ZEROPOINT(output);
+    }
+    else if (output_qnt_type == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        dstFixPointPos = TENSOR_POS(output);
+
         if (dstFixPointPos >= 0)
-        {
-            output_scale = (vx_float32) (1 << dstFixPointPos);
-        }
+            output_scale = (vx_float32)(1 << dstFixPointPos);
         else if (dstFixPointPos < 0)
-        {
             output_scale = 1.0f / (vx_float32) (1 << -dstFixPointPos);
-        }
-
-        outputZP = 0;
-    }
-    else if (output_format == VX_TYPE_FLOAT16)
-    {
-        output_scale    = 1.0f;
-        outputZP        = 0;
-    }
-    else if (output_format == VX_TYPE_UINT8)
-    {
-        if (TENSOR_QUANT_TYPE(output) == VX_QUANT_DYNAMIC_FIXED_POINT )
-        {
-            dstFixPointPos    = TENSOR_POS(output);
-            if (dstFixPointPos >= 0)
-            {
-                output_scale = (vx_float32) (1 << dstFixPointPos);
-            }
-            else if (dstFixPointPos < 0)
-            {
-                output_scale = 1.0f / (vx_float32) (1 << -dstFixPointPos);
-            }
-            outputZP = 0.0f;
-        }
-        else
-        {
-            output_scale = 1 / output_scale;
-        }
     }
 
     if (TENSOR_DIM_NUM(input0) == 1)
@@ -33961,7 +33914,8 @@ vxnne_shader_executable vxnneGetTensorMulSatRTEShaderExecutable(
 
     useImage2DFlag = (vx_bool)(depth == 1);
 
-    if (input0_format == input1_format && input0_format == VX_TYPE_INT8 && output_format == VX_TYPE_INT8)
+    if (input0_format == input1_format && input0_format == VX_TYPE_INT8 && output_format == VX_TYPE_INT8
+        && input0_qnt_type == VX_QUANT_DYNAMIC_FIXED_POINT )
     {
         if (depth == 1 && (src0FixPointPos + src1FixPointPos >= dstFixPointPos))
         {
