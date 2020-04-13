@@ -165,17 +165,18 @@ typedef gceSTATUS (* PFN_Free)(
 #define VSC_DI_STRTABLE_INIT_SIZE    10240
 
 typedef struct{
-    gctSTRING str;
     gctUINT size;
     gctUINT usedSize;
+    gctSTRING str;
 }VSC_DI_STRTABLE;
 
 #define VSC_DI_DIETABLE_INIT_COUNT    1024
 
 typedef struct{
-    VSC_DIE * die;
     gctUINT16 count;
     gctUINT16 usedCount;
+    gctCHAR   paddingBytes[4];
+    VSC_DIE * die;
 }VSC_DI_DIETABLE;
 
 #define VSC_DI_TEMP_LOG_SIZE  256
@@ -209,6 +210,7 @@ typedef struct _VSC_DI_CALL_STACK
     VIR_SourceFileLoc nextSourceLoc;
 
     gctUINT nextPC;
+    gctCHAR paddingBytes[4];
 
     VSC_DIE * die; /* DIE of this subprogram */
 
@@ -223,8 +225,9 @@ typedef struct _VSC_DI_LINE_TABLE_MAP
 
 typedef struct _VSC_DI_LINE_TABLE
 {
-    VSC_DI_LINE_TABLE_MAP * map;
     gctUINT count;
+    gctCHAR paddingBytes[4];
+    VSC_DI_LINE_TABLE_MAP * map;
 }VSC_DI_LINE_TABLE;
 
 typedef struct _VSC_DI_SW_LOC_LIST{
@@ -235,21 +238,27 @@ typedef struct _VSC_DI_SW_LOC_LIST{
 #define VSC_DI_LOCTABLE_INIT_COUNT    128
 
 typedef struct _VSC_DI_HW_LOC_TABLE{
-    VSC_DI_HW_LOC * loc;
     gctUINT16 count;
     gctUINT16 usedCount;
+    gctCHAR paddingBytes[4];
+    VSC_DI_HW_LOC * loc;
 }VSC_DI_HW_LOC_TABLE;
 
 typedef struct _VSC_DI_SW_LOC_TABLE{
-    VSC_DI_SW_LOC * loc;
     gctUINT16 count;
     gctUINT16 usedCount;
+    gctCHAR paddingBytes[4];
+    VSC_DI_SW_LOC * loc;
 }VSC_DI_SW_LOC_TABLE;
 
+/* If added elements in struct VSC_DIContext, please pay attention to the byte alignment on 32bit and 64bit platform. */
 typedef struct{
     gctBOOL collect;
-    PFN_Allocate pfnAllocate;
-    PFN_Free pfnFree;
+    gctUINT16 cu;
+    gctCHAR paddingBytes[2];
+
+    gctINT32 callDepth;
+    VSC_STEP_STATE stepState;
 
     VSC_DI_STRTABLE strTable;
     VSC_DI_DIETABLE dieTable;
@@ -257,13 +266,12 @@ typedef struct{
     VSC_DI_HW_LOC_TABLE locTable;
     VSC_DI_SW_LOC_TABLE swLocTable;
 
-    gctUINT16 cu;
+    PFN_Allocate pfnAllocate;
+    PFN_Free pfnFree;
 
     gctCHAR * tmpLog;
 
     VSC_DI_CALL_STACK callStack[VSC_DI_CALL_DEPTH]; /* always be current call frame */
-    gctINT32 callDepth;
-    VSC_STEP_STATE stepState;
 }VSC_DIContext;
 
 
