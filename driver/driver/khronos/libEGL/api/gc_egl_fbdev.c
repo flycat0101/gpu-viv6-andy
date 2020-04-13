@@ -619,7 +619,7 @@ typedef struct _fbdevDISPLAY_INFO
 
     /* The physical address of the display memory buffer. ~0 is returned
     ** if the address is not known for the specified display. */
-    unsigned long               physical;
+    gctPHYS_ADDR_T              physical;
 
     /* Can be wraped as surface. */
     int                         wrapFB;
@@ -1696,7 +1696,12 @@ fbdev_GetDisplayInfoEx2(
     gceSTATUS status = fbdev_GetDisplayInfoEx(Display, Window, DisplayInfoSize, DisplayInfo);
     if (gcmIS_SUCCESS(status))
     {
-        if ((DisplayInfo->logical == gcvNULL) || (DisplayInfo->physical == ~0U) || (DisplayInfo->physical == 0))
+        if ((DisplayInfo->physical == ~0U) || (DisplayInfo->physical == 0))
+        {
+             DisplayInfo->physical = gcvINVALID_PHYSICAL_ADDRESS;
+        }
+
+        if((DisplayInfo->logical == gcvNULL) && (DisplayInfo->physical = gcvINVALID_PHYSICAL_ADDRESS))
         {
             /* No offset. */
             status = gcvSTATUS_NOT_SUPPORTED;
