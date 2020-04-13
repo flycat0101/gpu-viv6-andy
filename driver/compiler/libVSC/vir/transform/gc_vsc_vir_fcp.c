@@ -2619,6 +2619,7 @@ static gctBOOL _VIR_CheckMemOp(
     return gcvFALSE;
 }
 
+#if gcmIS_DEBUG(gcdDEBUG_ASSERT)
 /* check the dest of Load instruction is used by a texld */
 static gctBOOL _VIR_CheckDestIsUsedByTexld(
     VIR_Instruction *pInst,
@@ -2681,6 +2682,7 @@ static gctBOOL _VIR_CheckDestIsUsedByTexld(
     }
     return gcvFALSE;
 }
+#endif
 
 static gctBOOL _VIR_CheckSourceDefinedBySkHp(
     VIR_Instruction *pInst,
