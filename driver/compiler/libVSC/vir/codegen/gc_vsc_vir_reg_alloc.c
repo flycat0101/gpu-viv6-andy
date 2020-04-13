@@ -1470,6 +1470,27 @@ void VIR_RA_ColorPool_Finalize(
     }
 }
 
+static void _VIR_RA_LS_AddDeadInst(
+    VIR_RA_LS*              pRA,
+    VIR_Instruction*        pInst
+    )
+{
+    VSC_HASH_TABLE*         pDestInstSet = VIR_RA_LS_GetDeadInstSet(pRA);
+
+    /* Create the hash table if it is not created before. */
+    if (pDestInstSet == gcvNULL)
+    {
+        pDestInstSet = vscHTBL_Create(VIR_RA_LS_GetMM(pRA), vscHFUNC_Default, vscHKCMP_Default, 8);
+        VIR_RA_LS_SetDeadInstSet(pRA, pDestInstSet);
+    }
+
+    /* Insert the dead instruction. */
+    vscHTBL_DirectSet(pDestInstSet, (void *)pInst, gcvNULL);
+
+    /* Mark the dead instruction. */
+    VIR_Inst_SetFlag(pInst, VIR_INSTFLAG_DEAD_INST);
+}
+
 static void _VIR_RA_LS_DeleteDeadInsts(
     VIR_RA_LS*              pRA
     )
@@ -8983,7 +9004,7 @@ _VIR_RA_LS_InsertFill_STARR(
     }
 
     /* remove STARR instruction */
-    VIR_Pass_DeleteInstruction(pFunc, pInst, gcvNULL);
+    _VIR_RA_LS_AddDeadInst(pRA, pInst);
 
     return retErrCode;
 }
@@ -10037,7 +10058,7 @@ void _VIR_RA_LS_GenLoadAttr_SetEnable(
             }
 
             /* remove ldarr */
-            VIR_Pass_DeleteInstruction(pFunc, pInst, gcvNULL);
+            _VIR_RA_LS_AddDeadInst(pRA, pInst);
         }
     }
     else
@@ -10051,7 +10072,7 @@ void _VIR_RA_LS_GenLoadAttr_SetEnable(
         _VIR_RA_LS_RewriteColor_Dest(pRA, pInst, newDest);
 
         /* remove ldarr */
-        VIR_Pass_DeleteInstruction(pFunc, pInst, gcvNULL);
+        _VIR_RA_LS_AddDeadInst(pRA, pInst);
     }
 }
 
@@ -10991,7 +11012,7 @@ VSC_ErrCode _VIR_RA_LS_GenStoreAttr(
               VIR_Symbol_GetName(sym) == VIR_NAME_TESS_LEVEL_INNER);
 
     /* remove attr_st */
-    VIR_Pass_DeleteInstruction(pFunc, pInst, gcvNULL);
+    _VIR_RA_LS_AddDeadInst(pRA, pInst);
 
     return retValue;
 }
@@ -11250,7 +11271,7 @@ VSC_ErrCode _VIR_RA_LS_GenEmitRestart(
     VIR_Operand_SetEnable(newInst->dest, VIR_ENABLE_XYZW);
 
     /* remove emit */
-    VIR_Pass_DeleteInstruction(pFunc, pInst, gcvNULL);
+    _VIR_RA_LS_AddDeadInst(pRA, pInst);
 
     return retValue;
 }
@@ -11261,7 +11282,6 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
 {
     VSC_ErrCode         retValue  = VSC_ERR_NONE;
     VIR_Shader          *pShader = VIR_RA_LS_GetShader(pRA);
-    VIR_Function        *pFunc = VIR_Shader_GetCurrentFunction(pShader);
 
     VIR_SrcOperand_Iterator srcOpndIter;
     VIR_Operand             *pSrcOpnd, *pDestOpnd;
@@ -11352,7 +11372,7 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
                 }
                 else
                 {
-                    VIR_Pass_DeleteInstruction(pFunc, pInst, gcvNULL);
+                    _VIR_RA_LS_AddDeadInst(pRA, pInst);
                 }
             }
         }
@@ -11424,7 +11444,7 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
                       isSymVectorizedOut(VIR_Operand_GetUnderlyingSymbol(pSrcOpnd)));
 
             /* unused attr/output */
-            VIR_Pass_DeleteInstruction(pFunc, pInst, gcvNULL);
+            _VIR_RA_LS_AddDeadInst(pRA, pInst);
         }
         break;
     case VIR_OP_ATTR_ST:
@@ -11444,7 +11464,7 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
                       isSymVectorizedOut(VIR_Operand_GetUnderlyingSymbol(pDestOpnd)));
 
             /* unused attr/output */
-            VIR_Pass_DeleteInstruction(pFunc, pInst, gcvNULL);
+            _VIR_RA_LS_AddDeadInst(pRA, pInst);
         }
         break;
     case VIR_OP_STORE_ATTR:
@@ -11466,7 +11486,7 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
         }
         else
         {
-            VIR_Pass_DeleteInstruction(pFunc, pInst, gcvNULL);
+            _VIR_RA_LS_AddDeadInst(pRA, pInst);
         }
         break;
     case VIR_OP_ATOMCMPXCHG:
@@ -11899,23 +11919,15 @@ VSC_ErrCode _VIR_RA_LS_AssignColorForA0B0Inst(
 
             if (bAllUsageSpilled)
             {
-                VSC_HASH_TABLE*     pDestInstSet = VIR_RA_LS_GetDeadInstSet(pRA);
-
                 _VIR_RA_LS_ExpireActiveLRs(pRA, VIR_Inst_GetId(pInst));
 
                 /* This MOVA is unused and can be deleted. */
-                VIR_Inst_SetFlag(pInst, VIR_INSTFLAG_DEAD_INST);
+                _VIR_RA_LS_AddDeadInst(pRA, pInst);
+
                 if (pRA->bReservedMovaReg)
                 {
                      _VSC_RA_MOVA_RemoveConstValAllChannel(pRA->movaHash, pInst);
                 }
-
-                if (pDestInstSet == gcvNULL)
-                {
-                    pDestInstSet = vscHTBL_Create(VIR_RA_LS_GetMM(pRA), vscHFUNC_Default, vscHKCMP_Default, 8);
-                    VIR_RA_LS_SetDeadInstSet(pRA, pDestInstSet);
-                }
-                vscHTBL_DirectSet(pDestInstSet, (void *)pInst, gcvNULL);
 
                 return retValue;
             }
