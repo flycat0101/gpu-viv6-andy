@@ -1529,18 +1529,18 @@ _ReleaseVideoMemory(
 
     if (isContiguous)
     {
-        gcmkONERROR(gckKERNEL_RemoveProcessDB(Kernel,
+        gckKERNEL_RemoveProcessDB(Kernel,
             ProcessID,
             gcvDB_CONTIGUOUS,
-            gcmINT2PTR(Handle)));
+            gcmINT2PTR(Handle));
     }
 
     if (nodeObject->type & gcvVIDMEM_TYPE_COMMAND)
     {
-        gcmkONERROR(gckKERNEL_RemoveProcessDB(Kernel,
+        gckKERNEL_RemoveProcessDB(Kernel,
             ProcessID,
             gcvDB_COMMAND_BUFFER,
-            gcmINT2PTR(Handle)));
+            gcmINT2PTR(Handle));
     }
 
     gckVIDMEM_HANDLE_Dereference(Kernel, ProcessID, Handle);
