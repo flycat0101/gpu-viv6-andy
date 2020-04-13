@@ -646,7 +646,6 @@ typedef enum _gceFEATURE
     gcvFEATURE_SMALL_BATCH_DISBLE_FIX,
     gcvFEATURE_FORMAT_10BIT_CROSS_4K,
     gcvFEATURE_ENDIAN_CONTROL,
-    gcvFEATURE_USE_SINGLE_PORT_VIPSRAM,
 
     /* Insert features above this comment only. */
     gcvFEATURE_COUNT                /* Not a feature. */
