@@ -62,6 +62,8 @@ __GLextension __glExtension[] =
     {__GL_EXTID_ARB_uniform_buffer_object, "GL_ARB_uniform_buffer_object", GL_FALSE, GL_FALSE},
 
     {__GL_EXTID_ARB_gpu_shader5, "GL_ARB_gpu_shader5", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_ARB_timer_query, "GL_ARB_timer_query", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_ARB_texture_rg, "GL_ARB_texture_rg", GL_TRUE, GL_FALSE},
 
     {__GL_EXTID_EXT_framebuffer_blit, "GL_EXT_framebuffer_blit", GL_TRUE, GL_FALSE},
     {__GL_EXTID_EXT_framebuffer_object, "GL_EXT_framebuffer_object", GL_TRUE, GL_FALSE},
@@ -70,8 +72,9 @@ __GLextension __glExtension[] =
     {__GL_EXTID_EXT_texture_compression_rgtc, "GL_EXT_texture_compression_rgtc", GL_FALSE, GL_FALSE},
     {__GL_EXTID_EXT_texture_integer, "GL_EXT_texture_integer", GL_TRUE, GL_FALSE},
     {__GL_EXTID_EXT_texture_shared_exponent, "GL_EXT_texture_shared_exponent", GL_TRUE, GL_FALSE},
-    {__GL_EXTID_EXT_texture_sRGB, "GL_EXT_texture_sRGB", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_EXT_texture_sRGB, "GL_EXT_texture_sRGB", GL_TRUE, GL_FALSE},
     {__GL_EXTID_EXT_timer_query, "GL_EXT_timer_query", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_EXT_framebuffer_multisample, "RenderbufferStorageMultisampleEXT", GL_TRUE, GL_FALSE},
 #endif
 
     {__GL_EXTID_OES_vertex_type_10_10_10_2, "GL_OES_vertex_type_10_10_10_2", GL_FALSE, GL_FALSE},
@@ -433,6 +436,7 @@ static __GLextProcAlias __glExtProcAlias[] =
     {__GL_EXTID_ARB_multitexture, "MultiTexCoord4ivARB", (__GLprocAddr)glMultiTexCoord4iv},
     {__GL_EXTID_ARB_multitexture, "MultiTexCoord4sARB", (__GLprocAddr)glMultiTexCoord4s},
     {__GL_EXTID_ARB_multitexture, "MultiTexCoord4svARB", (__GLprocAddr)glMultiTexCoord4sv},
+    {__GL_EXTID_EXT_framebuffer_multisample, "RenderbufferStorageMultisampleEXT", (__GLprocAddr)glRenderbufferStorageMultisampleEXT},
 #endif
 
     {__GL_EXTID_EXT_LAST, gcvNULL, gcvNULL}

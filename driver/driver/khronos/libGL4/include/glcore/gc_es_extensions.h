@@ -44,6 +44,8 @@ typedef enum
     __GL_EXTID_ARB_explicit_attrib_location,
     __GL_EXTID_ARB_uniform_buffer_object,
     __GL_EXTID_ARB_gpu_shader5,
+    __GL_EXTID_ARB_timer_query,
+    __GL_EXTID_ARB_texture_rg,
 
     __GL_EXTID_EXT_framebuffer_blit,
     __GL_EXTID_EXT_framebuffer_object,
@@ -54,6 +56,7 @@ typedef enum
     __GL_EXTID_EXT_texture_shared_exponent,
     __GL_EXTID_EXT_texture_sRGB,
     __GL_EXTID_EXT_timer_query,
+    __GL_EXTID_EXT_framebuffer_multisample,
 #endif
 
     /* OES extensions */
