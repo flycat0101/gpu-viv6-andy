@@ -45,7 +45,7 @@ endif
 ################################################################################
 # Define flags for the linker.
 
-LDFLAGS := $(LDFLAGS) -Wl,-z,defs
+LDFLAGS += -Wl,-z,defs
 
 ################################################################################
 # Supply necessary libraries.

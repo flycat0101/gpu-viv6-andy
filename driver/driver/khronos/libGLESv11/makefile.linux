@@ -86,9 +86,6 @@ CFLAGS += -D__GL_EXPORTS
 ################################################################################
 # Define flags for the linker.
 
-LDFLAGS := \
-    $(LDFLAGS)
-
 ifneq ($(USE_ARMCC),1)
   ifeq ($(GL_11_APPENDIX),)
     LDFLAGS += -Wl,--version-script=libGLESv11.map

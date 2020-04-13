@@ -120,8 +120,7 @@ CFLAGS += \
     -std=c99 \
     -Wno-unused-function
 
-LDFLAGS := \
-    $(LDFLAGS) \
+LDFLAGS += \
     -shared \
     -pthread \
     -Wl,-z,defs \
