@@ -4337,6 +4337,7 @@ VX_PRIVATE_API vx_status vxoMultiGPU_ComputeInputSize(
         }
         case VXNNE_OPERATOR_ACTIVATION:
         case VXNNE_OPERATOR_TENSOR_COPY:
+        case VXNNE_OPERATOR_NORMALIZATION:
         {
             size = outputSize;
             break;
@@ -4477,6 +4478,9 @@ VX_PRIVATE_API vx_bool vxoMultiGPU_IsSupport(
         (VXNNE_OPERATOR_DILATION_UPSAMPLE2 == operation->operatorType) ||
         (VXNNE_OPERATOR_UPSAMPLE == operation->operatorType) ||
         (VXNNE_OPERATOR_ACTIVATION == operation->operatorType) ||
+        (VXNNE_OPERATOR_NORMALIZATION == operation->operatorType) ||
+        (VXNNE_OPERATOR_ROIPOOL == operation->operatorType && operation->parameter.tpType == TP_ROI_POOLING_STEP_1) ||
+        (VXNNE_OPERATOR_ROIPOOLRELU == operation->operatorType) ||
         (VXNNE_OPERATOR_TENSOR_COPY == operation->operatorType) ||
         (VXNNE_OPERATOR_FULLYCONNECTED == operation->operatorType)))
     {
@@ -4672,6 +4676,47 @@ VX_PRIVATE_API vx_bool vxoMultiGPU_IsSupport(
         {
             splitFlag = vx_false_e;
             *splitCount = 0;
+        }
+    }
+    else if (VXNNE_OPERATOR_ROIPOOL == operation->operatorType || VXNNE_OPERATOR_ROIPOOLRELU == operation->operatorType)
+    {
+        vxnne_tp_operation srcTpOp = (vxnne_tp_operation)operation;
+        vx_uint32 outputDim = 0;
+        vx_uint32 inputDim = 0;
+        vx_uint32 inputZSize = 0;
+        vx_uint32 outputZSize = 0;
+
+        vxQueryTensor(srcTpOp->output, VX_TENSOR_NUMBER_OF_DIMS, &outputDim, sizeof(outputDim));
+        vxQueryTensor(srcTpOp->input, VX_TENSOR_NUMBER_OF_DIMS, &inputDim, sizeof(inputDim));
+
+        if(TP_ROI_POOLING_STEP_1 == (((srcTpOp)->base).parameter).tpType)
+        {
+            inputZSize = TENSOR_VIEW_SIZE_INDEX(srcTpOp->input, 2);
+            if (inputDim >= 3)
+            {
+                *splitCount = gcmMIN(gpuCount, inputZSize);
+                splitFlag = vx_true_e;
+            }
+            else
+            {
+                splitFlag = vx_false_e;
+                *splitCount = 0;
+            }
+        }
+        else if(TP_ROI_POOLING_STEP_2 == (((srcTpOp)->base).parameter).tpType)
+        {
+            outputZSize = TENSOR_VIEW_SIZE_INDEX(srcTpOp->output, 2);
+            if (outputDim >= 3)
+            {
+                *splitCount = gcmMIN(gpuCount, outputZSize);
+                splitFlag = vx_true_e;
+            }
+            else
+            {
+                splitFlag = vx_false_e;
+                *splitCount = 0;
+            }
+
         }
     }
     else
@@ -5406,6 +5451,194 @@ OnError:
 }
 
 
+
+
+
+
+
+
+
+
+VX_PRIVATE_API vx_status vxoMultiGPU_SplitResourceForTPROI(
+    vx_node node,
+    vxnne_tp_operation dstOperation,
+    vxnne_operation srcOperation,
+    vx_uint32 splitCount,
+    vx_uint32 gpuIndex
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vx_tensor input = (vx_tensor)srcOperation->inputs[0];
+    vx_tensor output = (vx_tensor)srcOperation->outputs[0];
+    vx_uint32 outputSizeStart[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+    vx_uint32 outputSizeEnd[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+    vx_uint32 inputSizeStart[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+    vx_uint32 inputSizeEnd[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+    vx_tensor_view outputView = VX_NULL, inputView = VX_NULL;
+    vx_tensor outputTensor = VX_NULL, inputTensor = VX_NULL;
+    vx_uint32 outputDim = 0, inputDim = 0;
+
+    gcmHEADER_ARG("node=%p, dstOperation=%p, srcOperation=%p, splitCount=0x%x, gpuIndex=0x%x",
+        node, dstOperation, srcOperation, splitCount, gpuIndex);
+
+    vxmONERROR(vxQueryTensor(output, VX_TENSOR_NUMBER_OF_DIMS, &outputDim, sizeof(outputDim)));
+    vxmONERROR(vxQueryTensor(input, VX_TENSOR_NUMBER_OF_DIMS, &inputDim, sizeof(inputDim)));
+    vxmONERROR(vxQueryTensor(output, VX_TENSOR_DIMS, outputSizeEnd, sizeof(outputSizeEnd)));
+    vxmONERROR(vxQueryTensor(input, VX_TENSOR_DIMS, inputSizeEnd, sizeof(inputSizeEnd)));
+
+    if(TP_ROI_POOLING_STEP_1 == srcOperation->parameter.tpType)
+    {
+        vx_uint32 splitAxis = 2; /* Z channel */
+        vx_uint32 inputZSize = 0, newInputSize = 0, InputResidue = 0;
+        vx_uint32 InputPreOp = 0, inputStart = 0, inputEnd = 0;
+
+        vx_uint32 poolZSize = 0, outputXSize = 0;
+
+        vxmONERROR(vxQueryTensor(output, VX_TENSOR_DIMS, outputSizeEnd, sizeof(outputSizeEnd)));
+        vxmONERROR(vxQueryTensor(input, VX_TENSOR_DIMS, inputSizeEnd, sizeof(inputSizeEnd)));
+
+        inputZSize = TENSOR_VIEW_SIZE_INDEX(input, splitAxis);
+        vxmASSERT(inputZSize >= splitCount);
+        vxmASSERT(output->dimCount == 1);
+
+        InputPreOp = inputZSize / splitCount;
+        InputResidue = inputZSize % splitCount;
+        if (InputResidue > gpuIndex)
+        {
+            newInputSize = InputPreOp + 1;
+            inputStart = gpuIndex * newInputSize + gpuIndex;
+        }
+        else
+        {
+            newInputSize = InputPreOp;
+            inputStart = gpuIndex * InputPreOp + InputResidue;
+        }
+
+        inputEnd =  inputStart + newInputSize;
+
+        inputSizeStart[splitAxis] = inputStart ;
+        inputSizeEnd[splitAxis] = inputEnd ;
+
+        if ((inputEnd - inputStart) == 0)
+        {
+            vxError("%s[%d]: not support split dilation reshuffle\n", __FUNCTION__, __LINE__);
+            vxmONERROR(VX_FAILURE);
+        }
+        vxmASSERT((inputEnd - inputStart) != 0);
+
+        /* split input */
+        inputView = vxCreateTensorView(node->base.context, inputSizeStart, inputSizeEnd, (vx_uint8)inputDim);
+        inputTensor  = vxoTensor_CreateTensorFromView((vx_tensor)srcOperation->inputs[0], inputView);
+        if (inputView != VX_NULL)
+        {
+            vxReleaseTensorView(&inputView);
+        }
+
+        /* split output */
+        poolZSize = TENSOR_VIEW_SIZE_INDEX(input, 2);
+        outputXSize = TENSOR_VIEW_SIZE_INDEX(output, 0);
+
+        outputSizeStart[0] = inputStart * outputXSize / poolZSize;
+        //outputSizeEnd[0] = inputEnd  * outputXSize / poolZSize;
+
+
+        /* split output */
+        outputView = vxCreateTensorView(node->base.context, outputSizeStart, outputSizeEnd, (vx_uint8)outputDim);
+        outputTensor  = vxoTensor_CreateTensorFromView((vx_tensor)srcOperation->outputs[0], outputView);
+        if (outputView != VX_NULL)
+        {
+            vxReleaseTensorView(&outputView);
+        }
+
+    }
+    else if(TP_ROI_POOLING_STEP_2 == srcOperation->parameter.tpType)
+    {
+        //vx_uint32 splitAxis = 2; /*out Z channel */
+        //vx_uint32 inputSizeStart[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+        //vx_uint32 inputSizeEnd[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+        //vx_uint32 outputSizeStart[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+        //vx_uint32 outputSizeEnd[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+
+
+        //vx_uint32 outputDim = 0, inputDim = 0;
+        //vx_uint32 inputZSize = 0, newInputSize = 0, InputResidue = 0;
+        //vx_uint32 InputPreOp = 0, inputStart = 0, inputEnd = 0;
+
+        //vx_uint32 poolZSize = 0, outputXSize = 0;
+
+        //vxmONERROR(vxQueryTensor(output, VX_TENSOR_DIMS, outputSizeEnd, sizeof(outputSizeEnd)));
+        //vxmONERROR(vxQueryTensor(input, VX_TENSOR_DIMS, inputSizeEnd, sizeof(inputSizeEnd)));
+
+        //inputZSize = TENSOR_VIEW_SIZE_INDEX(input, splitAxis);
+        //vxmASSERT(inputZSize >= splitCount);
+
+        //InputPreOp = inputZSize / splitCount;
+        //InputResidue = inputZSize % splitCount;
+        //if (InputResidue > gpuIndex)
+        //{
+        //    newOutputSize = InputPreOp + 1;
+        //    inputStart = gpuIndex * newOutputSize;
+        //}
+        //else
+        //{
+        //    newOutputSize = InputPreOp;
+        //    inputStart = gpuIndex * InputPreOp + InputResidue;
+        //}
+
+        //inputEnd =  ((inputStart + newOutputSize) > outputSize) ? outputSize : (inputStart + newOutputSize);
+
+        //inputSizeStart[splitAxis] = inputStart ;
+        //inputSizeEnd[splitAxis] = inputEnd ;
+
+        //if ((inputEnd - inputStart) == 0)
+        //{
+        //    vxError("%s[%d]: not support split dilation reshuffle\n", __FUNCTION__, __LINE__);
+        //    vxmONERROR(VX_FAILURE);
+        //}
+        //vxmASSERT((inputEnd - inputStart) != 0);
+
+        ///* split input */
+        //inputView = vxCreateTensorView(node->base.context, inputSizeStart, inputSizeEnd, (vx_uint8)inputDim);
+        //inputTensor  = vxoTensor_CreateTensorFromView((vx_tensor)srcOperation->inputs[0], inputView);
+        //if (inputView != VX_NULL)
+        //{
+        //    vxReleaseTensorView(&inputView);
+        //}
+
+        ///* split output */
+        //poolZSize = TENSOR_VIEW_SIZE_INDEX(input, 2);
+        //outputXSize = TENSOR_VIEW_SIZE_INDEX(output, 0);
+
+        //outputSizeStart[0] = inputStart * outputXSize / poolZSize;
+        //outputSizeEnd[0] = outputEnd  * outputXSize / poolZSize;
+
+        //if ((outputEnd - outputStart) == 0)
+        //{
+        //    vxError("%s[%d]: not support split dilation reshuffle\n", __FUNCTION__, __LINE__);
+        //    vxmONERROR(VX_FAILURE);
+        //}
+        //vxmASSERT((outputEnd - outputStart) != 0);
+
+        ///* split output */
+        //outputView = vxCreateTensorView(node->base.context, outputSizeStart, outputSizeEnd, (vx_uint8)outputDim);
+        //outputTensor  = vxoTensor_CreateTensorFromView((vx_tensor)srcOperation->outputs[0], outputView);
+        //if (outputView != VX_NULL)
+        //{
+        //    vxReleaseTensorView(&outputView);
+        //}
+    }
+    dstOperation->base.references[VX_MULTIVIP_INPUT_TENSOR_REFERENCE] = (vx_reference)inputTensor;
+
+    dstOperation->output = outputTensor;
+    dstOperation->base.outputs[0] = (vx_reference)outputTensor;
+    dstOperation->input = inputTensor;
+    dstOperation->base.inputs[0] = (vx_reference)inputTensor;
+
+OnError:
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
 VX_PRIVATE_API vx_status vxoMultiGPU_SplitInputOutput(
     vx_node node,
     vxnne_operation dstOperation,
@@ -6104,6 +6337,12 @@ VX_PRIVATE_API vx_status vxoMultiGPU_Handle(
                 vxmONERROR(vxoMultiGPU_SplitResourceForTPUpsample(node, tpOperation,
                                                         operation,
                                                         splitCount, gpuIndex));
+            }
+            else if (VXNNE_OPERATOR_ROIPOOL == operation->operatorType || VXNNE_OPERATOR_ROIPOOLRELU == operation->operatorType)
+            {
+                vxmONERROR(vxoMultiGPU_SplitResourceForTPROI(node, tpOperation,
+                                        operation,
+                                        splitCount, gpuIndex));
             }
             else
             {
