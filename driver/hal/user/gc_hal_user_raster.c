@@ -402,8 +402,7 @@ static gceSTATUS _CheckSurface(
                     }
                 }
             }
-            else if ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) == gcvTRUE) ||
-                      gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400EX_COMPRESSION) == gcvTRUE)
+            else if ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) == gcvTRUE))
             {
                 if (Format == gcvSURF_NV12 || Format == gcvSURF_P010  || Format == gcvSURF_P010_LSB)
                 {
