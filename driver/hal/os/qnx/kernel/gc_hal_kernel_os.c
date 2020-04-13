@@ -6358,6 +6358,7 @@ gckOS_RequestReservedMemory(
     gctSIZE_T Size,
     const char * Name,
     gctBOOL Requested,
+    gctBOOL CpuAccessible,
     gctPOINTER * MemoryHandle
     )
 {

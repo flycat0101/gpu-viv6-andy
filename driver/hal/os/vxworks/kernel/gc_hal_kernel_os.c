@@ -1118,6 +1118,7 @@ gckOS_RequestReservedMemory(
     unsigned long Size,
     const char * Name,
     gctBOOL Requested,
+    gctBOOL CpuAccessible,
     void ** MemoryHandle
     )
 {
@@ -1153,12 +1154,13 @@ gckOS_RequestReservedMemory(
     gcmkONERROR(allocator->ops->Attach(allocator, &desc, mdl));
 
     /* Assign alloator. */
-    mdl->allocator  = allocator;
-    mdl->bytes      = Size;
-    mdl->numPages   = Size >> PAGE_SHIFT;
-    mdl->contiguous = gcvTRUE;
-    mdl->addr       = gcvNULL;
-    mdl->gid        = 0;
+    mdl->allocator      = allocator;
+    mdl->bytes          = Size;
+    mdl->numPages       = Size >> PAGE_SHIFT;
+    mdl->contiguous     = gcvTRUE;
+    mdl->cpuAccessible  = CpuAccessible;
+    mdl->addr           = gcvNULL;
+    mdl->gid            = 0;
 
     /*
      * Add this to a global list.

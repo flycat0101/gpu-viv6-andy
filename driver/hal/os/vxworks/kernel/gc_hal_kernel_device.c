@@ -223,6 +223,7 @@ _SetupVidMem(
                     device->os, ContiguousBase, ContiguousSize,
                     "galcore contiguous memory",
                     Args->contiguousRequested,
+                    gcvTRUE,
                     &device->contiguousPhysical
                     ));
 
@@ -780,6 +781,7 @@ gckGALDEVICE_Construct(
                     device->os,
                     device->externalBase, device->externalSize,
                     "galcore external memory",
+                    gcvTRUE,
                     gcvTRUE,
                     &device->externalPhysical
                     ));

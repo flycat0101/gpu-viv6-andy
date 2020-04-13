@@ -179,7 +179,7 @@ struct _VX_MDL
     size_t                  bytes;
     gctINT                  numPages;
     gctBOOL                 contiguous;
-
+    gctBOOL                 cpuAccessible;
     gctBOOL                 cacheable;
 
     pthread_mutex_t         mapsMutex;
