@@ -2168,9 +2168,6 @@ OnError:
 **      gctUINT32 * Address
 **          Pointer to a variable that will hold the hardware specific address.
 **
-**      gctUINT32 * PhysicalAddress
-**          Pointer to a variable that will hold the bus address of a contiguous
-**          video node.
 */
 static gceSTATUS
 gckVIDMEM_Lock(
@@ -2194,6 +2191,9 @@ gckVIDMEM_Lock(
 
         switch (Node->VidMem.pool)
         {
+        case gcvPOOL_LOCAL_EXCLUSIVE:
+            address = Kernel->exclusiveBaseAddress + offset;
+            break;
         case gcvPOOL_LOCAL_EXTERNAL:
             address = Kernel->externalBaseAddress + offset;
             break;

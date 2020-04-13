@@ -639,6 +639,7 @@ gckKERNEL_Construct(
 
         kernel->contiguousBaseAddress = kernel->mmu->contiguousBaseAddress;
         kernel->externalBaseAddress   = kernel->mmu->externalBaseAddress;
+        kernel->exclusiveBaseAddress  = kernel->mmu->exclusiveBaseAddress;
 
         /* Construct the gckCOMMAND object, either MCFE or wait-link FE can exist. */
         if (gckHARDWARE_IsFeatureAvailable(kernel->hardware, gcvFEATURE_MCFE))

@@ -7141,6 +7141,16 @@ gckOS_QueryOption(
         *Value = device->externalSize;
         return gcvSTATUS_OK;
     }
+    else if (!strcmp(Option, "exclusiveBase"))
+    {
+        *Value = device->exclusiveBase;
+        return gcvSTATUS_OK;
+    }
+    else if (!strcmp(Option, "exclusiveSize"))
+    {
+        *Value = device->exclusiveSize;
+        return gcvSTATUS_OK;
+    }
     else if (!strcmp(Option, "externalBase"))
     {
         *Value = device->externalBase;

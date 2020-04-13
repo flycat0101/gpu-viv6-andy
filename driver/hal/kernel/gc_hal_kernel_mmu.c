@@ -1596,8 +1596,10 @@ _Construct(
     gctSIZE_T physSize;
     gctPHYS_ADDR_T contiguousBase;
     gctSIZE_T contiguousSize = 0;
-    gctPHYS_ADDR_T externalBase;
+    gctPHYS_ADDR_T externalBase = 0;
+    gctPHYS_ADDR_T exclusiveBase = 0;
     gctSIZE_T externalSize = 0;
+    gctSIZE_T exclusiveSize = 0;
     gctUINT32 gpuAddress;
     gctPHYS_ADDR_T gpuPhysical;
     gcsADDRESS_AREA_PTR area = gcvNULL;
@@ -1880,6 +1882,24 @@ _Construct(
             gcmkONERROR(_FillFlatMapping(mmu, gpuExternalBase, externalSize, gcvFALSE, gcvTRUE, &externalBaseAddress));
 
             mmu->externalBaseAddress = externalBaseAddress;
+        }
+
+        status = gckOS_QueryOption(mmu->os, "exclusiveBase", &exclusiveBase);
+
+        if (gcmIS_SUCCESS(status))
+        {
+            status = gckOS_QueryOption(mmu->os, "exclusiveSize", &data);
+            exclusiveSize = (gctSIZE_T)data;
+        }
+
+        if (gcmIS_SUCCESS(status) && exclusiveSize)
+        {
+            gctUINT32 exclusiveBaseAddress = 0;
+
+            /* Setup flat mapping for external memory. */
+            gcmkONERROR(_FillFlatMapping(mmu, exclusiveBase, exclusiveSize, gcvFALSE, gcvTRUE, &exclusiveBaseAddress));
+
+            mmu->exclusiveBaseAddress = exclusiveBaseAddress;
         }
     }
 

@@ -622,6 +622,7 @@ struct _gckKERNEL
     gctUINT32                   contiguousBaseAddress;
     gctUINT32                   externalBaseAddress;
     gctUINT32                   internalBaseAddress;
+    gctUINT32                   exclusiveBaseAddress;
 
     /* External shared SRAM. */
     gctUINT32                   extSRAMBaseAddresses[gcvSRAM_EXT_COUNT];
@@ -1784,6 +1785,7 @@ struct _gckMMU
     gctUINT32                   contiguousBaseAddress;
     gctUINT32                   externalBaseAddress;
     gctUINT32                   internalBaseAddress;
+    gctUINT32                   exclusiveBaseAddress;
 };
 
 
