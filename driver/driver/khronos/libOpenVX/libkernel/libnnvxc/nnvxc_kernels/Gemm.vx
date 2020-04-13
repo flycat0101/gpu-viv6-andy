@@ -7,7 +7,6 @@
 _viv_uniform int inputSize_aln8;
 _viv_uniform VXC_512Bits uniMulAcc;
 _viv_uniform VXC_512Bits uniFp16toFp32_16x1;
-_viv_uniform float bias_scale;
 _viv_uniform int is_bias_uint8;
 
 __kernel void gemm_fp16_bias_fp16
@@ -473,9 +472,8 @@ __kernel void gemm_I16
 #endif
     vxc_short8 wData;
     float4 sum = 0;
-    float4 dst, dstTmp = 0;
+    float4 dst;
     dst = convert_float4(read_imagei(bias, coord_in.yw));
-    dst.x = dst.x * bias_scale;
     dst = dst.xxxx;
 
     do
@@ -504,11 +502,11 @@ __kernel void gemm_I16
         VXC_DP16x1(sum, src3, wData, VXC_MODIFIER(3, 3, 0, VXC_RM_TowardZero, 0), uniMulAcc_Int16);
 #endif
 
-        dstTmp = dstTmp + sum;
+        dst = dst + sum;
 
     } while (coord_in.x < inputSize_aln8);
 
-    dst = dst + dstTmp * in_scale;
+    dst = dst * in_scale;
 #ifdef ENABLE_RELUN
     if(dRelu)
         dst = dst > 0 ? dst : 0;
@@ -609,9 +607,8 @@ __kernel void gemm_Tensor_I16
 
     vxc_short8 wData;
     float4 sum = 0;
-    float4 dst, dstTmp = 0;
+    float4 dst;
     dst = convert_float4(read_imagei(bias, coord.yw));
-    dst.x = dst.x * bias_scale;
     dst = dst.xxxx;
 
     do
@@ -625,11 +622,11 @@ __kernel void gemm_Tensor_I16
 
         VXC_DP16x1(sum, src0, wData, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0), uniMulAcc_Int16);
 
-        dstTmp = dstTmp + sum;
+        dst = dst + sum;
 
     } while (coord_in.x < inputSize_aln8);
 
-    dst += dstTmp * in_scale;
+    dst = dst * in_scale;
 
 #ifdef ENABLE_RELUN
     if(dRelu)
@@ -971,9 +968,9 @@ __kernel void gemm_Tensor_I16_4x
     vxc_short8 src0;
     vxc_short8 w0Data, w1Data, w2Data, w3Data;
     float4 sum;
-    float4 dst, dstTmp = 0;
+    float4 dst;
 
-    dst = convert_float4(read_imagei(bias, coord.zw)) * bias_scale;;
+    dst = convert_float4(read_imagei(bias, coord.zw));
 
     do
     {
@@ -992,10 +989,10 @@ __kernel void gemm_Tensor_I16_4x
         VXC_DP16x1(sum, src0, w2Data, VXC_MODIFIER(2, 2, 0, VXC_RM_TowardZero, 0), uniMulAcc_Int16);
         VXC_DP16x1(sum, src0, w3Data, VXC_MODIFIER(3, 3, 0, VXC_RM_TowardZero, 0), uniMulAcc_Int16);
 
-        dstTmp = dstTmp + sum;
+        dst = dst + sum;
     } while (coord_in.x < inputSize_aln8);
 
-    dst += dstTmp * in_scale;
+    dst = dst * in_scale;
 
 #ifdef ENABLE_RELUN
     if(dRelu)

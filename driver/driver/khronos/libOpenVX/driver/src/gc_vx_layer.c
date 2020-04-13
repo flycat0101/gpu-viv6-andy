@@ -17104,7 +17104,6 @@ vxnne_shader_executable vxnneGemmShaderExecutable(
     vx_enum      bias_quant_type                = TENSOR_QUANT_TYPE(bias);
     vx_bool      is_per_channel_quant           = (vx_bool)(weight_quant_type == VX_QUANT_AFFINE_SCALE_PER_CHANNEL && bias_quant_type == VX_QUANT_AFFINE_SCALE_PER_CHANNEL);
     vx_bool      is_asymmetric_quant            = (vx_bool)(weight_quant_type == VX_QUANT_AFFINE_SCALE && bias_quant_type == VX_QUANT_AFFINE_SCALE);
-    vx_float32   bias_scale                     = 1.0f;
     vx_uint32    bias_ZP                        = 0;
     vx_uint32    param_num                      = is_per_channel_quant ? 6 : 5;
 
@@ -17222,27 +17221,12 @@ vxnne_shader_executable vxnneGemmShaderExecutable(
         output_ZP        = TENSOR_TF_ZEROPOINT(output);
     }
 
-    if (TENSOR_QUANT_TYPE(bias) == VX_QUANT_DYNAMIC_FIXED_POINT
-       && (biasFormat == VX_TYPE_INT16 || biasFormat == VX_TYPE_UINT8))
+    if (TENSOR_QUANT_TYPE(bias) == VX_QUANT_DYNAMIC_FIXED_POINT)
     {
-        vx_int8   biasFixedPointPos  = TENSOR_POS(bias);
-        vx_int32  postshift         = 0;
-
-        postshift = postshift - biasFixedPointPos;
-
-        if (postshift < 0)
-        {
-            bias_scale = 1.0f / (vx_float32) (1 << -postshift);
-        }
-        else
-        {
-            bias_scale = (vx_float32) (1 << postshift);
-        }
         bias_ZP = 0;
     }
     else if (TENSOR_QUANT_TYPE(bias) == VX_QUANT_AFFINE_SCALE )
     {
-        bias_scale     = TENSOR_TF_SCALE(bias);
         bias_ZP        = TENSOR_TF_ZEROPOINT(bias);
     }
 
@@ -17598,7 +17582,6 @@ vxnne_shader_executable vxnneGemmShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniExtractInteger_2x8", 1, uniExtractInteger_2x8);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "inputSize_aln8", 1, &inputSize_aln8);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "in_scale", 1, &in_scale);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "bias_scale", 1, &bias_scale);
         if (status != VX_SUCCESS) goto OnError;
 
     }
