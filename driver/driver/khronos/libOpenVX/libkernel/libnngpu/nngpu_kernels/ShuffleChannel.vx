@@ -1,5 +1,3 @@
-#include "cl_viv_vx_ext.h"
-
 #define SUFFLE_CHANNEL_FUN_4X(name, src_type, read_fun, write_fun) \
 __kernel void shuffleChannel_##name##_4X( \
     image2d_array_t input, \
