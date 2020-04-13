@@ -188,7 +188,7 @@ __kernel void gpu_l2norm_axis1_U8toU8
     }
 
     sum = sum > epsilon ? sum : epsilon;
-    float4 l2_norm = rsqrt(sum);
+    float4 l2_norm = rsqrt(sum) * scaleOut;
     // Compute sum.
     for (coord_in.y = 0; coord_in.y < axis_size; )
     {
@@ -233,7 +233,7 @@ __kernel void gpu_l2norm_axis1_U8toU8_ALN4
     }
 
     sum = sum > epsilon ? sum : epsilon;
-    float4 l2_norm = rsqrt(sum);
+    float4 l2_norm = rsqrt(sum) * scaleOut;
     // Compute sum.
     for (coord_in.y = 0; coord_in.y < axis_size; )
     {
@@ -271,7 +271,7 @@ __kernel void gpu_l2norm_axis1_U8toU8_2D
     }
 
     sum = sum > epsilon ? sum : epsilon;
-    float4 l2_norm = rsqrt(sum);
+    float4 l2_norm = rsqrt(sum) * scaleOut;
     // Compute sum.
     for (coord_in.y = 0; coord_in.y < axis_size; )
     {
@@ -315,7 +315,7 @@ __kernel void gpu_l2norm_axis1_U8toU8_2D_ALN4
     }
 
     sum = sum > epsilon ? sum : epsilon;
-    float4 l2_norm = rsqrt(sum);
+    float4 l2_norm = rsqrt(sum) * scaleOut;
     // Compute sum.
     for (coord_in.y = 0; coord_in.y < axis_size; )
     {
@@ -354,7 +354,7 @@ __kernel void gpu_l2norm_axis1_I8toI8
     }
 
     sum = sum > epsilon ? sum : epsilon;
-    float4 l2_norm = rsqrt(sum);
+    float4 l2_norm = rsqrt(sum) * scaleOut;
     // Compute sum.
     for (coord_in.y = 0; coord_in.y < axis_size; )
     {
@@ -399,7 +399,7 @@ __kernel void gpu_l2norm_axis1_I8toI8_ALN4
     }
 
     sum = sum > epsilon ? sum : epsilon;
-    float4 l2_norm = rsqrt(sum);
+    float4 l2_norm = rsqrt(sum) * scaleOut;
     // Compute sum.
     for (coord_in.y = 0; coord_in.y < axis_size; )
     {
@@ -437,7 +437,7 @@ __kernel void gpu_l2norm_axis1_I8toI8_2D
     }
 
     sum = sum > epsilon ? sum : epsilon;
-    float4 l2_norm = rsqrt(sum);
+    float4 l2_norm = rsqrt(sum) * scaleOut;
     // Compute sum.
     for (coord_in.y = 0; coord_in.y < axis_size; )
     {
@@ -481,7 +481,7 @@ __kernel void gpu_l2norm_axis1_I8toI8_2D_ALN4
     }
 
     sum = sum > epsilon ? sum : epsilon;
-    float4 l2_norm = rsqrt(sum);
+    float4 l2_norm = rsqrt(sum) * scaleOut;
     // Compute sum.
     for (coord_in.y = 0; coord_in.y < axis_size; )
     {
