@@ -303,7 +303,7 @@ OnError:
     return status;
 }
 
-VX_PRIVATE_API vx_bool vxoNNTensorReverse_SH_EVIS_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+VX_PRIVATE_API vx_bool vxoNNTensorReverse_SH_Support_Ext(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis)
 {
     vx_tensor  input      = (vx_tensor)parameters[0];
     vx_tensor  output     = (vx_tensor)parameters[6];
@@ -335,7 +335,42 @@ VX_PRIVATE_API vx_bool vxoNNTensorReverse_SH_EVIS_Support(vx_node node, const vx
     return support;
 }
 
-VX_PRIVATE_API vx_status vxoNNTensorReverse_SH_EVIS_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+
+VX_PRIVATE_API vx_bool vxoNNTensorReverse_SH_Evis_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && node->base.context->evisNoInst.supportEVIS;
+
+    if (!support)return support;
+
+    support = support && vxoNNTensorReverse_SH_Support_Ext(node, parameters, num, reg_param, vx_true_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_bool vxoNNTensorReverse_SH_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && vxoNNTensorReverse_SH_Support_Ext(node, parameters, num, reg_param, vx_false_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNNTensorReverse_SH_Initialize_Ext(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis)
 {
     vx_status status = VX_SUCCESS;
     vx_tensor  input      = (vx_tensor)parameters[0];
@@ -354,8 +389,16 @@ VX_PRIVATE_API vx_status vxoNNTensorReverse_SH_EVIS_Initialize(vxnne_layer ops_l
         axis[i] = ((vx_scalar)parameters[i + 2])->value->n32;
     }
 
-    shaderExecutable = vxnneGetReverseShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_REVERSE, &ops_layer->node->kernelAttributes.borderMode,
-        input, output, numOfAxis, axis);
+    if (evis)
+    {
+        shaderExecutable = vxnneGetReverseShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_REVERSE,
+                           &ops_layer->node->kernelAttributes.borderMode, input, output, numOfAxis, axis);
+    }
+    else
+    {
+        shaderExecutable = vxnneGetGPUReverseShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_REVERSE,
+                           &ops_layer->node->kernelAttributes.borderMode, input, output, numOfAxis, axis);
+    }
 
     if (!shaderExecutable)
     {
@@ -378,6 +421,34 @@ VX_PRIVATE_API vx_status vxoNNTensorReverse_SH_EVIS_Initialize(vxnne_layer ops_l
 OnError:
     vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
 
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNTensorReverse_SH_EVIS_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoNNTensorReverse_SH_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_true_e));
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+OnError:
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNTensorReverse_SH_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoNNTensorReverse_SH_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_false_e));
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+OnError:
     return status;
 }
 
@@ -476,8 +547,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorReverse_Initializer(vx_node node
     vxnne_layer_imp_s registerTensorReverse[] = {/* Please DON'T adjust the order, it's importent */
         { "TensorReverse NN", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
         { "TensorReverse TP", vxoNNTensorReverse_TP_Support, vxoNNTensorReverse_TP_Initialize, VX_NULL },
-        { "TensorReverse SH EVIS", vxoNNTensorReverse_SH_EVIS_Support, vxoNNTensorReverse_SH_EVIS_Initialize, VX_NULL },
-        { "TensorReverse SH F32", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "TensorReverse SH EVIS", vxoNNTensorReverse_SH_Evis_Support, vxoNNTensorReverse_SH_EVIS_Initialize, VX_NULL },
+        { "TensorReverse SH F32", vxoNNTensorReverse_SH_Support, vxoNNTensorReverse_SH_Initialize, VX_NULL },
         { "TensorReverse SW ", vxoNNCommon_Support, vxoNNTensorReverse_SW_Initialize, VX_NULL },
     };
 
