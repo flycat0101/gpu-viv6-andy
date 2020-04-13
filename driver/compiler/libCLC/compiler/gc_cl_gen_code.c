@@ -31239,16 +31239,14 @@ cloIR_BINARY_EXPR_GenArithmeticAssignCode(
              {
                  clsGEN_CODE_DATA_TYPE dataType;
 
-                 if(lOperandParameters.rOperands[i].isReg)
-                 {
-                     lOperandParameters.rOperands[i].u.reg.componentSelection =
-                         _SwizzleComponentSelection(&reversedComponentSelection,
-                                                    &lOperandParameters.rOperands[i].u.reg.componentSelection);
+                 gcmASSERT(lOperandParameters.rOperands[i].isReg);
+                 lOperandParameters.rOperands[i].u.reg.componentSelection =
+                     _SwizzleComponentSelection(&reversedComponentSelection,
+                                                &lOperandParameters.rOperands[i].u.reg.componentSelection);
 
-                     dataType = gcGetVectorComponentSelectionDataType(lOperandParameters.rOperands[i].dataType,
-                                                                      lOperandParameters.rOperands[i].u.reg.componentSelection.components);
-                     lOperandParameters.rOperands[i].dataType = dataType;
-                 }
+                 dataType = gcGetVectorComponentSelectionDataType(lOperandParameters.rOperands[i].dataType,
+                                                                  lOperandParameters.rOperands[i].u.reg.componentSelection.components);
+                 lOperandParameters.rOperands[i].dataType = dataType;
 
                  if(rightParameters.rOperands[i].isReg)
                  {
