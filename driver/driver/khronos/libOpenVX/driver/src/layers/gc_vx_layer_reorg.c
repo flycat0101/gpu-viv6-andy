@@ -1264,19 +1264,19 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationSH(
     else
     {
         if (type == VX_REORG_DEPTH_TO_SPACE)
-            shaderExecutable = vxnneGetGPUDepth2SpaceShaderExecutable(context, VXNNE_KERNEL_DEPTH2SPACE, &node->kernelAttributes.borderMode,
+            shaderExecutable = vxnneGetGPUDepth2SpaceShaderExecutable(context, VXNNE_KERNEL_GPU_DEPTH2SPACE, &node->kernelAttributes.borderMode,
                 inputs, stride, outputs);
         else if(type == VX_REORG_SPACE_TO_DEPTH)
-            shaderExecutable = vxnneGetGPUSpace2DepthShaderExecutable(context, VXNNE_KERNEL_SPACE2DEPTH, &node->kernelAttributes.borderMode,
+            shaderExecutable = vxnneGetGPUSpace2DepthShaderExecutable(context, VXNNE_KERNEL_GPU_SPACE2DEPTH, &node->kernelAttributes.borderMode,
                 inputs, stride, outputs);
         else if(type == VX_REORG_BATCH_TO_SPACE_ND)
-            shaderExecutable = vxnneGetGPUBatch2SpaceShaderExecutable(context, VXNNE_KERNEL_BATCH2SPACE, &node->kernelAttributes.borderMode,
+            shaderExecutable = vxnneGetGPUBatch2SpaceShaderExecutable(context, VXNNE_KERNEL_GPU_BATCH2SPACE, &node->kernelAttributes.borderMode,
                 inputs, pad_list[0], pad_list[2], block_size_s, outputs);
         else if(type == VX_REORG_SPACE_TO_BATCH_ND)
-            shaderExecutable = vxnneGetGPUSpace2BatchShaderExecutable(context, VXNNE_KERNEL_SPACE2BATCH, &node->kernelAttributes.borderMode,
+            shaderExecutable = vxnneGetGPUSpace2BatchShaderExecutable(context, VXNNE_KERNEL_GPU_SPACE2BATCH, &node->kernelAttributes.borderMode,
                 inputs, block_size_s, outc_s, outputs, pad_list);
         else if(type == VX_REORG_SHUFFLE_CHANNEL)
-            shaderExecutable = vxnneGetGPUShuffleChannelShaderExecutable(context, VXNNE_KERNEL_SPACE2BATCH, &node->kernelAttributes.borderMode,
+            shaderExecutable = vxnneGetGPUShuffleChannelShaderExecutable(context, VXNNE_KERNEL_GPU_SHUFFLECHANNEL, &node->kernelAttributes.borderMode,
                 inputs, num_group_s, axis_s, outputs);
 
         if(type == VX_REORG_BATCH_TO_SPACE_ND || type == VX_REORG_SPACE_TO_BATCH_ND)

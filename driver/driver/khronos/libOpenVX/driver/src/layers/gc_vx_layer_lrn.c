@@ -470,7 +470,7 @@ VX_PRIVATE_API vx_status vxoLRNOperationSH_Initialize(
     {
         vx_scalar bias_s = vxCreateScalar(context, VX_TYPE_FLOAT32, &bias);
 
-        shaderExecutable = vxnneGetGPUNormalizationShaderExecutable(context, VXNNE_KERNEL_NORMALIZATION, &node->kernelAttributes.borderMode, inputs, type_s, norm_size_s, alpha_s, beta_s, bias_s, outputs);
+        shaderExecutable = vxnneGetGPUNormalizationShaderExecutable(context, VXNNE_KERNEL_GPU_NORMALIZATION, &node->kernelAttributes.borderMode, inputs, type_s, norm_size_s, alpha_s, beta_s, bias_s, outputs);
 
         if(bias_s) vxReleaseScalar(&bias_s);
     }

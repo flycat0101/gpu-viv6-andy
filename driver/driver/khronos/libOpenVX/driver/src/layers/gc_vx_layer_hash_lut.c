@@ -198,7 +198,7 @@ VX_PRIVATE_API vx_status vxoHashLUT_SH_Initialize_Ext(vxnne_layer ops_layer, con
     }
     else
     {
-        shaderExecutable = vxnneGetGPUHashLUTShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_HASHLUT,
+        shaderExecutable = vxnneGetGPUHashLUTShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_HASHLUT,
             &ops_layer->node->kernelAttributes.borderMode, inputs, keys, values, hits, outputs);
     }
 
@@ -386,7 +386,7 @@ OnError:
         }
         else
         {
-            shaderExecutable = vxnneGetGPUHashLUTShaderExecutable(node->base.context, VXNNE_KERNEL_HASHLUT,
+            shaderExecutable = vxnneGetGPUHashLUTShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_HASHLUT,
                 &node->kernelAttributes.borderMode, inputs, keys, values, hits, outputs);
         }
 

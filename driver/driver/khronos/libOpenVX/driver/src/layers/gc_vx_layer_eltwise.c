@@ -296,7 +296,7 @@ VX_PRIVATE_API vx_status vxoNNTensorAdd_SH_Initialize_Ext(vxnne_layer ops_layer,
     }
     else
     {
-            shaderExecutable = vxnneGetGPUTensorEltwiseShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_ADD, &ops_layer->node->kernelAttributes.borderMode, input0, input1, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_ADD, output);
+            shaderExecutable = vxnneGetGPUTensorEltwiseShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_ADD, &ops_layer->node->kernelAttributes.borderMode, input0, input1, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_ADD, output);
     }
 
     if (!shaderExecutable)
@@ -621,7 +621,7 @@ OnError:
         }
         else
         {
-                shaderExecutable = vxnneGetGPUTensorEltwiseShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_ADD, &node->kernelAttributes.borderMode, input0, input1, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_ADD, output);
+                shaderExecutable = vxnneGetGPUTensorEltwiseShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_ADD, &node->kernelAttributes.borderMode, input0, input1, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_ADD, output);
         }
 
         if (!shaderExecutable)
@@ -898,7 +898,7 @@ VX_PRIVATE_API vx_status vxoNNTensorSub_SH_Initialize_Ext(vxnne_layer ops_layer,
     }
     else
     {
-        shaderExecutable = vxnneGetGPUTensorEltwiseShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_ELTWISE, &ops_layer->node->kernelAttributes.borderMode, input0, input1, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_SUB, output);
+        shaderExecutable = vxnneGetGPUTensorEltwiseShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_ELTWISE, &ops_layer->node->kernelAttributes.borderMode, input0, input1, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_SUB, output);
     }
 
     if (!shaderExecutable)
@@ -1093,7 +1093,7 @@ OnError:
         }
         else
         {
-            shaderExecutable = vxnneGetGPUTensorEltwiseShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_ELTWISE, &node->kernelAttributes.borderMode, input0, input1, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_SUB, output);
+            shaderExecutable = vxnneGetGPUTensorEltwiseShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_ELTWISE, &node->kernelAttributes.borderMode, input0, input1, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_SUB, output);
         }
 
         if (!shaderExecutable)
@@ -1366,7 +1366,7 @@ VX_PRIVATE_API vx_status vxoNNTensorMul_SH_Initialize_Ext(vxnne_layer ops_layer,
     }
     else
     {
-        shaderExecutable = vxnneGetGPUTensorEltwiseShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_MUL, &ops_layer->node->kernelAttributes.borderMode, input0, input1, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_MUL, output);
+        shaderExecutable = vxnneGetGPUTensorEltwiseShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_MUL, &ops_layer->node->kernelAttributes.borderMode, input0, input1, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_MUL, output);
     }
 
     if (!shaderExecutable)
@@ -1574,7 +1574,7 @@ OnError:
         }
         else
         {
-            shaderExecutable = vxnneGetGPUTensorEltwiseShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MUL, &node->kernelAttributes.borderMode, input0, input1, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_MUL, output);
+            shaderExecutable = vxnneGetGPUTensorEltwiseShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_MUL, &node->kernelAttributes.borderMode, input0, input1, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_MUL, output);
         }
 
         if (!shaderExecutable)

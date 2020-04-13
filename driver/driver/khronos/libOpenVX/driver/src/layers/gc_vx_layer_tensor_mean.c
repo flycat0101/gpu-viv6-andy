@@ -647,7 +647,7 @@ VX_PRIVATE_API vx_status vxoNNTensorMean_SH_EVIS_Initialize_Ext(vxnne_layer ops_
                 }
                 else
                 {
-                    shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &ops_layer->node->kernelAttributes.borderMode, input, perm_array, pnum, transTensor);
+                    shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_TRANSPOSE, &ops_layer->node->kernelAttributes.borderMode, input, perm_array, pnum, transTensor);
                 }
 
                 if (!shaderExecutable)
@@ -779,7 +779,7 @@ VX_PRIVATE_API vx_status vxoNNTensorMean_SH_EVIS_Initialize_Ext(vxnne_layer ops_
         }
         else
         {
-            shaderExecutable = vxnneGetGPUAvgPoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_AVGPOOLING, &ops_layer->node->kernelAttributes.borderMode,
+            shaderExecutable = vxnneGetGPUAvgPoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_AVGPOOLING, &ops_layer->node->kernelAttributes.borderMode,
                 transTensor, NULL, stride_s, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, pad_x_left, pad_y_top, NULL, vx_false_e, 0, 0, dst);
         }
 
@@ -820,7 +820,7 @@ VX_PRIVATE_API vx_status vxoNNTensorMean_SH_EVIS_Initialize_Ext(vxnne_layer ops_
         }
         else
         {
-            shaderExecutable = vxnneGetGPUTensorMeanAxisShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS, &ops_layer->node->kernelAttributes.borderMode, axis_coef, transTensor, dst, input_axis);
+            shaderExecutable = vxnneGetGPUTensorMeanAxisShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_MEAN_AXIS, &ops_layer->node->kernelAttributes.borderMode, axis_coef, transTensor, dst, input_axis);
         }
 
         if (!shaderExecutable)
@@ -1287,7 +1287,7 @@ OnError:
                     }
                     else
                     {
-                        shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &node->kernelAttributes.borderMode, input, perm_array, pnum, transTensor);
+                        shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_TRANSPOSE, &node->kernelAttributes.borderMode, input, perm_array, pnum, transTensor);
                     }
 
                     if (!shaderExecutable)
@@ -1420,7 +1420,7 @@ OnError:
             }
             else
             {
-                shaderExecutable = vxnneGetGPUAvgPoolingShaderExecutable(node->base.context, VXNNE_KERNEL_AVGPOOLING, &node->kernelAttributes.borderMode,
+                shaderExecutable = vxnneGetGPUAvgPoolingShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_AVGPOOLING, &node->kernelAttributes.borderMode,
                     transTensor, NULL, stride_s, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, pad_x_left, pad_y_top, NULL, vx_false_e, 0, 0, dst);
             }
 
@@ -1466,7 +1466,7 @@ OnError:
             }
             else
             {
-                shaderExecutable = vxnneGetGPUTensorMeanAxisShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS, &node->kernelAttributes.borderMode, axis_coef, transTensor, dst, input_axis);
+                shaderExecutable = vxnneGetGPUTensorMeanAxisShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_MEAN_AXIS, &node->kernelAttributes.borderMode, axis_coef, transTensor, dst, input_axis);
             }
 
             if (!shaderExecutable)

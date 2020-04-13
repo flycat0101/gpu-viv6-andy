@@ -230,7 +230,7 @@ VX_PRIVATE_API vx_status vxoNNConcat2Layer_SH_EVIS_Initialize(vxnne_layer ops_la
             }
             else
             {
-                shaderExecutable    = vxnneGPUTensorCopyShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_COPY, &ops_layer->node->kernelAttributes.borderMode, input_rs, output_rs);
+                shaderExecutable    = vxnneGPUTensorCopyShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_COPY, &ops_layer->node->kernelAttributes.borderMode, input_rs, output_rs);
             }
 
             if (!shaderExecutable)
@@ -396,7 +396,7 @@ OnError:
                 }
                 else
                 {
-                    shaderExecutable    = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input_rs, output_rs);
+                    shaderExecutable    = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_COPY, &node->kernelAttributes.borderMode, input_rs, output_rs);
                 }
 
                 if (!shaderExecutable)
@@ -859,7 +859,7 @@ VX_PRIVATE_API vx_status vxoNNConcatIndefiniteLayer_SH_EVIS_Initialize_Ext(vxnne
             }
             else
             {
-                shaderExecutable    = vxnneGPUTensorCopyShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_COPY, &ops_layer->node->kernelAttributes.borderMode, input_rs, output_rs);
+                shaderExecutable    = vxnneGPUTensorCopyShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_COPY, &ops_layer->node->kernelAttributes.borderMode, input_rs, output_rs);
             }
 
             if (!shaderExecutable)
@@ -952,7 +952,7 @@ VX_PRIVATE_API vx_status vxoNNConcatIndefiniteLayer_SH_EVIS_Initialize_Ext(vxnne
             }
             else
             {
-                shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &ops_layer->node->kernelAttributes.borderMode, input, perm_array, 3, subtensor);
+                shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_TRANSPOSE, &ops_layer->node->kernelAttributes.borderMode, input, perm_array, 3, subtensor);
             }
 
             if (!shaderExecutable)
@@ -986,7 +986,7 @@ VX_PRIVATE_API vx_status vxoNNConcatIndefiniteLayer_SH_EVIS_Initialize_Ext(vxnne
         }
         else
         {
-           shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &ops_layer->node->kernelAttributes.borderMode, output_tmp, perm_array, 3, output_s);
+           shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_TRANSPOSE, &ops_layer->node->kernelAttributes.borderMode, output_tmp, perm_array, 3, output_s);
         }
 
         if (!shaderExecutable)
@@ -1421,7 +1421,7 @@ OnError:
                 }
                 else
                 {
-                    shaderExecutable    = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input_rs, output_rs);
+                    shaderExecutable    = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_COPY, &node->kernelAttributes.borderMode, input_rs, output_rs);
                 }
 
                 if (!shaderExecutable)
@@ -1514,7 +1514,7 @@ OnError:
                 }
                 else
                 {
-                    shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &node->kernelAttributes.borderMode, input, perm_array, 3, subtensor);
+                    shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_TRANSPOSE, &node->kernelAttributes.borderMode, input, perm_array, 3, subtensor);
                 }
 
                 if (!shaderExecutable)
@@ -1548,7 +1548,7 @@ OnError:
             }
             else
             {
-               shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &node->kernelAttributes.borderMode, output_tmp, perm_array, 3, output_s);
+               shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_TRANSPOSE, &node->kernelAttributes.borderMode, output_tmp, perm_array, 3, output_s);
             }
 
             if (!shaderExecutable)

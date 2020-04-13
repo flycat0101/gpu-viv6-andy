@@ -531,7 +531,7 @@ VX_PRIVATE_API vx_status vxoROIPoolLayer_SH_EVIS_Initialize_Ext(vxnne_layer ops_
         }
         else
         {
-            shaderExecutable = vxnneGPUROIPoolShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_ROIPOOL, &ops_layer->node->kernelAttributes.borderMode,
+            shaderExecutable = vxnneGPUROIPoolShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_ROIPOOL, &ops_layer->node->kernelAttributes.borderMode,
             input_data, input_rois, pool_width, pool_height, spatial_scale, enable_relu, outputs);
         }
         if (!shaderExecutable)
@@ -1305,7 +1305,7 @@ VX_PRIVATE_API vx_status vxnneROIPoolLayer_Initializer(
                     }
                     else
                     {
-                        shaderExecutable = vxnneGPUROIPoolShaderExecutable(node->base.context, VXNNE_KERNEL_ROIPOOL, &node->kernelAttributes.borderMode, input_data, input_rois, pool_width, pool_height, spatial_scale, enable_relu, outputs);
+                        shaderExecutable = vxnneGPUROIPoolShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_ROIPOOL, &node->kernelAttributes.borderMode, input_data, input_rois, pool_width, pool_height, spatial_scale, enable_relu, outputs);
                     }
 
                     if (!shaderExecutable)

@@ -338,7 +338,7 @@ VX_PRIVATE_API vx_status vxoNNSoftmax_SH_Initialize_Ext(vxnne_layer ops_layer, c
     {
         vx_scalar beta_s = vxCreateScalar(ops_layer->node->base.context, VX_TYPE_FLOAT32, &beta);
 
-        shaderExecutable = vxnneGetGPUSoftmaxShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_SOFTMAX, &ops_layer->node->kernelAttributes.borderMode, beta_s, inputs, outputs);
+        shaderExecutable = vxnneGetGPUSoftmaxShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_SOFTMAX, &ops_layer->node->kernelAttributes.borderMode, beta_s, inputs, outputs);
 
         vxReleaseScalar(&beta_s);
 
@@ -532,7 +532,7 @@ OnError:
         {
             vx_scalar beta_s = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &beta);
 
-            shaderExecutable = vxnneGetGPUSoftmaxShaderExecutable(node->base.context, VXNNE_KERNEL_SOFTMAX, &node->kernelAttributes.borderMode, beta_s, inputs, outputs);
+            shaderExecutable = vxnneGetGPUSoftmaxShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_SOFTMAX, &node->kernelAttributes.borderMode, beta_s, inputs, outputs);
 
             vxReleaseScalar(&beta_s);
 
@@ -751,7 +751,7 @@ VX_PRIVATE_API vx_status vxoNNSoftmax2_SH_Initialize_Ext(vxnne_layer ops_layer, 
     }
     else
     {
-        shaderExecutable = vxnneGetGPUSoftmaxShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_SOFTMAX, &ops_layer->node->kernelAttributes.borderMode, beta, inputs, outputs);
+        shaderExecutable = vxnneGetGPUSoftmaxShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_SOFTMAX, &ops_layer->node->kernelAttributes.borderMode, beta, inputs, outputs);
         if (!shaderExecutable)
         {
             status = VX_FAILURE;
@@ -934,7 +934,7 @@ OnError:
         }
         else
         {
-            shaderExecutable = vxnneGetGPUSoftmaxShaderExecutable(node->base.context, VXNNE_KERNEL_SOFTMAX, &node->kernelAttributes.borderMode, beta, inputs, outputs);
+            shaderExecutable = vxnneGetGPUSoftmaxShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_SOFTMAX, &node->kernelAttributes.borderMode, beta, inputs, outputs);
             if (!shaderExecutable)
             {
                 status = VX_FAILURE;

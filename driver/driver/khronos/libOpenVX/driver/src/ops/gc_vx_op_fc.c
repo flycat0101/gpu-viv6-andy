@@ -1414,7 +1414,7 @@ vx_status vxoFCOperationSH_Initialize(
     }
     else
     {
-        shaderExecutable = vxnneGetGPUFullyConnectedShaderExecutable(node->base.context, VXNNE_KERNEL_FULLYCONNECTED,
+        shaderExecutable = vxnneGetGPUFullyConnectedShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_FULLYCONNECTED,
                                     &node->kernelAttributes.borderMode, 0, inputs, weights, biases, activation, outputs);
     }
     if (!shaderExecutable)

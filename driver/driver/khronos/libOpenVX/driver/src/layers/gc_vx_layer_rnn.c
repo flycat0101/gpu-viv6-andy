@@ -563,7 +563,7 @@ VX_PRIVATE_API vx_status vxoRNNLayer_SH_EVIS_Initialize_Ext(vxnne_layer ops_laye
     }
     else
     {
-        shaderExecutable = vxnneGetGPURnnShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_RNN, &ops_layer->node->kernelAttributes.borderMode,
+        shaderExecutable = vxnneGetGPURnnShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_RNN, &ops_layer->node->kernelAttributes.borderMode,
             inputs, bias, weights, state_in, recurrent_weights, activation, state_out, outputs);
     }
 
@@ -1416,7 +1416,7 @@ OnError:
         }
         else
         {
-            shaderExecutable = vxnneGetGPURnnShaderExecutable(node->base.context, VXNNE_KERNEL_RNN, &node->kernelAttributes.borderMode,
+            shaderExecutable = vxnneGetGPURnnShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_RNN, &node->kernelAttributes.borderMode,
                 inputs, bias, weights, state_in, recurrent_weights, activation, state_out, outputs);
         }
 
@@ -1921,7 +1921,7 @@ VX_PRIVATE_API vx_status vxoSVDFLayer_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
             }
         }
 
-        shaderExecutable = vxnneGetGPUSvdfShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_SVDF, &ops_layer->node->kernelAttributes.borderMode,
+        shaderExecutable = vxnneGetGPUSvdfShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_SVDF, &ops_layer->node->kernelAttributes.borderMode,
             inputs, bias, weights_feature, recurrent_time, actType, rankValue, state_in, state_out, outputs);
     }
 
@@ -2994,7 +2994,7 @@ OnError:
                 }
             }
 
-            shaderExecutable = vxnneGetGPUSvdfShaderExecutable(node->base.context, VXNNE_KERNEL_SVDF, &node->kernelAttributes.borderMode,
+            shaderExecutable = vxnneGetGPUSvdfShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_SVDF, &node->kernelAttributes.borderMode,
                 inputs, bias, weights_feature, recurrent_time, actType, rankValue, state_in, state_out, outputs);
         }
 
@@ -5311,7 +5311,7 @@ VX_PRIVATE_API vx_status vxoNN_LSTMUnit_SH_EVIS_Initialize_Ext(vxnne_layer ops_l
             }
             else
             {
-                shaderExecutable = vxnneGPUTensorCopyShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_COPY, &ops_layer->node->kernelAttributes.borderMode, tensorArray[i], subtensor[i]);
+                shaderExecutable = vxnneGPUTensorCopyShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_COPY, &ops_layer->node->kernelAttributes.borderMode, tensorArray[i], subtensor[i]);
             }
 
             if (!shaderExecutable)
@@ -5412,7 +5412,7 @@ VX_PRIVATE_API vx_status vxoNN_LSTMUnit_SH_EVIS_Initialize_Ext(vxnne_layer ops_l
             }
             else
             {
-                shaderExecutable = vxnneGPUTensorCopyShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_COPY, &ops_layer->node->kernelAttributes.borderMode, tensorArray[i], subtensor[i]);
+                shaderExecutable = vxnneGPUTensorCopyShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_COPY, &ops_layer->node->kernelAttributes.borderMode, tensorArray[i], subtensor[i]);
             }
 
             if (!shaderExecutable)
@@ -5512,7 +5512,7 @@ VX_PRIVATE_API vx_status vxoNN_LSTMUnit_SH_EVIS_Initialize_Ext(vxnne_layer ops_l
             }
             else
             {
-                shaderExecutable = vxnneGPUTensorCopyShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_COPY, &ops_layer->node->kernelAttributes.borderMode, tensorArray[i], subtensor[i]);
+                shaderExecutable = vxnneGPUTensorCopyShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_COPY, &ops_layer->node->kernelAttributes.borderMode, tensorArray[i], subtensor[i]);
             }
 
             if (!shaderExecutable)
@@ -5572,7 +5572,7 @@ VX_PRIVATE_API vx_status vxoNN_LSTMUnit_SH_EVIS_Initialize_Ext(vxnne_layer ops_l
     }
     else
     {
-        shaderExecutable = vxnneGetGPUFullyConnectedShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_FULLYCONNECTED, &ops_layer->node->kernelAttributes.borderMode, vx_false_e, input, w_x, bias, VX_NN_ACTIVATION_NONE, fc_output);
+        shaderExecutable = vxnneGetGPUFullyConnectedShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_FULLYCONNECTED, &ops_layer->node->kernelAttributes.borderMode, vx_false_e, input, w_x, bias, VX_NN_ACTIVATION_NONE, fc_output);
     }
 
     if (!shaderExecutable)
@@ -5625,7 +5625,7 @@ VX_PRIVATE_API vx_status vxoNN_LSTMUnit_SH_EVIS_Initialize_Ext(vxnne_layer ops_l
         }
         else
         {
-            shaderExecutable = vxnneGPULSTMUnitShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_LSTMUNIT, &ops_layer->node->kernelAttributes.borderMode, fc_output, w_h,
+            shaderExecutable = vxnneGPULSTMUnitShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_LSTMUNIT, &ops_layer->node->kernelAttributes.borderMode, fc_output, w_h,
                 output_state_in, cell_state_in, cellClipValue, enable_cifg, enable_peephole, enable_projection, cell2input_weight,
                 cell2forget_weight, cell2output_weight, cell_state_out, output_state_out, actType, project_out);
         }
@@ -5639,7 +5639,7 @@ VX_PRIVATE_API vx_status vxoNN_LSTMUnit_SH_EVIS_Initialize_Ext(vxnne_layer ops_l
         }
         else
         {
-            shaderExecutable = vxnneGPULSTMUnitShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_LSTMUNIT, &ops_layer->node->kernelAttributes.borderMode, fc_output, w_h,
+            shaderExecutable = vxnneGPULSTMUnitShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_LSTMUNIT, &ops_layer->node->kernelAttributes.borderMode, fc_output, w_h,
                 output_state_in, cell_state_in, cellClipValue, enable_cifg, enable_peephole, enable_projection, cell2input_weight,
                 cell2forget_weight, cell2output_weight, cell_state_out, output_state_out, actType, output);
         }
@@ -5702,7 +5702,7 @@ VX_PRIVATE_API vx_status vxoNN_LSTMUnit_SH_EVIS_Initialize_Ext(vxnne_layer ops_l
         }
         else
         {
-            shaderExecutable = vxnneGetGPULSTMUnitProjectionShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_LSTMUNIT_PROJECTION, &ops_layer->node->kernelAttributes.borderMode, project_out, projection_weight, projection_bias, projClipValue, output_state_out, output);
+            shaderExecutable = vxnneGetGPULSTMUnitProjectionShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_LSTMUNIT_PROJECTION, &ops_layer->node->kernelAttributes.borderMode, project_out, projection_weight, projection_bias, projClipValue, output_state_out, output);
 
         }
 
@@ -6163,7 +6163,7 @@ OnError:
                     }
                     else
                     {
-                        shaderExecutable = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, tensorArray[i], subtensor[i]);
+                        shaderExecutable = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_COPY, &node->kernelAttributes.borderMode, tensorArray[i], subtensor[i]);
                     }
 
                     if (!shaderExecutable)
@@ -6266,7 +6266,7 @@ OnError:
                     }
                     else
                     {
-                        shaderExecutable = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, tensorArray[i], subtensor[i]);
+                        shaderExecutable = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_COPY, &node->kernelAttributes.borderMode, tensorArray[i], subtensor[i]);
                     }
 
                     if (!shaderExecutable)
@@ -6368,7 +6368,7 @@ OnError:
                     }
                     else
                     {
-                        shaderExecutable = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, tensorArray[i], subtensor[i]);
+                        shaderExecutable = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_COPY, &node->kernelAttributes.borderMode, tensorArray[i], subtensor[i]);
                     }
 
                     if (!shaderExecutable)
@@ -6430,7 +6430,7 @@ OnError:
             }
             else
             {
-                shaderExecutable = vxnneGetGPUFullyConnectedShaderExecutable(node->base.context, VXNNE_KERNEL_FULLYCONNECTED, &node->kernelAttributes.borderMode, vx_false_e, input, w_x, bias, VX_NN_ACTIVATION_NONE, fc_output);
+                shaderExecutable = vxnneGetGPUFullyConnectedShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_FULLYCONNECTED, &node->kernelAttributes.borderMode, vx_false_e, input, w_x, bias, VX_NN_ACTIVATION_NONE, fc_output);
             }
 
             if (!shaderExecutable)
@@ -6485,7 +6485,7 @@ OnError:
                 }
                 else
                 {
-                    shaderExecutable = vxnneGPULSTMUnitShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_LSTMUNIT, &node->kernelAttributes.borderMode, fc_output, w_h,
+                    shaderExecutable = vxnneGPULSTMUnitShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_LSTMUNIT, &node->kernelAttributes.borderMode, fc_output, w_h,
                         output_state_in, cell_state_in, cellClipValue, enable_cifg, enable_peephole, enable_projection, cell2input_weight,
                         cell2forget_weight, cell2output_weight, cell_state_out, output_state_out, actType, project_out);
                 }
@@ -6499,7 +6499,7 @@ OnError:
                 }
                 else
                 {
-                    shaderExecutable = vxnneGPULSTMUnitShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_LSTMUNIT, &node->kernelAttributes.borderMode, fc_output, w_h,
+                    shaderExecutable = vxnneGPULSTMUnitShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_LSTMUNIT, &node->kernelAttributes.borderMode, fc_output, w_h,
                         output_state_in, cell_state_in, cellClipValue, enable_cifg, enable_peephole, enable_projection, cell2input_weight,
                         cell2forget_weight, cell2output_weight, cell_state_out, output_state_out, actType, output);
                 }
@@ -6564,7 +6564,7 @@ OnError:
                 }
                 else
                 {
-                    shaderExecutable = vxnneGetGPULSTMUnitProjectionShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_LSTMUNIT_PROJECTION, &node->kernelAttributes.borderMode, project_out, projection_weight, projection_bias, projClipValue, output_state_out, output);
+                    shaderExecutable = vxnneGetGPULSTMUnitProjectionShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_LSTMUNIT_PROJECTION, &node->kernelAttributes.borderMode, project_out, projection_weight, projection_bias, projClipValue, output_state_out, output);
 
                 }
 

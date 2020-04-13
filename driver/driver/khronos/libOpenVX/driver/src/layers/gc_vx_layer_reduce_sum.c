@@ -647,7 +647,7 @@ VX_PRIVATE_API vx_status vxoNNTensorReduceSum_SH_EVIS_Initialize_Ext(vxnne_layer
                 }
                 else
                 {
-                    shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &ops_layer->node->kernelAttributes.borderMode, src, perm_array, dims, transTensor);
+                    shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_TRANSPOSE, &ops_layer->node->kernelAttributes.borderMode, src, perm_array, dims, transTensor);
                 }
 
                 if (!shaderExecutable)
@@ -725,7 +725,7 @@ VX_PRIVATE_API vx_status vxoNNTensorReduceSum_SH_EVIS_Initialize_Ext(vxnne_layer
         }
         else
         {
-            shaderExecutable = vxnneGetGPUTensorMeanAxisShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS, &ops_layer->node->kernelAttributes.borderMode, axis_coef, transTensor, dst, axis);
+            shaderExecutable = vxnneGetGPUTensorMeanAxisShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_MEAN_AXIS, &ops_layer->node->kernelAttributes.borderMode, axis_coef, transTensor, dst, axis);
         }
 
         if (!shaderExecutable)
@@ -1053,7 +1053,7 @@ OnError:
                     }
                     else
                     {
-                        shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &node->kernelAttributes.borderMode, src, perm_array, dims, transTensor);
+                        shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_TRANSPOSE, &node->kernelAttributes.borderMode, src, perm_array, dims, transTensor);
                     }
 
                     if (!shaderExecutable)
@@ -1134,7 +1134,7 @@ OnError:
             }
             else
             {
-                shaderExecutable = vxnneGetGPUTensorMeanAxisShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS, &node->kernelAttributes.borderMode, axis_coef, transTensor, dst, axis);
+                shaderExecutable = vxnneGetGPUTensorMeanAxisShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_MEAN_AXIS, &node->kernelAttributes.borderMode, axis_coef, transTensor, dst, axis);
             }
 
             if (!shaderExecutable)
