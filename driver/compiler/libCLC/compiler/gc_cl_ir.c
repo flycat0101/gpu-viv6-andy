@@ -3052,7 +3052,8 @@ IN cloCOMPILER Compiler,
 IN gctBOOL NotFirstParam,
 IN clsNAME * ParamName,
 IN cloIR_EXPR Argument,
-IN OUT clsNAME **RefParamName
+IN OUT clsNAME **RefParamName,
+OUT gctBOOL *HasImplicitConversion
 )
 {
 #if _CONVERT_HALF_TO_FLOAT
@@ -3079,6 +3080,8 @@ IN OUT clsNAME **RefParamName
   }
   paramDecl = &ParamName->decl;
   rDecl = &Argument->decl;
+  *HasImplicitConversion = gcvFALSE;
+
 #if _CONVERT_HALF_TO_FLOAT
   if (rDecl->dataType->elementType == clvTYPE_HALF &&
       !clmDECL_IsPointerType(rDecl) && !clmDECL_IsArray(rDecl) &&
@@ -3099,8 +3102,14 @@ IN OUT clsNAME **RefParamName
       }
   }
 #endif
-  if(clmDECL_IsScalar(rDecl) && ((!clmDECL_IsGenType(paramDecl) && ParamName->u.variableInfo.builtinSpecific.s.isConvertibleType) ||
-     clmDECL_IsScalar(paramDecl) || !ParamName->u.variableInfo.builtinSpecific.s.hasGenType)) {
+/* Perform implicit type conversion on argument when the corresponding parameter is not from a cloned
+   prototype of a prototype definition with gentype.
+   If the above condition is satisfied, scalar argument may go through implicit type conversion or
+   widen to a vector of matching vector size to its parameter
+*/
+  if(clmDECL_IsScalar(rDecl) && !ParamName->u.variableInfo.builtinSpecific.s.hasGenType &&
+     ((!clmDECL_IsGenType(paramDecl) && ParamName->u.variableInfo.builtinSpecific.s.isConvertibleType) ||
+       clmDECL_IsScalar(paramDecl))) {
       ParamName->u.variableInfo.effectiveDecl = ParamName->decl;
       if(!clmDECL_IsPointerType(paramDecl)) {
           if(clmDECL_IsScalar(paramDecl)) {
@@ -3112,14 +3121,19 @@ IN OUT clsNAME **RefParamName
                       && ParamName->u.variableInfo.builtinSpecific.s.isConvertibleType) {
                   if(clmDECL_IsIntegerType(rDecl)
                      && clmDECL_IsCompatibleIntegerType(paramDecl)) {  /*implicit integer conversion */
+                       if (rDecl->dataType->elementType != paramDecl->dataType->elementType)
+                           *HasImplicitConversion = gcvTRUE;
                        return gcvTRUE;
                   }
                   else if(clmDECL_IsHalfType(rDecl)
                      && clmDECL_IsFloatingType(paramDecl)) {  /*implicit half type to float conversion */
+                       *HasImplicitConversion = gcvTRUE;
                        return gcvTRUE;
                   }
                   else if(clmDECL_IsArithmeticType(paramDecl)
                           && rDecl->dataType->elementType <= paramDecl->dataType->elementType) {
+                       if (rDecl->dataType->elementType < paramDecl->dataType->elementType) /* implicit conversion */
+                           *HasImplicitConversion = gcvTRUE;
                        return gcvTRUE;
                   }
               }
@@ -3130,6 +3144,7 @@ IN OUT clsNAME **RefParamName
                  clmDECL_IsVectorType(paramDecl) &&
                  (rDecl->dataType->elementType <= paramDecl->dataType->elementType) &&
                  ParamName->u.variableInfo.builtinSpecific.s.isConvertibleType) { /*implicit conversion */
+                  *HasImplicitConversion = gcvTRUE;
                   return gcvTRUE;
               }
           }
@@ -3943,7 +3958,11 @@ IN clsDECL * RDecl
   return gcvFALSE;
 }
 
-static gctBOOL
+/* If it's an exact match, result = 0;
+   If is's an match with implicit conversion, result = 1 or greater number; (when implicit conversion is enabled)
+   Else, result = -1;
+*/
+static gctINT
 _IsCorrespondingFuncName(
 IN cloCOMPILER Compiler,
 IN clsNAME * FuncName,
@@ -3956,6 +3975,7 @@ OUT clsDATA_TYPE *FuncDataType
     gctUINT     paramCount;
     clsNAME *   paramName;
     cloIR_EXPR  argument;
+    gctINT ret = 0;
 
     gcmASSERT(FuncName);
     gcmASSERT(FuncName->type == clvFUNC_NAME ||
@@ -3968,7 +3988,7 @@ OUT clsDATA_TYPE *FuncDataType
     gcmASSERT(PolynaryExpr->type == clvPOLYNARY_FUNC_CALL);
     gcmASSERT(PolynaryExpr->funcSymbol);
 
-    if (FuncName->symbol != PolynaryExpr->funcSymbol) return gcvFALSE;
+    if (FuncName->symbol != PolynaryExpr->funcSymbol) return -1;
 
 
     *FuncDataType = *FuncName->decl.dataType;
@@ -3978,7 +3998,10 @@ OUT clsDATA_TYPE *FuncDataType
        gcmVERIFY_OK(cloNAME_GetParamCount(Compiler,
                                           FuncName,
                                           &paramCount));
-       return (paramCount == 0);
+       if (paramCount == 0)
+           return 0;
+       else
+           return -1;
     }
 
     if(FuncName->isBuiltin) {
@@ -3991,15 +4014,18 @@ OUT clsDATA_TYPE *FuncDataType
             && (slsDLINK_NODE *)argument != &PolynaryExpr->operands->members;
             paramName = (clsNAME *)((slsDLINK_NODE *)paramName)->next,
             argument = (cloIR_EXPR)((slsDLINK_NODE *)argument)->next) {
-            if (paramName->type != clvPARAMETER_NAME) break;
+            gctBOOL hasImplicitConversion;
 
             if (!clsDECL_IsMatchingBuiltinArg(Compiler,
                                               notFirstParam,
                                               paramName,
                                               argument,
-                                              &refParamName)) {
-                return gcvFALSE;
+                                              &refParamName,
+                                              &hasImplicitConversion)) {
+                return -1;
             }
+            else if (hasImplicitConversion)
+                ret++;
 
             notFirstParam = gcvTRUE;
             if (clmDECL_IsPointerType(&paramName->decl) && clmDECL_IsArray(&argument->decl)) {
@@ -4010,7 +4036,7 @@ OUT clsDATA_TYPE *FuncDataType
                 status = clParseMakeArrayPointerExpr(Compiler,
                                                      argument,
                                                      &argument);
-                if(gcmIS_ERROR(status)) return gcvFALSE;
+                if(gcmIS_ERROR(status)) return -1;
 
                 slsDLINK_NODE_InsertPrev(nextArgument, (slsDLINK_NODE *)argument);
             }
@@ -4022,7 +4048,7 @@ OUT clsDATA_TYPE *FuncDataType
 
             _UpdateGentypeDataType(refParamName, FuncName->decl.dataType, FuncDataType);
        }
-       if(clmDATA_TYPE_IsGenType(FuncDataType)) return gcvFALSE;
+       if(clmDATA_TYPE_IsGenType(FuncDataType)) return -1;
     }
     else {
        for (paramName = (clsNAME *)FuncName->u.funcInfo.localSpace->names.next,
@@ -4033,7 +4059,7 @@ OUT clsDATA_TYPE *FuncDataType
             argument = (cloIR_EXPR)((slsDLINK_NODE *)argument)->next) {
             if (paramName->type != clvPARAMETER_NAME) break;
 
-            if (!_IsDeclParameterizableTo(&paramName->decl, &argument->decl)) return gcvFALSE;
+            if (!_IsDeclParameterizableTo(&paramName->decl, &argument->decl)) return -1;
             if (clmDECL_IsPointerType(&paramName->decl) && clmDECL_IsArray(&argument->decl)) {
                 slsDLINK_NODE *nextArgument = ((slsDLINK_NODE *)argument)->next;
 
@@ -4042,7 +4068,7 @@ OUT clsDATA_TYPE *FuncDataType
                 status = clParseMakeArrayPointerExpr(Compiler,
                                                      argument,
                                                      &argument);
-                if(gcmIS_ERROR(status)) return gcvFALSE;
+                if(gcmIS_ERROR(status)) return -1;
 
                 slsDLINK_NODE_InsertPrev(nextArgument, (slsDLINK_NODE *)argument);
             }
@@ -4054,9 +4080,9 @@ OUT clsDATA_TYPE *FuncDataType
           && paramName->type == clvPARAMETER_NAME) ||
         ((slsDLINK_NODE *)argument != &PolynaryExpr->operands->members
           && !FuncName->u.funcInfo.hasVarArg)) {
-        return gcvFALSE;
+        return -1;
     }
-    return gcvTRUE;
+    return ret;
 }
 
 static gceSTATUS
@@ -4075,7 +4101,7 @@ IN OUT cloIR_POLYNARY_EXPR PolynaryExpr
         hasGenType = gcvFALSE;
         if (((name->type == clvFUNC_NAME) || (name->type == clvKERNEL_FUNC_NAME))
             && clsDECL_IsEqual(&name->decl, &PolynaryExpr->exprBase.decl)
-            && _IsCorrespondingFuncName(Compiler, name, PolynaryExpr, &hasGenType, dataType)) {
+            && (_IsCorrespondingFuncName(Compiler, name, PolynaryExpr, &hasGenType, dataType) >= 0)) {
 
             if (name->extension != clvEXTENSION_NONE) {
               if (!cloCOMPILER_ExtensionEnabled(Compiler, name->extension)) {
@@ -4310,7 +4336,7 @@ IN OUT cloIR_POLYNARY_EXPR FuncCall
       FOR_EACH_DLINK_NODE(&nameSpace->names, clsNAME, name) {
          hasGenType = gcvFALSE;
          if (((name->type == clvFUNC_NAME) || (name->type == clvKERNEL_FUNC_NAME))
-             && _IsCorrespondingFuncName(Compiler, name, FuncCall, &hasGenType, dataType)) {
+             && (_IsCorrespondingFuncName(Compiler, name, FuncCall, &hasGenType, dataType) >= 0)) {
              if (name->extension != clvEXTENSION_NONE) {
                 if (!cloCOMPILER_ExtensionEnabled(Compiler, name->extension)) {
                    continue;
@@ -4479,6 +4505,80 @@ IN clsNAME *BuiltinName
    return BuiltinName;
 }
 
+static clsNAME*
+_RebindBuiltinFuncName(
+IN cloCOMPILER Compiler,
+IN clsNAME *EffectiveFuncName,
+IN cloIR_POLYNARY_EXPR FuncCall
+)
+{
+    clsNAME *name, *match = gcvNULL;
+    clsDATA_TYPE dataType[1];
+    gctBOOL hasGenType;
+    clsNAME_SPACE *builtinSpace;
+    clsNAME *paramName;
+    cloIR_EXPR argument;
+
+    /* Copy effective decl to function call arguments */
+    if(FuncCall->operands) {
+
+        gctUINT paramCount;
+
+        gcmVERIFY_OK(cloIR_SET_GetMemberCount(Compiler,
+                              FuncCall->operands,
+                              &paramCount));
+
+        for (paramName = (clsNAME *)EffectiveFuncName->u.funcInfo.localSpace->names.next,
+            argument = (cloIR_EXPR)FuncCall->operands->members.next;
+            (slsDLINK_NODE *)paramName != &EffectiveFuncName->u.funcInfo.localSpace->names
+            && (slsDLINK_NODE *)argument != &FuncCall->operands->members;
+            paramName = (clsNAME *)((slsDLINK_NODE *)paramName)->next,
+            argument = (cloIR_EXPR)((slsDLINK_NODE *)argument)->next) {
+            clsDECL decl[1];
+
+            *decl = argument->decl;
+            argument->decl = paramName->u.variableInfo.effectiveDecl;
+            paramName->u.variableInfo.effectiveDecl = *decl;
+            paramCount--;
+        }
+        gcmASSERT(paramCount == 0);
+    }
+
+    builtinSpace = cloCOMPILER_GetBuiltinSpace(Compiler);
+
+    FOR_EACH_DLINK_NODE(&builtinSpace->names, clsNAME, name) {
+        hasGenType = gcvFALSE;
+        if (name->type == clvFUNC_NAME &&
+            _IsCorrespondingFuncName(Compiler, name, FuncCall, &hasGenType, dataType) == 0) {
+            if (name->extension != clvEXTENSION_NONE) {
+               if (!cloCOMPILER_ExtensionEnabled(Compiler, name->extension)) {
+                   continue;
+               }
+            }
+
+            gcmASSERT(!hasGenType);
+            match = name;
+            break;
+        }
+    }
+
+/* restore function call argument declaration */
+    for (paramName = (clsNAME *)EffectiveFuncName->u.funcInfo.localSpace->names.next,
+        argument = (cloIR_EXPR)FuncCall->operands->members.next;
+        (slsDLINK_NODE *)paramName != &EffectiveFuncName->u.funcInfo.localSpace->names
+        && (slsDLINK_NODE *)argument != &FuncCall->operands->members;
+        paramName = (clsNAME *)((slsDLINK_NODE *)paramName)->next,
+        argument = (cloIR_EXPR)((slsDLINK_NODE *)argument)->next) {
+        clsDECL decl[1];
+
+        *decl = argument->decl;
+        argument->decl = paramName->u.variableInfo.effectiveDecl;
+        paramName->u.variableInfo.effectiveDecl = *decl;
+    }
+    return match;
+}
+
+#define _cldCandidateFunctionArraySize 128
 static gceSTATUS
 _BindFuncName(
 IN cloCOMPILER Compiler,
@@ -4488,15 +4588,19 @@ IN OUT cloIR_POLYNARY_EXPR PolynaryExpr
 {
     gceSTATUS  status;
     clsNAME *name;
+    gctPOINTER      nameCandidates[_cldCandidateFunctionArraySize];
+    gctINT          nameCandidateDistances[_cldCandidateFunctionArraySize];
+    clsDATA_TYPE    nameCandidateDataTypes[_cldCandidateFunctionArraySize];
+    gctBOOL         nameCandidateHasGenType[_cldCandidateFunctionArraySize];
+    gctUINT         i, currentCandidateIndex = 0;
+    gctINT          distance = 0, minDistance = cldINT_MAX;
     clsDATA_TYPE dataType[1];
     gctBOOL hasGenType;
     gctBOOL nameCloned = gcvFALSE;
 
     FOR_EACH_DLINK_NODE(&NameSpace->names, clsNAME, name) {
         hasGenType = gcvFALSE;
-        if (((name->type == clvFUNC_NAME) || (name->type == clvKERNEL_FUNC_NAME))
-            && _IsCorrespondingFuncName(Compiler, name, PolynaryExpr, &hasGenType, dataType)) {
-            clsDECL funcDecl[1];
+        if (((name->type == clvFUNC_NAME) || (name->type == clvKERNEL_FUNC_NAME))) {
 
             if (name->extension != clvEXTENSION_NONE) {
                if (!cloCOMPILER_ExtensionEnabled(Compiler, name->extension)) {
@@ -4504,84 +4608,126 @@ IN OUT cloIR_POLYNARY_EXPR PolynaryExpr
                }
             }
 
-            dataType->accessQualifier = clvQUALIFIER_NONE; /* force data type creation if it is not already created */
-            clmDECL_Initialize(funcDecl, dataType, &name->decl.array, name->decl.ptrDscr, gcvFALSE, clvSTORAGE_QUALIFIER_NONE);
-            status = cloCOMPILER_CloneDecl(Compiler,
-                            clvQUALIFIER_CONST,
-                            name->decl.dataType->addrSpaceQualifier,
-                            funcDecl,
-                            &PolynaryExpr->exprBase.decl);
-            if (gcmIS_ERROR(status)) return status;
-
-            if(name->u.funcInfo.passArgByRef &&
-               !clmDECL_IsPackedType(&PolynaryExpr->exprBase.decl)) {
-               status = _MapFuncCallToPassByRef(Compiler,
-                                                NameSpace,
-                                                &hasGenType,
-                                                PolynaryExpr);
-               if (status == gcvSTATUS_OK) {
-                  name = PolynaryExpr->funcName;
-               }
+            distance = _IsCorrespondingFuncName(Compiler, name, PolynaryExpr, &hasGenType, dataType);
+            if (distance == -1) {
+                /* does not match */
+                continue;
             }
-
-            if(name->isBuiltin) {
-                if(hasGenType && name->u.funcInfo.refCount == 0) {
-/** KLC - may want to rebind func name */
-                     status = _CloneBuiltinFuncName(Compiler,
-                                                    PolynaryExpr,
-                                                    name->symbol,
-                                                    name,
-                                                    &name);
-                     if (gcmIS_ERROR(status)) return status;
-                     nameCloned = gcvTRUE;
-                 }
-                 if(!name->u.funcInfo.isIntrinsicCall &&
-                    !name->u.funcInfo.isInline) {
-#if cldNoInlineVectorToScalar
-                     if(clmDECL_IsVectorType(&PolynaryExpr->exprBase.decl)) {
-                         clsBUILTIN_FUNCTION_INFO *functionInfo;
-
-                         functionInfo = clGetBuiltinFunctionInfo(PolynaryExpr->funcSymbol);
-                         if(functionInfo == gcvNULL) return gcvSTATUS_INVALID_ARGUMENT;
-                         if(functionInfo->handleVector) {
-                             cloIR_POLYNARY_EXPR scalarFuncCall;
-
-                             status = cloIR_ScalarizeFuncCall(Compiler,
-                                                              PolynaryExpr,
-                                                              name,
-                                                              gcvFALSE,
-                                                              &scalarFuncCall);
-                             if (gcmIS_ERROR(status)) return status;
-                             if(scalarFuncCall->funcName->u.funcInfo.refCount == 1) {
-                                status = cloCOMPILER_AddReferencedBuiltinFunc(Compiler,
-                                                                              scalarFuncCall);
-                                if (gcmIS_ERROR(status)) return status;
-                             }
-
-                             scalarFuncCall->funcName->u.funcInfo.refCount += 1;
-                         }
-                     }
-#endif
-                     if(name->u.funcInfo.refCount == 1) {
-                          if(!PolynaryExpr->funcName)PolynaryExpr->funcName = name;
-                          status = cloCOMPILER_AddReferencedBuiltinFunc(Compiler,
-                                                                        PolynaryExpr);
-                          if (gcmIS_ERROR(status)) return status;
-                     }
-                 }
-             }
-             if(name->u.funcInfo.mangledName == gcvNULL) {
-                 name = _CreateMangledBuiltinFuncName(Compiler,
-                                                      PolynaryExpr,
-                                                      name);
-                 if(!name) return gcvSTATUS_NOT_FOUND;
-             }
-
-             name->u.funcInfo.refCount += 1;
-             PolynaryExpr->funcName = name;
-             if(nameCloned) return gcvSTATUS_NAME_NOT_FOUND;
-             else return gcvSTATUS_OK;
+            else {
+                if (currentCandidateIndex < _cldCandidateFunctionArraySize) {
+                    nameCandidates[currentCandidateIndex] = (gctPOINTER)name;
+                    nameCandidateDistances[currentCandidateIndex] = distance;
+                    nameCandidateDataTypes[currentCandidateIndex] = *dataType;
+                    nameCandidateHasGenType[currentCandidateIndex] = hasGenType;
+                    if(distance < minDistance) minDistance = distance;
+                    currentCandidateIndex++;
+                    if (distance == 0)
+                        break;
+                }
+                else {
+                    gcmASSERT(gcvFALSE);
+                }
+            }
         }
+    }
+
+    if (currentCandidateIndex > 0) {
+        clsDECL funcDecl[1];
+        /* find the best match */
+        for (i = 0; i < currentCandidateIndex; i++) {
+            name = (clsNAME *) nameCandidates[i];
+            distance = nameCandidateDistances[i];
+            hasGenType = nameCandidateHasGenType[i];
+            *dataType = nameCandidateDataTypes[i];
+            if (distance == minDistance)
+                break;
+            /* TODO: Need to report error for multiple candidates with same distance */
+        }
+
+        dataType->accessQualifier = clvQUALIFIER_NONE; /* force data type creation if it is not already created */
+        clmDECL_Initialize(funcDecl, dataType, &name->decl.array, name->decl.ptrDscr, gcvFALSE, clvSTORAGE_QUALIFIER_NONE);
+        status = cloCOMPILER_CloneDecl(Compiler,
+                        clvQUALIFIER_CONST,
+                        name->decl.dataType->addrSpaceQualifier,
+                        funcDecl,
+                        &PolynaryExpr->exprBase.decl);
+        if (gcmIS_ERROR(status)) return status;
+
+        if(name->u.funcInfo.passArgByRef &&
+            !clmDECL_IsPackedType(&PolynaryExpr->exprBase.decl)) {
+            status = _MapFuncCallToPassByRef(Compiler,
+                                            NameSpace,
+                                            &hasGenType,
+                                            PolynaryExpr);
+            if (status == gcvSTATUS_OK) {
+                name = PolynaryExpr->funcName;
+            }
+        }
+
+        if(name->isBuiltin) {
+            if(hasGenType && name->u.funcInfo.refCount == 0) {
+                clsNAME *found;
+
+                found = _RebindBuiltinFuncName(Compiler,
+                                               name,
+                                               PolynaryExpr);
+                if(!found) {
+                    status = _CloneBuiltinFuncName(Compiler,
+                                                   PolynaryExpr,
+                                                   name->symbol,
+                                                   name,
+                                                   &name);
+                    if (gcmIS_ERROR(status)) return status;
+                    nameCloned = gcvTRUE;
+                }
+                else name = found;
+           }
+            if(!name->u.funcInfo.isIntrinsicCall &&
+               !name->u.funcInfo.isInline) {
+#if cldNoInlineVectorToScalar
+                if(clmDECL_IsVectorType(&PolynaryExpr->exprBase.decl)) {
+                    clsBUILTIN_FUNCTION_INFO *functionInfo;
+
+                    functionInfo = clGetBuiltinFunctionInfo(PolynaryExpr->funcSymbol);
+                    if(functionInfo == gcvNULL) return gcvSTATUS_INVALID_ARGUMENT;
+                    if(functionInfo->handleVector) {
+                        cloIR_POLYNARY_EXPR scalarFuncCall;
+
+                        status = cloIR_ScalarizeFuncCall(Compiler,
+                                                        PolynaryExpr,
+                                                        name,
+                                                        gcvFALSE,
+                                                        &scalarFuncCall);
+                        if (gcmIS_ERROR(status)) return status;
+                        if(scalarFuncCall->funcName->u.funcInfo.refCount == 1) {
+                        status = cloCOMPILER_AddReferencedBuiltinFunc(Compiler,
+                                                                        scalarFuncCall);
+                        if (gcmIS_ERROR(status)) return status;
+                        }
+
+                        scalarFuncCall->funcName->u.funcInfo.refCount += 1;
+                    }
+                }
+#endif
+                if(name->u.funcInfo.refCount == 1) {
+                    if(!PolynaryExpr->funcName)PolynaryExpr->funcName = name;
+                    status = cloCOMPILER_AddReferencedBuiltinFunc(Compiler,
+                                                                PolynaryExpr);
+                    if (gcmIS_ERROR(status)) return status;
+                }
+            }
+        }
+        if(name->u.funcInfo.mangledName == gcvNULL) {
+           name = _CreateMangledBuiltinFuncName(Compiler,
+                                                PolynaryExpr,
+                                                name);
+           if(!name) return gcvSTATUS_NOT_FOUND;
+        }
+
+        name->u.funcInfo.refCount += 1;
+        PolynaryExpr->funcName = name;
+        if(nameCloned) return gcvSTATUS_NAME_NOT_FOUND;
+        else return gcvSTATUS_OK;
     }
 
     if (NameSpace->parent != gcvNULL) {
