@@ -6909,8 +6909,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             info->vx_nn_tp_cmd_info.aluFilterPwlSwap    = 0;
             info->vx_nn_tp_cmd_info.aluPwlSignSupport   = 0;
             info->vx_nn_tp_cmd_info.aluReluEnable       = 0;
-            info->vx_nn_tp_cmd_info.aluI2FEnable        = (tfQuant && hasInputQuant) ? 1 : (tpBF16 ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0));
-            info->vx_nn_tp_cmd_info.aluF2IEnable        = (tfQuant && hasOutputQuant) ? 1 : (tpBF16 ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0));
+            info->vx_nn_tp_cmd_info.aluI2FEnable        = (tfQuant && hasInputQuant) ? 1 : (tpBF16 ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : (inFormat == outFormat ? 0 : 1)));
+            info->vx_nn_tp_cmd_info.aluF2IEnable        = (tfQuant && hasOutputQuant) ? 1 : (tpBF16 ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : (inFormat == outFormat ? 0 : 1)));
             if (tp_type == TP_TENSOR_STRIDED_SLICE)
             {
                 info->vx_nn_tp_cmd_info.aluInputPreshift = (inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0;
@@ -6928,8 +6928,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             info->vx_nn_tp_cmd_info.aluFilterPwlSwap    = 0;
             info->vx_nn_tp_cmd_info.aluPwlSignSupport   = 0;
             info->vx_nn_tp_cmd_info.aluReluEnable       = 0;
-            info->vx_nn_tp_cmd_info.aluI2FEnable        = (tfQuant && hasInputQuant) ? 1 : (tpBF16 ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0));
-            info->vx_nn_tp_cmd_info.aluF2IEnable        = (tfQuant && hasOutputQuant) ? 1 : (tpBF16 ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0));
+            info->vx_nn_tp_cmd_info.aluI2FEnable        = (tfQuant && hasInputQuant) ? 1 : (tpBF16 ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : (inFormat == outFormat ? 0 : 1)));
+            info->vx_nn_tp_cmd_info.aluF2IEnable        = (tfQuant && hasOutputQuant) ? 1 : (tpBF16 ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : (inFormat == outFormat ? 0 : 1)));
             info->vx_nn_tp_cmd_info.aluInputPreshift    = 0;
             info->vx_nn_tp_cmd_info.aluOutputPostshift  = ((inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0) - ((outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? outFPP : 0);
             break;
