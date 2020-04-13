@@ -801,6 +801,10 @@ VX_INTERNAL_API void* vxoBinaryGraph_GetInputOutputPtrByIndex(
     vx_int32 index
     );
 
+VX_INTERNAL_API vx_status vxoBinaryGraph_StoreOperationPtr(
+    vxnne_operation operation
+    );
+
 VX_INTERNAL_API void vxoBinaryGraph_CacheOrImport(
     vx_graph graph
     );

@@ -2418,11 +2418,7 @@ VX_INTERNAL_API vx_status vxnneOperationCommand_GenerateCommands(
     {
         if (node->graph->binarySave)
         {
-            vx_binary_save binarySave = node->graph->binarySave;
-            binarySave->operationCmdPhysical[binarySave->currOperationIndex] = gcmPTR_TO_UINT64(operation);
-            binarySave->operationOffset[binarySave->currOperationIndex] = binarySave->currOperationOffset;
-            binarySave->currOperationIndex++;
-            binarySave->currOperationOffset += sizeof(vx_binary_operation_info_s);
+            vxoBinaryGraph_StoreOperationPtr(operation);
         }
 
         if (context->options.collectPerfType == COLLECT_PERF_RUN)

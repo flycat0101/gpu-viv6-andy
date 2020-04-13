@@ -6401,6 +6401,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveScalerOperation(
         vx_size tensorSize = 0;
         vx_uint32 wholeSize = 0;
         vx_uint32 outputPhyddr = 0, outputPhyddrR = 0, outputPhyddrG = 0, outputPhyddrB = 0;
+        vx_uint32 offset = 0;
 
         vxoTensor_GetTensorWholeSize(output, &tensorSize);
         wholeSize = (vx_uint32)tensorSize;
@@ -6500,9 +6501,10 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveScalerOperation(
         patchInfo.transformation = VX_BINARY_PATCH_TRANSFORMATION_ORIGINAL;
 
         vxoTensor_GetTensorViewMemory(output, VX_NULL, &outputPhyddr);
-        outputPhyddrR = outputPhyddr;
-        outputPhyddrG = outputPhyddr + TENSOR_STRIDE_INDEX(output, 2) * 1;
-        outputPhyddrB = outputPhyddr + TENSOR_STRIDE_INDEX(output, 2) * 2;
+        offset = scaleOperation->output_y_start * TENSOR_STRIDE_INDEX(output, 1);
+        outputPhyddrR = outputPhyddr + offset;
+        outputPhyddrG = outputPhyddr + offset + TENSOR_STRIDE_INDEX(output, 2) * 1;
+        outputPhyddrB = outputPhyddr + offset + TENSOR_STRIDE_INDEX(output, 2) * 2;
 
         /* R */
         ret = vxoBinaryGraph_SearchPattern((gctUINT32 *)stateBuffer,
@@ -6580,12 +6582,12 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveScalerOperation(
 
     for (index = 0; index < binarySave->operationCount; index++)
     {
-        if ((binarySave->operationCmdPhysical[index] == 0) || \
-            (binarySave->scOperationOffset >= binarySave->operationOffset[index]))
+        vx_uint64 cmdAddr = binarySave->operationCmdPhysical[index];
+        if ((cmdAddr == 0) || (binarySave->scOperationOffset >= binarySave->operationOffset[index]))
         {
             continue;
         }
-        else if (gcmPTR_TO_UINT64(operation) == binarySave->operationCmdPhysical[index])
+        else if (0xa5babaed == cmdAddr) /* 0xa5babaed is magic data */
         {
             break;
         }
@@ -8035,6 +8037,47 @@ OnError:
     return status;
 }
 
+VX_INTERNAL_API vx_status vxoBinaryGraph_StoreOperationPtr(
+    vxnne_operation operation
+    )
+{
+    vx_node node = operation->layer->node;
+    vx_binary_save binarySave = node->graph->binarySave;
+
+    if (operation->target == VXNNE_OPERATION_TARGET_SC)
+    {
+        if (node->base.context->options.enableMultiVIPCombined)
+        {
+            gctUINT32 gpuCount = 1;
+            gctUINT32 i = 0;
+            gcoVX_QueryCoreCount(node->graph->deviceID, &gpuCount);
+            for (i = 0; i < gpuCount; i++)
+            {
+                binarySave->operationCmdPhysical[binarySave->currOperationIndex] = 0xa5babaed;/* magic data for SC operation */
+                binarySave->operationOffset[binarySave->currOperationIndex] = binarySave->currOperationOffset;
+                binarySave->currOperationIndex++;
+                binarySave->currOperationOffset += sizeof(vx_binary_operation_info_s);
+            }
+        }
+        else
+        {
+            binarySave->operationCmdPhysical[binarySave->currOperationIndex] = 0xa5babaed;/* magic data for SC operation */
+            binarySave->operationOffset[binarySave->currOperationIndex] = binarySave->currOperationOffset;
+            binarySave->currOperationIndex++;
+            binarySave->currOperationOffset += sizeof(vx_binary_operation_info_s);
+        }
+    }
+    else
+    {
+        binarySave->operationCmdPhysical[binarySave->currOperationIndex] = gcmPTR_TO_UINT64(operation);
+        binarySave->operationOffset[binarySave->currOperationIndex] = binarySave->currOperationOffset;
+        binarySave->currOperationIndex++;
+        binarySave->currOperationOffset += sizeof(vx_binary_operation_info_s);
+    }
+
+    return VX_SUCCESS;
+}
+
 VX_INTERNAL_API vx_status vxoBinaryGraph_GetGraphInputOutput(
     vx_graph graph
     )
@@ -9069,14 +9112,20 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
             vxnne_yuv2rgb_scale_operation scaleOperation = (vxnne_yuv2rgb_scale_operation)operation;
             vx_image image = scaleOperation->inputs;
             vx_tensor output = scaleOperation->outputs;
+            gctUINT32 gpuCount = 1;
 
-            binarySave->scOperationCount++;
+            if (graph->base.context->options.enableMultiVIPCombined)
+            {
+                gcoVX_QueryCoreCount(graph->deviceID, &gpuCount);
+            }
+
+            binarySave->scOperationCount += (vx_uint32)gpuCount;
 
             /* lcd: hw states */
-            binarySave->loadingDataCount++;
+            binarySave->loadingDataCount += (vx_uint32)gpuCount;
 
             /* patch input(vx_image), output(r g b is 3 channel) */
-            binarySave->patchCount += image->planeCount + 3;
+            binarySave->patchCount += (image->planeCount + 3) * (vx_uint32)gpuCount;
 
             if (vxoMemory_GetType(&output->tensorBuffer->memory) == VXNNE_MEM_POOL_TYPE_ORIG_DDR)
             {
@@ -9087,7 +9136,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
                    if they can't be in SRAM, put it into LCD */
                 if (-1 == entryIndex)
                 {
-                    binarySave->loadingDataCount += 1;
+                    binarySave->loadingDataCount += (vx_uint32)gpuCount;;
                 }
             }
 
@@ -9100,7 +9149,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
                    if they can't be in SRAM, put it into LCD */
                 if (-1 == entryIndex)
                 {
-                    binarySave->loadingDataCount += image->planeCount;
+                    binarySave->loadingDataCount += image->planeCount * (vx_uint32)gpuCount;;
                 }
             }
             vxmASSERT(image->planeCount);
