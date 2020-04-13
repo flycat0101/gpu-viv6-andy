@@ -1801,7 +1801,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeConvolutionNodes(vx_node nod
                 }
             case VX_KERNEL_NN_PRELU:
                 {
-                    if(gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU))
+                    if(gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU) || 1)
                         goto merging; /*break merging node*/
 
                     prelu_alpha = (vx_tensor) nodes[i]->paramTable[1];
@@ -1812,7 +1812,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeConvolutionNodes(vx_node nod
                 }
             case VX_KERNEL_NN_LEAKY:
                 {
-                    if(gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_LEAKY_RELU))
+                    if(gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_LEAKY_RELU) || 1)
                         goto merging;
 
                     if(VX_QUANT_AFFINE_SCALE == TENSOR_QUANT_TYPE(weight))
