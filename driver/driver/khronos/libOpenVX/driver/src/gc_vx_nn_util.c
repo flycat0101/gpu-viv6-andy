@@ -6356,6 +6356,44 @@ vx_bool vx_nn_kernel_optimize_softmax_shape
     return ret;
 }
 
+vx_bool vx_nn_kernel_optimize_element_shape
+    (
+    const vx_int32* shape_x, const vx_uint32 rank_x,
+    vx_int32* out_shape_x, vx_int32* out_rank_x
+    )
+{
+    vx_bool  ret                        = vx_true_e;
+    vx_uint32 i                         = 0;
+    vx_uint32 rank_in                   = 0;
+    vx_int32  element_num               = 1;
+
+    for (i = 0; i < rank_x; i++)
+    {
+        element_num *= shape_x[i];
+    }
+
+#define GPU_TENSOR_MAX_WIDTH    (65536)
+    rank_in += element_fill_dim(out_shape_x, rank_in, GPU_TENSOR_MAX_WIDTH, element_num);
+#undef GPU_TENSOR_MAX_WIDTH
+
+    if(0 == rank_in )
+    {
+        out_shape_x[0] = 1;
+        out_shape_x[1] = 1;
+        rank_in = 2;
+    }
+    else if(1 == rank_in )
+    {
+        out_shape_x[1] = 1;
+        rank_in = 2;
+    }
+
+    *out_rank_x = rank_in;
+
+    return ret;
+} /* vx_nn_kernel_optimize_element_shape() */
+
+
 vx_int32 getUserIDFromOutputTensor(
     vx_tensor tensor)
 {

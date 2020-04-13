@@ -5,7 +5,7 @@
 _viv_uniform int         axisSize;
 _viv_uniform float       scaleLogE;
 _viv_uniform float       outputScale;
-_viv_uniform float       output_offset_asymmetric;
+_viv_uniform float       outputZP;
 _viv_uniform VXC_512Bits uniConvertInt32toUint8_2x8;
 _viv_uniform VXC_512Bits uniConvBF16toF32_Part0_2x8;
 
@@ -98,24 +98,24 @@ __kernel void softmax_axis2_##src_name##to##dst_name \
 SOFTMAX_AXIS2_SH_IMPL(F16, F16, vxc_half8, vxc_short8, half4,  vxc_short8,\
 CONV, 1, 0, VXC_VertMax3_Half)
 //SOFTMAX_AXIS2_SH_IMPL(F16, I16, vxc_half8, vxc_short8, short4, vxc_short8,\
-CONV_SAT_RTE, outputScale, 0, VXC_VertMax3_Half)
+CONV_SAT_RTE, outputScale, outputZP, VXC_VertMax3_Half)
 //SOFTMAX_AXIS2_SH_IMPL(F16, I8,  vxc_half8, vxc_short8, char4,  vxc_char8,\
-CONV_SAT_RTE, outputScale, 0, VXC_VertMax3_Half)
+CONV_SAT_RTE, outputScale, outputZP, VXC_VertMax3_Half)
 //SOFTMAX_AXIS2_SH_IMPL(F16, U8,  vxc_half8, vxc_short8, uchar4, vxc_uchar8,\
-CONV_SAT_RTE, outputScale, output_offset_asymmetric, VXC_VertMax3_Half)
+CONV_SAT_RTE, outputScale, outputZP, VXC_VertMax3_Half)
 
 SOFTMAX_AXIS2_SH_IMPL(I16, I16, vxc_short8, vxc_short8, short4, vxc_short8,\
-CONV_SAT_RTE, outputScale, 0, VXC_VertMax3_Integer)
+CONV_SAT_RTE, outputScale, outputZP, VXC_VertMax3_Integer)
 SOFTMAX_AXIS2_SH_IMPL(I16, F16, vxc_short8, vxc_short8, half4,  vxc_short8,\
 CONV, 1, 0, VXC_VertMax3_Integer)
 
 SOFTMAX_AXIS2_SH_IMPL(I8, I8,  vxc_char16, vxc_char16, char4,  vxc_char8,\
-CONV_SAT_RTE, outputScale, 0, VXC_VertMax3_Integer)
+CONV_SAT_RTE, outputScale, outputZP, VXC_VertMax3_Integer)
 SOFTMAX_AXIS2_SH_IMPL(I8, F16, vxc_char16, vxc_char16, half4,  vxc_short8,\
 CONV, 1, 0, VXC_VertMax3_Integer)
 
 SOFTMAX_AXIS2_SH_IMPL(U8, U8,  vxc_uchar16, vxc_uchar16, uchar4, vxc_uchar8,\
-CONV_SAT_RTE, outputScale, output_offset_asymmetric, VXC_VertMax3_Integer)
+CONV_SAT_RTE, outputScale, outputZP, VXC_VertMax3_Integer)
 SOFTMAX_AXIS2_SH_IMPL(U8, F16, vxc_uchar16, vxc_uchar16, half4,  vxc_short8,\
 CONV, 1, 0, VXC_VertMax3_Integer)
 
