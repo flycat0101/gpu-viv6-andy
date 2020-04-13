@@ -13,7 +13,7 @@
 
 #ifndef _gc_hal_user_platform_h_
 #define _gc_hal_user_platform_h_
-#include "gc_hal_edma.h"
+#include "gc_hal_eioctl.h"
 
 typedef struct _gcsPLATFORM * gcoPLATFORM;
 
