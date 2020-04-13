@@ -11657,10 +11657,12 @@ VSC_ErrCode __SpvEmitDecorator(gcSPV spv, VIR_Shader * virShader)
 
 static void __SpvSetClientVersion(
     IN gcSPV spv,
+    IN gctBOOL isGraphics,
     IN VIR_Shader *virShader
     )
 {
     gctUINT shaderKindValue = 0;
+    gctUINT srcLanguageVersion = isGraphics ? 450 : 110;
 
     /* Create VIR_SHADER */
     switch (virShader->shaderKind)
@@ -11681,43 +11683,34 @@ static void __SpvSetClientVersion(
         shaderKindValue = 2 /*gcSHADER_TYPE_FRAGMENT*/;
         break;
     case VIR_SHADER_COMPUTE:
-        shaderKindValue = (spv->srcLanguage == SpvSourceLanguageOpenCL_C) ? 4 /*gcSHADER_TYPE_CL*/ : 3 /*gcSHADER_TYPE_COMPUTE*/;
+        shaderKindValue = (!isGraphics) ? 4 /*gcSHADER_TYPE_CL*/ : 3 /*gcSHADER_TYPE_COMPUTE*/;
         break;
     default:
         gcmASSERT(0);
     }
 
-    /*
-    ** SrcLanguage is saved in Opsource, which is belong to debug information and not required.
-    ** So there is not OpSource in this binary, get the srcLanguage from OpMemoryModel.
-    */
-    if (spv->srcLanguage == SpvSourceLanguageUnknown)
-    {
-        if (spv->srcMemoryMode == SpvMemoryModelGLSL450)
-        {
-            spv->srcLanguage = SpvSourceLanguageGLSL;
-            spv->srcLanguageVersion = 450;
-        }
-        else if (spv->srcMemoryMode == SpvMemoryModelOpenCL)
-        {
-            spv->srcLanguage = SpvSourceLanguageOpenCL_C;
-            /* Assume it is OCL 1.1. */
-            spv->srcLanguageVersion = 110;
-        }
-    }
-
-    if (spv->srcLanguage == SpvSourceLanguageESSL ||
-        spv->srcLanguage == SpvSourceLanguageGLSL)
+    if (isGraphics)
     {
         virShader->compilerVersion[0] = _SHADER_GL_LANGUAGE_TYPE | (shaderKindValue << 16);
     }
-    else if (spv->srcLanguage == SpvSourceLanguageOpenCL_C)
+    else
     {
         virShader->compilerVersion[0] = _cldLanguageType | (shaderKindValue << 16);
     }
-    virShader->compilerVersion[1] = VIR_Shader_DecodeLangVersionToCompilerVersion(virShader, gcvFALSE, spv->srcLanguageVersion);
+    virShader->compilerVersion[1] = VIR_Shader_DecodeLangVersionToCompilerVersion(virShader, gcvFALSE, srcLanguageVersion);
 
-    spv->setClientVersion = gcvTRUE;
+    /* update default value of workgroupsizefixed when compilerVersion is determined */
+    if (VIR_Shader_GetKind(virShader) == VIR_SHADER_COMPUTE)
+    {
+        if (VIR_Shader_IsGlCompute(virShader))
+        {
+            VIR_Shader_SetWorkGroupSizeFixed(virShader, gcvTRUE);
+        }
+        else
+        {
+            VIR_Shader_SetWorkGroupSizeFixed(virShader, gcvFALSE);
+        }
+    }
 }
 
 static void __SpvSetWorkgroupSize(
@@ -12070,8 +12063,6 @@ static VSC_ErrCode __SpvDecodeInstruction(gcSPV spv, VIR_Shader * virShader)
         {
             SPV_NEXT_WORD;
         }
-
-        __SpvSetClientVersion(spv, virShader);
         break;
 
     case SpvOpSourceExtension:
@@ -12104,11 +12095,6 @@ static VSC_ErrCode __SpvDecodeInstruction(gcSPV spv, VIR_Shader * virShader)
         }
 
     default:
-        if (!spv->setClientVersion)
-        {
-            __SpvSetClientVersion(spv, virShader);
-        }
-
         spv->operandSize = 0;
 
         if (spv->numOperands > spv->maxOperandSize)
@@ -12371,6 +12357,8 @@ static gceSTATUS __SpvConstructAndInitializeVIRShader(
     spv->shaderStage = shaderStage;
 
     __SpvAddBuiltinVariable(spv, *virShader);
+
+    __SpvSetClientVersion(spv, (model != SpvExecutionModelKernel), *virShader);
 
     return gcvSTATUS_OK;
 }
