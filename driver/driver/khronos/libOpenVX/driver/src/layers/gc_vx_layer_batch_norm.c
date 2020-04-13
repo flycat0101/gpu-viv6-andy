@@ -234,6 +234,7 @@ VX_PRIVATE_API vx_bool vxoNNBatchNormalizationLayer_SH_EVIS_Support_Ext(vx_node 
                           || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_FLOAT16)
                           || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
                           || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16)
+                          || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_BFLOAT16)
                           || (inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16));
     }
     else
@@ -311,7 +312,7 @@ VX_PRIVATE_API vx_status vxoNNBatchNormalizationLayer_SH_EVIS_Initialize_Ext(vxn
     tensor_create_params.num_of_dims = dims;
     tensor_create_params.sizes = sizes;
     tensor_create_params.data_format = evis ? VX_TYPE_INT16 : VX_TYPE_FLOAT32;
-    tensor_create_params.quant_format = VX_QUANT_DYNAMIC_FIXED_POINT;
+    tensor_create_params.quant_format = VX_QUANT_NONE;
     tensor_create_params.quant_data.dfp.fixed_point_pos = 0;
 
     weights = vxoTensor_CreateTensor(ops_layer->node->base.context, ops_layer->node->graph, &tensor_create_params, vx_false_e);
@@ -536,6 +537,7 @@ OnError:
                           || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_FLOAT16)
                           || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
                           || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16)
+                          || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_BFLOAT16)
                           || (inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16));
     }
     else
@@ -570,7 +572,7 @@ OnError:
         tensor_create_params.num_of_dims = dims;
         tensor_create_params.sizes = sizes;
         tensor_create_params.data_format = context->evisNoInst.supportEVIS ? VX_TYPE_INT16 : VX_TYPE_FLOAT32;
-        tensor_create_params.quant_format = VX_QUANT_DYNAMIC_FIXED_POINT;
+        tensor_create_params.quant_format = VX_QUANT_NONE;
         tensor_create_params.quant_data.dfp.fixed_point_pos = 0;
 
         weights = vxoTensor_CreateTensor(node->base.context, node->graph, &tensor_create_params, vx_false_e);
@@ -589,7 +591,7 @@ OnError:
             goto exit;
         }
 
-        if ((inputFormat == VX_TYPE_INT8 || inputFormat == VX_TYPE_INT16) && TENSOR_QUANT_TYPE(input) == VX_QUANT_DYNAMIC_FIXED_POINT)
+        if (TENSOR_QUANT_TYPE(input) == VX_QUANT_DYNAMIC_FIXED_POINT)
         {
             if (srcFixPointPos >= 0)
             {
@@ -600,13 +602,13 @@ OnError:
                 inputScale = (vx_float32) (1 << -srcFixPointPos);
             }
         }
-        else if (inputFormat == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(input) == VX_QUANT_AFFINE_SCALE)
+        else if (TENSOR_QUANT_TYPE(input) == VX_QUANT_AFFINE_SCALE)
         {
             input_ZP   = context->evisNoInst.supportEVIS ? 0 : TENSOR_TF_ZEROPOINT(input);
             inputScale = TENSOR_TF_SCALE(input);
         }
 
-        if ((outputFormat == VX_TYPE_INT8 || outputFormat == VX_TYPE_INT16) && TENSOR_QUANT_TYPE(output) == VX_QUANT_DYNAMIC_FIXED_POINT)
+        if (TENSOR_QUANT_TYPE(output) == VX_QUANT_DYNAMIC_FIXED_POINT)
         {
             if (dstFixPointPos >= 0)
             {
@@ -617,7 +619,7 @@ OnError:
                 outputScale = 1.0f / (vx_float32) (1 << -dstFixPointPos);
             }
         }
-        else if (outputFormat == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE)
+        else if (TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE)
         {
             outputScale = 1.0f / TENSOR_TF_SCALE(output);
             output_ZP   = (vx_float32)TENSOR_TF_ZEROPOINT(output);
