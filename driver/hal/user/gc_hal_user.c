@@ -1434,7 +1434,7 @@ gcoHAL_SetFscaleValue(
         for (i = 0; i < gcPLS.hal->chipCount; i++)
         {
             gcoHAL_SetCoreIndex(gcvNULL, i);
-            gcmkONERROR(gcoHAL_SetFscaleValueEx(FscaleValue, ShaderFscaleValue));
+            gcmONERROR(gcoHAL_SetFscaleValueEx(FscaleValue, ShaderFscaleValue));
         }
     }
     else
@@ -1442,7 +1442,7 @@ gcoHAL_SetFscaleValue(
         /* Set for the specific core. */
         gcoHAL_SetCoreIndex(gcvNULL, CoreIndex);
 
-        gcmkONERROR(gcoHAL_SetFscaleValueEx(FscaleValue, ShaderFscaleValue));
+        gcmONERROR(gcoHAL_SetFscaleValueEx(FscaleValue, ShaderFscaleValue));
     }
 
 OnError:
