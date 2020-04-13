@@ -330,6 +330,11 @@ typedef struct _gcsHAL_QUERY_VIDEO_MEMORY
     OUT gctUINT32               contiguousPhysName;
     /* Size in bytes of contiguous memory.*/
     OUT gctUINT64               contiguousSize;
+
+    /* Physical memory address of exclusive memory. Just a name. */
+    OUT gctUINT32               exclusivePhysName;
+    /* Size in bytes of exclusive memory.*/
+    OUT gctUINT64               exclusiveSize;
 }
 gcsHAL_QUERY_VIDEO_MEMORY;
 

@@ -107,6 +107,10 @@ gckKERNEL_QueryVideoMemory(
     Interface->u.QueryVideoMemory.contiguousSize = device->contiguousSize;
     Interface->u.QueryVideoMemory.contiguousPhysName = device->contiguousPhysName;
 
+    /* Get exclusive memory size and physical address. */
+    Interface->u.QueryVideoMemory.exclusiveSize = device->exclusiveSize;
+    Interface->u.QueryVideoMemory.exclusivePhysName = device->exclusivePhysName;
+
     /* Success. */
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;
