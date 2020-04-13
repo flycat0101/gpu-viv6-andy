@@ -12467,12 +12467,12 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNBGSize(
 
     totalSize = headerSize + lcdSize;
 
+    totalSize += SH_COMMAND_ALIGN_SIZE; /* alignment PPU command size */
+
     if (size != VX_NULL)
     {
         *size = (vx_size)totalSize;
     }
-
-    totalSize += SH_COMMAND_ALIGN_SIZE;
 
     graph->binarySave->NBGInMemorySize = totalSize;
 
