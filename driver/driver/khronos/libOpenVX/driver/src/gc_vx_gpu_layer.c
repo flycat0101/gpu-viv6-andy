@@ -3613,6 +3613,7 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
     vx_scalar               downScaleSizeRounding,
     vx_int32                strideXvalue,
     vx_int32                strideYvalue,
+    vx_tensor               scales,
     vx_tensor               outputs)
 {
 #if !gcdUSE_VXC_BINARY
@@ -3640,12 +3641,12 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
     vx_int32      padRightv                  = padXRight->value->n32;
     vx_int32      padTopv                    = padYTop->value->n32;
     vx_int32      padBottomv                 = padYBottom->value->n32;
-    vx_uint32     inputZP                    = TENSOR_TF_ZEROPOINT(inputs);
-    vx_float32    inputScale                 = TENSOR_TF_SCALE(inputs);
-    vx_uint32     weightZP                   = TENSOR_TF_ZEROPOINT(weights);
-    vx_float32    weightScale                = TENSOR_TF_SCALE(weights);
-    vx_uint32     biasZP                     = biases ? TENSOR_TF_ZEROPOINT(biases) : 0;
-    vx_float32    biasScale                  = biases ? TENSOR_TF_SCALE(biases) : 0;
+    vx_uint32     inputZP                    = 0;
+    vx_float32    inputScale                 = 1.0f;
+    vx_uint32     weightZP                   = 0;
+    vx_float32    weightScale                = 1.0f;
+    vx_uint32     biasZP                     = 0;
+    vx_float32    biasScale                  = 1.0f;
     vx_uint32     outputZP                   = TENSOR_TF_ZEROPOINT(outputs);
     vx_float32    outputScale                = (vx_float32)1.0/TENSOR_TF_SCALE(outputs);
     vx_scalar     strideX                    = VX_NULL;
@@ -3677,7 +3678,9 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
     vx_scalar    outputHeight         = NULL;
     vx_scalar    heightDiff           = NULL;
     vx_size      thread_scale0        = 1;
-
+    vx_enum      weight_quant_type    = TENSOR_QUANT_TYPE(weights);
+    vx_enum      bias_quant_type      = biases != NULL ? TENSOR_QUANT_TYPE(biases) : VX_QUANT_NONE;
+    vx_bool      is_per_channel_quant = (vx_bool)(weight_quant_type == VX_QUANT_AFFINE_SCALE_PER_CHANNEL && bias_quant_type == VX_QUANT_AFFINE_SCALE_PER_CHANNEL);
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, inputs=%p, outputs=%p", context, kernelEnum, inputs, outputs);
 
     is_no_pad = ((0 == padLeftv) && (0 == padRightv) && (0 == padTopv) && (0 == padBottomv));
@@ -3703,7 +3706,25 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
         }
     }
 
-    if (biases)
+    if (VX_QUANT_AFFINE_SCALE == weight_quant_type)
+    {
+        weightZP      = TENSOR_TF_ZEROPOINT(weights);
+        weightScale   = TENSOR_TF_SCALE(weights);
+    }
+
+    if (VX_QUANT_AFFINE_SCALE == TENSOR_QUANT_TYPE(inputs))
+    {
+        inputZP       = TENSOR_TF_ZEROPOINT(inputs);
+        inputScale    = TENSOR_TF_SCALE(inputs);
+    }
+
+    if (VX_QUANT_AFFINE_SCALE == bias_quant_type)
+    {
+        biasZP       = TENSOR_TF_ZEROPOINT(biases);
+        biasScale    = TENSOR_TF_SCALE(biases);
+    }
+
+    if (biases && (!is_per_channel_quant))
     {
         if (fabs(inputScale*weightScale - biasScale) > 0.000001f || biasZP !=0)
         {
@@ -3712,11 +3733,15 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
         }
     }
 
-    if (biases != VX_NULL)
+    if (biases)
     {
-        is_static_weights_biases = (vx_bool)((TENSOR_DATA_LIFETIME(weights) == VX_TENSOR_LIFE_TIME_STATIC) && (TENSOR_DATA_LIFETIME(biases) == VX_TENSOR_LIFE_TIME_STATIC));
-        enable_adjust_biases     = (is_static_weights_biases && (TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE) && (TENSOR_QUANT_TYPE(biases) == VX_QUANT_AFFINE_SCALE));
+        is_static_weights_biases = (vx_bool)(CHECK_LIFETIME_IS_STATIC(weights) && CHECK_LIFETIME_IS_STATIC(biases));
     }
+    else
+    {
+        is_static_weights_biases = (vx_bool)(CHECK_LIFETIME_IS_STATIC(weights));
+    }
+    enable_adjust_biases = (is_static_weights_biases && (inputFormat == VX_TYPE_UINT8) && (3 == kernel_width) && (3 == kernel_height));
 
     strideX = vxCreateScalar(context, VX_TYPE_INT32, &strideXvalue);
     strideY = vxCreateScalar(context, VX_TYPE_INT32, &strideYvalue);
@@ -3836,7 +3861,7 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
 
             if ((3 == kernel_width) && (3 == kernel_height) && enable_adjust_biases)
             {
-                if (1 == channel_multiplier->value->n32)
+                if ((1 == channel_multiplier->value->n32) && (!is_per_channel_quant))
                 {
                     if (enable_2d_img && enable_in_cast_format && is_no_pad
                        && ((1 == strideXvalue && 1 == strideYvalue) || (2 == strideXvalue && 2 == strideYvalue)))
@@ -3943,7 +3968,14 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
                 }
                 else
                 {
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_Quant8", borderMode);
+                    if (is_per_channel_quant)
+                    {
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_PerChannel_3x3_Quant8", borderMode);
+                    }
+                    else
+                    {
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_Quant8", borderMode);
+                    }
                 }
                 if (!shaderExecutable)
                 {
@@ -3980,18 +4012,30 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
             }
             else
             {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
+                if (is_per_channel_quant)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_PerChannel_Quant8", borderMode);
+                }
+                else
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
+                }
                 if (!shaderExecutable)
                 {
                     goto OnError;
                 }
             }
 
+            if (is_per_channel_quant)
+            {
+                weightZP = 0;
+            }
+
             if (is_use_2d_fun)
             {
-                vx_reference  parameters[11] = {(vx_reference)inputs, (vx_reference)reWeights, (vx_reference)reBiases,
+                vx_reference  parameters[12] = {(vx_reference)inputs, (vx_reference)reWeights, (vx_reference)reBiases,
                         (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL,
-                        (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)outputs};
+                        (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)outputs, (vx_reference)scales};
                 vx_float32  scale_out_value;
                 vx_float32  inputZP_f   = (vx_float32)inputZP;
                 vx_float32  weightZP_f  = (vx_float32)weightZP;
@@ -4031,14 +4075,21 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
                 parameters[9] = (vx_reference)zpIn_int;
                 parameters[0] = (vx_reference)inputs_rs;
                 parameters[10] = (vx_reference)outputs_rs;
-                status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 11);
+                if (is_per_channel_quant)
+                {
+                    status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 12);
+                }
+                else
+                {
+                    status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 11);
+                }
             }
             else
             {
-                vx_reference  parameters[16] = {(vx_reference)inputs, (vx_reference)reWeights, (vx_reference)reBiases, (vx_reference)channel_multiplier,
+                vx_reference  parameters[17] = {(vx_reference)inputs, (vx_reference)reWeights, (vx_reference)reBiases, (vx_reference)channel_multiplier,
                         (vx_reference)kernelX, (vx_reference)kernelY, (vx_reference)strideX, (vx_reference)strideY,
                         (vx_reference)padXLeft, (vx_reference)padYTop, (vx_reference)NULL, (vx_reference)NULL,
-                        (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)outputs};
+                        (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)outputs, (vx_reference)scales};
                 vx_float32  scale_out_value;
                 vx_float32  inputZP_f   = (vx_float32)inputZP;
                 vx_float32  weightZP_f  = (vx_float32)weightZP;
@@ -4054,7 +4105,14 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
                 parameters[12] = (vx_reference)zpWeight;
                 parameters[13] = (vx_reference)zpOut;
                 parameters[14] = (vx_reference)zpIn_int;
-                status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 16);
+                if (is_per_channel_quant)
+                {
+                    status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 17);
+                }
+                else
+                {
+                    status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 16);
+                }
             }
 
             if (status != VX_SUCCESS) goto OnError;
@@ -4083,7 +4141,7 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
             status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 10);
             if (status != VX_SUCCESS) goto OnError;
         }
-        else if (inputFormat == VX_TYPE_UINT8 && biases == VX_NULL)
+        else if (inputFormat == VX_TYPE_UINT8 && biases == VX_NULL && (!is_per_channel_quant))
         {
             vx_reference  parameters[16] = {(vx_reference)inputs, (vx_reference)reWeights, (vx_reference)channel_multiplier,
                                 (vx_reference)kernelX, (vx_reference)kernelY, (vx_reference)strideX, (vx_reference)strideY,

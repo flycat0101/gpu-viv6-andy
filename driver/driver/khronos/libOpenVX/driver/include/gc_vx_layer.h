@@ -3513,6 +3513,7 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
     vx_scalar               downScaleSizeRounding,
     vx_int32                strideXvalue,
     vx_int32                strideYvalue,
+    vx_tensor               scales,
     vx_tensor               outputs);
 
 vxnne_shader_executable vxnneGetLSTMUnitProjectionShaderExecutable(
@@ -3873,6 +3874,7 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
     vx_scalar               downScaleSizeRounding,
     vx_int32                strideXvalue,
     vx_int32                strideYvalue,
+    vx_tensor               scales,
     vx_tensor               outputs);
 
 vxnne_shader_executable vxnneGetGPUDepth2SpaceShaderExecutable(

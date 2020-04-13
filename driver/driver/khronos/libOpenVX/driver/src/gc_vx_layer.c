@@ -23199,6 +23199,7 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
     vx_scalar               downScaleSizeRounding,
     vx_int32                strideXvalue,
     vx_int32                strideYvalue,
+    vx_tensor               scales,
     vx_tensor               outputs)
 {
 #if !gcdUSE_VXC_BINARY
@@ -23211,8 +23212,8 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
     vxnne_kernel_shaders             kernel               = NULL;
     vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
 
-    vx_reference  parameters[10]             = {(vx_reference)inputs, (vx_reference)weights, (vx_reference)biases, (vx_reference)channel_multiplier,
-                                                VX_NULL, VX_NULL, VX_NULL, (vx_reference)padXLeft, (vx_reference)padYTop, (vx_reference)outputs};
+    vx_reference  parameters[11]             = {(vx_reference)inputs, (vx_reference)weights, (vx_reference)biases, (vx_reference)channel_multiplier,
+                                                VX_NULL, VX_NULL, VX_NULL, (vx_reference)padXLeft, (vx_reference)padYTop, (vx_reference)outputs, (vx_reference)scales};
     vx_uint32     input_width                = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
     vx_uint32     input_height               = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
     vx_uint32     input_depth                = TENSOR_VIEW_SIZE_INDEX(inputs, 2);
@@ -23226,12 +23227,12 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
     vx_int32      kernel_height              = TENSOR_VIEW_SIZE_INDEX(weights, 1);
     vx_int32      padLeftv                   = padXLeft->value->n32;
     vx_int32      padRightv                  = padXRight->value->n32;
-    vx_uint32     inputZP                    = TENSOR_TF_ZEROPOINT(inputs);
-    vx_float32    inputScale                 = TENSOR_TF_SCALE(inputs);
-    vx_uint32     weightZP                   = TENSOR_TF_ZEROPOINT(weights);
-    vx_float32    weightScale                = TENSOR_TF_SCALE(weights);
-    vx_uint32     biasZP                     = TENSOR_TF_ZEROPOINT(biases);
-    vx_float32    biasScale                  = TENSOR_TF_SCALE(biases);
+    vx_uint32     inputZP                    = 0;
+    vx_float32    inputScale                 = 1.0f;
+    vx_uint32     weightZP                   = 0;
+    vx_float32    weightScale                = 1.0f;
+    vx_uint32     biasZP                     = 0;
+    vx_float32    biasScale                  = 1.0f;
     vx_uint32     outputZP                   = TENSOR_TF_ZEROPOINT(outputs);
     vx_float32    outputScale                = TENSOR_TF_SCALE(outputs);
     vx_int8       input_fractionLengthValue  = TENSOR_POS(inputs);
@@ -23252,11 +23253,33 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
     vx_uint32     maxWorkGroupSize           = 8;
     vx_bool       is_use_k3_fast             = vx_true_e;
     vx_bool       use_2d_thread              = vx_false_e;
+    vx_enum       weight_quant_type          = TENSOR_QUANT_TYPE(weights);
+    vx_enum       bias_quant_type            = TENSOR_QUANT_TYPE(biases);
+    vx_bool       is_per_channel_quant       = (vx_bool)(weight_quant_type == VX_QUANT_AFFINE_SCALE_PER_CHANNEL && bias_quant_type == VX_QUANT_AFFINE_SCALE_PER_CHANNEL);
+    vx_uint32     param_num                  = is_per_channel_quant ? 11 : 10;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, inputs=%p, outputs=%p",
          context, kernelEnum, borderMode, inputs, outputs);
 
-    if (fabs(inputScale*weightScale - biasScale) > 0.000001f || biasZP !=0)
+    if (VX_QUANT_AFFINE_SCALE == weight_quant_type)
+    {
+        weightZP      = TENSOR_TF_ZEROPOINT(weights);
+        weightScale   = TENSOR_TF_SCALE(weights);
+    }
+
+    if (VX_QUANT_AFFINE_SCALE == TENSOR_QUANT_TYPE(inputs))
+    {
+        inputZP       = TENSOR_TF_ZEROPOINT(inputs);
+        inputScale    = TENSOR_TF_SCALE(inputs);
+    }
+
+    if (VX_QUANT_AFFINE_SCALE == bias_quant_type)
+    {
+        biasZP       = TENSOR_TF_ZEROPOINT(biases);
+        biasScale    = TENSOR_TF_SCALE(biases);
+    }
+
+    if ((!is_per_channel_quant) && (fabs(inputScale*weightScale - biasScale) > 0.000001f || biasZP !=0))
     {
         vxError("biase's scale must equal to input's scale multiply weight's scale, and biase's zero point must equal to 0! failed at function %s line %d", __FUNCTION__, __LINE__);
         goto OnError;
@@ -23432,7 +23455,7 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
         status = vxBuildProgram(program, "-cl-viv-vx-extension");
         if (status != VX_SUCCESS) goto OnError;
 
-        kernel = vxnneAddKernelShadersInProgram(context, "vxcDepthwiseConv", program, 10, kernelEnum);
+        kernel = vxnneAddKernelShadersInProgram(context, "vxcDepthwiseConv", program, param_num, kernelEnum);
         if (!kernel) goto OnError;
 
         vxReleaseProgram(&program);
@@ -23801,21 +23824,38 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
         {
             if (1 == stride)
             {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8kernel_3x3_S1", borderMode);
+                if (is_per_channel_quant)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8PerChannel_3x3_S1", borderMode);
+                }
+                else
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8kernel_3x3_S1", borderMode);
+                }
             }
             else if (2 == stride)
             {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8kernel_3x3_S2", borderMode);
+                if (is_per_channel_quant)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8PerChannel_3x3_S2", borderMode);
+                }
+                else
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8kernel_3x3_S2", borderMode);
+                }
             }
         }
         if (!shaderExecutable) goto OnError;
 
-        status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "ksZPinZPwe", 1, &ksZPinZPwe);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outScale", 1, &outScale);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outZP", 1, &outZP);
+        status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "outZP", 1, &outZP);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumOrderShort4_2x8", 1, uniSumOrderShort4_2x8);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniWeightsSum_16x1", 1, uniWeightsSum_16x1);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "output_height", 1, &output_height);
+        if (!is_per_channel_quant)
+        {
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "ksZPinZPwe", 1, &ksZPinZPwe);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outScale", 1, &outScale);
+        }
         if (1 == stride)
         {
             execution_parameters.globalWorkScale[0]  = 8;
@@ -23857,7 +23897,7 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniU8Conv_22_s1_8x2", 1, uniU8Conv_22_s1_8x2);
         if (status != VX_SUCCESS) goto OnError;
     }
-    else if (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_UINT8)
+    else if ((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_UINT8) && (!is_per_channel_quant))
     {
         vx_int32 x_len_4x       = kernel_width / 4;
         vx_int32 x_len_remain   = kernel_width % 4;
@@ -23939,6 +23979,53 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "x_len5x_remain", 1, &x_len5x_remain);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "ksZPinZPwe", 1, &ksZPinZPwe);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outScale", 1, &outScale);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outZP", 1, &outZP);
+
+        if (status != VX_SUCCESS) goto OnError;
+    }
+    else if ((inputFormat == VX_TYPE_UINT8) && is_per_channel_quant)
+    {
+        vx_int32 x_len_5x       = kernel_width / 5;
+        vx_int32 x_len5x_remain = kernel_width % 5;
+        vx_uint32 packZPin      = (inputZP << 16) | inputZP;
+        vx_float32 outZP        = (vx_float32)outputZP;
+        vx_uint32 uniU8MulAccumtoF32_dp16x1[16] = {
+            0x29a69a69, // TCfg
+            0x00004514, // ASelt
+            0x44322100, 0x04332110, // ABin
+            0x29a69a69, // BSelt
+            0x04002000, 0x00030010, // BBin
+            0x00000700, // AccumType, ConstantType, and PostShift
+            packZPin, packZPin, packZPin, packZPin, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
+        };
+        vx_uint32 uniU8MulAccumNtoF32_dp16x1[16] = {
+            0x29a69a69, // TCfg
+            0x00004514, // ASelt
+            0x44322100, 0x04332110, // ABin
+            0x29a69a69, // BSelt
+            0x04002000, 0x00030010, // BBin
+            0x00000700, // AccumType, ConstantType, and PostShift
+            packZPin, packZPin, packZPin, packZPin, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
+        };
+        vx_uint32 uniConfigU8MulAccumN[5] = {0x29a69a69, 0x00020009, 0x00260029, 0x00a60269, 0x09a60a69};
+        uniU8MulAccumNtoF32_dp16x1[0] = uniConfigU8MulAccumN[x_len5x_remain];
+
+        if (kernel_width <= 5 && inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8PerChannelWidthLE5", borderMode);
+        }
+        else if (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8PerChannelWidthGT5", borderMode);
+        }
+        if (!shaderExecutable) goto OnError;
+
+        status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "input_height", 1, &input_height);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "input_depth", 1, &input_depth);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniU8MulAccumNtoF32_dp16x1", 1, uniU8MulAccumNtoF32_dp16x1);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniU8MulAccumtoF32_dp16x1", 1, uniU8MulAccumtoF32_dp16x1);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "x_len_5x", 1, &x_len_5x);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "x_len5x_remain", 1, &x_len5x_remain);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outZP", 1, &outZP);
 
         if (status != VX_SUCCESS) goto OnError;
@@ -24087,7 +24174,7 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
         execution_parameters.globalWorkSize[2]   = output_depth;
     }
 
-    status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 10);
+    status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, param_num);
     if (status != VX_SUCCESS) goto OnError;
 
     status = vxnneShaderExecutable_SetExecutionParameters(shaderExecutable, &execution_parameters);
