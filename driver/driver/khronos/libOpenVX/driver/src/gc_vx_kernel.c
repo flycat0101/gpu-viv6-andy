@@ -3472,14 +3472,22 @@ VX_PRIVATE_API vx_status vxoKernel_Remove(vx_kernel kernel)
 
     gcmHEADER_ARG("kernel=%p", kernel);
 
-    if (!(kernel->enumeration == VX_KERNEL_IMPORT_FROM_FILE) &&
-        (kernel == NULL
+    if (kernel == NULL
         || !vxoReference_IsValidAndSpecific(&kernel->base, VX_TYPE_KERNEL)
-        || !kernel->isUserkernel))
+        || (!kernel->isUserkernel && !(kernel->enumeration == VX_KERNEL_IMPORT_FROM_FILE)))
     {
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
+
+     if (kernel->enumeration == VX_KERNEL_IMPORT_FROM_FILE)
+    {
+        /* release binary kernel*/
+        vx_binary_loader_s *binaryLoad = (vx_binary_loader_s*)(kernel->base.reserved);
+        vxoBinaryGraph_ReleaseNBG(binaryLoad);
+        gcmFOOTER_NO();
+    }
+
     if (kernel->base.context->targetCount > 0)
     {
         vx_uint32 t = 0, k = 0;
