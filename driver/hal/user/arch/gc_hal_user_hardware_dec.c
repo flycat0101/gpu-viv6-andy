@@ -2603,6 +2603,7 @@ gcoDEC400EXHARDWARE_SetTilingConfig(
 
         switch (Tiling)
         {
+            /* TODO
             case gcvTILED:
                 config = IsRead ?
  ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -2626,7 +2627,7 @@ gcoDEC400EXHARDWARE_SetTilingConfig(
  30:25) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:25) - (0 ? 30:25) + 1))))))) << (0 ? 30:25)));
                 break;
-
+            */
             case gcvTILED_4X8:
                 config = IsRead ?
  ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -4101,13 +4102,12 @@ _gcoDECHARDWARE_SetSrcDEC400EXCompression(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gctBOOL enable, data3D, msaa, tpcEnable, tpcComEnable, onePlanar;
+    gctBOOL enable, data3D, tpcEnable, tpcComEnable, onePlanar;
     gceSURF_FORMAT format = gcvSURF_UNKNOWN;
     gctUINT32 address;
 
     enable = TileStatusConfig & gcv2D_TSC_DEC_COMPRESSED;
     data3D = TileStatusConfig & (gcv2D_TSC_COMPRESSED | gcv2D_TSC_ENABLE | gcv2D_TSC_DOWN_SAMPLER);
-    msaa   = TileStatusConfig & gcv2D_TSC_DOWN_SAMPLER;
     tpcEnable = (TileStatusConfig & gcv2D_TSC_DEC_TPC);
     tpcComEnable = (TileStatusConfig & gcv2D_TSC_DEC_TPC_COMPRESSED);
     onePlanar = gcoDECHARDWARE_IsOnePlanar(Surface->format);
@@ -4124,7 +4124,6 @@ _gcoDECHARDWARE_SetSrcDEC400EXCompression(
     {
         gctUINT32 config = 0, configEx = 0;
         gctUINT32 regOffset[3] = {0}, regOffsetEx[3] = {0};
-        //gctUINT32 width = 0;
 
         gcmGETHARDWAREADDRESS(Surface->node, address);
 
