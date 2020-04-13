@@ -569,17 +569,25 @@ void getFP32M0AndN(vx_float32 mult, vx_uint16 *M0, vx_int8 *N)
     vx_uint32 postShift         = 0;
     vx_int8   tmpPostShift      = 0;
 
-    tmpMultiply         = (uintMult & 0x7FFFFF) >> 8;
-    *M0                 = (vx_uint16)((1U << 15) + tmpMultiply);
+    if (gcmABS(mult  - 0.0) < 1e-5 )
+    {
+        *M0 = 0;
+        *N = 0;
+    }
+    else
+    {
+        tmpMultiply         = (uintMult & 0x7FFFFF) >> 8;
+        *M0                 = (vx_uint16)((1U << 15) + tmpMultiply);
 
-    exp                 = (uintMult & 0x7F800000) >> 23; /* postShift is Scale's exp*/
-    tmpPostShift        = 15 - ((vx_int8)exp - 127);
-    postShift           = tmpPostShift & 0x1F;
-    tmpPostShift        = tmpPostShift >> 5;
-    postShiftBit6to5    = tmpPostShift & 3;
+        exp                 = (uintMult & 0x7F800000) >> 23; /* postShift is Scale's exp*/
+        tmpPostShift        = 15 - ((vx_int8)exp - 127);
+        postShift           = tmpPostShift & 0x1F;
+        tmpPostShift        = tmpPostShift >> 5;
+        postShiftBit6to5    = tmpPostShift & 3;
 
-    *N = (vx_int8)(((postShiftBit6to5 << 5) | (postShift & 0x1F)));
-    *N = (((vx_int32)*N << 25) >> 25);
+        *N = (vx_int8)(((postShiftBit6to5 << 5) | (postShift & 0x1F)));
+        *N = (((vx_int32)*N << 25) >> 25);
+    }
 }
 
 void calculateActivationRangeFloat16(vx_int32 activation, vx_int16* act_min, vx_int16* act_max)
