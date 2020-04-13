@@ -581,6 +581,7 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
 
              padX = vxCreateScalar(context, VX_TYPE_INT32, &pool_pad_x_left);
              padY = vxCreateScalar(context, VX_TYPE_INT32, &pool_pad_y_top);
+             enable_tf_s = vxCreateScalar(context, VX_TYPE_INT32, &enable_tf_avgPool);
 
              parameters[1] = (vx_reference)poolSizeX;
              parameters[2] = (vx_reference)poolSizeY;
