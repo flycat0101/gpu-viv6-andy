@@ -249,7 +249,6 @@ VIR_LinkLibLibrary(
 
 typedef struct _VSC_EXTERNAL_LINK_PASS_DATA
 {
-    gctBOOL                     bNeedToInvalidCFG;
     gctBOOL                     bChanged;
 } VSC_EXTERNAL_LINK_PASS_DATA;
 

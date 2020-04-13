@@ -49,6 +49,11 @@ typedef struct _VSC_CPF_BLOCK_FLOW
     VSC_STATE_VECTOR  outFlow;
 } VSC_CPF_BLOCK_FLOW;
 
+typedef struct _VSC_CPF_PASS_DATA
+{
+    gctBOOL         bChanged;
+} VSC_CPF_PASS_DATA;
+
 typedef struct _VSC_CPF
 {
     gcePATCH_ID                 appNameId;

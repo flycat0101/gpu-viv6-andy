@@ -3382,6 +3382,12 @@ VSC_CPF_PerformOnShader(
     VSC_OPTN_CPFOptions  *options = (VSC_OPTN_CPFOptions*)pPassWorker->basePassWorker.pBaseOption;
     VIR_Dumper           *dumper = pPassWorker->basePassWorker.pDumper;
     VSC_CPF             cpf;
+    VSC_CPF_PASS_DATA   *cpfPassData = gcvNULL;
+
+    if (pPassWorker->basePassWorker.pPassSpecificData)
+    {
+        cpfPassData = (VSC_CPF_PASS_DATA *)pPassWorker->basePassWorker.pPassSpecificData;
+    }
 
     if (!VSC_OPTN_InRange(VIR_Shader_GetId(shader), VSC_OPTN_CPFOptions_GetBeforeShader(options),
                           VSC_OPTN_CPFOptions_GetAfterShader(options)))
@@ -3422,6 +3428,10 @@ VSC_CPF_PerformOnShader(
     if (VSC_CPF_CodeChanged(&cpf))
     {
         pPassWorker->pResDestroyReq->s.bInvalidateCfg = gcvTRUE;
+        if (cpfPassData)
+        {
+            cpfPassData->bChanged = gcvTRUE;
+        }
     }
     _VSC_CPF_Final(&cpf);
 

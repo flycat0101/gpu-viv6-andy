@@ -810,6 +810,7 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
     VSC_PRELL_PASS_DATA preLLPassData = { gcvFALSE };
     VSC_CPP_PASS_DATA   cppPassData = { VSC_CPP_NONE, gcvTRUE };
     VSC_IL_PASS_DATA    ilPassData = { 3, gcvFALSE };
+    VSC_CPF_PASS_DATA   cpfPassData = { gcvFALSE };
 
     gcmASSERT(VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Pre_Low ||
               VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Post_Medium);
@@ -857,13 +858,23 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
     CALL_SH_PASS(VSC_DCE_Perform, 0, gcvNULL);
     CALL_SH_PASS(VIR_CFO_PerformOnShader, 1, gcvNULL);
     CALL_SH_PASS(vscVIR_AdjustPrecision, 0, gcvNULL);
+
+    /* Call SIMP before the local vectorization because some code patterns are messed up after the vectorization. */
+    CALL_SH_PASS(VSC_SIMP_Simplification_PerformOnShader, 0, gcvNULL);
+
     CALL_SH_PASS(vscVIR_DoLocalVectorization, 0, gcvNULL);
     CALL_SH_PASS(vscVIR_AddOutOfBoundCheckSupport, 0, gcvNULL);
 
     CALL_SH_PASS(vscVIR_ClampPointSize, 0, gcvNULL);
 
     /* Call CPF one more time because after CFO we can optimize more instructions. */
-    CALL_SH_PASS(VSC_CPF_PerformOnShader, 0, gcvNULL);
+    CALL_SH_PASS(VSC_CPF_PerformOnShader, 0, &cpfPassData);
+
+    /* Call SIMP one more time because we can optimize more instructions after CPF. */
+    if (cpfPassData.bChanged)
+    {
+        CALL_SH_PASS(VSC_SIMP_Simplification_PerformOnShader, 0, gcvNULL);
+    }
 
     /* Lower ML to LL post */
     CALL_SH_PASS(VIR_Lower_MiddleLevel_To_LowLevel_Post, 0, &bRAEnabled);
@@ -1126,7 +1137,7 @@ static VSC_ErrCode _DoMLPostCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
 
         if (libShLevel == VIR_SHLEVEL_Post_Medium)
         {
-            VSC_EXTERNAL_LINK_PASS_DATA externalLinkPassData = { gcvFALSE, gcvFALSE };
+            VSC_EXTERNAL_LINK_PASS_DATA externalLinkPassData = { gcvFALSE };
             VSC_CPP_PASS_DATA           cppPassData = { VSC_CPP_NONE, gcvTRUE };
 
             /* If this is from recompiler, we need to do these processes before linking external lib functions. */
@@ -1143,8 +1154,6 @@ static VSC_ErrCode _DoMLPostCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
 
                 CALL_SH_PASS(vscVIR_ConvertVirtualInstructions, 0, gcvNULL);
                 CALL_SH_PASS(VSC_CPP_PerformOnShader, 0, &cppPassData);
-
-                externalLinkPassData.bNeedToInvalidCFG = gcvTRUE;
             }
 
             CALL_SH_PASS(VIR_LinkExternalLibFunc, 3, &externalLinkPassData);

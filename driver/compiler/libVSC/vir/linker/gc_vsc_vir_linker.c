@@ -7501,11 +7501,11 @@ VIR_LinkExternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker)
 {
     VSC_ErrCode                 errCode  = VSC_ERR_NONE;
     gctBOOL                     bChanged = gcvFALSE;
-    VSC_EXTERNAL_LINK_PASS_DATA passData = { gcvFALSE, gcvFALSE};
+    VSC_EXTERNAL_LINK_PASS_DATA*pPassData = gcvNULL;
 
     if (pPassWorker->basePassWorker.pPassSpecificData != gcvNULL)
     {
-        passData = *(VSC_EXTERNAL_LINK_PASS_DATA*)pPassWorker->basePassWorker.pPassSpecificData;
+        pPassData = (VSC_EXTERNAL_LINK_PASS_DATA*)pPassWorker->basePassWorker.pPassSpecificData;
     }
 
     errCode = VIR_LinkLibLibrary(&pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg,
@@ -7516,14 +7516,16 @@ VIR_LinkExternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker)
     ON_ERROR(errCode, "VIR_LinkExternalLibFunc");
 
     /* Check if we need to invalid CFG/CG. */
-    if (bChanged && passData.bNeedToInvalidCFG)
+    if (bChanged)
     {
         pPassWorker->pResDestroyReq->s.bInvalidateCg = gcvTRUE;
         pPassWorker->pResDestroyReq->s.bInvalidateCfg = gcvTRUE;
         pPassWorker->pResDestroyReq->s.bInvalidateDu = gcvTRUE;
 
-        gcmASSERT(pPassWorker->basePassWorker.pPassSpecificData );
-        ((VSC_EXTERNAL_LINK_PASS_DATA*)pPassWorker->basePassWorker.pPassSpecificData)->bChanged = gcvTRUE;
+        if (pPassData)
+        {
+            pPassData->bChanged = gcvTRUE;
+        }
     }
 
 OnError:
@@ -7581,6 +7583,7 @@ VIR_LinkInternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker)
     VSC_LIB_LINK_POINT          libLinkPoint;
     VSC_SHADER_LIB_LINK_ENTRY   libLinkEntry;
     VSC_SHADER_LIB_LINK_TABLE   libLinkTable;
+    gctBOOL                     bChanged = gcvFALSE;
 
     if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader),
         VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
@@ -7661,7 +7664,7 @@ VIR_LinkInternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker)
                                      pPassWorker->basePassWorker.pMM,
                                      (VIR_Shader *)pPassWorker->pCompilerParam->hShader,
                                      &libLinkTable,
-                                     gcvNULL);
+                                     &bChanged);
         ON_ERROR(errCode, "VIR_LinkExternalLibFunc");
 
         /* replace glLocalinvocationIndex if need */
@@ -7692,6 +7695,14 @@ VIR_LinkInternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker)
     }
 
 OnError:
+    /* Check if we need to invalid CFG/CG. */
+    if (bChanged)
+    {
+        pPassWorker->pResDestroyReq->s.bInvalidateCg = gcvTRUE;
+        pPassWorker->pResDestroyReq->s.bInvalidateCfg = gcvTRUE;
+        pPassWorker->pResDestroyReq->s.bInvalidateDu = gcvTRUE;
+    }
+
     return errCode;
 }
 
