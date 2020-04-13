@@ -30,7 +30,11 @@
 #include "archModelInterface.h"
 #endif
 
-#if (defined(__linux__) && !defined(__ANDROID__) && !defined(__QNX__) && !defined(__APPLE__) && !defined(__CYGWIN__))
+#if gcdFPGA_BUILD
+#define ENABLE_BACK_TRACE  1
+#endif
+
+#if ENABLE_BACK_TRACE
 #include <execinfo.h>
 #endif
 
@@ -537,7 +541,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSWRPN(
 
 /****************SW Operation Implement End**********************/
 
-#if (defined(__linux__) && !defined(__ANDROID__) && !defined(__QNX__) && !defined(__APPLE__) && !defined(__CYGWIN__))
+#if ENABLE_BACK_TRACE
 VX_PRIVATE_API vx_status vxoBinaryGraph_BackTrace(void)
 {
     void *buffer[256];
@@ -4362,7 +4366,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_Write(
             {
                 vx_uint32 *dump = (vx_uint32*)buf;
 
-                #if (defined(__linux__) && !defined(__ANDROID__) && !defined(__QNX__) && !defined(__APPLE__) && !defined(__CYGWIN__))
+                #if ENABLE_BACK_TRACE
                 vxoBinaryGraph_BackTrace();
                 #endif
 
@@ -5910,7 +5914,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveErrorHandle(
             gcoOS_Remove(gcvNULL, binarySave->binaryFileName);
         }
 
-        #if (defined(__linux__) && !defined(__ANDROID__) && !defined(__QNX__) && !defined(__APPLE__) && !defined(__CYGWIN__))
+        #if ENABLE_BACK_TRACE
         vxoBinaryGraph_BackTrace();
         #endif
     }
