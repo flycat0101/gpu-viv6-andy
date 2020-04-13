@@ -35,7 +35,7 @@ extern "C" {
     (context->nnConfig.fixedFeature.latencyHidingAtFullAxiBw * context->nnConfig.fixedFeature.axiBusWidth)
 
 #define SW_TILING_DEBUG                     1
-#define SW_TILING_BRANCH                    1
+#define SW_TILING_BRANCH                    0
 
 struct _vxnne_operation_s;
 struct _vxnne_layer_s;
