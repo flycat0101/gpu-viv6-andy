@@ -562,8 +562,8 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
     vx_uint32 poolSizeYValue                 = pool_size_y_s->value->u32;
     vx_enum roundingValue                    = rounding_s->value->e;
 
-    vx_enum inputdata_format                 = TENSOR_DATA_TYPE(inputs);
-    vx_enum outputdata_format                = TENSOR_DATA_TYPE(outputs);
+    vx_enum inputFormat                      = TENSOR_DATA_TYPE(inputs);
+    vx_enum outputFormat                     = TENSOR_DATA_TYPE(outputs);
 
     vx_bool avgPool_flag                     = GETBIT(reg_param->flag, 0);
     vx_bool maxPool_flag                     = GETBIT(reg_param->flag, 1);
@@ -709,10 +709,14 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
         if(avgPool_flag)
         {
             vx_tensor tensorCopy       = NULL;
+            vx_bool supportFormat_flag = (vx_bool)((inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+                                         || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
+                                         || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16)
+                                         || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT32)
+                                         || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16));
             vx_bool enable_2d_img  = (vx_bool)(TENSOR_VIEW_SIZE_INDEX(inputs, 1) * TENSOR_VIEW_SIZE_INDEX(inputs, 2) < IMG_MAX_WIDTH);
-            vx_bool is_copy_tensor = ((inputdata_format == VX_TYPE_UINT8) && (3 == poolSizeXValue) && (3 == poolSizeYValue)
-                && (stride_x == 1 || stride_x == 2) && enable_2d_img && outputdata_format == VX_TYPE_UINT8
-                && (pool_pad_x_left == 1 || pool_pad_x_right == 1 || pool_pad_y_top == 1 || pool_pad_y_bottom == 1));
+            vx_bool is_copy_tensor = (supportFormat_flag && (3 == poolSizeXValue) && (3 == poolSizeYValue)
+                                  && (stride_x == 1 || stride_x == 2) && enable_2d_img);
 
             if (is_copy_tensor)
             {
