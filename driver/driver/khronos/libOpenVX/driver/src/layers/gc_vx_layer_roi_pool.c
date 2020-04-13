@@ -695,7 +695,7 @@ VX_PRIVATE_API vx_status vxoROIPoolLayer_TP_Initialize(vxnne_layer ops_layer, co
     maxpool = (TENSOR_VIEW_SIZE_INDEX(input_data, 0) + pool_width - 1) / pool_width;
     poolx = 1 << (vx_uint32) ceil(log(TENSOR_VIEW_SIZE_INDEX(input_data, 0)) / log(2));
     pooly = 1 << (vx_uint32) ceil(log(TENSOR_VIEW_SIZE_INDEX(input_data, 1)) / log(2));
-    poolz = 1 << (vx_uint32) ceil(log(TENSOR_VIEW_SIZE_INDEX(input_data, 2)) / log(2));
+    poolz = TENSOR_VIEW_SIZE_INDEX(input_data, 2);
     size = poolx * pooly * poolz * maxpool * TENSOR_DATA_SIZE(input_data);
 
     gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
