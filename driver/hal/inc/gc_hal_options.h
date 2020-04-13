@@ -1335,9 +1335,9 @@ This define enables the use of VM for gckCommand and fence buffers.
 
 /*
     gcdEXTERNAL_SRAM_DEFAULT_POOL
-        When enabled, external SRAM will be a default pool in loop when allocating video memory.
-        But the external SRAM base and size must be set by customer.
-        By default, it is disabled, which means it only can be used if pool type is speficied
+        When enabled, external SRAM can be used for the initial command,
+        but the external SRAM base and size must be set by customer.
+        AXI-SRAM only can be used if pool type is speficied
         with gcvSRAM_EXTERNAL[X] when allocating video memory.
 */
 #ifndef gcdEXTERNAL_SRAM_DEFAULT_POOL
