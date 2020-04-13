@@ -1084,6 +1084,13 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
     }
 
     envctrl = gcvNULL;
+    globalData->options.vipTimeOut = gcdGPU_TIMEOUT;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_VIP_TIMEOUT", &envctrl)) && envctrl)
+    {
+        globalData->options.vipTimeOut = atoi(envctrl);
+    }
+
+    envctrl = gcvNULL;
     globalData->options.enableAllocateContigousMemForKernel = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_CONTIGOUS_MEM_FOR_KERNEL", &envctrl)) && envctrl)
     {
@@ -1497,6 +1504,11 @@ VX_PRIVATE_API void vxoGlobalData_Initialize(vx_global_data globalData)
     gcoVX_ForceTpCoreCount(globalData);
     initUndefinedHardwareConfig(globalData);
 
+    if (globalData->options.vipTimeOut != gcdGPU_TIMEOUT)
+    {
+        gcoHAL_SetTimeOut(gcvNULL, globalData->options.vipTimeOut);
+    }
+
     vxoGlobalData_InitSRAM(globalData);
 
 }
@@ -1779,6 +1791,10 @@ VX_PRIVATE_API vx_uint32 vxoGlobalData_Release(vx_global_data globalData)
     refCount = globalData->refGlobalDataCount;
     if (refCount == 0)
     {
+        if (globalData->options.vipTimeOut != gcdGPU_TIMEOUT)
+        {
+            gcoHAL_SetTimeOut(gcvNULL, gcdGPU_TIMEOUT);
+        }
 
 #if gcdCAPTURE_ONLY_MODE
         vx_uint32 deviceCount = 0;

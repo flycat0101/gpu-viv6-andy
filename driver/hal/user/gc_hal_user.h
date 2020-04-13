@@ -3107,6 +3107,7 @@ typedef struct _vx_drv_option
     gctUINT enableWBDump;
     gctUINT commandBufferDump;
     gctUINT enableWBShare;
+    gctUINT vipTimeOut;
 
     /* graph batch count */
     gctUINT graphBatchCount;
