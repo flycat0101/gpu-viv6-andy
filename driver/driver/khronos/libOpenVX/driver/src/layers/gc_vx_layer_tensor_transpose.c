@@ -112,6 +112,7 @@ VX_PRIVATE_API vx_bool vxoNNTensorTrans_SH_EVIS_Support_Ext(vx_node node, const 
 
     vx_uint32_ptr  pPerm = (vx_uint32_ptr)perm->memory.logicals[0];
     vx_uint32      num = pnum->value->u32;
+    vx_uint32      depth = TENSOR_VIEW_SIZE_INDEX(input, 2);
     vx_uint32      batch = TENSOR_VIEW_SIZE_INDEX(input, 3);
     vx_bool        shExe_flag = vx_true_e;
     vx_bool        shExe_copy_flag = vx_true_e;
@@ -151,6 +152,8 @@ VX_PRIVATE_API vx_bool vxoNNTensorTrans_SH_EVIS_Support_Ext(vx_node node, const 
                                             (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8));
 
         enable_4D_perm = (vx_bool)((enable_dataFormat || support_format) && num == 4 &&  pPerm[3] != 3 && TENSOR_DIM_NUM(input) == 4 && _IsSameQuantType(input, output));
+
+        enable_4D_perm = enable_4D_perm && (depth * batch < IMG_MAX_WIDTH);
     }
 
     shExe_flag = (vx_bool)((enable_dataFormat && pPerm[0] == 2 && pPerm[1] == 0 && pPerm[2] == 1 && num == 3)
