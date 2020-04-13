@@ -561,6 +561,54 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_BackTrace(void)
 }
 #endif
 
+VX_PRIVATE_API vx_status vxoBinaryGraph_DumpHexData(
+    vx_uint32 *buffer,
+    vx_uint32 size
+    )
+{
+    vx_uint32 i = 0;
+    vx_uint32 line = size / 32;
+    vx_uint32 left = size % 32;
+    vx_uint32 *data = buffer;
+
+    vxInfo("Dump HEX data size 0x%x\n", size);
+    for (i = 0; i < line; i++)
+    {
+        vxInfo("%08X %08X %08X %08X %08X %08X %08X %08X\n", data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
+        data += 8;
+    }
+
+    switch(left) {
+        case 28:
+          vxInfo("%08X %08X %08X %08X %08X %08X %08X\n", data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
+          break;
+        case 24:
+          vxInfo("%08X %08X %08X %08X %08X %08X\n", data[0], data[1], data[2], data[3], data[4], data[5]);
+          break;
+        case 20:
+          vxInfo("%08X %08X %08X %08X %08X\n", data[0], data[1], data[2], data[3], data[4]);
+          break;
+        case 16:
+          vxInfo("%08X %08X %08X %08X\n", data[0], data[1], data[2], data[3]);
+          break;
+        case 12:
+          vxInfo("%08X %08X %08X\n", data[0], data[1], data[2]);
+          break;
+        case 8:
+          vxInfo("%08X %08X\n", data[0], data[1]);
+          break;
+
+        case 4:
+          vxInfo("%08X\n", data[0]);
+          break;
+
+        default:
+          break;
+    }
+
+    return VX_SUCCESS;
+}
+
 static void openReader(
     vx_binary_reader_s *reader,
     void *data,
@@ -6338,9 +6386,14 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                 patchInfo.originalBaseAddress = axiSRAMPhysical;
                 patchInfo.transformation = VX_BINARY_PATCH_TRANSFORMATION_ORIGINAL;
                 #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
-                vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(initBuffer, offsetArray[0],
-                                                                patchInfo.originalBaseAddress,
-                                                                patchInfo.transformation));
+                status = vxoBinaryGraph_ChangeAddressToOffset(initBuffer, offsetArray[0],
+                                                              patchInfo.originalBaseAddress,
+                                                              patchInfo.transformation);
+                if (status != VX_SUCCESS)
+                {
+                    vxError("%s[%d]: failed to chang address to offset\n", __FUNCTION__, __LINE__);
+                    vxmONERROR(VX_FAILURE);
+                }
                 patchInfo.originalBaseAddress = 0;
                 #endif
                 indexTemp = vxoBinaryGraph_SavePatchEntry(graph, (void *)&patchInfo);
@@ -6369,9 +6422,14 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                     patchInfo.originalBaseAddress = axiSRAMPhysical;
                     patchInfo.transformation      = VX_BINARY_PATCH_TRANSFORMATION_ORIGINAL;
                     #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
-                    vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(initBuffer, offsetArray[0],
-                                                                    patchInfo.originalBaseAddress,
-                                                                    patchInfo.transformation));
+                    status = vxoBinaryGraph_ChangeAddressToOffset(initBuffer, offsetArray[0],
+                                                                  patchInfo.originalBaseAddress,
+                                                                  patchInfo.transformation);
+                    if (status != VX_SUCCESS)
+                    {
+                        vxError("%s[%d]: failed to chang address to offset\n", __FUNCTION__, __LINE__);
+                        vxmONERROR(VX_FAILURE);
+                    }
                     patchInfo.originalBaseAddress = 0;
                     #endif
                     check = vxoBinaryGraph_SavePatchEntry(graph, (void *)&patchInfo);
@@ -6397,9 +6455,14 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                         patchInfo.originalBaseAddress = axiSRAMPhysical;
                         patchInfo.transformation      = VX_BINARY_PATCH_TRANSFORMATION_ORIGINAL;
                         #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
-                        vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(initBuffer, patchInfo.offset,
-                                                                         patchInfo.originalBaseAddress,
-                                                                         patchInfo.transformation));
+                        status = vxoBinaryGraph_ChangeAddressToOffset(initBuffer, patchInfo.offset,
+                                                                      patchInfo.originalBaseAddress,
+                                                                      patchInfo.transformation);
+                        if (status != VX_SUCCESS)
+                        {
+                            vxError("%s[%d]: failed to chang address to offset\n", __FUNCTION__, __LINE__);
+                            vxmONERROR(VX_FAILURE);
+                        }
                         patchInfo.originalBaseAddress = 0;
                         #endif
                         check = vxoBinaryGraph_SavePatchEntry(graph, (void *)&patchInfo);
@@ -6435,9 +6498,14 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                     patchInfo.originalBaseAddress = axiSRAMPhysical;
                     patchInfo.transformation      = VX_BINARY_PATCH_TRANSFORMATION_ORIGINAL;
                     #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
-                    vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(initBuffer, patchInfo.offset,
-                                                                     patchInfo.originalBaseAddress,
-                                                                     patchInfo.transformation));
+                    status = vxoBinaryGraph_ChangeAddressToOffset(initBuffer, patchInfo.offset,
+                                                                  patchInfo.originalBaseAddress,
+                                                                  patchInfo.transformation);
+                    if (status != VX_SUCCESS)
+                    {
+                        vxError("%s[%d]: failed to chang address to offset\n", __FUNCTION__, __LINE__);
+                        vxmONERROR(VX_FAILURE);
+                    }
                     patchInfo.originalBaseAddress = 0;
                     #endif
                     indexTemp = vxoBinaryGraph_SavePatchEntry(graph, (void *)&patchInfo);
@@ -6466,9 +6534,14 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                         patchInfo.originalBaseAddress = axiSRAMPhysical;
                         patchInfo.transformation      = VX_BINARY_PATCH_TRANSFORMATION_ORIGINAL;
                         #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
-                        vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(initBuffer, patchInfo.offset,
-                                                                         patchInfo.originalBaseAddress,
-                                                                         patchInfo.transformation));
+                        status = vxoBinaryGraph_ChangeAddressToOffset(initBuffer, patchInfo.offset,
+                                                                      patchInfo.originalBaseAddress,
+                                                                      patchInfo.transformation);
+                        if (status != VX_SUCCESS)
+                        {
+                            vxError("%s[%d]: failed to chang address to offset\n", __FUNCTION__, __LINE__);
+                            vxmONERROR(VX_FAILURE);
+                        }
                         patchInfo.originalBaseAddress = 0;
                         #endif
                         check = vxoBinaryGraph_SavePatchEntry(graph, (void *)&patchInfo);
@@ -6511,9 +6584,14 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                 patchInfo.originalBaseAddress = vipSRAMPhysical;
                 patchInfo.transformation      = VX_BINARY_PATCH_TRANSFORMATION_ORIGINAL;
                 #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
-                vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(initBuffer, patchInfo.offset,
-                                                                 patchInfo.originalBaseAddress,
-                                                                 patchInfo.transformation));
+                status = vxoBinaryGraph_ChangeAddressToOffset(initBuffer, patchInfo.offset,
+                                                              patchInfo.originalBaseAddress,
+                                                              patchInfo.transformation);
+                if (status != VX_SUCCESS)
+                {
+                    vxError("%s[%d]: failed to chang address to offset\n", __FUNCTION__, __LINE__);
+                    vxmONERROR(VX_FAILURE);
+                }
                 patchInfo.originalBaseAddress = 0;
                 #endif
                 indexTemp = vxoBinaryGraph_SavePatchEntry(graph, (void *)&patchInfo);
@@ -6546,9 +6624,14 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                     patchInfo.originalBaseAddress = vipSRAMPhysical;
                     patchInfo.transformation      = VX_BINARY_PATCH_TRANSFORMATION_ORIGINAL;
                     #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
-                    vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(initBuffer, patchInfo.offset,
-                                                                     patchInfo.originalBaseAddress,
-                                                                     patchInfo.transformation));
+                    status= vxoBinaryGraph_ChangeAddressToOffset(initBuffer, patchInfo.offset,
+                                                                 patchInfo.originalBaseAddress,
+                                                                 patchInfo.transformation);
+                    if (status != VX_SUCCESS)
+                    {
+                        vxError("%s[%d]: failed to chang address to offset\n", __FUNCTION__, __LINE__);
+                        vxmONERROR(VX_FAILURE);
+                    }
                     patchInfo.originalBaseAddress = 0;
                     #endif
                     indexTemp = vxoBinaryGraph_SavePatchEntry(graph, (void *)&patchInfo);
@@ -6578,6 +6661,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                                                               MEMORY_ALIGN_SIZE);
         if (stateLCDTIndex == 0xFFFFFFFF)
         {
+            vxError("%s[%d]: failed to save loaging config data in init operation\n", __FUNCTION__, __LINE__);
             vxmONERROR(VX_ERROR_NO_MEMORY);
         }
 
@@ -6604,6 +6688,11 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
     }
 
 OnError:
+    if (status != VX_SUCCESS)
+    {
+        vxoBinaryGraph_DumpHexData(initBuffer, context->binaryGraphInitSize[deviceID]);
+    }
+
     if (initBuffer != VX_NULL)
     {
         gcmVERIFY_OK(gcoOS_Free(gcvNULL, (gctPOINTER)initBuffer));
@@ -7283,11 +7372,16 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveShaderOperation(
 
         gcmGETHARDWAREADDRESSP(sharedMemNode, address);
 
-        vxmONERROR(vxoBinaryGraph_SaveShaderPatchTable(node, operation, (vx_uint32)address,
+        status = vxoBinaryGraph_SaveShaderPatchTable(node, operation, (vx_uint32)address,
                                             (vx_uint8_ptr)sharedMemNode->logical,
                                             (vx_uint32)sharedMemNode->size, (vx_uint32)address,
                                             stateBuffer, stateSize, VXNNE_MEM_POOL_TYPE_ORIG_DDR,
-                                            &patchCount, patchedParamPhy, &patchParamNum, 0xFF, 0x00));
+                                            &patchCount, patchedParamPhy, &patchParamNum, 0xFF, 0x00);
+        if (status != VX_SUCCESS)
+        {
+            vxError("%s[%d]: failed to Save Shader Patch Table\n", __FUNCTION__, __LINE__);
+            vxmONERROR(VX_FAILURE);
+        }
     }
 
     vxmASSERT(!hints->shaderVidNodes.crSpillVidmemNode[gceSGSK_FRAGMENT_SHADER] &&
@@ -7316,10 +7410,15 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveShaderOperation(
                 vxmONERROR(VX_FAILURE);
             }
 
-            vxmONERROR(vxoBinaryGraph_SaveShaderPatchTable(node, operation, physical, logical,
+            status = vxoBinaryGraph_SaveShaderPatchTable(node, operation, physical, logical,
                                                 (vx_uint32)imageInfo.bytes, physical,
                                                 stateBuffer, stateSize, vxoMemory_GetType(&image->memory),
-                                                &patchCount, patchedParamPhy, &patchParamNum, index, VX_TYPE_IMAGE));
+                                                &patchCount, patchedParamPhy, &patchParamNum, index, VX_TYPE_IMAGE);
+            if (status != VX_SUCCESS)
+            {
+                vxError("%s[%d]: failed to Save Shader Patch Table\n", __FUNCTION__, __LINE__);
+                vxmONERROR(VX_FAILURE);
+            }
         }
         else if (vx_true_e == vxoReference_IsValidAndSpecific(parameter, VX_TYPE_TENSOR))
         {
@@ -7381,10 +7480,15 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveShaderOperation(
                 }
             }
 
-            vxmONERROR(vxoBinaryGraph_SaveShaderPatchTable(node, operation, physical, logical,
+            status = vxoBinaryGraph_SaveShaderPatchTable(node, operation, physical, logical,
                                                 wholeSize, imageInfo.physicals[0],
                                                 stateBuffer, stateSize, allocType,
-                                                &patchCount, patchedParamPhy, &patchParamNum, index, VX_TYPE_TENSOR));
+                                                &patchCount, patchedParamPhy, &patchParamNum, index, VX_TYPE_TENSOR);
+            if (status != VX_SUCCESS)
+            {
+                vxError("%s[%d]: failed to Save Shader Patch Table\n", __FUNCTION__, __LINE__);
+                vxmONERROR(VX_FAILURE);
+            }
         }
         else if (vx_true_e == vxoReference_IsValidAndSpecific(parameter, VX_TYPE_ARRAY))
         {
@@ -8905,7 +9009,13 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
     /* create NBG file and allocate memory for binarySave */
     if (binarySave == VX_NULL)
     {
-        vxmONERROR(vxoBinaryGraph_Initialize(graph, VX_NULL));
+        status = vxoBinaryGraph_Initialize(graph, VX_NULL);
+        if (status != VX_SUCCESS)
+        {
+            vxError("%s[%d]: failed to initialize\n", __FUNCTION__, __LINE__);
+            vxmONERROR(VX_FAILURE);
+        }
+
         binarySave = graph->binarySave;
         if (binarySave == VX_NULL)
         {
@@ -9758,7 +9868,12 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
                 gcsHINT_PTR hints = VX_NULL;
                 gcsSURF_NODE_PTR sharedMemNode = VX_NULL;
 
-                vxmONERROR(vxoProgramKernel_GetCurrentShaderID(node, &currentShaderID));
+                status = vxoProgramKernel_GetCurrentShaderID(node, &currentShaderID);
+                if (status != VX_SUCCESS)
+                {
+                    vxError("%s[%d]: failed to get currecnt shader id\n", __FUNCTION__, __LINE__);
+                    vxmONERROR(VX_FAILURE);
+                }
                 kernelShader = node->kernel->kernelShader[currentShaderID];
                 hints = kernelShader->states.programState.hints;
                 /* the share memory of shader need to be patched? */
@@ -10051,7 +10166,12 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
     currPos += sizeof(vx_binary_entrance_info_s);
 
     /* refine input/output of graph if user call api vxIdentifyGraphInputsAndOutputs() */
-    vxmONERROR(vxoBinaryGraph_RefineInputOutput(graph, &inputCount, &outputCount));
+    status = vxoBinaryGraph_RefineInputOutput(graph, &inputCount, &outputCount);
+    if (status != VX_SUCCESS)
+    {
+        vxError("%s[%d]: failed to refine input and output\n", __FUNCTION__, __LINE__);
+        vxmONERROR(VX_FAILURE);
+    }
 
     /* allocate memory for inputInfo */
     graph->binarySave->inputInfo = (vx_binary_input_output_info_s*)vxAllocateAndZeroMemory(inputCount * sizeof(vx_binary_input_output_info_s));
@@ -10625,7 +10745,12 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
     /* save initialization command */
     if ((context->binaryGraphInitBuffer != VX_NULL) && (context->binaryGraphInitSize != VX_NULL))
     {
-        vxmONERROR(vxoBinaryGraph_SaveInitialOperation(graph));
+        status = vxoBinaryGraph_SaveInitialOperation(graph);
+        if (status != VX_SUCCESS)
+        {
+            vxError("%s[%d]: failed to save initial operation\n", __FUNCTION__, __LINE__);
+            vxmONERROR(VX_FAILURE);
+        }
     }
 
 OnError:
