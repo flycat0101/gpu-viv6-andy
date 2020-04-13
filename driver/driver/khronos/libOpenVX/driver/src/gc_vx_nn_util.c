@@ -5594,7 +5594,7 @@ vx_status vxo_updateSwapHandle(vx_graph graph)
                     {
                         if(node->paramTable[paramIndex] != VX_NULL && (node->paramTable[paramIndex]->type == VX_TYPE_TENSOR) && (((vx_tensor)executionLayer->swapHandle[j]->ref)->tensorBuffer == ((vx_tensor)node->paramTable[paramIndex])->tensorBuffer))
                          {
-                            if(graph->commandBuffer)
+                            if(graph->commandBuffer && node->patchLocation[paramIndex][0] != 0xFFFFFFFF)
                             {
                                 vxInfo("\n SH:  pre_physical:0x%08X, new_physical:0x%08X", graph->commandBuffer[node->patchLocation[paramIndex][0]], ((vx_tensor)executionLayer->swapHandle[j]->ref)->tensorBuffer->memory.physicals[0] + offset);
                                 graph->commandBuffer[node->patchLocation[paramIndex][0]] = ((vx_tensor)executionLayer->swapHandle[j]->ref)->tensorBuffer->memory.physicals[0] + offset;
@@ -5873,7 +5873,7 @@ vx_status patchNodeParamLocation(vx_node node)
                         break;
                 }
                 if (location == commandSizeInUint)
-                    location = 0;
+                    location = 0xFFFFFFFF;
                 node->patchLocation[j][0] = location;
 
                 break;
