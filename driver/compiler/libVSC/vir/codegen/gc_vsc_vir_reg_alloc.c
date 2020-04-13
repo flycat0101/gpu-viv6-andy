@@ -10975,7 +10975,7 @@ VSC_ErrCode _VIR_RA_LS_GenStoreAttr(
                                 newInst,
                                 newInst->src[VIR_Operand_Src2]);
 
-    newInst->dest = pInst->dest;
+    VIR_Operand_Copy(newInst->dest, pInst->dest);
     if (VIR_RA_LS_GetHwCfg(pRA)->hwFeatureFlags.hasHalti5 &&
         VIR_Inst_Store_Have_Dst(pInst))
     {
@@ -10985,14 +10985,13 @@ VSC_ErrCode _VIR_RA_LS_GenStoreAttr(
     }
     VIR_Operand_SetEnable(newInst->dest, stEnable);
 
-    gcmASSERT(stEnable == VIR_Operand_GetEnable(pInst->dest));
-
+    /* stEnable may be changed in _VIR_RA_LS_ComputeAttrIndexEnable */
+    gcmASSERT(stEnable == VIR_Operand_GetEnable(pInst->dest) ||
+              VIR_Symbol_GetName(sym) == VIR_NAME_TESS_LEVEL_OUTER ||
+              VIR_Symbol_GetName(sym) == VIR_NAME_TESS_LEVEL_INNER);
 
     /* remove attr_st */
-    VIR_Inst_SetDest(pInst, gcvNULL);
     VIR_Pass_DeleteInstruction(pFunc, pInst, gcvNULL);
-
-    pInst = newInst;
 
     return retValue;
 }
@@ -11252,7 +11251,6 @@ VSC_ErrCode _VIR_RA_LS_GenEmitRestart(
 
     /* remove emit */
     VIR_Pass_DeleteInstruction(pFunc, pInst, gcvNULL);
-    pInst = newInst;
 
     return retValue;
 }
