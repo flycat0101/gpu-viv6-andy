@@ -728,6 +728,7 @@ typedef struct _vxnne_tiling_order_info_s
 {
     vx_uint32                   opID;
     vx_uint32                   subID;
+    vxnne_operation             operation;
     vxnne_tiling_info           tilingInfo;
 }vxnne_tiling_order_info_s, *vxnne_tiling_order_info;
 

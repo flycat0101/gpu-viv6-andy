@@ -998,6 +998,16 @@ VX_PRIVATE_API vx_status GenerateTilingOrderInfo(
                     tilingSegmentInfo->tilingOrderInfo[orderCount].opID  = operation->absoluteOperationID;
                     tilingSegmentInfo->tilingOrderInfo[orderCount].subID = operation->walked;
                     tilingSegmentInfo->tilingOrderInfo[orderCount].tilingInfo = &operation->tilingInfo[operation->walked];
+                    tilingSegmentInfo->tilingOrderInfo[orderCount].operation = operation;
+                    if (orderCount > 0)
+                    {
+                        if (!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_USC_INVALIDATE_CACHE_LINE_FIX) &&
+                            tilingSegmentInfo->tilingOrderInfo[orderCount-1].operation->target != operation->target)
+                        {
+                            tilingSegmentInfo->tilingOrderInfo[orderCount].tilingInfo->flush = vx_true_e;
+                        }
+                    }
+
                     operation->walked++;
                     orderCount++;
                 }
