@@ -3157,10 +3157,16 @@ _clGetOrConstructElement(
            }
         }
         if(typeInfo != gcvNULL) {
-            dataType = typeInfo->typePtr[CompoundDecl->dataType->accessQualifier]
-                              [CompoundDecl->dataType->addrSpaceQualifier];
-            if(dataType->accessQualifier == clvQUALIFIER_CONST && CompoundDecl->ptrDscr != gcvNULL) {
-                dataType->accessQualifier = clvQUALIFIER_NONE;
+            if (!slmSLINK_LIST_IsEmpty(CompoundDecl->ptrDscr) && CompoundDecl->dataType->accessQualifier == clvQUALIFIER_CONST)
+            {
+                /* when the compound decl is a pointer, its element should not be const qualifier */
+                dataType = typeInfo->typePtr[clvQUALIFIER_NONE]
+                                            [CompoundDecl->dataType->addrSpaceQualifier];
+            }
+            else
+            {
+                dataType = typeInfo->typePtr[CompoundDecl->dataType->accessQualifier]
+                                            [CompoundDecl->dataType->addrSpaceQualifier];
             }
         }
         else dataType = gcvNULL;
