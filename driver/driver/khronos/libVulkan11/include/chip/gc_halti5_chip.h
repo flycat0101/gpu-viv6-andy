@@ -154,6 +154,7 @@ typedef enum
     HW_CACHE_TFB              = 1 << 11,
     HW_CACHE_L2               = 1 << 12,
     HW_CACHE_VERTEX_DATA      = 1 << 13, /* for multicluster */
+    HW_CACHE_MCTS_HEADER      = 1 << 14,
 
     /* combined mask */
     HW_CACHE_TEXTURE_DATA     = HW_CACHE_TEXTURE_L2 | HW_CACHE_TEXUTRE_L1,

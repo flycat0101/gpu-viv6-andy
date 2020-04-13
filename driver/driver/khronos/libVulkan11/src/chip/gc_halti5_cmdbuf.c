@@ -5646,13 +5646,6 @@ VkResult halti5_setRtTileStatus(
             __vkCmdLoadSingleHWState(commandBuffer, 0x05F8 + hwRtIndex, VK_FALSE,
                 img->memory->devAddr);
 
-            /* Program clear value register. */
-            __vkCmdLoadSingleHWState(commandBuffer, 0x0680 + hwRtIndex, VK_FALSE,
-                tsResource->fcValue[pRanges->baseMipLevel][pRanges->baseArrayLayer]);
-
-            __vkCmdLoadSingleHWState(commandBuffer, 0x0688 + hwRtIndex, VK_FALSE,
-                tsResource->fcValueUpper[pRanges->baseMipLevel][pRanges->baseArrayLayer]);
-
             gcmDUMP(gcvNULL, "#[surface 0x%x 0x%x]", tileStatusAddress, tsResource->tsNode.size);
 
             /* Program memory configuration register. */
@@ -10142,12 +10135,6 @@ VkResult halti5_setTxTileStatus(
  ~0U : (~(~0U << ((1 ? 16:16) - (0 ? 16:16) + 1))))))) << (0 ? 16:16))));
 
             __vkCmdLoadSingleHWState(&pCmdBuffer, VK_FALSE, 0x05D0 + samplerTSIndex, tileStatusAddress);
-
-            __vkCmdLoadSingleHWState(&pCmdBuffer, VK_FALSE, 0x05D8 + samplerTSIndex,
-                tsResource->fcValue[pRanges->baseMipLevel][pRanges->baseArrayLayer]);
-
-            __vkCmdLoadSingleHWState(&pCmdBuffer, VK_FALSE, 0x05E0 + samplerTSIndex,
-                tsResource->fcValueUpper[pRanges->baseMipLevel][pRanges->baseArrayLayer]);
 
             __vkCmdLoadSingleHWState(&pCmdBuffer, VK_FALSE, 0x06A0 + samplerTSIndex, imgMem->devAddr);
         }
@@ -14704,7 +14691,57 @@ VkResult halti5_flushCache(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));
         }
+
+        needSemaphoreStall = VK_TRUE;
     }
+
+    if (hwCacheMask & HW_CACHE_MCTS_HEADER)
+    {
+        *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E03) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ?
+ 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ? 25:16)));
+
+        *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:15) - (0 ?
+ 15:15) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 15:15) - (0 ?
+ 15:15) + 1))))))) << (0 ?
+ 15:15))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 15:15) - (0 ?
+ 15:15) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 15:15) - (0 ? 15:15) + 1))))))) << (0 ? 15:15)));
+
+        needSemaphoreStall = VK_TRUE;
+    }
+
 #endif
     if ((devCtx->database->REG_Halti5) && (hwCacheMask & HW_CACHE_INSTRUCTION))
     {

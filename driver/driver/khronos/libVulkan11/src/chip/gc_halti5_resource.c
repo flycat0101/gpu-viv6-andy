@@ -2980,13 +2980,28 @@ VkResult halti5_clearImage(
  ~0U : (~(~0U << ((1 ? 9:7) - (0 ? 9:7) + 1))))))) << (0 ? 9:7)))
             );
 
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5006, VK_FALSE, address);
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5000, VK_FALSE, address);
+
+#if __VK_ENABLETS
+        if (fastClear)
+        {
+            /* DestTileStatusAddress. */
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5008, VK_FALSE, tileStatusAddress);
+            /* Set SrcTileStatusAddress. */
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5004, VK_FALSE, tileStatusAddress);
+            /* DstClearValue. */
+            __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x500F, VK_FALSE, 2, fcClearValue);
+            /* SrcClearValue. */
+            __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x500D, VK_FALSE, 2, fcClearValue);
+        }
+#endif
+
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5009, VK_FALSE, config);
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500A, VK_FALSE, dstConfigEx);
-        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5006, VK_FALSE, address);
 
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5002, VK_FALSE, config);
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5003, VK_FALSE, srcConfigEx);
-        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5000, VK_FALSE, address);
 
         if (devCtx->enabledFeatures.robustBufferAccess &&
             devCtx->database->ROBUSTNESS &&
@@ -3026,19 +3041,6 @@ VkResult halti5_clearImage(
         __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x5011, VK_FALSE, 2, clearVals);
         __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x5013, VK_FALSE, 2, clearMasks);
 
-#if __VK_ENABLETS
-        if (fastClear)
-        {
-            /* DestTileStatusAddress. */
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5008, VK_FALSE, tileStatusAddress);
-            /* Set SrcTileStatusAddress. */
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5004, VK_FALSE, tileStatusAddress);
-            /* DstClearValue. */
-            __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x500F, VK_FALSE, 2, fcClearValue);
-            /* SrcClearValue. */
-            __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x500D, VK_FALSE, 2, fcClearValue);
-        }
-#endif
 
         originX = rect->offset.x * img->sampleInfo.x;
         originY = rect->offset.y * img->sampleInfo.y;
@@ -3287,6 +3289,8 @@ VkResult halti5_clearImage(
 
             /* Turn the tile status on again. */
             tsResource->tileStatusDisable[subResource->mipLevel][subResource->arrayLayer] = gcvFALSE;
+
+            halti5_flushCache((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE, HW_CACHE_MCTS_HEADER);
         }
 #endif
         partIndex++;
@@ -3410,7 +3414,7 @@ VkResult halti5_copyImage(
         {
             /* Flush the tile status cache. */
             __VK_ONERROR(halti5_flushCache((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE, HW_CACHE_ALL));
-            srcTileStatusAddress = halti5_computeTileStatusAddr(devCtx, srcImg, offset);;
+            srcTileStatusAddress = halti5_computeTileStatusAddr(devCtx, srcImg, offset);
 
             color64 = (srcTsResource->fcValue[srcRes->u.img.subRes.mipLevel][srcRes->u.img.subRes.arrayLayer] !=
                 srcTsResource->fcValueUpper[srcRes->u.img.subRes.mipLevel][srcRes->u.img.subRes.arrayLayer]);
@@ -4325,6 +4329,14 @@ VkResult halti5_copyImage(
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5016, VK_FALSE, ~0U);
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5017, VK_FALSE, ~0U);
 
+#if __VK_ENABLETS
+        /* Set SrcTileStatusAddress. */
+        if (srcFastClear)
+        {
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5004, VK_FALSE, srcTileStatusAddress);
+        }
+#endif
+
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5002, VK_FALSE, srcConfig);
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5003, VK_FALSE, srcConfigEx);
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5000, VK_FALSE, srcAddress);
@@ -4584,17 +4596,7 @@ VkResult halti5_copyImage(
  31:16) - (0 ?
  31:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16))));
-#if __VK_ENABLETS
-        /* Set SrcTileStatusAddress. */
-        if (srcFastClear)
-        {
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5004, VK_FALSE, srcTileStatusAddress);
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500D, VK_FALSE,
-                srcTsResource->fcValue[srcRes->u.img.subRes.mipLevel][srcRes->u.img.subRes.arrayLayer]);
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500E, VK_FALSE,
-                srcTsResource->fcValueUpper[srcRes->u.img.subRes.mipLevel][srcRes->u.img.subRes.arrayLayer]);
-        }
-#endif
+
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x502B, VK_FALSE,
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:1) - (0 ?
