@@ -14,7 +14,6 @@
 #ifndef __GC_VX_BINARY_H__
 #define __GC_VX_BINARY_H__
 
-#define SH_COMMAND_ALIGN_SIZE             256
 #define VX_MAX_LAYER_NAME_LENGTH          64
 #define VX_MAX_NAME_LEGTH                 64
 #define VX_MAX_IO_NAME_LEGTH              64

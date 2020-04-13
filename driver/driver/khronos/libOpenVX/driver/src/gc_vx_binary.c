@@ -28,6 +28,9 @@
 #ifndef ORI_NNARCHPERF
 #include "archModelInterface.h"
 #endif
+
+#define SH_COMMAND_ALIGN_SIZE        256
+#define MEMORY_ALIGN_SIZE            64
 #define ONCE_FILL_SIZE               1024
 #define BINARY_FILE_NAME_MAX_SIZE    256
 #define LOAD_WHOLE_BINARY_TO_BUFFER  0
@@ -4507,7 +4510,8 @@ VX_PRIVATE_API vx_uint32 vxoBinaryGraph_SearchPatternRightShift6(
 VX_PRIVATE_API vx_uint32 vxoBinaryGraph_SaveLoadingConfigData(
     vx_graph  graph,
     vx_uint8 *source,
-    vx_uint32 bytes
+    vx_uint32 bytes,
+    vx_uint32 alignSize
     )
 {
 #define WRITE_NBG_CHECK_LCD()   \
@@ -4521,16 +4525,25 @@ VX_PRIVATE_API vx_uint32 vxoBinaryGraph_SaveLoadingConfigData(
     vx_uint32 i = 0;
     vx_status status = VX_SUCCESS;
     vx_uint32 loadingDataTableIndex;
-    vx_uint32 alignedBytes = gcmALIGN(bytes, 64);
+    vx_uint32 alignedBytes = 0;
     vx_binary_loadingdata_table_info_s loadingDataTable;
     vx_binary_save_s *binarySave = graph->binarySave;
-    gcmHEADER_ARG("graph=%p, source=%p, bytes=0x%x", graph, source, bytes);
+    gcmHEADER_ARG("graph=%p, source=%p, bytes=0x%x, alignSize=0x%x", graph, source, bytes, alignSize);
     if (bytes <= 0)
     {
         vxError("%s[%d]: save bytes is 0, fail to save binary\n", __FUNCTION__, __LINE__);
         vxmASSERT(0);
         gcmFOOTER_ARG("0x%x", 0xFFFFFFFF);
         return 0xFFFFFFFF;
+    }
+
+    if (alignSize > 0)
+    {
+        alignedBytes = gcmALIGN(bytes, alignSize);
+    }
+    else
+    {
+        alignedBytes = bytes;
     }
 
     /* save loading data */
@@ -4709,7 +4722,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveShaderPatchTable(
                 LCDTindex = vxoBinaryGraph_GetLCDTIndexForTempTensor(node->graph, basePhysical, &lcdSize);
                 if (-1 == LCDTindex)
                 {
-                    LCDTindex = (vx_int32)vxoBinaryGraph_SaveLoadingConfigData(node->graph, baseLogical, wholeSize);
+                    LCDTindex = (vx_int32)vxoBinaryGraph_SaveLoadingConfigData(node->graph, baseLogical, wholeSize, MEMORY_ALIGN_SIZE);
                     binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].tensorPhysical = basePhysical;
                     binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].LCDTIndex = LCDTindex;
                     binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].size  = wholeSize;
@@ -5632,7 +5645,7 @@ VX_PRIVATE_API vx_uint32 vxoBinaryGraph_GetSourceType(
                 LCDTindex = vxoBinaryGraph_GetLCDTIndexForTempTensor(graph, basePhysical, &lcdSize);
                 if (-1 == LCDTindex)
                 {
-                    LCDTindex = (vx_int32)vxoBinaryGraph_SaveLoadingConfigData(graph, baseLogical, wholeSize);
+                    LCDTindex = (vx_int32)vxoBinaryGraph_SaveLoadingConfigData(graph, baseLogical, wholeSize, MEMORY_ALIGN_SIZE);
                     binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].tensorPhysical = basePhysical;
                     binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].LCDTIndex = LCDTindex;
                     binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].size  = wholeSize;
@@ -6110,8 +6123,9 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
 
         /*2. save INIT command to LCD*/
         stateLCDTIndex = vxoBinaryGraph_SaveLoadingConfigData(graph,
-                        (vx_uint8_ptr)initBuffer,
-                        context->binaryGraphInitSize[deviceID]);
+                                                              (vx_uint8_ptr)initBuffer,
+                                                              context->binaryGraphInitSize[deviceID],
+                                                              MEMORY_ALIGN_SIZE);
         if (stateLCDTIndex == 0xFFFFFFFF)
         {
             vxmONERROR(VX_ERROR_NO_MEMORY);
@@ -6176,7 +6190,8 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveEndOperation(
     /*2. save END commands to LCD*/
     stateLCDTIndex = vxoBinaryGraph_SaveLoadingConfigData(graph,
                                                           stateBuffer,
-                                                          stateSize);
+                                                          stateSize,
+                                                          MEMORY_ALIGN_SIZE);
     if (stateLCDTIndex == 0xFFFFFFFF)
     {
         vxmONERROR(VX_ERROR_NO_MEMORY);
@@ -6255,7 +6270,9 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveScalerOperation(
 
     /*1. save states to LCD */
     stateLCDTIndex = vxoBinaryGraph_SaveLoadingConfigData(graph,
-                                stateBuffer, (vx_uint32)stateSize);
+                                                          stateBuffer,
+                                                          (vx_uint32)stateSize,
+                                                          MEMORY_ALIGN_SIZE);
     if (stateLCDTIndex == 0xFFFFFFFF)
     {
         vxmONERROR(VX_ERROR_NO_MEMORY);
@@ -6297,7 +6314,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveScalerOperation(
                 LCDTindex = vxoBinaryGraph_GetLCDTIndexForTempTensor(graph, planePhysicalBase, &lcdSize);
                 if (-1 == LCDTindex)
                 {
-                    LCDTindex = (vx_int32)vxoBinaryGraph_SaveLoadingConfigData(graph, planeLogicaBase, planeSize);
+                    LCDTindex = (vx_int32)vxoBinaryGraph_SaveLoadingConfigData(graph, planeLogicaBase, planeSize, MEMORY_ALIGN_SIZE);
                     binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].tensorPhysical = planePhysicalBase;
                     binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].LCDTIndex = LCDTindex;
                     binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].size  = planeSize;
@@ -6437,7 +6454,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveScalerOperation(
                 LCDTindex = vxoBinaryGraph_GetLCDTIndexForTempTensor(graph, physicalAddrBase, &lcdSize);
                 if (-1 == LCDTindex)
                 {
-                    LCDTindex = (vx_int32)vxoBinaryGraph_SaveLoadingConfigData(graph, logicalAddr, wholeSize);
+                    LCDTindex = (vx_int32)vxoBinaryGraph_SaveLoadingConfigData(graph, logicalAddr, wholeSize, MEMORY_ALIGN_SIZE);
                     binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].tensorPhysical = physicalAddrBase;
                     binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].LCDTIndex = LCDTindex;
                     binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].size  = wholeSize;
@@ -6656,7 +6673,9 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveShaderOperation(
     }
 
     stateLCDTIndex = vxoBinaryGraph_SaveLoadingConfigData(node->graph,
-                                            stateBuffer, (vx_uint32)stateSize);
+                                                          stateBuffer,
+                                                          (vx_uint32)stateSize,
+                                                          MEMORY_ALIGN_SIZE);
     if (stateLCDTIndex == 0xFFFFFFFF)
     {
         vxmONERROR(VX_ERROR_NO_MEMORY);
@@ -6670,6 +6689,22 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveShaderOperation(
         vx_int32 ret = -1;
         vx_binary_patch_info_s patchInfo;
         vx_uint32 SHinstrSize = hints->fsInstCount * sizeof(gctUINT) * 4;
+        vx_binary_save_s *binarySave = graph->binarySave;
+        vx_uint32 alignSize = 0;
+        vx_uint32 diffSize = 0;
+
+        /* SH instr should be aligned to 256 */
+        alignSize = gcmALIGN_SAFE(binarySave->currLoadingDataOffset, SH_COMMAND_ALIGN_SIZE);
+        if (alignSize > binarySave->currLoadingDataOffset)
+        {
+            diffSize = alignSize - binarySave->currLoadingDataOffset;
+        }
+
+        if (diffSize > 0)
+        {
+            /* fill zero to LCD for alignSize */
+            vxoBinaryGraph_SaveLoadingConfigData(node->graph, VX_NULL, diffSize, 0);
+        }
 
         if (SHinstrSize > (vx_uint32)instMemNode->size)
         {
@@ -6682,7 +6717,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveShaderOperation(
 
         instructionLCDTIndex = vxoBinaryGraph_SaveLoadingConfigData(node->graph,
                                                     instMemNode->logical,
-                                                    SHinstrSize);
+                                                    SHinstrSize, SH_COMMAND_ALIGN_SIZE);
         if (instructionLCDTIndex == 0xFFFFFFFF)
         {
             vxmONERROR(VX_ERROR_NO_MEMORY);
@@ -7119,7 +7154,8 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveTPNNOperation(
             LCDTindex   = vxoBinaryGraph_GetLCDTIndexForTempTensor(node->graph, input->memoryPhysicalBase, &lcdSize);
             if (-1 == LCDTindex)
             {
-                LCDTindex = (vx_int32)vxoBinaryGraph_SaveLoadingConfigData(node->graph, input->memoryLogicalBase, input->memorySize);
+                LCDTindex = (vx_int32)vxoBinaryGraph_SaveLoadingConfigData(node->graph, input->memoryLogicalBase,
+                                                                           input->memorySize, MEMORY_ALIGN_SIZE);
                 binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].tensorPhysical = input->memoryPhysicalBase;
                 binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].LCDTIndex = LCDTindex;
                 binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].size = input->memorySize;
@@ -7342,7 +7378,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveTPNNOperation(
             LCDTindex   = vxoBinaryGraph_GetLCDTIndexForTempTensor(node->graph, output->memoryPhysicalBase, &lcdSize);
             if (-1 == LCDTindex)
             {
-                LCDTindex = (vx_int32)vxoBinaryGraph_SaveLoadingConfigData(node->graph, VX_NULL, output->memorySize);
+                LCDTindex = (vx_int32)vxoBinaryGraph_SaveLoadingConfigData(node->graph, VX_NULL, output->memorySize, MEMORY_ALIGN_SIZE);
                 binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].tensorPhysical = output->memoryPhysicalBase;
                 binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].LCDTIndex = LCDTindex;
                 binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].size = output->memorySize;
@@ -7519,7 +7555,8 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveTPNNOperation(
 
             ksLCDTIndex = vxoBinaryGraph_SaveLoadingConfigData(node->graph,
                                                                 ksDataLogical,
-                                                                ksDataSize);
+                                                                ksDataSize,
+                                                                MEMORY_ALIGN_SIZE);
             binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].tensorPhysical = ksDataPhysical;
             binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].LCDTIndex = (vx_uint32)ksLCDTIndex;
             binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].size = ksDataSize;
@@ -7789,7 +7826,8 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveNNTPStates(
     /* 1. re-write state lcd index to operation table*/
     stateLCDTIndex = vxoBinaryGraph_SaveLoadingConfigData(node->graph,
                                                           stateBuffer,
-                                                          stateSize);
+                                                          stateSize,
+                                                          MEMORY_ALIGN_SIZE);
     if (stateLCDTIndex == 0xFFFFFFFF)
     {
         vxmONERROR(VX_ERROR_NO_MEMORY);
@@ -9751,11 +9789,12 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
 
     currPos += binarySave->loadingDataCount * sizeof(vx_binary_loadingdata_table_info_s);
 
+    /* LCD offset should be aligned to 256 */
     if (1 == binarySave->generateNBGToMemory)
     {
         vx_uint8_ptr pos =  (vx_uint8_ptr)binarySave->NBGBuffer + currPos;
         vx_uint64 address = gcmPTR_TO_UINT64(pos);
-        vx_uint64 alignAddress = gcmALIGN_SAFE(address, 64);
+        vx_uint64 alignAddress = gcmALIGN_SAFE(address, SH_COMMAND_ALIGN_SIZE);
         vx_uint32 diff = (vx_uint32)(alignAddress - address);
         currPos += diff;
     }
@@ -9769,7 +9808,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
     binarySave->headerInfo.magic[1]= 'P';
     binarySave->headerInfo.magic[2]= 'M';
     binarySave->headerInfo.magic[3]= 'N';
-    binarySave->headerInfo.version = 0x00010004;
+    binarySave->headerInfo.version = 0x00010005;
     binarySave->headerInfo.target = context->pid;
     binarySave->headerInfo.layerCount     = graph->nodeCount;
     binarySave->headerInfo.operationCount = binarySave->operationCount;
@@ -9829,7 +9868,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
                                                                             SH_COMMAND_ALIGN_SIZE); /* for DDR-less project alignment */
     binarySave->entrancesInfo.loadingConfigDataEntr.loadingConfigDataBytes  = 0; /* rewrite later */
 
-    vxmASSERT(binarySave->entrancesInfo.loadingConfigDataEntr.loadingConfigDataOffset ==  binarySave->currLoadingDataOffset);
+    binarySave->entrancesInfo.loadingConfigDataEntr.loadingConfigDataOffset =  binarySave->currLoadingDataOffset;
 
     status = vxoBinaryGraph_Write(binarySave, binarySave->entryTablePos, sizeof(vx_binary_entrance_info_s), &binarySave->entrancesInfo);
     WRITE_NBG_STATUS_CHECK();
@@ -11789,15 +11828,6 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_VerifyGraph(
             vxoGraphParallel_AnalyzeOperationsBefore(graph);
         }
 
-        if (graph->base.context->options.collectPerfType == COLLECT_PERF_ESTIMATE)
-        {
-#ifdef ORI_NNARCHPERF
-            vxoGraph_PredictPerf(graph);
-#else
-            archGraphPredictPerf(graph);
-#endif
-        }
-
         vxmONERROR(vxoGraph_VerifyTiling(graph));
 
         vxmONERROR(vxoGraph_VerifyVirtualBuffer(graph));
@@ -12011,6 +12041,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNBGSize(
     {
         *size = (vx_size)totalSize;
     }
+
+    totalSize += SH_COMMAND_ALIGN_SIZE;
 
     graph->binarySave->NBGInMemorySize = totalSize;
 
