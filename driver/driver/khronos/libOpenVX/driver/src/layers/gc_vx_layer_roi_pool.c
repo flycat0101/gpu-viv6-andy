@@ -659,19 +659,33 @@ VX_PRIVATE_API vx_status vxoROIPoolLayer_TP_Initialize(vxnne_layer ops_layer, co
     vx_bool mult = context->options.enableMultiTP && core > 1;
     vx_uint32 slice = !mult ? 1 : gcmMIN(TENSOR_VIEW_SIZE_INDEX(outputs, 3), core);
     vx_uint32 roi_size = TENSOR_VIEW_SIZE_INDEX(outputs, 3);
-    vx_uint32 split_size_array[TP_TENSOR_COUNT] = {0};
-    vx_uint32 split_offset_array[TP_TENSOR_COUNT] = {0};
     vx_uint32 splitEnds[TP_TENSOR_COUNT] = {0};
+    vx_uint32 multiGpu_split_size[TP_TENSOR_COUNT];
+    vx_uint32 multiGpu_split_offset[TP_TENSOR_COUNT];
+    vx_uint32 split_size[TP_TENSOR_COUNT][TP_TENSOR_COUNT] = {0};
+    vx_uint32 split_offset[TP_TENSOR_COUNT][TP_TENSOR_COUNT] = {0};
     vx_uint32 i = 0;
+    vx_uint32 gpuCount = 0;
+    vx_uint32 all_split_count = 0;
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
-    calculateSplitSize(roi_size, slice, split_size_array, split_offset_array);
+    gcmONERROR(gcoVX_QueryCoreCount((((roipoolLayer)->base).node)->graph->deviceID, &gpuCount));
 
-    splitEnds[0] = split_size_array[0] - 1;
-    for (i = 1; i < slice; i++)
+    gpuCount = context->options.enableMultiVIPCombined ? gpuCount :1;
+
+    calculateSplitSize(roi_size, gpuCount, multiGpu_split_size, multiGpu_split_offset);
+
+    for(i = 0; i < gpuCount; ++i)
+        calculateSplitSize(multiGpu_split_size[i], slice, split_size[i], split_offset[i]);
+
+    all_split_count = slice * gpuCount;
+
+    splitEnds[0] = split_size[0][0] -1;
+
+    for(i = 1; i < all_split_count; ++i)
     {
-        splitEnds[i] = splitEnds[i - 1] + split_size_array[i];
+        splitEnds[i] = split_size[i/slice][i%slice] + splitEnds[ i - 1];
     }
 
     vxmONERROR(vxnneOperation_Initialize(&roipoolLayer->roipool_tp_operation[0].base,
@@ -766,16 +780,16 @@ VX_PRIVATE_API vx_status vxoROIPoolLayer_TP_Initialize(vxnne_layer ops_layer, co
         goto OnError;
     }
     /* Prepare Split end list. */
-    split_end = vxnneAllocateTPROIListBuffer(context, ops_layer->node, slice, VX_TYPE_UINT32);
+    split_end = vxnneAllocateTPROIListBuffer(context, ops_layer->node, all_split_count, VX_TYPE_UINT32);
     if (split_end == VX_NULL)
     {
         status = VX_ERROR_NO_MEMORY;
         goto OnError;
     }
 
-    vxnneInitROITensorFromBuffer(split_end, splitEnds, slice * sizeof(vx_uint32));
+    vxnneInitROITensorFromBuffer(split_end, splitEnds, all_split_count * sizeof(vx_uint32));
 
-    shaderExecutable = vxnneROIRect2ROIListShaderExecutable(context, VXNNE_KERNEL_ROIRECT2ROILIST, &ops_layer->node->kernelAttributes.borderMode, input_rois, roi_stride, rois_num, pool_width, pool_height, spatial_scale, slice, split_end, list);
+    shaderExecutable = vxnneROIRect2ROIListShaderExecutable(context, VXNNE_KERNEL_ROIRECT2ROILIST, &ops_layer->node->kernelAttributes.borderMode, input_rois, roi_stride, rois_num, pool_width, pool_height, spatial_scale, all_split_count, split_end, list);
     if (!shaderExecutable)
     {
         status = VX_FAILURE;

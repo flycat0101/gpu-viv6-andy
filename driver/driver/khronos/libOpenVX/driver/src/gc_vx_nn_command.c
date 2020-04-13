@@ -1915,7 +1915,7 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
             else
             {
                 slice = !mult ? 1 : gcmMIN(value->u32[6], core);
-                size = value->u32[6];
+                size = ((parameter)->data_buff)->dims[0]/4;
             }
             break;
         }
@@ -3335,13 +3335,13 @@ void _fill_TP_ROI_POOLING_Command(
         {
             vx_uint32 proposalsInterleaved, zTogether;
             vx_tensor inputTensor = (vx_tensor)other_tensor;
-
+            vx_uint32 physical = 0;
             vxmASSERT(data_buff != VX_NULL);
 
             inXSize = TENSOR_VIEW_SIZE_INDEX(inputTensor, 0);
             inYSize = TENSOR_VIEW_SIZE_INDEX(inputTensor, 1);
             inZSize = TENSOR_VIEW_SIZE_INDEX(inputTensor, 2);
-
+            vxoTensor_GetTensorViewMemory(data_buff, VX_NULL, &physical);
             proposalsInterleaved = 1;
             zTogether = 1;
 
@@ -3356,7 +3356,7 @@ void _fill_TP_ROI_POOLING_Command(
             info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = inXSize - 1;
             info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x2;
             info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase;
-            info_array[i].vx_tp_general_cmd_split_info.inTileListAddress = data_buff->tensorBuffer->memory.physicals[0] + split_offsets[i] * sizeof(vx_tp_roi_pool);
+            info_array[i].vx_tp_general_cmd_split_info.inTileListAddress = physical + split_offsets[i] * sizeof(vx_tp_roi_pool);
             info_array[i].vx_tp_general_cmd_split_info.inTileXSize = poolHeight;
             info_array[i].vx_tp_general_cmd_split_info.inTileYSize = poolWidth;
             info_array[i].vx_tp_general_cmd_split_info.inTileXInc = zTogether;
@@ -4349,8 +4349,8 @@ void _fill_TP_DILATE_RESHUFFLE_Command(
 
     DEFINE_TP_GENERAL_PARAMETER();
 
-    dilationX = parameter->dilationX;
-    dilationY = parameter->dilationY;
+    dilationX = (vx_uint32)parameter->dilationX;
+    dilationY = (vx_uint32)parameter->dilationY;
     orgoutZSize = parameter->tp_value->u32[0];
 
     for (i = 0; i < split_count; i++)
