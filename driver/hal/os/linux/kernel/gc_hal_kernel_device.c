@@ -702,7 +702,7 @@ _ShowRecord(
     }
     else
     {
-        physical = (gctUINT64)Record->physical;
+        physical = (gctUINT64)(gctUINTPTR_T)Record->physical;
     }
 
     seq_printf(File, "%-14s %3d %16x %16zx %16zu\n",
