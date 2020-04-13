@@ -6503,6 +6503,7 @@ _AddTexelBufferToImage(
         pTexelBufferToImageSym->layout = pSamplerSym->layout;
         /* Set the corresponding image format. */
         VIR_Symbol_SetImageFormat(pTexelBufferToImageSym, fixedImageFormat);
+        VIR_Symbol_SetOriginalImageFormat(pTexelBufferToImageSym, fixedImageFormat);
 
         pTexelBufferToImage = VIR_Symbol_GetImage(pTexelBufferToImageSym);
         pTexelBufferToImage->u.samplerOrImageAttr.parentSamplerSymId = VIR_Symbol_GetIndex(pSamplerSym);
@@ -7000,7 +7001,7 @@ VIR_Lib_UpdateImageFormat(
         if (VIR_Symbol_GetDescriptorSet(pVirUniformSym) == pImageFormatInfo->set &&
             VIR_Symbol_GetBinding(pVirUniformSym) == pImageFormatInfo->binding)
         {
-            originalImageFormat = VIR_Symbol_GetImageFormat(pVirUniformSym);
+            originalImageFormat = VIR_Symbol_GetOriginalImageFormat(pVirUniformSym);
             VIR_Symbol_SetImageFormat(pVirUniformSym, imageFormat);
 
             /*
@@ -7013,8 +7014,16 @@ VIR_Lib_UpdateImageFormat(
             */
             if (originalImageFormat != VIR_IMAGE_FORMAT_NONE && originalImageFormat != imageFormat)
             {
+                VIR_IMAGE_ACCESS_STRATEGY accessStrategy = (VIR_IMAGE_ACCESS_STRATEGY)pImageFormatInfo->replaceStrategy;
+
+                VIR_Symbol_SetImageAccessStrategy(pVirUniformSym, accessStrategy);
                 VIR_Symbol_SetFlagExt(pVirUniformSym, VIR_SYMUNIFORMFLAGEXT_IMAGE_FORMAT_MISMATCH);
-                VIR_Shader_SetFlagExt1(pShader, VIR_SHFLAG_EXT1_IMAGE_FORMAT_MISMATCH);
+
+                /* If the access strategy is using the current format, then we don't need to trigger this. */
+                if (accessStrategy != VIR_IMAGE_ACCESS_STRATEGY_USE_FORMAT)
+                {
+                    VIR_Shader_SetFlagExt1(pShader, VIR_SHFLAG_EXT1_IMAGE_FORMAT_MISMATCH);
+                }
             }
 
             break;

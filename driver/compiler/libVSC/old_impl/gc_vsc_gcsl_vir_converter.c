@@ -2727,6 +2727,7 @@ _ConvShaderUniformIdx2Vir(
                 VIR_Symbol_SetBinding(sym, GetUniformBinding(uniform));
                 VIR_Symbol_SetLocation(sym, GetUniformLayoutLocation(uniform));
                 VIR_Symbol_SetImageFormat(sym, imageFormat);
+                VIR_Symbol_SetOriginalImageFormat(sym, imageFormat);
             }
             break;
 
@@ -2754,6 +2755,7 @@ _ConvShaderUniformIdx2Vir(
                 if (isUniformImage(uniform))
                 {
                     VIR_Symbol_SetImageFormat(sym, _ConvImageFormat2Vir(uniform->imageFormat));
+                    VIR_Symbol_SetOriginalImageFormat(sym, _ConvImageFormat2Vir(uniform->imageFormat));
                 }
             }
             VIR_FieldInfo_SetTempRegOrUniformOffset(VIR_Symbol_GetFieldInfo(sym), currUniformIndex - StartUniformIndex);

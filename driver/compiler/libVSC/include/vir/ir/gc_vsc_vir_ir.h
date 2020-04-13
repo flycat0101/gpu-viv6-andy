@@ -1275,7 +1275,9 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Symbol_GetStructTypeId(Sym)     (VIR_Symbol_isField(Sym) ? (Sym)->u3.structTypeId : VIR_INVALID_ID)
 #define VIR_Symbol_GetLayout(Sym)           (&(Sym)->layout)
 #define VIR_Symbol_GetLayoutQualifier(Sym)  ((Sym)->layout.layoutQualifier)
-#define VIR_Symbol_GetImageFormat(Sym)      (VIR_Layout_GetImageFormat(VIR_Symbol_GetLayout(Sym)))
+#define VIR_Symbol_GetOriginalImageFormat(Sym)  (VIR_Layout_GetOriginalImageFormat(VIR_Symbol_GetLayout(Sym)))
+#define VIR_Symbol_GetImageFormat(Sym)          (VIR_Layout_GetImageFormat(VIR_Symbol_GetLayout(Sym)))
+#define VIR_Symbol_GetImageAccessStrategy(Sym)  (VIR_Layout_GetImageAccessStrategy(VIR_Symbol_GetLayout(Sym)))
 #define VIR_Symbol_GetImageSampledType(Sym) (VIR_Layout_GetImageSampledType(VIR_Symbol_GetLayout(Sym)))
 #define VIR_Symbol_GetLocation(Sym)         ((Sym)->layout.location)
 #define VIR_Symbol_GetMasterLocation(Sym)   ((Sym)->layout.masterLocation)
@@ -1313,6 +1315,15 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
     do {(Sym)->layout.layoutQualifier = (Qual); } while(0)
 #define VIR_Symbol_SetOneLayoutQualifier(Sym, Qual)     \
     do {(Sym)->layout.layoutQualifier |= (Qual); } while(0)
+#define VIR_Symbol_SetOriginalImageFormat(Sym, Val)                         \
+    do                                                                      \
+    {                                                                       \
+        (Sym)->layout.originalImageFormat = (Val);                          \
+        if ((Val) != VIR_IMAGE_FORMAT_NONE)                                 \
+        {                                                                   \
+            VIR_Symbol_SetOneLayoutQualifier(Sym, VIR_LAYQUAL_IMAGE_FORMAT);\
+        }                                                                   \
+    } while(0)
 #define VIR_Symbol_SetImageFormat(Sym, Val)                                 \
     do                                                                      \
     {                                                                       \
@@ -1322,6 +1333,8 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
             VIR_Symbol_SetOneLayoutQualifier(Sym, VIR_LAYQUAL_IMAGE_FORMAT);\
         }                                                                   \
     } while(0)
+#define VIR_Symbol_SetImageAccessStrategy(Sym, Qual)                        \
+    do {(Sym)->layout.imageAccessStrategy = (Qual); } while(0)
 #define VIR_Symbol_SetImageSampledType(Sym, Val)                            \
     do                                                                      \
     {                                                                       \
@@ -2882,10 +2895,20 @@ typedef enum _VIR_LAYOUTQUAL
     VIR_LAYQUAL_BLEND_SUPPORT_SCREEN                 = 0xF00000,
 } VIR_LayoutQual;
 
+/* Same value with VSC_LIB_LINK_IMAGE_ACCESS_STRATEGY. */
+typedef enum _VIR_IMAGE_ACCESS_STRATEGY
+{
+    VIR_IMAGE_ACCESS_STRATEGY_USE_FORMAT                = 0,
+    VIR_IMAGE_ACCESS_STRATEGY_LOAD_ZERO_STORE_NOP       = 1,
+    VIR_IMAGE_ACCESS_STRATEGY_LOAD_ZERO_STORE_ZERO      = 2,
+} VIR_IMAGE_ACCESS_STRATEGY;
+
 typedef struct _VIR_LAYOUT
 {
     VIR_LayoutQual layoutQualifier;     /* layout quliafiers */
-    VIR_ImageFormat imageFormat;        /* Image format qualilfier. */
+    VIR_ImageFormat originalImageFormat;/* Image format qualilfier, from spirv or shader source. */
+    VIR_ImageFormat imageFormat;        /* Image format qualilfier, use for code generation. */
+    VIR_IMAGE_ACCESS_STRATEGY  imageAccessStrategy;
     VIR_TypeId     imageSampledType;
     gctINT         location;            /* location of in/out variable, uniform, interface block */
     gctINT         component;           /* Indicates which component within a Location input/output will be taken by the decorated entity. */
@@ -2901,22 +2924,24 @@ typedef struct _VIR_LAYOUT
     gctUINT        hwFirstCompIndex;    /* HW's 'attributeIndex' to index USC, just for I/O */
 } VIR_Layout;
 
-#define VIR_LAYOUT_Initialize(Layout)                                   \
-    do {                                                                \
-        gcoOS_ZeroMemory((Layout), gcmSIZEOF(VIR_Layout));              \
-        (Layout)->location = NOT_ASSIGNED;                              \
-        (Layout)->component = NOT_ASSIGNED;                             \
-        (Layout)->imageFormat = VIR_IMAGE_FORMAT_NONE;                  \
-        (Layout)->imageSampledType = VIR_TYPE_UNKNOWN;                  \
-        (Layout)->masterLocation = NOT_ASSIGNED;                        \
-        (Layout)->binding = NOT_ASSIGNED;                               \
-        (Layout)->streamNumber = 0;                                     \
-        (Layout)->inputAttachmentIndex = NOT_ASSIGNED;                  \
-        (Layout)->descriptorSet = NOT_ASSIGNED;                         \
-        (Layout)->llFirstSlot = NOT_ASSIGNED;                           \
-        (Layout)->llArraySlot = NOT_ASSIGNED;                           \
-        (Layout)->llResSlot = NOT_ASSIGNED;                             \
-        (Layout)->hwFirstCompIndex = NOT_ASSIGNED;                      \
+#define VIR_LAYOUT_Initialize(Layout)                                           \
+    do {                                                                        \
+        gcoOS_ZeroMemory((Layout), gcmSIZEOF(VIR_Layout));                      \
+        (Layout)->location = NOT_ASSIGNED;                                      \
+        (Layout)->component = NOT_ASSIGNED;                                     \
+        (Layout)->originalImageFormat = VIR_IMAGE_FORMAT_NONE;                  \
+        (Layout)->imageFormat = VIR_IMAGE_FORMAT_NONE;                          \
+        (Layout)->imageAccessStrategy = VIR_IMAGE_ACCESS_STRATEGY_USE_FORMAT;   \
+        (Layout)->imageSampledType = VIR_TYPE_UNKNOWN;                          \
+        (Layout)->masterLocation = NOT_ASSIGNED;                                \
+        (Layout)->binding = NOT_ASSIGNED;                                       \
+        (Layout)->streamNumber = 0;                                             \
+        (Layout)->inputAttachmentIndex = NOT_ASSIGNED;                          \
+        (Layout)->descriptorSet = NOT_ASSIGNED;                                 \
+        (Layout)->llFirstSlot = NOT_ASSIGNED;                                   \
+        (Layout)->llArraySlot = NOT_ASSIGNED;                                   \
+        (Layout)->llResSlot = NOT_ASSIGNED;                                     \
+        (Layout)->hwFirstCompIndex = NOT_ASSIGNED;                              \
     } while(0)
 
 #define VIR_Layout_GetQualifiers(Layout)    ((Layout)->layoutQualifier)
@@ -2942,13 +2967,15 @@ typedef struct _VIR_LAYOUT
 #define VIR_Layout_GetOffset(Layout)        ((Layout)->offset)
 #define VIR_Layout_HasBlend(Layout)         ((Layout)->layoutQualifier & VIR_LAYQUAL_BLEND)
 #define VIR_Layout_GetBlend(Layout)         ((Layout)->layoutQualifier & VIR_LAYQUAL_BLEND_MASK)
-#define VIR_Layout_HasImageFormat(Layout)        ((Layout)->layoutQualifier & VIR_LAYQUAL_IMAGE_FORMAT)
-#define VIR_Layout_GetImageFormat(Layout)        ((Layout)->imageFormat)
-#define VIR_Layout_HasImageSampledType(Layout)   ((Layout)->layoutQualifier & VIR_LAYQUAL_IMAGE_SAMPLED_TYPE)
-#define VIR_Layout_GetImageSampledType(Layout)   ((Layout)->imageSampledType)
-#define VIR_Layout_GetLlFirstSlot(Layout)       ((Layout)->llFirstSlot)
-#define VIR_Layout_GetLlArraySlot(Layout)       ((Layout)->llArraySlot)
-#define VIR_Layout_GetHwFirstCompIndex(Layout)  ((Layout)->hwFirstCompIndex)
+#define VIR_Layout_HasImageFormat(Layout)           ((Layout)->layoutQualifier & VIR_LAYQUAL_IMAGE_FORMAT)
+#define VIR_Layout_GetImageFormat(Layout)           ((Layout)->imageFormat)
+#define VIR_Layout_GetOriginalImageFormat(Layout)   ((Layout)->originalImageFormat)
+#define VIR_Layout_GetImageAccessStrategy(Layout)   ((Layout)->imageAccessStrategy)
+#define VIR_Layout_HasImageSampledType(Layout)      ((Layout)->layoutQualifier & VIR_LAYQUAL_IMAGE_SAMPLED_TYPE)
+#define VIR_Layout_GetImageSampledType(Layout)      ((Layout)->imageSampledType)
+#define VIR_Layout_GetLlFirstSlot(Layout)           ((Layout)->llFirstSlot)
+#define VIR_Layout_GetLlArraySlot(Layout)           ((Layout)->llArraySlot)
+#define VIR_Layout_GetHwFirstCompIndex(Layout)      ((Layout)->hwFirstCompIndex)
 
 typedef struct _VIR_FIELDINFO
 {

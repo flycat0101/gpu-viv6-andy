@@ -7544,6 +7544,7 @@ VkResult halti5_patch_pipeline(
                                                     shaderLinkTable->pShLibLinkEntries[linkIdx].linkPoint[0].u.imageFormat.imageFormat = mapedFormat;
                                                     shaderLinkTable->pShLibLinkEntries[linkIdx].linkPoint[0].u.imageFormat.set = i;
                                                     shaderLinkTable->pShLibLinkEntries[linkIdx].linkPoint[0].u.imageFormat.arrayIndex = patchInfo->arrayIndex;
+                                                    shaderLinkTable->pShLibLinkEntries[linkIdx].linkPoint[0].u.imageFormat.replaceStrategy = VSC_LIB_LINK_IMAGE_ACCESS_STRATEGY_LOAD_ZERO_STORE_NOP;
 
                                                     compileFlag = VK_TRUE;
                                                 }
@@ -7590,6 +7591,7 @@ VkResult halti5_patch_pipeline(
                                                     shaderLinkTable->pShLibLinkEntries[linkIdx].linkPoint[0].u.imageFormat.imageFormat = mapedFormat;
                                                     shaderLinkTable->pShLibLinkEntries[linkIdx].linkPoint[0].u.imageFormat.set = i;
                                                     shaderLinkTable->pShLibLinkEntries[linkIdx].linkPoint[0].u.imageFormat.arrayIndex = patchInfo->arrayIndex;
+                                                    shaderLinkTable->pShLibLinkEntries[linkIdx].linkPoint[0].u.imageFormat.replaceStrategy = VSC_LIB_LINK_IMAGE_ACCESS_STRATEGY_LOAD_ZERO_STORE_NOP;
 
                                                     compileFlag = VK_TRUE;
                                                 }
@@ -7625,6 +7627,7 @@ VkResult halti5_patch_pipeline(
                                                     shaderLinkTable->pShLibLinkEntries[linkIdx].linkPoint[0].u.imageFormat.imageFormat = mapedFormat;
                                                     shaderLinkTable->pShLibLinkEntries[linkIdx].linkPoint[0].u.imageFormat.set = i;
                                                     shaderLinkTable->pShLibLinkEntries[linkIdx].linkPoint[0].u.imageFormat.arrayIndex = patchInfo->arrayIndex;
+                                                    shaderLinkTable->pShLibLinkEntries[linkIdx].linkPoint[0].u.imageFormat.replaceStrategy = VSC_LIB_LINK_IMAGE_ACCESS_STRATEGY_LOAD_ZERO_STORE_NOP;
 
                                                     compileFlag = VK_TRUE;
                                                 }
@@ -7660,6 +7663,7 @@ VkResult halti5_patch_pipeline(
                                                     shaderLinkTable->pShLibLinkEntries[linkIdx].linkPoint[0].u.imageFormat.imageFormat = mapedFormat;
                                                     shaderLinkTable->pShLibLinkEntries[linkIdx].linkPoint[0].u.imageFormat.set = i;
                                                     shaderLinkTable->pShLibLinkEntries[linkIdx].linkPoint[0].u.imageFormat.arrayIndex = patchInfo->arrayIndex;
+                                                    shaderLinkTable->pShLibLinkEntries[linkIdx].linkPoint[0].u.imageFormat.replaceStrategy = VSC_LIB_LINK_IMAGE_ACCESS_STRATEGY_LOAD_ZERO_STORE_NOP;
 
                                                     compileFlag = VK_TRUE;
                                                 }
