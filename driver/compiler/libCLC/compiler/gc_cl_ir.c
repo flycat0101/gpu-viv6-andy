@@ -4123,16 +4123,9 @@ IN OUT cloIR_POLYNARY_EXPR PolynaryExpr
     clsNAME *name;
     clsDATA_TYPE dataType[1];
     gctBOOL hasGenType;
-    slsDLINK_NODE *bucket;
-    clsNAME_NODE *node;
 
     gcmASSERT(PolynaryExpr->exprBase.decl.dataType);
-    bucket = clsHASH_TABLE_Bucket(&NameSpace->nameHash,
-                                  clmBUCKET_INDEX(clHashString(PolynaryExpr->funcSymbol)));
-    FOR_EACH_DLINK_NODE(bucket, clsNAME_NODE, node) {
-        name = node->name;
-        if (name->symbol != PolynaryExpr->funcSymbol)
-            continue;
+    FOR_EACH_DLINK_NODE(&NameSpace->names, clsNAME, name) {
         hasGenType = gcvFALSE;
         if (((name->type == clvFUNC_NAME) || (name->type == clvKERNEL_FUNC_NAME))
             && clsDECL_IsEqual(&name->decl, &PolynaryExpr->exprBase.decl)
