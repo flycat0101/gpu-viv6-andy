@@ -854,6 +854,7 @@ static VkResult halti5_pip_emit_viewport(
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
     const gcsFEATURE_DATABASE *database = devCtx->database;
     halti5_pipeline *chipPipeline = (halti5_pipeline *)pip->chipPriv;
+    float maxPointSize = devCtx->pPhyDevice->phyDevProp.limits.pointSizeRange[1];
 
     if(database->REG_BugFixes22 && database->REG_PAEnhancements3)
     {
@@ -868,7 +869,7 @@ static VkResult halti5_pip_emit_viewport(
 
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x02A3, VK_FALSE, *(uint32_t*)&wSmall);
 
-    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x02A1, VK_TRUE, 8192 << 16);
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x02A1, VK_TRUE, ((int32_t)maxPointSize) << 16);
 
     if ((!(pip->dynamicStates & __VK_DYNAMIC_STATE_VIEWPORT_BIT))
         && info->pViewportState)
