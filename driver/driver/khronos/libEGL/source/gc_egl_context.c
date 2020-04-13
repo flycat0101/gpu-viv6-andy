@@ -49,11 +49,15 @@ static const char * _driverDlls[] =
     "libOpenGL.dylib",                  /* OpenGL */
     "libOpenVG.dylib",                  /* OpenVG 1.0 */
 #else
-    "libEGL",                           /* EGL */
-    "libGLESv1_CM",                     /* OpenGL ES 1.1 Common */
-    "libGLESv2",                        /* OpenGL ES 2.0/3.x */
-    "libGL",                            /* OpenGL */
-    "libOpenVG",                        /* OpenVG 1.0 */
+    "libEGL.so",                        /* EGL */
+    "libGLESv1_CM.so",                  /* OpenGL ES 1.1 Common */
+    "libGLESv2.so",                     /* OpenGL ES 2.0/3.x */
+  #if defined(EGL_API_DRI) || defined(X11_DRI3)
+    "/usr/lib/dri/vivante_dri.so",      /* OpenGL */
+  #else
+    "libGL.so",                         /* OpenGL */
+  #endif
+    "libOpenVG.so",                     /* OpenVG 1.0 */
 #endif
 };
 

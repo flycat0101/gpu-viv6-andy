@@ -118,7 +118,7 @@ typedef screen_pixmap_t EGLNativePixmapType;
 
 #elif defined(__unix__) || defined(USE_X11)
 
-#if defined(EGL_API_X)
+#if defined(EGL_API_X) || defined(EGL_API_DRI) || defined(X11_DRI3)
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
