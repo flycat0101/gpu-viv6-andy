@@ -1320,6 +1320,9 @@
         glEGLImageTargetRenderbufferStorageOES;
         glMultiDrawArraysEXT;
         glMultiDrawElementsEXT;
+        glMultiDrawElementsBaseVertexEXT;
+        glMultiDrawArraysIndirectEXT;
+        glMultiDrawElementsIndirectEXT;
         glMapBufferOES;
         glUnmapBufferOES;
         glGetBufferPointervOES;
