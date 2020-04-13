@@ -179,10 +179,61 @@ VX_INTERNAL_API vx_bool vxoGraphOptimization_nnHalSupport(vx_tensor inputTensor)
     return nnSupportFormat;
 }
 
-VX_PRIVATE_API void vxoGraphOptimization_getQuantizeParam(float dMax, float dMin, float *scale, vx_int32 *zp)
+VX_PRIVATE_API void vxoGraphOptimization_getAsymQuantizeAttribute(vx_enum dataType, float maxValue, float minValue, float *scale, vx_int32 *zeroPoint)
 {
-    *scale = dMin> 0 ? dMax/ 255 :  (dMax - dMin)/ 255;
-    *zp = (vx_int32)gcmMIN(255, gcmMAX(0, roundRTNE(0 - dMin/ *scale)));
+    vx_uint32 drange = 255;
+
+    gcmASSERT(scale || zeroPoint);
+
+    maxValue = gcmMAX(maxValue, 0);
+    minValue = gcmMIN(minValue, 0);
+    *scale = (maxValue - minValue)/drange;
+
+    if(VX_TYPE_UINT8 == dataType)
+    {
+        *zeroPoint = gcmMIN(255, gcmMAX(0, (vx_int32)roundRTNE(0 - minValue/ *scale)));
+    }
+    else if(VX_TYPE_INT8 == dataType)
+    {
+        *zeroPoint = gcmMIN(127, gcmMAX(-128, (vx_int32)roundRTNE(-128 - minValue/ *scale)));
+    }
+    else
+    {
+        vxError("unsupported datatype for asym quantize\n");
+        vxmASSERT(0);
+    }
+}
+
+VX_INTERNAL_API vx_status vxoGraphOptimization_computeQuantAttribute(vx_enum quantType, vx_enum dataType,
+                                                                     vx_float32 maxValue, vx_float32 minValue,
+                                                                     vx_int8 *fixedPointPos, vx_int32 *zeroPoint, vx_float32 * scale)
+{
+    gcmHEADER_ARG("quantType=%d, maxValue=%f, minValue=%f, fixedPointPos=%p, zeroPoint=%p, scale=%p",
+        quantType, maxValue, minValue, fixedPointPos, zeroPoint, scale);
+    if(quantType == VX_QUANT_AFFINE_SCALE)
+    {
+        vxoGraphOptimization_getAsymQuantizeAttribute(dataType, maxValue, minValue, scale, zeroPoint);
+    }
+    else if(quantType == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        gcmASSERT(fixedPointPos);
+        if(VX_TYPE_INT8 != dataType)
+        {
+            vxError("unsupported datatype for dfp quantization\n");
+            vxmASSERT(0);
+        }
+        minValue = (vx_float32)fabs(minValue);
+        maxValue = gcmMAX(maxValue, minValue);
+        if(maxValue <= 0.0)
+        {
+            vxInfo("can not compute quant attribute");
+            return VX_ERROR_INVALID_PARAMETERS;
+        }
+        *fixedPointPos = (vx_int8) gcmMIN(12, QUANT_BIT_WIDTH - ceilf((float)gcoMATH_Log2(maxValue) + 1));
+    }
+
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
+    return VX_SUCCESS;
 }
 
 VX_PRIVATE_API vx_tensor_create_params_t vxoGraphOptimization_createParamsForTensor(vx_uint32 dimNum, vx_uint32 *dims, vx_enum dataType,
@@ -2701,60 +2752,6 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_ConvertBatchFCtoConv(vx_graph gra
     return VX_SUCCESS;
 }
 
-VX_INTERNAL_API vx_status vxoGraphOptimization_computeQuantAttribute(vx_enum quantType, vx_enum dataType,
-                                                                     vx_float32 maxValue, vx_float32 minValue,
-                                                                     vx_int8 *fixedPointPos, vx_int32 *zeroPoint, vx_float32 * scale)
-{
-    gcmHEADER_ARG("quantType=%d, maxValue=%f, minValue=%f, fixedPointPos=%p, zeroPoint=%p, scale=%p",
-        quantType, maxValue, minValue, fixedPointPos, zeroPoint, scale);
-    if(quantType == VX_QUANT_AFFINE_SCALE)
-    {
-        vx_uint32 drange = 255;
-
-        gcmASSERT(fixedPointPos);
-        gcmASSERT(scale);
-
-        maxValue = gcmMAX(maxValue, 0);
-        minValue = gcmMIN(minValue, 0);
-        *scale = (maxValue - minValue)/drange;
-
-        if(VX_TYPE_UINT8 == dataType)
-        {
-            *zeroPoint = gcmMIN(255, gcmMAX(0, (vx_int32)roundRTNE(0 - minValue/ *scale)));
-        }
-        else if(VX_TYPE_INT8 == dataType)
-        {
-            *zeroPoint = gcmMIN(127, gcmMAX(-128, (vx_int32)roundRTNE(-128 - minValue/ *scale)));
-        }
-        else
-        {
-            vxError("unsupported datatype for asym quantize\n");
-            vxmASSERT(0);
-        }
-
-    }
-    else if(quantType == VX_QUANT_DYNAMIC_FIXED_POINT)
-    {
-        gcmASSERT(fixedPointPos);
-        if(VX_TYPE_INT8 != dataType)
-        {
-            vxError("unsupported datatype for dfp quantization\n");
-            vxmASSERT(0);
-        }
-        minValue = (vx_float32)fabs(minValue);
-        maxValue = gcmMAX(maxValue, minValue);
-        if(maxValue <= 0.0)
-        {
-            vxInfo("can not compute quant attribute");
-            return VX_ERROR_INVALID_PARAMETERS;
-        }
-        *fixedPointPos = (vx_int8) gcmMIN(12, QUANT_BIT_WIDTH - ceilf((float)gcoMATH_Log2(maxValue) + 1));
-    }
-
-    gcmFOOTER_ARG("%d", VX_SUCCESS);
-    return VX_SUCCESS;
-}
-
 VX_INTERNAL_API vx_tensor vxoGraphOptimization_ConvertAvgPool2Conv_createWeight(vx_tensor input, vx_uint32 weight_dims[4])
 {
     vx_uint32   i = 0;
@@ -3029,7 +3026,7 @@ VX_PRIVATE_API vx_status vxoGraphOptimization_TensorAdd2Conv_copyData2Weight_asy
     float scale;
     float fWeight[2] = {1, TENSOR_TF_SCALE(tensorIn[1]) / TENSOR_TF_SCALE(tensorIn[0])};
 
-    vxoGraphOptimization_getQuantizeParam(gcmMAX(fWeight[0], fWeight[1]), gcmMIN(fWeight[0], fWeight[1]), &scale, &zp);
+    vxoGraphOptimization_getAsymQuantizeAttribute(TENSOR_DATA_TYPE(*weight), gcmMAX(fWeight[0], fWeight[1]), gcmMIN(fWeight[0], fWeight[1]), &scale, &zp);
 
     if(TENSOR_DATA_TYPE(*weight) == VX_TYPE_UINT8 || TENSOR_DATA_TYPE(*weight) == VX_TYPE_INT8)
     {
@@ -3136,7 +3133,7 @@ VX_PRIVATE_API vx_status vxoGraphOptimization_TensorAdd2Conv_createQuantizedWeig
     else
     {
         float fWeight[2] = {1, TENSOR_TF_SCALE(tensorIn[1]) / TENSOR_TF_SCALE(tensorIn[0])};
-        vxoGraphOptimization_getQuantizeParam(gcmMAX(fWeight[0], fWeight[1]), gcmMIN(fWeight[0], fWeight[1]), &scale, &zp);
+        vxoGraphOptimization_getAsymQuantizeAttribute(TENSOR_DATA_TYPE(tensorIn[0]), gcmMAX(fWeight[0], fWeight[1]), gcmMIN(fWeight[0], fWeight[1]), &scale, &zp);
     }
 
     vxoGraphOptimization_TensorAdd2Conv_createWeight(context, weight, coreNum,
