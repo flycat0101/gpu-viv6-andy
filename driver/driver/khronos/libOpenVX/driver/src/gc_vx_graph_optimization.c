@@ -610,11 +610,18 @@ VX_PRIVATE_API vx_bool vxoGraphOptimization_matchTensorInNode(vx_node node, vx_t
     {
         if(node->paramTable[k]->type != VX_TYPE_TENSOR)
             continue;
-        if(((vx_tensor)node->paramTable[k])->isViewed || tensor->isViewed)
-            continue;
-
-        if(((vx_tensor)node->paramTable[k])->tensorBuffer == tensor->tensorBuffer)
         {
+            vx_tensor t = (vx_tensor)node->paramTable[k];
+            if(t->isViewed || tensor->isViewed)
+                continue;
+            if(t->tensorBuffer != tensor->tensorBuffer)
+                continue;
+
+            /*with same memory size*/
+            if(TENSOR_STRIDE_INDEX(t, TENSOR_DIM_NUM(t)) !=
+                TENSOR_STRIDE_INDEX(tensor, TENSOR_DIM_NUM(tensor)))
+                continue;
+
             if(index != VX_NULL)
                 *index = k;
             return vx_true_e;
