@@ -2784,7 +2784,7 @@ static VIR_SymId __SpvAddIdSymbol(
 
             if ((renderPass->subPassInfoCount > 0) &&
                 (subpassAttachmentIndex >= 0) &&
-                (subpassAttachmentIndex <= (gctINT)renderPass->subPassInfoCount))
+                (subpassAttachmentIndex <= __SPV_MAX_RENDER_TARGETS))
             {
                 inputAttachmentIndex = renderPass->subPassInfo[spv->subPass].input_attachment_index[subpassAttachmentIndex];
             }
