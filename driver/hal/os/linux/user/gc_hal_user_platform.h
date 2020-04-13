@@ -13,7 +13,6 @@
 
 #ifndef _gc_hal_user_platform_h_
 #define _gc_hal_user_platform_h_
-#include "gc_hal_eioctl.h"
 
 typedef struct _gcsPLATFORM * gcoPLATFORM;
 
@@ -46,52 +45,6 @@ typedef struct _gcsPLATFORM_OPERATIONS
         IN gctPHYS_ADDR_T GPUPhysical,
         OUT gctPHYS_ADDR_T * CPUPhysical
         );
-
-    /*******************************************************************************
-    **
-    **  dmaAllocate
-    **
-    **  allocate dma resource for dma transfer.
-    */
-    gceSTATUS
-    (*dmaAllocate)(
-        IN gcvEDMA_DIRECTION dir,
-        OUT gctEDMA_HANDLE *handle
-        );
-
-    /*******************************************************************************
-    **
-    **  dmaPrepare
-    **
-    **  config dma and submit dma transaction.
-    */
-    gceSTATUS
-    (*dmaPrepare)(
-        IN gctEDMA_HANDLE handle,
-        IN gctUINT32 node,
-        IN gctSIZE_T len
-        );
-
-    /*******************************************************************************
-    **
-    **  dmaStart
-    **
-    **  start transaction.
-    */
-    gceSTATUS
-    (*dmaStart)(
-        IN gctEDMA_HANDLE handle,
-        IN gctBOOL async
-        );
-
-    /*******************************************************************************
-    **
-    **  dmaFree
-    **
-    **  free dma resource.
-    */
-    gceSTATUS
-    (*dmaFree)(IN gctEDMA_HANDLE handle);
 }
 gcsPLATFORM_OPERATIONS;
 
