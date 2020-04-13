@@ -2913,23 +2913,18 @@ _FillInFeatureTable(
     /* AIGPU */
     Features[gcvFEATURE_AI_GPU] = database->AI_GPU;
 
-#ifdef GC_MINOR_FEATURES6_DISABLE_VIP
     if (Features[gcvFEATURE_AI_GPU])
     {
         Hardware->config->disableVIP = ((((gctUINT32) (Hardware->config->chipMinorFeatures6)) >> (0 ?
- GC_MINOR_FEATURES6_DISABLE_VIP) & ((gctUINT32) ((((1 ?
- GC_MINOR_FEATURES6_DISABLE_VIP) - (0 ?
- GC_MINOR_FEATURES6_DISABLE_VIP) + 1) == 32) ?
+ 5:5) & ((gctUINT32) ((((1 ?
+ 5:5) - (0 ?
+ 5:5) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
- GC_MINOR_FEATURES6_DISABLE_VIP) - (0 ?
- GC_MINOR_FEATURES6_DISABLE_VIP) + 1)))))) == (GC_MINOR_FEATURES6_DISABLE_VIP_AVAILABLE & ((gctUINT32) ((((1 ?
- GC_MINOR_FEATURES6_DISABLE_VIP) - (0 ?
- GC_MINOR_FEATURES6_DISABLE_VIP) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- GC_MINOR_FEATURES6_DISABLE_VIP) - (0 ?
- GC_MINOR_FEATURES6_DISABLE_VIP) + 1)))))));
+ 5:5) - (0 ?
+ 5:5) + 1)))))) == (0x1 & ((gctUINT32) ((((1 ?
+ 5:5) - (0 ?
+ 5:5) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1)))))));
     }
-#endif
 
     /*these chip don't have maxpointSize limit, so need fix */
     if (((chipModel == gcv880) && (chipRevision == 0x5106))
