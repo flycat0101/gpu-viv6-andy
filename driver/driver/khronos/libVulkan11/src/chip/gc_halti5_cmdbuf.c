@@ -330,8 +330,35 @@ static void halti5_gfxpipeline_switch(
         if (switchCacheMode)
         {
             uint32_t cacheMode = (chipGfxPipeline->hwCacheMode == CHIP_CACHEMODE_256) ? 1 : 0;
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0529, gcvFALSE,
-                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+
+            if (cmdBuf->devCtx->database->CACHE128B256BPERLINE)
+            {
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x052F, gcvFALSE,
+                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 24:24) - (0 ?
+ 24:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 24:24) - (0 ?
+ 24:24) + 1))))))) << (0 ?
+ 24:24))) | (((gctUINT32) ((gctUINT32) (cacheMode) & ((gctUINT32) ((((1 ?
+ 24:24) - (0 ?
+ 24:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 24:24) - (0 ? 24:24) + 1))))))) << (0 ? 24:24))) |
+                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ?
+ 26:26))) | (((gctUINT32) ((gctUINT32) (cacheMode) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ? 26:26))));
+            }
+            else
+            {
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0529, gcvFALSE,
+                    (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  24:24) - (0 ?
  24:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -353,7 +380,7 @@ static void halti5_gfxpipeline_switch(
  25:25) - (0 ?
  25:25) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 25:25) - (0 ? 25:25) + 1))))))) << (0 ? 25:25)))) &
-                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                    (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:26) - (0 ?
  26:26) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -375,6 +402,7 @@ static void halti5_gfxpipeline_switch(
  27:27) - (0 ?
  27:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 27:27) - (0 ? 27:27) + 1))))))) << (0 ? 27:27)))));
+            }
         }
         cmdBuf->curScrachBufIndex += (uint32_t)(uintptr_t)(pCmdBuffer - pCmdBufferBegin);
     }
@@ -5791,9 +5819,7 @@ VkResult halti5_setRtTileStatus(
             uint32_t cacheMode = (img->sampleInfo.product > 1) ?
                                 0x1:
                                 0x0;
-
-            __vkCmdLoadSingleHWState(commandBuffer, 0x0529, gcvFALSE,
-                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            uint32_t colorDepthCacheMode = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  24:24) - (0 ?
  24:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -5802,20 +5828,8 @@ VkResult halti5_setRtTileStatus(
  24:24))) | (((gctUINT32) ((gctUINT32) (cacheMode) & ((gctUINT32) ((((1 ?
  24:24) - (0 ?
  24:24) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 24:24) - (0 ?
- 24:24) + 1))))))) << (0 ?
- 24:24))) &((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:25) - (0 ?
- 25:25) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 25:25) - (0 ?
- 25:25) + 1))))))) << (0 ?
- 25:25))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 25:25) - (0 ?
- 25:25) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 25:25) - (0 ? 25:25) + 1))))))) << (0 ? 25:25)))) &
-                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ ~0U : (~(~0U << ((1 ? 24:24) - (0 ? 24:24) + 1))))))) << (0 ? 24:24)))
+                                         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:26) - (0 ?
  26:26) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -5824,19 +5838,9 @@ VkResult halti5_setRtTileStatus(
  26:26))) | (((gctUINT32) ((gctUINT32) (cacheMode) & ((gctUINT32) ((((1 ?
  26:26) - (0 ?
  26:26) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 26:26) - (0 ?
- 26:26) + 1))))))) << (0 ?
- 26:26))) &((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 27:27) - (0 ?
- 27:27) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 27:27) - (0 ?
- 27:27) + 1))))))) << (0 ?
- 27:27))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 27:27) - (0 ?
- 27:27) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 27:27) - (0 ? 27:27) + 1))))))) << (0 ? 27:27)))));
+ ~0U : (~(~0U << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ? 26:26)));
+
+            __vkCmdLoadSingleHWState(commandBuffer, 0x052F, VK_FALSE, colorDepthCacheMode);
 
         }
 
