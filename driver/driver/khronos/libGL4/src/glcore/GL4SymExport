@@ -906,8 +906,8 @@ VERSION {
         glGetObjectParameterivARB;
         glGetInfoLogARB;
 
-        / Additinal GL API entries (Not in API dispatch table) */
-        / GL optinoal Imaging APIs */
+        /* Additinal GL API entries (Not in API dispatch table) */
+        /* GL optinoal Imaging APIs */
         glColorTable;
         glColorTableParameteriv;
         glColorTableParameterfv;
