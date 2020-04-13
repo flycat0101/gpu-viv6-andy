@@ -4124,10 +4124,11 @@ typedef enum _VIR_OPERANDNO
 
 typedef enum _VIR_INSTFLAG
 {
-    VIR_INSTFLAG_NONE       = 0x00,
-    VIR_INSTFLAG_PACKEDMODE = 0x01,
-    VIR_INSTFLAG_FULL_DEF   = 0x02,
-    VIR_INSTFLAG_FORCE_GEN  = 0x04,
+    VIR_INSTFLAG_NONE               = 0x00,
+    VIR_INSTFLAG_PACKEDMODE         = 0x01,
+    VIR_INSTFLAG_FULL_DEF           = 0x02,
+    VIR_INSTFLAG_FORCE_GEN          = 0x04,
+    VIR_INSTFLAG_DEAD_INST          = 0x08,
 }
 VIR_InstFlag;
 
@@ -4198,7 +4199,7 @@ struct _VIR_INSTRUCTION
 
     /* Word 3. */
     gctUINT                 _condOp     : 5;
-    VIR_InstFlag            _instFlags  : 3;  /* VL concept, etc */
+    VIR_InstFlag            _instFlags  : 4;  /* VL concept, etc */
     gctUINT                 _srcOpndNum : 3;  /* number of source operands */
     gctUINT                 _threadMode : 3;
     gctUINT                 _parentUseBB: 1;  /* parent union uses BB */
@@ -4208,7 +4209,7 @@ struct _VIR_INSTRUCTION
     gctUINT                 _endOfBB    : 1;  /* End Of Basic Block Bit for non-control-flow inst */
     gctUINT                 _USCUnallocate: 1; /* USC Unallocate Bit for global memory load/store  */
     gctUINT                 _skHp       : 1;   /* load instruction need to set skip_for_helpers flag */
-    gctUINT                 _reserved1  : 6;
+    gctUINT                 _reserved1  : 5;
 
     gctUINT                 _dual16ExpandSeq;
 

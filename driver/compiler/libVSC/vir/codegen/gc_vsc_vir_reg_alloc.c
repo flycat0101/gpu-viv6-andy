@@ -11264,7 +11264,13 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
         ** If the dest operand of a MOVA is invalid(optimize this in _VIR_RA_LS_AssignColorForA0B0Inst),
         ** then we don't need to write the source operand.
         */
-        if (VIR_Operand_GetHwRegId(VIR_Inst_GetDest(pInst)) != VIR_INVALID_HWREG)
+        if (VIR_Inst_GetFlags(pInst) & VIR_INSTFLAG_DEAD_INST)
+        {
+            gcmASSERT(VIR_Operand_GetHwRegId(VIR_Inst_GetDest(pInst)) == VIR_INVALID_HWREG);
+
+            VIR_Pass_DeleteInstruction(pFunc, pInst, gcvNULL);
+        }
+        else
         {
             _VIR_RA_LS_RewriteColor_Src(pRA, pInst, pInst->src[0], pInst, pInst->src[0]);
         }
@@ -11883,6 +11889,9 @@ VSC_ErrCode _VIR_RA_LS_AssignColorForA0B0Inst(
             if (bAllUsageSpilled)
             {
                 _VIR_RA_LS_ExpireActiveLRs(pRA, VIR_Inst_GetId(pInst));
+
+                /* This MOVA is unused and can be deleted. */
+                VIR_Inst_SetFlag(pInst, VIR_INSTFLAG_DEAD_INST);
                 return retValue;
             }
         }
