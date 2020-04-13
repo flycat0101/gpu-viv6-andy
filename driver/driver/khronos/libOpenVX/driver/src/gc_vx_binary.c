@@ -918,7 +918,15 @@ static vx_status readBinDynamic(
     {
         vxmONERROR(readerLocate(reader, binLoad->fixed.patchDataTable.offset));
         binLoad->patchData = (vx_binary_patch_info_s *)(reader->currentData);
-        binLoad->nPdEntries = binLoad->fixed.patchDataTable.size / sizeof(vx_binary_patch_info_s);
+
+        if (binLoad->fixed.header.version >= 0x00010006)
+        {
+            binLoad->nPdEntries = binLoad->fixed.patchDataTable.size / sizeof(vx_binary_patch_info_s);
+        }
+        else
+        {
+            binLoad->nPdEntries = binLoad->fixed.patchDataTable.size / (sizeof(vx_binary_patch_info_s) - sizeof(vx_uint32));
+        }
     }
 
     /* layer parameter data entries*/
@@ -1712,6 +1720,29 @@ VX_INTERNAL_API void* vxoBinaryGraph_GetInputOutputPtrByIndex(
     return ptrInOut;
 }
 
+VX_INTERNAL_API void* vxoBinaryGraph_GetPatchPtrByIndex(
+    vx_binary_loader_s *binLoad,
+    vx_binary_patch_info_s *patchPtr,
+    vx_int32 index
+    )
+{
+    void *ptr = VX_NULL;
+    vx_uint32 size = 0;
+
+    size = sizeof(vx_binary_patch_info_s) - sizeof(vx_uint32);
+
+    if (binLoad->fixed.header.version >= 0x00010006)
+    {
+        ptr = (void*)(patchPtr + index);
+    }
+    else
+    {
+        ptr = (void*)((vx_char *)patchPtr + index * size);
+    }
+
+    return ptr;
+}
+
 VX_PRIVATE_API vx_status vxoBinaryGraph_GetNetworkNameAndRank(
     vx_binary_save_s *binarySave
     )
@@ -1824,7 +1855,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchNN(
     for (i = 0; i < operation->counterOfPatches; i++)
     {
         ioIndex = -1;
-        nnPatchData = &binLoad->patchData[operation->indexOfFirstPatch + i];
+        nnPatchData = (vx_binary_patch_info_s*)vxoBinaryGraph_GetPatchPtrByIndex(binLoad, binLoad->patchData,
+                                                                                 operation->indexOfFirstPatch + i);
 
         if (nnPatchData->type == VX_BINARY_PATCH_TYPE_STATE)
         {
@@ -2164,7 +2196,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchTP(
     for (i = 0; i < operation->counterOfPatches; i++)
     {
         ioIndex = -1;
-        tpPatchData = &binLoad->patchData[operation->indexOfFirstPatch + i];
+        tpPatchData = (vx_binary_patch_info_s*)vxoBinaryGraph_GetPatchPtrByIndex(binLoad, binLoad->patchData,
+                                                                                 operation->indexOfFirstPatch + i);
 
         if (tpPatchData->type == VX_BINARY_PATCH_TYPE_STATE)
         {
@@ -2498,7 +2531,9 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSH(
     /* patch SH states */
     for (i = 0; i < operation->counterOfPatches; i++)
     {
-        shPatchData = &binLoad->patchData[operation->indexOfFirstPatch + i];
+        shPatchData = (vx_binary_patch_info_s*)vxoBinaryGraph_GetPatchPtrByIndex(binLoad, binLoad->patchData,
+                                                                                 operation->indexOfFirstPatch + i);
+
         ioIndex = shPatchData->index;
         if (shPatchData->type == VX_BINARY_PATCH_TYPE_STATE)
         {
@@ -2919,7 +2954,9 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSC(
     /* patch SC states */
     for (i = 0; i < operation->counterOfPatches; i++)
     {
-        scPatchData = &binLoad->patchData[operation->indexOfFirstPatch + i];
+        scPatchData = (vx_binary_patch_info_s*)vxoBinaryGraph_GetPatchPtrByIndex(binLoad, binLoad->patchData,
+                                                                                 operation->indexOfFirstPatch + i);
+
         ioIndex = scPatchData->index;
         if (scPatchData->type == VX_BINARY_PATCH_TYPE_STATE)
         {
@@ -3708,7 +3745,9 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_InitBinaryLoad(
 
        for (j = 0; j < operation->counterOfPatches; j++)
        {
-           patchData = &binLoad->patchData[operation->indexOfFirstPatch + j];
+           patchData = (vx_binary_patch_info_s*)vxoBinaryGraph_GetPatchPtrByIndex(binLoad, binLoad->patchData,
+                                                                                  operation->indexOfFirstPatch + j);
+
            ioIndex = patchData->index;
            if (ioIndex >= 0)
            {
@@ -4683,10 +4722,25 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveShaderPatchTable(
     vx_binary_patch_info_s patchInfo;
     vx_binary_save_s *binarySave = node->graph->binarySave;
     vx_context context = node->base.context;
+    static vx_uint32 dynamicIndex = 0;
+    static vx_uint32 isScaleShader = 0;
     gcmHEADER_ARG("node=%p, operation=%p, basePhysical=0x%x, baseLogical=0x%x, wholeSize=0x%x, batchPhysical=0x%x",
         node, operation, basePhysical, baseLogical, wholeSize, batchPhysical);
 
     gcoOS_ZeroMemory(&patchInfo, sizeof(vx_binary_patch_info_s));
+
+    if (0 == paramIndex)
+    {
+        dynamicIndex = 0; /* initialize dynamicIndex for each shader operation */
+        if (gcoOS_StrStr(node->kernel->name, "ScaletoTensor", VX_NULL))
+        {
+            isScaleShader = 1;
+        }
+        else
+        {
+            isScaleShader = 0;
+        }
+    }
 
     if (allocType == VXNNE_MEM_POOL_TYPE_VIRTUAL_DDR)
     {
@@ -4790,10 +4844,44 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveShaderPatchTable(
             patchInfo.index = -1;
             break;
         case VX_BINARY_SOURCE_INPUT:
-        case VX_BINARY_SOURCE_OUTPUT:
+        {
+            if ((binarySave->supportDynInputShape) && isScaleShader)
+            {
+                patchInfo.name = VX_BINARY_PATCH_NAME_SCALE_INPUT;
+            }
             patchInfo.index = (vx_uint32)entryIndex;
             break;
+        }
+        case VX_BINARY_SOURCE_OUTPUT:
+        {
+            patchInfo.index = (vx_uint32)entryIndex;
+            break;
+        }
         case VX_BINARY_SOURCE_MISC_DYNAMIC_GENERIC:
+        {
+            if ((binarySave->supportDynInputShape) && isScaleShader)
+            {
+                if (0 == dynamicIndex)
+                {
+                   patchInfo.name =  VX_BINARY_PATCH_NAME_SCALE_RATIO_X;
+                }
+                else if (1 == dynamicIndex)
+                {
+                    patchInfo.name =  VX_BINARY_PATCH_NAME_SCALE_RATIO_Y;
+                }
+                else if (2 == dynamicIndex)
+                {
+                    patchInfo.name =  VX_BINARY_PATCH_NAME_SCALE_OFFSET_X;
+                }
+                else if (3 == dynamicIndex)
+                {
+                    patchInfo.name =  VX_BINARY_PATCH_NAME_SCALE_OFFSET_Y;
+                }
+                dynamicIndex++;
+            }
+            patchInfo.index = (vx_uint32)LCDTindex;
+            break;
+        }
         case VX_BINARY_SOURCE_MISC_DYNAMIC_INPUT:
         case VX_BINARY_SOURCE_MISC_DYNAMIC_OUTPUT:
             patchInfo.index = (vx_uint32)LCDTindex;
@@ -5069,6 +5157,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_Initialize(
     vx_char *networkBinaryPath = VX_NULL;
     vx_char NBNameFromGraph[256];
     vx_uint32 useGraphName = 0;
+    vx_char *env = VX_NULL;
 
     gcmHEADER_ARG("graph=%p, fileName=%s", graph, fileName);
 
@@ -5179,6 +5268,19 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_Initialize(
         gcmVERIFY_OK(gcoOS_Open(gcvNULL, fileName, gcvFILE_CREATE, (gctFILE*)(&binarySave->binarySaveFile)));
         gcoOS_StrCopySafe(binarySave->binaryFileName, BINARY_FILE_NAME_MAX_SIZE, fileName);
         vxInfo("Save binary graph for unified drvier. \n");
+    }
+
+    gcoOS_GetEnv(gcvNULL, "VIV_VX_NBG_SUPPORT_DYNAMIC_INPUT_SHAPE", &env);
+    if (env)
+    {
+        if (atoi(env))
+        {
+            binarySave->supportDynInputShape = vx_true_e;
+        }
+        else
+        {
+            binarySave->supportDynInputShape = vx_false_e;
+        }
     }
 
     if (binarySave->binarySaveFile == NULL)
@@ -9813,7 +9915,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
     binarySave->headerInfo.magic[1]= 'P';
     binarySave->headerInfo.magic[2]= 'M';
     binarySave->headerInfo.magic[3]= 'N';
-    binarySave->headerInfo.version = 0x00010005;
+    binarySave->headerInfo.version = 0x00010006;
     binarySave->headerInfo.target = context->pid;
     binarySave->headerInfo.layerCount     = graph->nodeCount;
     binarySave->headerInfo.operationCount = binarySave->operationCount;

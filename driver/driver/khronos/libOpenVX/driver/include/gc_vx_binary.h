@@ -127,6 +127,18 @@ typedef enum _vx_binary_operation_target_e
 }
 vx_binary_operation_target_e;
 
+typedef enum _vx_binary_patch_name_e
+{
+    VX_BINARY_PATCH_NAME_SCALE_NONE     = 0,
+    VX_BINARY_PATCH_NAME_SCALE_INPUT    = 1,
+    VX_BINARY_PATCH_NAME_SCALE_OUTPUT   = 2,
+    VX_BINARY_PATCH_NAME_SCALE_RATIO_X  = 3,
+    VX_BINARY_PATCH_NAME_SCALE_RATIO_Y  = 4,
+    VX_BINARY_PATCH_NAME_SCALE_OFFSET_X = 5,
+    VX_BINARY_PATCH_NAME_SCALE_OFFSET_Y = 6,
+}
+vx_binary_patch_name_e;
+
 typedef struct _vx_binary_segment_base_s
 {
     vx_uint32           segmentType;
@@ -389,6 +401,7 @@ typedef struct _vx_binary_patch_info_s
     vx_int32                               index;
     vx_uint32                              originalBaseAddress;
     vx_uint32                              transformation;
+    vx_uint32                              name;
 }
 vx_binary_patch_info_s;
 
@@ -551,6 +564,8 @@ typedef struct _vx_binary_save_s
     vx_uint32                                *NBGSize;
     vx_uint32                                NBGFileSize;
     vx_uint32                                NBGInMemorySize;
+
+    vx_bool                                  supportDynInputShape;
 }
 vx_binary_save_s, *vx_binary_save;
 
