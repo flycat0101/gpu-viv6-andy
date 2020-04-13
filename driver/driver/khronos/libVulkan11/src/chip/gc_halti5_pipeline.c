@@ -1961,7 +1961,7 @@ static int32_t get_used_color_count(
     __vkRenderSubPassInfo *subPass
     )
 {
-    uint32_t i;
+    int32_t i;
     int32_t colorOutCount = subPass->colorCount;
 
     for (i = subPass->colorCount - 1; i >= 0; i--)
