@@ -129,6 +129,93 @@ vx_status vxnneExecuteSWPooling(struct _vxnne_operation_s *operation)
 
 }
 
+VX_PRIVATE_API vx_tensor _get_AvgPoolingMaskData
+    (
+    vx_graph  graph,
+    vx_tensor input,
+    vx_tensor output,
+    vx_uint32 kernel_x,
+    vx_uint32 kernel_y,
+    vx_uint32 stride_x,
+    vx_uint32 stride_y,
+    vx_uint32 pad_x,
+    vx_uint32 pad_y
+    )
+{
+    vx_context context      = vxGetContext((vx_reference)input);
+    vx_tensor  mask         = NULL;
+    vx_uint32  sizes[4]     = {1, 1, 1, 1};
+    vx_uint8   *maskData    = VX_NULL;
+    vx_uint32  w            = 0;
+    vx_uint32  h            = 0;
+    vx_uint32  width        = TENSOR_VIEW_SIZE_INDEX(input, 0);
+    vx_uint32  height       = TENSOR_VIEW_SIZE_INDEX(input, 1);
+    vx_float32 scale        = 1.0f;
+    vx_uint32  mask_w       = gcmALIGN_NP2_SAFE(TENSOR_VIEW_SIZE_INDEX(output, 0), 16);
+    vx_uint32  mask_h       = TENSOR_VIEW_SIZE_INDEX(output, 1);
+    vx_uint32  output_w     = TENSOR_VIEW_SIZE_INDEX(output, 0);
+    vx_tensor_create_params_t tensor_create_params;
+
+    sizes[0] = mask_w;
+    sizes[1] = mask_h;
+
+    gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+    tensor_create_params.num_of_dims = 2;
+    tensor_create_params.sizes = sizes;
+    tensor_create_params.data_format = VX_TYPE_FLOAT32;
+    tensor_create_params.quant_format = VX_QUANT_NONE;
+
+    mask = vxoTensor_CreateTensor(context, graph, &tensor_create_params, vx_false_e);
+    if (vxoTensor_AllocateMemory(mask) != VX_SUCCESS)
+    {
+        vxError("vxoTensor_AllocateMemory fail at function %s, line %d", __FUNCTION__, __LINE__);
+        goto OnError;
+    }
+    vxoTensor_GetTensorViewMemory(mask, (vx_ptr_ptr)&maskData, VX_NULL);
+
+    if (TENSOR_QUANT_TYPE(input) == VX_QUANT_AFFINE_SCALE)
+    {
+        scale *= TENSOR_TF_SCALE(input);
+    }
+
+    if (TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE)
+    {
+        scale /= TENSOR_TF_SCALE(output);
+    }
+
+    for (h = 0; h < mask_h; h++)
+    {
+        for (w = 0; w < mask_w; w++)
+        {
+            vx_int32 wstart = w * stride_x - pad_x;
+            vx_int32 hstart = h * stride_y - pad_y;
+            vx_int32 wend   = gcmMIN(wstart + kernel_x, width);
+            vx_int32 hend   = gcmMIN(hstart + kernel_y, height);
+            vx_float32 filter = 1.0f;
+            vx_int32 index = w + h * mask_w;
+
+            if (w < output_w)
+            {
+                wstart     = gcmMAX(wstart, 0);
+                hstart     = gcmMAX(hstart, 0);
+
+                filter = 1.0f / ((vx_float32)(wend - wstart) * (hend - hstart));
+                filter *= scale;
+            }
+
+            vxnneSaveDataExt(TENSOR_DATA_TYPE(mask), TENSOR_QUANT_TYPE(mask), index, filter, maskData,
+                0, 0, 1.0, TENSOR_ROUNDING_MODE(mask));
+        }
+    }
+
+    return mask;
+OnError:
+    if (mask) vxoTensor_ReleaseTensor(&mask);
+    mask = NULL;
+
+    return NULL;
+}
+
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_NNPoolingLayer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     return VX_SUCCESS;
@@ -566,43 +653,23 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
         if (enable_tf_avgPool)
         {
             vx_tensor mask          = NULL;
-            vx_uint32 sizes[4]      = {1, 1, 1, 1};
-            vx_uint32 mask_size     = 0;
-            vx_uint8  *maskData     = VX_NULL;
-            vx_tensor_create_params_t tensor_create_params;
 
-            sizes[0]            = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
-            sizes[1]            = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
-            sizes[2]            = TENSOR_VIEW_SIZE_INDEX(inputs, 2);
-            sizes[3]            = TENSOR_VIEW_SIZE_INDEX(inputs, 3);
+            mask = _get_AvgPoolingMaskData(ops_layer->node->graph, inputs, outputs, poolSizeXValue, poolSizeYValue,
+                            stride_x, stride_y, pool_pad_x_left, pool_pad_x_right);
 
-            gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
-            tensor_create_params.num_of_dims = TENSOR_DIM_NUM(inputs);
-            tensor_create_params.sizes = sizes;
-            tensor_create_params.data_format = VX_TYPE_UINT8;
-            tensor_create_params.quant_format = TENSOR_QUANT_TYPE(inputs);
-            if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+            if (mask == NULL)
             {
-                tensor_create_params.quant_data.dfp.fixed_point_pos = 0;
-            }
-            else
-            {
-                tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(inputs);
-                tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(inputs);
-            }
-            mask                = vxoTensor_CreateTensor(ops_layer->node->base.context, ops_layer->node->graph, &tensor_create_params, vx_false_e);
-            if (vxoTensor_AllocateMemory(mask) != VX_SUCCESS)
-            {
-                vxError("vxoTensor_AllocateMemory fail at function %s, line %d", __FUNCTION__, __LINE__);
-                status = VX_ERROR_NO_MEMORY;
+                vxError("craete tensor fail at function %s, line %d", __FUNCTION__, __LINE__);
                 goto OnError;
             }
-            vxoTensor_GetTensorViewMemory(mask, (vx_ptr_ptr)&maskData, VX_NULL);
-            vxoTensor_GetTensorElementCount(mask, &mask_size);
-            memset(maskData, 1, mask_size);
 
             shaderExecutable = vxnneGetTFAvgPoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TF_AVGPOOLING, &ops_layer->node->kernelAttributes.borderMode,
             inputs, mask, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, VX_NN_ACTIVATION_NONE, outputs);
+
+            if (batchCount > 1)
+            {
+                vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_NO_BATCH_BIT);
+            }
 
             poolingLayer->base.num_temp_tensors = 1;
             poolingLayer->base.temp_tensors[0]  = mask;
