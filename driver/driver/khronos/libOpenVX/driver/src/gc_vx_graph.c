@@ -79,10 +79,11 @@ VX_INTERNAL_API void vxoGraph_ClearAllExecutedFlags(vx_graph graph)
 VX_INTERNAL_CALLBACK_API void vxoGraph_Destructor(vx_reference ref)
 {
     vx_graph graph = (vx_graph)ref;
-    vx_uint32    i;
+    vx_uint32    i, j;
     gcoHARDWARE savedHardware = gcvNULL;
     gctUINT32 savedCoreIndex = 0;
     gceHARDWARE_TYPE savedHardwareType = gcvHARDWARE_INVALID;
+    vxnne_execution_layer   executionLayer = (vxnne_execution_layer)&graph->layer->base;
 
     gcmHEADER_ARG("ref=%p", ref);
     vxmASSERT(vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH));
@@ -93,6 +94,15 @@ VX_INTERNAL_CALLBACK_API void vxoGraph_Destructor(vx_reference ref)
         {
             gcmFOOTER_NO();
             return;
+        }
+    }
+
+    for(j = 0; j < MAX_HANDLE; ++j)
+    {
+        if(executionLayer->swapHandle[j] != VX_NULL)
+        {
+            vxFree(executionLayer->swapHandle[j]);
+            executionLayer->swapHandle[j] = VX_NULL;
         }
     }
 
