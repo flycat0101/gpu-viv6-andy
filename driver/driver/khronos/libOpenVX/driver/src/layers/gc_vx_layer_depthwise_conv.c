@@ -1102,7 +1102,7 @@ vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(vx_node node,
     vx_reference params[] = {
         (vx_reference)inputs, (vx_reference)weights, (vx_reference)biases,
         (vx_reference)padXLeft, (vx_reference)padXRight, (vx_reference)padYTop, (vx_reference)padYBottom,
-        (vx_reference)dilationX, (vx_reference)dilationY, (vx_reference)vxCreateScalar(node->base.context, VX_TYPE_ENUM, &padMode), (vx_reference)padConstant,
+        (vx_reference)vxCreateScalar(node->base.context, VX_TYPE_ENUM, &padMode), (vx_reference)padConstant, (vx_reference)dilationX, (vx_reference)dilationY,
         (vx_reference)strideX, (vx_reference)strideY, (vx_reference)depth_multiplier,
         (vx_reference)relu_s, (vx_reference)pooling_s, (vx_reference)poolingX, (vx_reference)poolingY,
         (vx_reference)downScaleSizeRounding, (vx_reference)outputs
