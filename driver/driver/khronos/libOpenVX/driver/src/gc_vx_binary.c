@@ -5311,6 +5311,33 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_RefineInputOutput(
     return status;
 }
 
+VX_PRIVATE_API vx_status vxoBinaryGraph_GetUidFromOutputTensor(
+    vx_tensor tensor
+    )
+{
+    vx_int32 uid = -1;
+    char uidName[64] = {'\0'};
+
+    if (strlen(((vx_reference)tensor)->name) > 4)
+    {
+        char *p;
+        gcoOS_StrCopySafe(uidName, 64, &((vx_reference)tensor)->name[4]);
+        p = uidName;
+        while (p)
+        {
+            if (*p == '_')
+            {
+                *p = '\0';
+                uid = atoi(uidName);
+                break;
+            }
+            p++;
+        }
+    }
+
+    return uid;
+}
+
 VX_PRIVATE_API vx_status vxoBinaryGraph_Initialize(
     vx_graph graph,
     vx_char *fileName
@@ -10388,7 +10415,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
                 {
                     if (gcoOS_StrStr(ref->name, "out", VX_NULL))
                     {
-                        vx_int32 uid = getUserIDFromOutputTensor((vx_tensor)ref);
+                        vx_int32 uid = vxoBinaryGraph_GetUidFromOutputTensor((vx_tensor)ref);
                         if (uid >= 0)
                         {
                             layersInfo.uid = uid;
