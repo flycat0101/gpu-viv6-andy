@@ -5229,7 +5229,7 @@ APMHandle CreateAPModel (
         assert(0);
     }
 
-    //InitHWModeling(inParam.bwl);
+    InitHWModeling(inParam.bwl);
 
     // copy fpga info from inParam
     memcpy(&p_hwInfo->fpagInfo, &inParam.fpagInfo, sizeof(FPGA_INFO_T));
