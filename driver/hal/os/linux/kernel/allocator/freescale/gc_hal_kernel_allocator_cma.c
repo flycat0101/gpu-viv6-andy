@@ -169,10 +169,17 @@ _CMAFSLAlloc(
     }
 #endif
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0)
+    mdl_priv->kvaddr = dma_alloc_wc(&os->device->platform->device->dev,
+            NumPages * PAGE_SIZE,
+            &mdl_priv->physical,
+            gfp);
+#else
     mdl_priv->kvaddr = dma_alloc_writecombine(&os->device->platform->device->dev,
             NumPages * PAGE_SIZE,
             &mdl_priv->physical,
             gfp);
+#endif
 
     if (mdl_priv->kvaddr == gcvNULL)
     {
@@ -276,10 +283,17 @@ _CMAFSLFree(
     gckOS os = Allocator->os;
     struct mdl_cma_priv *mdlPriv=(struct mdl_cma_priv *)Mdl->priv;
     gcsCMA_PRIV_PTR priv = (gcsCMA_PRIV_PTR)Allocator->privateData;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0)
+    dma_free_wc(&os->device->platform->device->dev,
+            Mdl->numPages * PAGE_SIZE,
+            mdlPriv->kvaddr,
+            mdlPriv->physical);
+#else
     dma_free_writecombine(&os->device->platform->device->dev,
             Mdl->numPages * PAGE_SIZE,
             mdlPriv->kvaddr,
             mdlPriv->physical);
+#endif
      gckOS_Free(os, mdlPriv);
     atomic_sub(Mdl->numPages, &priv->cmasize);
 }
@@ -306,11 +320,19 @@ _CMAFSLMmap(
     if (Mdl->contiguous)
     {
         /* map kernel memory to user space.. */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0)
+        if (dma_mmap_wc(&os->device->platform->device->dev,
+                vma,
+                (gctINT8_PTR)mdlPriv->kvaddr + (skipPages << PAGE_SHIFT),
+                mdlPriv->physical + (skipPages << PAGE_SHIFT),
+                numPages << PAGE_SHIFT) < 0)
+#else
         if (dma_mmap_writecombine(&os->device->platform->device->dev,
                 vma,
                 (gctINT8_PTR)mdlPriv->kvaddr + (skipPages << PAGE_SHIFT),
                 mdlPriv->physical + (skipPages << PAGE_SHIFT),
                 numPages << PAGE_SHIFT) < 0)
+#endif
         {
             gcmkTRACE_ZONE(
                 gcvLEVEL_WARNING, gcvZONE_OS,
