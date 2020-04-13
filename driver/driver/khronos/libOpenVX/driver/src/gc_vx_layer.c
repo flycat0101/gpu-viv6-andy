@@ -8417,7 +8417,8 @@ vxnne_shader_executable vxnneGetAvgPooling_UInt8ShaderExecutable(
         vx_int32     packedMinData[4]   = {0};
         vx_int32     packedMaxData[4]   = {0};
         vx_float32   uint8Scale_in      = scaleIn;
-        vx_float32   uint8qScale_out    = 1 / (float)(kernel_size_x * kernel_size_y * scaleOut);
+        vx_float64   tempSum            = (vx_float64)kernel_size_x * (vx_float64)kernel_size_y * (vx_float64)scaleOut;
+        vx_float32   uint8qScale_out    = (vx_float32)((vx_float64)1.0 / tempSum);
         vx_float32   uint8ZP_out        = (vx_float32)output_ZP;
         vx_float32   uint8ConstData_in  = (vx_float32)input_ZP * kernel_size_x * kernel_size_y * scaleIn;
         vx_int32     pool_size          = gcmALIGN_SAFE(kernel_size_x * kernel_size_y, 64);

@@ -4253,6 +4253,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_Write(
     void *data
     )
 {
+#define DEBUG_SAME_NBG_FILE    0
     vx_status status = VX_SUCCESS;
 
     if ((size == 0) || (data == VX_NULL))
@@ -4260,6 +4261,22 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_Write(
         vxError("%s[%d]: data is null or size is 0\n", __FUNCTION__, __LINE__);
         return VX_FAILURE;
     }
+
+#if DEBUG_SAME_NBG_FILE
+    {
+        vx_uint32 i = 0;
+        vx_uint8 *tmp = (vx_uint8*)data;
+        vx_uint8 *buf = tmp;
+        for (i = 0; i < size; i++)
+        {
+            if ((tmp[i] == 0x0C) && (tmp[i + 1] == 0x66) && (tmp[i + 2] == 0x3D))
+            {
+                vxInfo("find this data in NBG\n");
+            }
+            buf = tmp + i;
+        }
+    }
+#endif
 
     if (1 == binarySave->generateNBGToMemory)
     {   /* write NBG to memory */
