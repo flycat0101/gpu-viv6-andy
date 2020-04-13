@@ -11120,7 +11120,6 @@ VX_PRIVATE_API void vxoGraph_EndProcess(vx_graph graph)
         vx_uint32 i, j;
         vx_node node;
 
-        gcfVX_Flush(gcvTRUE);
         for (j = 0; j < graph->tailNodeCount; j++)
         {
             node = graph->nodeTable[graph->tailNodeIndexTable[j]];
