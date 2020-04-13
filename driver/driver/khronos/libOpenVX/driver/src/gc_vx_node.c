@@ -422,12 +422,20 @@ VX_INTERNAL_API void vxoNode_Dump(vx_node node)
 
 VX_INTERNAL_CALLBACK_API void vxoNode_Destructor(vx_reference ref)
 {
+    gctUINT32 gpuCount = 1;
     vx_uint32 i;
     vx_node node = (vx_node)ref;
     vx_status status;
     gcmHEADER_ARG("ref=%p", ref);
     vxmASSERT(vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE));
     vxmASSERT(node->kernel);
+
+    gcoVX_QueryCoreCount(node->graph->deviceID, &gpuCount);
+    if (gpuCount > 1)
+    {
+        /* release multiGPU operations memory*/
+        status |= vxoMultiGpu_FreeMemory(node);
+    }
 
     /* Wrapped user node need to deinitialize layer/op first */
     if (node->kernel->deinitializeWrapFunction != VX_NULL)
@@ -1097,16 +1105,9 @@ VX_INTERNAL_API vx_status vxoNode_Replay(vx_node node)
 
 VX_INTERNAL_API vx_status vxoNode_Release(vx_node_ptr nodePtr)
 {
-    gctUINT32 gpuCount = 1;
     vx_status status = VX_SUCCESS;
     gcmHEADER_ARG("nodePtr=%p", nodePtr);
 
-    gcoVX_QueryCoreCount((*nodePtr)->graph->deviceID, &gpuCount);
-    if (gpuCount > 1)
-    {
-        /* release multiGPU operations memory*/
-        status |= vxoMultiGpu_FreeMemory(*nodePtr);
-    }
     status |= vxoReference_Release((vx_reference_ptr)nodePtr, VX_TYPE_NODE, VX_REF_EXTERNAL);
 
     gcmFOOTER_ARG("%d", status);
