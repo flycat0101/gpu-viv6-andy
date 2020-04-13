@@ -752,6 +752,8 @@ __GL_INLINE GLboolean __glDrawEnd(__GLcontext *gc)
         GLuint index;
         __GLprogramObject *progObj;
         __GLSLStage stage;
+        GLuint i;
+        GLboolean bAdvancedBlendEquation = GL_FALSE;
 
         for (index = 0; index < __GL_MAX_BUFFER_INDEX; index++)
         {
@@ -795,7 +797,22 @@ __GL_INLINE GLboolean __glDrawEnd(__GLcontext *gc)
             }
         }
 
-        /* Temp disable the dirty in case to affect perf */
+        for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; i++)
+        {
+            if (gc->state.raster.blendEquationRGB[i] >= GL_MULTIPLY_KHR &&
+                gc->state.raster.blendEquationRGB[i] <= GL_HSL_LUMINOSITY_KHR)
+            {
+                bAdvancedBlendEquation = GL_TRUE;
+                break;
+            }
+        }
+
+        /* Mark FBO tex attach point dirty */
+        if (gc->frameBuffer.drawFramebufObj->name && bAdvancedBlendEquation)
+        {
+            __glSetFBOAttachedTexDirty(gc, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT, -1);
+        }
+
     }
 
     return ret;
