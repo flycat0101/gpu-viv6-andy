@@ -3223,19 +3223,15 @@ gckMMU_SetupSRAM(
 
                 Device->extSRAMBaseAddresses[i] = 0;
 
-                Hardware->options.extSRAMCPUPhysAddrs[i] = Device->extSRAMBases[i];
-
                 gcmkONERROR(gckOS_CPUPhysicalToGPUPhysical(
                     Mmu->os,
                     Device->extSRAMBases[i],
-                    &Device->extSRAMBases[i]
+                    &Device->extSRAMGPUBases[i]
                     ));
-
-                Hardware->options.extSRAMGPUPhysAddrs[i] = Device->extSRAMBases[i];
 
                 gcmkONERROR(_FillFlatMapping(
                     Mmu,
-                    Device->extSRAMBases[i],
+                    Device->extSRAMGPUBases[i],
                     Device->extSRAMSizes[i],
                     gcvFALSE,
                     gcvTRUE,
@@ -3314,15 +3310,17 @@ gckMMU_SetupSRAM(
             kernel->extSRAMBaseAddresses[i] = Device->extSRAMBaseAddresses[i];
 
             Hardware->options.extSRAMGPUVirtAddrs[i] = Device->extSRAMBaseAddresses[i];
-            Hardware->options.extSRAMSizes[i] = Device->extSRAMSizes[i];
-            Hardware->options.extSRAMGPUPhysAddrs[i] = Device->extSRAMBases[i];
+            Hardware->options.extSRAMSizes[i]        = Device->extSRAMSizes[i];
+            Hardware->options.extSRAMCPUPhysAddrs[i] = Device->extSRAMBases[i];
+            Hardware->options.extSRAMGPUPhysAddrs[i] = Device->extSRAMGPUBases[i];
             Hardware->options.extSRAMGPUPhysNames[i] = Device->extSRAMGPUPhysNames[i];
 
             if (Device->showSRAMMapInfo)
             {
-                gcmkPRINT("Galcore Info: MMU mapped external shared SRAM[%d] GPU view base=0x%llx GPU virtual address=0x%x size=0x%x",
+                gcmkPRINT("Galcore Info: MMU mapped external shared SRAM[%d] CPU view base=0x%llx GPU view base=0x%llx GPU virtual address=0x%x size=0x%x",
                     i,
                     Device->extSRAMBases[i],
+                    Device->extSRAMGPUBases[i],
                     kernel->extSRAMBaseAddresses[i],
                     Device->extSRAMSizes[i]
                     );
