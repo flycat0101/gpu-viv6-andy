@@ -169,18 +169,6 @@ typedef struct _gcsTASK_MASTER_TABLE
 }
 gcsTASK_MASTER_TABLE;
 
-#if gcdENABLE_VG
-typedef struct _gcoVGHARDWARE *            gcoVGHARDWARE;
-typedef struct _gcoVGBUFFER *           gcoVGBUFFER;
-typedef struct _gckVGHARDWARE *         gckVGHARDWARE;
-typedef struct _gcsVGCONTEXT *            gcsVGCONTEXT_PTR;
-typedef struct _gcsVGCONTEXT_MAP *        gcsVGCONTEXT_MAP_PTR;
-typedef struct _gcsVGCMDQUEUE *            gcsVGCMDQUEUE_PTR;
-typedef struct _gcsTASK_MASTER_TABLE *    gcsTASK_MASTER_TABLE_PTR;
-typedef struct _gckVGKERNEL *            gckVGKERNEL;
-typedef void *                            gctTHREAD;
-#endif
-
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
