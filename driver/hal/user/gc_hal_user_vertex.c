@@ -34,12 +34,19 @@
 **  the cache, the oldest buffer will be flushed and marked as free
 **  asynchronously by the hardware
 */
-
+#if gcdCAPTURE_ONLY_MODE
+#define DYNAMIC_STREAM_COUNT           0x10000
+#define gcdSTREAM_CACHE_SLOTS   2048
+#define gcdSTREAM_CACHE_HASH    8192
+#define gcdSTREAM_CACHE_SIZE    (4 << 10)
+#define gcdSTREAM_CACHE_COUNT   1
+#else
 #define DYNAMIC_STREAM_COUNT           0x10000
 #define gcdSTREAM_CACHE_SLOTS   2048
 #define gcdSTREAM_CACHE_HASH    8192
 #define gcdSTREAM_CACHE_SIZE    (1024 << 10)
 #define gcdSTREAM_CACHE_COUNT   2
+#endif
 
 typedef enum _gceSTREAM_CACHE_TYPE
 {
