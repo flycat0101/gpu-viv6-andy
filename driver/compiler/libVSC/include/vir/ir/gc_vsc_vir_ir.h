@@ -2786,6 +2786,7 @@ typedef enum _VIR_UNIFORMKIND
     VIR_UNIFORM_VIEW_INDEX,
     VIR_UNIFORM_THREAD_ID_MEM_ADDR,
     VIR_UNIFORM_CLIP_DISTANCE_ENABLE,
+    VIR_UNIFORM_YCBCR_PLANES,
     /* should not larger than 2^6, since it is using storageClass,
      * in case it is >= 64, need to enlarge _storageClass */
 } VIR_UniformKind;
@@ -4434,6 +4435,11 @@ struct _VIR_UNIFORM
             ** So far it is used for vulkan-recompiler only.
             */
             VIR_SymId       texelBufferToImageSymId;
+
+            /*
+            ** The plane image uniform for a ycbcr sampler.
+            */
+            VIR_SymId       ycbcrPlaneSymId;
 
             /* The sampled image symbol ID. */
             VIR_SymId       sampledImageSymId;

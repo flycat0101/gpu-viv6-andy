@@ -8887,6 +8887,7 @@ VIR_Shader_AddSymbolContents(
                         uniform->u.samplerOrImageAttr.extraImageLayer = VIR_INVALID_ID;
                         uniform->u.samplerOrImageAttr.texelBufferToImageSymId   = VIR_INVALID_ID;
                         uniform->u.samplerOrImageAttr.sampledImageSymId   = VIR_INVALID_ID;
+                        uniform->u.samplerOrImageAttr.ycbcrPlaneSymId = VIR_INVALID_ID;
                     }
                 }
                 else
@@ -8897,6 +8898,7 @@ VIR_Shader_AddSymbolContents(
                     uniform->u.samplerOrImageAttr.extraImageLayer = VIR_INVALID_ID;
                     uniform->u.samplerOrImageAttr.texelBufferToImageSymId   = VIR_INVALID_ID;
                     uniform->u.samplerOrImageAttr.sampledImageSymId   = VIR_INVALID_ID;
+                    uniform->u.samplerOrImageAttr.ycbcrPlaneSymId = VIR_INVALID_ID;
                 }
                 uniform->auxAddrSymId = VIR_INVALID_ID;
                 if (PresetId == VIR_INVALID_ID)
