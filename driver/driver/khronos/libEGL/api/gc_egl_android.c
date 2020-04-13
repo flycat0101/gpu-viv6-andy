@@ -2206,17 +2206,6 @@ _QueryRenderMode(
                 mode2D = VEGL_DIRECT_RENDERING_NOFC;
             }
 
-            /* Query 2D FC: fast clear support. */
-            status = gcoHAL_IsFeatureAvailable(
-                gcvNULL,
-                gcvFEATURE_2D_FAST_CLEAR
-                );
-
-            if (status == gcvSTATUS_TRUE)
-            {
-                mode2D = VEGL_DIRECT_RENDERING_FC_NOCC;
-            }
-
             /* Query 2D FC: full tile status support. */
             status = gcoHAL_IsFeatureAvailable(
                 gcvNULL,
