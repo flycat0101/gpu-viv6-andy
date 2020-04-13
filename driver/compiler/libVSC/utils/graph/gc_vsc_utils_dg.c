@@ -1094,57 +1094,7 @@ static void _DoTraversalCB(VSC_DIRECTED_GRAPH* pDG,
     }
     else if (searchMode == VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST_ITERATIVE)
     {
-        VSC_SIMPLE_STACK        stack;
-        VSC_DG_NODE*            pPopNode;
-
-        STACK_INITIALIZE(&stack);
-
-        _PushStack(&stack, pNode, pDG->pMM);
-
-        SAFE_CALL_DG_NODE_HANDLER_RETURN(pfnHandlerOwnPre, pNode, pParam);
-
-        while (!STACK_CHECK_EMPTY(&stack))
-        {
-            pPopNode = _PopStack(&stack, pDG->pMM);
-            if (pPopNode->bVisited)
-            {
-                continue;
-            }
-            pPopNode->bVisited = gcvTRUE;
-
-            /* Determine direction */
-            pAdjList = (bFromTail) ? &pPopNode->predList : &pPopNode->succList;
-
-            vscUNILST_Reverse(pAdjList);
-
-            /* Visit descendants before siblings */
-            for (pEdge = AJLST_GET_FIRST_EDGE(pAdjList);
-                 pEdge != NULL;
-                 pEdge = DGEG_GET_NEXT_EDGE(pEdge))
-            {
-                gcmASSERT(pEdge->pFromNode == pPopNode);
-
-                if (!pEdge->pToNode->bVisited)
-                {
-                    SAFE_CALL_DG_NODE_HANDLER_CONTINUE(pfnHandlerDescendantPre, pEdge->pToNode, pParam);
-
-                    _PushStack(&stack, pEdge->pToNode, pDG->pMM);
-
-                    SAFE_CALL_DG_NODE_HANDLER_CONTINUE(pfnHandlerDescendantPost, pEdge->pToNode, pParam);
-                }
-                else
-                {
-                    SAFE_CALL_DG_EDGE_HANDLER(pfnHandlerDFSEdgeOnRevisit, pEdge, pParam);
-                }
-            }
-
-            /* Reverse the list again. */
-            vscUNILST_Reverse(pAdjList);
-        }
-
-        SAFE_CALL_DG_NODE_HANDLER_RETURN(pfnHandlerOwnPost, pNode, pParam);
-
-        STACK_FINALIZE(&stack);
+        gcmASSERT(gcvFALSE);
     }
     else if (searchMode == VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_NARROW)
     {
@@ -1257,6 +1207,12 @@ void vscDG_TraversalCB(VSC_DIRECTED_GRAPH* pDG,
     VSC_SIMPLE_RESIZABLE_ARRAY* pStartNodeArray;
 
     searchMode = _ChooseImplementSearchMode(pDG, searchMode);
+
+    /* Disable iterative DFS temporarily when the check function is set, need to refine it later. */
+    if (searchMode == VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST_ITERATIVE)
+    {
+        searchMode = VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST_RECURSIVE;
+    }
 
     /* Prepare firstly */
     pStartNodeArray = _PrepareTraversal(pDG, searchMode, bFromTail);
