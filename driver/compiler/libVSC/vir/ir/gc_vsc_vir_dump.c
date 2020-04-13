@@ -1255,7 +1255,7 @@ _DumpSymbol(
         else if (isSymNoperspective(Sym))
         {
             VERIFY_OK(
-                VIR_LOG(Dumper, "noperspective "));
+                VIR_LOG(Dumper, " noperspective "));
         }
 
         switch(VIR_Symbol_GetKind(Sym))
@@ -1304,13 +1304,11 @@ _DumpSymbol(
         }
     }
 
-    if (Dumper->baseDumper.verbose)
+    if (FullInfo)
     {
-        if (FullInfo)
-        {
-            _DumpLayout(Dumper, VIR_Symbol_GetLayout(Sym));
-        }
+        _DumpLayout(Dumper, VIR_Symbol_GetLayout(Sym));
     }
+
     switch(VIR_Symbol_GetKind(Sym))
     {
     case VIR_SYM_FUNCTION:       /* function */
