@@ -62,6 +62,7 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
     vx_bool                 is_roi_copy,
     vx_uint32               input_width,
     vx_uint32               input_height,
+    vx_bool                 enable_tf_avgPool,
     vx_tensor               output)
 {
 #if !gcdUSE_VXC_BINARY
@@ -92,6 +93,7 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
     vx_scalar    zeroPointOut       = VX_NULL;
     vx_scalar    padX               = VX_NULL;
     vx_scalar    padY               = VX_NULL;
+    vx_scalar    enable_tf_s        = VX_NULL;
     vx_scalar    inputWidth_s       = VX_NULL;
     vx_scalar    inputHeight_s      = VX_NULL;
     vx_scalar    inputHeightPad_s   = VX_NULL;
@@ -523,8 +525,8 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
         if(inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
         {
             vx_float32 outScaleValue = output_scale;
-            vx_reference parameters[12] = {(vx_reference)input, VX_NULL, VX_NULL, VX_NULL, VX_NULL, VX_NULL,
-                VX_NULL, VX_NULL, VX_NULL, VX_NULL, VX_NULL, (vx_reference)output};
+            vx_reference parameters[13] = {(vx_reference)input, VX_NULL, VX_NULL, VX_NULL, VX_NULL, VX_NULL,
+                VX_NULL, VX_NULL, VX_NULL, VX_NULL, VX_NULL, VX_NULL, (vx_reference)output};
 
             if(filterValue[0] < 4)
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_AvgPadQuant8", borderMode);
@@ -544,6 +546,7 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
             zeroPointOut = vxCreateScalar(context, VX_TYPE_INT32, &outputZP);
             padX = vxCreateScalar(context, VX_TYPE_INT32, &pool_pad_x_left);
             padY = vxCreateScalar(context, VX_TYPE_INT32, &pool_pad_y_top);
+            enable_tf_s = vxCreateScalar(context, VX_TYPE_INT32, &enable_tf_avgPool);
 
             parameters[1]  = (vx_reference)poolSizeX;
             parameters[2]  = (vx_reference)poolSizeY;
@@ -555,14 +558,14 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
             parameters[8]  = (vx_reference)zeroPointOut;
             parameters[9]  = (vx_reference)padX;
             parameters[10] = (vx_reference)padY;
-
-            status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 12);
+            parameters[11] = (vx_reference)enable_tf_s;
+            status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 13);
             if (status != VX_SUCCESS) goto OnError;
         }
          else if((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16) ||
              (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32))
          {
-             vx_reference parameters[8] = {(vx_reference)input, VX_NULL, VX_NULL, VX_NULL, VX_NULL, VX_NULL, VX_NULL, (vx_reference)output};
+             vx_reference parameters[9] = {(vx_reference)input, VX_NULL, VX_NULL, VX_NULL, VX_NULL, VX_NULL, VX_NULL, VX_NULL, (vx_reference)output};
 
              if(filterValue[0] < 4)
                  shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_AvgPadFP32", borderMode);
@@ -585,8 +588,8 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
              parameters[4] = (vx_reference)stride_y;
              parameters[5] = (vx_reference)padX;
              parameters[6] = (vx_reference)padY;
-
-             status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 8);
+             parameters[7] = (vx_reference)enable_tf_s;
+             status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 9);
              if (status != VX_SUCCESS) goto OnError;
          }
     }
@@ -618,6 +621,7 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
     if (zeroPointOut) vxReleaseScalar(&zeroPointOut);
     if (padX) vxReleaseScalar(&padX);
     if (padY) vxReleaseScalar(&padY);
+    if (enable_tf_s) vxReleaseScalar(&enable_tf_s);
     if (inputWidth_s) vxReleaseScalar(&inputWidth_s);
     if (inputHeight_s) vxReleaseScalar(&inputHeight_s);
     if (inputHeightPad_s) vxReleaseScalar(&inputHeightPad_s);
@@ -634,6 +638,7 @@ OnError:
     if (zeroPointOut) vxReleaseScalar(&zeroPointOut);
     if (padX) vxReleaseScalar(&padX);
     if (padY) vxReleaseScalar(&padY);
+    if (enable_tf_s) vxReleaseScalar(&enable_tf_s);
     if (inputWidth_s) vxReleaseScalar(&inputWidth_s);
     if (inputHeight_s) vxReleaseScalar(&inputHeight_s);
     if (inputHeightPad_s) vxReleaseScalar(&inputHeightPad_s);
@@ -11973,6 +11978,11 @@ vxnne_shader_executable vxnneGPUTensorCopyROIShaderExecutable(
             status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_TWO_COMPONENTS);
             status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_TWO_COMPONENTS);
         }
+        else
+        {
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_ONE_COMPONENTS);
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_ONE_COMPONENTS);
+        }
         if (status != VX_SUCCESS) goto OnError;
     }
     else if ((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT32)
@@ -11988,6 +11998,11 @@ vxnne_shader_executable vxnneGPUTensorCopyROIShaderExecutable(
                 execution_parameters.globalWorkScale[0] = 4;
                 status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                 status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            }
+            else
+            {
+                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_ONE_COMPONENTS);
+                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_ONE_COMPONENTS);
             }
             if (status != VX_SUCCESS) goto OnError;
     }

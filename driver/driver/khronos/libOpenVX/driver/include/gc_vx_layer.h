@@ -3781,6 +3781,7 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
     vx_bool                 is_roi_copy,
     vx_uint32               input_width,
     vx_uint32               input_height,
+    vx_bool                 enable_tf_avgPool,
     vx_tensor               output);
 
 vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(

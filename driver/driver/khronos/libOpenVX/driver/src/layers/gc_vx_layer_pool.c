@@ -821,7 +821,7 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
             ops_layer->node->base.context, VXNNE_KERNEL_GPU_AVGPOOLING, &ops_layer->node->kernelAttributes.borderMode,
             tensorCopy, pool_type_s, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left,
             pool_pad_y_top, pool_pad_x_right, pool_pad_y_bottom, rounding_s, is_copy_tensor,
-            TENSOR_VIEW_SIZE_INDEX(inputs, 0), TENSOR_VIEW_SIZE_INDEX(inputs, 1), outputs);
+            TENSOR_VIEW_SIZE_INDEX(inputs, 0), TENSOR_VIEW_SIZE_INDEX(inputs, 1), enable_tf_avgPool, outputs);
         }
         else if (enable_L2Pool_SH)
         {
@@ -2435,7 +2435,7 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
                         node->base.context, VXNNE_KERNEL_GPU_AVGPOOLING, &node->kernelAttributes.borderMode,
                         tensorCopy, pool_type_s, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left,
                         pool_pad_y_top, pool_pad_x_right, pool_pad_y_bottom, rounding_s, is_copy_tensor,
-                        TENSOR_VIEW_SIZE_INDEX(inputs, 0), TENSOR_VIEW_SIZE_INDEX(inputs, 1), outputs);
+                        TENSOR_VIEW_SIZE_INDEX(inputs, 0), TENSOR_VIEW_SIZE_INDEX(inputs, 1), enable_tf_avgPool, outputs);
                     }
                     else if (enable_L2Pool_SH)
                     {
