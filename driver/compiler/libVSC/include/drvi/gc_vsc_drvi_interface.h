@@ -493,8 +493,8 @@ typedef VSC_TyQualifier      VIR_TyQualifier;
  * to achieve best performance */
 typedef enum {
     VSC_OCLImgLibKind_UseLoadStore       = 0, /* for v54x GC chips, use LOAD/STORE/TEXLD */
-    VSC_OCLImgLibKind_UseImgLoadTexldU   = 1, /* for v55 GC chips, use IMG_LOAD/IMG_STORE/TEXLD_U */
-    VSC_OCLImgLibKind_UseImgLoadTexldUXY = 2, /* for v60 GC and v620 GC chips */
+    VSC_OCLImgLibKind_UseImgLoadTexldU   = 1, /* for v55 GC chips, use IMG_LOAD/IMG_STORE/TEXLD_U  -- unused now */
+    VSC_OCLImgLibKind_UseImgLoadTexldUXY = 2, /* for v60 GC and v620 GC chips -- unused now*/
     VSC_OCLImgLibKind_UseImgLoadVIP      = 3, /* v60 VIP chip, use IMG_LOAD/IMG_STORE */
     VSC_OCLImgLibKind_Counts, /* count of img libs */
     VSC_OCLImgLibKind_BasedOnHWFeature         /* select library based on HW feature */

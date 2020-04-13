@@ -1173,23 +1173,6 @@ _CreateCLIntrinsicLib(
             gcLibCL_VIR_ReadImage_WITH_IMGLD_float[2],
             "",
     };
-     gctCONST_STRING  clImgLibStr_UseTexldUXY[] =
-    {
-            gcLibCL_ReadImage_VIR_Common_Func_Str,
-
-            gcLibCL_VIR_ReadImage_WITH_IMGLD_int[0],
-            gcLibCL_VIR_ReadImage_WITH_IMGLD_int[1],
-            gcLibCL_VIR_ReadImage_WITH_IMGLD_int[2],
-
-            gcLibCL_VIR_ReadImage_WITH_IMGLD_uint[0],
-            gcLibCL_VIR_ReadImage_WITH_IMGLD_uint[1],
-            gcLibCL_VIR_ReadImage_WITH_IMGLD_uint[2],
-
-            gcLibCL_VIR_ReadImage_WITH_IMGLD_float[0],
-            gcLibCL_VIR_ReadImage_WITH_IMGLD_float[1],
-            gcLibCL_VIR_ReadImage_WITH_IMGLD_float[2],
-            "",
-    };
 #if _SUPPORT_TEDLX_U_IMG_LIB
     gctCONST_STRING  clImgLibStr_UseTexldU[] =
     {
@@ -1365,34 +1348,13 @@ _CreateCLIntrinsicLib(
     /* construct image builtin lib source base on ImgLibKind */
     switch (ImgLibKind)
     {
-    case VSC_OCLImgLibKind_UseImgLoadTexldUXY:
-        virCLIntrinsicLibraryPtr = &clImgLib_UseTexldUXY;
-        virLibName               = virLibName_UseLoadStore;
-        imgStringNum             = sizeof(clImgLibStr_UseTexldUXY) / sizeof(gctSTRING);
-        clImgLibStr              = clImgLibStr_UseTexldUXY;
-        break;
     case VSC_OCLImgLibKind_UseImgLoadVIP:
         virCLIntrinsicLibraryPtr = &clImgLib_UseImgLoadStore;
         virLibName               = virLibName_UseImgLoadStore;
         imgStringNum             = sizeof(clImgLibStr_UseImgLoadStore) / sizeof(gctSTRING);
         clImgLibStr              = clImgLibStr_UseImgLoadStore;
       break;
-    case VSC_OCLImgLibKind_UseImgLoadTexldU:
-#if _SUPPORT_TEDLX_U_IMG_LIB
-        virCLIntrinsicLibraryPtr = &clImgLib_UseTexldU;
-        virLibName               = virLibName_UseTexldU;
-        imgStringNum             = sizeof(clImgLibStr_UseTexldU) / sizeof(gctSTRING);
-        clImgLibStr              = clImgLibStr_UseTexldU;
-        break;
-#else
-        /* fall through */
-#endif
-    case VSC_OCLImgLibKind_UseLoadStore:
-        virCLIntrinsicLibraryPtr = &clImgLib_UseLoadStore;
-        virLibName               = virLibName_UseLoadStore;
-        imgStringNum             = sizeof(clImgLibStr_UseLoadStore) / sizeof(gctSTRING);
-        clImgLibStr              = clImgLibStr_UseLoadStore;
-        break;
+
     default:
         gcmASSERT(gcvFALSE);
         virCLIntrinsicLibraryPtr = &clImgLib_UseLoadStore;

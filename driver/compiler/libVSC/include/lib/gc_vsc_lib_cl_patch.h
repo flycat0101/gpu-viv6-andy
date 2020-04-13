@@ -11459,9 +11459,6 @@ extern gctSTRING gcLibCL_ReadImage_Common_Func_Str;
 
 extern gctSTRING gcLibCL_ReadImage_With_IMGLD_Funcs;
 
-/* read image with texldu macros */
-#define READ_IMAGE_WITH_TEXLDU_FUNC_NAME(RET_TYPE, COORD_TYPE) \
-#RET_TYPE" _read_image_with_texldu_"#RET_TYPE"_"#COORD_TYPE"(viv_generic_image_t image, sampler_t sampler, "#COORD_TYPE" coord)\n"
 
 #define DECLARE_GENERIC_SAMPLER_IDX \
 "    uint glSamplerIndex;\n"
@@ -11473,21 +11470,6 @@ extern gctSTRING gcLibCL_ReadImage_With_IMGLD_Funcs;
 "    _viv_asm(TEXU, result, sampler);\n" \
 "    _viv_asm(TEXTURE_LOAD, result, glSamplerIndex, coord);\n"
 
-#define READ_IMAGE_WITH_TEXLDU(RET_TYPE, COORD_TYPE) \
-    READ_IMAGE_WITH_TEXLDU_FUNC_NAME(RET_TYPE, COORD_TYPE) \
-    "{\n" \
-    DECLARE_RESULT(RET_TYPE) \
-    DECLARE_GENERIC_SAMPLER_IDX \
-    GET_IMAGE_T_SAMPLER_IDX_STMT \
-    SINGLE_TEXLDU_TO_RESULT \
-    RETURN_RESULT \
-    "}\n"
-
-extern gctSTRING gcLibCL_ReadImage_With_TEXLDU_Funcs;
-
-extern gctSTRING gcLibCL_ReadImage_With_V55_TEXLDU_Funcs;
-
-extern gctSTRING gcLibCL_ReadImage_With_TEXLD_Funcs;
 
 #define WRITE_IMAGE_WITH_IMGST_FUNC_NAME(DIMENSION, DATA_TYPE) \
     "void _write_image_with_imgst_"#DIMENSION"_"#DATA_TYPE"(viv_generic_image_t image, int3 coord, "#DATA_TYPE" data)\n"
