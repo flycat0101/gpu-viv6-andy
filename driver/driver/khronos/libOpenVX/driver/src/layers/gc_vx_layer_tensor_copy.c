@@ -386,10 +386,10 @@ VX_PRIVATE_API vx_bool vxoNNTensorCopy_TP_Support(vx_node node, const vx_referen
         {
             vx_uint32 i, srcDimCount = 1, dstDimCount = 1;
 
-            for (i = 0; i < gcmMAX(TENSOR_DIM_NUM(src), TENSOR_DIM_NUM(dst)); i++)
+            for (i = 0; i < gcmMAX(TENSOR_VIEW_DIM_NUM(src), TENSOR_VIEW_DIM_NUM(dst)); i++)
             {
-                srcDimCount *= TENSOR_SIZE_INDEX(src, i);
-                dstDimCount *= TENSOR_SIZE_INDEX(dst, i);
+                srcDimCount *= TENSOR_VIEW_SIZE_INDEX(src, i);
+                dstDimCount *= TENSOR_VIEW_SIZE_INDEX(dst, i);
 
                 if (i > 1 && (TENSOR_VIEW_START_INDEX(src, i) != 0 || TENSOR_VIEW_START_INDEX(dst, i) != 0))
                 {
@@ -423,23 +423,24 @@ VX_PRIVATE_API vx_status vxoNNTensorCopy_TP_Initialize(vxnne_layer ops_layer, co
 
     if (TENSOR_VIEW_DIM_NUM(src) != TENSOR_VIEW_DIM_NUM(dst))
     {
-        vx_uint32 i, srcDepth, dstDepth, srcDimCount = 1, dstDimCount = 1;
+        vx_uint32 i, dstDepth, dstDimCount = 1;
 
-        for (i = 0; i < gcmMAX(TENSOR_DIM_NUM(src), TENSOR_DIM_NUM(dst)); i++)
+        for (i = 0; i < TENSOR_VIEW_DIM_NUM(dst); i++)
         {
-            srcDimCount *= TENSOR_SIZE_INDEX(src, i);
-            dstDimCount *= TENSOR_SIZE_INDEX(dst, i);
+            dstDimCount *= TENSOR_VIEW_SIZE_INDEX(dst, i);
         }
 
-        srcDepth = srcDimCount / (TENSOR_SIZE_INDEX(src, 0) * TENSOR_SIZE_INDEX(src, 1));
-        dstDepth = dstDimCount / (TENSOR_SIZE_INDEX(dst, 0) * TENSOR_SIZE_INDEX(dst, 1));
+        dstDepth = dstDimCount / (TENSOR_VIEW_SIZE_INDEX(dst, 0) * TENSOR_VIEW_SIZE_INDEX(dst, 1));
 
         batchCount = 1;
 
         conv.tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(sizeof(vx_tp_value_cmd_s));
         conv.tp_value->e32[0] = 1;
-        conv.tp_value->u32[0] = srcDepth;
-        conv.tp_value->u32[1] = dstDepth;
+        conv.tp_value->u32[0] = dstDepth;
+        conv.tp_value->u32[1] = TENSOR_VIEW_SIZE_INDEX(dst, 0);
+        conv.tp_value->u32[2] = TENSOR_VIEW_SIZE_INDEX(dst, 1);
+        conv.tp_value->u32[3] = TENSOR_STRIDE_INDEX(dst, 1);
+        conv.tp_value->u32[4] = TENSOR_STRIDE_INDEX(dst, 2);
     }
     else
     {

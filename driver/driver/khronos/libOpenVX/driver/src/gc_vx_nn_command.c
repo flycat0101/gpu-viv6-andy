@@ -5278,9 +5278,12 @@ VX_PRIVATE_API vx_status _SplitInputAndOutputForMultiTPCores(vx_context context,
     /* special change for tensor copy */
     if (tp_type == TP_TENSOR_COPY && parameter->tp_value != VX_NULL && parameter->tp_value->e32[0] != 0)
     {
-        input->depth  = parameter->tp_value->u32[0];
-        output->depth = parameter->tp_value->u32[1];
-        output_size_z = output->depth;
+        output->depth  = output_size_z = parameter->tp_value->u32[0];
+        input->width   = parameter->tp_value->u32[1];
+        input->height  = parameter->tp_value->u32[2];
+        input->depth   = parameter->tp_value->u32[0];
+        input->yStride = parameter->tp_value->u32[3];
+        input->zStride = parameter->tp_value->u32[4];
     }
 
     /* Decide the slice num. */
