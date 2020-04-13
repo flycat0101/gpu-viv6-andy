@@ -23,6 +23,42 @@ static vx_uint32 optPhase = 1;
 
 extern vx_int16 Fp32toBF16(vx_float32 val);
 
+VX_INTERNAL_API vx_uint32 vxoGraphOptimization_getOutputIndex(vx_node node)
+{
+    vx_uint32   i       = 0;
+
+    gcmHEADER_ARG("node=%p", node);
+    CHECK_NULL(node);
+
+    for(i = 0; i < node->numParameters; i++)
+    {
+        if(VX_OUTPUT == node->kernel->signature.directionTable[i])
+        {
+            gcmFOOTER_NO();
+            return  i;
+        }
+    }
+
+    vxError("can not get node(%s) 's output index", node->kernel->name);
+    vxmASSERT(0);
+    return node->numParameters - 1;
+}
+
+VX_INTERNAL_API vx_reference vxoGraphOptimization_getOutputParameter(vx_node node)
+{
+    vx_uint32 index = 0;
+    vx_reference output = NULL;
+
+    gcmHEADER_ARG("node=%p", node);
+    CHECK_NULL(node);
+
+    index = vxoGraphOptimization_getOutputIndex(node);
+    output = node->paramTable[index];
+
+    gcmFOOTER_ARG("0x%x", output);
+    return output;
+}
+
 VX_INTERNAL_API vx_uint32 vxoGraphOptimization_computeFinalKernelSize(vx_uint32 kernelsize, vx_uint32 stride)
 {
     vx_uint32 alignedWidth = ((kernelsize % stride == 0) ? kernelsize : (kernelsize + (stride - kernelsize % stride)));
@@ -316,7 +352,7 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
         {
             vx_enum poolType = SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_TYPE_INDEX], u32);
             vx_tensor input = (vx_tensor)node->paramTable[0];
-            vx_tensor output = (vx_tensor)node->paramTable[PARAM_POOLING_OUTPUT_INDEX];
+            vx_tensor output = (vx_tensor)vxoGraphOptimization_getOutputParameter(node);
             vx_uint32 input_w = input->dims[0];
             vx_uint32 input_h = input->dims[1];
             vx_uint32 output_w = output->dims[0];
@@ -1594,9 +1630,9 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeConvolutionNodes(vx_node nod
                 }
             case VX_KERNEL_ACTIVATION_LAYER:{
                     enable_relu = vx_true_e;
-                    lastNodeOutputIndex = PARAM_RELU_OUTPUT_INDEX;
+                    lastNodeOutputIndex = vxoGraphOptimization_getOutputIndex(nodes[i]);
                     lastNode = i;
-                    reluOutputTensor = (vx_tensor)nodes[i]->paramTable[PARAM_RELU_OUTPUT_INDEX];
+                    reluOutputTensor = (vx_tensor)nodes[i]->paramTable[lastNodeOutputIndex];
                     break;
                 }
             case VX_KERNEL_NN_PRELU:
@@ -1614,7 +1650,8 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeConvolutionNodes(vx_node nod
                 vx_bool diff = vx_false_e;
                 vx_uint32 idx = 0;
                 vx_tensor maxpInput = (vx_tensor)nodes[i]->paramTable[0];
-                vx_enum data_type = TENSOR_DATA_TYPE((vx_tensor)nodes[i]->paramTable[PARAM_POOLING_OUTPUT_INDEX]);
+                vx_uint32 poolOuputIndex = vxoGraphOptimization_getOutputIndex(nodes[i]);
+                vx_enum data_type = TENSOR_DATA_TYPE((vx_tensor)nodes[i]->paramTable[poolOuputIndex]);
                 if(data_type == VX_TYPE_UINT16 || data_type == VX_TYPE_INT16)
                     break;
                 if(int16_check && data_type == VX_TYPE_FLOAT16)
@@ -1637,7 +1674,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeConvolutionNodes(vx_node nod
                     pool_type = VX_NN_POOLING_MAX;
                     pool_size[0] = SCALAR_VALUE(nodes[i]->paramTable[PARAM_POOLING_POOL_SIZE_X_INDEX], u32);
                     pool_size[1] = SCALAR_VALUE(nodes[i]->paramTable[PARAM_POOLING_POOL_SIZE_Y_INDEX], u32);
-                    lastNodeOutputIndex = PARAM_POOLING_OUTPUT_INDEX;
+                    lastNodeOutputIndex = poolOuputIndex;
                     lastNode = i;
                     break;
                 }
@@ -1762,12 +1799,13 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeFullyConnectedNodes(vx_node 
         nodes[0]->merged = vx_true_e;
         nodes[0] = newNode;
         newNodeflag = vx_true_e;
+        if(newNode) vxReleaseNode(&newNode);
     }
 
     /*replace fc's output with relu's output, but reshape it as fc's output*/
     if(nodeCount >1)
     {
-        vx_tensor reluOut = (vx_tensor)nodes[1]->paramTable[PARAM_RELU_OUTPUT_INDEX];
+        vx_tensor reluOut = (vx_tensor)vxoGraphOptimization_getOutputParameter(nodes[1]);
         vxoGraphOptimization_updateTensorInNodeWithIndex(nodes, PARAM_FULLYCONNECTED_RELU_OUTPUT_INDEX, reluOut);
 
         SCALAR_VALUE(nodes[0]->paramTable[PARAM_FULLYCONNECTED_RELU_ENABLE_RELU_INDEX], b) = vx_true_e;
@@ -2022,7 +2060,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_dispelConcatNode(vx_node node)
     vx_uint32   numTensor = 2;
     vx_uint32   concatAxis = 0;
     vx_tensor   *tensorsIn, *tensorsSub;
-    vx_tensor   tensorOut = (vx_tensor) node->paramTable[PARAM_CONCAT2_OUTPUT_INDEX];
+    vx_tensor   tensorOut = (vx_tensor)vxoGraphOptimization_getOutputParameter(node);
 
     vx_enum nodeType = node->kernel->enumeration;
     gcmHEADER_ARG("node=%p", node);
@@ -2641,7 +2679,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_ConvertAvgPool2Conv(vx_graph grap
         {
             vx_tensor weight = VX_NULL;
             vx_tensor input = (vx_tensor)node->paramTable[0];
-            vx_tensor output = (vx_tensor)node->paramTable[PARAM_POOLING_OUTPUT_INDEX];
+            vx_tensor output = (vx_tensor)vxoGraphOptimization_getOutputParameter(node);
 
             vx_uint32 kernel_x = SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_SIZE_X_INDEX], u32);
             vx_uint32 kernel_y = SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_SIZE_Y_INDEX], u32);
