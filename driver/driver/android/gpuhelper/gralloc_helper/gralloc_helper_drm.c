@@ -271,6 +271,9 @@ static int create_vivante_drm_buffer_surface(buffer_handle_t handle,
             (tilingArgs.ts_mode == DRM_VIV_GEM_TS_NONE) ||
             (tilingArgs.ts_mode == DRM_VIV_GEM_TS_DISABLED);
 
+    surface->fcValue[0]      = (gctUINT32)tilingArgs.clear_value;
+    surface->fcValueUpper[0] = (gctUINT32)(tilingArgs.clear_value >> 32);
+
     *pSurface = surface;
     return 0;
 
