@@ -14,6 +14,10 @@
 #ifndef __gc_gl_dispatch_h__
 #define __gc_gl_dispatch_h__
 
+#ifndef VIV_EGL_BUILD
+#include "gc_es_types.h"
+#endif
+
 #define __GL_API_ENTRIES(glApiMacro) \
     glApiMacro(NewList), \
     glApiMacro(EndList), \
