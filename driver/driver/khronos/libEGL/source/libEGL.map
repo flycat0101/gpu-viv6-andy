@@ -100,6 +100,7 @@
         forward_glClearColor;
         forward_glClearDepthf;
         forward_glClearStencil;
+        forward_glColorMask;
         forward_glCompressedTexImage2D;
         forward_glCompressedTexSubImage2D;
         forward_glCopyTexImage2D;
@@ -124,6 +125,7 @@
         forward_glGetError;
         forward_glGetFloatv;
         forward_glGetIntegerv;
+        forward_glGetPointerv;
         forward_glGetString;
         forward_glGetTexParameterfv;
         forward_glGetTexParameteriv;
@@ -147,8 +149,12 @@
         forward_glTexParameteriv;
         forward_glTexSubImage2D;
         forward_glViewport;
+        forward_glMapBufferOES;
+        forward_glUnmapBufferOES;
         forward_glEGLImageTargetTexture2DOES;
         forward_glEGLImageTargetRenderbufferStorageOES;
+        forward_glMultiDrawArraysEXT;
+        forward_glMultiDrawElementsEXT;
 
     local:
         *;

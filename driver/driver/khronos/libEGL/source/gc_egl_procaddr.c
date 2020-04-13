@@ -12,7 +12,7 @@
 
 
 #include "gc_egl_precomp.h"
-#include <GLES2/gl2.h>
+#include <GLES3/gl32.h>
 #include <GLES2/gl2ext.h>
 
 #define VIV_EGL_BUILD
@@ -40,6 +40,7 @@
     esApiMacro(ClearColor), \
     esApiMacro(ClearDepthf), \
     esApiMacro(ClearStencil), \
+    esApiMacro(ColorMask), \
     esApiMacro(CompressedTexImage2D), \
     esApiMacro(CompressedTexSubImage2D), \
     esApiMacro(CopyTexImage2D), \
@@ -64,6 +65,7 @@
     esApiMacro(GetError), \
     esApiMacro(GetFloatv), \
     esApiMacro(GetIntegerv), \
+    esApiMacro(GetPointerv), \
     esApiMacro(GetString), \
     esApiMacro(GetTexParameterfv), \
     esApiMacro(GetTexParameteriv), \
@@ -87,8 +89,12 @@
     esApiMacro(TexParameteriv), \
     esApiMacro(TexSubImage2D), \
     esApiMacro(Viewport), \
+    esApiMacro(MapBufferOES), \
+    esApiMacro(UnmapBufferOES), \
     esApiMacro(EGLImageTargetTexture2DOES), \
-    esApiMacro(EGLImageTargetRenderbufferStorageOES),
+    esApiMacro(EGLImageTargetRenderbufferStorageOES), \
+    esApiMacro(MultiDrawArraysEXT), \
+    esApiMacro(MultiDrawElementsEXT),
 
 enum {
     __GLES_COMMON_API(COMMON_ES_INDEX,=0)
@@ -157,6 +163,11 @@ void GL_APIENTRY COMMON_ES_API(glClearDepthf)(GLfloat depth)
 void GL_APIENTRY COMMON_ES_API(glClearStencil)(GLint s)
 {
     CALL_ES_API(PFNGLCLEARSTENCILPROC, ClearStencil, s);
+}
+
+void GL_APIENTRY COMMON_ES_API(glColorMask)(GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha)
+{
+    CALL_ES_API(PFNGLCOLORMASKPROC, ColorMask, red, green, blue, alpha);
 }
 
 void GL_APIENTRY COMMON_ES_API(glCompressedTexImage2D)(GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLint border, GLsizei imageSize, const void * data)
@@ -279,6 +290,11 @@ void GL_APIENTRY COMMON_ES_API(glGetIntegerv)(GLenum pname, GLint * data)
     CALL_ES_API(PFNGLGETINTEGERVPROC, GetIntegerv, pname, data);
 }
 
+void GL_APIENTRY COMMON_ES_API(glGetPointerv)(GLenum pname, void **params)
+{
+    CALL_ES_API(PFNGLGETPOINTERVPROC, GetPointerv, pname, params);
+}
+
 const GLubyte * GL_APIENTRY COMMON_ES_API(glGetString)(GLenum name)
 {
     CALL_ES_API_RETURN(PFNGLGETSTRINGPROC, GetString, name)
@@ -394,6 +410,16 @@ void GL_APIENTRY COMMON_ES_API(glViewport)(GLint x, GLint y, GLsizei width, GLsi
     CALL_ES_API(PFNGLVIEWPORTPROC, Viewport, x, y, width, height);
 }
 
+void GL_APIENTRY COMMON_ES_API(glMapBufferOES)(GLenum target, GLenum access)
+{
+    CALL_ES_API(PFNGLMAPBUFFEROESPROC, MapBufferOES, target, access);
+}
+
+void GL_APIENTRY COMMON_ES_API(glUnmapBufferOES)(GLenum target, GLenum pname, void **params)
+{
+    CALL_ES_API(PFNGLUNMAPBUFFEROESPROC, UnmapBufferOES, target, pname, params);
+}
+
 void GL_APIENTRY COMMON_ES_API(glEGLImageTargetTexture2DOES)(GLenum target, GLeglImageOES image)
 {
     CALL_ES_API(PFNGLEGLIMAGETARGETTEXTURE2DOESPROC, EGLImageTargetTexture2DOES, target, image);
@@ -402,6 +428,16 @@ void GL_APIENTRY COMMON_ES_API(glEGLImageTargetTexture2DOES)(GLenum target, GLeg
 void GL_APIENTRY COMMON_ES_API(glEGLImageTargetRenderbufferStorageOES)(GLenum target, GLeglImageOES image)
 {
     CALL_ES_API(PFNGLEGLIMAGETARGETRENDERBUFFERSTORAGEOESPROC, EGLImageTargetRenderbufferStorageOES, target, image);
+}
+
+void GL_APIENTRY COMMON_ES_API(glMultiDrawArraysEXT)(GLenum mode, const GLint *first, const GLsizei *count, GLsizei primcount)
+{
+    CALL_ES_API(PFNGLMULTIDRAWARRAYSEXTPROC, MultiDrawArraysEXT, mode, first, count, primcount);
+}
+
+void GL_APIENTRY COMMON_ES_API(glMultiDrawElementsEXT)(GLenum mode, const GLsizei *count, GLenum type, const void *const*indices, GLsizei primcount)
+{
+    CALL_ES_API(PFNGLMULTIDRAWELEMENTSEXTPROC, MultiDrawElementsEXT, mode, count, type, indices, primcount);
 }
 
 EGLAPI EGLBoolean EGLAPIENTRY eglPatchID(EGLenum *PatchID, EGLBoolean Set)
