@@ -754,6 +754,21 @@ static vx_status readAxiSram(
     return status;
 }
 
+static vx_status readVipSram(
+    vx_binary_reader_s *reader,
+    vx_binary_vip_sram_info_s *vipTable
+    )
+{
+    vx_status status = VX_SUCCESS;
+    gcmHEADER_ARG("reader=%p, vipTable=%p", reader, vipTable);
+
+    vipTable->sramBase = readuInt(reader, 1);
+    vipTable->sramSize = readuInt(reader, 1);
+
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
 vx_status readBinEntry(
     vx_binary_reader_s *reader,
     vx_binary_entry_s *Entry
@@ -775,6 +790,11 @@ static vx_status readBinFixed(
 
     readBinPool(reader, &binaryLoad->fixed.poolTable);
     vxmONERROR(readAxiSram(reader, &binaryLoad->fixed.axiSramTable));
+
+    if (binaryLoad->fixed.header.version >= 0x00010008)
+    {
+        vxmONERROR(readVipSram(reader, &binaryLoad->fixed.vipSramTable));
+    }
 
     readBinEntry(reader, &binaryLoad->fixed.inputTable);
     readBinEntry(reader, &binaryLoad->fixed.outputTable);
@@ -1056,6 +1076,7 @@ VX_PRIVATE_API vx_uint32 geLCDOffset(
 
     LCDEntryOffsetPos = sizeof(vx_binary_header_s) + sizeof(vx_binary_memory_pool_info_s)
                             + sizeof(vx_binary_axi_sram_info_s)
+                            + sizeof(vx_binary_vip_sram_info_s)
                             + sizeof(vx_binary_entry_s)/*inputTable*/
                             + sizeof(vx_binary_entry_s)/*outputTable*/
                             + sizeof(vx_binary_entry_s)/*layerTable*/
@@ -1065,6 +1086,11 @@ VX_PRIVATE_API vx_uint32 geLCDOffset(
     if (version < 0x00010003)
     {
         LCDEntryOffsetPos -= sizeof(vx_binary_feature_database_s);
+    }
+
+    if (version < 0x00010008)
+    {
+        LCDEntryOffsetPos -= sizeof(vx_binary_vip_sram_info_s);
     }
 
     return LCDEntryOffsetPos;
@@ -8448,6 +8474,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_ReSaveInputAndPatchTable(
     inputEntryStartOffset = sizeof(vx_binary_header_s) +
                             sizeof(vx_binary_memory_pool_info_s) +
                             sizeof(vx_binary_axi_sram_info_s) +
+                            sizeof(vx_binary_vip_sram_info_s) +
                             sizeof(vx_binary_entrance_info_s);
 
     for (i = 0; i < binarySave->inputParamCount; i++)
@@ -8547,6 +8574,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_ReSaveInputAndPatchTable(
             entracnceInputOffset = sizeof(vx_binary_header_s) +
                                    sizeof(vx_binary_memory_pool_info_s) +
                                    sizeof(vx_binary_axi_sram_info_s) +
+                                   sizeof(vx_binary_vip_sram_info_s) +
                                    sizeof(vx_uint32);
             inputSize = sizeof(vx_binary_input_output_info_s) * binarySave->inputInPatchedNum;
             status= vxoBinaryGraph_Write(binarySave, entracnceInputOffset,
@@ -9899,6 +9927,24 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
     WRITE_NBG_STATUS_CHECK();
     currPos += sizeof(vx_binary_axi_sram_info_s);
 
+    /* save vip sram info */
+    {
+    vx_binary_vip_sram_info_s vipSramInfo;
+    gcoOS_MemFill(&vipSramInfo, 0, sizeof(vx_binary_vip_sram_info_s));
+    if (context->vipSRAM.size != 0)
+    {
+    #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
+        vipSramInfo.sramBase = 0;
+    #else
+        vipSramInfo.sramBase = context->vipSRAM.physical;
+    #endif
+        vipSramInfo.sramSize = context->vipSRAM.size;
+    }
+    status = vxoBinaryGraph_Write(binarySave, currPos, sizeof(vx_binary_vip_sram_info_s), &vipSramInfo);
+    WRITE_NBG_STATUS_CHECK();
+    currPos += sizeof(vx_binary_vip_sram_info_s);
+    }
+
     /* save network binary entranceInfo - re-write later */
     binarySave->entryTablePos = currPos;
     gcoOS_MemFill(&binarySave->entrancesInfo, 0, sizeof(vx_binary_entrance_info_s));
@@ -10401,7 +10447,8 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
 
     /* save network binary entrance info */
     binarySave->entrancesInfo.inputEntr.inputInfoOffset = sizeof(vx_binary_header_s) + sizeof(vx_binary_memory_pool_info_s)
-                                                            + sizeof(vx_binary_axi_sram_info_s) + sizeof(vx_binary_entrance_info_s);
+                                                            + sizeof(vx_binary_axi_sram_info_s) + sizeof(vx_binary_vip_sram_info_s)
+                                                            + sizeof(vx_binary_entrance_info_s);
     binarySave->entrancesInfo.inputEntr.inputInfoBytes = binarySave->headerInfo.inputCount * sizeof(vx_binary_input_output_info_s);
 
     binarySave->entrancesInfo.outputEntr.outputInfoOffset = binarySave->entrancesInfo.inputEntr.inputInfoOffset
@@ -12543,8 +12590,9 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNBGSize(
     }
 
     /* 1. enrtance size */
-    nbEntranceSize = sizeof(vx_binary_header_s) + sizeof(vx_binary_memory_pool_info_s) +
-                     sizeof(vx_binary_axi_sram_info_s) + sizeof(vx_binary_entrance_info_s);
+    nbEntranceSize = sizeof(vx_binary_header_s) + sizeof(vx_binary_memory_pool_info_s)
+                     + sizeof(vx_binary_axi_sram_info_s) + sizeof(vx_binary_vip_sram_info_s)
+                     + sizeof(vx_binary_entrance_info_s);
 
     /* 2. input and output table size */
     if ((graph->inputCount == 0) || (graph->outputCount == 0))

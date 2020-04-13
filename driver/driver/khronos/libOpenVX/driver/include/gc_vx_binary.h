@@ -252,6 +252,13 @@ typedef struct _vx_binary_axi_sram_info_s
 }
 vx_binary_axi_sram_info_s;
 
+typedef struct _vx_binary_vip_sram_info_s
+{
+    vx_uint32                               sramBase;
+    vx_uint32                               sramSize;
+}
+vx_binary_vip_sram_info_s;
+
 typedef struct _vx_binary_input_table_entrance
 {
     vx_uint32                               inputInfoOffset;
@@ -611,6 +618,7 @@ typedef struct _vx_binary_fixed
     vx_binary_header_s                      header;
     vx_binary_memory_pool_info_s            poolTable;
     vx_binary_axi_sram_info_s               axiSramTable;
+    vx_binary_vip_sram_info_s               vipSramTable;
     vx_binary_entry_s                       layerTable;
     vx_binary_entry_s                       opeartionTable;
     vx_binary_entry_s                       LCDTable;
