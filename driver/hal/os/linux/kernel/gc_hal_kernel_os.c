@@ -2261,8 +2261,11 @@ gckOS_MapPhysical(
         {
             /* Map memory as cached memory. */
             request_mem_region(physical, Bytes, "MapRegion");
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,5,0)
+            logical = (gctPOINTER) ioremap(physical, Bytes);
+#else
             logical = (gctPOINTER) ioremap_nocache(physical, Bytes);
-
+#endif
             if (logical == gcvNULL)
             {
                 gcmkTRACE_ZONE(
@@ -5162,10 +5165,15 @@ gckOS_GetProfileTick(
     OUT gctUINT64_PTR Tick
     )
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,5,0)
+    struct timespec64 time;
+
+    ktime_get_ts64(&time);
+#else
     struct timespec time;
 
     ktime_get_ts(&time);
-
+#endif
     *Tick = time.tv_nsec + time.tv_sec * 1000000000ULL;
 
     return gcvSTATUS_OK;
@@ -5176,7 +5184,11 @@ gckOS_QueryProfileTickRate(
     OUT gctUINT64_PTR TickRate
     )
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,5,0)
+    struct timespec64 res;
+#else
     struct timespec res;
+#endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0)
     res.tv_sec = 0;
