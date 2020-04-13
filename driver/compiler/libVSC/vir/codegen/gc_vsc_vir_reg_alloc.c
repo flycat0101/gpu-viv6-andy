@@ -6788,6 +6788,9 @@ _VIR_RA_LS_computeWeight(
         pWeb = GET_WEB_BY_IDX(&pLvInfo->pDuInfo->webTable, webIdx);
         if (pLR->liveFunc == pFunc)
         {
+            VIR_RA_LS_Interval *deadInterval = gcvNULL;
+            gctUINT deadInterval_len = 0;
+            gctUINT liveInterval_len = pLR->endPoint - pLR->startPoint;
             /* find all defs */
             defIdx = pWeb->firstDefIdx;
             while (VIR_INVALID_DEF_INDEX != defIdx)
@@ -6797,7 +6800,18 @@ _VIR_RA_LS_computeWeight(
                 defIdx = pDef->nextDefInWebIdx;
             }
 
-            pLR->weight = (gctFLOAT)(pLR->endPoint - pLR->startPoint) / (gctFLOAT)(pWeb->numOfDef + usageCount);
+            /* reverse weight computation, the weight value is large if live range is short and more reference
+             * if live range is long and less used, it will be selected spilled first
+             * consider deadInterval range especially for multi-inlined function, which temp variables
+             * will be used in a range and in multi places
+             */
+            for (deadInterval = pLR->deadIntervals; deadInterval != gcvNULL;
+                 deadInterval = deadInterval->next)
+            {
+                deadInterval_len += deadInterval->endPoint - deadInterval->startPoint;
+            }
+            liveInterval_len = (liveInterval_len - deadInterval_len > 0) ? liveInterval_len - deadInterval_len : 1;
+            pLR->weight = (gctFLOAT)(pWeb->numOfDef + usageCount) / (gctFLOAT)(liveInterval_len);
         }
     }
 
