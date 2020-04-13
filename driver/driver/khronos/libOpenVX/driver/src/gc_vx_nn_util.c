@@ -6395,15 +6395,15 @@ vx_bool vx_nn_kernel_optimize_element_shape
 
 
 vx_int32 getUserIDFromOutputTensor(
-    vx_tensor tensor)
+    vx_reference tensor)
 {
     vx_int32 uid = -1;
     char uidName[64] = {'\0'};
 
-    if (((vx_reference)tensor != VX_NULL) && strlen(((vx_reference)tensor)->name) > 4)
+    if ((tensor != VX_NULL) && strlen(tensor->name) > 4)
     {
         char *p;
-        gcoOS_StrCopySafe(uidName, 64, &((vx_reference)tensor)->name[4]);
+        gcoOS_StrCopySafe(uidName, 64, &tensor->name[4]);
         p = uidName;
         while (p)
         {

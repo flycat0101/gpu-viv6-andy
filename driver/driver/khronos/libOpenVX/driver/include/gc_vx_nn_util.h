@@ -191,7 +191,7 @@ void _DataGeneralConvert(void* input_ptr, void* output_ptr, vx_uint32 input_size
 
 
 vx_int32 getUserIDFromOutputTensor(
-    vx_tensor tensor);
+    vx_reference tensor);
 
 vx_int32 getHwPoolingType(vx_enum poolingType);
 vx_int32 getHWRoundingMode(vx_nn_round_mode_e roundingMode, vx_enum dataFormat, vx_bool isTP);

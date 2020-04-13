@@ -876,7 +876,7 @@ static archModelOpInfo ** archTransferParam(vx_graph graph, archNN_DATABASE_FEAT
             opInfo[count]->tpType = operation->parameter.tpType;
             //opInfo[count]->op = operation->operatorType;
             opInfo[count]->absoluteOperationID = operation->absoluteOperationID;
-            opInfo[count]->uid = getUserIDFromOutputTensor((vx_tensor)operation->outputs[0]);
+            opInfo[count]->uid = getUserIDFromOutputTensor(operation->outputs[0]);
             opInfo[count]->layerId = node->id;
             opInfo[count]->layerName = node->layer->name;
             opInfo[count]->operationId = operation->id;
