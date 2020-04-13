@@ -4952,28 +4952,43 @@ vx_status vxnneOperation_NodeDump(
                 elementCount = width * height * depth;
                 for(index = 0; index < elementCount; index++)
                 {
-                    if (TENSOR_DATA_TYPE(output) == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE)
+                    if (!opCommand->operation->layer->node->base.context->options.enableNNLayerDump_Int)
                     {
-                        if (fpLayer)
+                        if (TENSOR_DATA_TYPE(output) == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE)
                         {
-                            fprintf(fpLayer, "%f\n", vxnneGetDataQuant((vx_type_e)TENSOR_DATA_TYPE(output), index, (vx_uint8_ptr)outputsBase, TENSOR_TF_ZEROPOINT(output), TENSOR_TF_SCALE(output)));
-                        }
+                            if (fpLayer)
+                            {
+                                fprintf(fpLayer, "%f\n", vxnneGetDataQuant((vx_type_e)TENSOR_DATA_TYPE(output), index, (vx_uint8_ptr)outputsBase, TENSOR_TF_ZEROPOINT(output), TENSOR_TF_SCALE(output)));
+                            }
 
-                        if (fpOperation)
+                            if (fpOperation)
+                            {
+                                fprintf(fpOperation, "%f\n", vxnneGetDataQuant((vx_type_e)TENSOR_DATA_TYPE(output), index, (vx_uint8_ptr)outputsBase, TENSOR_TF_ZEROPOINT(output), TENSOR_TF_SCALE(output)));
+                            }
+                        }
+                        else
                         {
-                            fprintf(fpOperation, "%f\n", vxnneGetDataQuant((vx_type_e)TENSOR_DATA_TYPE(output), index, (vx_uint8_ptr)outputsBase, TENSOR_TF_ZEROPOINT(output), TENSOR_TF_SCALE(output)));
+                            if (fpLayer)
+                            {
+                                fprintf(fpLayer, "%f\n", vxnneGetData((vx_type_e)TENSOR_DATA_TYPE(output), index, (vx_uint8_ptr)outputsBase, TENSOR_POS(output)));
+                            }
+
+                            if (fpOperation)
+                            {
+                                fprintf(fpOperation, "%f\n", vxnneGetData((vx_type_e)TENSOR_DATA_TYPE(output), index, (vx_uint8_ptr)outputsBase, TENSOR_POS(output)));
+                            }
                         }
                     }
                     else
                     {
                         if (fpLayer)
                         {
-                            fprintf(fpLayer, "%f\n", vxnneGetData((vx_type_e)TENSOR_DATA_TYPE(output), index, (vx_uint8_ptr)outputsBase, TENSOR_POS(output)));
+                            fprintf(fpLayer, "%d\n", vxnneGetDataInt((vx_type_e)TENSOR_DATA_TYPE(output), index, (vx_uint8_ptr)outputsBase, TENSOR_POS(output)));
                         }
 
                         if (fpOperation)
                         {
-                            fprintf(fpOperation, "%f\n", vxnneGetData((vx_type_e)TENSOR_DATA_TYPE(output), index, (vx_uint8_ptr)outputsBase, TENSOR_POS(output)));
+                            fprintf(fpOperation, "%d\n", vxnneGetDataInt((vx_type_e)TENSOR_DATA_TYPE(output), index, (vx_uint8_ptr)outputsBase, TENSOR_POS(output)));
                         }
                     }
                 }
@@ -4987,11 +5002,13 @@ vx_status vxnneOperation_NodeDump(
                 if (fpOperation)
                 {
                     fclose(fpOperation);
+                    fpOperation = VX_NULL;
                 }
 
                 if (opCommand->operation->transposeOutChannel > 1)
                 {
                     vxFree(outputsBase);
+                    outputsBase = VX_NULL;
                 }
 
                 layerNum++;
