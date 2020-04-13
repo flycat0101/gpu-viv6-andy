@@ -659,6 +659,8 @@ _vscEP_Buffer_SavePrivUavEntry(
 {
     VSC_IO_BUFFER* pIoBuf = pEPBuf->pIoBuf;
 
+    VSC_IO_writeUint(pIoBuf, pPrivUavEntry->uavEntryIndex);
+
     /* Save SHADER_PRIV_MAPPING_COMMON_ENTRY. */
     _vscEP_Buffer_SavePrivMappingCommonEntry(pEPBuf, &pPrivUavEntry->commonPrivm);
 
@@ -1343,6 +1345,19 @@ _vscEP_Buffer_SaveVkCombTexSampHwMapping(
     else
     {
         VSC_IO_writeUint(pIoBuf, 0);
+    }
+
+    for (i = 0; i < __YCBCR_PLANE_COUNT__; i++)
+    {
+        if (pCombTsHwMapping->pYcbcrPlanes[i] != gcvNULL)
+        {
+            VSC_IO_writeUint(pIoBuf, 1);
+            VSC_IO_writeUint(pIoBuf, pCombTsHwMapping->pYcbcrPlanes[i]->uavEntryIndex);
+        }
+        else
+        {
+            VSC_IO_writeUint(pIoBuf, 0);
+        }
     }
 
     _vscEP_Buffer_SaveResourceSlotMapping(pEPBuf, &pCombTsHwMapping->texMapping);
@@ -3129,6 +3144,8 @@ _vscEP_Buffer_LoadPrivUavEntry(
     VSC_IO_BUFFER* pIoBuf = pEPBuf->pIoBuf;
     gctUINT uVal = 0;
 
+    VSC_IO_readUint(pIoBuf, &pPrivUavEntry->uavEntryIndex);
+
     /* Load SHADER_PRIV_MAPPING_COMMON_ENTRY. */
     ON_ERROR0(_vscEP_Buffer_LoadPrivMappingCommonEntry(pEPBuf, &pPrivUavEntry->commonPrivm));
 
@@ -4153,6 +4170,7 @@ _vscEP_Buffer_LoadVKPrivCombTexSampHwMappingList(
 static VSC_ErrCode
 _vscEP_Buffer_LoadVkCombTexSampHwMapping(
     VSC_EP_IO_BUFFER*       pEPBuf,
+    gctUINT                 shaderStageIndex,
     PROG_VK_COMBINED_TEXTURE_SAMPLER_HW_MAPPING* pCombTsHwMapping,
     gctUINT                 ArraySize
     )
@@ -4161,6 +4179,7 @@ _vscEP_Buffer_LoadVkCombTexSampHwMapping(
     VSC_IO_BUFFER* pIoBuf = pEPBuf->pIoBuf;
     gctUINT i;
     gctUINT uVal = 0;
+    SHADER_EXECUTABLE_PROFILE* pSep = &pEPBuf->epData.pPEP->seps[shaderStageIndex];
 
     ON_ERROR0(_vscEP_Buffer_LoadSamplerSlotMapping(pEPBuf, &pCombTsHwMapping->samplerMapping));
 
@@ -4182,6 +4201,20 @@ _vscEP_Buffer_LoadVkCombTexSampHwMapping(
     else
     {
         pCombTsHwMapping->ppExtraSamplerArray = gcvNULL;
+    }
+
+    for (i = 0; i < __YCBCR_PLANE_COUNT__; i++)
+    {
+        VSC_IO_readUint(pIoBuf, &uVal);
+        if (uVal != 0)
+        {
+            VSC_IO_readUint(pIoBuf, &uVal);
+            pCombTsHwMapping->pYcbcrPlanes[i] = &pSep->staticPrivMapping.privUavMapping.pPrivUavEntries[uVal];
+        }
+        else
+        {
+            pCombTsHwMapping->pYcbcrPlanes[i] = gcvNULL;
+        }
     }
 
     ON_ERROR0(_vscEP_Buffer_LoadResourceSlotMapping(pEPBuf, &pCombTsHwMapping->texMapping));
@@ -4287,7 +4320,7 @@ _vscEP_Buffer_LoadVKCombinedTextureSamplerEntry(
     /* Load hw mapping. */
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
     {
-        ON_ERROR0(_vscEP_Buffer_LoadVkCombTexSampHwMapping(pEPBuf, &pCombTsEntry->hwMappings[i], pCombTsEntry->combTsBinding.arraySize));
+        ON_ERROR0(_vscEP_Buffer_LoadVkCombTexSampHwMapping(pEPBuf, i, &pCombTsEntry->hwMappings[i], pCombTsEntry->combTsBinding.arraySize));
     }
 
     /* Load the sampled image index. */
