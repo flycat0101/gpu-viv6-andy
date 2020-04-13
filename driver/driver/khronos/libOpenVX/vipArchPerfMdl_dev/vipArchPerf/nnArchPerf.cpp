@@ -4692,7 +4692,11 @@ static double TPCycleCountCore(
     }
 
     // data size is bit size
-    assert (data_size == 8 || data_size == 16);
+    assert (data_size == 8 || data_size == 16 || data_size == 32);
+    if (data_size == 32)
+    {
+        printf("CArch warning: data_size is 32 bits, should support FP32!\n");
+    }
     if (type == VXNNE_OPERATOR_FULLYCONNECTED)
     {
         ddrKernelReadBW = x * y * z * kz * coef_compress_ratio * image_nonzero_ratio * data_size / 8 * TP_MISS_RATIO; /*' always store kernel in DDR*/
