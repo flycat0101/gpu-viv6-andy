@@ -11521,7 +11521,7 @@ _GenCombinedSamplerOpnd(
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VIR_Symbol  *pSymbol = gcvNULL;
-    VIR_Uniform *pUniform = gcvNULL, *pSeparateImageUniform = gcvNULL, *pSeparateSamplerUniform = gcvNULL;
+    VIR_Uniform *pUniform = gcvNULL;
     VIR_Id      id ;
     VIR_Symbol  *uniformSym = gcvNULL, *separateImage = gcvNULL, *separateSampler = gcvNULL;
     gctUINT i;
@@ -11595,9 +11595,6 @@ _GenCombinedSamplerOpnd(
         separateImage = VIR_Symbol_GetSeparateImage(pShader, pSymbol);
 
         gcmASSERT(separateSampler && separateImage);
-
-        pSeparateSamplerUniform = VIR_Symbol_GetUniformPointer(pShader, separateSampler);
-        pSeparateImageUniform = VIR_Symbol_GetUniformPointer(pShader, separateImage);
 
         /* clear the flag */
         VIR_Symbol_ClrFlag(separateSampler, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
