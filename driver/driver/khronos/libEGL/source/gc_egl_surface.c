@@ -484,10 +484,12 @@ _DestroySurfaceObjects(
         {
 #if gcdENABLE_3D
             surfView.surf = Surface->depthBuffer;
+#if !gcdCAPTURE_ONLY_MODE
             /* Flush pixels and disable the tile status. */
             gcmERR_BREAK(gcoSURF_DisableTileStatus(
                 &surfView, gcvFALSE
                 ));
+#endif
 #endif
 
             /* Destroy the depth buffer */
@@ -498,8 +500,8 @@ _DestroySurfaceObjects(
         if (Surface->renderTarget != gcvNULL)
         {
 #if gcdENABLE_3D
-#if !gcdCAPTURE_ONLY_MODE
             surfView.surf = Surface->renderTarget;
+#if !gcdCAPTURE_ONLY_MODE
             /* Flush pixels and disable the tile status. */
             gcmERR_BREAK(gcoSURF_DisableTileStatus(
                 &surfView, gcvFALSE
