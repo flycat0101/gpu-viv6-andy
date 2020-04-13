@@ -10162,7 +10162,7 @@ vxnne_shader_executable vxnneGetGPUTensorPad2ShaderExecutable(
     vx_uint32     output_depth               = TENSOR_VIEW_SIZE_INDEX(outputs, 2);
     vx_uint32     output_batch               = TENSOR_VIEW_SIZE_INDEX(outputs, 3);
     vx_enum       inputFormat                = TENSOR_DATA_TYPE(inputs);
-    vx_float32    padConstv                  = padConst->value->f32;
+    vx_int32      padConstv                  = padConst->value->n32;
     vx_uint32     maxWorkGroupSize           = 8;
     vx_uint32     width                      = output_width;
     vx_uint32     height                     = output_height;
