@@ -1086,12 +1086,6 @@ gckKERNEL_AllocateVideoMemory(
         }
     }
 
-    if (Flag & gcvALLOC_FLAG_NON_CPU_ACCESS)
-    {
-        Flag &= ~gcvALLOC_FLAG_CPU_ACCESS;
-        *Pool = gcvPOOL_LOCAL_EXCLUSIVE;
-    }
-
 AllocateMemory:
 
 #if gcdCAPTURE_ONLY_MODE
@@ -1220,19 +1214,14 @@ AllocateMemory:
             if (gcmIS_SUCCESS(status))
             {
                 /* Allocate memory. */
-                if ((Flag & videoMemory->capability) != Flag)
-                {
-                    status = gcvSTATUS_NOT_SUPPORTED;
-
-                }
 #if defined(gcdLINEAR_SIZE_LIMIT)
                 /* 512 KB */
-                else if (bytes > gcdLINEAR_SIZE_LIMIT)
+                if (bytes > gcdLINEAR_SIZE_LIMIT)
                 {
                     status = gcvSTATUS_OUT_OF_MEMORY;
                 }
-#endif
                 else
+#endif
                 {
                     hasFastPools = gcvTRUE;
                     status = gckVIDMEM_NODE_AllocateLinear(Kernel,
@@ -1268,9 +1257,11 @@ AllocateMemory:
             /* Advance to external memory. */
             pool = gcvPOOL_LOCAL_EXTERNAL;
         }
-
-        else
-        if (pool == gcvPOOL_LOCAL_EXTERNAL)
+        else if (pool == gcvPOOL_LOCAL_EXTERNAL)
+        {
+            pool = gcvPOOL_LOCAL_EXCLUSIVE;
+        }
+        else if (pool == gcvPOOL_LOCAL_EXCLUSIVE)
         {
             if (Kernel->sRAMLoopMode)
             {
@@ -1283,9 +1274,7 @@ AllocateMemory:
                 pool = gcvPOOL_SYSTEM;
             }
         }
-
-        else
-        if (pool == gcvPOOL_INTERNAL_SRAM)
+        else if (pool == gcvPOOL_INTERNAL_SRAM)
         {
             if (Kernel->sRAMIndex < gcvSRAM_INTER_COUNT - 1 && !Kernel->sRAMPhysFaked[Kernel->sRAMIndex])
             {
@@ -1298,9 +1287,7 @@ AllocateMemory:
                 pool = gcvPOOL_SYSTEM;
             }
         }
-
-        else
-        if (pool == gcvPOOL_SYSTEM)
+        else if (pool == gcvPOOL_SYSTEM)
         {
             /* Do not go ahead to try relative slow pools */
             if (fastPools && hasFastPools)
@@ -1312,7 +1299,6 @@ AllocateMemory:
             /* Advance to virtual memory. */
             pool = gcvPOOL_VIRTUAL;
         }
-
         else
         {
             /* Out of pools. */

@@ -3082,6 +3082,18 @@ gckVIDMEM_NODE_AllocateLinear(
     gcmkHEADER_ARG("Kernel=%p VideoMemory=%p Pool=%d Alignment=%d Type=%d *Bytes=%u",
                    Kernel, VideoMemory, Pool, Alignment, Type, bytes);
 
+    /* if it is exclusive pool, update Flag */
+    if (Pool == gcvPOOL_LOCAL_EXCLUSIVE)
+    {
+        Flag &= ~gcvALLOC_FLAG_CPU_ACCESS;
+        Flag |= gcvALLOC_FLAG_NON_CPU_ACCESS;
+    }
+
+    if ((Flag & VideoMemory->capability) != Flag)
+    {
+        gcmkONERROR(gcvSTATUS_NOT_SUPPORTED);
+    }
+
     gcmkONERROR(
         gckVIDMEM_AllocateLinear(Kernel,
                                  VideoMemory,
