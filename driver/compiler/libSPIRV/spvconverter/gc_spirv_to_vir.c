@@ -5526,10 +5526,29 @@ VSC_ErrCode __SpvEmitConstant(gcSPV spv, VIR_Shader * virShader)
     return virErrCode;
 }
 
+static VIR_LabelId __SpvGetVirLabelIdFromSpvLabelId(gcSPV spv, VIR_Shader * virShader, SpvId spvLabelId)
+{
+    VIR_LabelId     virLabelId = VIR_INVALID_ID;
+
+    /*
+    ** SPV_ID_VIR_NAME_ID(spvLabelId) may be VALID(point to a OpName) while the label is still not defined yet,
+    ** so we can't use it to check, we need to use SPV_ID_TYPE(spvLabelId) to check.
+    */
+    if (SPV_ID_TYPE(spvLabelId) == SPV_ID_TYPE_LABEL)
+    {
+        virLabelId = SPV_ID_VIR_NAME_ID(spvLabelId);
+        gcmASSERT(virLabelId != VIR_INVALID_ID);
+    }
+
+    return virLabelId;
+}
+
 VSC_ErrCode __SpvEmitLabel(gcSPV spv, VIR_Shader * virShader)
 {
     VIR_LabelId labelId;
     VSC_ErrCode virErrCode = VSC_ERR_NONE;
+    VIR_NameId labelNameId = SPV_ID_VIR_NAME_ID(spv->resultId);
+    gctSTRING labelNameString = gcvNULL;
     gctCHAR labelName[20];
     VIR_Label *virLabel;
     gctUINT offset = 0;
@@ -5541,21 +5560,33 @@ VSC_ErrCode __SpvEmitLabel(gcSPV spv, VIR_Shader * virShader)
     VIR_Operand        *operand;
 #endif
 
-    gcmVERIFY_OK(gcoOS_PrintStrSafe(labelName,
-                                    20,
-                                    &offset,
-                                    "#spv_%u",
-                                    spv->resultId));
+    /* Generate the name of this label, and because a label ID is unique, if it is not INVALID, it must be from a OpName. */
+    if (labelNameId != VIR_INVALID_ID)
+    {
+        /* The type of the target of a OpName must be UNKNOWN*/
+        gcmASSERT(SPV_ID_TYPE(spv->resultId) == SPV_ID_TYPE_UNKNOW);
+        labelNameString = VIR_Shader_GetStringFromId(virShader, labelNameId);
+    }
+    else
+    {
+        gcmVERIFY_OK(gcoOS_PrintStrSafe(labelName,
+                                        20,
+                                        &offset,
+                                        "#spv_%u",
+                                        spv->resultId));
+    }
 
+    /* Add a label. */
     virErrCode = VIR_Function_AddLabel(spv->virFunction,
-                                        labelName,
-                                        &labelId);
+                                       (labelNameString == gcvNULL) ? labelName : labelNameString,
+                                       &labelId);
+    if(virErrCode != VSC_ERR_NONE) return virErrCode;
 
+    /* Add a label instruction. */
     virErrCode =  VIR_Function_AddInstruction(spv->virFunction,
                                               SPV_OPCODE_2_VIR_OPCODE(SpvOpLabel),
                                               SPV_VIR_OP_FORMAT(spv->opCode),
                                               &virInst);
-
     if(virErrCode != VSC_ERR_NONE) return virErrCode;
 
     /* do dynamic size check if needed */
@@ -7258,17 +7289,15 @@ VSC_ErrCode __SpvEmitPhi(gcSPV spv, VIR_Shader * virShader)
         VIR_PhiOperand_SetFlags(phiOperand, 0);
 
         /* Set label, the label may not defined, we need delay the setting */
-        if (SPV_ID_TYPE(label) == SPV_ID_TYPE_LABEL)
+        labelId = __SpvGetVirLabelIdFromSpvLabelId(spv, virShader, label);
+        if (labelId == VIR_INVALID_ID)
         {
-            labelId = SPV_ID_VIR_NAME_ID(label);
-            gcmASSERT(labelId != VIR_INVALID_ID);
-
-            virLabel = VIR_Function_GetLabelFromId(spv->virFunction, labelId);
-            VIR_PhiOperand_SetLabel(phiOperand, virLabel);
+            SPV_SET_UNHANDLE_LABEL_PHI(spv, label, phiOperand);
         }
         else
         {
-            SPV_SET_UNHANDLE_LABEL_PHI(spv, label, phiOperand);
+            virLabel = VIR_Function_GetLabelFromId(spv->virFunction, labelId);
+            VIR_PhiOperand_SetLabel(phiOperand, virLabel);
         }
     }
 
@@ -10880,7 +10909,7 @@ VSC_ErrCode __SpvEmitSwitch(gcSPV spv, VIR_Shader * virShader)
         gcmASSERT(2 + 2 * i + 1 < spv->operandSize);
         labelId = spv->operands[2 + 2 * i + 1];
 
-        virLabelId = SPV_ID_VIR_NAME_ID(labelId);
+        virLabelId = __SpvGetVirLabelIdFromSpvLabelId(spv, virShader, labelId);
         if (virLabelId == VIR_INVALID_ID)
         {
             SPV_SET_UNHANDLE_LABEL_VIRDEST(spv, labelId, virInst, operand);
@@ -10943,7 +10972,7 @@ VSC_ErrCode __SpvEmitSwitch(gcSPV spv, VIR_Shader * virShader)
     operand = VIR_Inst_GetDest(virInst);
     VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
 
-    virLabelId = SPV_ID_VIR_NAME_ID(defaultId);
+    virLabelId = __SpvGetVirLabelIdFromSpvLabelId(spv, virShader, defaultId);
     if (virLabelId == VIR_INVALID_ID)
     {
         SPV_SET_UNHANDLE_LABEL_VIRDEST(spv, defaultId, virInst, operand);
@@ -11157,7 +11186,7 @@ VSC_ErrCode __SpvEmitBranch(gcSPV spv, VIR_Shader * virShader)
     virDest = VIR_Inst_GetDest(virInst);
     VIR_Operand_SetModifier(virDest, VIR_MOD_NONE);
 
-    labelId = SPV_ID_VIR_NAME_ID(label);
+    labelId = __SpvGetVirLabelIdFromSpvLabelId(spv, virShader, label);
 
     VIR_Inst_SetConditionOp(virInst, virCond);
 
@@ -11208,7 +11237,7 @@ VSC_ErrCode __SpvEmitBranchConditional(gcSPV spv, VIR_Shader * virShader)
     VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
 
     label = spv->operands[1];
-    virLabelId = SPV_ID_VIR_NAME_ID(label);
+    virLabelId = __SpvGetVirLabelIdFromSpvLabelId(spv, virShader, label);
 
     if (virLabelId == VIR_INVALID_ID)
     {
@@ -11266,7 +11295,7 @@ VSC_ErrCode __SpvEmitBranchConditional(gcSPV spv, VIR_Shader * virShader)
     operand = VIR_Inst_GetDest(virInst);
 
     label = spv->operands[2];
-    virLabelId = SPV_ID_VIR_NAME_ID(label);
+    virLabelId = __SpvGetVirLabelIdFromSpvLabelId(spv, virShader, label);
 
     if (virLabelId == VIR_INVALID_ID)
     {
