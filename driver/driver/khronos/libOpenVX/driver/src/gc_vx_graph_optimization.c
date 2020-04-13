@@ -608,7 +608,7 @@ VX_PRIVATE_API vx_bool vxoGraphOptimization_matchTensorInNode(vx_node node, vx_t
     vx_uint32 k = 0;
     for(k = 0; k < node->numParameters; k++)
     {
-        if(node->paramTable[k]->type != VX_TYPE_TENSOR)
+        if(NULL == node->paramTable[k] || node->paramTable[k]->type != VX_TYPE_TENSOR)
             continue;
         {
             vx_tensor t = (vx_tensor)node->paramTable[k];
