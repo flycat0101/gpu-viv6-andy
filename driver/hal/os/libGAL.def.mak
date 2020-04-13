@@ -251,6 +251,7 @@ EXPORTS
     gcoHAL_QueryChipFeature
     gcoHAL_QueryChipIdentity
     gcoHAL_QueryChipIdentityEx
+	gcoHAL_QuerySuperTileMode
     gcoHAL_QueryChipLimits
     gcoHAL_QueryPowerManagementState
     gcoHAL_QueryTiled
