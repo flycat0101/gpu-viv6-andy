@@ -46,13 +46,27 @@ gctSTRING    virLibName_UseImgLoadStore = "viv_vir_cl_intrinsic_ImgLS.lib";
 VIR_Shader * clImgLib_UseLoadStore   = gcvNULL;
 gctSTRING    virLibName_UseLoadStore = "viv_vir_cl_intrinsic_LS.lib";
 
-/*-------------------------CL intrinsic library-------------------------*/
-VIR_Shader * virGLIntrinsicLibrary = gcvNULL;
-VIR_Shader * virGLUseImgInstIntrinsicLibrary = gcvNULL;
+/*------------------------Graphic intrinsic library-------------------------*/
+/* Built-in intrinsic library for HW that does not support image instruction */
+VIR_Shader * virGLIntrinsicLibrary_Common = gcvNULL;
+gctSTRING virLibName_NoImgInst_GLIntrinsic_Common = "viv_vir_noimg_intrinsic_common.lib";
+
+VIR_Shader * virGLIntrinsicLibrary_Image = gcvNULL;
+gctSTRING virLibName_NoImgInst_GLIntrinsic_Image = "viv_vir_noimg_intrinsic_image.lib";
+
+/* Built-in intrinsic library for HW that support image instructions */
+VIR_Shader * virGLUseImgInstIntrinsicLibrary_Common = gcvNULL;
+gctSTRING virLibName_GLIntrinsic_Common   = "viv_vir_intrinsic_common.lib";
+
+VIR_Shader * virGLUseImgInstIntrinsicLibrary_Image = gcvNULL;
+gctSTRING virLibName_GLIntrinsic_Image   = "viv_vir_intrinsic_image.lib";
+
 
 /*-------------------------All intrinsic library-------------------------*/
-VIR_Shader** ppVirLibArray[7] = {&virGLIntrinsicLibrary, &virGLUseImgInstIntrinsicLibrary,
-                                 &clImgLib, &clImgLib_UseTexldUXY, &clImgLib_UseTexldU, &clImgLib_UseImgLoadStore, &clImgLib_UseLoadStore};
+VIR_Shader** ppVirLibArray[9] = {&virGLIntrinsicLibrary_Common, &virGLIntrinsicLibrary_Image,
+                                 &virGLUseImgInstIntrinsicLibrary_Common, &virGLUseImgInstIntrinsicLibrary_Image,
+                                 &clImgLib, &clImgLib_UseTexldUXY, &clImgLib_UseTexldU,
+                                 &clImgLib_UseImgLoadStore, &clImgLib_UseLoadStore};
 gctUINT virLibLength = gcmSIZEOF(ppVirLibArray)/gcmSIZEOF(ppVirLibArray[0]);
 
 #define     CompileIntrinsicLibfromSrc                1
@@ -199,7 +213,7 @@ OnError:
 }
 #endif /* CompileIntrinsicLibList */
 
-/* this is for test only, compile the library from the FE and GCSL->VIR converter */
+/* compile the library from the FE and GCSL->VIR converter */
 static VSC_ErrCode
 _CreateIntrinsicLib(
     IN VSC_HW_CONFIG            *pHwCfg,
@@ -212,8 +226,8 @@ _CreateIntrinsicLib(
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
     gceSTATUS   status  = gcvSTATUS_OK;
-    gctSTRING   sloBuiltinSource = gcvNULL;
-    gcSHADER    Binary = gcvNULL;
+    gctSTRING   sloBuiltinSource[LIB_NUM];
+    gcSHADER    binary[LIB_NUM] = {gcvNULL, gcvNULL};
     gctSIZE_T   length;
     gctINT      i, stringNum = 0;
     gctBOOL     locked = gcvFALSE;
@@ -227,12 +241,10 @@ _CreateIntrinsicLib(
     gctBOOL     supportImgAddr = pHwCfg->hwFeatureFlags.supportImgAddr;
     gctBOOL     bSupportImgLdSt = VIR_Shader_SupportImgLdSt(gcvNULL, pHwCfg, forGraphics);
     gctBOOL     needAtomicPatch = (pHwCfg->hwFeatureFlags.supportUSC) && (!pHwCfg->hwFeatureFlags.hasUSCAtomicFix2);
-    VIR_Shader* virIntrinsicLibrary = gcvNULL;
-    VIR_Shader** virIntrinsicLibraryPtr = gcvNULL;
-    gctBOOL isReadVirLib = gcvFALSE;
-    gctSTRING virLibName;
-    const gctSTRING virImgInstLibName   = "viv_vir_intrinsic.lib";
-    const gctSTRING virNoImgInstLibName = "viv_vir_noimg_intrinsic.lib" ;
+    gctBOOL     isReadVirLib = gcvFALSE;
+    VIR_Shader* virIntrinsicLibrary[LIB_NUM] = {gcvNULL};
+    VIR_Shader** virIntrinsicLibraryPtr[LIB_NUM] = {gcvNULL};
+    gctSTRING   virLibName[LIB_NUM];
 
     /* built-in function library */
     gctSTRING   BuiltinLib_common[] =
@@ -656,22 +668,27 @@ _CreateIntrinsicLib(
     /* select intrinsic library and lib file name based on whether support ImgInst */
     if (bSupportImgLdSt)
     {
-        virIntrinsicLibraryPtr = &virGLUseImgInstIntrinsicLibrary;
-        virLibName = virImgInstLibName;
+        virIntrinsicLibraryPtr[0] = &virGLUseImgInstIntrinsicLibrary_Common;
+        virIntrinsicLibraryPtr[1] = &virGLUseImgInstIntrinsicLibrary_Image;
+        virLibName[0] = virLibName_GLIntrinsic_Common;
+        virLibName[1] = virLibName_GLIntrinsic_Image;
     }
     else
     {
-        virIntrinsicLibraryPtr = &virGLIntrinsicLibrary;
-        virLibName = virNoImgInstLibName;
+        virIntrinsicLibraryPtr[0] = &virGLIntrinsicLibrary_Common;
+        virIntrinsicLibraryPtr[1] = &virGLIntrinsicLibrary_Image;
+        virLibName[0] = virLibName_NoImgInst_GLIntrinsic_Common;
+        virLibName[1] = virLibName_NoImgInst_GLIntrinsic_Image;
     }
 
     gcmONERROR(gcLockLoadLibrary());
     locked = gcvTRUE;
 
-    if (*virIntrinsicLibraryPtr != gcvNULL)
+    if (*virIntrinsicLibraryPtr[0] != gcvNULL)
     {
         /* use cached intrinsic library */
-        *pOutLib = *virIntrinsicLibraryPtr;
+        for (i = 0; i < LIB_NUM; i++)
+            pOutLib[i] = *virIntrinsicLibraryPtr[i];
         locked = gcvFALSE;
         gcmVERIFY_OK(gcUnLockLoadLibrary());
         return VSC_ERR_NONE;
@@ -687,9 +704,10 @@ _CreateIntrinsicLib(
         }
         else
         {
-            status = gcSHADER_ReadVirLibFromFile(virLibName,&virIntrinsicLibrary);
+            for (i = 0; i < LIB_NUM; i++)
+                status = gcSHADER_ReadVirLibFromFile(virLibName[i], &virIntrinsicLibrary[i]);
         }
-        if ((rewriteFile == gcvTRUE) || (status != gcvSTATUS_OK) || (virIntrinsicLibrary == gcvNULL))
+        if ((rewriteFile == gcvTRUE) || (status != gcvSTATUS_OK) || (virIntrinsicLibrary[0] == gcvNULL))
         {
         }
         else
@@ -699,42 +717,47 @@ _CreateIntrinsicLib(
     }
 
     /* create shader if it is empty or load from file failed */
-    if ((isReadVirLib == gcvFALSE) &&((status != gcvSTATUS_OK) || (Binary == gcvNULL)))
+    if ((isReadVirLib == gcvFALSE) &&((status != gcvSTATUS_OK) || (binary[0] == gcvNULL)))
     {
-        sloBuiltinSource = (gctSTRING) vscMM_Alloc(pMM, __LL_LIB_LENGTH__ * sizeof(char));
+        for (i = 0; i < LIB_NUM; i++)
+            sloBuiltinSource[i] = (gctSTRING) vscMM_Alloc(pMM, __LL_LIB_LENGTH__ * sizeof(char));
 
         /* add the extension source */
         if (forDesktopGL)
         {
             length = gcoOS_StrLen(gcLibFunc_Extension_For_GL, gcvNULL);
-            gcoOS_StrCopySafe(sloBuiltinSource, length + 1, gcLibFunc_Extension_For_GL);
+            gcoOS_StrCopySafe(sloBuiltinSource[0], length + 1, gcLibFunc_Extension_For_GL);
         }
         else
         {
             length = gcoOS_StrLen(gcLibFunc_Extension, gcvNULL);
-            gcoOS_StrCopySafe(sloBuiltinSource, length + 1, gcLibFunc_Extension);
+            gcoOS_StrCopySafe(sloBuiltinSource[0], length + 1, gcLibFunc_Extension);
         }
 
         /* add the extension source */
         if (supportTexMSAA2DArray)
         {
-            gcoOS_StrCatSafe(sloBuiltinSource, __LL_LIB_LENGTH__, gcLibFunc_Extension_For_TexMS2DArray);
+            gcoOS_StrCatSafe(sloBuiltinSource[0], __LL_LIB_LENGTH__, gcLibFunc_Extension_For_TexMS2DArray);
         }
 
         if (supportMSShading)
         {
-            gcoOS_StrCatSafe(sloBuiltinSource, __LL_LIB_LENGTH__, gcLibFunc_Extension_For_MSShading);
+            gcoOS_StrCatSafe(sloBuiltinSource[0], __LL_LIB_LENGTH__, gcLibFunc_Extension_For_MSShading);
         }
 
         /* add the header source */
-        gcoOS_StrCatSafe(sloBuiltinSource, __LL_LIB_LENGTH__, gcLibFunc_MathMacros);
-        gcoOS_StrCatSafe(sloBuiltinSource, __LL_LIB_LENGTH__, gcLibFunc_TextureBufferSize_For_VK);
-        gcoOS_StrCatSafe(sloBuiltinSource, __LL_LIB_LENGTH__, gcLibFunc_BuiltinHeader);
+        gcoOS_StrCatSafe(sloBuiltinSource[0], __LL_LIB_LENGTH__, gcLibFunc_MathMacros);
+        gcoOS_StrCatSafe(sloBuiltinSource[0], __LL_LIB_LENGTH__, gcLibFunc_TextureBufferSize_For_VK);
+        gcoOS_StrCatSafe(sloBuiltinSource[0], __LL_LIB_LENGTH__, gcLibFunc_BuiltinHeader);
+        length = gcoOS_StrLen(sloBuiltinSource[0], gcvNULL);
+
+        for (i = 1; i < LIB_NUM; i++)
+            gcoOS_StrCopySafe(sloBuiltinSource[i], length + 1, sloBuiltinSource[0]);
 
         stringNum = sizeof(BuiltinLib_common) / sizeof(gctSTRING);
         for (i = 0; i < stringNum; i++)
         {
-            gcoOS_StrCatSafe(sloBuiltinSource,
+            gcoOS_StrCatSafe(sloBuiltinSource[0],
                 __LL_LIB_LENGTH__, BuiltinLib_common[i]);
         }
 
@@ -742,75 +765,78 @@ _CreateIntrinsicLib(
         if (pHwCfg->hwFeatureFlags.supportAdvancedInsts &&
             pHwCfg->hwFeatureFlags.hasHalti5)
         {
-            gcoOS_StrCatSafe(sloBuiltinSource,
+            gcoOS_StrCatSafe(sloBuiltinSource[0],
                     __LL_LIB_LENGTH__, gcLibFMA_Func_fmaSupported);
 
-            gcoOS_StrCatSafe(sloBuiltinSource,
+            gcoOS_StrCatSafe(sloBuiltinSource[0],
                     __LL_LIB_LENGTH__, gcLibATAN_Funcs_halti5_fmaSupported);
 
-            gcoOS_StrCatSafe(sloBuiltinSource,
+            gcoOS_StrCatSafe(sloBuiltinSource[0],
                     __LL_LIB_LENGTH__, gcLibASIN_ACOS_Funcs_halti5_fmaSupported);
 
-            gcoOS_StrCatSafe(sloBuiltinSource,
+            gcoOS_StrCatSafe(sloBuiltinSource[0],
                     __LL_LIB_LENGTH__, gcLibATAN2_Funcs_halti5_fmaSupported);
 
             /* Use FMA to implement reflect. */
             stringNum = sizeof(BuiltinLib_Reflect_fmaSupported) / sizeof(gctSTRING);
             for (i = 0; i < stringNum; i++)
             {
-                gcoOS_StrCatSafe(sloBuiltinSource,
+                gcoOS_StrCatSafe(sloBuiltinSource[0],
                     __LL_LIB_LENGTH__, BuiltinLib_Reflect_fmaSupported[i]);
             }
         }
         else if (pHwCfg->hwFeatureFlags.hasHalti5)
         {
-            gcoOS_StrCatSafe(sloBuiltinSource,
+            gcoOS_StrCatSafe(sloBuiltinSource[0],
                     __LL_LIB_LENGTH__, gcLibFMA_Func_fmaNotSupported);
 
-            gcoOS_StrCatSafe(sloBuiltinSource,
+            gcoOS_StrCatSafe(sloBuiltinSource[0],
                     __LL_LIB_LENGTH__, gcLibATAN_Funcs_halti5);
 
-            gcoOS_StrCatSafe(sloBuiltinSource,
+            gcoOS_StrCatSafe(sloBuiltinSource[0],
                     __LL_LIB_LENGTH__, gcLibASIN_ACOS_Funcs_halti5);
 
-            gcoOS_StrCatSafe(sloBuiltinSource,
+            gcoOS_StrCatSafe(sloBuiltinSource[0],
                     __LL_LIB_LENGTH__, gcLibATAN2_Funcs_halti5);
 
             /* Use normal MAD to implement reflect. */
             stringNum = sizeof(BuiltinLib_Reflect) / sizeof(gctSTRING);
             for (i = 0; i < stringNum; i++)
             {
-                gcoOS_StrCatSafe(sloBuiltinSource,
+                gcoOS_StrCatSafe(sloBuiltinSource[0],
                     __LL_LIB_LENGTH__, BuiltinLib_Reflect[i]);
             }
         }
         else
         {
-            gcoOS_StrCatSafe(sloBuiltinSource,
+            gcoOS_StrCatSafe(sloBuiltinSource[0],
                     __LL_LIB_LENGTH__, gcLibFMA_Func_fmaNotSupported);
 
-            gcoOS_StrCatSafe(sloBuiltinSource,
+            gcoOS_StrCatSafe(sloBuiltinSource[0],
                     __LL_LIB_LENGTH__, gcLibATAN_Funcs_halti2);
 
-            gcoOS_StrCatSafe(sloBuiltinSource,
+            gcoOS_StrCatSafe(sloBuiltinSource[0],
                     __LL_LIB_LENGTH__, gcLibASIN_ACOS_Funcs_halti2);
 
-            gcoOS_StrCatSafe(sloBuiltinSource,
+            gcoOS_StrCatSafe(sloBuiltinSource[0],
                     __LL_LIB_LENGTH__, gcLibATAN2_Funcs_halti2);
 
             /* Use normal MAD to implement reflect. */
             stringNum = sizeof(BuiltinLib_Reflect) / sizeof(gctSTRING);
             for (i = 0; i < stringNum; i++)
             {
-                gcoOS_StrCatSafe(sloBuiltinSource,
+                gcoOS_StrCatSafe(sloBuiltinSource[0],
                     __LL_LIB_LENGTH__, BuiltinLib_Reflect[i]);
             }
         }
 
+        gcoOS_StrCatSafe(sloBuiltinSource[1],
+                __LL_LIB_LENGTH__, BuiltinLib_common[2]);
+
         stringNum = sizeof(ImageLib_common) / sizeof(gctSTRING);
         for (i = 0; i < stringNum; i++)
         {
-            gcoOS_StrCatSafe(sloBuiltinSource,
+            gcoOS_StrCatSafe(sloBuiltinSource[1],
                 __LL_LIB_LENGTH__, ImageLib_common[i]);
         }
 
@@ -818,7 +844,7 @@ _CreateIntrinsicLib(
         stringNum = sizeof(ImageQuery_halti4) / sizeof(gctSTRING);
         for (i = 0; i < stringNum; i++)
         {
-            gcoOS_StrCatSafe(sloBuiltinSource,
+            gcoOS_StrCatSafe(sloBuiltinSource[1],
                 __LL_LIB_LENGTH__, ImageQuery_halti4[i]);
         }
 
@@ -828,7 +854,7 @@ _CreateIntrinsicLib(
             stringNum = sizeof(ImageLib_hati4) / sizeof(gctSTRING);
             for (i = 0; i < stringNum; i++)
             {
-                gcoOS_StrCatSafe(sloBuiltinSource,
+                gcoOS_StrCatSafe(sloBuiltinSource[1],
                     __LL_LIB_LENGTH__, ImageLib_hati4[i]);
             }
         }
@@ -837,7 +863,7 @@ _CreateIntrinsicLib(
             stringNum = sizeof(ImageLib) / sizeof(gctSTRING);
             for (i = 0; i < stringNum; i++)
             {
-                gcoOS_StrCatSafe(sloBuiltinSource,
+                gcoOS_StrCatSafe(sloBuiltinSource[1],
                     __LL_LIB_LENGTH__, ImageLib[i]);
             }
         }
@@ -848,7 +874,7 @@ _CreateIntrinsicLib(
             stringNum = sizeof(TexelFetchLib_halti4) / sizeof(gctSTRING);
             for (i = 0; i < stringNum; i++)
             {
-                gcoOS_StrCatSafe(sloBuiltinSource,
+                gcoOS_StrCatSafe(sloBuiltinSource[1],
                     __LL_LIB_LENGTH__, TexelFetchLib_halti4[i]);
             }
 
@@ -857,7 +883,7 @@ _CreateIntrinsicLib(
                 stringNum = sizeof(TexelFetchSamplerBuffer_halti4) / sizeof(gctSTRING);
                 for (i = 0; i < stringNum; i++)
                 {
-                    gcoOS_StrCatSafe(sloBuiltinSource,
+                    gcoOS_StrCatSafe(sloBuiltinSource[1],
                         __LL_LIB_LENGTH__, TexelFetchSamplerBuffer_halti4[i]);
                 }
             }
@@ -867,7 +893,7 @@ _CreateIntrinsicLib(
             stringNum = sizeof(TexelFetchLib) / sizeof(gctSTRING);
             for (i = 0; i < stringNum; i++)
             {
-                gcoOS_StrCatSafe(sloBuiltinSource,
+                gcoOS_StrCatSafe(sloBuiltinSource[1],
                     __LL_LIB_LENGTH__, TexelFetchLib[i]);
             }
 
@@ -876,7 +902,7 @@ _CreateIntrinsicLib(
                 stringNum = sizeof(TexelFetchSamplerBuffer) / sizeof(gctSTRING);
                 for (i = 0; i < stringNum; i++)
                 {
-                    gcoOS_StrCatSafe(sloBuiltinSource,
+                    gcoOS_StrCatSafe(sloBuiltinSource[1],
                         __LL_LIB_LENGTH__, TexelFetchSamplerBuffer[i]);
                 }
             }
@@ -890,7 +916,7 @@ _CreateIntrinsicLib(
                 stringNum = sizeof(texelFetchMSLib_halti4) / sizeof(gctSTRING);
                 for (i = 0; i < stringNum; i++)
                 {
-                    gcoOS_StrCatSafe(sloBuiltinSource,
+                    gcoOS_StrCatSafe(sloBuiltinSource[1],
                         __LL_LIB_LENGTH__, texelFetchMSLib_halti4[i]);
                 }
             }
@@ -901,7 +927,7 @@ _CreateIntrinsicLib(
             stringNum = sizeof(MSShadingLib) / sizeof(gctSTRING);
             for (i = 0; i < stringNum; i++)
             {
-                gcoOS_StrCatSafe(sloBuiltinSource,
+                gcoOS_StrCatSafe(sloBuiltinSource[0],
                     __LL_LIB_LENGTH__, MSShadingLib[i]);
             }
         }
@@ -910,62 +936,72 @@ _CreateIntrinsicLib(
         stringNum = sizeof(TexLdLib_hati4) / sizeof(gctSTRING);
         for (i = 0; i < stringNum; i++)
         {
-            gcoOS_StrCatSafe(sloBuiltinSource,
+            gcoOS_StrCatSafe(sloBuiltinSource[0],
                 __LL_LIB_LENGTH__, TexLdLib_hati4[i]);
         }
+
+        gcoOS_StrCatSafe(sloBuiltinSource[1], __LL_LIB_LENGTH__, gcLibTextureCommon_Func);
+        gcoOS_StrCatSafe(sloBuiltinSource[1], __LL_LIB_LENGTH__, gcLibGetLod);
 
         /* add atomic patch according to pHwCfg */
         if (needAtomicPatch)
         {
-            gcoOS_StrCatSafe(sloBuiltinSource, __LL_LIB_LENGTH__, gcGLLibGetLocalID);
+            gcoOS_StrCatSafe(sloBuiltinSource[0], __LL_LIB_LENGTH__, gcGLLibGetLocalID);
             if (pHwCfg->maxCoreCount == 1)
             {
-                gcoOS_StrCatSafe(sloBuiltinSource, __LL_LIB_LENGTH__, gcLib_AtomicPatch_Common_Func_core1_Str);
-                gcoOS_StrCatSafe(sloBuiltinSource, __LL_LIB_LENGTH__, gcGLLib_AtomcmpxchgPatch_Func_core1_Str);
+                gcoOS_StrCatSafe(sloBuiltinSource[0], __LL_LIB_LENGTH__, gcLib_AtomicPatch_Common_Func_core1_Str);
+                gcoOS_StrCatSafe(sloBuiltinSource[0], __LL_LIB_LENGTH__, gcGLLib_AtomcmpxchgPatch_Func_core1_Str);
             }
             else if (pHwCfg->maxCoreCount == 2)
             {
-                gcoOS_StrCatSafe(sloBuiltinSource, __LL_LIB_LENGTH__, gcLib_AtomicPatch_Common_Func_core2_Str);
-                gcoOS_StrCatSafe(sloBuiltinSource, __LL_LIB_LENGTH__, gcGLLib_AtomcmpxchgPatch_Func_core2_Str);
+                gcoOS_StrCatSafe(sloBuiltinSource[0], __LL_LIB_LENGTH__, gcLib_AtomicPatch_Common_Func_core2_Str);
+                gcoOS_StrCatSafe(sloBuiltinSource[0], __LL_LIB_LENGTH__, gcGLLib_AtomcmpxchgPatch_Func_core2_Str);
             }
             else if (pHwCfg->maxCoreCount == 4)
             {
-                gcoOS_StrCatSafe(sloBuiltinSource, __LL_LIB_LENGTH__, gcLib_AtomicPatch_Common_Func_core4_Str);
-                gcoOS_StrCatSafe(sloBuiltinSource, __LL_LIB_LENGTH__, gcGLLib_AtomcmpxchgPatch_Func_core4_Str);
+                gcoOS_StrCatSafe(sloBuiltinSource[0], __LL_LIB_LENGTH__, gcLib_AtomicPatch_Common_Func_core4_Str);
+                gcoOS_StrCatSafe(sloBuiltinSource[0], __LL_LIB_LENGTH__, gcGLLib_AtomcmpxchgPatch_Func_core4_Str);
             }
             else if (pHwCfg->maxCoreCount == 8)
             {
-                gcoOS_StrCatSafe(sloBuiltinSource, __LL_LIB_LENGTH__, gcLib_AtomicPatch_Common_Func_core8_Str);
-                gcoOS_StrCatSafe(sloBuiltinSource, __LL_LIB_LENGTH__, gcGLLib_AtomcmpxchgPatch_Func_core8_Str);
+                gcoOS_StrCatSafe(sloBuiltinSource[0], __LL_LIB_LENGTH__, gcLib_AtomicPatch_Common_Func_core8_Str);
+                gcoOS_StrCatSafe(sloBuiltinSource[0], __LL_LIB_LENGTH__, gcGLLib_AtomcmpxchgPatch_Func_core8_Str);
             }
         }
-        gcmONERROR((*gcGLSLCompiler)(gcSHADER_TYPE_LIBRARY,
-                      gcoOS_StrLen(sloBuiltinSource, gcvNULL),
-                      sloBuiltinSource,
-                      &Binary,
-                      &log));
+        for (i = 0; i < LIB_NUM; i++)
+        {
+            gcmONERROR((*gcGLSLCompiler)(gcSHADER_TYPE_LIBRARY,
+                          gcoOS_StrLen(sloBuiltinSource[i], gcvNULL),
+                          sloBuiltinSource[i],
+                          &binary[i],
+                          &log));
+        }
     }
 
-    if((isReadVirLib == gcvFALSE) && (Binary != gcvNULL))
+    if((isReadVirLib == gcvFALSE) && (binary[0] != gcvNULL))
     {
-        gcmONERROR(gcoOS_Allocate(gcvNULL,
-                                    sizeof(VIR_Shader),
-                                    (gctPOINTER*)&virIntrinsicLibrary));
-        gcmASSERT(virIntrinsicLibrary != gcvNULL);
+        for (i = 0; i < LIB_NUM; i++)
+        {
+            gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                      sizeof(VIR_Shader),
+                                      (gctPOINTER*)&virIntrinsicLibrary[i]));
+            gcmASSERT(virIntrinsicLibrary[i] != gcvNULL);
 
-        errCode = VIR_Shader_Construct(gcvNULL,
-                                       VIR_SHADER_LIBRARY,
-                                       virIntrinsicLibrary);
-        ON_ERROR(errCode, "VIR_CompileIntrinsicLib");
+            errCode = VIR_Shader_Construct(gcvNULL,
+                                           VIR_SHADER_LIBRARY,
+                                           virIntrinsicLibrary[i]);
+            ON_ERROR(errCode, "VIR_CompileIntrinsicLib");
 
-        gcSHADER_Conv2VIR(Binary, pHwCfg, virIntrinsicLibrary);
+            gcSHADER_Conv2VIR(binary[i], pHwCfg, virIntrinsicLibrary[i]);
+        }
     }
 
     if ((gcmOPT_LibShaderFile() == 1) || (gcmOPT_LibShaderFile() == 2))
     {
         if((isReadVirLib == gcvFALSE) && (virIntrinsicLibrary != gcvNULL))
         {
-             status = gcSHADER_WriteVirLibToFile(virLibName,virIntrinsicLibrary);
+            for (i = 0; i < LIB_NUM; i++)
+                status = gcSHADER_WriteVirLibToFile(virLibName[i], virIntrinsicLibrary[i]);
 
             if (status != gcvSTATUS_OK)
             {
@@ -1026,24 +1062,24 @@ _CreateIntrinsicLib(
     }
 #endif
 
-    if (DumpShader)
+    for (i = 0; i < LIB_NUM; i++)
     {
-        VIR_Shader_Dump(gcvNULL, "VIR library shader IR.", virIntrinsicLibrary, gcvTRUE);
+        if (DumpShader)
+            VIR_Shader_Dump(gcvNULL, "VIR library shader IR.", virIntrinsicLibrary[i], gcvTRUE);
+        *virIntrinsicLibraryPtr[i] = virIntrinsicLibrary[i];
+        pOutLib[i] = virIntrinsicLibrary[i];
     }
-
-    *virIntrinsicLibraryPtr = virIntrinsicLibrary;
-    *pOutLib = virIntrinsicLibrary;
 
 OnError:
-    if (sloBuiltinSource)
+    for (i = 0; i < LIB_NUM; i++)
     {
-        vscMM_Free(pMM, sloBuiltinSource);
-    }
-
-    if (Binary)
-    {
-        gcSHADER_Destroy(Binary);
-        Binary = gcvNULL;
+        if (sloBuiltinSource[i])
+            vscMM_Free(pMM, sloBuiltinSource[i]);
+        if (binary[i])
+        {
+            gcSHADER_Destroy(binary[i]);
+            binary[i] = gcvNULL;
+        }
     }
 
     if (log)
@@ -6874,9 +6910,7 @@ _LinkLibContext_Initialize(
     Context->linkPoint  = pLinkPoint;
     Context->libSpecializationConstantCount = libSpecializationConstantCount;
     Context->libSpecializationConsts = libSpecializationConsts;
-
     Context->changed    = gcvFALSE;
-
     Context->getTranspoint  = GetTranspoint;
     Context->getLibFuncName = GetLibFuncName;
     Context->insertCall     = InsertCallPtr;
@@ -6950,7 +6984,7 @@ _LinkLib_Transform(
         return errCode;
     }
 
-    if (!Context->libShader)
+    if (!Context->libShader && !Context->libShaders[0])
     {
         /* no lib shader provided, wait for internal link to resovle ext function calls */
         return errCode;
@@ -6985,6 +7019,14 @@ _LinkLib_Transform(
         else
         {
             libFuncName = (gctSTRING) Context->linkPoint->strFunc;
+        }
+
+        if (Context->libShader == gcvNULL)
+        {
+            if (gcmIS_SUCCESS(gcoOS_StrNCmp(libFuncName, "_viv_image_", 11)))
+                Context->libShader = Context->libShaders[1]; /* image intrinsic lib */
+            else
+                Context->libShader = Context->libShaders[0]; /* common intrinsic lib */
         }
 
         VIR_Shader_GetFunctionByName(pShader, libFuncName, &pFunc);
@@ -7354,6 +7396,10 @@ VIR_LinkLibLibrary(
         libEntry = &pLibLinkTable->pShLibLinkEntries[i];
         _InitializeLibLinkEntryData(pMM, libEntry);
 
+        /* TODO: will move it into _LinkLibContext_Initialize later */
+        for (j = 0; j < LIB_NUM; j++)
+            vContext.libShaders[j] = (VIR_Shader *)(libEntry->hShaderLibs[j]);
+
         /* for each link point */
         for (j = 0; j < libEntry->linkPointCount; j++)
         {
@@ -7581,10 +7627,12 @@ VIR_LinkInternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker)
     gctBOOL                     linkImageIntrinsic = gcvTRUE;
     VSC_HW_CONFIG*              pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
     VIR_Shader *                pIntrinsicLib = gcvNULL;
+    VIR_Shader *                pIntrinsicLibs[LIB_NUM] = {gcvNULL}; /* Use multiple lib shaders for graphic applications */
     VSC_LIB_LINK_POINT          libLinkPoint;
     VSC_SHADER_LIB_LINK_ENTRY   libLinkEntry;
     VSC_SHADER_LIB_LINK_TABLE   libLinkTable;
     gctBOOL                     bChanged = gcvFALSE;
+    gctUINT                     i = 0;
 
     if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader),
         VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
@@ -7631,14 +7679,14 @@ VIR_LinkInternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker)
                                                   VIR_Shader_IsGraphics(pShader),
                                                   VIR_Shader_IsDesktopGL(pShader),
                                                   gcvFALSE,
-                                                  &pIntrinsicLib);
+                                                  pIntrinsicLibs);
                     CHECK_ERROR(errCode, "VIR_GetIntrinsicLib failed.");
                 }
             }
         }
     }
 
-    if (pIntrinsicLib && gcUseFullNewLinker(pHwCfg->hwFeatureFlags.hasHalti2))
+    if ((pIntrinsicLib || pIntrinsicLibs[0]) && gcUseFullNewLinker(pHwCfg->hwFeatureFlags.hasHalti2))
     {
         /* Construct the lib link point. */
         gcoOS_ZeroMemory(&libLinkPoint, sizeof(VSC_LIB_LINK_POINT));
@@ -7650,6 +7698,8 @@ VIR_LinkInternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker)
         gcoOS_ZeroMemory(&libLinkEntry, sizeof(VSC_SHADER_LIB_LINK_ENTRY));
         libLinkEntry.applyLevel = VSC_SHLEVEL_Post_Medium;
         libLinkEntry.hShaderLib = pIntrinsicLib;
+        for (i = 0; i < LIB_NUM; i++)
+            libLinkEntry.hShaderLibs[i] = pIntrinsicLibs[i];
         libLinkEntry.pTempHashTable = gcvNULL;
         libLinkEntry.libSpecializationConstantCount = 0;
         libLinkEntry.pLibSpecializationConsts = gcvNULL;

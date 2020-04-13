@@ -192,10 +192,12 @@ typedef VSC_ErrCode (*VIR_LinkLib_INSERT_CALL_PTR) (
     IN  VIR_Function                *LibFunc
     );
 
+#define LIB_NUM 2
 struct _VIR_LinkLib_CONTEXT
 {
     VIR_Shader                          *shader;
     VIR_Shader                          *libShader;
+    VIR_Shader                          *libShaders[LIB_NUM];
     VSC_HASH_TABLE                      *pTempHashTable;
     VIR_ShaderKind                      shaderKind;
     VSC_LIB_LINK_POINT                  *linkPoint;
