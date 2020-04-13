@@ -13651,6 +13651,7 @@ gcLinkTreeThruVirShaders(
                 pgComParam.cfg.optFlags |= VSC_COMPILER_OPT_NO_IO_PACKING;
                 pgComParam.cfg.optFlags |= VSC_COMPILER_OPT_NO_FULL_ACTIVE_IO;
                 pgComParam.cfg.optFlags |= VSC_COMPILER_OPT_NO_DUAL16;
+                pgComParam.cfg.optFlags |= VSC_COMPILER_OPT_NO_LOOP;
             }
             if (Flags & gcvSHADER_SET_INLINE_LEVEL_0)
             {

@@ -3873,6 +3873,16 @@ void VSC_OPTN_Options_SetOptionsByOptFlags(
         VSC_OPTN_ISOptions_SetSwitchOn(VSC_OPTN_Options_GetISOptions(Options, 0), gcvFALSE);
         VSC_OPTN_ISOptions_SetSwitchOn(VSC_OPTN_Options_GetISOptions(Options, 1), gcvFALSE);
     }
+
+    if(OptFlags & VSC_COMPILER_OPT_LOOP)
+    {
+        gcmASSERT(!(OptFlags & VSC_COMPILER_OPT_NO_LOOP));
+        VSC_OPTN_LoopOptsOptions_SetSwitchOn(VSC_OPTN_Options_GetLoopOptsOptions(Options, 0), gcvTRUE);
+    }
+    else if(OptFlags & VSC_COMPILER_OPT_NO_LOOP)
+    {
+        VSC_OPTN_LoopOptsOptions_SetSwitchOn(VSC_OPTN_Options_GetLoopOptsOptions(Options, 0), gcvFALSE);
+    }
 }
 
 void VSC_OPTN_Options_SetSpecialOptions(
