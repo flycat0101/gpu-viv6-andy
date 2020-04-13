@@ -71,6 +71,7 @@ void vscUNILST_Prepend(VSC_UNI_LIST* pList, VSC_UNI_LIST_NODE* pWhat);
 void vscUNILST_Remove(VSC_UNI_LIST* pList, VSC_UNI_LIST_NODE* pWhat);
 gctBOOL vscUNILST_IsEmpty(VSC_UNI_LIST* pList);
 void vscUNILST_Finalize(VSC_UNI_LIST* pList);
+void vscUNILST_Reverse(VSC_UNI_LIST* pList);
 VSC_UNI_LIST_NODE* vscUNILST_GetHead(VSC_UNI_LIST* pList);
 VSC_UNI_LIST_NODE* vscUNILST_GetTail(VSC_UNI_LIST* pList);
 VSC_UNI_LIST_NODE* vscUNILST_RemoveHead(VSC_UNI_LIST* pList);
