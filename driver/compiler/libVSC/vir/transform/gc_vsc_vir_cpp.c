@@ -461,10 +461,8 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
              continue;
         }
 
-        /* cannot copy to temp256 pair, otherwise it will break the assumption that
-         * register pair will be contiguous*/
-        if (VIR_Operand_isTemp256High(srcOpnd) ||
-            VIR_Operand_isTemp256Low(srcOpnd))
+        /* Do not copy the temp256 pair in SCPP, otherwise it will break the assumption that the register pair wiil be contiguous. */
+        if (VIR_Operand_isTemp256High(srcOpnd) || VIR_Operand_isTemp256Low(srcOpnd))
         {
              continue;
         }
@@ -2701,6 +2699,12 @@ VSC_ErrCode VIR_SCPP_PerformOnBB(
                 VIR_Symbol* srcSym = gcvNULL;
                 VIR_Swizzle srcSwizzle = VIR_Operand_GetSwizzle(src);
                 VIR_OperandInfo srcOpndInfo;
+
+                /* Do not copy the temp256 pair in SCPP, otherwise it will break the assumption that the register pair wiil be contiguous. */
+                if (VIR_Operand_isTemp256High(src) || VIR_Operand_isTemp256Low(src))
+                {
+                     continue;
+                }
 
                 if(VIR_Operand_isSymbol(src))
                 {
