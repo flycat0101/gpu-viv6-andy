@@ -2419,6 +2419,44 @@ _AllocateSurface(
                                    Surface->node3.size);
 
                 }
+
+                if (Surface->tileStatusNode.pool != gcvPOOL_UNKNOWN)
+                {
+                    gcmDUMP(gcvNULL, "#[info tile status buffer]");
+                    gcmGETHARDWAREADDRESS(Surface->tileStatusNode, address);
+                    gcmDUMP_BUFFER(gcvNULL,
+                                   gcvDUMP_BUFFER_MEMORY,
+                                   address,
+                                   Surface->tileStatusNode.logical,
+                                   0,
+                                   Surface->tileStatusNode.size);
+                }
+
+                if (Surface->hzNode.pool != gcvPOOL_UNKNOWN)
+                {
+                    gcmDUMP(gcvNULL, "#[info hz buffer]");
+                    gcmGETHARDWAREADDRESS(Surface->hzNode, address);
+                    gcmDUMP_BUFFER(gcvNULL,
+                                   gcvDUMP_BUFFER_MEMORY,
+                                   address,
+                                   Surface->hzNode.logical,
+                                   0,
+                                   Surface->hzNode.size);
+
+                }
+
+                if (Surface->hzTileStatusNode.pool != gcvPOOL_UNKNOWN)
+                {
+                    gcmDUMP(gcvNULL, "#[info hz tile status buffer]");
+                    gcmGETHARDWAREADDRESS(Surface->hzTileStatusNode, address);
+                    gcmDUMP_BUFFER(gcvNULL,
+                                   gcvDUMP_BUFFER_MEMORY,
+                                   address,
+                                   Surface->hzTileStatusNode.logical,
+                                   0,
+                                   Surface->hzTileStatusNode.size);
+
+                }
             }
 
 #endif
