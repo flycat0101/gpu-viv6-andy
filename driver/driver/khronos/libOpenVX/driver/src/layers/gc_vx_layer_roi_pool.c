@@ -662,13 +662,16 @@ VX_PRIVATE_API vx_status vxoROIPoolLayer_TP_Initialize(vxnne_layer ops_layer, co
     vx_uint32 splitEnds[TP_TENSOR_COUNT] = {0};
     vx_uint32 multiGpu_split_size[TP_TENSOR_COUNT];
     vx_uint32 multiGpu_split_offset[TP_TENSOR_COUNT];
-    vx_uint32 split_size[TP_TENSOR_COUNT][TP_TENSOR_COUNT] = {0};
-    vx_uint32 split_offset[TP_TENSOR_COUNT][TP_TENSOR_COUNT] = {0};
+    vx_uint32 split_size[TP_TENSOR_COUNT][TP_TENSOR_COUNT];
+    vx_uint32 split_offset[TP_TENSOR_COUNT][TP_TENSOR_COUNT];
     vx_uint32 i = 0;
     vx_uint32 gpuCount = 0;
     vx_uint32 all_split_count = 0;
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    gcoOS_ZeroMemory(split_size, TP_TENSOR_COUNT * TP_TENSOR_COUNT * sizeof(vx_uint32));
+    gcoOS_ZeroMemory(split_offset, TP_TENSOR_COUNT * TP_TENSOR_COUNT * sizeof(vx_uint32));
 
     gcmONERROR(gcoVX_QueryCoreCount((((roipoolLayer)->base).node)->graph->deviceID, &gpuCount));
 
