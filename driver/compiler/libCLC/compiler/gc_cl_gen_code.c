@@ -31192,6 +31192,9 @@ cloIR_BINARY_EXPR_GenArithmeticAssignCode(
 
           /* Generate the arithmetic code */
           useLeftReg = gcmOPT_DriverVIRPath() &&
+                       lOperandParameters.rOperands[i].arrayIndex.mode == clvINDEX_NONE &&
+                       lOperandParameters.rOperands[i].vectorIndex.mode == clvINDEX_NONE &&
+                       lOperandParameters.rOperands[i].matrixIndex.mode == clvINDEX_NONE &&
                        !(needConvToFuncCall || Parameters->hasIOperand || (leftParameters.hint & clvGEN_DEREF_CODE));
           if(useLeftReg) {
               status =_ComputeReverseComponentSelection(Compiler,
