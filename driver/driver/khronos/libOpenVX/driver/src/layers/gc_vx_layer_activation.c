@@ -508,8 +508,12 @@ VX_PRIVATE_API vx_bool vxoNNActivationLayer_TP_Support(vx_node node, const vx_re
                          func_s->value->e == VX_NN_ACTIVATION_RELU1 ||
                          func_s->value->e == VX_NN_ACTIVATION_RELU6 ||
                          func_s->value->e == VX_NN_ACTIVATION_LEAKYRELU ||
-                         func_s->value->e == VX_NN_ACTIVATION_HYPERBOLIC_TAN) &&
-                         (TENSOR_TF_ZEROPOINT(inputs) < 16));
+                         func_s->value->e == VX_NN_ACTIVATION_HYPERBOLIC_TAN));
+    if (!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FLOAT_POST_MULT) &&
+        (TENSOR_QUANT_TYPE(inputs) == VX_QUANT_DYNAMIC_FIXED_POINT) && (TENSOR_POS(inputs) >= 16))
+    {
+        support = vx_false_e;
+    }
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
