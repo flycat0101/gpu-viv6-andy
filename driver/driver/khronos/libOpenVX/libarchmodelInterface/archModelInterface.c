@@ -876,6 +876,7 @@ static archModelOpInfo ** archTransferParam(vx_graph graph, archNN_DATABASE_FEAT
             opInfo[count]->tpType = operation->parameter.tpType;
             //opInfo[count]->op = operation->operatorType;
             opInfo[count]->absoluteOperationID = operation->absoluteOperationID;
+            opInfo[count]->uid = getUserIDFromOutputTensor((vx_tensor)operation->outputs[0]);
             opInfo[count]->layerId = node->id;
             opInfo[count]->layerName = node->layer->name;
             opInfo[count]->operationId = operation->id;
@@ -1826,6 +1827,7 @@ void printOpInfo(archModelOpInfo ** archOp, vx_uint32 totalCount)
         vxInfo("\nArchOp index %d:\n",i);
         vxInfo("TP type is %d\n",archOp[i]->tpType);
         vxInfo("absoluteOperationID is %d\n",archOp[i]->absoluteOperationID);
+        vxInfo("uid is %d\n",archOp[i]->uid);
         vxInfo("layerId is %d\n",archOp[i]->layerId);
         vxInfo("layerName is %s\n",archOp[i]->layerName);
         vxInfo("operationId is %d\n",archOp[i]->operationId);
@@ -2716,7 +2718,7 @@ vx_status showDriverPerformance(
              layer->node->id, layer->name,
              op->id, vxnneGetOperatorTypeName(op->operatorType), vxnneGetOperatorTargetName(op->target));
 
-    vxInfo("abs_op_id:%d\n", op->absoluteOperationID);
+    vxInfo("abs_op_id:%d\nuid:%d\n", op->absoluteOperationID, getUserIDFromOutputTensor((vx_tensor)op->outputs[0]));
 
     vxInfo("upstream_layer_num:%d upstream_opertaion_num:%d\n",
              op->parentLayerNum, op->parentOpNum);

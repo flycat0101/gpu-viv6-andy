@@ -6356,3 +6356,31 @@ vx_bool vx_nn_kernel_optimize_softmax_shape
     return ret;
 }
 
+vx_int32 getUserIDFromOutputTensor(
+    vx_tensor tensor)
+{
+    vx_int32 uid = -1;
+    char uidName[64] = {'\0'};
+
+    if (((vx_reference)tensor != VX_NULL) && strlen(((vx_reference)tensor)->name) > 4)
+    {
+        char *p;
+        gcoOS_StrCopySafe(uidName, 64, &((vx_reference)tensor)->name[4]);
+        p = uidName;
+        while (p)
+        {
+            if (*p == '_')
+            {
+                *p = '\0';
+                uid = atoi(uidName);
+                break;
+            }
+            p++;
+        }
+    }
+
+    return uid;
+}
+
+
+
