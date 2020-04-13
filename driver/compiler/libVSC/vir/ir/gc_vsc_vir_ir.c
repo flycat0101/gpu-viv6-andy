@@ -14487,12 +14487,22 @@ void
 VIR_Operand_ReplaceDefOperandWithDef(
     IN OUT VIR_Operand *    Def,
     IN VIR_Operand *        New_Def,
-    IN VIR_Enable           New_Enable
+    IN VIR_Enable           New_Enable,
+    IN gctBOOL              bKeepPrecision
     )
 {
+    VIR_Precision           originalPrecision = VIR_Operand_GetPrecision(Def);
+
     gcmASSERT(VIR_Operand_isLvalue(Def) && VIR_Operand_isLvalue(New_Def));
+
     VIR_Operand_Copy(Def, New_Def);
     VIR_Operand_SetEnable(Def, New_Enable);
+
+    /* Keep precision will also change the symbol precision of the New_Def. */
+    if (bKeepPrecision)
+    {
+        VIR_Operand_SetPrecision(Def, originalPrecision);
+    }
 }
 
 void
