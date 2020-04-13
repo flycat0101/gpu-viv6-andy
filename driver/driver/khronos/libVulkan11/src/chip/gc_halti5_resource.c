@@ -2939,7 +2939,7 @@ VkResult halti5_clearImage(
 #if __VK_ENABLETS
         if (fastClear)
         {
-            tileStatusAddress = halti5_computeTileStatusAddr(devCtx, img, offset);
+            tileStatusAddress = img->memory->ts->devAddr;
         }
 #endif
         if ((devCtx)->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE) {halti5_setMultiGpuSync((VkDevice)(devCtx), &(pCmdBuffer), VK_NULL_HANDLE);
@@ -3414,7 +3414,7 @@ VkResult halti5_copyImage(
         {
             /* Flush the tile status cache. */
             __VK_ONERROR(halti5_flushCache((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE, HW_CACHE_ALL));
-            srcTileStatusAddress = halti5_computeTileStatusAddr(devCtx, srcImg, offset);
+            srcTileStatusAddress = srcImg->memory->ts->devAddr;
 
             color64 = (srcTsResource->fcValue[srcRes->u.img.subRes.mipLevel][srcRes->u.img.subRes.arrayLayer] !=
                 srcTsResource->fcValueUpper[srcRes->u.img.subRes.mipLevel][srcRes->u.img.subRes.arrayLayer]);

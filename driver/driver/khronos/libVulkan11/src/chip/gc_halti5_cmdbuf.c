@@ -5875,9 +5875,7 @@ static VkResult halti5_3DBlitTileFill(
 
         offset = (uint32_t)(img->memOffset + baseLevel->offset + pRanges->baseArrayLayer * baseLevel->sliceSize);
         dstAddress += offset;
-        tileStatusAddress = halti5_computeTileStatusAddr(devCtx, img, offset);
-
-        tileStatusAddress -= 64;
+        tileStatusAddress = img->memory->ts->devAddr;
 
         if (devCtx->database->CACHE128B256BPERLINE)
         {
@@ -6046,14 +6044,6 @@ static VkResult halti5_3DBlitTileFill(
             /* DstTileCount. */
             __vkCmdLoadSingleHWState(commandBuffer, 0x501A, VK_FALSE, tileCount);
         }
-
-        /* DstClearValue. */
-        __vkCmdLoadSingleHWState(commandBuffer, 0x500F, VK_FALSE,
-            tsResource->fcValue[pRanges->baseMipLevel][pRanges->baseArrayLayer]);
-
-        /* DstClearValue64. */
-        __vkCmdLoadSingleHWState(commandBuffer, 0x5010, VK_FALSE,
-            tsResource->fcValueUpper[pRanges->baseMipLevel][pRanges->baseArrayLayer]);
 
         __vkCmdLoadSingleHWState(commandBuffer, 0x5018, VK_FALSE,
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -6336,11 +6326,6 @@ static VkResult halti5_3DBlitToSelf(
 
     tileStatusAddress = halti5_computeTileStatusAddr(devCtx, img, offset);
 
-    if (devCtx->database->CACHE128B256BPERLINE)
-    {
-        /* Todo. */
-    }
-
     __vkCmdLoadSingleHWState(commandBuffer, 0x502E, VK_FALSE,
         ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ?
@@ -6370,6 +6355,11 @@ static VkResult halti5_3DBlitToSelf(
     __vkCmdLoadSingleHWState(commandBuffer, 0x502F, VK_FALSE,
         (dstBltDesc.bltSwizzleEx | (dstBltDesc.bltSwizzleEx << 12))
         );
+
+    if (fastClear)
+    {
+        __vkCmdLoadSingleHWState(commandBuffer, 0x5004, VK_FALSE, tileStatusAddress);
+    }
 
     __vkCmdLoadSingleHWState(commandBuffer, 0x5009, VK_FALSE, config);
     __vkCmdLoadSingleHWState(commandBuffer, 0x500A, VK_FALSE, dstConfigEx);
@@ -6423,15 +6413,6 @@ static VkResult halti5_3DBlitToSelf(
  31:16) - (0 ?
  31:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16))));
-
-    if (fastClear)
-    {
-        __vkCmdLoadSingleHWState(commandBuffer, 0x5004, VK_FALSE, tileStatusAddress);
-        __vkCmdLoadSingleHWState(commandBuffer, 0x500D, VK_FALSE,
-            tsResource->fcValue[dstRes->u.img.subRes.mipLevel][dstRes->u.img.subRes.arrayLayer]);
-        __vkCmdLoadSingleHWState(commandBuffer, 0x500E, VK_FALSE,
-            tsResource->fcValueUpper[dstRes->u.img.subRes.mipLevel][dstRes->u.img.subRes.arrayLayer]);
-    }
 
     if (devCtx->chipInfo->gpuCoreCount > 1)
     {

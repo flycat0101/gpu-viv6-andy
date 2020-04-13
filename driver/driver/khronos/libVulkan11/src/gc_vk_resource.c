@@ -2351,7 +2351,7 @@ VkResult __vki_AllocateTileStatus(
                 break;
             }
 
-            __VK_ERR_BREAK(__vki_CreateSurfNode(devCtx, &tsResource->tsNode, totalBytes, 1, gcvSURF_TYPE_UNKNOWN,
+            __VK_ERR_BREAK(__vki_CreateSurfNode(devCtx, &tsResource->tsNode, totalBytes, 64, gcvSURF_TYPE_UNKNOWN,
                 gcvALLOC_FLAG_NONE, gcvPOOL_DEFAULT));
 
             __VK_ERR_BREAK(__vki_LockSurfNode(devCtx, &tsResource->tsNode, &tsResource->devAddr, &tsResource->hostAddr));
