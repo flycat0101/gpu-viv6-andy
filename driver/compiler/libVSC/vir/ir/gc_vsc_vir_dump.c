@@ -1505,85 +1505,83 @@ VIR_Symbol_Dump(
         break;
     }
 
-    if (Dumper->baseDumper.verbose)
+    /* dump flags */
+    VERIFY_OK(VIR_LOG(Dumper, " common_flags:<"));
+    if (isSymEnabled(Sym))
     {
-        /* dump flags */
-        VERIFY_OK(VIR_LOG(Dumper, " common_flags:<"));
-        if (isSymEnabled(Sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " enabled"));
-        }
-        if (isSymInactive(Sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " inactive"));
-        }
-        if (isSymFlat(Sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " flat"));
-        }
-        else if (isSymNoperspective(Sym))
-        {
-            VERIFY_OK(
-                VIR_LOG(Dumper, " noperspective"));
-        }
-        if (isSymInvariant(Sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " invariant"));
-        }
-        if (isSymField(Sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " is_field"));
-        }
-        if (isSymCompilerGen(Sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " compiler_gen"));
-        }
-        if (isSymBuildin(Sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " builtin"));
-        }
-        if (isSymArrayedPerVertex(Sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " arrayed_per_vertex"));
-        }
-        if (isSymPrecise(Sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " precise"));
-        }
-        if (isSymLoadStoreAttr(Sym))
-        {
-             VERIFY_OK(VIR_LOG(Dumper, " ld_st_attr"));
-        }
-        if (isSymStaticallyUsed(Sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " statically_used"));
-        }
-        if (isSymVectorizedOut(Sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " vectorized_out"));
-        }
-        if (isSymIOBlockMember(Sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " is_ioblock_member"));
-        }
-        if (isSymInstanceMember(Sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " is_instance_member"));
-        }
-        if (isSymUnused(Sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " unused"));
-        }
-        if (isSymUnDef(Sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " unDef"));
-        }
-        if (isSymPassByReference(Sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " passByRef"));
-        }
-        VERIFY_OK(VIR_LOG(Dumper, " >"));
+        VERIFY_OK(VIR_LOG(Dumper, " enabled"));
     }
+    if (isSymInactive(Sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " inactive"));
+    }
+    if (isSymFlat(Sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " flat"));
+    }
+    else if (isSymNoperspective(Sym))
+    {
+        VERIFY_OK(
+            VIR_LOG(Dumper, " noperspective"));
+    }
+    if (isSymInvariant(Sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " invariant"));
+    }
+    if (isSymField(Sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " is_field"));
+    }
+    if (isSymCompilerGen(Sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " compiler_gen"));
+    }
+    if (isSymBuildin(Sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " builtin"));
+    }
+    if (isSymArrayedPerVertex(Sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " arrayed_per_vertex"));
+    }
+    if (isSymPrecise(Sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " precise"));
+    }
+    if (isSymLoadStoreAttr(Sym))
+    {
+            VERIFY_OK(VIR_LOG(Dumper, " ld_st_attr"));
+    }
+    if (isSymStaticallyUsed(Sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " statically_used"));
+    }
+    if (isSymVectorizedOut(Sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " vectorized_out"));
+    }
+    if (isSymIOBlockMember(Sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " is_ioblock_member"));
+    }
+    if (isSymInstanceMember(Sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " is_instance_member"));
+    }
+    if (isSymUnused(Sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " unused"));
+    }
+    if (isSymUnDef(Sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " unDef"));
+    }
+    if (isSymPassByReference(Sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " passByRef"));
+    }
+    VERIFY_OK(VIR_LOG(Dumper, " >"));
+
     return errCode;
 }
 
@@ -1771,13 +1769,12 @@ _DumpType(
 
                 VERIFY_OK(
                     VIR_LOG(Dumper, ";"));
-                if (Dumper->baseDumper.verbose)
-                {
-                    /* dump field info */
-                    VERIFY_OK(
-                        VIR_LOG(Dumper, "/* offset:%d, virRegOffset:%d */",
-                                VIR_FieldInfo_GetOffset(fInfo), VIR_FieldInfo_GetTempRegOrUniformOffset(fInfo)));
-                }
+
+                /* dump field info */
+                VERIFY_OK(
+                    VIR_LOG(Dumper, "/* offset:%d, virRegOffset:%d */",
+                            VIR_FieldInfo_GetOffset(fInfo), VIR_FieldInfo_GetTempRegOrUniformOffset(fInfo)));
+
                 VIR_LOG_FLUSH(Dumper);
             }
 
@@ -3016,68 +3013,67 @@ VIR_Uniform_Dump(
     {
         VIR_LOG(Dumper, " ubIndex %d", VIR_Uniform_GetBlockIndex(Uniform));
     }
-    if (Dumper->baseDumper.verbose)
+
+    /* dump flags */
+    VERIFY_OK(VIR_LOG(Dumper, " uniform_flags:<"));
+    if (isSymUniformLoadtimeConst(sym))
     {
-        /* dump flags */
-        VERIFY_OK(VIR_LOG(Dumper, " uniform_flags:<"));
-        if (isSymUniformLoadtimeConst(sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " load_time_const"));
-        }
-        if (isSymUniformCompiletimeInitialized(sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " compile_time_initialized"));
-        }
-        if (isSymUniformUsedInShader(sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " used_in_shader"));
-        }
-        if (isSymUniformUsedInLTC(sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " used_in_LTC"));
-        }
-        if (isSymUniformMovedToDUB(sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " moved_to_DUB"));
-        }
-        if (isSymUniformUsedInTextureSize(sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " used_in_texture_size"));
-        }
-        if (isSymUniformImplicitlyUsed(sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " implicitly_used"));
-        }
-        if (isSymUniformForcedToActive(sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " forced_to_active"));
-        }
-        if (isSymUniformMovingToDUBO(sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " moving_to_DUBO"));
-        }
-        if (isSymUniformAlwaysInDUB(sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " always_in_DUB"));
-        }
-        if (isSymUniformMovedToDUBO(sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " moved_to_DUBO"));
-        }
-        if (isSymUniformMovedToCUBO(sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " moved_to_CUBO"));
-        }
-        if (isSymUniformAtomicCounter(sym))
-        {
-             VERIFY_OK(VIR_LOG(Dumper, " atomic_counter"));
-        }
-        if (isSymUniformTreatSamplerAsConst(sym))
-        {
-            VERIFY_OK(VIR_LOG(Dumper, " Treat_sampler_as_const"));
-        }
-        VERIFY_OK(VIR_LOG(Dumper, " >"));
+        VERIFY_OK(VIR_LOG(Dumper, " load_time_const"));
     }
+    if (isSymUniformCompiletimeInitialized(sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " compile_time_initialized"));
+    }
+    if (isSymUniformUsedInShader(sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " used_in_shader"));
+    }
+    if (isSymUniformUsedInLTC(sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " used_in_LTC"));
+    }
+    if (isSymUniformMovedToDUB(sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " moved_to_DUB"));
+    }
+    if (isSymUniformUsedInTextureSize(sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " used_in_texture_size"));
+    }
+    if (isSymUniformImplicitlyUsed(sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " implicitly_used"));
+    }
+    if (isSymUniformForcedToActive(sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " forced_to_active"));
+    }
+    if (isSymUniformMovingToDUBO(sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " moving_to_DUBO"));
+    }
+    if (isSymUniformAlwaysInDUB(sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " always_in_DUB"));
+    }
+    if (isSymUniformMovedToDUBO(sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " moved_to_DUBO"));
+    }
+    if (isSymUniformMovedToCUBO(sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " moved_to_CUBO"));
+    }
+    if (isSymUniformAtomicCounter(sym))
+    {
+            VERIFY_OK(VIR_LOG(Dumper, " atomic_counter"));
+    }
+    if (isSymUniformTreatSamplerAsConst(sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " Treat_sampler_as_const"));
+    }
+    VERIFY_OK(VIR_LOG(Dumper, " >"));
+
     VERIFY_OK(VIR_LOG(Dumper, ";"));
     VIR_LOG_FLUSH(Dumper);
 
