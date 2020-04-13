@@ -280,7 +280,9 @@ enum vxnne_kernel_e
     VXNNE_KERNEL_GPU_FULLYCONNECTED,
     VXNNE_KERNEL_ACTIVATION,
     VXNNE_KERNEL_GPU_ACTIVATION,
-    VXNNE_KERNEL_SOFTMAX,
+    VXNNE_KERNEL_SOFTMAX_AXIS0,
+    VXNNE_KERNEL_SOFTMAX_AXIS1,
+    VXNNE_KERNEL_SOFTMAX_AXIS2,
     VXNNE_KERNEL_GPU_SOFTMAX,
     VXNNE_KERNEL_REORG,
     VXNNE_KERNEL_GPU_REORG,
@@ -2981,7 +2983,25 @@ vxnne_shader_executable vxnneGetActivation_UInt8ShaderExecutable(
     vx_float32              maxVal,
     vx_tensor               output);
 
-vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
+vxnne_shader_executable vxnneGetSoftmaxAxis0ShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_uint32               dims,
+    vx_tensor               input,
+    vx_float32              beta,
+    vx_tensor               output);
+
+vxnne_shader_executable vxnneGetSoftmaxAxis1ShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_uint32               dims,
+    vx_tensor               input,
+    vx_float32              beta,
+    vx_tensor               output);
+
+vxnne_shader_executable vxnneGetSoftmaxAxis2ShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,

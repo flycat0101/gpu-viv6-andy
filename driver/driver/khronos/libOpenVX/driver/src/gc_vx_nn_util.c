@@ -6250,3 +6250,131 @@ vx_status nnTransposeChannel(vx_context context, vx_graph graph)
     return status;
 }
 
+static vx_bool compute_gpu_divisor
+    (
+    const vx_int32 input_value,
+    const vx_int32 limit,
+    const vx_int32 gcd,
+    vx_int32* divisor
+    )
+{
+    vx_int32 i = 0;
+    for(i = gcmMIN(input_value, limit - 1 ); i > 0; i -- )
+    {
+        if((i % gcd == 0 ) && (input_value % i == 0 ) )
+        {
+            *divisor = i;
+            return vx_true_e;
+        }
+    }
+    return vx_false_e;
+} /* compute_gpu_divisor */
+
+static vx_uint32 element_fill_dim
+    (
+    vx_int32* shape_x, vx_uint32 rank_x,
+    vx_uint32 max_rank, vx_int32 size_x
+    )
+{
+    vx_uint32 cost_size = 1;
+
+    if (size_x == 1)
+        return 0;
+#define GPU_TENSOR_MAX_WIDTH    (65536)
+    if(size_x < GPU_TENSOR_MAX_WIDTH)
+    {
+        shape_x[rank_x] = size_x;
+    }
+    else
+    {
+        vx_int32 divisor = 0;
+        vx_int32 remainder = 0;
+        compute_gpu_divisor(size_x, GPU_TENSOR_MAX_WIDTH, 1, &divisor );
+        remainder = size_x / divisor;
+        if(remainder > GPU_TENSOR_MAX_WIDTH || rank_x >= max_rank)
+        {
+            // Cannot optimize.
+            shape_x[rank_x] = size_x;
+        }
+        else
+        {
+            /*
+             * We've limit the max size to 2^32 -1(Almost 4G * sizeof(data type)),
+             * so it should be always 2.
+             */
+            cost_size = 2;
+            if(size_x > 1 )
+            {
+                shape_x[rank_x]  = divisor;
+                shape_x[rank_x + 1] = remainder;
+            }
+            else
+            {
+                shape_x[rank_x] = 1;
+                shape_x[rank_x + 1] = 1;
+            }
+        }
+    }
+#undef GPU_TENSOR_MAX_WIDTH
+
+    return cost_size;
+} /* element_fill_dim() */
+
+vx_bool vx_nn_kernel_optimize_softmax_shape
+    (
+    const vx_int32* shape_x, const vx_uint32 rank_x, const vx_int32 axis,
+    vx_int32* out_shape_x, vx_uint32* out_rank_x, vx_int32* out_axis
+    )
+{
+    vx_bool   ret                   = vx_true_e;
+    vx_uint32 i                     = 0;
+    vx_uint32 rank_in               = 0;
+    vx_uint32 dims                  = 0;
+    vx_int32  innerSize             = 1;
+    vx_int32  outerSize             = 1;
+    vx_int32  axisSize              = shape_x[axis];
+
+    for (i = 0; i < (vx_uint32)axis; i++)
+    {
+        innerSize *= shape_x[i];
+    }
+
+    for (i = axis + 1; i < rank_x; i++)
+    {
+        outerSize *= shape_x[i];
+    }
+#define GPU_TENSOR_MAX_WIDTH    (65536)
+    rank_in += element_fill_dim(out_shape_x, rank_in, GPU_TENSOR_MAX_WIDTH, innerSize);
+    dims = element_fill_dim(out_shape_x, rank_in, GPU_TENSOR_MAX_WIDTH, axisSize);
+    if (dims == 0)
+    {
+        *out_axis = rank_in;
+        out_shape_x[rank_in ++] = 1;
+    }
+    else
+    {
+        *out_axis = rank_in;
+    }
+
+    rank_in += dims;
+
+    rank_in += element_fill_dim(out_shape_x, rank_in, GPU_TENSOR_MAX_WIDTH, outerSize);
+
+    if(0 == rank_in )
+    {
+        out_shape_x[0] = 1;
+        out_shape_x[1] = 1;
+        rank_in = 2;
+    }
+    else if(1 == rank_in )
+    {
+        out_shape_x[1] = 1;
+        rank_in = 2;
+    }
+
+    *out_rank_x = rank_in;
+
+#undef GPU_TENSOR_MAX_WIDTH
+    return ret;
+}
+
