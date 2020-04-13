@@ -4234,7 +4234,7 @@ void _fill_TP_DILATE_UPSAMPLE_Command(
 
     dilationX = parameter->tp_value->u32[1];
     strideY = parameter->tp_value->u32[2];
-    dilationY = parameter->dilationY;
+    dilationY = (vx_uint32)parameter->dilationY;
     batch = dilationX * dilationY;
 
     for (i = 0; i < split_count; i++)
