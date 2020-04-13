@@ -327,6 +327,8 @@ typedef struct _gcsHARDWARE_CONFIG
     vx_hw_chip_info             hwChipInfo;
 #endif
     gctBOOL                     parallelNoFix;
+
+    gctBOOL                     disableVIP;
 }
 gcsHARDWARE_CONFIG;
 
