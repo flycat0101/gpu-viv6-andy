@@ -450,7 +450,7 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
                     if((input_w - kernelx + pad[0] + pad[1]) % stride_x != 0 ||
                         (input_h - kernely + pad[2] + pad[3]) % stride_y != 0 )
                         break;
-                    else if(((TENSOR_QUANT_TYPE(input) == VX_QUANT_AFFINE_SCALE && TENSOR_DATA_TYPE(input) == VX_TYPE_UINT8) ||
+                    else if(((TENSOR_QUANT_TYPE(input) == VX_QUANT_AFFINE_SCALE && TENSOR_DATA_SIZE(input) == 1) || /*AFFINE support i8 and u8*/
                                (TENSOR_QUANT_TYPE(input) == VX_QUANT_DYNAMIC_FIXED_POINT && TENSOR_DATA_TYPE(input) == VX_TYPE_INT8)) &&
                         (input_w > 64 || input_h > 64) &&
                         poolx == 3)
@@ -3031,7 +3031,7 @@ VX_PRIVATE_API vx_status vxoGraphOptimization_TensorAdd2Conv_copyData2Weight_asy
 
     vxoGraphOptimization_getQuantizeParam(gcmMAX(fWeight[0], fWeight[1]), gcmMIN(fWeight[0], fWeight[1]), &scale, &zp);
 
-    if(TENSOR_DATA_TYPE(*weight) == VX_TYPE_UINT8)
+    if(TENSOR_DATA_TYPE(*weight) == VX_TYPE_UINT8 || TENSOR_DATA_TYPE(*weight) == VX_TYPE_INT8)
     {
         vx_int8 quantedData[2] = {
             (vx_int8) roundRTNE(fWeight[0] / scale+ zp),
@@ -5029,7 +5029,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
             vx_float32  max         = scale * (255-zp);
             vx_float32  min         = scale * -zp;
 
-            if(dataType != VX_TYPE_UINT8 && dataType != VX_TYPE_UINT16)
+            if(dataType != VX_TYPE_INT8 && dataType != VX_TYPE_UINT8 && dataType != VX_TYPE_UINT16)
                 continue;
             if(TENSOR_QUANT_TYPE(reluOut) != VX_QUANT_AFFINE_SCALE)
                 continue;
