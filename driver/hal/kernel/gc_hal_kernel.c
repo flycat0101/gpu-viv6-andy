@@ -2827,6 +2827,7 @@ gckKERNEL_Dispatch(
 
     gctBOOL powerMutexAcquired = gcvFALSE;
     gctBOOL commitMutexAcquired = gcvFALSE;
+    gctBOOL idle = gcvFALSE;
 
     gcmkHEADER_ARG("Kernel=%p Interface=%p", Kernel, Interface);
 
@@ -3525,6 +3526,21 @@ gckKERNEL_Dispatch(
 
     case gcvHAL_SET_FSCALE_VALUE:
 #if gcdENABLE_FSCALE_VAL_ADJUST
+        /* Wait for HW idle, otherwise it is not safe. */
+        gcmkONERROR(gckCOMMAND_Stall(Kernel->command, gcvFALSE));
+
+        for (;;)
+        {
+            gcmkONERROR(gckHARDWARE_QueryIdle(Kernel->hardware, &idle));
+
+            if (idle)
+            {
+                break;
+            }
+
+            gcmkVERIFY_OK(gckOS_Delay(Kernel->os, 1));
+        }
+
         status = gckHARDWARE_SetFscaleValue(Kernel->hardware,
                                             Interface->u.SetFscaleValue.value,
                                             Interface->u.SetFscaleValue.shValue);

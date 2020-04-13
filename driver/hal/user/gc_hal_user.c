@@ -1370,19 +1370,11 @@ OnError:
 **
 **  gcoHAL_SetFscaleValue
 **
-**  Set the fscale value used when GPU is gcvPOWER_ON.
+**  Set Fscale value to current core.
 **
-**  INPUT:
-**
-**      gctUINT FscalueValue
-**          Fscale value to be set.
-**
-**  OUTPUT:
-**
-**          Nothing.
 */
 gceSTATUS
-gcoHAL_SetFscaleValue(
+gcoHAL_SetFscaleValueEx(
     IN gctUINT FscaleValue,
     IN gctUINT ShaderFscaleValue
     )
@@ -1390,7 +1382,7 @@ gcoHAL_SetFscaleValue(
     gceSTATUS status;
     gcsHAL_INTERFACE iface;
 
-    gcmHEADER_ARG("FscaleValue=0x%X", FscaleValue);
+    gcmHEADER_ARG("FscaleValue=0x%x ShaderFscaleValue=0x%x", FscaleValue, ShaderFscaleValue);
 
     iface.command = gcvHAL_SET_FSCALE_VALUE;
     iface.u.SetFscaleValue.value = FscaleValue;
@@ -1398,6 +1390,62 @@ gcoHAL_SetFscaleValue(
 
     status = gcoHAL_Call(gcvNULL, &iface);
 
+    gcmFOOTER();
+    return status;
+}
+
+/*******************************************************************************
+**
+**  gcoHAL_SetFscaleValue
+**
+**  Set the fscale value used when GPU is gcvPOWER_ON.
+**
+**  INPUT:
+**      gctUINT CoreIndex
+**          Global core index to set the specific core clock.
+**          If the value is 0xFFFFFFFF, all the cores will be set.
+**      gctUINT FscaleValue
+**          Set core clock. Value can be 64, 32, 16, 8, 4, 2, 1.
+**          64 means 64/64 full clock, 1 means 1/64 clock.
+**      gctUINT ShaderFscaleValue
+**          Set shader clock. Value can be 64, 32, 16, 8, 4, 2, 1.
+**          64 means 64/64 full clock, 1 means 1/64 clock.
+**
+**  OUTPUT:
+**
+**          Nothing.
+*/
+gceSTATUS
+gcoHAL_SetFscaleValue(
+    IN gcoHAL Hal,
+    IN gctUINT CoreIndex,
+    IN gctUINT FscaleValue,
+    IN gctUINT ShaderFscaleValue
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctINT i = 0;
+
+    gcmHEADER_ARG("CoreIndex=%x FscaleValue=0x%x ShaderFscaleValue=0x%x", CoreIndex, FscaleValue, ShaderFscaleValue);
+
+    if (CoreIndex == 0xFFFFFFFF)
+    {
+        /* Set for all the cores. */
+        for (i = 0; i < gcPLS.hal->chipCount; i++)
+        {
+            gcoHAL_SetCoreIndex(gcvNULL, i);
+            gcmkONERROR(gcoHAL_SetFscaleValueEx(FscaleValue, ShaderFscaleValue));
+        }
+    }
+    else
+    {
+        /* Set for the specific core. */
+        gcoHAL_SetCoreIndex(gcvNULL, CoreIndex);
+
+        gcmkONERROR(gcoHAL_SetFscaleValueEx(FscaleValue, ShaderFscaleValue));
+    }
+
+OnError:
     gcmFOOTER();
     return status;
 }
