@@ -4595,7 +4595,7 @@ IN OUT cloIR_POLYNARY_EXPR PolynaryExpr
     gctUINT         i, currentCandidateIndex = 0;
     gctINT          distance = 0, minDistance = cldINT_MAX;
     clsDATA_TYPE dataType[1];
-    gctBOOL hasGenType;
+    gctBOOL hasGenType = gcvFALSE;
     gctBOOL nameCloned = gcvFALSE;
 
     FOR_EACH_DLINK_NODE(&NameSpace->names, clsNAME, name) {
