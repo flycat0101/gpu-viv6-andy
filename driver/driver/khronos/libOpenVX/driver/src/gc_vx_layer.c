@@ -10828,7 +10828,14 @@ vxnne_shader_executable vxnneGetNormalizationUint8ShaderExecutable(
         execution_parameters.globalWorkSize[1]   = (height + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1];
         execution_parameters.globalWorkSize[2]   = channel;
 
-        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_genSameMapUint8In", borderMode);
+        if (inputFormat == VX_TYPE_UINT8)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_genSameMapUint8In", borderMode);
+        }
+        else if (inputFormat == VX_TYPE_INT8)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_genSameMapInt8In", borderMode);
+        }
         if (!shaderExecutable) goto OnError;
 
         status = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSqrSumUint8_16x1", 1, uniSqrSumUint8_16x1);

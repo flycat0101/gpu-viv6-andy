@@ -457,6 +457,24 @@ vx_uint8 Fp32toUint8(vx_float32 val, vx_int32 zeroPoint, vx_float32 scale, vx_in
     return result;
 }
 
+vx_int8 Fp32toInt8_asym(vx_float32 val, vx_int32 zeroPoint, vx_float32 scale, vx_int32 roundMode)
+{
+    vx_int8 result = 0;
+    vx_int32 data;
+
+    data = (vx_int32) vxnneRound((val / scale + zeroPoint), roundMode);
+
+    if (data > 127)
+        data = 127;
+
+    if (data < -128)
+        data = -128;
+
+    result = (vx_int8)(data);
+
+    return result;
+}
+
 vx_int16 Fp32toInt16(vx_float32 val, vx_int8 fixedPointPos, vx_int32 roundMode)
 {
     vx_int16 result = 0;
@@ -899,6 +917,12 @@ vx_status vxnneSaveDataQuant(vx_type_e format, vx_int32 index, vx_float64 data, 
         {
             vx_uint8* dst_data_p = (vx_uint8*)dst_data;
             dst_data_p[index] = Fp32toUint8((vx_float32)data, zeroPoint, scale, roundMode);
+        }
+        break;
+    case VX_TYPE_INT8:
+        {
+            vx_int8* dst_data_p = (vx_int8*)dst_data;
+            dst_data_p[index] = Fp32toInt8_asym((vx_float32)data, zeroPoint, scale, roundMode);
         }
         break;
     case VX_TYPE_INT32:

@@ -60,6 +60,9 @@ vx_status vxnneExecuteSWNormalization(struct _vxnne_operation_s *operation)
     vx_uint32  start_w, end_w, start_h, end_h, start_c, end_c;
     vx_uint32  input_data_size = vxDataType_GetSize(input_format);
     vx_uint32  output_data_size = vxDataType_GetSize(output_format);
+    vx_enum    inputQuantType    = TENSOR_QUANT_TYPE(input);
+    vx_enum    outputQuantType   = TENSOR_QUANT_TYPE(output);
+
     if ((input_data_size == 0) || (output_data_size == 0))
     {
         return VX_FAILURE;
@@ -94,7 +97,7 @@ vx_status vxnneExecuteSWNormalization(struct _vxnne_operation_s *operation)
 
                             for (i = start_w; i <= end_w; i++)
                             {
-                                if (input_format == VX_TYPE_UINT8)
+                                if (VX_QUANT_AFFINE_SCALE == inputQuantType)
                                 {
                                     val = vxnneGetDataQuant((vx_type_e)TENSOR_DATA_TYPE(input),
                                                             (c + b * channel) * input_stride + width * j + i,
@@ -113,7 +116,7 @@ vx_status vxnneExecuteSWNormalization(struct _vxnne_operation_s *operation)
                             }
                         }
 
-                        if (input_format == VX_TYPE_UINT8)
+                        if (VX_QUANT_AFFINE_SCALE == inputQuantType)
                         {
                             val = vxnneGetDataQuant((vx_type_e)TENSOR_DATA_TYPE(input),
                                                     (c + b * channel) * input_stride + width * h + w,
@@ -131,7 +134,7 @@ vx_status vxnneExecuteSWNormalization(struct _vxnne_operation_s *operation)
 
                         val = val / powf((bias + (alpha / div) * sum), beta);
 
-                        if (output_format == VX_TYPE_UINT8)
+                        if (VX_QUANT_AFFINE_SCALE == outputQuantType)
                         {
                             vxnneSaveDataQuant((vx_type_e)TENSOR_DATA_TYPE(output),
                                                (c + b * channel) * output_stride + width * h + w,
@@ -171,7 +174,7 @@ vx_status vxnneExecuteSWNormalization(struct _vxnne_operation_s *operation)
 
                         for(n = start_c; n <= end_c; n++)
                         {
-                            if (input_format == VX_TYPE_UINT8)
+                            if (VX_QUANT_AFFINE_SCALE == inputQuantType)
                             {
                                 val = vxnneGetDataQuant((vx_type_e)TENSOR_DATA_TYPE(input),
                                                         (n + b * channel) * input_stride + width * h + w,
@@ -189,7 +192,7 @@ vx_status vxnneExecuteSWNormalization(struct _vxnne_operation_s *operation)
 
                             sum += val * val;
                         }
-                        if (input_format == VX_TYPE_UINT8)
+                        if (VX_QUANT_AFFINE_SCALE == inputQuantType)
                         {
                             val = vxnneGetDataQuant((vx_type_e)TENSOR_DATA_TYPE(input),
                                                     (c + b * channel) * input_stride + width * h + w,
@@ -207,7 +210,7 @@ vx_status vxnneExecuteSWNormalization(struct _vxnne_operation_s *operation)
 
                         val = val / powf((bias + (alpha / div) * sum), beta);
 
-                        if (output_format == VX_TYPE_UINT8)
+                        if (VX_QUANT_AFFINE_SCALE == outputQuantType)
                         {
                             vxnneSaveDataQuant((vx_type_e)TENSOR_DATA_TYPE(output),
                                                (c + b * channel) * output_stride + width * h + w,
@@ -397,6 +400,7 @@ VX_PRIVATE_API vx_status vxoLRNOperationSH_Initialize(
     vx_bool    generic_flag              = vx_false_e;
     vx_bool    isuint8_flag              = vx_false_e;
     vx_bool    norm_shader_flag          = vx_false_e;
+    vx_enum    inputQuantType            = TENSOR_QUANT_TYPE(inputs);
 
     if (!op_index)
     {
@@ -408,14 +412,16 @@ VX_PRIVATE_API vx_status vxoLRNOperationSH_Initialize(
     norm_config[0]     = (vx_bool)(norm_size == 3 && beta == 0.75);
     norm_config[1]     = (vx_bool)(norm_size == 5 && beta == 0.75);
     norm_config[2]     = (vx_bool)(norm_size == 11 && beta == 0.5);
-    dataformat_flag[0] = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT8) && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_INT8));
+    dataformat_flag[0] = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT8)
+                                && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_INT8) && (VX_QUANT_AFFINE_SCALE != inputQuantType));
     dataformat_flag[1] = (vx_bool)(inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16);
     dataformat_flag[2] = (vx_bool)(inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8);
     dataformat_flag[3] = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16);
     dataformat_flag[4] = (vx_bool)(inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32 &&!evis);
     dataformat_flag[5] = (vx_bool)(inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16);
     isuint8_flag       = (vx_bool)((acrossmap_flag && dataformat_flag[5])
-                                    || dataformat_flag[2]);
+                                    || dataformat_flag[2]
+                                    || ((inputFormat == VX_TYPE_INT8) && (outputFormat == VX_TYPE_INT8) && evis && (VX_QUANT_AFFINE_SCALE == inputQuantType)));
     generic_flag       = (vx_bool)((acrossmap_flag && dataformat_flag[0]) || (sammap_flag && dataformat_flag[3])
                                     ||(acrossmap_flag && dataformat_flag[5]));
     norm_shader_flag   = (vx_bool)((sammap_flag && norm_config[0] && dataformat_flag[0])
@@ -619,7 +625,7 @@ VX_PRIVATE_API vx_bool vxoNormalization_SH_EVIS_Support_Ext(vx_node node, const 
     vx_bool    norm_config[3]             = {vx_false_e};
     vx_bool    generic_flag               = vx_false_e;
     vx_bool    isuint8_flag               = vx_false_e;
-
+    vx_enum    inputQuantType             = TENSOR_QUANT_TYPE(inputs);
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
@@ -642,7 +648,8 @@ VX_PRIVATE_API vx_bool vxoNormalization_SH_EVIS_Support_Ext(vx_node node, const 
     isuint8_flag       = (vx_bool)((acrossmap_flag && norm_config[0] && dataformat_flag[2])
         || (acrossmap_flag && norm_config[1] && dataformat_flag[2])
         || (acrossmap_flag && norm_config[2] && dataformat_flag[2])
-        || dataformat_flag[2]);
+        || dataformat_flag[2]
+        || ((input_format == VX_TYPE_INT8) && (output_format == VX_TYPE_INT8) && evis && (VX_QUANT_AFFINE_SCALE == inputQuantType)));
 
     generic_flag       = (vx_bool)((acrossmap_flag && dataformat_flag[0]) || (sammap_flag && dataformat_flag[3])
                                     || (dataformat_flag[1])
