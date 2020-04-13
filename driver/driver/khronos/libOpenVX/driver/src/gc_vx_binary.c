@@ -9219,14 +9219,16 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
     /* collect all patch count, op count, lcdt count from operations */
     for (i = 0; i < executionLayer->opIndicesNum; i++)
     {
-        vxnne_operation operation = VX_NULL;
         vxnne_operation_command operationCommand = VX_NULL;
+        vx_op_param parameter = VX_NULL;
+        vxnne_operation operation = VX_NULL;
         vx_tensor input = VX_NULL;
         vx_tensor output = VX_NULL;
         vx_enum operationTarget = VX_BINARY_OPERATION_TYPE_NONE;
 
-        operation = executionLayer->operations[executionLayer->opIndices[i].operationID];
         operationCommand = &executionLayer->opIndices[i];
+        parameter = &operationCommand->parameter;
+        operation = executionLayer->operations[executionLayer->opIndices[i].operationID];
         operationTarget = vxoBinaryGraph_ConvertToBinaryOperationTarget(operation->target);
 
         if ((operationTarget == VX_BINARY_OPERATION_TYPE_NN) || (operationTarget == VX_BINARY_OPERATION_TYPE_TP))
@@ -9271,7 +9273,14 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
             else
             {
                 vxnne_tp_operation tpOperation = (vxnne_tp_operation)operation;
-                vx_uint32 opNum = context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
+                vx_uint32 size, opNum = context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
+                vx_enum tpType = parameter->tpType;
+                vx_uint32 core = tpType != TP_SINGLE_FC ? context->nnConfig.fixedFeature.tpCoreCount :
+                                                              context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
+
+                vx_bool mult = context->options.enableMultiTP && core > 1;
+
+
                 if (operation->parameter.tpType == TP_SINGLE_FC)
                 {
                     vx_tensor otherRef = (vx_tensor)operation->parameter.other_ref;
@@ -9279,11 +9288,11 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
                     if (!value->e32[0])
                     {
                         vxmASSERT(otherRef != VX_NULL);
-                        opNum = WB_TOTAL_SLICE_NUM((vx_weights_biases_parameter)otherRef);
+                        opNum += WB_TOTAL_SLICE_NUM((vx_weights_biases_parameter)otherRef);
                     }
                     else
                     {
-                        opNum = 1;
+                        opNum += 1;
                     }
                 }
                 else if (operation->parameter.tpType == TP_TRANSPOSE)
@@ -9316,7 +9325,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
                     }
                     if (x < TP_MAX_XYSIZE && y < TP_MAX_XYSIZE)
                     {
-                        opNum = 1;
+                        opNum += 1;
                     }
                     else
                     {
@@ -9324,11 +9333,111 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
                         {
                             if (dims[i] > 1) break;
                         }
+                        size = dims[i];
 
                         /* TP X/Y size has max size limitation, must split */
                         y = tsize / dims[0];
-                        opNum = gcmALIGN_NP2(y, TP_MAX_XYSIZE-1) / (TP_MAX_XYSIZE-1);
+                        opNum += gcmALIGN_NP2(y, TP_MAX_XYSIZE-1) / (TP_MAX_XYSIZE-1);
                     }
+                    if (opNum == 1 && (dnum == 3 || (dnum == 4 && dims[3] == 1)))
+                                {
+                                    vx_uint32_ptr perm = (vx_uint32*)value->p8[0];
+                                    if (perm[0] == 1 && perm[1] == 0) /* y, x, z */
+                                    {
+                                        opNum += x * y > 128 && mult ? gcmMIN(dims[2], core) : 1;
+                                        size = dims[2];
+                                        value->e32[0] = 1;
+                                    }
+                                    else if (perm[0] == 1 && perm[1] == 2) /* y, z, x */ /* use single TP to reduce bandwidth */
+                                    {
+                                        opNum += context->hwChipInfo.customerID == 0xAE && x * y > 128 && mult ? gcmMIN(dims[2], core) : 1;
+                                        size = dims[2];
+                                        value->e32[0] = 2;
+                                    }
+                                    else if (context->hwChipInfo.customerID == 0xAE)
+                                    {
+                                        if (perm[0] == 2 && perm[1] == 0) /* z, x, y */
+                                        {
+                                            opNum += mult ? gcmMIN(dims[1], core) : 1;
+                                            size = dims[1];
+                                            value->e32[0] = 3;
+                                        }
+                                        else if (perm[0] == 2 && perm[1] == 1) /* z, y, x */
+                                        {
+                                            opNum += mult ? gcmMIN(dims[1], core) : 1;
+                                            size = dims[1];
+                                            value->e32[0] = 4;
+                                        }
+                                        else if (perm[0] == 0 && perm[1] == 2) /* x, z, y */
+                                        {
+                                            opNum += mult ? gcmMIN(dims[1], core) : 1;
+                                            size = dims[1];
+                                            value->e32[0] = 5;
+                                        }
+                                    }
+                                }
+
+                }
+                else if (operation->parameter.tpType == TP_RESHUFFLE)
+                {
+                    vxnne_tiling_rect input = &operationCommand->inputTile;
+                    vxnne_tp_operation tpOperation = (vxnne_tp_operation)operationCommand->operation;
+                    vx_uint32 inputXSize = input->width;
+                    vx_uint32 inputYSize = input->height;
+                    vx_uint32 inputZSize = TENSOR_VIEW_SIZE_INDEX(tpOperation->input, 2);
+
+                    if (mult && (inputXSize * inputYSize * inputZSize) > MULTI_TP_RESHUFFLE_SIZE)
+                    {
+                        opNum += gcoMATH_MIN(inputZSize, core);
+                    }
+                    else
+                    {
+                        opNum += 1;
+                    }
+
+                }
+                else if (operation->parameter.tpType == TP_REORG)
+                {
+                    vx_int32 split_type = 0;
+                    vx_uint32 outputZSize = 0, outputXSize = 0, outputYSize = 0;
+                    vx_tp_value_cmd value_tp = operation->parameter.tp_value;
+                    vxnne_tp_operation tpOperation = (vxnne_tp_operation)operationCommand->operation;
+                    vx_uint32 inputZSize = TENSOR_VIEW_SIZE_INDEX(tpOperation->input, 2);
+                    outputZSize = inputZSize / value_tp->u32[0] / value_tp->u32[0];
+                    outputXSize *= value_tp->u32[0];
+                    outputYSize *= value_tp->u32[0];
+
+                    if (split_type == 0) /*TP_SPLIT_Z_DIRECTION*/
+                    {
+                        size = outputZSize;
+                    }
+                    if (split_type == 1) /*TP_SPLIT_X_DIRECTION*/
+                    {
+                        size = outputXSize;
+                    }
+                    if (split_type == 2) /*TP_SPLIT_Y_DIRECTION*/
+                    {
+                        size = outputYSize;
+                    }
+                    opNum += !mult || size < core ? 1 : core;
+                }
+                else if (operation->parameter.tpType == TP_REORG_SPACE2BATCH || operation->parameter.tpType == TP_REORG_BATCH2SPACE)
+                {
+                    vx_uint32 inputZSize = 0;
+                    vx_tp_value_cmd value_tp = operation->parameter.tp_value;
+                    vxmASSERT(value_tp != VX_NULL);
+                    inputZSize = TENSOR_VIEW_SIZE_INDEX(tpOperation->input, 2);
+                    size = inputZSize * value_tp->u32[2];
+                    opNum += 1;
+                }
+                else if(operation->parameter.tpType == TP_REORG_SHUFFLECHANNEL)
+                {
+                    vx_uint32 inputZSize = 0;
+                    vx_tp_value_cmd value_tp = operation->parameter.tp_value;
+                    vxmASSERT(value_tp != VX_NULL);
+                    inputZSize = TENSOR_VIEW_SIZE_INDEX(tpOperation->input, 2);
+                    size = inputZSize * value_tp->u32[2];
+                    opNum += !mult || size < core ? 1 : core;
                 }
 
                 binarySave->tpOperationCount += opNum;
