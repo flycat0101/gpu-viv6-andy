@@ -261,6 +261,11 @@ typedef enum _gceHAL_COMMAND_CODES
 
     /* Destory MMU. */
     gcvHAL_DESTROY_MMU,
+
+#if gcdDEVICE_EXTEND_IOCTL
+    /* platform extend ioctrl interface */
+    gcvHAL_DEVICE_EXTEND_CONTROL,
+#endif
     /*************** Reserved end ***************/
 }
 gceHAL_COMMAND_CODES;
@@ -1309,6 +1314,16 @@ typedef struct _gcsHAL_DEC300_FLUSH_WAIT
 DEC300FlushWait;
 #endif
 
+#if gcdDEVICE_EXTEND_IOCTL
+typedef struct _gcsDEVICE_EXTEND_CONTROL_ARGS
+{
+    gctUINT64               InputBuffer;
+    gctUINT64               InputBufferSize;
+    gctUINT64               OutputBuffer;
+    gctUINT64               OutputBufferSize;
+}
+gcsDEVICE_EXTEND_CONTROL_ARGS;
+#endif
 
 typedef struct _gcsHAL_INTERFACE
 {
@@ -1439,6 +1454,10 @@ typedef struct _gcsHAL_INTERFACE
         gcsHAL_DEC300_WRITE                 DEC300Write;
         gcsHAL_DEC300_FLUSH                 DEC300Flush;
         gcsHAL_DEC300_FLUSH_WAIT            DEC300FlushWait;
+#endif
+
+#if gcdDEVICE_EXTEND_IOCTL
+        gcsDEVICE_EXTEND_CONTROL_ARGS       ExtendControlArgs;
 #endif
     }
     u;

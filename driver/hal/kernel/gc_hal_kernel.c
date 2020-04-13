@@ -3783,6 +3783,12 @@ gckKERNEL_Dispatch(
                 &Interface->u.QueryChipOptions));
         break;
 
+#if gcdDEVICE_EXTEND_IOCTL
+    case gcvHAL_DEVICE_EXTEND_CONTROL:
+        gcmkONERROR(gckOS_ExtendDeviceControl(Kernel->os, &Interface->u.ExtendControlArgs));
+        break;
+#endif
+
     default:
         /* Invalid command. */
         gcmkONERROR(gcvSTATUS_INVALID_ARGUMENT);

@@ -295,6 +295,20 @@ typedef struct _gcsPLATFORM_OPERATIONS
         OUT gctUINT32_PTR PolicyID,
         OUT gctUINT32_PTR AXIConfig
         );
+
+#if gcdDEVICE_EXTEND_IOCTL
+    /*******************************************************************************
+    **
+    ** deviceControl
+    **
+    ** Special device ioctl interface.
+    */
+    gceSTATUS
+    (*extendControl)(
+        IN gcsPLATFORM *Platform,
+        INOUT gcsDEVICE_EXTEND_CONTROL_ARGS *Args
+        );
+#endif
 }
 gcsPLATFORM_OPERATIONS;
 

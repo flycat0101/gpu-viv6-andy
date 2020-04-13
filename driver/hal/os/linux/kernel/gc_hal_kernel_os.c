@@ -7486,3 +7486,21 @@ gckOS_GetPolicyID(
     return status;
 }
 
+#if gcdDEVICE_EXTEND_IOCTL
+gceSTATUS
+gckOS_ExtendDeviceControl(
+    IN gckOS Os,
+    INOUT gcsDEVICE_EXTEND_CONTROL_ARGS *Args
+    )
+{
+    gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
+    gcsPLATFORM * platform = Os->device->platform;
+
+    if (platform && platform->ops->extendControl)
+    {
+        status = platform->ops->extendControl(platform, Args);
+    }
+
+    return status;
+}
+#endif

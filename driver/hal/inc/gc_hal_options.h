@@ -1343,6 +1343,14 @@ This define enables the use of VM for gckCommand and fence buffers.
 #endif
 
 /*
+    gcdDEVICE_EXTERND_IOCTROL
+        When enabled, will enable device special ioctl functions.
+ */
+#ifndef gcdDEVICE_EXTEND_IOCTL
+#   define gcdDEVICE_EXTEND_IOCTL               0
+#endif
+
+/*
     gcdIGNORE_DRIVER_VERSIONS_MISMATCH
         When enabled, driver will ignore user and kernel driver version mismatch.
 */
