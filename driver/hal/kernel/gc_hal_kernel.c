@@ -1088,7 +1088,7 @@ gckKERNEL_AllocateVideoMemory(
 AllocateMemory:
 
 #if gcdCAPTURE_ONLY_MODE
-    if (!virtualPool4K)
+    if (*Pool != gcvPOOL_VIRTUAL)
     {
         *Pool = gcvPOOL_SYSTEM;
     }
@@ -5199,7 +5199,13 @@ gckFENCE_Create(
     )
 {
     gceSTATUS status;
+
+#if !gcdCAPTURE_ONLY_MODE
     gcePOOL pool = gcvPOOL_DEFAULT;
+#else
+    gcePOOL pool = gcvPOOL_VIRTUAL;
+#endif
+
     gckFENCE fence = gcvNULL;
     gctSIZE_T size = 8;
     gctUINT32 allocFlag = gcvALLOC_FLAG_CONTIGUOUS;

@@ -1404,7 +1404,12 @@ gckCOMMAND_Construct(
     /* Pre-allocate the command queues. */
     for (i = 0; i < gcdCOMMAND_QUEUES; ++i)
     {
+#if !gcdCAPTURE_ONLY_MODE
         gcePOOL pool = gcvPOOL_DEFAULT;
+#else
+        gcePOOL pool = gcvPOOL_VIRTUAL;
+#endif
+
         gctSIZE_T size = pageSize;
         gckVIDMEM_NODE videoMem = gcvNULL;
         gctUINT32 allocFlag = 0;

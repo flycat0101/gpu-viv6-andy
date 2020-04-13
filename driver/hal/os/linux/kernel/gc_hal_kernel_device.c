@@ -2030,7 +2030,11 @@ gckGALDEVICE_Construct(
     gckKERNEL kernel = gcvNULL;
     gckGALDEVICE device;
     gctINT32 i;
+
+#if !gcdCAPTURE_ONLY_MODE
     gceHARDWARE_TYPE type;
+#endif
+
     gceSTATUS status = gcvSTATUS_OK;
     gctUINT64 isrPolling = -1;
 
@@ -2246,6 +2250,7 @@ gckGALDEVICE_Construct(
         }
     }
 
+#if !gcdCAPTURE_ONLY_MODE
     if (device->irqLines[gcvCORE_2D] != -1 || gcmBITTEST(isrPolling, gcvCORE_2D)!= 0)
     {
         gcmkONERROR(gckDEVICE_AddCore(
@@ -2311,6 +2316,11 @@ gckGALDEVICE_Construct(
     {
         device->kernels[gcvCORE_VG] = gcvNULL;
     }
+#else
+    device->kernels[gcvCORE_2D] = gcvNULL;
+
+    device->kernels[gcvCORE_VG] = gcvNULL;
+#endif
 
 #if !gcdEXTERNAL_SRAM_DEFAULT_POOL
     /* Setup external SRAM video memory pool. */

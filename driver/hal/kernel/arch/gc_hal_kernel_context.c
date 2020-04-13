@@ -4168,6 +4168,11 @@ _DestroyContext(
             {
                 gckKERNEL kernel = Context->hardware->kernel;
 
+#if gcdCAPTURE_ONLY_MODE
+                gceDATABASE_TYPE dbType;
+                gctUINT32 processID;
+#endif
+
                 /* End cpu access. */
                 gcmkVERIFY_OK(gckVIDMEM_NODE_UnlockCPU(
                     kernel,
@@ -4184,6 +4189,21 @@ _DestroyContext(
                     0,
                     gcvNULL
                     ));
+
+#if gcdCAPTURE_ONLY_MODE
+                /* Encode surface type and pool to database type. */
+                dbType = gcvDB_VIDEO_MEMORY
+                       | (gcvVIDMEM_TYPE_GENERIC << gcdDB_VIDEO_MEMORY_TYPE_SHIFT)
+                       | (buffer->videoMem->pool << gcdDB_VIDEO_MEMORY_POOL_SHIFT);
+
+                gcmkONERROR(gckOS_GetProcessID(&processID));
+
+                gcmkONERROR(
+                    gckKERNEL_RemoveProcessDB(kernel,
+                        processID,
+                        dbType,
+                        buffer->videoMem));
+#endif
 
                 /* Free video memory. */
                 gcmkVERIFY_OK(gckVIDMEM_NODE_Dereference(
@@ -4225,6 +4245,11 @@ _AllocateContextBuffer(
     gctSIZE_T totalSize = Context->totalSize;
     gctUINT32 allocFlag = 0;
 
+#if gcdCAPTURE_ONLY_MODE
+    gceDATABASE_TYPE dbType;
+    gctUINT32 processID;
+#endif
+
 #if gcdENABLE_CACHEABLE_COMMAND_BUFFER
     allocFlag = gcvALLOC_FLAG_CACHEABLE;
 #endif
@@ -4242,6 +4267,22 @@ _AllocateContextBuffer(
 
 #if gcdCAPTURE_ONLY_MODE
     gcmkONERROR(gckVIDMEM_HANDLE_Allocate(kernel, Buffer->videoMem, &Context->buffer->handle));
+
+    /* Encode surface type and pool to database type. */
+    dbType = gcvDB_VIDEO_MEMORY
+           | (gcvVIDMEM_TYPE_GENERIC << gcdDB_VIDEO_MEMORY_TYPE_SHIFT)
+           | (pool << gcdDB_VIDEO_MEMORY_POOL_SHIFT);
+
+    gcmkONERROR(gckOS_GetProcessID(&processID));
+
+    /* Record in process db. */
+    gcmkONERROR(
+            gckKERNEL_AddProcessDB(kernel,
+                                   processID,
+                                   dbType,
+                                   Buffer->videoMem,
+                                   gcvNULL,
+                                   totalSize));
 #endif
 
     /* Lock for GPU access. */
