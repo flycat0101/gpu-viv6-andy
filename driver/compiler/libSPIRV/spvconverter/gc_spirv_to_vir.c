@@ -719,6 +719,14 @@ OnError:
     return status;
 }
 
+/* All builtin extended instruction-sets we can support now. */
+static SpvExtInstSet extInstSets[] =
+{
+    { "GLSL.std.450",   12,     VIR_INTRINSIC_SET_GLSL},
+    { "OpenCL.std",     10,     VIR_INTRINSIC_SET_CL},
+};
+static gctUINT extInstSetCount = sizeof(extInstSets) / sizeof(SpvExtInstSet);
+
 static void __SpvSetExtInstImport(gcSPV spv)
 {
     gctSTRING       extenedInstSetName = gcvNULL;
