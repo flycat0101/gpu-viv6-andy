@@ -2715,7 +2715,7 @@ gcoHAL_AllocateVideoMemory(
     IN gctUINT Alignment,
     IN gceVIDMEM_TYPE Type,
     IN gctUINT32 Flag,
-    IN gcePOOL Pool,
+    IN OUT gcePOOL *Pool,
     IN OUT gctSIZE_T * Bytes,
     OUT gctUINT32_PTR Node
     )
@@ -2726,7 +2726,7 @@ gcoHAL_AllocateVideoMemory(
         = (struct _gcsHAL_ALLOCATE_LINEAR_VIDEO_MEMORY *) &iface.u;
 
     gcmHEADER_ARG("Node=%p, Bytes=%u, Alignement=%d, Type=%d, Flag=%d, Pool=%d",
-                  Node, *Bytes, Alignment, Type, Flag, Pool);
+                  Node, *Bytes, Alignment, Type, Flag, *Pool);
 
     iface.command   = gcvHAL_ALLOCATE_LINEAR_VIDEO_MEMORY;
 
@@ -2734,13 +2734,14 @@ gcoHAL_AllocateVideoMemory(
 
     alvm->alignment = Alignment;
     alvm->type      = (gctUINT32)Type;
-    alvm->pool      = Pool;
+    alvm->pool      = *Pool;
     alvm->flag      = Flag;
 
     gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
 
     *Node  = alvm->node;
     *Bytes = (gctSIZE_T)alvm->bytes;
+    *Pool = alvm->pool;
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;

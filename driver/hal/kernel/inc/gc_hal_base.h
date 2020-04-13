@@ -1108,7 +1108,7 @@ gcoHAL_AllocateVideoMemory(
     IN gctUINT Alignment,
     IN gceVIDMEM_TYPE Type,
     IN gctUINT32 Flag,
-    IN gcePOOL Pool,
+    IN OUT gcePOOL *Pool,
     IN OUT gctSIZE_T * Bytes,
     OUT gctUINT32_PTR Node
     );
