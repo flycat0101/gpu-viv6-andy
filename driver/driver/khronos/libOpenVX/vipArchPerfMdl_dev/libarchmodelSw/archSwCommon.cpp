@@ -1588,6 +1588,21 @@ arch_status archCalculateArchPerf(
                             }
                             for (y = minOutTileYSize; y <= tmpMaxOutTileYSize; y++)
                             {
+                                if(pArchNnConfig->fixedFeature.preprocessImgBuf640BLimit == 1)
+                                {
+                                    if (kernelXSize > 1 || kernelYSize > 1)
+                                    {   // preprocessor in buffer changed to 640 B and has this limitation, when we have this?
+                                        int inTileXsize = x + kernelXSize - 1; inTileXsize = (inTileXsize < 0) ? 1: inTileXsize;
+                                        int inTileYsize = y + kernelYSize - 1; inTileYsize = (inTileYsize < 0) ? 1: inTileYsize;
+                                        int inbuffer_tile_xsize = ((kernelXSize & 1) == 0) ? (inTileXsize + 1) : inTileXsize;
+                                        int inputDataType16Bit  = (inputDataSize == 16) ? 1: 0;
+                                        inbuffer_tile_xsize <<= inputDataType16Bit;
+                                        if (inbuffer_tile_xsize * inTileYsize > 640) // 640 is inbuffer_tile_maxsize = NUM_OF_BUFFER_OUT_BYTE * INIMAGE_MxN_BUFFER_DEPTH
+                                        {
+                                            continue;
+                                        }
+                                    }
+                                }
                                 if (inXSize - xOffSet <= x + kernelXSize -1 &&
                                     inYSize - yOffSet <= y + kernelYSize -1 &&
                                     (!pArchDataFeature->drJdDiffConditionForCacheLineModePreFix ||

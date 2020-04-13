@@ -1279,6 +1279,8 @@ static vx_status initConfigration(arch_nn_config *pArchNnConfig,arch_drv_option 
     pArchNnConfig->fixedFeature.equivalentVipsramWidthInByte = pContextNnConfig->fixedFeature.equivalentVipsramWidthInByte;
     pArchNnConfig->fixedFeature.shaderCoreCount = pContextNnConfig->fixedFeature.shaderCoreCount;
 
+    /* gcFEATURE_BIT_PREPROCESS_IMG_BUF_640BYTE_LIMIT */
+    pArchNnConfig->fixedFeature.preprocessImgBuf640BLimit = gcoHAL_IsFeatureAvailable(gcvNULL, gcFEATURE_PREPROCESS_IMG_BUF_640BYTE_LIMIT);
     /* query multi core count */
     gcmGETCURRENTHARDWARE(hwType);
     gcoHAL_QueryCoreCount(gcvNULL, hwType, &coreCount, chipIDs);

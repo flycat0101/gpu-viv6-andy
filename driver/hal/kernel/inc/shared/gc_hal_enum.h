@@ -616,6 +616,7 @@ typedef enum _gceFEATURE
     gcFEATURE_BIT_NN_COMPRESSION_BYPASSS,
     gcFEATURE_BIT_BFLOAT_KERNEL_COMPRESSION_ZERO_SKIP_FIX,
     gcFEATURE_BIT_TP_KERNEL_1BYTE_ALGIN,
+    gcFEATURE_PREPROCESS_IMG_BUF_640BYTE_LIMIT,
     /* Insert features above this comment only. */
     gcvFEATURE_COUNT                /* Not a feature. */
 }

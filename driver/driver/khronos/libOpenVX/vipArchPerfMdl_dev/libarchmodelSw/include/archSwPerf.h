@@ -366,6 +366,9 @@ typedef struct _archNN_FIXED_FEATURE
 
     /*multi Core count*/
     arch_uint32  multiVIPnum;
+
+    /* gcFEATURE_BIT_PREPROCESS_IMG_BUF_640BYTE_LIMIT */
+    arch_uint32 preprocessImgBuf640BLimit;
 } archNN_FIXED_FEATURE;
 
 /* Features can be customized from outside */
