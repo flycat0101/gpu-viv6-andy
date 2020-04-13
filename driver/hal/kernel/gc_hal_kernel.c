@@ -1622,16 +1622,13 @@ _LockVideoMemory(
     }
 #endif
 
-    if (nodeObject->pool != gcvPOOL_LOCAL_EXCLUSIVE)
-    {
-        /* Lock for userspace CPU userspace. */
-        gcmkONERROR(
-            gckVIDMEM_NODE_LockCPU(Kernel,
-                                   nodeObject,
-                                   Interface->u.LockVideoMemory.cacheable,
-                                   gcvTRUE,
-                                   &logical));
-    }
+    /* Lock for userspace CPU userspace. */
+    gcmkONERROR(
+        gckVIDMEM_NODE_LockCPU(Kernel,
+                               nodeObject,
+                               Interface->u.LockVideoMemory.cacheable,
+                               gcvTRUE,
+                               &logical));
 
     /* Lock for GPU address. */
     gcmkONERROR(gckVIDMEM_NODE_Lock(Kernel, nodeObject, &address));
@@ -1641,14 +1638,7 @@ _LockVideoMemory(
     gcmkONERROR(gckVIDMEM_NODE_GetGid(Kernel, nodeObject, &gid));
 
     Interface->u.LockVideoMemory.address = address;
-    if (nodeObject->pool == gcvPOOL_LOCAL_EXCLUSIVE)
-    {
-        Interface->u.LockVideoMemory.memory = 0;
-    }
-    else
-    {
-        Interface->u.LockVideoMemory.memory = gcmPTR_TO_UINT64(logical);
-    }
+    Interface->u.LockVideoMemory.memory = gcmPTR_TO_UINT64(logical);
     Interface->u.LockVideoMemory.physicalAddress = physical;
     Interface->u.LockVideoMemory.gid = gid;
 
@@ -1742,13 +1732,10 @@ _UnlockVideoMemory(
         &nodeObject
         ));
 
-    if (nodeObject->pool != gcvPOOL_LOCAL_EXCLUSIVE)
-    {
-        gckOS_QueryOption(Kernel->os, "allMapInOne", &mappingInOne);
-        /* Unlock CPU. */
-        gcmkONERROR(gckVIDMEM_NODE_UnlockCPU(
-            Kernel, nodeObject, ProcessID, gcvTRUE, mappingInOne == 1));
-    }
+    gckOS_QueryOption(Kernel->os, "allMapInOne", &mappingInOne);
+    /* Unlock CPU. */
+    gcmkONERROR(gckVIDMEM_NODE_UnlockCPU(
+        Kernel, nodeObject, ProcessID, gcvTRUE, mappingInOne == 1));
 
     /* Unlock video memory. */
     gcmkONERROR(gckVIDMEM_NODE_Unlock(

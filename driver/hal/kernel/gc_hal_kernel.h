@@ -1301,6 +1301,9 @@ typedef struct _gcsVIDMEM_NODE
     /* Pointer to gcuVIDMEM_NODE. */
     gcuVIDMEM_NODE_PTR          node;
 
+    /* Pointer to gcuVIDMEM_NODE. */
+    gcuVIDMEM_NODE_PTR          transitNode;
+
     /* Pointer to gckKERNEL object. */
     gckKERNEL                   kernel;
 
