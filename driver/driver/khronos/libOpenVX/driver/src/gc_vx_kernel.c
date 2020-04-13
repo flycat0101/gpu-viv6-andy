@@ -4270,29 +4270,30 @@ VX_INTERNAL_API vx_status vxoDumpOutput(vx_node node, const vx_reference paramet
 #endif
             )
         {
-            vx_uint8_ptr physical = 0, logical = 0;
+            vx_uint32 physical = gcvINVALID_ADDRESS;
+            vx_uint8_ptr logical = 0;
             vx_uint32 size = 0;
 
             switch(ref->type)
             {
             case VX_TYPE_IMAGE:
-                physical    = (vx_uint8_ptr)(((vx_image)ref)->memory.physicals[0]);
+                physical    = ((vx_image)ref)->memory.physicals[0];
                 logical     = ((vx_image)ref)->memory.logicals[0];
                 size        = (vx_uint32)(((vx_image)ref)->memory.strides[0][2] * ((vx_image)ref)->height);
                 break;
             case VX_TYPE_DISTRIBUTION:
-                physical    = (vx_uint8_ptr)(((vx_image)ref)->memory.physicals[0]);
+                physical    = ((vx_image)ref)->memory.physicals[0];
                 logical     = (vx_uint8_ptr)((vx_distribution)ref)->memAllocInfo.logical;
                 size        = ((vx_distribution)ref)->memAllocInfo.allocatedSize;
                 break;
             case VX_TYPE_LUT:
             case VX_TYPE_ARRAY:
-                physical    = (vx_uint8_ptr)(((vx_image)ref)->memory.physicals[0]);
+                physical    = ((vx_image)ref)->memory.physicals[0];
                 logical     = ((vx_array)ref)->memory.logicals[0];
                 size        = ((vx_array)ref)->memAllocInfo.allocatedSize;
                 break;
             case VX_TYPE_SCALAR:
-                physical    = (vx_uint8_ptr)(((vx_scalar)ref)->physical);
+                physical    = ((vx_scalar)ref)->physical;
                 size        = vxoScalar_GetTypeSize((vx_scalar)ref);
 
                 logical     = (vx_uint8_ptr)((vx_scalar)ref)->value;
@@ -4305,7 +4306,7 @@ VX_INTERNAL_API vx_status vxoDumpOutput(vx_node node, const vx_reference paramet
             /* Dump memory */
             gcmDUMP_BUFFER(gcvNULL,
                         gcvDUMP_BUFFER_VERIFY,
-                        (gctUINT32)physical,
+                        physical,
                         (gctPOINTER)logical,
                         0,
                         size);
