@@ -23,7 +23,7 @@
 #include <gc_vx_nn_encoder.h>
 #include <gc_vx_nn_extension_interface.h>
 #include <gc_vx_internal_node_api.h>
-#include "gc_hal_types.h"
+#include "shared/gc_hal_types.h"
 #include "anchors.h"
 #include <gc_vx_nn_util.h>
 #ifdef ORI_NNARCHPERF

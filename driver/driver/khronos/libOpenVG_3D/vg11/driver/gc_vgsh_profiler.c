@@ -16,7 +16,6 @@
 */
 
 #include "gc_vgsh_precomp.h"
-#include "gc_hal_driver.h"
 #include "gc_hal_user.h"
 
 #define _GC_OBJ_ZONE                gcdZONE_VG3D_PROFILER

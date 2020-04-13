@@ -14,7 +14,7 @@
 #ifndef __GC_VX_PROFILER_H__
 #define __GC_VX_PROFILER_H__
 
-#include "gc_hal_types.h"
+#include "shared/gc_hal_types.h"
 
 /* Profile information. */
 typedef struct _vx_profiler
