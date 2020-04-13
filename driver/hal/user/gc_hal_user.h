@@ -3107,6 +3107,19 @@ typedef struct _vx_drv_option
     gctUINT enableWBDump;
     gctUINT commandBufferDump;
     gctUINT enableWBShare;
+
+    /* add env setting for DDR Burst */
+    gctUINT specificDDRLimitByBurst;
+    gctFLOAT ddrReadSustainedBw64BBurst;
+    gctFLOAT ddrReadSustainedBw128BBurst;
+    gctFLOAT ddrReadSustainedBw256BBurst;
+    gctFLOAT ddrMaskWriteSustainedBw64BBurst;
+    gctFLOAT ddrMaskWriteSustainedBw128BBurst;
+    gctFLOAT ddrMaskWriteSustainedBw256BBurst;
+    gctFLOAT ddrNonMaskWriteSustainedBw64BBurst;
+    gctFLOAT ddrNonMaskWriteSustainedBw128BBurst;
+    gctFLOAT ddrNonMaskWriteSustainedBw256BBurst;
+
 }
 vx_drv_option;
 

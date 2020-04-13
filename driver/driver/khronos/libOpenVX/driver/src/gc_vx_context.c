@@ -1108,6 +1108,69 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
         }
     }
 
+    /* get the DDR Burst information from env */
+    envctrl = gcvNULL;
+    globalData->options.specificDDRLimitByBurst = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_SPECIFIC_DDR_LIMIT_BYBURST", &envctrl)) && envctrl)
+    {
+        globalData->options.specificDDRLimitByBurst = atoi(envctrl);
+    }
+    /* DDR Burst detail value */
+    envctrl = gcvNULL;
+    globalData->options.ddrReadSustainedBw64BBurst = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DDR_READ_BW64B_BURST", &envctrl)) && envctrl)
+    {
+        globalData->options.ddrReadSustainedBw64BBurst = (gctFLOAT) atof(envctrl);
+    }
+    envctrl = gcvNULL;
+    globalData->options.ddrReadSustainedBw128BBurst = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DDR_READ_BW128B_BURST", &envctrl)) && envctrl)
+    {
+        globalData->options.ddrReadSustainedBw128BBurst = (gctFLOAT) atof(envctrl);
+    }
+    envctrl = gcvNULL;
+    globalData->options.ddrReadSustainedBw256BBurst = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DDR_READ_BW256B_BURST", &envctrl)) && envctrl)
+    {
+        globalData->options.ddrReadSustainedBw256BBurst = (gctFLOAT) atof(envctrl);
+    }
+    envctrl = gcvNULL;
+    globalData->options.ddrMaskWriteSustainedBw64BBurst = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DDR_MASKWRITE_BW64B_BURST", &envctrl)) && envctrl)
+    {
+        globalData->options.ddrMaskWriteSustainedBw64BBurst = (gctFLOAT) atof(envctrl);
+    }
+    envctrl = gcvNULL;
+    globalData->options.ddrMaskWriteSustainedBw128BBurst = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DDR_MASKWRITE_BW128B_BURST", &envctrl)) && envctrl)
+    {
+        globalData->options.ddrMaskWriteSustainedBw128BBurst = (gctFLOAT) atof(envctrl);
+    }
+    envctrl = gcvNULL;
+    globalData->options.ddrMaskWriteSustainedBw256BBurst = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DDR_MASKWRITE_BW256B_BURST", &envctrl)) && envctrl)
+    {
+        globalData->options.ddrMaskWriteSustainedBw256BBurst = (gctFLOAT) atof(envctrl);
+    }
+    envctrl = gcvNULL;
+    globalData->options.ddrNonMaskWriteSustainedBw64BBurst = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DDR_NON_MASKWRITE_BW64B_BURST", &envctrl)) && envctrl)
+    {
+        globalData->options.ddrNonMaskWriteSustainedBw64BBurst = (gctFLOAT) atof(envctrl);
+    }
+    envctrl = gcvNULL;
+    globalData->options.ddrNonMaskWriteSustainedBw128BBurst = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DDR_NON_MASKWRITE_BW128B_BURST", &envctrl)) && envctrl)
+    {
+        globalData->options.ddrNonMaskWriteSustainedBw128BBurst = (gctFLOAT) atof(envctrl);
+    }
+    envctrl = gcvNULL;
+    globalData->options.ddrNonMaskWriteSustainedBw256BBurst = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DDR_NON_MASKWRITE_BW256B_BURST", &envctrl)) && envctrl)
+    {
+        globalData->options.ddrNonMaskWriteSustainedBw256BBurst = (gctFLOAT) atof(envctrl);
+    }
+
     gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }

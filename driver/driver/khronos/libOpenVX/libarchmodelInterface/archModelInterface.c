@@ -31,6 +31,17 @@
 /*******************************************MARCO definition***************************************************/
 #define USE_NNPERF_EXPORT           /* Use NNPerf export functions or SW version */
 
+/*Solely for BRCM 2019July */
+#define  DEFAULT_DDR_READ_BW_IN_BYTE_PER_CYCLE_64B              2
+#define  DEFAULT_DDR_READ_BW_IN_BYTE_PER_CYCLE_128B             14.2
+#define  DEFAULT_DDR_READ_BW_IN_BYTE_PER_CYCLE_256B             14.7
+#define  DEFAULT_DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_64B         0.32
+#define  DEFAULT_DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_128B        1.8
+#define  DEFAULT_DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_256B        3.04
+#define  DEFAULT_DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_64B      1.28
+#define  DEFAULT_DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_128B     7.2
+#define  DEFAULT_DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_256B     12.16
+
 /****************************************** Local function declaration ***********************************************/
 static vx_bool_e isValidNN(vxnne_operation operation);
 static vx_bool_e isValidTP(vxnne_operation operation);
@@ -41,7 +52,7 @@ static void updateStreamLayer(vx_graph graph,archModelOpInfo **OpInfo);
 static archModelOpInfo ** archTransferParam(vx_graph graph,archNN_DATABASE_FEATURE *pArchDataFeature,vx_uint32 *totalCount);
 static archModelGraphInfo ** archTransferGraphInfo(vx_graph graph,vx_uint32 *totalCount);
 archnne_operator_type archGetLayerType(vx_char * name);
-static vx_status updateConfigration(archNN_DATABASE_FEATURE *pArchDataFeature,arch_nn_config *pArchNnConfig);
+static vx_status updateConfigration(archNN_DATABASE_FEATURE *pArchDataFeature,arch_nn_config *pArchNnConfig, vx_context context);
 static vx_status initConfigration(arch_nn_config *pArchNnConfig,arch_drv_option *pArchOptions,vx_context context);
 /***********************************************************************************
 * Function:        archGetLayerType
@@ -543,7 +554,7 @@ archModelGraphInfo ** archTransferGraphInfo(vx_graph graph, vx_uint32 *totalCoun
     initConfigration(pArchNnConfig,pArchOptions,context);
 
     /* Init data feature */
-    updateConfigration(&archDataFeature,pArchNnConfig);
+    updateConfigration(&archDataFeature,pArchNnConfig, context);
 
     /* Init graph info for arch model */
     graphInfo = initArchGraphInfo(maxCount);
@@ -1414,6 +1425,13 @@ static vx_status initConfigration(arch_nn_config *pArchNnConfig,arch_drv_option 
     return 0;
 }
 
+static arch_uint32 isZeroForFloat(arch_float32 value)
+{
+    if(value > -0.000000001 && value < 0.000000001)
+        return 1;
+    else
+        return 0;
+}
 
 /***********************************************************************************
 * Function:     updateConfigration
@@ -1424,9 +1442,9 @@ static vx_status initConfigration(arch_nn_config *pArchNnConfig,arch_drv_option 
 *               pArchNnConfig:    dependency
 * Ouput:        vx_status:       success or failed
 ***************************************************************************************/
-static vx_status updateConfigration(archNN_DATABASE_FEATURE *pArchDataFeature,arch_nn_config *pArchNnConfig)
+static vx_status updateConfigration(archNN_DATABASE_FEATURE *pArchDataFeature,arch_nn_config *pArchNnConfig, vx_context context)
 {
-    arch_uint32 isV8 = 0;
+    vx_drv_option *pContextOptions = &(context->options);
     pArchDataFeature->swtilingPhase1Enable = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1);
     pArchDataFeature->swtilingPhase2Enable = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE2);
     pArchDataFeature->swtilingPhase3Enable = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE3);
@@ -1473,28 +1491,43 @@ static vx_status updateConfigration(archNN_DATABASE_FEATURE *pArchDataFeature,ar
     /* for verify, set the flag */
     pArchDataFeature->nnTranspose = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_TRANSPOSE);
     pArchDataFeature->specificDDRLimitByBurst = 0;
-    /*  Only V8 support ddr burst*/
-    isV8 = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_XYDP0);
-    if(!isV8)
-    {
-        pArchDataFeature->specificDDRLimitByBurst = 0;
-    }
-    else
-    {
-        pArchDataFeature->specificDDRLimitByBurst = 1;
-    }
 
+    /* Please NOTE that the value set here is just for log output, the actual value setting is in gc_vx_nn_util.c */
     /* DDR sustained BW burst, these data should be get from App in the furture, hard code to 16 for now */
-    pArchDataFeature->ddrReadSustainedBw64BBurst = 16.0;
-    pArchDataFeature->ddrReadSustainedBw128BBurst = 16.0;
-    pArchDataFeature->ddrReadSustainedBw256BBurst = 16.0;
-    pArchDataFeature->ddrMaskWriteSustainedBw64BBurst = 16.0;
-    pArchDataFeature->ddrMaskWriteSustainedBw128BBurst = 16.0;
-    pArchDataFeature->ddrMaskWriteSustainedBw256BBurst = 16.0;
-    pArchDataFeature->ddrNonMaskWriteSustainedBw64BBurst = 16.0;
-    pArchDataFeature->ddrNonMaskWriteSustainedBw128BBurst = 16.0;
-    pArchDataFeature->ddrNonMaskWriteSustainedBw256BBurst = 16.0;
+    pArchDataFeature->specificDDRLimitByBurst = pContextOptions->specificDDRLimitByBurst;
 
+    /* Set default value */
+    pArchDataFeature->ddrReadSustainedBw64BBurst = (arch_float32)DEFAULT_DDR_READ_BW_IN_BYTE_PER_CYCLE_64B;
+    pArchDataFeature->ddrReadSustainedBw128BBurst = (arch_float32)DEFAULT_DDR_READ_BW_IN_BYTE_PER_CYCLE_128B;
+    pArchDataFeature->ddrReadSustainedBw256BBurst = (arch_float32)DEFAULT_DDR_READ_BW_IN_BYTE_PER_CYCLE_256B;
+    pArchDataFeature->ddrMaskWriteSustainedBw64BBurst = (arch_float32)DEFAULT_DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_64B;
+    pArchDataFeature->ddrMaskWriteSustainedBw128BBurst = (arch_float32)DEFAULT_DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_128B;
+    pArchDataFeature->ddrMaskWriteSustainedBw256BBurst = (arch_float32)DEFAULT_DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_256B;
+    pArchDataFeature->ddrNonMaskWriteSustainedBw64BBurst = (arch_float32)DEFAULT_DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_64B;
+    pArchDataFeature->ddrNonMaskWriteSustainedBw128BBurst = (arch_float32)DEFAULT_DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_128B;
+    pArchDataFeature->ddrNonMaskWriteSustainedBw256BBurst = (arch_float32)DEFAULT_DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_256B;
+
+    if(pArchDataFeature->specificDDRLimitByBurst == 1)
+    {
+        if(isZeroForFloat(pContextOptions->ddrReadSustainedBw64BBurst) == 0)
+            pArchDataFeature->ddrReadSustainedBw64BBurst = pContextOptions->ddrReadSustainedBw64BBurst;
+        if(isZeroForFloat(pContextOptions->ddrReadSustainedBw128BBurst) == 0)
+            pArchDataFeature->ddrReadSustainedBw128BBurst = pContextOptions->ddrReadSustainedBw128BBurst;
+        if(isZeroForFloat(pContextOptions->ddrReadSustainedBw256BBurst) == 0)
+            pArchDataFeature->ddrReadSustainedBw256BBurst = pContextOptions->ddrReadSustainedBw256BBurst;
+        if(isZeroForFloat(pContextOptions->ddrMaskWriteSustainedBw64BBurst) == 0)
+            pArchDataFeature->ddrMaskWriteSustainedBw64BBurst = pContextOptions->ddrMaskWriteSustainedBw64BBurst;
+        if(isZeroForFloat(pContextOptions->ddrMaskWriteSustainedBw128BBurst) == 0)
+            pArchDataFeature->ddrMaskWriteSustainedBw128BBurst = pContextOptions->ddrMaskWriteSustainedBw128BBurst;
+        if(isZeroForFloat(pContextOptions->ddrMaskWriteSustainedBw256BBurst) == 0)
+            pArchDataFeature->ddrMaskWriteSustainedBw256BBurst = pContextOptions->ddrMaskWriteSustainedBw256BBurst;
+        if(isZeroForFloat(pContextOptions->ddrNonMaskWriteSustainedBw64BBurst) == 0)
+            pArchDataFeature->ddrNonMaskWriteSustainedBw64BBurst = pContextOptions->ddrNonMaskWriteSustainedBw64BBurst;
+        if(isZeroForFloat(pContextOptions->ddrNonMaskWriteSustainedBw128BBurst) == 0)
+            pArchDataFeature->ddrNonMaskWriteSustainedBw128BBurst = pContextOptions->ddrNonMaskWriteSustainedBw128BBurst;
+        if(isZeroForFloat(pContextOptions->ddrNonMaskWriteSustainedBw256BBurst) == 0)
+            pArchDataFeature->ddrNonMaskWriteSustainedBw256BBurst =pContextOptions->ddrNonMaskWriteSustainedBw256BBurst;
+    }
     /* VIPSRAM ASYNC FIFO */
     pArchDataFeature->vipSramAsyncFifo = 0;             /* From Feature DB */
 
@@ -1914,7 +1947,7 @@ VX_INTERNAL_API vx_status archGraphPredictPerf(vx_graph graph)
     initConfigration(&archNNConfig, &archDrvOption, context);
 
     /* update configuration */
-    updateConfigration(&archDataFeature,&archNNConfig);
+    updateConfigration(&archDataFeature,&archNNConfig, context);
 
     /* get the chip information */
     gcoHAL_QueryChipIdentityEx(ARCH_NULL, sizeof(archHAL_CHIPIDENTITY),
@@ -2056,7 +2089,7 @@ VX_INTERNAL_API void archCalculateArchPerfFromTiling(
     initConfigration(pArchNnConfig, pArchOptions,context);
 
     /* Init data feature */
-    updateConfigration(&archDataFeature, pArchNnConfig);
+    updateConfigration(&archDataFeature, pArchNnConfig, context);
 
     axiSramOnlySWTiling = pArchNnConfig->unifiedFeature.axiSramOnlySWTiling ? arch_true_e : arch_false_e;
 
@@ -2248,7 +2281,7 @@ ARCH_INTERNAL_API void archCalculateArchPerfFromWB(
     memset(pArchOptions,0,sizeof(arch_drv_option));
     initConfigration(pArchNnConfig,pArchOptions,context);
     /* Init data feature */
-    updateConfigration(&archDataFeature,pArchNnConfig);
+    updateConfigration(&archDataFeature,pArchNnConfig, context);
 
     poolingSize = gcmMAX(1, pool_size);
     poolingStride = pool_size ? pool_stride : 1;
@@ -2457,7 +2490,7 @@ vx_status showDriverPerformance(
         memset(&archNNConfig,0,sizeof(arch_nn_config));
         memset(&archDrvOption,0,sizeof(arch_drv_option));
         initConfigration(&archNNConfig,&archDrvOption,context);
-        updateConfigration(&archDataFeature,&archNNConfig);
+        updateConfigration(&archDataFeature,&archNNConfig, context);
         /* get the chip information */
         gcoHAL_QueryChipIdentityEx(ARCH_NULL, sizeof(archHAL_CHIPIDENTITY),
                                (gcsHAL_CHIPIDENTITY *)&chipIdentity);

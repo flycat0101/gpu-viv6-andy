@@ -181,6 +181,7 @@ vx_status vxnneSaveDataExt(vx_type_e format, vx_enum quant_format, vx_int32 inde
 vx_int32 vxoNNExternsionConvlutionRound(vx_float32 in, vx_enum round_type);
 void reshuffleData(vx_nn_reshuffle_s *src, vx_uint32 strideStepX, vx_uint32 strideStepY, vx_nn_reshuffle_s *dst);
 void initUndefinedHardwareConfig(vx_global_data globalData);
+void initArchModelConfig(vx_global_data globalData, APM_IN_PARAM_T *pInParam);
 vx_bool WeightBiasBufferAllocate(vx_context context, vx_weights_biases_parameter weight_bias, vx_size size);
 void writeBits(uint32_t **buffer, vx_uint32 *bitOffset, vx_uint32 data, vx_uint32 dataBits);
 void replaceBits(uint32_t **buffer, vx_uint32 *bitOffset, vx_uint32 data, vx_uint32 dataBits);
