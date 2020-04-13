@@ -294,6 +294,8 @@ static int thermal_hot_pm_notify(struct notifier_block *nb, unsigned long event,
     static gctBOOL bAlreadyTooHot = gcvFALSE;
     gckHARDWARE hardware;
     gckGALDEVICE galDevice;
+    gctUINT FscaleVal = orgFscale;
+    gctUINT core = gcvCORE_MAJOR;
 
     galDevice = platform_get_drvdata(pdevice);
     if (!galDevice)
@@ -316,14 +318,19 @@ static int thermal_hot_pm_notify(struct notifier_block *nb, unsigned long event,
 
     if (event && !bAlreadyTooHot) {
         gckHARDWARE_GetFscaleValue(hardware,&orgFscale,&minFscale, &maxFscale);
-        gckHARDWARE_SetFscaleValue(hardware, minFscale, ~0U);
+        FscaleVal = minFscale;
         bAlreadyTooHot = gcvTRUE;
         printk("System is too hot. GPU3D will work at %d/64 clock.\n", minFscale);
     } else if (!event && bAlreadyTooHot) {
-        gckHARDWARE_SetFscaleValue(hardware, orgFscale, ~0U);
         printk("Hot alarm is canceled. GPU3D clock will return to %d/64\n", orgFscale);
         bAlreadyTooHot = gcvFALSE;
     }
+
+    while (galDevice->kernels[core] && core <= gcvCORE_3D_MAX)
+    {
+        gckHARDWARE_SetFscaleValue(galDevice->kernels[core++]->hardware, FscaleVal, ~0U);
+    }
+
     return NOTIFY_OK;
 }
 
@@ -355,17 +362,20 @@ static ssize_t gpu3DMinClock_store(struct device_driver *dev, const char *buf, s
     gctINT fields;
     gctUINT MinFscaleValue;
     gckGALDEVICE galDevice;
+    gctUINT core = gcvCORE_MAJOR;
 
     galDevice = platform_get_drvdata(pdevice);
+    if (!galDevice)
+         return -EINVAL;
 
-    if (galDevice->kernels[gcvCORE_MAJOR])
+    fields = sscanf(buf, "%d", &MinFscaleValue);
+
+    if (fields < 1)
+         return -EINVAL;
+
+    while (galDevice->kernels[core] && core <= gcvCORE_3D_MAX)
     {
-         fields = sscanf(buf, "%d", &MinFscaleValue);
-
-         if (fields < 1)
-             return -EINVAL;
-
-         gckHARDWARE_SetMinFscaleValue(galDevice->kernels[gcvCORE_MAJOR]->hardware,MinFscaleValue);
+         gckHARDWARE_SetMinFscaleValue(galDevice->kernels[core++]->hardware,MinFscaleValue);
     }
 
     return count;
