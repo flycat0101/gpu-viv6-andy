@@ -30,7 +30,7 @@
 #include "archModelInterface.h"
 #endif
 
-#if defined(__linux__)
+#if (defined(__linux__) && !defined(__ANDROID__) && !defined(__QNX__) && !defined(__APPLE__) && !defined(__CYGWIN__))
 #include <execinfo.h>
 #endif
 
@@ -536,6 +536,30 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSWRPN(
 }
 
 /****************SW Operation Implement End**********************/
+
+#if (defined(__linux__) && !defined(__ANDROID__) && !defined(__QNX__) && !defined(__APPLE__) && !defined(__CYGWIN__))
+VX_PRIVATE_API vx_status vxoBinaryGraph_BackTrace(void)
+{
+    void *buffer[256];
+    vx_char **string;
+    vx_uint32 num = 0, j = 0;
+
+    num = backtrace(buffer, 256);
+    string = backtrace_symbols(buffer, num);
+
+    if (string != VX_NULL)
+    {
+        vxError("%s backtrace return %d address\n", __FUNCTION__, num);
+        for (j = 0; j < num; j++)
+        {
+            vxInfo("%s\n", string[j]);
+        }
+        free(string);
+    }
+
+    return VX_SUCCESS;
+}
+#endif
 
 static void openReader(
     vx_binary_reader_s *reader,
@@ -4290,26 +4314,11 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_Write(
             {
                 vx_uint32 *dump = (vx_uint32*)buf;
 
-                #if defined(__linux__)
-                void *buffer[256];
-                vx_char **string;
-                vx_uint32 num = 0, j = 0;
-                vxError("find this data in NBG .. dump data, 0x%x, 0x%x, 0x%x. \n", dump[0], dump[1], dump[2]);
-                num = backtrace(buffer, 256);
-                string = backtrace_symbols(buffer, num);
-                if (string != VX_NULL)
-                {
-                    vxInfo("%s backtrace return %d address\n", __FUNCTION__, num);
-                    for (j = 0; j < num; j++)
-                    {
-                        vxInfo("%s\n", string[j]);
-                    }
-                    free(string);
-                }
-                #else
-                vxError("find this data in NBG .. dump data, 0x%x, 0x%x, 0x%x. \n", dump[0], dump[1], dump[2]);
+                #if (defined(__linux__) && !defined(__ANDROID__) && !defined(__QNX__) && !defined(__APPLE__) && !defined(__CYGWIN__))
+                vxoBinaryGraph_BackTrace();
                 #endif
 
+                vxError("find this data in NBG .. dump data, 0x%x, 0x%x, 0x%x. \n", dump[0], dump[1], dump[2]);
                 break;
             }
         }
@@ -5852,6 +5861,10 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveErrorHandle(
         {
             gcoOS_Remove(gcvNULL, binarySave->binaryFileName);
         }
+
+        #if (defined(__linux__) && !defined(__ANDROID__) && !defined(__QNX__) && !defined(__APPLE__) && !defined(__CYGWIN__))
+        vxoBinaryGraph_BackTrace();
+        #endif
     }
 
     return re_status;
