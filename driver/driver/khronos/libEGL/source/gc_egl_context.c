@@ -48,6 +48,12 @@ static const char * _driverDlls[] =
     "libGLESv2.dylib",                  /* OpenGL ES 2.0/3.x */
     "libOpenGL.dylib",                  /* OpenGL */
     "libOpenVG.dylib",                  /* OpenVG 1.0 */
+#elif defined(_WINDOWS)
+    "libEGL",                           /* EGL */
+    "libGLESv1_CM",                     /* OpenGL ES 1.1 Common */
+    "libGLESv2",                        /* OpenGL ES 2.0/3.x */
+    "libGL",                            /* OpenGL */
+    "libOpenVG",                        /* OpenVG 1.0 */
 #else
     "libEGL.so",                        /* EGL */
     "libGLESv1_CM.so",                  /* OpenGL ES 1.1 Common */
