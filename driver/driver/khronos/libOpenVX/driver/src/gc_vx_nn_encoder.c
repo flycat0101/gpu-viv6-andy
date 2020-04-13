@@ -12959,7 +12959,11 @@ vx_uint32 fillinKernelBufferV8Huffman(
 
                             }
 
-                            vxmASSERT(finded);
+                            if(!finded)
+                            {
+                                vxInfo("\n bestRunsSorted mismatch \n");
+                                vxmASSERT(finded);
+                            }
 
                             j = invSizeOrder[size];
                             while(k--){/*k of the runs*/
