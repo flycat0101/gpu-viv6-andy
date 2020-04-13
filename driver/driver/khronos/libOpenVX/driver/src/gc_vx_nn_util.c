@@ -5412,7 +5412,7 @@ void vxnneGetKernelPatternBits(vx_uint32 oneNum, vx_uint32 zeroNum, vx_uint64 *k
     *kernelPatternBitPtr = result;
 }
 
-vx_status vxo_insertHandel(vxnne_execution_layer   executionLayer)
+vx_status vxo_insertHandle(vxnne_execution_layer   executionLayer)
 {
 
 #define TP_INPUT_PHYSICAL_OFFSET    10
@@ -5425,7 +5425,7 @@ vx_status vxo_insertHandel(vxnne_execution_layer   executionLayer)
     if(executionLayer == VX_NULL)
         return vx_true_e;
 
-    for(j = 0; j< MAX_HANDEL; ++j)
+    for(j = 0; j< MAX_HANDLE; ++j)
     {
         executionLayer->swapHandle[j] = VX_NULL;
     }

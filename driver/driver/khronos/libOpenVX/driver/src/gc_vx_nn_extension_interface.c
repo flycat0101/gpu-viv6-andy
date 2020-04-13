@@ -1507,7 +1507,7 @@ vx_status vxnneExecutionLayer_GenerateCommands(vx_context context, vxnne_layer l
     }
 
         /*used by swap handel*/
-    vxo_insertHandel(executionLayer);
+    vxo_insertHandle(executionLayer);
 
     /* nn and tp have saved done, this is for saving SH reset current offset */
     if (executionLayer->graph->binarySave)
