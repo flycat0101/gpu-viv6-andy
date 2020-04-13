@@ -622,6 +622,250 @@ static gceSTATUS _CheckSurface(
 }
 #endif
 
+/*Resolve tilestatus buffer by a temp buffer*/
+gceSTATUS _ResolveTileStatus(
+    IN gco2D Engine,
+    IN gctUINT32 RectCount,
+    IN gcsRECT_PTR Rect)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcoSURF source;
+    gcoSURF origSrc = gcvNULL;
+    gcoSURF dest;
+    gcoSURF origDest = gcvNULL;
+    gcoSURF tempSurf = gcvNULL;
+    gcs2D_State *state;
+    gcs2D_State origState;
+    gcs2D_MULTI_SOURCE_PTR curSrc;
+    gcs2D_MULTI_SOURCE origCurSrc;
+
+    gcoOS_Allocate(gcvNULL,sizeof(state->dstSurface),(gctPOINTER *)(&origSrc));
+    gcoOS_Allocate(gcvNULL,sizeof(state->dstSurface),(gctPOINTER *)(&origDest));
+
+    state = &Engine->state;
+    source = &state->multiSrc[state->currentSrcIndex].srcSurface;
+    curSrc = &state->multiSrc[state->currentSrcIndex];
+    dest = &state->dstSurface;
+
+    gcoOS_MemCopy(origSrc, source, sizeof(state->dstSurface));
+    gcoOS_MemCopy(origDest, dest, sizeof(state->dstSurface));
+    gcoOS_MemCopy(&origCurSrc, curSrc, sizeof(gcs2D_MULTI_SOURCE));
+    gcoOS_MemCopy(&origState, state, sizeof(gcs2D_State));
+
+    gcmONERROR(gcoHARDWARE_Get2DTempSurface(
+            Engine->hardware,
+            source->alignedW,
+            source->alignedH,
+            source->format,
+            gcvSURF_BITMAP,
+            &tempSurf
+            ));
+
+    /* Blit/resolve src to temp surface*/
+    gcoOS_MemCopy(&state->dstSurface, tempSurf, sizeof(state->dstSurface));
+    curSrc->srcRect.right = tempSurf->alignedW;
+    curSrc->srcRect.bottom = tempSurf->alignedH;
+    curSrc->srcType = origCurSrc.srcType;
+    curSrc->clipRect.right = tempSurf->alignedW;
+    curSrc->clipRect.bottom = tempSurf->alignedH;
+    curSrc->srcSurface.rotation = gcvSURF_0_DEGREE;
+
+    /*init the dest information for tempsurface*/
+    state->dstColorKeyHigh = 0x0;
+    state->dstColorKeyLow = 0x0;
+    state->dstYUVMode = gcv2D_YUV_601;
+    gcoOS_MemCopy(&state->dstClipRect, &curSrc->clipRect, sizeof(gcsRECT));
+    state->dstEnGamma = 0;
+
+    gcmONERROR(gcoHARDWARE_Blit(
+        Engine->hardware,
+        &Engine->state,
+        0,
+        gcvNULL,
+        1,
+        &curSrc->srcRect
+        ));
+
+    /*Blit temp surface to dest*/
+    gcoOS_MemCopy(state, &origState, sizeof(gcs2D_State));
+    gcoOS_MemCopy(&curSrc->srcSurface, tempSurf, sizeof(state->dstSurface));
+    curSrc->srcSurface.rotation = origSrc->rotation;
+    gcoOS_MemCopy(&Engine->state.dstSurface, origDest, sizeof(state->dstSurface));
+
+    gcmONERROR(gcoHARDWARE_Blit(
+        Engine->hardware,
+        &Engine->state,
+        0,
+        gcvNULL,
+        RectCount,
+        Rect
+        ));
+    gcmONERROR(gco2D_Commit(Engine,gcvTRUE));
+
+    /*restore state*/
+    gcoOS_MemCopy(state, &origState, sizeof(gcs2D_State));
+
+OnError:
+    gcoHARDWARE_Put2DTempSurface(Engine->hardware,tempSurf);
+    gcoOS_Free(gcvNULL, origSrc);
+    gcoOS_Free(gcvNULL, origDest);
+
+    return status;
+}
+
+gceSTATUS _ResolveTileStatusFilter(
+    IN gcoHARDWARE Hardware,
+    IN gcs2D_State_PTR State,
+    IN gcoSURF SrcSurface,
+    IN gcoSURF DstSurface,
+    IN gcsRECT_PTR SrcRect,
+    IN gcsRECT_PTR DstRect,
+    IN gcsRECT_PTR DstSubRect)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcoSURF OrigSrc = gcvNULL;
+    gcoSURF OrigDest = gcvNULL;
+    gcoSURF  tempSurf = gcvNULL;
+    gcs2D_State OrigState;
+    gcs2D_MULTI_SOURCE_PTR pCurSrc;
+    gcs2D_MULTI_SOURCE OrigCurSrc;
+
+    gcoOS_Allocate(gcvNULL,sizeof(State->dstSurface),(gctPOINTER *)(&OrigSrc));
+    gcoOS_Allocate(gcvNULL,sizeof(State->dstSurface),(gctPOINTER *)(&OrigDest));
+
+    pCurSrc = &State->multiSrc[State->currentSrcIndex];
+
+    /* Backup the original settings*/
+    gcoOS_MemCopy(OrigSrc, SrcSurface, sizeof(State->dstSurface));
+    gcoOS_MemCopy(OrigDest, DstSurface, sizeof(State->dstSurface));
+    gcoOS_MemCopy(&OrigCurSrc, pCurSrc, sizeof(gcs2D_MULTI_SOURCE));
+    gcoOS_MemCopy(&OrigState, State, sizeof(gcs2D_State));
+
+    gcmONERROR(gcoHARDWARE_Get2DTempSurface(
+        Hardware,
+        SrcSurface->alignedW,
+        SrcSurface->alignedH,
+        SrcSurface->format,
+        gcvSURF_BITMAP,
+        &tempSurf
+        ));
+
+    /*Blit src to temp surface*/
+    gcoOS_MemCopy(&State->dstSurface, tempSurf, sizeof(State->dstSurface));
+    pCurSrc->srcRect.right = tempSurf->alignedW;
+    pCurSrc->srcRect.bottom = tempSurf->alignedH;
+    pCurSrc->srcType = gcv2D_SOURCE_COLOR;
+    pCurSrc->clipRect.right = tempSurf->alignedW;
+    pCurSrc->clipRect.bottom = tempSurf->alignedH;
+    pCurSrc->srcSurface.rotation = gcvSURF_0_DEGREE;
+    pCurSrc->bgRop = 0xCC;
+    pCurSrc->fgRop = 0xCC;
+
+    /*init the dest information for tempsurface*/
+    State->dstColorKeyHigh = 0x0;
+    State->dstColorKeyLow = 0x0;
+    State->dstYUVMode = gcv2D_YUV_601;
+    gcoOS_MemCopy(&State->dstClipRect, &pCurSrc->clipRect, sizeof(gcsRECT));
+    State->dstEnGamma = 0;
+
+
+    gcmONERROR(gcoHARDWARE_Blit(
+        Hardware,
+        State,
+        0,
+        gcvNULL,
+        1,
+        &pCurSrc->clipRect
+        ));
+
+    /*FilterBlit tempsurface to Dest*/
+    gcoOS_MemCopy(State, &OrigState, sizeof(gcs2D_State));
+    tempSurf->orientation = OrigSrc->rotation;
+    gcoOS_MemCopy(&OrigCurSrc.srcSurface, tempSurf, sizeof(State->dstSurface));
+    gcoOS_MemCopy(DstSurface, OrigDest, sizeof(State->dstSurface));
+    gcmONERROR(gcoHARDWARE_FilterBlit(
+        Hardware,
+        State,
+        tempSurf,
+        DstSurface,
+        SrcRect,
+        DstRect,
+        DstSubRect
+        ));
+
+    gcmONERROR(gcoHARDWARE_Commit(Hardware));
+    gcmONERROR(gcoHARDWARE_Stall(Hardware));
+
+    /*restore state*/
+    gcoOS_MemCopy(State, &OrigState, sizeof(gcs2D_State));
+
+OnError:
+    gcoHARDWARE_Put2DTempSurface(Hardware,tempSurf);
+    gcoOS_Free(gcvNULL, OrigSrc);
+    gcoOS_Free(gcvNULL, OrigDest);
+    return status;
+}
+
+gceSTATUS
+_ResolveTileStatusWithRotation(
+    IN gco2D Engine,
+    IN gctUINT32 RectCount,
+    IN gcsRECT_PTR Rect)
+{
+    gcoSURF source;
+    gcoSURF dest;
+
+    if(!Engine)
+        return gcvSTATUS_INVALID_ARGUMENT;
+    source = &Engine->state.multiSrc[Engine->state.currentSrcIndex].srcSurface;
+    dest   = &Engine->state.dstSurface;
+    if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_FAST_CLEAR) &&
+        source->tileStatusConfig == gcv2D_TSC_ENABLE &&
+        ((source->rotation != gcvSURF_0_DEGREE && source->rotation != gcvSURF_180_DEGREE) ||
+         (dest->rotation != gcvSURF_0_DEGREE && dest->rotation != gcvSURF_180_DEGREE)))
+    {
+        return _ResolveTileStatus(Engine, RectCount, Rect);
+    } else
+    {
+        /*No need resolve*/
+        return gcvSTATUS_TRUE;
+    }
+}
+
+gceSTATUS
+_ResolveTileStatusWithFilter(
+    IN gcoHARDWARE Hardware,
+    IN gcs2D_State_PTR State,
+    IN gcoSURF SrcSurface,
+    IN gcoSURF DstSurface,
+    IN gcsRECT_PTR SrcRect,
+    IN gcsRECT_PTR DstRect,
+    IN gcsRECT_PTR DstSubRect)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmGETHARDWARE(Hardware);
+    if(!Hardware)
+        return gcvSTATUS_INVALID_ARGUMENT;
+    if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_FAST_CLEAR) &&
+        SrcSurface->tileStatusConfig == gcv2D_TSC_ENABLE)
+    {
+        status =  _ResolveTileStatusFilter(Hardware,
+            State,
+            SrcSurface,
+            DstSurface,
+            SrcRect,
+            DstRect,
+            DstSubRect);
+    } else
+    {
+        /*No need  resolve*/
+        return gcvSTATUS_TRUE;
+    }
+OnError:
+    return status;
+}
+
+
 /*******************************************************************************
 **
 **  gco2D_Construct
@@ -3454,14 +3698,18 @@ gco2D_Blit(
 
     Engine->state.dstSurface.format = DstFormat;
 
-    gcmONERROR(gcoHARDWARE_Blit(
-        Engine->hardware,
-        &Engine->state,
-        0,
-        gcvNULL,
-        RectCount,
-        Rect
-        ));
+    status = _ResolveTileStatusWithRotation(Engine, RectCount,Rect);
+    if(gcvSTATUS_OK != status)
+    {
+        gcmONERROR(gcoHARDWARE_Blit(
+            Engine->hardware,
+            &Engine->state,
+            0,
+            gcvNULL,
+            RectCount,
+            Rect
+            ));
+    }
 
 OnError:
     /* Return status. */
@@ -4422,15 +4670,27 @@ gco2D_FilterBlitEx(
 
     if (status != gcvSTATUS_OK)
     {
-        status = gcoHARDWARE_FilterBlit(
+        status =  _ResolveTileStatusWithFilter(
             Engine->hardware,
             &Engine->state,
             srcSurface,
             destSurface,
             SrcRect,
             DstRect,
-            DstSubRect
-            );
+            DstSubRect);
+
+        if(gcvSTATUS_OK!= status)
+        {
+            status = gcoHARDWARE_FilterBlit(
+                Engine->hardware,
+                &Engine->state,
+                srcSurface,
+                destSurface,
+                SrcRect,
+                DstRect,
+                DstSubRect
+                );
+        }
     }
 
 OnError:
@@ -4774,15 +5034,27 @@ gco2D_FilterBlitEx2(
 
         if (status != gcvSTATUS_OK)
         {
-            status = gcoHARDWARE_FilterBlit(
+            status =  _ResolveTileStatusWithFilter(
                 Engine->hardware,
                 &Engine->state,
                 srcSurface,
                 destSurface,
                 SrcRect,
                 DstRect,
-                DstSubRect
-                );
+                DstSubRect);
+
+            if(gcvSTATUS_OK!= status)
+            {
+                status = gcoHARDWARE_FilterBlit(
+                    Engine->hardware,
+                    &Engine->state,
+                    srcSurface,
+                    destSurface,
+                    SrcRect,
+                    DstRect,
+                    DstSubRect
+                    );
+            }
         }
     }
 
