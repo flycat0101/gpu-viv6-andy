@@ -706,6 +706,13 @@ static void __vki_InitializePhysicalDeviceFeatures(
     phyDev->phyDevFeatures.sparseResidency16Samples                = VK_FALSE;
     phyDev->phyDevFeatures.sparseResidencyAliased                  = VK_FALSE;
     phyDev->phyDevFeatures.variableMultisampleRate                 = VK_FALSE;
+
+    if (phyDevConfig->chipModel == gcv7000 &&
+        (phyDevConfig->chipRevision == 0x6204 ||
+        phyDevConfig->chipRevision == 0x6203))
+    {
+        phyDev->phyDevFeatures.samplerAnisotropy = VK_TRUE;
+    }
 }
 
 static void __vki_InitializePhysicalDeviceName(
