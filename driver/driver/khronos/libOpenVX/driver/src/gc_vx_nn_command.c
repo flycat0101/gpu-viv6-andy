@@ -244,6 +244,7 @@ VX_PRIVATE_API vx_status fillBF16ActivateReluLUT(vx_uint32 *pwlLUTBaseEx, vx_uin
     vx_float32 m_out_of_max_range_slope;
     vx_float32 m_out_of_min_range_slope;
     vx_float32 scale = 0.0;
+    vx_uint32 baseBF16 = 0x400;
 
 
     for(base = 0; base < 0x400; base++)
@@ -279,11 +280,8 @@ VX_PRIVATE_API vx_status fillBF16ActivateReluLUT(vx_uint32 *pwlLUTBaseEx, vx_uin
     m_out_of_max_range_slope = 1;
     m_out_of_min_range_slope = scale;
 
-    pwlLUTBaseEx[0x400 + 0] = (*(vx_uint32 *)&m_out_of_max_range_slope) >> 8;
-    pwlLUTBaseEx[0x400 + 1] = (*(vx_uint32 *)&m_out_of_min_range_slope) >> 8;
-    pwlLUTBaseEx[0x400 + 2] = expBits;
-    pwlLUTBaseEx[0x400 + 3] = 0;
-
+    pwlLUTBaseEx[baseBF16 + 0] = ((*(vx_uint32 *)&m_out_of_max_range_slope) >> 8 | expBits << 24) & (0xFFFFFFF);
+    pwlLUTBaseEx[baseBF16 + 1] = ((*(vx_uint32 *)&m_out_of_min_range_slope) >> 8) & 0xFFFFFF;
 
     return VX_SUCCESS;
 }
@@ -331,11 +329,8 @@ VX_PRIVATE_API vx_status fillBF16LeakyReluLUT(vx_uint32 *pwlLUTBaseEx, vx_uint32
     m_out_of_max_range_slope = 1;
     m_out_of_min_range_slope = scale;
 
-    pwlLUTBaseEx[baseBF16 + 0] = (*(vx_uint32 *)&m_out_of_max_range_slope) >> 8;
-    pwlLUTBaseEx[baseBF16 + 1] = (*(vx_uint32 *)&m_out_of_min_range_slope) >> 8;
-    pwlLUTBaseEx[baseBF16 + 2] = expBits;
-    pwlLUTBaseEx[baseBF16 + 3] = 0;
-
+    pwlLUTBaseEx[baseBF16 + 0] = ((*(vx_uint32 *)&m_out_of_max_range_slope) >> 8 | expBits << 24) & (0xFFFFFFF);
+    pwlLUTBaseEx[baseBF16 + 1] = ((*(vx_uint32 *)&m_out_of_min_range_slope) >> 8) & 0xFFFFFF;
 
     return VX_SUCCESS;
 }
@@ -383,10 +378,8 @@ VX_PRIVATE_API vx_status  fillBF16ActivateRelu1LUT(vx_uint32 *pwlLUTBaseEx, vx_u
     m_out_of_max_range_slope = 0.0f;
     m_out_of_min_range_slope = 0.0f;
 
-    pwlLUTBaseEx[baseBF16 + 0] = (*(vx_uint32 *)&m_out_of_max_range_slope) >> 8;
-    pwlLUTBaseEx[baseBF16 + 1] = (*(vx_uint32 *)&m_out_of_min_range_slope) >> 8;
-    pwlLUTBaseEx[baseBF16 + 2] = expBits;
-    pwlLUTBaseEx[baseBF16 + 3] = 0;
+    pwlLUTBaseEx[baseBF16 + 0] = ((*(vx_uint32 *)&m_out_of_max_range_slope) >> 8 | expBits << 24) & (0xFFFFFFF);
+    pwlLUTBaseEx[baseBF16 + 1] = ((*(vx_uint32 *)&m_out_of_min_range_slope) >> 8) & 0xFFFFFF;
 
 
     return VX_SUCCESS;
@@ -400,6 +393,7 @@ VX_PRIVATE_API vx_status  fillBF16ActivateRelu6LUT(vx_uint32 *pwlLUTBaseEx, vx_u
     vx_float32  pwlValue;
     vx_float32 m_out_of_max_range_slope;
     vx_float32 m_out_of_min_range_slope;
+    vx_uint32 baseBF16 = 0x400;
 
     for(base = 0; base < 0x400; base++)
     {
@@ -444,10 +438,8 @@ VX_PRIVATE_API vx_status  fillBF16ActivateRelu6LUT(vx_uint32 *pwlLUTBaseEx, vx_u
     m_out_of_max_range_slope = 0;
     m_out_of_min_range_slope = 0;
 
-    pwlLUTBaseEx[0x400 + 0] = (*(vx_uint32 *)&m_out_of_max_range_slope) >> 8;
-    pwlLUTBaseEx[0x400 + 1] = (*(vx_uint32 *)&m_out_of_min_range_slope) >> 8;
-    pwlLUTBaseEx[0x400 + 2] = expBits;
-    pwlLUTBaseEx[0x400 + 3] = 0;
+    pwlLUTBaseEx[baseBF16 + 0] = ((*(vx_uint32 *)&m_out_of_max_range_slope) >> 8 | expBits << 24) & (0xFFFFFFF);
+    pwlLUTBaseEx[baseBF16 + 1] = ((*(vx_uint32 *)&m_out_of_min_range_slope) >> 8) & 0xFFFFFF;
 
     return VX_SUCCESS;
 }
@@ -527,10 +519,8 @@ VX_PRIVATE_API vx_status  fillBF16ActivateLogisticLUT(vx_uint32 *pwlLUTBaseEx, v
 
     }
 
-    pwlLUTBaseEx[baseBF16 + 0] = (*(vx_uint32 *)&m_out_of_max_range_slope) >> 8;
-    pwlLUTBaseEx[baseBF16 + 1] = (*(vx_uint32 *)&m_out_of_min_range_slope) >> 8;
-    pwlLUTBaseEx[baseBF16 + 2] = expBits;
-    pwlLUTBaseEx[baseBF16 + 3] = 0;
+    pwlLUTBaseEx[baseBF16 + 0] = ((*(vx_uint32 *)&m_out_of_max_range_slope) >> 8 | expBits << 24) & (0xFFFFFFF);
+    pwlLUTBaseEx[baseBF16 + 1] = ((*(vx_uint32 *)&m_out_of_min_range_slope) >> 8) & 0xFFFFFF;
 
     return VX_SUCCESS;
 }
@@ -588,10 +578,8 @@ VX_PRIVATE_API vx_status  fillBF16ActivateHyperbolicTanLUT(vx_uint32 *pwlLUTBase
             m_out_of_min_range_slope = (vx_float32)(scaleOut * (1.0f - pow(gcoMATH_TangentH(baseF32 * scaleIn), 2)));
     }
 
-    pwlLUTBaseEx[baseBF16 + 0] = (*(vx_uint32 *)&m_out_of_max_range_slope) >> 8;
-    pwlLUTBaseEx[baseBF16 + 1] = (*(vx_uint32 *)&m_out_of_min_range_slope) >> 8;
-    pwlLUTBaseEx[baseBF16 + 2] = expBits;
-    pwlLUTBaseEx[baseBF16 + 3] = 0;
+    pwlLUTBaseEx[baseBF16 + 0] = ((*(vx_uint32 *)&m_out_of_max_range_slope) >> 8 | expBits << 24) & (0xFFFFFFF);
+    pwlLUTBaseEx[baseBF16 + 1] = ((*(vx_uint32 *)&m_out_of_min_range_slope) >> 8) & 0xFFFFFF;
 
    return VX_SUCCESS;
 }
@@ -648,10 +636,8 @@ VX_PRIVATE_API vx_status  fillBF16LRNLUT(vx_uint32 *pwlLUTBaseEx, vx_uint32 expB
             m_out_of_min_range_slope = -1.0f * (beta * alpha* u8Scale * u8Scale * (vx_float32)preShiftValue / ks) / (vx_float32)pow(tempValue, beta + 1);
     }
 
-    pwlLUTBaseEx[baseBF16 + 0] = (*(vx_uint32 *)&m_out_of_max_range_slope) >> 8;
-    pwlLUTBaseEx[baseBF16 + 1] = (*(vx_uint32 *)&m_out_of_min_range_slope) >> 8;
-    pwlLUTBaseEx[baseBF16 + 2] = expBits;
-    pwlLUTBaseEx[baseBF16 + 3] = 0;
+    pwlLUTBaseEx[baseBF16 + 0] = ((*(vx_uint32 *)&m_out_of_max_range_slope) >> 8 | expBits << 24) & (0xFFFFFFF);
+    pwlLUTBaseEx[baseBF16 + 1] = ((*(vx_uint32 *)&m_out_of_min_range_slope) >> 8) & 0xFFFFFF;
 
     return VX_SUCCESS;
 }
@@ -743,7 +729,7 @@ VX_PRIVATE_API vx_float64 maxErrorLUT(vx_uint32 * pwlLUTBaseEx, vx_uint32 expBit
                     minMaxBaseF24 = baseF24;
                 else
                     minMaxBaseF24 = (((baseF24 >> 15 ) & 0xFF) + 1) << 15 | (baseF24 & 0x807FFF);
-                predictValue = SE8M12toFp32(pwlLUTBaseEx[maxAbsLUTinput]) + SE8M15toFp32(pwlLUTBaseEx[0x400]) * (SE8M15toFp32(minMaxBaseF24) - SE8M15toFp32(baseF24));
+                predictValue = SE8M12toFp32(pwlLUTBaseEx[maxAbsLUTinput]) + SE8M15toFp32(pwlLUTBaseEx[0x400] & 0xFFFFFF) * (SE8M15toFp32(minMaxBaseF24) - SE8M15toFp32(baseF24));
             }
             if(base == minAbsLUTinput)
             {
@@ -6483,20 +6469,20 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             vx_uint32 expBits;
                             vx_float64 maxError0 = 0, maxError1 = 1024 * 1024 * 1024;
-                            vx_uint32 *pwlLUTBase0 = (vx_uint32 *)vxAllocate((0x400 + 4) * sizeof(vx_uint32));
-                            vx_uint32 *pwlLUTBase1 = (vx_uint32 *)vxAllocate((0x400 + 4) * sizeof(vx_uint32));
+                            vx_uint32 *pwlLUTBase0 = (vx_uint32 *)vxAllocate((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32));
+                            vx_uint32 *pwlLUTBase1 = (vx_uint32 *)vxAllocate((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32));
                             vx_uint16 selBase = 0;
                             for(expBits = 4; expBits <= 8; expBits++) /*SE8M12 fromat*/
                             {
                                 if(selBase)
                                 {
-                                    memset(pwlLUTBase1, 0, ((0x400 + 4) * sizeof(vx_uint32)));
+                                    memset(pwlLUTBase1, 0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
                                     fillBF16ActivateLogisticLUT(pwlLUTBase1, expBits, u8Scale, vx_true_e, inFormat);
                                     maxError1 = maxErrorLUT(pwlLUTBase1, expBits, VX_NN_ACTIVATION_LOGISTIC, u8Scale, vx_true_e, VX_NULL, 0);
                                 }
                                 else
                                 {
-                                    memset(pwlLUTBase0, 0, ((0x400 + 4) * sizeof(vx_uint32)));
+                                    memset(pwlLUTBase0, 0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
                                     fillBF16ActivateLogisticLUT(pwlLUTBase0, expBits, u8Scale, vx_true_e, inFormat);
                                     maxError0 = maxErrorLUT(pwlLUTBase0, expBits, VX_NN_ACTIVATION_LOGISTIC, u8Scale, vx_true_e, VX_NULL, 0);
                                 }
@@ -6513,9 +6499,9 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                                     selBase = 1;
                             }
                             if(selBase)
-                                memcpy(pwlLUTBaseEx, pwlLUTBase0, ((0x400 + 4) * sizeof(vx_uint32)));
+                                memcpy(pwlLUTBaseEx, pwlLUTBase0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
                             else
-                                memcpy(pwlLUTBaseEx, pwlLUTBase1, ((0x400 + 4) * sizeof(vx_uint32)));
+                                memcpy(pwlLUTBaseEx, pwlLUTBase1, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
 
                             vxFree(pwlLUTBase0);
                             vxFree(pwlLUTBase1);
@@ -6600,20 +6586,20 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                             {
                                 vx_uint32 expBits;
                                 vx_float64 maxError0 = 1024, maxError1 = 1024;
-                                vx_uint32 *pwlLUTBase0 = (vx_uint32 *)vxAllocate((0x400 + 4) * sizeof(vx_uint32));
-                                vx_uint32 *pwlLUTBase1 = (vx_uint32 *)vxAllocate((0x400 + 4) * sizeof(vx_uint32));
+                                vx_uint32 *pwlLUTBase0 = (vx_uint32 *)vxAllocate((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32));
+                                vx_uint32 *pwlLUTBase1 = (vx_uint32 *)vxAllocate((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32));
                                 vx_uint16 selBase = 0;
                                 for(expBits = 5; expBits <= 8; expBits++) /*SE8M12 fromat*/
                                 {
                                     if(selBase)
                                     {
-                                        memset(pwlLUTBase1, 0, ((0x400 + 4) * sizeof(vx_uint32)));
+                                        memset(pwlLUTBase1, 0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
                                         fillBF16ActivateHyperbolicTanLUT(pwlLUTBase1, expBits, scaleIn, scaleOut, vx_false_e, inFormat);
                                         maxError1 = maxErrorLUT(pwlLUTBase1, expBits, VX_NN_ACTIVATION_HYPERBOLIC_TAN, u8Scale, vx_false_e, value_cmd_ptr, 0);
                                     }
                                     else
                                     {
-                                        memset(pwlLUTBase0, 0, ((0x400 + 4) * sizeof(vx_uint32)));
+                                        memset(pwlLUTBase0, 0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
                                         fillBF16ActivateHyperbolicTanLUT(pwlLUTBase0, expBits, scaleIn, scaleOut, vx_false_e, inFormat);
                                         maxError0 = maxErrorLUT(pwlLUTBase0, expBits, VX_NN_ACTIVATION_HYPERBOLIC_TAN, u8Scale, vx_false_e, value_cmd_ptr, 0);
                                     }
@@ -6631,9 +6617,9 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                                         selBase = 1;
                                 }
                                 if(selBase)
-                                    memcpy(pwlLUTBaseEx, pwlLUTBase0, ((0x400 + 4) * sizeof(vx_uint32)));
+                                    memcpy(pwlLUTBaseEx, pwlLUTBase0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
                                 else
-                                    memcpy(pwlLUTBaseEx, pwlLUTBase1, ((0x400 + 4) * sizeof(vx_uint32)));
+                                    memcpy(pwlLUTBaseEx, pwlLUTBase1, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
 
                                 vxFree(pwlLUTBase0);
                                 vxFree(pwlLUTBase1);
@@ -6758,26 +6744,26 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                 {
                     vx_uint32 expBits;
                     vx_float64 maxError0 = 1024, maxError1 = 1024;
-                    vx_uint32 *pwlLUTBase0 = (vx_uint32 *)vxAllocate((0x400 + 4) * sizeof(vx_uint32));
-                    vx_uint32 *pwlLUTBase1 = (vx_uint32 *)vxAllocate((0x400 + 4) * sizeof(vx_uint32));
+                    vx_uint32 *pwlLUTBase0 = (vx_uint32 *)vxAllocate((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32));
+                    vx_uint32 *pwlLUTBase1 = (vx_uint32 *)vxAllocate((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32));
                     vx_uint16 selBase = 0;
                     for(expBits = 5; expBits <= 8; expBits++) /*SE8M12 fromat*/
                     {
                         if(selBase)
                         {
-                            memset(pwlLUTBase1, 0, ((0x400 + 4) * sizeof(vx_uint32)));
+                            memset(pwlLUTBase1, 0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
                             fillBF16LRNLUT(pwlLUTBase1, expBits, u8Scale, value_cmd_ptr, preShiftValue, vx_false_e, inFormat);
                             maxError1 = maxErrorLUT(pwlLUTBase1, expBits, TP_LRN, u8Scale, vx_false_e, value_cmd_ptr, preShiftValue);
                         }
                         else
                         {
-                            memset(pwlLUTBase0, 0, ((0x400 + 4) * sizeof(vx_uint32)));
+                            memset(pwlLUTBase0, 0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
                             fillBF16LRNLUT(pwlLUTBase0, expBits, u8Scale, value_cmd_ptr, preShiftValue, vx_false_e, inFormat);
                             maxError0 = maxErrorLUT(pwlLUTBase0, expBits, TP_LRN, u8Scale, vx_false_e, value_cmd_ptr, preShiftValue);
                         }
                         if(maxError0 == maxError1)
                         {
-                            if(pwlLUTBase0[0x402] >= pwlLUTBase1[0x402])
+                            if(((pwlLUTBase0[0x400] >> 24) & 0xF) >= ((pwlLUTBase1[0x400] >> 24) & 0xF))
                                 selBase = 0;
                             else
                                 selBase = 1;
@@ -6788,9 +6774,9 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                             selBase = 1;
                     }
                     if(selBase)
-                        memcpy(pwlLUTBaseEx, pwlLUTBase0, ((0x400 + 4) * sizeof(vx_uint32)));
+                        memcpy(pwlLUTBaseEx, pwlLUTBase0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
                     else
-                        memcpy(pwlLUTBaseEx, pwlLUTBase1, ((0x400 + 4) * sizeof(vx_uint32)));
+                        memcpy(pwlLUTBaseEx, pwlLUTBase1, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
 
                     vxFree(pwlLUTBase0);
                     vxFree(pwlLUTBase1);
