@@ -489,7 +489,26 @@ clNewVariable(
     IN clsARRAY  *Array,
     IN gctBOOL   IsArray,
     IN gctREG_INDEX TempRegIndex,
-    OUT gcVARIABLE *Variable
+    OUT gcVARIABLE *Variable,
+    IN gctINT16 parent,
+    IN gctINT16 prevSibling,
+    OUT gctINT16* ThisVarIndex
+    );
+
+gceSTATUS
+clNewStructIntermediateElementSymbol(
+    IN cloCOMPILER Compiler,
+    IN gctCONST_STRING Name,
+    IN clsGEN_CODE_DATA_TYPE DataType,
+    IN gctSIZE_T Length,
+    IN clsARRAY *Array,
+    IN gctBOOL   IsArray,
+    IN gctREG_INDEX TempRegIndex,
+    IN gcSHADER_VAR_CATEGORY varCategory,
+    IN gctUINT16 numStructureElement,
+    IN gctINT16 parent,
+    IN gctINT16 prevSibling,
+    OUT gctINT16* ThisVarIndex
     );
 
 gctTYPE_QUALIFIER

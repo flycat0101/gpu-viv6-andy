@@ -2332,6 +2332,9 @@ _GenSinCode(
                        gcvNULL,
                        gcvTRUE,
                        tempRegIndex,
+                       gcvNULL,
+                       -1,
+                       -1,
                        gcvNULL);
     for(i = 0; i<7; i++){
         clsIOPERAND_Initialize(Compiler, &intermIOperands[20+i], clmGenCodeDataType(T_UINT), tempRegIndex + (gctREG_INDEX)i);
@@ -4453,6 +4456,9 @@ _GenCosCode(
                        gcvNULL,
                        gcvTRUE,
                        tempRegIndex,
+                       gcvNULL,
+                       -1,
+                       -1,
                        gcvNULL);
     for(i = 0; i<7; i++){
         clsIOPERAND_Initialize(Compiler, &intermIOperands[20+i], clmGenCodeDataType(T_UINT), tempRegIndex + (gctREG_INDEX)i);
@@ -6581,6 +6587,9 @@ _GenSinCosCode(
                        gcvNULL,
                        gcvTRUE,
                        tempRegIndex,
+                       gcvNULL,
+                       -1,
+                       -1,
                        gcvNULL);
     for(i = 0; i<7; i++){
         clsIOPERAND_Initialize(Compiler, &intermIOperands[20+i], clmGenCodeDataType(T_UINT), tempRegIndex + (gctREG_INDEX)i);
@@ -8369,6 +8378,9 @@ _GenTanCode(
                        gcvNULL,
                        gcvTRUE,
                        tempRegIndex,
+                       gcvNULL,
+                       -1,
+                       -1,
                        gcvNULL);
     for(i = 0; i<7; i++){
         clsIOPERAND_Initialize(Compiler, &intermIOperands[20+i], clmGenCodeDataType(T_UINT), tempRegIndex + (gctREG_INDEX)i);
