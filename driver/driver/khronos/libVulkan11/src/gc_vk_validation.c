@@ -303,7 +303,9 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceFormatProperties(VkPhysicalD
         result = __VK_ERROR_INVALID_HANDLE;
         goto vk_Exit;
     }
-    if (format > VK_FORMAT_END_RANGE)
+    if (format > VK_FORMAT_END_RANGE &&
+        !(format >= VK_FORMAT_YCBCR_START &&
+        format <= VK_FROMAT_YCBCR_END))
     {
         result = __VK_ERROR_INVALID_FORMAT;
         goto vk_Exit;
@@ -333,7 +335,9 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceImageFormatProperties(Vk
         result = __VK_ERROR_INVALID_HANDLE;
         goto vk_Exit;
     }
-    if (format > VK_FORMAT_END_RANGE)
+    if (format > VK_FORMAT_END_RANGE &&
+        !(format >= VK_FORMAT_YCBCR_START &&
+        format <= VK_FROMAT_YCBCR_END))
     {
         result = __VK_ERROR_INVALID_FORMAT;
         goto vk_Exit;
@@ -1344,7 +1348,9 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceSparseImageFormatProperties(
         result = __VK_ERROR_INVALID_HANDLE;
         goto vk_Exit;
     }
-    if (format > VK_FORMAT_END_RANGE)
+    if (format > VK_FORMAT_END_RANGE &&
+        !(format >= VK_FORMAT_YCBCR_START &&
+        format <= VK_FROMAT_YCBCR_END))
     {
         result = __VK_ERROR_INVALID_FORMAT;
         goto vk_Exit;
