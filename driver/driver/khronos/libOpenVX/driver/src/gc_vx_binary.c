@@ -6422,6 +6422,38 @@ VX_PRIVATE_API vx_uint32 vxoBinaryGraph_SaveScalarToLayerParamTable(
     return index;
 }
 
+
+VX_PRIVATE_API vx_uint32 vxoBinaryGraph_SaveArrayToLayerParamTable(
+    vx_graph graph,
+    vxnne_operation operation,
+    vx_array array,
+    vx_char *paramName
+    )
+{
+    vx_binary_layer_parameter_s layerParam;
+    vx_uint32 index = 0;
+    vx_uint32 physical = array->memory.physicals[0];
+    vx_uint8_ptr logical = array->memory.logicals[0];
+    vx_enum allocType = vxoMemory_GetType(&array->memory);
+    vx_uint32 size = array->itemSize * array->capacity;
+
+    vxMemCopy((vx_ptr)layerParam.paramName, (vx_const_ptr)paramName, sizeof(layerParam.paramName));
+    layerParam.dataFormat = vxoBinaryGraph_ConvertToBinaryDataFormat(array->itemType);
+    layerParam.dataType = VX_BINARY_BUFFER_TYPE_ARRAY;
+    layerParam.quantFormat = VX_BINARY_BUFFER_QUANT_FORMAT_NONE;
+    layerParam.fixPointZeroPoint = 0;
+    layerParam.tfScale = 0;
+    layerParam.addressOffset = 0;
+    layerParam.dimCount = 1;
+    layerParam.dims[0] = (vx_uint32)array->capacity;
+    layerParam.sourceType = vxoBinaryGraph_GetSourceType(graph, operation, allocType,
+                                                        size, physical, (vx_uint8_ptr)logical, &layerParam.index);
+
+    index = vxoBinaryGraph_SaveLayerParamTable(graph, &layerParam);
+
+    return index;
+}
+
 VX_PRIVATE_API vx_status vxoBinaryGraph_SaveSWRPN(
     vxnne_operation operation
     )
@@ -6516,7 +6548,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveUserCPU(
         }
         else if (ref->type == VX_TYPE_ARRAY)
         {
-            vxInfo("TODO....\n");
+            index = vxoBinaryGraph_SaveArrayToLayerParamTable(graph, operation, (vx_array)ref, name);
         }
 
         if (0 == i)
