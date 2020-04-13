@@ -780,7 +780,7 @@ gceSTATUS _ResolveTileStatusFilter(
 
     /*FilterBlit tempsurface to Dest*/
     gcoOS_MemCopy(State, &OrigState, sizeof(gcs2D_State));
-    tempSurf->orientation = OrigSrc->rotation;
+    tempSurf->rotation = OrigSrc->rotation;
     gcoOS_MemCopy(&OrigCurSrc.srcSurface, tempSurf, sizeof(State->dstSurface));
     gcoOS_MemCopy(DstSurface, OrigDest, sizeof(State->dstSurface));
     gcmONERROR(gcoHARDWARE_FilterBlit(
