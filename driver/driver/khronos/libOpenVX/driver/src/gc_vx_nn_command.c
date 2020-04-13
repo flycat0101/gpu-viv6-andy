@@ -2062,25 +2062,20 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
 
                 if (parameter->tpTransposeSize > 0 && ((!output->sRAM) && (!input->sRAM))/*context->hwChipInfo.customerID == 0xAE*/)
                 {
-                    if (1)/*(perm[0] == 1 && perm[1] == 0) || /* y, x, z */
-                        /*(perm[0] == 1 && perm[1] == 2) || /* y, z, x */
-                        /*(perm[0] == 2 && perm[1] == 1))   /* z, y, x */
-                    {
-                        vx_uint32 splitXCount = 1;/*4 * vxnneGetTypeSize(input->dataFormat);*/
-                        vx_uint32 tempXCount = 0;
-                        size = dims[1];
-                        slice = mult ? gcmMIN(dims[1], core) : 1;
-                        tempXCount = parameter->tpTransposeSize / (vxnneGetTypeSize(input->dataFormat) * dims[1] * dims[2]);/*get higher SRAM usage*/
-                        tempXCount = 1 << (vx_uint32) (floor(log(tempXCount)) / log(2));
-                        splitXCount = gcmMAX(dims[0] / tempXCount, 1);
-                        slice2 = splitXCount * slice * 2;
-                        value->u32[1] = slice;
-                        value->u32[2] = splitXCount;
-                        value->e32[0] = 6;
-                        vxmASSERT(input->dataFormat == output->dataFormat);
-                        vxmASSERT(dims[0] % splitXCount == 0);
-                        vxmASSERT(dims[0] / splitXCount * dims[1] * dims[2] * vxnneGetTypeSize(input->dataFormat) < parameter->tpTransposeSize);
-                    }
+                    vx_uint32 splitXCount = 1;/*4 * vxnneGetTypeSize(input->dataFormat);*/
+                    vx_uint32 tempXCount = 0;
+                    size = dims[1];
+                    slice = mult ? gcmMIN(dims[1], core) : 1;
+                    tempXCount = parameter->tpTransposeSize / (vxnneGetTypeSize(input->dataFormat) * dims[1] * dims[2]);/*get higher SRAM usage*/
+                    tempXCount = 1 << (vx_uint32) (floor(log(tempXCount)) / log(2));
+                    splitXCount = gcmMAX(dims[0] / tempXCount, 1);
+                    slice2 = splitXCount * slice * 2;
+                    value->u32[1] = slice;
+                    value->u32[2] = splitXCount;
+                    value->e32[0] = 6;
+                    vxmASSERT(input->dataFormat == output->dataFormat);
+                    vxmASSERT(dims[0] % splitXCount == 0);
+                    vxmASSERT(dims[0] / splitXCount * dims[1] * dims[2] * vxnneGetTypeSize(input->dataFormat) < parameter->tpTransposeSize);
                 }
                 else
                 {
@@ -2926,7 +2921,7 @@ void _fill_TP_TRANSPOSE_Command(
             }
             else /* copy from sram to ddr */
             {
-                vx_uint32 inXSizeT, inYSizeT, inZSizeT, inYStrideT, inZStrideT, outYStrideT, outZStrideT, multiInOffset, multiOutOffset;
+                vx_uint32 inXSizeT = 0, inYSizeT = 0, inZSizeT = 0, inYStrideT = 0, inZStrideT = 0, outYStrideT = 0, outZStrideT = 0, multiInOffset = 0, multiOutOffset = 0;
                 inputBase = parameter->tpTransposeStart;
                 outputBase = output->physical.start + ((i / multiTPCount / 2) % xSplit) * xSize * distances[0] * outputElemSize;
 

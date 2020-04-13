@@ -13570,12 +13570,10 @@ vx_bool isInt64BiasOverflow(
         !vxoContext_IsFeatureAvailable(context, VX_TP_FEATURE_FP32_BIAS))
     {
         vx_uint32 filterIndex = 0, filterCount = z_count;
-        vx_uint32 size = 0;
         vx_int64 *bias_base_ptr = VX_NULL;
 
         if (bias_tensor != VX_NULL)
         {
-            size = z_count * vxDataType_GetSize((vx_type_e)bias_format);
             vxoTensor_GetTensorViewMemory(bias_tensor, (gctPOINTER*)(&bias_base_ptr), VX_NULL);
         }
 

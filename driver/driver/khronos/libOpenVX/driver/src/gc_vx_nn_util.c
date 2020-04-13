@@ -4304,6 +4304,10 @@ vx_status vxnneOperation_InitializeCommand(
                     requestList->inputCount = requestList->inputCount - count;
                 }
             }
+            else
+            {
+                command->cmdInfo.tpTransposeSize = 0;
+            }
 
         }
 
