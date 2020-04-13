@@ -2875,8 +2875,20 @@ VSC_ErrCode vscVIR_PostCGCleanup(
     /* So far only vulkan driver needs to check the resource opcode type. */
     gctBOOL             bNeedToCheckResOp = VIR_Shader_IsVulkan(pShader);
     VSC_MM*             pMM = pPassWorker->basePassWorker.pMM;
-    VIR_MemoryAccessFlag    memoryAccessFlag = VIR_MA_FLAG_NONE;
-    VIR_TexldFlag       texldFlag = VIR_TEXLD_FLAG_NONE;
+    VIR_ShLevel         curShLevel = VIR_Shader_GetLevel(pShader);
+    VIR_MemoryAccessFlag    memoryAccessFlag = pShader->memoryAccessFlag[curShLevel];
+    VIR_TexldFlag       texldFlag = pShader->texldFlag[curShLevel];
+
+    /* add skHp flag to load instruction if dest of load is not used in any texld instructions. */
+    /* We need to do this check here because we don't update DU in this pass!!! */
+    if (VIR_Shader_IsFS(pShader)
+        &&
+        /* A rough check here to skip some cases. */
+        (texldFlag & VIR_TEXLD_FLAG_TEXLD) && (memoryAccessFlag & VIR_MA_FLAG_LOAD))
+    {
+        status = _VIR_CheckAndSetSkHpForLdInst(pShader, pDuInfo, pMM);
+        ON_ERROR(status, "Check and set skipHp for the LOAD instruction.");
+    }
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (func_node = VIR_FuncIterator_First(&func_iter);
@@ -2895,9 +2907,6 @@ VSC_ErrCode vscVIR_PostCGCleanup(
             gctBOOL bGenInst = gcvFALSE;
             gctBOOL bFP16Changed = gcvFALSE;
             VIR_OpCode opCode = VIR_Inst_GetOpcode(inst);
-
-            /* Record the instruction status. */
-            VIR_Inst_RecordInstStatus(inst, &memoryAccessFlag, gcvNULL, &texldFlag);
 
             if (VIR_Shader_isDual16Mode(pShader))
             {
@@ -2975,16 +2984,6 @@ VSC_ErrCode vscVIR_PostCGCleanup(
                 inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter);
             }
         }
-    }
-
-    /* add skHp flag to load instruction if dest of load is not used in any texld instructions */
-    if (VIR_Shader_IsFS(pShader)
-        &&
-        /* A rough check here to skip some cases. */
-        (texldFlag & VIR_TEXLD_FLAG_TEXLD) && (memoryAccessFlag & VIR_MA_FLAG_LOAD))
-    {
-        status = _VIR_CheckAndSetSkHpForLdInst(pShader, pDuInfo, pMM);
-        ON_ERROR(status, "Check and set skipHp for the LOAD instruction.");
     }
 
     /* mark EndOfBB to help HW manage 2-group fast reissue */

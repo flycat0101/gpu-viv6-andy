@@ -983,6 +983,9 @@ static VSC_ErrCode _PerformCodegen(VSC_SHADER_PASS_MANAGER*   pShPassMnger,
 
     CALL_SH_PASS(VSC_IS_InstSched_PerformOnShader, 1, gcvNULL);
 
+    /* Record the instruction status here so we can use it for the following passes. */
+    CALL_SH_PASS(vscVIR_RecordInstructionStatus, 0, gcvNULL);
+
     CALL_SH_PASS(vscVIR_PostCGCleanup, 0, gcvNULL);
     CALL_SH_PASS(VSC_MC_GEN_MachineCodeGen, 0, gcvNULL);
 
