@@ -314,8 +314,8 @@ typedef struct VIR_REG_ALLOC_LINEAR_SCAN
     /* registers that are occupied because of false dep */
     VSC_BIT_VECTOR              falseDepRegVec;
 
-    /* Save the current max register count. */
-    gctUINT                     currentMaxRegCount;
+    /* Save the current max general register count. */
+    gctUINT                     currentMaxGRCount;
 
     gctBOOL                     bEnableDebug;
     VSC_DIContext               *DIContext;
