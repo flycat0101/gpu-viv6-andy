@@ -57,6 +57,9 @@ typedef struct _VSC_CPF
     VSC_OPTN_CPFOptions         *pOptions;
     VIR_Dumper                  *pDumper;
     VSC_MM                      *pMM;
+
+    gctUINT                     stateCount;
+    VSC_STATE_VECTOR            *pTmpFlow;
     gctUINT                     flowSize;
 
     VSC_SIMPLE_QUEUE            workList;       /* worklist to save working bb */
@@ -81,6 +84,10 @@ typedef struct _VSC_CPF
 #define VSC_CPF_GetDumper(cpf)                  ((cpf)->pDumper)
 #define VSC_CPF_SetDumper(cpf, d)               ((cpf)->pDumper = (d))
 #define VSC_CPF_GetMM(cpf)                      ((cpf)->pMM)
+#define VSC_CPF_GetStateCount(cpf)              ((cpf)->stateCount)
+#define VSC_CPF_SetStateCount(cpf, d)           ((cpf)->stateCount = (d))
+#define VSC_CPF_GetTmpFlow(cpf)                 ((cpf)->pTmpFlow)
+#define VSC_CPF_SetTmpFlow(cpf, v)              ((cpf)->pTmpFlow = (v))
 #define VSC_CPF_GetFlowSize(cpf)                ((cpf)->flowSize)
 #define VSC_CPF_SetFlowSize(cpf, d)             ((cpf)->flowSize = (d))
 

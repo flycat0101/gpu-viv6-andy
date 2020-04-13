@@ -71,6 +71,7 @@ void vscBV_Initialize(VSC_BIT_VECTOR* pBV, VSC_MM* pMM, gctINT bvSize);
 void vscBV_Resize(VSC_BIT_VECTOR *pBV, gctINT newBVSize, gctBOOL bKeep);
 void vscBV_Destroy(VSC_BIT_VECTOR* pBV);
 void vscBV_Finalize(VSC_BIT_VECTOR* pBV);
+void vscBV_Reset(VSC_BIT_VECTOR* pBV);
 
 /* Set, clear and test */
 void vscBV_SetAll(VSC_BIT_VECTOR* pBV);
@@ -289,6 +290,7 @@ void vscSV_Initialize(VSC_STATE_VECTOR* pSV, VSC_MM* pMM, gctINT svSize, gctUINT
 void vscSV_Resize(VSC_STATE_VECTOR *pSV, gctINT newSvSize, gctBOOL bKeep);
 void vscSV_Destroy(VSC_STATE_VECTOR* pSV);
 void vscSV_Finalize(VSC_STATE_VECTOR* pSV);
+void vscSV_Reset(VSC_STATE_VECTOR* pSV);
 
 /* Set, get and test state */
 void vscSV_Set(VSC_STATE_VECTOR* pSV, gctINT ordinal, gctUINT state);

@@ -375,12 +375,14 @@ _VSC_CPF_Init(
     IN VSC_MM               *pMM
     )
 {
+    memset(pCPF, 0, sizeof(VSC_CPF));
     VSC_CPF_SetAppNameId(pCPF, patchId);
     VSC_CPF_SetShader(pCPF, pShader);
     VSC_CPF_SetHwCfg(pCPF, pHwCfg);
     VSC_CPF_SetOptions(pCPF, pOptions);
     VSC_CPF_SetDumper(pCPF, pDumper);
     VSC_CPF_SetCodeChange(pCPF, gcvFALSE);
+    VSC_CPF_SetStateCount(pCPF, VIR_CHANNEL_COUNT);
     pCPF->pMM = pMM;
 }
 
@@ -389,9 +391,16 @@ _VSC_CPF_Final(
     IN OUT VSC_CPF  *pCPF
     )
 {
+    VSC_STATE_VECTOR        *pTmpFlow = VSC_CPF_GetTmpFlow(pCPF);
+
     VSC_CPF_SetShader(pCPF, gcvNULL);
     VSC_CPF_SetOptions(pCPF, gcvNULL);
     VSC_CPF_SetDumper(pCPF, gcvNULL);
+
+    if (pTmpFlow)
+    {
+        vscSV_Destroy(pTmpFlow);
+    }
 }
 
 /* initialize the pBlkFlowArray, which is indexed by BB id.
@@ -430,8 +439,8 @@ _VSC_CPF_InitializeBlkFlow(
         VSC_CPF_BLOCK_FLOW  *pBlkFlow = (VSC_CPF_BLOCK_FLOW*)
             vscSRARR_GetElement(pBlkFlowArray, pBasicBlk->dgNode.id);
 
-        vscSV_Initialize(&pBlkFlow->inFlow, pMM, flowSize, 4);
-        vscSV_Initialize(&pBlkFlow->outFlow, pMM, flowSize, 4);
+        vscSV_Initialize(&pBlkFlow->inFlow, pMM, flowSize, VSC_CPF_GetStateCount(pCPF));
+        vscSV_Initialize(&pBlkFlow->outFlow, pMM, flowSize, VSC_CPF_GetStateCount(pCPF));
     }
 
     return errCode;
@@ -2848,7 +2857,7 @@ _VSC_CPF_AnalysisOnBlock(
     VIR_BASIC_BLOCK     *pCurrentLoopEndBB = gcvNULL;
     gctBOOL             bIsLoopHead = gcvFALSE;
 
-    VSC_STATE_VECTOR  tmpFlow;
+    VSC_STATE_VECTOR  *pTmpFlow = VSC_CPF_GetTmpFlow(pCPF);
     VSC_STATE_VECTOR  *inFlow = gcvNULL;
     VSC_STATE_VECTOR  *outFlow = gcvNULL;
 
@@ -2957,12 +2966,12 @@ _VSC_CPF_AnalysisOnBlock(
             pLoopBlkFlow = (VSC_CPF_BLOCK_FLOW*)vscSRARR_GetElement(VSC_CPF_GetBlkFlowArray(pCPF), pLoopBB->dgNode.id);
 
             /* Clean the in flow. */
-            vscSV_Initialize(&pLoopBlkFlow->inFlow, VSC_CPF_GetMM(pCPF), VSC_CPF_GetFlowSize(pCPF), 4);
+            vscSV_Initialize(&pLoopBlkFlow->inFlow, VSC_CPF_GetMM(pCPF), VSC_CPF_GetFlowSize(pCPF), VSC_CPF_GetStateCount(pCPF));
 
             /* Do not clean the out flow of the end BB. */
             if (pLoopBB != VIR_LoopInfo_GetLoopEnd(pLoopInfo))
             {
-                vscSV_Initialize(&pLoopBlkFlow->outFlow, VSC_CPF_GetMM(pCPF), VSC_CPF_GetFlowSize(pCPF), 4);
+                vscSV_Initialize(&pLoopBlkFlow->outFlow, VSC_CPF_GetMM(pCPF), VSC_CPF_GetFlowSize(pCPF), VSC_CPF_GetStateCount(pCPF));
             }
 
             /* Remove it from the table. */
@@ -2977,7 +2986,17 @@ _VSC_CPF_AnalysisOnBlock(
         }
     }
 
-    vscSV_Initialize(&tmpFlow, VSC_CPF_GetMM(pCPF), VSC_CPF_GetFlowSize(pCPF), 4);
+    if (pTmpFlow == gcvNULL)
+    {
+        pTmpFlow = vscSV_Create(VSC_CPF_GetMM(pCPF), VSC_CPF_GetFlowSize(pCPF), VSC_CPF_GetStateCount(pCPF));
+        VSC_CPF_SetTmpFlow(pCPF, pTmpFlow);
+    }
+    else if (VSC_CPF_GetFlowSize(pCPF) > (gctUINT)pTmpFlow->svSize)
+    {
+        vscSV_Resize(pTmpFlow, VSC_CPF_GetFlowSize(pCPF), gcvFALSE);
+    }
+    gcmASSERT(pTmpFlow != gcvNULL && (gctUINT)pTmpFlow->svSize >= VSC_CPF_GetFlowSize(pCPF));
+
     /*
     ** 1) BB is the head of a loop:
     **      tmpFlow = inFlow
@@ -2986,7 +3005,7 @@ _VSC_CPF_AnalysisOnBlock(
     */
     if (bIsLoopHead)
     {
-        _VSC_CPF_CopyFlowLattice(&tmpFlow, inFlow);
+        _VSC_CPF_CopyFlowLattice(pTmpFlow, inFlow);
     }
     else
     {
@@ -3027,13 +3046,13 @@ _VSC_CPF_AnalysisOnBlock(
             if (firstPred)
             {
                 /* tmpFlow = pred->out */
-                _VSC_CPF_CopyFlow(pCPF, pBB->dgNode.id, &tmpFlow, pPredBasicBlk->dgNode.id, &predBlkFlow->outFlow);
+                _VSC_CPF_CopyFlow(pCPF, pBB->dgNode.id, pTmpFlow, pPredBasicBlk->dgNode.id, &predBlkFlow->outFlow);
                 firstPred = gcvFALSE;
             }
             else
             {
                 /* tmpFlow = tmpFlow ^ pred->out */
-                _VSC_CPF_AndFlow(pCPF, pBB->dgNode.id, &tmpFlow, pPredBasicBlk->dgNode.id, &predBlkFlow->outFlow);
+                _VSC_CPF_AndFlow(pCPF, pBB->dgNode.id, pTmpFlow, pPredBasicBlk->dgNode.id, &predBlkFlow->outFlow);
             }
 
             inChanged = gcvTRUE;
@@ -3041,11 +3060,11 @@ _VSC_CPF_AnalysisOnBlock(
 
         if (inChanged)
         {
-            _VSC_CPF_CopyFlowLattice(inFlow, &tmpFlow);
+            _VSC_CPF_CopyFlowLattice(inFlow, pTmpFlow);
         }
         else
         {
-            _VSC_CPF_CopyFlowLattice(&tmpFlow, inFlow);
+            _VSC_CPF_CopyFlowLattice(pTmpFlow, inFlow);
         }
     }
 
@@ -3065,7 +3084,7 @@ _VSC_CPF_AnalysisOnBlock(
         VIR_Instruction *inst = BB_GET_START_INST(pBB);
         while(inst)
         {
-            _VSC_CPF_PerformOnInst(pCPF, pBB->dgNode.id, inst, &tmpFlow, gcvTRUE /*analysis only*/);
+            _VSC_CPF_PerformOnInst(pCPF, pBB->dgNode.id, inst, pTmpFlow, gcvTRUE /*analysis only*/);
 
             if (inst == BB_GET_END_INST(pBB))
             {
@@ -3081,14 +3100,14 @@ _VSC_CPF_AnalysisOnBlock(
         gctBOOL constCondition = gcvFALSE;
         gctBOOL checkingResult = gcvFALSE;
 
-        if (pBB->flowType == VIR_FLOW_TYPE_ENTRY || !_VSC_CPF_EqualFlowLattice(outFlow, &tmpFlow))
+        if (pBB->flowType == VIR_FLOW_TYPE_ENTRY || !_VSC_CPF_EqualFlowLattice(outFlow, pTmpFlow))
         {
             VIR_BASIC_BLOCK             *psuccBasicBlk;
             VSC_ADJACENT_LIST_ITERATOR  succEdgeIter;
             VIR_CFG_EDGE                *pSuccEdge;
 
             /* copy the tmpFlow (i.e., new outFlow) to outFlow */
-            _VSC_CPF_CopyFlowLattice(outFlow, &tmpFlow);
+            _VSC_CPF_CopyFlowLattice(outFlow, pTmpFlow);
 
             /* If meet a STOP BB, do not add its successors to the working list. */
             if (pCurrentLoopInfo != gcvNULL && pBB == pCurrentLoopEndBB)
@@ -3159,7 +3178,7 @@ _VSC_CPF_AnalysisOnBlock(
         VIR_LOG_FLUSH(pDumper);
     }
 
-    vscSV_Finalize(&tmpFlow);
+    vscSV_Reset(pTmpFlow);
 
     return errCode;
 }
@@ -3172,7 +3191,7 @@ _VSC_CPF_TransformOnBlock(
 {
     VSC_ErrCode errCode    = VSC_ERR_NONE;
 
-    VSC_STATE_VECTOR  tmpFlow;
+    VSC_STATE_VECTOR  *pTmpFlow = VSC_CPF_GetTmpFlow(pCPF);
     VSC_STATE_VECTOR  *inFlow = gcvNULL;
 
     VIR_Instruction *inst = gcvNULL;
@@ -3183,8 +3202,18 @@ _VSC_CPF_TransformOnBlock(
 
     inFlow = &pBlkFlow->inFlow;
 
-    vscSV_Initialize(&tmpFlow, VSC_CPF_GetMM(pCPF), pCPF->flowSize, 4);
-    _VSC_CPF_CopyFlowLattice(&tmpFlow, inFlow);
+    if (pTmpFlow == gcvNULL)
+    {
+        pTmpFlow = vscSV_Create(VSC_CPF_GetMM(pCPF), VSC_CPF_GetFlowSize(pCPF), VSC_CPF_GetStateCount(pCPF));
+        VSC_CPF_SetTmpFlow(pCPF, pTmpFlow);
+    }
+    else if (VSC_CPF_GetFlowSize(pCPF) > (gctUINT)pTmpFlow->svSize)
+    {
+        vscSV_Resize(pTmpFlow, VSC_CPF_GetFlowSize(pCPF), gcvFALSE);
+    }
+    gcmASSERT(pTmpFlow != gcvNULL && (gctUINT)pTmpFlow->svSize >= VSC_CPF_GetFlowSize(pCPF));
+
+    _VSC_CPF_CopyFlowLattice(pTmpFlow, inFlow);
 
     _VSC_CPF_CopyConstKey(pCPF, pBB->dgNode.id);
 
@@ -3193,7 +3222,7 @@ _VSC_CPF_TransformOnBlock(
     inst = BB_GET_START_INST(pBB);
     while(inst)
     {
-        _VSC_CPF_PerformOnInst(pCPF, pBB->dgNode.id, inst, &tmpFlow, gcvFALSE);
+        _VSC_CPF_PerformOnInst(pCPF, pBB->dgNode.id, inst, pTmpFlow, gcvFALSE);
 
         if (inst == BB_GET_END_INST(pBB))
         {
@@ -3202,7 +3231,7 @@ _VSC_CPF_TransformOnBlock(
         inst = VIR_Inst_GetNext(inst);
     }
 
-    vscSV_Finalize(&tmpFlow);
+    vscSV_Reset(pTmpFlow);
 
     return errCode;
 }
