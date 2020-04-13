@@ -1110,7 +1110,7 @@ vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(vx_node node,
 
     status = vxoNNDepthwiseConvolutionLayer_Initializer(node, params, gcmCOUNTOF(params));
 
-    vxReleaseScalar((vx_scalar*)&params[9]);
+    vxReleaseScalar((vx_scalar*)&params[7]);
     return status;
 }
 #else
