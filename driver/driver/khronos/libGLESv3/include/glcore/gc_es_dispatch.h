@@ -402,9 +402,10 @@
     esApiMacro(MultiDrawArraysIndirectEXT), \
     esApiMacro(MultiDrawElementsIndirectEXT), \
     /* cl_khr_gl_sharing */ \
-    esApiMacro(GetTexImage)
+    esApiMacro(GetTexImage),
 
 
+#ifndef VIV_EGL_BUILD
 
 #define __GLES_API_DISPATCH_FUNCS \
     GLvoid         (GL_APIENTRY *ActiveTexture) (_gcArgComma_ GLenum texture); \
@@ -851,5 +852,6 @@ typedef struct __GLtraceDispatchTableRec{
 
 extern __GLesDispatchTable __glesApiFuncDispatchTable;
 
+#endif /* VIV_EGL_BUILD */
 
 #endif /* __gc_es_dispatch_h__ */

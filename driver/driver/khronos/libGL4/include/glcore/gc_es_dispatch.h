@@ -11,10 +11,8 @@
 *****************************************************************************/
 
 
-#ifndef __gc_es_dispatch_h__
-#define __gc_es_dispatch_h__
-
-#include "gc_es_types.h"
+#ifndef __gc_gl_dispatch_h__
+#define __gc_gl_dispatch_h__
 
 #define __GL_API_ENTRIES(glApiMacro) \
     glApiMacro(NewList), \
@@ -916,8 +914,10 @@
     /* GL_ARB_shader_objects */ \
     glApiMacro(DeleteObjectARB), \
     glApiMacro(GetObjectParameterivARB), \
-    glApiMacro(GetInfoLogARB), \
+    glApiMacro(GetInfoLogARB),
 
+
+#ifndef VIV_EGL_BUILD
 
 #define __GL_LISTEXEC_ENTRIES(glApiMacro, _initstr_) \
     glApiMacro(Skip) _initstr_, \
@@ -2134,5 +2134,6 @@ extern __GLdispatchTable __glImmediateFuncTable;
 extern __GLdispatchTable __glListCompileFuncTable;
 extern __GLexportFuncTable __glVIV_DispatchFuncTable;
 
+#endif /* VIV_EGL_BUILD */
 
-#endif /* __gc_es_dispatch_h__ */
+#endif /* __gc_gl_dispatch_h__ */

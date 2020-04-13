@@ -150,7 +150,6 @@ typedef void (* VEGL_ESPrivDestructor) (gctPOINTER priv);
 typedef enum _veglAPIINDEX
 {
     vegl_EGL,
-    vegl_OPENGL_ES11_CL,
     vegl_OPENGL_ES11,
     vegl_OPENGL_ES20,
     vegl_OPENGL,
@@ -734,6 +733,21 @@ typedef struct EGL_CONFIG_DEPTH
     int stencilSize;
 }
 * VEGLConfigDepth;
+
+typedef struct _veglClientApiEntry
+{
+    const char *                                name;
+    __eglMustCastToProperFunctionPointerType    function;
+}
+veglClientApiEntry;
+
+typedef struct _veglCommonEsApiDispatch
+{
+    const char *                                name;
+    __eglMustCastToProperFunctionPointerType    es11func;
+    __eglMustCastToProperFunctionPointerType    es2xfunc;
+}
+veglCommonEsApiDispatch;
 
 /*******************************************************************************
 ** Thread API functions.

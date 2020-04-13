@@ -21,21 +21,33 @@
 
 #if !gcdSTATIC_LINK
 #if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__)
-static pthread_mutex_t client_handles_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t client_lib_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
-static gctHANDLE client_handles[vegl_API_LAST] = {NULL};
+static gctHANDLE client_lib[vegl_API_LAST] = {NULL};
 
 static gctCONST_STRING _dispatchNames[] =
 {
     "",                                 /* EGL */
-    "GLES_CL_DISPATCH_TABLE",           /* OpenGL ES 1.1 Common Lite */
     "GLES_CM_DISPATCH_TABLE",           /* OpenGL ES 1.1 Common */
     "GLESv2_DISPATCH_TABLE",            /* OpenGL ES 2.0 */
     "GL_DISPATCH_TABLE",                /* OpenGL */
     "OpenVG_DISPATCH_TABLE",            /* OpenVG 1.0 */
 };
 #endif
+
+
+extern veglClientApiEntry eglApiEntryTbl[];
+extern veglClientApiEntry gles11ApiEntryTbl[];
+extern veglClientApiEntry gles32ApiEntryTbl[];
+extern veglClientApiEntry gl4xApiEntryTbl[];
+extern veglClientApiEntry glesCommonApiEntryTbl[];
+extern veglCommonEsApiDispatch glesCommonApiDispatchTbl[];
+extern veglClientApiEntry vgApiEntryTbl[];
+
+extern void veglInitClientApiProcTbl(gctHANDLE library, veglClientApiEntry *lookupTbl, const char *suffix, const char *info);
+extern void veglInitEsCommonApiDispatchTbl(gctHANDLE es11lib, gctHANDLE es2xlib, veglCommonEsApiDispatch *lookupTbl, const char *suffix);
+
 /*******************************************************************************
 ***** Version Signature *******************************************************/
 
@@ -212,7 +224,6 @@ static void _InitDispatchTables(
 
     Thread->dispatchTables[vegl_EGL]            = gcvNULL;
 #if gcdENABLE_3D
-    Thread->dispatchTables[vegl_OPENGL_ES11_CL] = gcvNULL;
     Thread->dispatchTables[vegl_OPENGL_ES11]    = &GLES_CM_DISPATCH_TABLE;
     Thread->dispatchTables[vegl_OPENGL_ES20]    = &GLESv2_DISPATCH_TABLE;
     Thread->dispatchTables[vegl_OPENGL] = &GL_DISPATCH_TABLE;
@@ -221,23 +232,25 @@ static void _InitDispatchTables(
     Thread->dispatchTables[vegl_OPENVG]         = &OpenVG_DISPATCH_TABLE;
 #  endif
 #else /* gcdSTATIC_LINK */
+
+    static gctBOOL apiTblInitialized = gcvFALSE;
     gctINT32 index;
 
 #if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__)
-    gcoOS_AcquireMutex(gcvNULL, &client_handles_lock, gcvINFINITE);
+    gcoOS_AcquireMutex(gcvNULL, &client_lib_lock, gcvINFINITE);
 #endif
 
     for (index = 0; index < vegl_API_LAST; index++)
     {
-        if (client_handles[index] == NULL)
+        if (client_lib[index] == NULL)
         {
-            client_handles[index] = Thread->clientHandles[index] =
+            client_lib[index] = Thread->clientHandles[index] =
                 veglGetModule(gcvNULL, index, _dispatchNames[index], &Thread->dispatchTables[index]);
         }
         else
         {
-            Thread->clientHandles[index] = client_handles[index];
-            gcoOS_GetProcAddress(NULL, client_handles[index], _dispatchNames[index],
+            Thread->clientHandles[index] = client_lib[index];
+            gcoOS_GetProcAddress(NULL, client_lib[index], _dispatchNames[index],
                     (gctPOINTER*) &Thread->dispatchTables[index]);
         }
 
@@ -249,8 +262,22 @@ static void _InitDispatchTables(
             );
     }
 
+    /* Only initialize the EGL client API tables once by the first thread */
+    if (!apiTblInitialized)
+    {
+        veglInitClientApiProcTbl(client_lib[vegl_EGL], eglApiEntryTbl, "", "EGL");
+        veglInitClientApiProcTbl(client_lib[vegl_EGL], glesCommonApiEntryTbl, "forward_gl", "ES_Common");
+        veglInitClientApiProcTbl(client_lib[vegl_OPENGL_ES11], gles11ApiEntryTbl, "gl", "GLES11");
+        veglInitClientApiProcTbl(client_lib[vegl_OPENGL_ES20], gles32ApiEntryTbl, "gl", "GLES32");
+        veglInitClientApiProcTbl(client_lib[vegl_OPENGL], gl4xApiEntryTbl, "gl", "GL4X");
+        veglInitClientApiProcTbl(client_lib[vegl_OPENVG], vgApiEntryTbl, "vg", "OpenVG");
+        veglInitEsCommonApiDispatchTbl(client_lib[vegl_OPENGL_ES11], client_lib[vegl_OPENGL_ES20],
+                                       glesCommonApiDispatchTbl, "gl");
+        apiTblInitialized = gcvTRUE;
+    }
+
 #if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__)
-    gcoOS_ReleaseMutex(gcvNULL, &client_handles_lock);
+    gcoOS_ReleaseMutex(gcvNULL, &client_lib_lock);
 #endif
 
     return;
