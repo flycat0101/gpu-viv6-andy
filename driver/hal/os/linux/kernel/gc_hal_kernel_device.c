@@ -1596,6 +1596,7 @@ _SetupContiguousVidMem(
                 device->os, Args->contiguousBase, Args->contiguousSize,
                 "galcore contiguous memory",
                 contiguousRequested,
+                gcvTRUE,
                 &device->contiguousPhysical
                 ));
 
@@ -1672,6 +1673,7 @@ _SetupExternalSRAMVidMem(
                         device->extSRAMBases[i], device->extSRAMSizes[i],
                         sRAMName,
                         device->args.sRAMRequested,
+                        gcvTRUE,
                         &device->extSRAMPhysical[i]
                         ));
 

@@ -898,6 +898,7 @@ gckVIDMEM_AllocateLinear(
                 node->VidMem.bytes,
                 "gal reserved memory",
                 gcvTRUE,
+                gcvTRUE,
                 &node->VidMem.physical
                 ));
     }

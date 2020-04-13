@@ -3307,6 +3307,7 @@ gckMMU_SetupSRAM(
                         kernel->sRAMSizes[i],
                         "Per core SRAM reserve usage region",
                         gcvTRUE,
+                        gcvTRUE,
                         &kernel->sRAMPhysical[i]
                         ));
 
