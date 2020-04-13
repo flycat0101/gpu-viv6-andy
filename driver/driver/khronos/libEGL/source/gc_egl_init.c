@@ -768,6 +768,9 @@ veglGetPlatformDisplay(
     VEGLPlatform eglPlatform = gcvNULL;
     gctSTRING platEnv = gcvNULL;
 
+    /* Detect trace mode. */
+    _SetTraceMode();
+
     gcoOS_GetEnv(gcvNULL, "VIV_EGL_PLATFORM", &platEnv);
 
     gcoOS_LockPLS();
