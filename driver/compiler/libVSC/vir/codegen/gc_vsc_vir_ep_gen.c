@@ -1555,6 +1555,7 @@ static VSC_ErrCode _CollectConstantMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelpe
     SHADER_COMPILE_TIME_CONSTANT*      pThisCTC;
     gctUINT                            thisChannelValue, i, k, subConstArrayRange;
     gctINT                             thisSubUniformPhysicalAddr;
+    gctINT                             uniformPhysical;
     gctUINT*                           pThisSubUniformConstValue;
     SHADER_CONSTANT_ARRAY_MAPPING*     pThisConstantArrayMapping;
     SHADER_CONSTANT_SUB_ARRAY_MAPPING* pThisCnstSubArrayMapping;
@@ -1599,197 +1600,194 @@ static VSC_ErrCode _CollectConstantMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelpe
                     pVirUniform = VIR_Symbol_GetSampler(pVirUniformSym);
                 }
             }
-
-            /* Don't collect it for some circumstances */
-            if (pVirUniform && pVirUniform->physical == -1 &&
-                 /* Only affiliated with LTC */
-                (isSymUniformUsedInLTC(pVirUniformSym) ||
-                 /* We use same uniform to indicate ubo and ubo address, but it is possible that ubo is used but ubo address is not used */
-                 VIR_Symbol_GetUniformKind(pVirUniformSym) == VIR_UNIFORM_UNIFORM_BLOCK_ADDRESS))
+            if (pVirUniform == gcvNULL)
             {
                 continue;
             }
 
-            if (pVirUniform)
+            uniformPhysical = VIR_Uniform_GetPhysical(pVirUniform);
+            if (uniformPhysical == -1)
             {
-                gcmASSERT(pVirUniform->physical != -1);
+                continue;
+            }
 
-                pVirUniformType = VIR_Symbol_GetType(pVirUniformSym);
-                thisUniformRegCount = VIR_Type_GetVirRegCount(pShader, pVirUniformType, pVirUniform->realUseArraySize);
-                compCount = VIR_GetTypeComponents(pVirUniformType->_base);
+            pVirUniformType = VIR_Symbol_GetType(pVirUniformSym);
+            thisUniformRegCount = VIR_Type_GetVirRegCount(pShader, pVirUniformType, pVirUniform->realUseArraySize);
+            compCount = VIR_GetTypeComponents(pVirUniformType->_base);
 
-                /* HW constant register count */
-                pCnstMapping->hwConstRegCount = vscMAX(pCnstMapping->hwConstRegCount,
-                                                       (pVirUniform->physical + thisUniformRegCount));
-                pCnstMapping->maxHwConstRegIndex = vscMAX(pCnstMapping->maxHwConstRegIndex,
-                                                          (gctINT)((pVirUniform->physical + thisUniformRegCount - 1)));
+            /* HW constant register count */
+            pCnstMapping->hwConstRegCount = vscMAX(pCnstMapping->hwConstRegCount, (uniformPhysical + thisUniformRegCount));
+            pCnstMapping->maxHwConstRegIndex = vscMAX(pCnstMapping->maxHwConstRegIndex, (gctINT)((uniformPhysical + thisUniformRegCount - 1)));
 
-                /* Collect CTC */
-                if (isSymUniformCompiletimeInitialized(pVirUniformSym))
+            /* Collect CTC */
+            if (isSymUniformCompiletimeInitialized(pVirUniformSym))
+            {
+                VIR_Type *symType = VIR_Symbol_GetType(pVirUniformSym);
+                VIR_ConstId *initializerPtr;
+                gctUINT  uniformIdx = 0;
+                gctUINT arraySize = 1;
+                gctUINT subRegCount, arrElemIdx;
+                gctBOOL bLongConst;
+                VIR_Type *pBaseType;
+                gctUINT subUniformConstValue[CHANNEL_NUM];
+
+                pBaseType = symType;
+                if (VIR_Type_isArray(symType))
                 {
-                    VIR_Type *symType = VIR_Symbol_GetType(pVirUniformSym);
-                    VIR_ConstId *initializerPtr;
-                    gctUINT  uniformIdx = 0;
-                    gctUINT arraySize = 1;
-                    gctUINT subRegCount, arrElemIdx;
-                    gctBOOL bLongConst;
-                    VIR_Type *pBaseType;
-                    gctUINT subUniformConstValue[CHANNEL_NUM];
-
-                    pBaseType = symType;
-                    if(VIR_Type_isArray(symType)) {
-                        /* To be handled for arrays */
-                        arraySize = pVirUniform->realUseArraySize;
-                        initializerPtr = pVirUniform->u.initializerPtr;                        ;
-                        while (VIR_Type_isArray(pBaseType))
-                        {
-                            pBaseType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(pBaseType));
-                        }
-                    }
-                    else {
-                        initializerPtr = &pVirUniform->u.initializer;
-                    }
-
-                    subRegCount = VIR_Type_GetVirRegCount(pShader, pVirUniformType, 1);
-                    /* Maxium is 512-bits uniform (4 HW constants) */
-                    gcmASSERT((subRegCount * arraySize) == thisUniformRegCount);
-
-                    bLongConst = (VIR_GetTypeSize(VIR_GetTypeComponentType(VIR_Type_GetIndex(pBaseType))) >= 8);
-                    for(arrElemIdx = 0; arrElemIdx < arraySize; arrElemIdx++)
+                    /* To be handled for arrays */
+                    arraySize = pVirUniform->realUseArraySize;
+                    initializerPtr = pVirUniform->u.initializerPtr;                        ;
+                    while (VIR_Type_isArray(pBaseType))
                     {
-                        pThisVirCTCVal = (VIR_Const*)VIR_GetSymFromId(&pShader->constTable, initializerPtr[arrElemIdx]);
-
-                        for (subUniformIdx = 0; subUniformIdx < subRegCount; subUniformIdx++, uniformIdx++)
-                        {
-                            pThisCTC = gcvNULL;
-
-                            thisSubUniformPhysicalAddr = pVirUniform->physical + uniformIdx;
-                            if(bLongConst)
-                            {
-                               gctUINT64 *pU64Value;
-
-                               pU64Value = &pThisVirCTCVal->value.vecVal.u64Value[CHANNEL_NUM * subUniformIdx >> 1];
-                               if(subUniformIdx & 0x1)
-                               {
-                                   for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
-                                   {
-                                       subUniformConstValue[channel] = (gctUINT)((pU64Value[channel] >> 32) & 0xFFFFFFFF);
-                                   }
-                               }
-                               else
-                               {
-                                   for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
-                                   {
-                                       subUniformConstValue[channel] = (gctUINT)(pU64Value[channel] & 0xFFFFFFFF);
-                                   }
-                               }
-                               pThisSubUniformConstValue = subUniformConstValue;
-                            }
-                            else pThisSubUniformConstValue = &pThisVirCTCVal->value.vecVal.u32Value[CHANNEL_NUM * subUniformIdx];
-
-                            /* Check whether there is already a CTC allocated on same HW location */
-                            for (ctcSlot = 0; ctcSlot < pCnstMapping->countOfCompileTimeConstant; ctcSlot ++)
-                            {
-                                if (_IsUniformAllocatedOnHwCnstReg(thisSubUniformPhysicalAddr,
-                                                         &pCnstMapping->pCompileTimeConstant[ctcSlot].hwConstantLocation))
-                                {
-                                    pThisCTC = &pCnstMapping->pCompileTimeConstant[ctcSlot];
-                                    break;
-                                }
-                            }
-
-                            /* Enlarge CTC set to make room for current CTC */
-                            if (pThisCTC == gcvNULL)
-                            {
-                                pThisCTC = _EnlargeCTCRoom(pCnstMapping, 1, &ctcSlot);
-                                vscInitializeCTC(pThisCTC);
-                                _SetUniformHwCnstReg(thisSubUniformPhysicalAddr, 1, &pThisCTC->hwConstantLocation);
-                            }
-
-                            /* Copy CTC now */
-                            for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
-                            {
-                                if (channel >= (gctUINT)(VIR_GetTypeComponents(pThisVirCTCVal->type)))
-                                {
-                                    break;
-                                }
-
-                                hwChannel = (((pVirUniform->swizzle) >> ((channel) * 2)) & 0x3);
-                                thisChannelValue = *(gctUINT*)&pThisSubUniformConstValue[channel];
-
-                                if (pThisCTC->hwConstantLocation.validHWChannelMask & (1 << hwChannel))
-                                {
-                                    gcmASSERT(thisChannelValue == pThisCTC->constantValue[hwChannel]);
-                                }
-                                else
-                                {
-                                    _SetValidChannelForHwConstantLoc(&pThisCTC->hwConstantLocation, hwChannel);
-                                    pThisCTC->constantValue[hwChannel] = thisChannelValue;
-                                }
-                            }
-
-                            if (subUniformIdx == 0)
-                            {
-                                VIR_Symbol_SetFirstSlot(pVirUniformSym, ctcSlot);
-                            }
-                        }
+                        pBaseType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(pBaseType));
                     }
                 }
                 else
                 {
-                    subConstArrayRange = (VIR_Symbol_isImage(pVirUniformSym)) ? 1 : thisUniformRegCount;
-                    for (k = 0; k < thisUniformRegCount; k += subConstArrayRange)
+                    initializerPtr = &pVirUniform->u.initializer;
+                }
+
+                subRegCount = VIR_Type_GetVirRegCount(pShader, pVirUniformType, 1);
+                /* Maxium is 512-bits uniform (4 HW constants) */
+                gcmASSERT((subRegCount * arraySize) == thisUniformRegCount);
+
+                bLongConst = (VIR_GetTypeSize(VIR_GetTypeComponentType(VIR_Type_GetIndex(pBaseType))) >= 8);
+                for (arrElemIdx = 0; arrElemIdx < arraySize; arrElemIdx++)
+                {
+                    pThisVirCTCVal = (VIR_Const*)VIR_GetSymFromId(&pShader->constTable, initializerPtr[arrElemIdx]);
+
+                    for (subUniformIdx = 0; subUniformIdx < subRegCount; subUniformIdx++, uniformIdx++)
                     {
-                        thisConstantArrayIndex = 0;
-                        pThisConstantArrayMapping = _GetConstantArrayMappingByArrayIdx(pCnstMapping, thisConstantArrayIndex);
+                        pThisCTC = gcvNULL;
 
-                        pCnstMapping->arrayIndexMask |= (1 << thisConstantArrayIndex);
-                        pThisConstantArrayMapping->constantArrayIndex = thisConstantArrayIndex;
-
-                        pThisConstantArrayMapping->arrayRange += subConstArrayRange;
-
-                        if (!(pShader->clientApiVersion == gcvAPI_D3D &&
-                              pShader->compilerVersion[1] == _SHADER_DX_VERSION_30))
+                        thisSubUniformPhysicalAddr = uniformPhysical + uniformIdx;
+                        if (bLongConst)
                         {
-                            pThisConstantArrayMapping->constantUsage = SHADER_CONSTANT_USAGE_MIXED;
-                        }
+                            gctUINT64 *pU64Value;
 
-                        pThisCnstSubArrayMapping = _enlargeCnstSubArrayMappingRoom(pThisConstantArrayMapping, 1, &tartCSAMIdx);
-                        vscInitializeCnstSubArrayMapping(pThisCnstSubArrayMapping);
-                        if (pShader->clientApiVersion == gcvAPI_D3D)
-                        {
+                            pU64Value = &pThisVirCTCVal->value.vecVal.u64Value[CHANNEL_NUM * subUniformIdx >> 1];
+                            if (subUniformIdx & 0x1)
+                            {
+                                for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
+                                {
+                                    subUniformConstValue[channel] = (gctUINT)((pU64Value[channel] >> 32) & 0xFFFFFFFF);
+                                }
+                            }
+                            else
+                            {
+                                for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
+                                {
+                                    subUniformConstValue[channel] = (gctUINT)(pU64Value[channel] & 0xFFFFFFFF);
+                                }
+                            }
+                            pThisSubUniformConstValue = subUniformConstValue;
                         }
                         else
                         {
-                            pThisCnstSubArrayMapping->firstMSCSharpRegNo = NOT_ASSIGNED;
-                        }
-                        if (pThisConstantArrayMapping->pSubConstantArrays == pThisCnstSubArrayMapping)
-                        {
-                            pThisCnstSubArrayMapping->startIdx = 0;
-                        }
-                        else
-                        {
-                            pPrevCnstSubArrayMapping = pThisCnstSubArrayMapping - 1;
-                            pThisCnstSubArrayMapping->startIdx = pPrevCnstSubArrayMapping->startIdx + pPrevCnstSubArrayMapping->subArrayRange;
-                        }
-                        pThisCnstSubArrayMapping->subArrayRange = subConstArrayRange;
-                        for (i = 0; i < compCount; i ++)
-                        {
-                            pThisCnstSubArrayMapping->validChannelMask |= (1 << i);
+                            pThisSubUniformConstValue = &pThisVirCTCVal->value.vecVal.u32Value[CHANNEL_NUM * subUniformIdx];
                         }
 
-                        _SetUniformHwCnstReg((pVirUniform->physical + k), subConstArrayRange, &pThisCnstSubArrayMapping->hwFirstConstantLocation);
+                        /* Check whether there is already a CTC allocated on same HW location */
+                        for (ctcSlot = 0; ctcSlot < pCnstMapping->countOfCompileTimeConstant; ctcSlot ++)
+                        {
+                            if (_IsUniformAllocatedOnHwCnstReg(thisSubUniformPhysicalAddr,
+                                                               &pCnstMapping->pCompileTimeConstant[ctcSlot].hwConstantLocation))
+                            {
+                                pThisCTC = &pCnstMapping->pCompileTimeConstant[ctcSlot];
+                                break;
+                            }
+                        }
+
+                        /* Enlarge CTC set to make room for current CTC */
+                        if (pThisCTC == gcvNULL)
+                        {
+                            pThisCTC = _EnlargeCTCRoom(pCnstMapping, 1, &ctcSlot);
+                            vscInitializeCTC(pThisCTC);
+                            _SetUniformHwCnstReg(thisSubUniformPhysicalAddr, 1, &pThisCTC->hwConstantLocation);
+                        }
+
+                        /* Copy CTC now */
                         for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
                         {
+                            if (channel >= (gctUINT)(VIR_GetTypeComponents(pThisVirCTCVal->type)))
+                            {
+                                break;
+                            }
+
                             hwChannel = (((pVirUniform->swizzle) >> ((channel) * 2)) & 0x3);
-                            _SetValidChannelForHwConstantLoc(&pThisCnstSubArrayMapping->hwFirstConstantLocation, hwChannel);
+                            thisChannelValue = *(gctUINT*)&pThisSubUniformConstValue[channel];
+
+                            if (pThisCTC->hwConstantLocation.validHWChannelMask & (1 << hwChannel))
+                            {
+                                gcmASSERT(thisChannelValue == pThisCTC->constantValue[hwChannel]);
+                            }
+                            else
+                            {
+                                _SetValidChannelForHwConstantLoc(&pThisCTC->hwConstantLocation, hwChannel);
+                                pThisCTC->constantValue[hwChannel] = thisChannelValue;
+                            }
                         }
 
-                        if (k == 0)
+                        if (subUniformIdx == 0)
                         {
-                            VIR_Symbol_SetArraySlot(pVirUniformSym, thisConstantArrayIndex);
-                            VIR_Symbol_SetFirstSlot(pVirUniformSym, tartCSAMIdx);
+                            VIR_Symbol_SetFirstSlot(pVirUniformSym, ctcSlot);
                         }
+                    }
+                }
+            }
+            else
+            {
+                subConstArrayRange = (VIR_Symbol_isImage(pVirUniformSym)) ? 1 : thisUniformRegCount;
+                for (k = 0; k < thisUniformRegCount; k += subConstArrayRange)
+                {
+                    thisConstantArrayIndex = 0;
+                    pThisConstantArrayMapping = _GetConstantArrayMappingByArrayIdx(pCnstMapping, thisConstantArrayIndex);
+
+                    pCnstMapping->arrayIndexMask |= (1 << thisConstantArrayIndex);
+                    pThisConstantArrayMapping->constantArrayIndex = thisConstantArrayIndex;
+
+                    pThisConstantArrayMapping->arrayRange += subConstArrayRange;
+
+                    if (!(pShader->clientApiVersion == gcvAPI_D3D && pShader->compilerVersion[1] == _SHADER_DX_VERSION_30))
+                    {
+                        pThisConstantArrayMapping->constantUsage = SHADER_CONSTANT_USAGE_MIXED;
+                    }
+
+                    pThisCnstSubArrayMapping = _enlargeCnstSubArrayMappingRoom(pThisConstantArrayMapping, 1, &tartCSAMIdx);
+                    vscInitializeCnstSubArrayMapping(pThisCnstSubArrayMapping);
+                    if (pShader->clientApiVersion == gcvAPI_D3D)
+                    {
+                    }
+                    else
+                    {
+                        pThisCnstSubArrayMapping->firstMSCSharpRegNo = NOT_ASSIGNED;
+                    }
+                    if (pThisConstantArrayMapping->pSubConstantArrays == pThisCnstSubArrayMapping)
+                    {
+                        pThisCnstSubArrayMapping->startIdx = 0;
+                    }
+                    else
+                    {
+                        pPrevCnstSubArrayMapping = pThisCnstSubArrayMapping - 1;
+                        pThisCnstSubArrayMapping->startIdx = pPrevCnstSubArrayMapping->startIdx + pPrevCnstSubArrayMapping->subArrayRange;
+                    }
+                    pThisCnstSubArrayMapping->subArrayRange = subConstArrayRange;
+                    for (i = 0; i < compCount; i ++)
+                    {
+                        pThisCnstSubArrayMapping->validChannelMask |= (1 << i);
+                    }
+
+                    _SetUniformHwCnstReg((uniformPhysical + k), subConstArrayRange, &pThisCnstSubArrayMapping->hwFirstConstantLocation);
+                    for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
+                    {
+                        hwChannel = (((pVirUniform->swizzle) >> ((channel) * 2)) & 0x3);
+                        _SetValidChannelForHwConstantLoc(&pThisCnstSubArrayMapping->hwFirstConstantLocation, hwChannel);
+                    }
+
+                    if (k == 0)
+                    {
+                        VIR_Symbol_SetArraySlot(pVirUniformSym, thisConstantArrayIndex);
+                        VIR_Symbol_SetFirstSlot(pVirUniformSym, tartCSAMIdx);
                     }
                 }
             }
