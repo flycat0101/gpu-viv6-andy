@@ -5772,6 +5772,28 @@ vx_bool _IsSameQuantType(
             }
             break;
 
+        case VX_QUANT_AFFINE_SCALE_PER_CHANNEL:
+            {
+                vx_uint32 i = 0;
+                vx_uint32 scale_cnt0 = TENSOR_TF_SCALE_COUNT(src);
+                vx_uint32 scale_cnt1 = TENSOR_TF_SCALE_COUNT(dst);
+
+                if (scale_cnt0 == scale_cnt1)
+                {
+                    vx_float32_ptr src_scale_ptr = TENSOR_TF_SCALE_POINTER(src);
+                    vx_float32_ptr dst_scale_ptr = TENSOR_TF_SCALE_POINTER(dst);
+                    for (i = 0; i < scale_cnt0; i++)
+                    {
+                        if (src_scale_ptr[i] != dst_scale_ptr[i])
+                            break;
+                    }
+
+                    if (i == scale_cnt0)
+                        result = vx_true_e;
+                }
+            }
+            break;
+
         default:
             break;
         }

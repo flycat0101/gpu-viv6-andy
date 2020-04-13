@@ -1904,6 +1904,15 @@ VX_PRIVATE_API vx_tensor vxoNNTensor_ReorgWeights(vx_tensor weights, vx_graph gr
     {
         tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(weights);
     }
+    else if (tensor_create_params.quant_format == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
+    {
+        tensor_create_params.quant_data.affinePerChannel.channelDim = TENSOR_TF_CHANNEL_DIMS(weights);
+        tensor_create_params.quant_data.affinePerChannel.scaleCount = TENSOR_TF_SCALE_COUNT(weights);
+        tensor_create_params.quant_data.affinePerChannel.zeroPointCount = TENSOR_TF_SCALE_COUNT(weights);
+
+        tensor_create_params.quant_data.affinePerChannel.scales = TENSOR_TF_SCALE_POINTER(weights);
+        tensor_create_params.quant_data.affinePerChannel.zeroPoint = TENSOR_TF_ZEROPOINT_POINTER(weights);
+    }
     else
     {
         tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(weights);
@@ -1994,12 +2003,13 @@ VX_PRIVATE_API vx_status vxnneTensorConstPad(vx_tensor src, vx_tensor dst, vx_ui
                 {
                     for (x = left; x < outWidth - right; x++)
                     {
-                        vx_float32 src0;
                         vx_uint32 srcOffset = (x - left) + inWidth * (y - top) + inWidth * inHeight * z + inWidth * inHeight * ofm * w;
                         vx_uint32 dstOffset = x + outWidth * y + outWidth * outHeight * z + outWidth * outHeight * ofm * w;
 
-                        src0 = vxnneGetDataExt((vx_type_e)TENSOR_DATA_TYPE(src), TENSOR_QUANT_TYPE(src), srcOffset, (vx_uint8_ptr)srcLogical, srcFp, TENSOR_TF_ZEROPOINT(src), TENSOR_TF_SCALE(src));
-                        vxnneSaveDataExt((vx_type_e)TENSOR_DATA_TYPE(dst), TENSOR_QUANT_TYPE(dst), dstOffset, src0, (vx_uint8_ptr)dstLogical, dstFp, TENSOR_TF_ZEROPOINT(dst), TENSOR_TF_SCALE(dst), dstRoundingMode);
+                        if (_IsSameType(src, dst))
+                        {
+                            gcoOS_MemCopy((vx_uint8_ptr)dstLogical + dstOffset, (vx_uint8_ptr)srcLogical + srcOffset, 1);
+                        }
                     }
                 }
             }
@@ -2041,6 +2051,198 @@ VX_PRIVATE_API vx_status vxnneTensorConstPad(vx_tensor src, vx_tensor dst, vx_ui
     return VX_SUCCESS;
 }
 
+VX_PRIVATE_API vx_tensor _createTensorFromData(vx_graph graph, vx_tensor_create_params_t params, vx_uint8_ptr data)
+{
+    vx_tensor tensor = VX_NULL;
+    vx_uint8_ptr input_base_ptr = VX_NULL;
+    vx_uint32 tensor_size = 0;
+
+    tensor = vxoTensor_CreateTensor2(vxGetContext((vx_reference)graph), &params, sizeof(vx_tensor_create_params_t));
+    if (vxoTensor_AllocateMemory(tensor) != VX_SUCCESS)
+    {
+        vxError("vxoTensor_AllocateMemory fail at function %s, line %d", __FUNCTION__, __LINE__);
+        return VX_NULL;
+    }
+
+    vxoTensor_GetTensorSize(tensor, &tensor_size);
+
+    input_base_ptr = TENSOR_LOGICAL_ADDR(tensor);
+    memcpy(input_base_ptr, data, tensor_size);
+
+    return tensor;
+}
+
+VX_PRIVATE_API vx_tensor _mergeInputZeroPoint2Bias(vx_graph graph, vx_tensor input, vx_tensor weight, vx_tensor bias)
+{
+    vx_tensor new_bias = VX_NULL;
+    vx_tensor_create_params_t params;
+    vx_int32_ptr bias_base_ptr = VX_NULL;
+    vx_int32_ptr bias_base_prev_ptr = VX_NULL;
+    vx_uint8_ptr kernelDataPtr = VX_NULL;
+    vx_uint32 channelCount = TENSOR_VIEW_SIZE_INDEX(weight, 3);
+    vx_uint32 sizes[2] = {channelCount, 1};
+    vx_enum  weight_quant_format = TENSOR_QUANT_TYPE(weight);
+
+    gcoOS_MemFill(&params, 0, sizeof(vx_tensor_create_params_t));
+
+    params.num_of_dims = 2;
+    params.sizes = sizes;
+    params.data_format = TENSOR_DATA_TYPE(weight);
+    params.quant_format = weight_quant_format;
+    if (params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        params.quant_data.dfp.fixed_point_pos = TENSOR_POS(input) * TENSOR_POS(weight);
+        params.data_format = VX_TYPE_INT32;
+    }
+    else if (params.quant_format == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
+    {
+        params.quant_data.affinePerChannel.channelDim = 0;
+        params.quant_data.affinePerChannel.scaleCount = channelCount;
+        params.quant_data.affinePerChannel.zeroPointCount = channelCount;
+        params.quant_data.affinePerChannel.scales = (vx_float32 *)vxAllocateAndZeroMemory(channelCount * sizeof(vx_float32));
+        if (params.quant_data.affinePerChannel.scales == VX_NULL)
+        {
+            vxError("vxoTensor_Create: Out of memory");
+            goto OnError;
+        }
+
+        gcoOS_MemFill(params.quant_data.affinePerChannel.scales, 0, channelCount * sizeof(vx_float32));
+
+        params.quant_data.affinePerChannel.zeroPoint = (vx_int32 *)vxAllocateAndZeroMemory(channelCount * sizeof(vx_int32));
+        if (params.quant_data.affinePerChannel.zeroPoint == VX_NULL)
+        {
+            vxError("vxoTensor_Create: Out of memory");
+            goto OnError;
+        }
+
+        gcoOS_MemFill(params.quant_data.affinePerChannel.zeroPoint, 0, channelCount * sizeof(vx_int32));
+
+        params.data_format = VX_TYPE_INT32;
+    }
+    else
+    {
+        params.quant_data.affine.scale = TENSOR_TF_SCALE(input) * TENSOR_TF_SCALE(weight);
+        params.quant_data.affine.zeroPoint = 0;
+        params.data_format = VX_TYPE_INT32;
+    }
+
+    if (bias && params.quant_format == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
+    {
+        gcoOS_MemCopy(params.quant_data.affinePerChannel.scales, TENSOR_TF_SCALE_POINTER(bias), channelCount * sizeof(vx_float32));
+    }
+    else  if (params.quant_format == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
+    {
+        vx_uint32 i = 0;
+        vx_float32_ptr bias_scales = params.quant_data.affinePerChannel.scales;
+        vx_float32 input_scales = TENSOR_TF_SCALE(input);
+        vx_float32_ptr weight_scales = TENSOR_TF_SCALE_POINTER(weight);
+
+        for (i = 0; i < channelCount; i++)
+        {
+            bias_scales[i] = input_scales * weight_scales[i];
+        }
+    }
+
+    new_bias = vxoTensor_CreateTensor2(vxGetContext((vx_reference)graph), &params, sizeof(vx_tensor_create_params_t));
+    if (vxoTensor_AllocateMemory(new_bias) != VX_SUCCESS)
+    {
+        vxError("vxoTensor_AllocateMemory fail at function %s, line %d", __FUNCTION__, __LINE__);
+        goto OnError;
+    }
+
+    vxoTensor_GetTensorViewMemory(new_bias, (gctPOINTER*)&bias_base_ptr, VX_NULL);
+    vxoTensor_GetTensorViewMemory(weight, (gctPOINTER*)&kernelDataPtr, VX_NULL);
+
+    if (bias)
+    {
+        vxoTensor_GetTensorViewMemory(bias, (gctPOINTER*)&bias_base_prev_ptr, VX_NULL);
+        gcoOS_MemCopy(bias_base_ptr, bias_base_prev_ptr, channelCount * sizeof(vx_int32));
+    }
+
+    if (TENSOR_TF_ZEROPOINT(input) != 0)
+    {
+        vx_uint32 filterIndex   = 0;
+        vx_uint32 sliceIndex    = 0;
+        vx_uint32 x             = 0;
+        vx_uint32 y             = 0;
+        vx_int32  weightZp      = 0;
+        vx_int32  input_zp      = TENSOR_TF_ZEROPOINT(input);
+        vx_uint32 weight_x      = TENSOR_VIEW_SIZE_INDEX(weight, 0);
+        vx_uint32 weight_y      = TENSOR_VIEW_SIZE_INDEX(weight, 1);
+        vx_uint32 sliceCount    = TENSOR_VIEW_SIZE_INDEX(weight, 2);
+        vx_enum   weight_format = TENSOR_DATA_TYPE(weight);
+        vx_uint32 weightSize    = (vx_uint32)vxDataType_GetSize((vx_type_e)weight_format);
+
+        for (filterIndex = 0; filterIndex < channelCount; filterIndex++)
+        {
+            if (weight_quant_format == VX_QUANT_AFFINE_SCALE)
+            {
+                weightZp = TENSOR_TF_ZEROPOINT(weight);
+            }
+
+            for (sliceIndex = 0; sliceIndex < sliceCount; sliceIndex++)
+            {
+                for (y = 0; y < weight_y; y++)
+                {
+                    for (x = 0; x < weight_x; x++)
+                    {
+                        vx_int32 weight = 0;
+
+                        if(weight_format == VX_TYPE_UINT8)
+                        {
+                            weight = *((vx_uint8 *)kernelDataPtr);
+                        }
+                        else if(weight_format == VX_TYPE_INT8)
+                        {
+                            weight = *((vx_int8 *)kernelDataPtr);
+                        }
+
+                        kernelDataPtr = kernelDataPtr + weightSize;
+
+                        /*Calc sum((coef[i] - coefZP) * InZP) */
+                        bias_base_ptr[filterIndex] -= (weight - weightZp) * input_zp;
+                    }
+                }
+            }
+        }
+    }
+
+    if (params.quant_data.affinePerChannel.scales)
+    {
+        vxFree(params.quant_data.affinePerChannel.scales);
+        params.quant_data.affinePerChannel.scales = VX_NULL;
+    }
+
+    if (params.quant_data.affinePerChannel.zeroPoint != VX_NULL)
+    {
+        vxFree(params.quant_data.affinePerChannel.zeroPoint);
+        params.quant_data.affinePerChannel.zeroPoint = VX_NULL;
+    }
+
+    TENSOR_DATA_LIFETIME(new_bias) = VX_TENSOR_LIFE_TIME_STATIC;
+
+    return new_bias;
+
+OnError:
+    if (params.quant_data.affinePerChannel.scales)
+    {
+        vxFree(params.quant_data.affinePerChannel.scales);
+        params.quant_data.affinePerChannel.scales = VX_NULL;
+    }
+
+    if (params.quant_data.affinePerChannel.zeroPoint != VX_NULL)
+    {
+        vxFree(params.quant_data.affinePerChannel.zeroPoint);
+        params.quant_data.affinePerChannel.zeroPoint = VX_NULL;
+    }
+
+    if (new_bias)
+    {
+        vxoTensor_ReleaseTensor(&new_bias);
+    }
+
+    return VX_NULL;
+}
 
 VX_PRIVATE_API vx_status vxnneExecuteSWConv_Convolution_DeInilition(struct _vxnne_operation_s *operation)
 {
@@ -2369,7 +2571,6 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
 
     vx_bool    enable_2dTensor   = GETBIT(reg_param->flag, 0);
 
-    vx_context context = vxGetContext((vx_reference)inputs);
     vx_uint32 idx = 0;
     vx_uint32 numTmpTensor = 0;
 
@@ -2403,10 +2604,17 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
     vx_tensor    weights_new_rs                 = NULL;
     vx_tensor    input_rs                       = NULL;
     vx_tensor    outputs_rs                     = NULL;
+    vx_tensor    scales                         = NULL;
     vx_bool      is_static_weights_biases       = vx_false_e;
     vx_bool      enable_adjust_biases           = vx_false_e;
     vx_bool      enable_conv2d_1x1              = vx_false_e;
     vx_bool      is_conv_3x3_s2                 = vx_false_e;
+    vx_enum      input_quant                    = TENSOR_QUANT_TYPE(inputs);
+    vx_enum      weight_quant                   = TENSOR_QUANT_TYPE(weights);
+    vx_enum      bias_quant                     = TENSOR_QUANT_TYPE(weights);
+    vx_bool      is_bias_null                   = (vx_bool)(biases == NULL);
+    vx_bool      is_asym_quant                  = (vx_bool)(weight_quant == VX_QUANT_AFFINE_SCALE);
+    vx_bool      is_sym_per_channel_quant       = (vx_bool)(weight_quant == VX_QUANT_AFFINE_SCALE_PER_CHANNEL);
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
@@ -2434,7 +2642,7 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
         && (strideX == strideY && strideX == 1)
         && (paddingLeft == paddingRight && paddingLeft == 0)
         && (paddingTop == paddingBottom && paddingTop == 0)
-        && biases != NULL
+        && biases != NULL && !is_sym_per_channel_quant
         && (CHECK_LIFETIME_IS_STATIC(weights) || TENSOR_QUANT_TYPE(inputs) != VX_QUANT_AFFINE_SCALE)
         /*&& ((inputWidth * inputHeight % CONV2D_ALIGN_SIZE4 == 0) || (input_size % CONV2D_ALIGN_SIZE16 != 0) || TENSOR_QUANT_TYPE(inputs) != VX_QUANT_AFFINE_SCALE)*/
         )
@@ -2504,15 +2712,17 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
 
     if(evis)
     {
-        shaderExecutable = vxnneTensor2RowShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR2ROW, &ops_layer->node->kernelAttributes.borderMode,
-                           inputs, k_w, k_h, dilation_x, dilation_y, strideX, strideY, paddingLeft, paddingTop, outputWidth, outputHeight, tensor2Row);
+        shaderExecutable = vxnneTensor2RowShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR2ROW,
+            &ops_layer->node->kernelAttributes.borderMode, inputs, k_w, k_h, dilation_x, dilation_y,
+            strideX, strideY, paddingLeft, paddingTop, outputWidth, outputHeight, tensor2Row);
     }
     else
     {
         if (enable_conv2d_1x1 == vx_false_e)
         {
-            shaderExecutable = vxnneGPUTensor2RowShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR2ROW, &ops_layer->node->kernelAttributes.borderMode,
-                           inputs, k_w, k_h, dilation_x, dilation_y, strideX, strideY, paddingLeft, paddingTop, outputWidth, outputHeight, tensor2Row);
+            shaderExecutable = vxnneGPUTensor2RowShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR2ROW,
+                &ops_layer->node->kernelAttributes.borderMode, inputs, k_w, k_h, dilation_x, dilation_y,
+                strideX, strideY, paddingLeft, paddingTop, outputWidth, outputHeight, tensor2Row);
         }
     }
 
@@ -2541,75 +2751,60 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
 
     // step 2, gemm
     {
-        is_static_weights_biases = (vx_bool)(CHECK_LIFETIME_IS_STATIC(weights) && CHECK_LIFETIME_IS_STATIC(biases));
-        enable_adjust_biases     = is_static_weights_biases && TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE && TENSOR_QUANT_TYPE(biases);
-        enable_adjust_biases     = enable_adjust_biases && (TENSOR_DATA_TYPE(biases) != VX_TYPE_UINT8);
+        vx_bool is_asym_static = (vx_bool)(is_asym_quant && CHECK_LIFETIME_IS_STATIC(weights) && CHECK_LIFETIME_IS_STATIC(biases));
+        vx_bool is_sym_static = (vx_bool)(is_sym_per_channel_quant && CHECK_LIFETIME_IS_STATIC(weights) && (is_bias_null || CHECK_LIFETIME_IS_STATIC(biases)));
+        is_static_weights_biases = (vx_bool)(is_asym_static || is_sym_static);
+        enable_adjust_biases     = is_static_weights_biases && (is_bias_null || bias_quant == weight_quant);
+
+        enable_adjust_biases = enable_adjust_biases && (is_bias_null || TENSOR_DATA_TYPE(biases) != VX_TYPE_UINT8);
 
         if (enable_adjust_biases)
         {
-            vx_tensor_create_params_t params;
-            gctPOINTER weightsLogical   = VX_NULL;
-            gctPOINTER biasesLogical    = VX_NULL;
-            gctPOINTER newBiasesLogical = VX_NULL;
-            vx_uint32  i                = 0;
-            vx_uint32  j                = 0;
-            vx_uint32  sizes[4]         = {1};
-            vx_uint32  ofm              = TENSOR_VIEW_SIZE_INDEX(biases, 0);
-            vx_uint32  ifm              = k_w * k_h * inputDepth;
-
-            sizes[0] = TENSOR_VIEW_SIZE_INDEX(biases, 0);
-            sizes[1] = 1;
-
-            gcoOS_MemFill(&params, 0, sizeof(vx_tensor_create_params_t));
-            params.num_of_dims = TENSOR_DIM_NUM(biases);
-            params.sizes = sizes;
-            params.data_format = TENSOR_DATA_TYPE(biases);
-            params.quant_format = TENSOR_QUANT_TYPE(biases);
-            if (params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
-            {
-                params.quant_data.dfp.fixed_point_pos = TENSOR_POS(biases);
-            }
-            else
-            {
-                params.quant_data.affine.scale = TENSOR_TF_SCALE(biases);
-            }
-
-            newBiases = vxoTensor_CreateTensor(context, NULL, &params, vx_false_e);
-            convolutionLayer->base.temp_tensors[numTmpTensor++] = newBiases;
-            vxoTensor_AllocateMemory(newBiases);
-            if (newBiases == VX_NULL)
-            {
-                vxError("vxoTensor_CreateTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
-                status = VX_ERROR_NO_MEMORY;
-                goto OnError;
-            }
-
-            TENSOR_DATA_LIFETIME(newBiases) = VX_TENSOR_LIFE_TIME_STATIC;
-
-            vxoTensor_GetTensorViewMemory(weights, &weightsLogical, VX_NULL);
-            vxoTensor_GetTensorViewMemory(biases, &biasesLogical, VX_NULL);
-            vxoTensor_GetTensorViewMemory(newBiases, &newBiasesLogical, VX_NULL);
-
-            for (j = 0; j < ofm; j++)
-            {
-                vx_int32 offset = 0;
-                vx_int32 dstVal = 0;
-
-                for (i = 0; i < ifm; i++)
-                {
-                    vx_uint32 idx = j * ifm + i;
-                    offset = offset - (((vx_uint8*)weightsLogical)[idx] - TENSOR_TF_ZEROPOINT(weights)) * TENSOR_TF_ZEROPOINT(inputs);
-                }
-
-                dstVal = ((vx_int32*)biasesLogical)[j] + offset;
-                ((vx_int32*)newBiasesLogical)[j] = dstVal;
-            }
-
+            newBiases = _mergeInputZeroPoint2Bias(ops_layer->node->graph, inputs, weights, biases);
             convolutionLayer->base.temp_tensors[numTmpTensor++] = newBiases;
         }
         else
         {
             newBiases = biases;
+        }
+
+        if (TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
+        {
+            vx_tensor_create_params_t params;
+            vx_uint32 channelCount = TENSOR_TF_SCALE_COUNT(weights);
+            vx_uint32 sizes[2] = {channelCount, 1};
+            vx_float32_ptr scales_data_ptr = VX_NULL;
+            vx_enum ouput_quant_type = TENSOR_QUANT_TYPE(outputs);
+            vx_float32 input_scales = 1;
+            vx_uint32 idx = 0;
+
+            if (input_quant == VX_QUANT_AFFINE_SCALE)
+                input_scales = TENSOR_TF_SCALE(inputs);
+
+            scales_data_ptr = (vx_float32 *)vxAllocateAndZeroMemory(channelCount * sizeof(vx_float32));
+            if (scales_data_ptr == VX_NULL)
+            {
+                status = VX_ERROR_NO_MEMORY;
+                vxError("allocate memory fail at function %s line %d", __FUNCTION__, __LINE__);
+                goto OnError;
+            }
+            gcoOS_MemCopy(scales_data_ptr, TENSOR_TF_SCALE_POINTER(weights), channelCount * sizeof(vx_float32));
+
+            for (idx = 0; idx < channelCount; idx++)
+            {
+                scales_data_ptr[idx] *= input_scales;
+                if (ouput_quant_type == VX_QUANT_AFFINE_SCALE)
+                    scales_data_ptr[idx] /= TENSOR_TF_SCALE(outputs);
+            }
+
+            gcoOS_MemFill(&params, 0, sizeof(vx_tensor_create_params_t));
+
+            params.num_of_dims = 2;
+            params.sizes = sizes;
+            params.data_format = VX_TYPE_FLOAT32;
+
+            scales = _createTensorFromData(ops_layer->node->graph, params, (vx_uint8_ptr)scales_data_ptr);
+            convolutionLayer->base.temp_tensors[numTmpTensor++] = scales;
         }
     }
 
@@ -2618,9 +2813,9 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
         weights_new_rs = weights;
         input_rs = tensor2Row;
         outputs_rs = outputs;
-        if (biases)
+        if (newBiases)
         {
-            shaderExecutable = vxnneGemmShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GEMM, &ops_layer->node->kernelAttributes.borderMode, tensor2Row, weights_new_rs, newBiases, VX_NN_ACTIVATION_NONE, enable_2dTensor, outputs_rs);
+            shaderExecutable = vxnneGemmShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GEMM, &ops_layer->node->kernelAttributes.borderMode, tensor2Row, weights_new_rs, scales, newBiases, VX_NN_ACTIVATION_NONE, enable_2dTensor, outputs_rs);
         }
         else
         {
@@ -3820,6 +4015,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                     || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16  && biasFormat == VX_TYPE_INT64 && outputFormat == VX_TYPE_INT16)
                     || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16  && biasFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
                     || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_INT32 && outputFormat != VX_TYPE_FLOAT32)
+                    || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_INT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_UINT8)
                     || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_UINT8 && outputFormat != VX_TYPE_FLOAT32)
                     || (inputFormat == VX_TYPE_BFLOAT16 && weightFormat == VX_TYPE_BFLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_BFLOAT16));
             }
@@ -4640,6 +4836,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                 vxnne_shader_executable shaderExecutable = VX_NULL;
                 vx_tensor_create_params_t tensor_create_params;
                 vx_tensor    newBiases                      = NULL;
+                vx_tensor    scales                         = NULL;
                 vx_tensor    weights_new_rs                 = NULL;
                 vx_tensor    input_rs                       = NULL;
                 vx_tensor    outputs_rs                     = NULL;
@@ -4647,6 +4844,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                 vx_bool      enable_adjust_biases           = vx_false_e;
                 vx_bool      enable_conv2d_1x1              = vx_false_e;
                 vx_bool      is_conv_3x3_s2                 = vx_false_e;
+                vx_enum      input_quant                    = TENSOR_QUANT_TYPE(inputs);
+                vx_enum      weight_quant                   = TENSOR_QUANT_TYPE(weights);
+                vx_enum      bias_quant                     = TENSOR_QUANT_TYPE(weights);
+                vx_bool      is_bias_null                   = (vx_bool)(biases == NULL);
+                vx_bool      is_asym_quant                  = (vx_bool)(weight_quant == VX_QUANT_AFFINE_SCALE);
+                vx_bool      is_sym_per_channel_quant       = (vx_bool)(weight_quant == VX_QUANT_AFFINE_SCALE_PER_CHANNEL);
                 // step 1, tensor to row
                 if (enable_2dTensor)
                 {
@@ -4671,7 +4874,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                     && (strideX == strideY && strideX == 1)
                     && (paddingLeft == paddingRight && paddingLeft == 0)
                     && (paddingTop == paddingBottom && paddingTop == 0)
-                    && biases != NULL
+                    && biases != NULL && !is_sym_per_channel_quant
                     && (CHECK_LIFETIME_IS_STATIC(weights) || TENSOR_QUANT_TYPE(inputs) != VX_QUANT_AFFINE_SCALE)
                     /*&& ((inputWidth * inputHeight % CONV2D_ALIGN_SIZE4 == 0) || (input_size % CONV2D_ALIGN_SIZE16 != 0) || TENSOR_QUANT_TYPE(inputs) != VX_QUANT_AFFINE_SCALE)*/
                     )
@@ -4741,15 +4944,17 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
 
                 if(node->base.context->evisNoInst.supportEVIS)
                 {
-                    shaderExecutable = vxnneTensor2RowShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR2ROW, &node->kernelAttributes.borderMode,
-                                       inputs, k_w, k_h, dilation_x, dilation_y, strideX, strideY, paddingLeft, paddingTop, outputWidth, outputHeight, tensor2Row);
+                    shaderExecutable = vxnneTensor2RowShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR2ROW,
+                        &node->kernelAttributes.borderMode, inputs, k_w, k_h, dilation_x, dilation_y,
+                        strideX, strideY, paddingLeft, paddingTop, outputWidth, outputHeight, tensor2Row);
                 }
                 else
                 {
                     if (enable_conv2d_1x1 == vx_false_e)
                     {
-                        shaderExecutable = vxnneGPUTensor2RowShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR2ROW, &node->kernelAttributes.borderMode,
-                                       inputs, k_w, k_h, dilation_x, dilation_y, strideX, strideY, paddingLeft, paddingTop, outputWidth, outputHeight, tensor2Row);
+                        shaderExecutable = vxnneGPUTensor2RowShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR2ROW,
+                            &node->kernelAttributes.borderMode, inputs, k_w, k_h, dilation_x, dilation_y,
+                            strideX, strideY, paddingLeft, paddingTop, outputWidth, outputHeight, tensor2Row);
                     }
                 }
 
@@ -4781,75 +4986,60 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
 
                 // step 2, gemm
                 {
-                    is_static_weights_biases = (vx_bool)(CHECK_LIFETIME_IS_STATIC(weights) && CHECK_LIFETIME_IS_STATIC(biases));
-                    enable_adjust_biases     = is_static_weights_biases && TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE && TENSOR_QUANT_TYPE(biases);
-                    enable_adjust_biases     = enable_adjust_biases && (TENSOR_DATA_TYPE(biases) != VX_TYPE_UINT8);
+                    vx_bool is_asym_static = (vx_bool)(is_asym_quant && CHECK_LIFETIME_IS_STATIC(weights) && CHECK_LIFETIME_IS_STATIC(biases));
+                    vx_bool is_sym_static = (vx_bool)(is_sym_per_channel_quant && CHECK_LIFETIME_IS_STATIC(weights) && (is_bias_null || CHECK_LIFETIME_IS_STATIC(biases)));
+                    is_static_weights_biases = (vx_bool)(is_asym_static || is_sym_static);
+                    enable_adjust_biases     = is_static_weights_biases && (is_bias_null || bias_quant == weight_quant);
+
+                    enable_adjust_biases = enable_adjust_biases && (is_bias_null || TENSOR_DATA_TYPE(biases) != VX_TYPE_UINT8);
 
                     if (enable_adjust_biases)
                     {
-                        vx_tensor_create_params_t params;
-                        gctPOINTER weightsLogical   = VX_NULL;
-                        gctPOINTER biasesLogical    = VX_NULL;
-                        gctPOINTER newBiasesLogical = VX_NULL;
-                        vx_uint32  i                = 0;
-                        vx_uint32  j                = 0;
-                        vx_uint32  sizes[4]         = {1};
-                        vx_uint32  ofm              = TENSOR_VIEW_SIZE_INDEX(biases, 0);
-                        vx_uint32  ifm              = k_w * k_h * inputDepth;
-
-                        sizes[0] = TENSOR_VIEW_SIZE_INDEX(biases, 0);
-                        sizes[1] = 1;
-
-                        gcoOS_MemFill(&params, 0, sizeof(vx_tensor_create_params_t));
-                        params.num_of_dims = TENSOR_DIM_NUM(biases);
-                        params.sizes = sizes;
-                        params.data_format = TENSOR_DATA_TYPE(biases);
-                        params.quant_format = TENSOR_QUANT_TYPE(biases);
-                        if (params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
-                        {
-                            params.quant_data.dfp.fixed_point_pos = TENSOR_POS(biases);
-                        }
-                        else
-                        {
-                            params.quant_data.affine.scale = TENSOR_TF_SCALE(biases);
-                        }
-
-                        newBiases = vxoTensor_CreateTensor(context, NULL, &params, vx_false_e);
-                        convolutionLayer->base.temp_tensors[numTmpTensor++] = newBiases;
-                        vxoTensor_AllocateMemory(newBiases);
-                        if (newBiases == VX_NULL)
-                        {
-                            vxError("vxoTensor_CreateTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
-                            status = VX_ERROR_NO_MEMORY;
-                            goto exit;
-                        }
-
-                        TENSOR_DATA_LIFETIME(newBiases) = VX_TENSOR_LIFE_TIME_STATIC;
-
-                        vxoTensor_GetTensorViewMemory(weights, &weightsLogical, VX_NULL);
-                        vxoTensor_GetTensorViewMemory(biases, &biasesLogical, VX_NULL);
-                        vxoTensor_GetTensorViewMemory(newBiases, &newBiasesLogical, VX_NULL);
-
-                        for (j = 0; j < ofm; j++)
-                        {
-                            vx_int32 offset = 0;
-                            vx_int32 dstVal = 0;
-
-                            for (i = 0; i < ifm; i++)
-                            {
-                                vx_uint32 idx = j * ifm + i;
-                                offset = offset - (((vx_uint8*)weightsLogical)[idx] - TENSOR_TF_ZEROPOINT(weights)) * TENSOR_TF_ZEROPOINT(inputs);
-                            }
-
-                            dstVal = ((vx_int32*)biasesLogical)[j] + offset;
-                            ((vx_int32*)newBiasesLogical)[j] = dstVal;
-                        }
-
+                        newBiases = _mergeInputZeroPoint2Bias(node->graph, inputs, weights, biases);
                         convolutionLayer->base.temp_tensors[numTmpTensor++] = newBiases;
                     }
                     else
                     {
                         newBiases = biases;
+                    }
+
+                    if (TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
+                    {
+                        vx_tensor_create_params_t params;
+                        vx_uint32 channelCount = TENSOR_TF_SCALE_COUNT(weights);
+                        vx_uint32 sizes[2] = {channelCount, 1};
+                        vx_float32_ptr scales_data_ptr = VX_NULL;
+                        vx_enum ouput_quant_type = TENSOR_QUANT_TYPE(outputs);
+                        vx_float32 input_scales = 1;
+                        vx_uint32 idx = 0;
+
+                        if (input_quant == VX_QUANT_AFFINE_SCALE)
+                            input_scales = TENSOR_TF_SCALE(inputs);
+
+                        scales_data_ptr = (vx_float32 *)vxAllocateAndZeroMemory(channelCount * sizeof(vx_float32));
+                        if (scales_data_ptr == VX_NULL)
+                        {
+                            status = VX_ERROR_NO_MEMORY;
+                            vxError("allocate memory fail at function %s line %d", __FUNCTION__, __LINE__);
+                            goto exit;
+                        }
+                        gcoOS_MemCopy(scales_data_ptr, TENSOR_TF_SCALE_POINTER(weights), channelCount * sizeof(vx_float32));
+
+                        for (idx = 0; idx < channelCount; idx++)
+                        {
+                            scales_data_ptr[idx] *= input_scales;
+                            if (ouput_quant_type == VX_QUANT_AFFINE_SCALE)
+                                scales_data_ptr[idx] /= TENSOR_TF_SCALE(outputs);
+                        }
+
+                        gcoOS_MemFill(&params, 0, sizeof(vx_tensor_create_params_t));
+
+                        params.num_of_dims = 2;
+                        params.sizes = sizes;
+                        params.data_format = VX_TYPE_FLOAT32;
+
+                        scales = _createTensorFromData(node->graph, params, (vx_uint8_ptr)scales_data_ptr);
+                        convolutionLayer->base.temp_tensors[numTmpTensor++] = scales;
                     }
                 }
 
@@ -4858,9 +5048,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                     weights_new_rs = weights;
                     input_rs = tensor2Row;
                     outputs_rs = outputs;
-                    if (biases)
+                    if (newBiases)
                     {
-                        shaderExecutable = vxnneGemmShaderExecutable(node->base.context, VXNNE_KERNEL_GEMM, &node->kernelAttributes.borderMode, tensor2Row, weights_new_rs, newBiases, VX_NN_ACTIVATION_NONE, enable_2dTensor, outputs_rs);
+                        shaderExecutable = vxnneGemmShaderExecutable(node->base.context, VXNNE_KERNEL_GEMM, &node->kernelAttributes.borderMode, tensor2Row, weights_new_rs, scales, newBiases, VX_NN_ACTIVATION_NONE, enable_2dTensor, outputs_rs);
                     }
                     else
                     {

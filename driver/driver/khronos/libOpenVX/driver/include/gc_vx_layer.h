@@ -3324,6 +3324,7 @@ vxnne_shader_executable vxnneGemmShaderExecutable(
     vx_border_mode_t        *borderMode,
     vx_tensor               input,
     vx_tensor               weight,
+    vx_tensor               scales,
     vx_tensor               bias,
     vx_int32                fuseCode,
     vx_bool                 enable_2dTensor,
