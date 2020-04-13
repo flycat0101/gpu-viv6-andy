@@ -67,7 +67,7 @@ _viv_uniform VXC_512Bits uniExtact8Bin_2x8;
         _viv_asm(CONV_RTE, data2, data0); \
         _viv_asm(CONV_RTE, data3, data1); \
         dst_type dst0; \
-        VXC_DP2x8(dst0, data2, data3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExtact8Bin_2x8); \
+        VXC_DP2x8(dst0, data2, data3, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtact8Bin_2x8); \
         save_type dst;\
         _viv_asm(COPY, dst, dst0, 16); \
         VXC_IMG_WRITE_8PIXELS(VXC_WriteImage2DArray) \
