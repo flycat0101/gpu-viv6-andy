@@ -192,55 +192,34 @@ OnError:
 
 VX_PRIVATE_API vx_bool vxoNNL2NormalizeLayer_SH_EVIS_Support_Ext(vx_node node, const vx_reference parameters[], vx_uint32 _num, vxnne_register_param reg_param, vx_bool evis)
 {
-    vx_tensor  input                      = (vx_tensor)parameters[0];
-    vx_tensor  output                     = (vx_tensor)parameters[1];
-    vx_bool    enableShader;
-    vx_type_e  inputFormat                = (vx_type_e)TENSOR_DATA_TYPE(input);
-    vx_type_e  outputFormat               = (vx_type_e)TENSOR_DATA_TYPE(output);
-    vx_uint32  dims                       = TENSOR_VIEW_DIM_NUM(input);
-    vx_uint32  width                      = TENSOR_VIEW_SIZE_INDEX(input, 0);
-    vx_uint32  height                     = (dims > 1) ? TENSOR_VIEW_SIZE_INDEX(input, 1) : 1;
-    vx_uint32  depth                      = (dims > 2) ? TENSOR_VIEW_SIZE_INDEX(input, 2) : 1;
-    vx_uint32  batch                      = (dims > 3) ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
+    vx_tensor  inputs                           = (vx_tensor)parameters[0];
+    vx_tensor  outputs                          = (vx_tensor)parameters[1];
+    vx_bool    enableShader                     = vx_false_e;
+    vx_type_e  inputFormat                      = (vx_type_e)TENSOR_DATA_TYPE(inputs);
+    vx_type_e  outputFormat                     = (vx_type_e)TENSOR_DATA_TYPE(outputs);
+    vx_uint32  i                                = 0;
+    vx_uint32  rank_x                           = TENSOR_DIM_NUM(inputs);
+    vx_int32   axis                             = rank_x < 3 ? 0 : 2;
+    vx_int32   shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+    vx_int32   out_shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+    vx_uint32  out_rank_x                       = 1;
+    vx_int32   out_axis                         = 0;
+    vx_bool    ret                              = 0;
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
 
     vxoLayer_VerificationHead(node, parameters, _num, reg_param);
-    switch(dims)
+
+    for (i = 0; i < rank_x; i++)
     {
-    case 1:
-        depth   = TENSOR_VIEW_SIZE_INDEX(input, 0);
-        batch   = 1;
-        width   = 1;
-        height  = 1;
-        dims    = 3;
-        break;
-    case 2:
-        depth   = TENSOR_VIEW_SIZE_INDEX(input, 0);
-        batch   = TENSOR_VIEW_SIZE_INDEX(input, 1);
-        width   = 1;
-        height  = 1;
-        dims    = 4;
-        break;
-    case 3:
-        width   = TENSOR_VIEW_SIZE_INDEX(input, 0);
-        height  = TENSOR_VIEW_SIZE_INDEX(input, 1);
-        depth   = TENSOR_VIEW_SIZE_INDEX(input, 2);
-        batch   = 1;
-        dims    = 3;
-        break;
-    case 4:
-        width   = TENSOR_VIEW_SIZE_INDEX(input, 0);
-        height  = TENSOR_VIEW_SIZE_INDEX(input, 1);
-        depth   = TENSOR_VIEW_SIZE_INDEX(input, 2);
-        batch   = TENSOR_VIEW_SIZE_INDEX(input, 3);
-        break;
-    default:
-        vxError("Input tensor error dimension[%u]\n", dims);
+        shape_x[i] = (vx_int32)TENSOR_VIEW_SIZE_INDEX(inputs, i);
     }
+
+    ret = vx_nn_kernel_optimize_softmax_shape(shape_x, rank_x, axis, out_shape_x, &out_rank_x, &out_axis);
 
     if(evis)
     {
-        enableShader = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+        enableShader = (vx_bool)(
+                             (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8)
                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT16)
                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_UINT8)
@@ -251,12 +230,21 @@ VX_PRIVATE_API vx_bool vxoNNL2NormalizeLayer_SH_EVIS_Support_Ext(vx_node node, c
                           || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
                           || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16)
                           || (inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16));
-        enableShader  = enableShader && (width * height < IMG_MAX_WIDTH);
     }
     else
-        enableShader = vx_true_e;
+    {
+        enableShader = (vx_bool)(
+                             (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+                          || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
+                          || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT32)
+                          || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16)
+                          || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+                          || (inputFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT32)
+                          || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
+                          || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8));
+    }
 
-    support = support && enableShader;
+    support = support && enableShader && ret && out_axis < 3;
 
     vxoLayer_VerificationFoot(node, parameters, _num, reg_param, &support);
     return support;
@@ -266,103 +254,104 @@ VX_PRIVATE_API vx_status vxoNNL2NormalizeLayer_SH_Initialize_Ext(vxnne_layer ops
 {
     vx_status status = VX_SUCCESS;
 
-    vx_tensor  input                      = (vx_tensor)parameters[0];
-    vx_tensor  output                     = (vx_tensor)parameters[1];
-    vx_uint32  dims                       = TENSOR_VIEW_DIM_NUM(input);
-    vx_uint32  width                      = TENSOR_VIEW_SIZE_INDEX(input, 0);
-    vx_uint32  height                     = (dims > 1) ? TENSOR_VIEW_SIZE_INDEX(input, 1) : 1;
-    vx_uint32  depth                      = (dims > 2) ? TENSOR_VIEW_SIZE_INDEX(input, 2) : 1;
-    vx_uint32  batch                      = (dims > 3) ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
-    vx_uint32  sizes[4]                   = {0, 0, 0, 0};
-    vx_tensor  src                        = NULL;
-    vx_tensor  dst                        = NULL;
-    vxnne_l2normalize_layer l2normalizeLayer = (vxnne_l2normalize_layer)ops_layer;
-    vxnne_shader_executable shaderExecutable = VX_NULL;
-    vx_uint32 dim                  = 4;
-    vx_uint32 tmp_sizes[4]         = {1, 1, 1, 1};
-    vx_tensor_create_params_t      tensor_create_params;
-    vx_tensor sumTmp = VX_NULL;
+    vx_tensor  inputs                                       = (vx_tensor)parameters[0];
+    vx_tensor  outputs                                      = (vx_tensor)parameters[1];
+    vx_uint32  i                                            = 0;
+    vx_uint32  rank_x                                       = TENSOR_DIM_NUM(inputs);
+    vx_int32   axis                                         = rank_x < 3 ? 0 : 2;
+    vx_int32   shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION]     = {1};
+    vx_int32   out_shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+    vx_uint32  out_rank_x                                   = 1;
+    vx_int32   out_axis                                     = 0;
+    vx_bool    ret                                          = 0;
+    vx_tensor  src                                          = NULL;
+    vx_tensor  dst                                          = NULL;
+     vx_uint32 batch                                        = (rank_x > 3) ? TENSOR_VIEW_SIZE_INDEX(inputs, 3) : 1;
+    vxnne_l2normalize_layer l2normalizeLayer                = (vxnne_l2normalize_layer)ops_layer;
+     vxnne_shader_executable shaderExecutable               = VX_NULL;
 
-    switch(dims)
+    for (i = 0; i < rank_x; i++)
     {
-    case 1:
-        depth   = TENSOR_VIEW_SIZE_INDEX(input, 0);
-        batch   = 1;
-        width   = 1;
-        height  = 1;
-        dims    = 3;
-        break;
-    case 2:
-        depth   = TENSOR_VIEW_SIZE_INDEX(input, 0);
-        batch   = TENSOR_VIEW_SIZE_INDEX(input, 1);
-        width   = 1;
-        height  = 1;
-        dims    = 4;
-        break;
-    case 3:
-        width   = TENSOR_VIEW_SIZE_INDEX(input, 0);
-        height  = TENSOR_VIEW_SIZE_INDEX(input, 1);
-        depth   = TENSOR_VIEW_SIZE_INDEX(input, 2);
-        batch   = 1;
-        dims    = 3;
-        break;
-    case 4:
-        width   = TENSOR_VIEW_SIZE_INDEX(input, 0);
-        height  = TENSOR_VIEW_SIZE_INDEX(input, 1);
-        depth   = TENSOR_VIEW_SIZE_INDEX(input, 2);
-        batch   = TENSOR_VIEW_SIZE_INDEX(input, 3);
-        break;
-    default:
-        vxError("Input tensor error dimension[%u]\n", dims);
+        shape_x[i] = (vx_int32)TENSOR_VIEW_SIZE_INDEX(inputs, i);
     }
 
-    sizes[0] = width;
-    sizes[1] = height;
-    sizes[2] = depth;
-    sizes[3] = batch;
-
-    src      = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims);
-    dst      = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims);
+    ret = vx_nn_kernel_optimize_softmax_shape(shape_x, rank_x, axis, out_shape_x, &out_rank_x, &out_axis);
+    src = vxoTensor_ReshapeTensor(inputs, out_shape_x, out_rank_x);
+    dst = vxoTensor_ReshapeTensor(outputs, out_shape_x, out_rank_x);
     l2normalizeLayer->base.temp_tensors[0] = src;
     l2normalizeLayer->base.temp_tensors[1] = dst;
     l2normalizeLayer->base.num_temp_tensors = 2;
+
+    batch = out_rank_x > 3 ? out_shape_x[3] : 1;
+
     vxoLayer_InitializeHead(ops_layer, parameters, _num, reg_param);
 
-    if(evis)
-    {
-        tmp_sizes[0] = gcmALIGN(width * height, 16);
-        tmp_sizes[3] = batch;
-    }
-    else
-    {
-        tmp_sizes[0] = width;
-        tmp_sizes[1] = height;
-        tmp_sizes[3] = batch;
-    }
-
-    gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
-    tensor_create_params.num_of_dims = dim;
-    tensor_create_params.sizes = tmp_sizes;
-    tensor_create_params.data_format = VX_TYPE_FLOAT32;
-    tensor_create_params.quant_format = 0;
-
-    sumTmp = vxoTensor_CreateTensor(ops_layer->node->base.context, ops_layer->node->graph, &tensor_create_params, vx_true_e);
-    if (sumTmp == VX_NULL)
-    {
-        vxError("vxoTensor_CreateTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
-        status = VX_ERROR_NO_MEMORY;
-        goto OnError;
-    }
-    l2normalizeLayer->base.temp_tensors[2] = sumTmp;
-    l2normalizeLayer->base.num_temp_tensors = 3;
     //node 1
     if(evis)
     {
-        shaderExecutable = vxnneL2NormSumSqrtShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_L2NORM_SUMSQRT, &ops_layer->node->kernelAttributes.borderMode, src, sumTmp);
+        if (out_axis == 0)
+        {
+            shaderExecutable = vxnneGetL2NormAxis0ShaderExecutable(
+                ops_layer->node->base.context,
+                VXNNE_KERNEL_L2NORM_AXIS0,
+                &ops_layer->node->kernelAttributes.borderMode,
+                out_axis,
+                src,
+                dst);
+        }
+        else if (out_axis == 1)
+        {
+            shaderExecutable = vxnneGetL2NormAxis1ShaderExecutable(
+                ops_layer->node->base.context,
+                VXNNE_KERNEL_L2NORM_AXIS1,
+                &ops_layer->node->kernelAttributes.borderMode,
+                out_axis,
+                src,
+                dst);
+        }
+        else
+        {
+            shaderExecutable = vxnneGetL2NormAxis2ShaderExecutable(
+                ops_layer->node->base.context,
+                VXNNE_KERNEL_L2NORM_AXIS2,
+                &ops_layer->node->kernelAttributes.borderMode,
+                out_axis,
+                src,
+                dst);
+        }
     }
     else
     {
-        shaderExecutable = vxnneGPUL2NormSumSqrtShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_L2NORM_SUMSQRT, &ops_layer->node->kernelAttributes.borderMode, src, sumTmp);
+        if (out_axis == 0)
+        {
+            shaderExecutable = vxnneGetGPUL2NormAxis0ShaderExecutable(
+                ops_layer->node->base.context,
+                VXNNE_KERNEL_GPU_L2NORM_AXIS0,
+                &ops_layer->node->kernelAttributes.borderMode,
+                out_axis,
+                src,
+                dst);
+        }
+        else if (out_axis == 1)
+        {
+            shaderExecutable = vxnneGetGPUL2NormAxis1ShaderExecutable(
+                ops_layer->node->base.context,
+                VXNNE_KERNEL_GPU_L2NORM_AXIS1,
+                &ops_layer->node->kernelAttributes.borderMode,
+                out_axis,
+                src,
+                dst);
+        }
+        else
+        {
+            shaderExecutable = vxnneGetGPUL2NormAxis2ShaderExecutable(
+                ops_layer->node->base.context,
+                VXNNE_KERNEL_GPU_L2NORM_AXIS2,
+                &ops_layer->node->kernelAttributes.borderMode,
+                out_axis,
+                src,
+                dst);
+        }
     }
 
     if (!shaderExecutable)
@@ -370,48 +359,19 @@ VX_PRIVATE_API vx_status vxoNNL2NormalizeLayer_SH_Initialize_Ext(vxnne_layer ops
         status = VX_FAILURE;
         goto OnError;
     }
-    vxmONERROR(vxnneShaderOperation_Initialize(&l2normalizeLayer->l2normalize_SumSqrt_sh_operation,
+    vxmONERROR(vxnneShaderOperation_Initialize(&l2normalizeLayer->l2normalize_sh_operation,
                                     &l2normalizeLayer->base,
                                     VXNNE_OPERATOR_L2NORMALIZE_SUMSQRT,
                                     batch,
                                     shaderExecutable));
 
-    vxmONERROR(vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_SumSqrt_sh_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT));
-    vxmONERROR(vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_SumSqrt_sh_operation.base, (vx_reference)sumTmp, VXNNE_OPERATION_REFENRENCE_OUTPUT));
-
-    //node 2
-    if(evis)
-    {
-        shaderExecutable = vxnneL2NormSumScaleShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_L2NORM_SUMSCALE, &ops_layer->node->kernelAttributes.borderMode, src, sumTmp, dst);
-    }
-    else
-    {
-        shaderExecutable = vxnneGPUL2NormSumScaleShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_L2NORM_SUMSCALE, &ops_layer->node->kernelAttributes.borderMode, src, sumTmp, dst);
-    }
-
-    if (!shaderExecutable)
-    {
-        status = VX_FAILURE;
-        goto OnError;
-    }
-    vxmONERROR(vxnneShaderOperation_Initialize(&l2normalizeLayer->l2normalize_sumScale_sh_operation,
-                                    &l2normalizeLayer->base,
-                                    VXNNE_OPERATOR_L2NORMALIZE_SUMSCALE,
-                                    batch,
-                                    shaderExecutable));
-
-    vxmONERROR(vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_sumScale_sh_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT));
-    vxmONERROR(vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_sumScale_sh_operation.base, (vx_reference)sumTmp, VXNNE_OPERATION_REFENRENCE_INPUT));
-    vxmONERROR(vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_sumScale_sh_operation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    vxmONERROR(vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_sh_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_sh_operation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT));
 
     vxmONERROR(vxnneLayer_SetOperation(
         &l2normalizeLayer->base,
-        &l2normalizeLayer->l2normalize_SumSqrt_sh_operation.base,
+        &l2normalizeLayer->l2normalize_sh_operation.base,
         0));
-    vxmONERROR(vxnneLayer_SetOperation(
-        &l2normalizeLayer->base,
-        &l2normalizeLayer->l2normalize_sumScale_sh_operation.base,
-        1));
 
 OnError:
 
@@ -508,21 +468,24 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNL2NormalizeLayer_Initializer(vx_node n
 
 OnError:
 #else
-    vx_tensor  input                      = (vx_tensor)parameters[0];
-    vx_tensor  output                     = (vx_tensor)parameters[1];
-    vx_bool    enableShader;
-    vx_type_e  inputFormat                = (vx_type_e)TENSOR_DATA_TYPE(input);
-    vx_type_e  outputFormat               = (vx_type_e)TENSOR_DATA_TYPE(output);
-    vx_uint32  dims                       = TENSOR_VIEW_DIM_NUM(input);
-    vx_uint32  width                      = TENSOR_VIEW_SIZE_INDEX(input, 0);
-    vx_uint32  height                     = (dims > 1) ? TENSOR_VIEW_SIZE_INDEX(input, 1) : 1;
-    vx_uint32  depth                      = (dims > 2) ? TENSOR_VIEW_SIZE_INDEX(input, 2) : 1;
-    vx_uint32  batch                      = (dims > 3) ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
-    vx_uint32  sizes[4]                   = {0, 0, 0, 0};
-    vx_tensor  src                        = NULL;
-    vx_tensor  dst                        = NULL;
-
-    vxnne_l2normalize_layer l2normalizeLayer = VX_NULL;
+    vx_tensor  inputs                           = (vx_tensor)parameters[0];
+    vx_tensor  outputs                          = (vx_tensor)parameters[1];
+    vx_type_e  inputFormat                      = (vx_type_e)TENSOR_DATA_TYPE(inputs);
+    vx_type_e  outputFormat                     = (vx_type_e)TENSOR_DATA_TYPE(outputs);
+    vx_uint32  i                                = 0;
+    vx_uint32  rank_x                           = TENSOR_DIM_NUM(inputs);
+    vx_int32   axis                             = rank_x < 3 ? 0 : 2;
+    vx_int32   shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+    vx_int32   out_shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+    vx_uint32  out_rank_x                       = 1;
+    vx_int32   out_axis                         = 0;
+    vx_tensor  src                              = NULL;
+    vx_tensor  dst                              = NULL;
+    vx_uint32  batch                            = (rank_x > 3) ? TENSOR_VIEW_SIZE_INDEX(inputs, 3) : 1;
+    vx_bool    ret                              = vx_false_e;
+    vx_bool    enableShader                     = vx_false_e;
+    vxnne_shader_executable shaderExecutable    = VX_NULL;
+    vxnne_l2normalize_layer l2normalizeLayer    = VX_NULL;
     /* destroy the existing layer */
     if (node->layer)
     {
@@ -538,46 +501,19 @@ OnError:
         return status;
     }
 
-    switch(dims)
+    for (i = 0; i < rank_x; i++)
     {
-    case 1:
-        depth   = TENSOR_VIEW_SIZE_INDEX(input, 0);
-        batch   = 1;
-        width   = 1;
-        height  = 1;
-        dims    = 3;
-        break;
-    case 2:
-        depth   = TENSOR_VIEW_SIZE_INDEX(input, 0);
-        batch   = TENSOR_VIEW_SIZE_INDEX(input, 1);
-        width   = 1;
-        height  = 1;
-        dims    = 4;
-        break;
-    case 3:
-        width   = TENSOR_VIEW_SIZE_INDEX(input, 0);
-        height  = TENSOR_VIEW_SIZE_INDEX(input, 1);
-        depth   = TENSOR_VIEW_SIZE_INDEX(input, 2);
-        batch   = 1;
-        dims    = 3;
-        break;
-    case 4:
-        width   = TENSOR_VIEW_SIZE_INDEX(input, 0);
-        height  = TENSOR_VIEW_SIZE_INDEX(input, 1);
-        depth   = TENSOR_VIEW_SIZE_INDEX(input, 2);
-        batch   = TENSOR_VIEW_SIZE_INDEX(input, 3);
-        break;
-    default:
-        vxError("Input tensor error dimension[%u]\n", dims);
+        shape_x[i] = (vx_int32)TENSOR_VIEW_SIZE_INDEX(inputs, i);
     }
 
-    sizes[0] = width;
-    sizes[1] = height;
-    sizes[2] = depth;
-    sizes[3] = batch;
+    ret = vx_nn_kernel_optimize_softmax_shape(shape_x, rank_x, axis, out_shape_x, &out_rank_x, &out_axis);
+    src = vxoTensor_ReshapeTensor(inputs, out_shape_x, out_rank_x);
+    dst = vxoTensor_ReshapeTensor(outputs, out_shape_x, out_rank_x);
+    l2normalizeLayer->base.temp_tensors[0] = src;
+    l2normalizeLayer->base.temp_tensors[1] = dst;
+    l2normalizeLayer->base.num_temp_tensors = 2;
 
-    src      = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims);
-    dst      = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims);
+    batch = out_rank_x > 3 ? out_shape_x[3] : 1;
 
     gcoOS_ZeroMemory(l2normalizeLayer, sizeof(vxnne_l2normalize_layer_s));
 
@@ -590,7 +526,8 @@ OnError:
 
     if(node->base.context->evisNoInst.supportEVIS)
     {
-        enableShader = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+        enableShader = (vx_bool)(
+                             (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8)
                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT16)
                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_UINT8)
@@ -601,111 +538,110 @@ OnError:
                           || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
                           || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16)
                           || (inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16));
-        enableShader  = enableShader && (width * height < IMG_MAX_WIDTH);
     }
     else
-        enableShader = vx_true_e;
+    {
+        enableShader = (vx_bool)(
+                             (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+                          || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
+                          || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT32)
+                          || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16)
+                          || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+                          || (inputFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT32)
+                          || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
+                          || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8));
+    }
+
+    enableShader = enableShader && ret && out_axis < 3;
 
     if (enableShader && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
     {
-        vxnne_shader_executable shaderExecutable = VX_NULL;
-        vx_uint32 dim                  = 4;
-        vx_uint32 tmp_sizes[4]         = {1, 1, 1, 1};
-        vx_tensor_create_params_t      tensor_create_params;
-        vx_tensor sumTmp = VX_NULL;
-
         if(node->base.context->evisNoInst.supportEVIS)
         {
-            tmp_sizes[0] = gcmALIGN(width * height, 16);
-            tmp_sizes[3] = batch;
+            if (out_axis == 0)
+            {
+                shaderExecutable = vxnneGetL2NormAxis0ShaderExecutable(
+                    node->base.context,
+                    VXNNE_KERNEL_L2NORM_AXIS0,
+                    &node->kernelAttributes.borderMode,
+                    out_axis,
+                    src,
+                    dst);
+            }
+            else if (out_axis == 1)
+            {
+                shaderExecutable = vxnneGetL2NormAxis1ShaderExecutable(
+                    node->base.context,
+                    VXNNE_KERNEL_L2NORM_AXIS1,
+                    &node->kernelAttributes.borderMode,
+                    out_axis,
+                    src,
+                    dst);
+            }
+            else
+            {
+                shaderExecutable = vxnneGetL2NormAxis2ShaderExecutable(
+                    node->base.context,
+                    VXNNE_KERNEL_L2NORM_AXIS2,
+                    &node->kernelAttributes.borderMode,
+                    out_axis,
+                    src,
+                    dst);
+            }
         }
         else
         {
-            tmp_sizes[0] = width;
-            tmp_sizes[1] = height;
-            tmp_sizes[3] = batch;
-        }
-
-        gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
-        tensor_create_params.num_of_dims = dim;
-        tensor_create_params.sizes = tmp_sizes;
-        tensor_create_params.data_format = VX_TYPE_FLOAT32;
-        tensor_create_params.quant_format = 0;
-
-        sumTmp = vxoTensor_CreateTensor(node->base.context, node->graph, &tensor_create_params, vx_true_e);
-        if (sumTmp == VX_NULL)
-        {
-            vxError("vxoTensor_CreateTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
-            status = VX_ERROR_NO_MEMORY;
-            goto exit;
-        }
-
-        //node 1
-        if(node->base.context->evisNoInst.supportEVIS)
-        {
-            shaderExecutable = vxnneL2NormSumSqrtShaderExecutable(node->base.context, VXNNE_KERNEL_L2NORM_SUMSQRT, &node->kernelAttributes.borderMode, src, sumTmp);
-        }
-        else
-        {
-            shaderExecutable = vxnneGPUL2NormSumSqrtShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_L2NORM_SUMSQRT, &node->kernelAttributes.borderMode, src, sumTmp);
+            if (out_axis == 0)
+            {
+                shaderExecutable = vxnneGetGPUL2NormAxis0ShaderExecutable(
+                    node->base.context,
+                    VXNNE_KERNEL_GPU_L2NORM_AXIS0,
+                    &node->kernelAttributes.borderMode,
+                    out_axis,
+                    src,
+                    dst);
+            }
+            else if (out_axis == 1)
+            {
+                shaderExecutable = vxnneGetGPUL2NormAxis1ShaderExecutable(
+                    node->base.context,
+                    VXNNE_KERNEL_GPU_L2NORM_AXIS1,
+                    &node->kernelAttributes.borderMode,
+                    out_axis,
+                    src,
+                    dst);
+            }
+            else
+            {
+                shaderExecutable = vxnneGetGPUL2NormAxis2ShaderExecutable(
+                    node->base.context,
+                    VXNNE_KERNEL_GPU_L2NORM_AXIS2,
+                    &node->kernelAttributes.borderMode,
+                    out_axis,
+                    src,
+                    dst);
+            }
         }
 
         if (!shaderExecutable)
         {
             status = VX_FAILURE;
-            goto exit;
+            goto OnError;
         }
-        status = vxnneShaderOperation_Initialize(&l2normalizeLayer->l2normalize_SumSqrt_sh_operation,
+        vxmONERROR(vxnneShaderOperation_Initialize(&l2normalizeLayer->l2normalize_sh_operation,
                                         &l2normalizeLayer->base,
                                         VXNNE_OPERATOR_L2NORMALIZE_SUMSQRT,
                                         batch,
-                                        shaderExecutable);
-        if (status != VX_SUCCESS)
-            goto exit;
+                                        shaderExecutable));
 
-        vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_SumSqrt_sh_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT);
-        vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_SumSqrt_sh_operation.base, (vx_reference)sumTmp, VXNNE_OPERATION_REFENRENCE_OUTPUT);
-
-        //node 2
-        if(node->base.context->evisNoInst.supportEVIS)
-        {
-            shaderExecutable = vxnneL2NormSumScaleShaderExecutable(node->base.context, VXNNE_KERNEL_L2NORM_SUMSCALE, &node->kernelAttributes.borderMode, src, sumTmp, dst);
-        }
-        else
-        {
-            shaderExecutable = vxnneGPUL2NormSumScaleShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_L2NORM_SUMSCALE, &node->kernelAttributes.borderMode, src, sumTmp, dst);
-        }
-
-        if (!shaderExecutable)
-        {
-            status = VX_FAILURE;
-            goto exit;
-        }
-        status = vxnneShaderOperation_Initialize(&l2normalizeLayer->l2normalize_sumScale_sh_operation,
-                                        &l2normalizeLayer->base,
-                                        VXNNE_OPERATOR_L2NORMALIZE_SUMSCALE,
-                                        batch,
-                                        shaderExecutable);
-        if (status != VX_SUCCESS)
-            goto exit;
-
-        vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_sumScale_sh_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT);
-        vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_sumScale_sh_operation.base, (vx_reference)sumTmp, VXNNE_OPERATION_REFENRENCE_INPUT);
-        vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_sumScale_sh_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+        vxmONERROR(vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_sh_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_sh_operation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT));
 
         vxnneLayer_SetOperation(
             &l2normalizeLayer->base,
-            &l2normalizeLayer->l2normalize_SumSqrt_sh_operation.base,
+            &l2normalizeLayer->l2normalize_sh_operation.base,
             0);
-        vxnneLayer_SetOperation(
-            &l2normalizeLayer->base,
-            &l2normalizeLayer->l2normalize_sumScale_sh_operation.base,
-            1);
 
-        l2normalizeLayer->base.temp_tensors[0] = sumTmp;
-        l2normalizeLayer->base.temp_tensors[1] = src;
-        l2normalizeLayer->base.temp_tensors[2] = dst;
-        l2normalizeLayer->base.num_temp_tensors = 3;
 
         node->layer = &l2normalizeLayer->base;
     }
@@ -725,18 +661,18 @@ OnError:
             &l2normalizeLayer->l2normalize_sw_operation.base,
             0);
 
-        l2normalizeLayer->l2normalize_sw_operation.inputs           = input;
-        l2normalizeLayer->l2normalize_sw_operation.outputs          = output;
+        l2normalizeLayer->l2normalize_sw_operation.inputs           = inputs;
+        l2normalizeLayer->l2normalize_sw_operation.outputs          = outputs;
 
-        vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_sw_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT);
-        vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_sw_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+        vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_sw_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_sw_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
 
         node->layer = &l2normalizeLayer->base;
     }
 
     return status;
 
-exit:
+OnError:
     if (src) vxoTensor_ReleaseTensor(&src);
     if (dst) vxoTensor_ReleaseTensor(&dst);
     if (l2normalizeLayer)
