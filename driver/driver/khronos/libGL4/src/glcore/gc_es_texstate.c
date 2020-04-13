@@ -3471,6 +3471,7 @@ __glTexEnvfv(__GLcontext *gc, GLenum target, GLenum pname, GLfloat *pv)
                   case GL_ADD:
                   case GL_COMBINE:
                   case __GL_STIPPLE:
+                  case GL_REPLACE_EXT:
                       break;
                   default:
                       __glSetError(gc, GL_INVALID_ENUM);
