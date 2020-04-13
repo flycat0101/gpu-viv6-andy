@@ -1410,7 +1410,8 @@ void initUndefinedHardwareConfig(vx_global_data globalData)
             /*axi-bus bw limit*/globalData->nnConfig.customizedFeature.axiBusReadBWLimit,globalData->nnConfig.customizedFeature.axiBusWriteBWLimit,globalData->nnConfig.customizedFeature.axiBusTotalBWLimit,
             /*internal write bw limite*/ (vx_float32)globalData->nnConfig.fixedFeature.nnLanesPerOutCycle,
             /*ddr latency*/globalData->nnConfig.customizedFeature.ddrLatency,
-            /*total latency*/globalData->nnConfig.derivedFeature.totalLatency
+            /*total latency*/globalData->nnConfig.derivedFeature.totalLatency,
+            /*max soc out standing */(float)globalData->nnConfig.customizedFeature.maxSocOTNumber
         };
         APM_IN_PARAM_T inParam;
         gcsHAL_CHIPIDENTITY chipIdentity;
