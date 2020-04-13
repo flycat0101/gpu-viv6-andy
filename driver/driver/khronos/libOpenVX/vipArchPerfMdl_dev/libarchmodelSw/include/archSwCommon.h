@@ -290,10 +290,4 @@ void reshapeImageTo16xN(
     unsigned int    *SIY
     );
 
-void updateSingleAllSilbling1X1(
-    archModelOpInfo ** OpInfo,
-    arch_uint32 index,
-    arch_uint32 totalCount
-    );
-
 #endif /* _ARCH_SW_COMMON_H_ */

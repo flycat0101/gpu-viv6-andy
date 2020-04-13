@@ -4343,13 +4343,6 @@ arch_status archPredictPerf(
     archModel->chipDentity.customerID = pChipDentity->customerID;
     archModel->chipDentity.ecoID = pChipDentity->ecoID;
 
-    // update net work info before calculating, for NN transpose
-    opInfo[0]->perf.allSibling1x1 = 0;
-    for (arch_uint32 i = 0; i < totalOpCount; i++)
-    {
-        updateSingleAllSilbling1X1(opInfo, i, totalOpCount);
-    }
-
     /* init data feature */
     archModel->pArchDataFeature = pArchDataFeature;
     archModel->apm = apm;
@@ -4631,7 +4624,7 @@ arch_status dumpNetWrok(
 *                index:            Indicate the layer index
 * Ouput:        void
 ***************************************************************************************/
-void updateSingleAllSilbling1X1(archModelOpInfo ** OpInfo,arch_uint32 index, arch_uint32 totalCount)
+static void updateSingleAllSilbling1X1(archModelOpInfo ** OpInfo,arch_uint32 index, arch_uint32 totalCount)
 {
     arch_uint32 i=0;
     OpInfo[index]->perf.allSibling1x1 = 1;
@@ -4686,6 +4679,7 @@ void updateSingleAllSilbling1X1(archModelOpInfo ** OpInfo,arch_uint32 index, arc
                     }
                 }
             }
+
         }
     }
 }
