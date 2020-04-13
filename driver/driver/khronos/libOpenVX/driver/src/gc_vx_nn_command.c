@@ -1290,6 +1290,17 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
     vx_float32 inScale, outScale;
     vx_weights_biases_parameter weights_biases = (vx_weights_biases_parameter) conv_cmd_ptr->other_ref;
     vx_bool isV8 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP0);
+    vx_weights_biases_parameter wb = (vx_weights_biases_parameter)(conv_cmd_ptr->other_ref);
+
+    vx_bool hasNNPerFilterPostMultiply = 0;
+    vx_bool hasTensorAdd = vx_false_e;
+
+    if(wb != VX_NULL)
+    {
+        hasNNPerFilterPostMultiply = (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT) &&
+            WB_WEIGHT_QUANT_FORMAT(wb) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL &&
+            (input->dataFormat == VX_TYPE_UINT8) && (WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_UINT8 || WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_INT8));
+    }
 
     outZSize = output->depth;
     inDataFormat   = input->dataFormat;
@@ -1326,7 +1337,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
     info->vx_nn_general_cmd_info.hwDepthWise       = WB_IS_DEPTH_WISE(weights_biases) ? 1 : 0;
     info->vx_nn_general_cmd_info.noZOffset         = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_NO_Z_LOCATION_OFFSET);
     info->vx_nn_general_cmd_info.pRelu             = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU);
-    info->vx_nn_general_cmd_info.perChannelPostMul = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT);
+    info->vx_nn_general_cmd_info.perChannelPostMul = (vx_uint8)hasNNPerFilterPostMultiply;
 
     /* add assert for hw limitation */
     vxmASSERT(info->vx_nn_general_cmd_info.outImageZSize <= NN_IMAGE_ZSIZE_MAX);
@@ -1336,6 +1347,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
 
     info->vx_nn_general_cmd_info.outImageXstride = output->yStride;
     info->vx_nn_general_cmd_info.outImageYstride = output->zStride / output->yStride;
+
+    vxmASSERT(info->vx_nn_general_cmd_info.kernelXSize < 16 && info->vx_nn_general_cmd_info.kernelYSize < 16);
 
     if (output->sRAM)
     {
@@ -1385,8 +1398,32 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
 
     info->vx_nn_general_cmd_info.outImageDataTypeMsb = info->vx_nn_general_cmd_info.outImageDataType >> 2;
     info->vx_nn_general_cmd_info.outImageDataTypeBit3 = info->vx_nn_general_cmd_info.outImageDataType >> 3;
+    if (weights_biases->alpha_ref != VX_NULL &&
+        WB_OPERATION_TYPE(wb) == VX_NN_CONV_PRELU &&
+        gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU) &&
+        gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT))
+    {
+        info->vx_nn_general_cmd_info.nnAluFunction = 0x2;
+        info->vx_nn_general_cmd_info.perChannelPostMul = 1; /*Prelu need enable per channel multiply*/
+        gcmPRINT("Yun add print here, merge pRelu\n");
+    }
 
-    vxmASSERT(info->vx_nn_general_cmd_info.inImageDataType == info->vx_nn_general_cmd_info.kernelDataType);
+    if (hasTensorAdd)
+    {
+        vx_uint16 nnTensorAddConst = 0;
+        vx_uint32 secPostMul = 0;
+        vx_uint32 secPostShift = 0;
+
+        info->vx_nn_general_cmd_info.nnAluFunction = 0x1;
+        info->vx_nn_general_cmd_info.negPostMultiplier = secPostMul;
+        info->vx_nn_general_cmd_info.negPostShift = secPostShift;
+        info->vx_nn_general_cmd_info.dwOutputZPBit1To0 = (nnTensorAddConst & 0x300) >> 8; /*dwOutZP[1:0] = nnTensorAddConst[9:8]*/
+        info->vx_nn_general_cmd_info.dwCoefZPBit5To0 = (nnTensorAddConst & 0x3F); /*dwOutZP[5:0] = nnTensorAddConst[5:0]*/
+        info->vx_nn_general_cmd_info.dwCoefZPBit7To6 = (nnTensorAddConst & 0xC0) >> 6; /*dwOutZP[7:6] = nnTensorAddConst[7:6]*/
+    }
+    info->vx_nn_general_cmd_info.convolutionStride = (conv_cmd_ptr->nn_strideX == 2 && conv_cmd_ptr->nn_strideY == 2) ? 1 : 0;
+
+    //vxmASSERT(info->vx_nn_general_cmd_info.inImageDataType == info->vx_nn_general_cmd_info.kernelDataType);
 
     info->vx_nn_general_cmd_info.postMultiplier = 0;
     info->vx_nn_general_cmd_info.roundingMode   = getHWRoundingMode((vx_nn_round_mode_e)outRMode, outDataFormat, vx_false_e);
@@ -1415,12 +1452,12 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
         vx_uint32 tmpMultiply;
         vx_int32 exp;
         vx_int8 tmpPostShift;
-        vx_float32 wScale = WB_WEIGHT_SCALE(weights_biases);
-        vx_float32 bScale = WB_BIAS_SCALE(weights_biases);
+        vx_float32 wScale = WB_WEIGHT_SCALE(weights_biases, 0);
+        vx_float32 bScale = WB_BIAS_SCALE(weights_biases, 0);
 
         if (inQuantFormat  == VX_QUANT_DYNAMIC_FIXED_POINT)
         {
-            inScale = vxnneConvertDynamicFixPointValueToFloat32(1.0, inFPP);
+             inScale = vxnneConvertDynamicFixPointValueToFloat32(1.0, inFPP);
         }
 
         if (WB_WEIGHT_QUANT_FORMAT(weights_biases) == VX_QUANT_DYNAMIC_FIXED_POINT)
@@ -1476,13 +1513,58 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
             tmpMultiply = tmpMultiply >> 8;
             info->vx_nn_general_cmd_info.postMultiplierBit22to15 = tmpMultiply;
 
-            /*V8 post shift no need add 15*/
-            tmpPostShift = 127 - (vx_int8)exp;
-            info->vx_nn_general_cmd_info.postShift = tmpPostShift & 0x1F;
-            tmpPostShift = tmpPostShift >> 5;
-            info->vx_nn_general_cmd_info.postShiftBit6to5 = tmpPostShift & 3;
+            if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FLOAT_POST_MULT))
+            {
+                info->vx_nn_general_cmd_info.postShift =  exp & 0x1F;
+                info->vx_nn_general_cmd_info.postShiftBit6to5 = (exp >> 5) & 0x3;
+                info->vx_nn_general_cmd_info.postShiftBits7 = (exp >> 7) & 0x1;
+                info->vx_nn_general_cmd_info.postMultiplierSign = (uintScale >> 31) & 0x1;
+            }
+            else
+            {
+                /*V8 post shift no need add 15*/
+                tmpPostShift = 127 - (vx_int8)exp;
+                info->vx_nn_general_cmd_info.postShift = tmpPostShift & 0x1F;
+                tmpPostShift = tmpPostShift >> 5;
+                info->vx_nn_general_cmd_info.postShiftBit6to5 = tmpPostShift & 3;
+                info->vx_nn_general_cmd_info.postShiftBits7 = 0;
+                info->vx_nn_general_cmd_info.postMultiplierSign = 0;
+            }
+
+            if ((WB_OPERATION_TYPE(weights_biases) == VX_NN_CONV_LEAKYRELU) &&
+                (vxoReference_GetType(wb->alpha_ref) == VX_TYPE_SCALAR) &&
+                (!hasNNPerFilterPostMultiply) &&
+                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_LEAKY_RELU))
+            {
+                vx_float32 leakyReluAlpha = 0;
+                vx_scalar  negative_slopes   = (vx_scalar)wb->alpha_ref;
+                leakyReluAlpha  = negative_slopes->value->f32;
+
+                scale = scale * leakyReluAlpha;
+                uintScale = *((vx_uint32*)(&scale));
+                exp = (uintScale & 0x7F800000) >> 23; /* negPostShift is Scale's exp*/
+
+                if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FLOAT_POST_MULT))
+                {
+                    info->vx_nn_general_cmd_info.negPostShift = exp & 0x7F;
+                    info->vx_nn_general_cmd_info.negPostShiftBits7 = (exp >> 7) & 0x1;
+                    info->vx_nn_general_cmd_info.negPostMultiplierSign = (uintScale >> 31) & 0x1;
+                }
+                else
+                {
+                    info->vx_nn_general_cmd_info.negPostShift = (127 - (vx_int8)exp) & 0x7F;
+                    info->vx_nn_general_cmd_info.negPostShiftBits7 = 0;
+                    info->vx_nn_general_cmd_info.negPostMultiplierSign = (uintScale >> 31) & 0x1;
+                }
+
+                info->vx_nn_general_cmd_info.negPostMultiplier = uintScale & 0x7FFFFF; /* negPostMultiply is 23-bit of Scale's mantissa*/
+                /*leaky relu can't enable per channel*/
+                info->vx_nn_general_cmd_info.nnAluFunction = 0x2;
+                info->vx_nn_general_cmd_info.perChannelPostMul = 0;
+            }
+
         }
-        info->vx_nn_general_cmd_info.coefZP = WB_WEIGHT_ZP(weights_biases);
+        info->vx_nn_general_cmd_info.coefZP = WB_WEIGHT_ZP(weights_biases, 0);
         info->vx_nn_general_cmd_info.outputZP = outZP;
     }
     else if ((inQuantFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ||
@@ -1497,26 +1579,45 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
         }
 
         if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT) &&
-           (WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_INT8 && outDataFormat != VX_TYPE_FLOAT16) &&
-           !isV8)
+        (WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_INT8 && outDataFormat != VX_TYPE_FLOAT16) &&
+        !isV8)
         {
             tmpPostShift += 15;
         }
 
-        if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT) || (context->nnConfig.fixedFeature.nnCoreCountInt16 > 0) || isV8)
+        tmpPostShift = tmpPostShift + inFPP - outFPP + WB_WEIGHT_FPP(weights_biases);
+
+        if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FLOAT_POST_MULT))
         {
-            tmpPostShift = tmpPostShift + inFPP - outFPP + WB_WEIGHT_FPP(weights_biases);
+            tmpPostShift = 127 - tmpPostShift;
+            info->vx_nn_general_cmd_info.postShift = tmpPostShift & 0x1F;
+            info->vx_nn_general_cmd_info.postShiftBit6to5 = (tmpPostShift >> 5) & 0x3;
+            info->vx_nn_general_cmd_info.postShiftBits7 = (tmpPostShift >> 7) & 0x1;
+            info->vx_nn_general_cmd_info.postMultiplierSign = 0;
+        }
+        else if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT) || (context->nnConfig.fixedFeature.nnCoreCountInt16 > 0) || isV8)
+        {
+
             info->vx_nn_general_cmd_info.postShift = tmpPostShift & 0x1F;
             tmpPostShift = tmpPostShift >> 5;
             info->vx_nn_general_cmd_info.postShiftBit6to5 = tmpPostShift & 3;
-        } else
+            info->vx_nn_general_cmd_info.postShiftBits7 = 0;
+            info->vx_nn_general_cmd_info.postMultiplierSign = 0;
+        }
+        else
         {
-            info->vx_nn_general_cmd_info.postShift = tmpPostShift + inFPP - outFPP + WB_WEIGHT_FPP(weights_biases);
+            info->vx_nn_general_cmd_info.postShift = tmpPostShift;
+            info->vx_nn_general_cmd_info.postShiftBit6to5 = 0;
+            info->vx_nn_general_cmd_info.postShiftBits7 = 0;
+            info->vx_nn_general_cmd_info.postMultiplierSign = 0;
         }
     }
     else
     {
         info->vx_nn_general_cmd_info.postShift = 0;
+        info->vx_nn_general_cmd_info.postShiftBit6to5 = 0;
+        info->vx_nn_general_cmd_info.postShiftBits7 = 0;
+        info->vx_nn_general_cmd_info.postMultiplierSign = 0;
     }
 
     if (isV8)
@@ -6976,7 +7077,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
 
             if (hasWQuant)
             {
-                wScale = WB_WEIGHT_SCALE(weights_biases);
+                wScale = WB_WEIGHT_SCALE(weights_biases, 0);
             }
             else
             {
@@ -7017,7 +7118,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
         tmpPostShift = tmpPostShift >> 5;
         info->vx_nn_tp_cmd_info.aluOutputPostshiftBit6to5 = tmpPostShift & 3;
 
-        if (0)
+        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_23BITS_POST_MULTIPLIER))
         {
             /* 23-bit post multiplier */
             info->vx_nn_tp_cmd_info.aluOutputPostMultiplier = tmpMultiply & 0x7FFF;
@@ -7030,7 +7131,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             info->vx_nn_tp_cmd_info.aluOutputPostMultiplierBit22to15 = 0;
         }
 
-        info->vx_nn_tp_cmd_info.coefZP = weights_biases == VX_NULL ? 0 : WB_WEIGHT_ZP(weights_biases);
+        info->vx_nn_tp_cmd_info.coefZP = weights_biases == VX_NULL ? 0 : WB_WEIGHT_ZP(weights_biases, 0);
         if (tp_type == TP_ROI_POOLING_STEP_1)
         {
             /* Zero point is handled in VPooling, so no zero point in HPooling. */
@@ -7143,6 +7244,7 @@ VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
 
             cmdBufPhys = command_buffer->physical + NNE_COMMAND_SIZE * i;
             cmdBufTPtr = cmdBufPtr = (vx_uint8_ptr)command_buffer->logical + NNE_COMMAND_SIZE * i;
+
 
             vxMemCopy(&info.vx_nn_tp_cmd_info, &sinfo[i].vx_nn_general_cmd_split_info, sizeof(struct _vx_nn_general_cmd_split_info));
             memset(cmdBufTPtr, 0, NNE_COMMAND_SIZE);

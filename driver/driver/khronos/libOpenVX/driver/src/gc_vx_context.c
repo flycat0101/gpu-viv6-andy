@@ -3146,6 +3146,9 @@ VX_INTERNAL_API vx_bool vxoGlobalData_IsFeatureAvailable(vx_global_data globalDa
     case VX_NN_FEATURE_FIRST_PIXEL_POOLING:
         return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FIRST_PIXEL_POOLING) && globalData->options.enableNNFirstPixelPooling) ? vx_true_e : vx_false_e;
 
+     case VX_NN_FEATURE_FAST_FIRST_PIXEL_POOLING:
+        return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FAST_FIRST_PIXEL_POOLING)) ? vx_true_e : vx_false_e;
+
     case VX_NN_FEATURE_NN_STRIDE_SUPPORT:
         return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_STRIDE_SUPPORT)
             && gcoHAL_GetOption(gcvNULL, gcvOPTION_OVX_ENABLE_NN_STRIDE)) ? vx_true_e : vx_false_e;

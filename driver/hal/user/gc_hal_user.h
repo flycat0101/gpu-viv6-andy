@@ -3265,11 +3265,17 @@ typedef union _vx_nn_cmd_info_union
         gctUINT32  roundingMode;
         gctUINT32  relu;
         gctINT32   nn_layer_flush;
+        gctUINT32  postMultiplierSign;
+        gctUINT32  negPostMultiplierSign;
+        gctUINT32  postShiftBits7;
+        gctUINT32  negPostShiftBits7;
         gctUINT32  postMultiplier;
+        gctUINT32  negPostMultiplier;
         gctUINT32  postMultiplierBit6to1;
         gctUINT32  postMultiplierBit14to7;
         gctUINT32  postMultiplierBit22to15;
         gctINT32   postShift;
+        gctINT32   negPostShift;
         gctUINT32  postShiftBit6to5;
         gctUINT32  wSize;
         gctUINT8   kernelDataType;
@@ -3308,6 +3314,7 @@ typedef union _vx_nn_cmd_info_union
         gctUINT8  kernelDataTypeBit3;
         gctUINT8  inImageDataTypeBit3;
         gctUINT8  outImageDataTypeBit3;
+        gctUINT8  nnAluFunction;
         gctUINT8  outImageCacheEvictPolicy;
         gctUINT32 noFlush;
         gctUINT8  hwDepthWise;
@@ -3315,6 +3322,15 @@ typedef union _vx_nn_cmd_info_union
         gctUINT8  noBias;
         gctUINT8  perChannelPostMul;
         gctUINT8  pRelu;
+
+        gctUINT32 secInImageAddress;
+        gctUINT32 secInImageCircularBufSize;
+        gctUINT32 secInImageCircularBufEndAddrPlus1;
+        gctUINT32  dwOutputZPBit1To0;
+        gctUINT32  dwCoefZPBit5To0;
+        gctUINT32  dwCoefZPBit7To6;
+        gctUINT8   secInImageTransposeChMinusOne;
+        gctUINT8   convolutionStride;
     }
     vx_nn_general_cmd_info;
 

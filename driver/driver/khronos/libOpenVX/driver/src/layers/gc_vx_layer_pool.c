@@ -1221,13 +1221,14 @@ VX_PRIVATE_API vx_status vxoNNPooling_NN_AVG_Initialize(vxnne_layer ops_layer, c
                                                                    (vx_uint32*)(TENSOR_SIZES(outputs)),
                                                                    VX_NULL,
                                                                    &opt,
+                                                                   0,
                                                                    TENSOR_DATA_TYPE(weights),
                                                                    0,
                                                                    VX_TENSOR_RANK_WHCN,
                                                                    weights,
                                                                    biases,
                                                                    VX_NULL,
-                                                                   vx_false_e,
+                                                                   VX_NN_CONV_ONLY,
                                                                    vx_false_e);
         }
         else
@@ -1315,13 +1316,14 @@ VX_PRIVATE_API vx_status vxoNNPooling_NN_AVG_Initialize(vxnne_layer ops_layer, c
                                                                    (vx_uint32*)(TENSOR_SIZES(outputs)),
                                                                    VX_NULL,
                                                                    VX_NULL,
+                                                                   0,
                                                                    TENSOR_DATA_TYPE(weights),
                                                                    0,
                                                                    VX_TENSOR_RANK_WHCN,
                                                                    weights,
                                                                    biases,
                                                                    VX_NULL,
-                                                                   vx_false_e,
+                                                                   VX_NN_CONV_ONLY,
                                                                    vx_false_e);
         }
 

@@ -2144,10 +2144,11 @@ VX_PRIVATE_API vx_status vxoSVDFLayer_NN_TP_Initialize(vxnne_layer ops_layer, co
             TENSOR_DATA_TYPE(weights_feature),
             0,
             VX_TENSOR_RANK_SN,
+            0,
             weights_feature,
             VX_NULL,
             VX_NULL,
-            vx_false_e,
+            VX_NN_CONV_ONLY,
             vx_false_e
         );
 
@@ -2197,10 +2198,11 @@ VX_PRIVATE_API vx_status vxoSVDFLayer_NN_TP_Initialize(vxnne_layer ops_layer, co
             TENSOR_DATA_TYPE(weights_feature_fc),
             0,
             VX_TENSOR_RANK_WHCN,
+            0,
             weights_feature_fc,
             VX_NULL,
             VX_NULL,
-            vx_false_e,
+            VX_NN_CONV_ONLY,
             vx_false_e
         );
 
@@ -2354,10 +2356,11 @@ VX_PRIVATE_API vx_status vxoSVDFLayer_NN_TP_Initialize(vxnne_layer ops_layer, co
             TENSOR_DATA_TYPE(depth_weight_time),
             0,
             VX_TENSOR_RANK_SN,
+            0,
             depth_weight_time,
             bias,
             VX_NULL,
-            vx_false_e,
+            VX_NN_CONV_ONLY,
             vx_false_e
         );
 
@@ -2409,10 +2412,11 @@ VX_PRIVATE_API vx_status vxoSVDFLayer_NN_TP_Initialize(vxnne_layer ops_layer, co
             TENSOR_DATA_TYPE(depth_weight_time),
             0,
             VX_TENSOR_RANK_WHCN,
+            0,
             depth_weight_time,
             bias,
             VX_NULL,
-            vx_false_e,
+            VX_NN_CONV_ONLY,
             vx_false_e
         );
 
@@ -2647,13 +2651,14 @@ OnError:
                 output_feature->dims,/*convolution_outputs_dims,*/
                 output_feature->dims,/*pool_outputs_dims,*/
                 NULL, /*optimizations,*/
+                0,
                 TENSOR_DATA_TYPE(weights_feature),
                 0,
                 VX_TENSOR_RANK_SN,
                 weights_feature,
                 VX_NULL,
                 VX_NULL,
-                vx_false_e,
+                VX_NN_CONV_ONLY,
                 vx_false_e
             );
 
@@ -2700,13 +2705,14 @@ OnError:
                 output_feature->dims,/*convolution_outputs_dims,*/
                 output_feature->dims,/*pool_outputs_dims,*/
                 NULL, /*optimizations,*/
+                0,
                 TENSOR_DATA_TYPE(weights_feature_fc),
                 0,
                 VX_TENSOR_RANK_WHCN,
                 weights_feature_fc,
                 VX_NULL,
                 VX_NULL,
-                vx_false_e,
+                VX_NN_CONV_ONLY,
                 vx_false_e
             );
 
@@ -2859,13 +2865,14 @@ OnError:
                 outputs->dims,/*convolution_outputs_dims,*/
                 outputs->dims,/*pool_outputs_dims,*/
                 NULL, /*optimizations,*/
+                0,
                 TENSOR_DATA_TYPE(depth_weight_time),
                 0,
                 VX_TENSOR_RANK_SN,
                 depth_weight_time,
                 bias,
                 VX_NULL,
-                vx_false_e,
+                VX_NN_CONV_ONLY,
                 vx_false_e
             );
 
@@ -2914,13 +2921,14 @@ OnError:
                 output_fc->dims,/*convolution_outputs_dims,*/
                 output_fc->dims,/*pool_outputs_dims,*/
                 NULL, /*optimizations,*/
+                0,
                 TENSOR_DATA_TYPE(depth_weight_time),
                 0,
                 VX_TENSOR_RANK_WHCN,
                 depth_weight_time,
                 bias,
                 VX_NULL,
-                vx_false_e,
+                VX_NN_CONV_ONLY,
                 vx_false_e
             );
 
@@ -4640,13 +4648,14 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
                     output_conv[i]->dims,/*convolution_outputs_dims,*/
                     output_conv[i]->dims,/*pool_outputs_dims,*/
                     NULL, /*optimizations,*/
+                    0,
                     TENSOR_DATA_TYPE(weights_conv),
                     0,
                     VX_TENSOR_RANK_SN,
                     weights_conv,
                     biases_conv,
                     VX_NULL,
-                    vx_false_e,
+                    VX_NN_CONV_ONLY,
                     vx_false_e
                 );
 
@@ -4748,13 +4757,14 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
                     output_conv[i]->dims,/*convolution_outputs_dims,*/
                     output_conv[i]->dims,/*pool_outputs_dims,*/
                     NULL, /*optimizations,*/
+                    0,
                     TENSOR_DATA_TYPE(weights_conv),
                     0,
                     VX_TENSOR_RANK_SN,
                     weights_conv,
                     biases_conv,
                     VX_NULL,
-                    vx_false_e,
+                    VX_NN_CONV_ONLY,
                     vx_false_e
                 );
 

@@ -329,6 +329,10 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
             weightX = vxoGraphOptimization_computeFinalKernelSize(weightX, strideX);
             weightY = vxoGraphOptimization_computeFinalKernelSize(weightY, strideY);
 
+            if(VX_QUANT_AFFINE_SCALE_PER_CHANNEL == TENSOR_QUANT_TYPE(weight) &&
+                gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT))
+                break;
+
             if(gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1) &&
                 (TENSOR_SIZE_INDEX(inputTensor,0) > NN_IMAGE_XSIZE_MAX || TENSOR_SIZE_INDEX(inputTensor, 1) > NN_IMAGE_YSIZE_MAX) )
                 break;
@@ -645,6 +649,11 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
     case VX_KERNEL_NN_PRELU:
         {
             nodeOpType = OP_PRELU;
+            break;
+        }
+    case VX_KERNEL_NN_LEAKY:
+        {
+            nodeOpType = OP_LEAKYRELU;
             break;
         }
     default:
@@ -1474,8 +1483,8 @@ VX_PRIVATE_API  void vxoGraphOptimization_MergeConvolutionNodes_GetParmFromConvR
         *bias                        = WB_BIAS_TENSOR(wb);
     if(stride)
     {
-        stride[0]                   = WB_STRIDE_X(wb);
-        stride[1]                   = WB_STRIDE_Y(wb);
+        stride[0]                   = WB_ORG_STRIDE_X(wb) != 0 ? WB_ORG_STRIDE_X(wb) : WB_STRIDE_X(wb) ;
+        stride[1]                   = WB_ORG_STRIDE_Y(wb) != 0 ? WB_ORG_STRIDE_Y(wb) : WB_STRIDE_Y(wb) ;
     }
 
     if(pad)
@@ -1580,12 +1589,19 @@ VX_INTERNAL_API  vx_weights_biases_parameter vxoGraphOptimization_CreateWBParame
                                                                                      vx_nn_convolution_relu_pooling_params_t *wb_params,
                                                                                      vx_uint32 sizeOfParms,
                                                                                      vx_tensor input, vx_tensor convOutput,vx_tensor finalOutput,
-                                                                                     vx_tensor weight, vx_tensor bias, vx_tensor prelu_alpha)
+                                                                                     vx_tensor weight, vx_tensor bias, vx_tensor prelu_alpha,
+                                                                                     vx_scalar leakyRelu_perm)
 
 {
     vx_weights_biases_parameter wb = VX_NULL;
-    vx_weights_biases_parameter_optimizations_ext_t opt = {-1, TENSOR_DATA_TYPE(finalOutput),
-        TENSOR_TF_ZEROPOINT(input), TENSOR_DIM_NUM(input), TENSOR_DIM_NUM(finalOutput) };
+    vx_weights_biases_parameter_optimizations_ext2_t opt =
+    {
+        {
+            -1, TENSOR_DATA_TYPE(finalOutput), TENSOR_TF_ZEROPOINT(input), TENSOR_DIM_NUM(input), TENSOR_DIM_NUM(finalOutput)
+        },
+        TENSOR_TF_SCALE(input), TENSOR_TF_SCALE(finalOutput), TENSOR_DATA_TYPE(input), 0, 0.0f, 0
+    };
+
     if(VX_NULL != prelu_alpha)
     {
         wb = vxoCreateWeightsBiasesParameterFromTensorsPRelu(layer_type,
@@ -1593,6 +1609,14 @@ VX_INTERNAL_API  vx_weights_biases_parameter vxoGraphOptimization_CreateWBParame
             (vx_nn_convolution_relu_pooling_params_t *)wb_params, sizeOfParms,
         (vx_weights_biases_parameter_optimizations_t *)&opt, sizeof(opt),
         weight, bias, prelu_alpha);
+    }
+    else if(NULL != leakyRelu_perm)
+    {
+        wb = vxoCreateWeightsBiasesParameterFromTensorsLeakyRelu(layer_type,
+            TENSOR_SIZES(input), TENSOR_SIZES(convOutput), TENSOR_SIZES(finalOutput),
+            (vx_nn_convolution_relu_pooling_params_t *)wb_params, sizeOfParms,
+        (vx_weights_biases_parameter_optimizations_t *)&opt, sizeof(opt),
+        weight, bias, leakyRelu_perm);
     }
     else
     {
@@ -1616,7 +1640,7 @@ VX_INTERNAL_API vx_node vxoGraphOptimization_transformConv(vx_graph graph, vx_te
                                                                vx_enum pool_type, vx_enum pad_mode,
                                                                vx_enum overflow_policy, vx_enum rounding_policy,
                                                                vx_enum down_scale_size_rounding, vx_uint32 depth_multiplier,
-                                                               vx_tensor prelu_alpha)
+                                                               vx_tensor prelu_alpha, vx_scalar leakyRelu_perm)
 {
     vx_node node;
     vx_context context = vxGetContext((vx_reference)graph);
@@ -1639,7 +1663,7 @@ VX_INTERNAL_API vx_node vxoGraphOptimization_transformConv(vx_graph graph, vx_te
         VX_NN_CONVOLUTION_LAYER,
         (vx_nn_convolution_relu_pooling_params_t *)&wb_params,
         sizeof(wb_params),
-        input, convOut, finalOutput, weight, bias, prelu_alpha);
+        input, convOut, finalOutput, weight, bias, prelu_alpha, leakyRelu_perm);
     CHECK_NULL(wb);
 
     if(depth_multiplier == 1)
@@ -1686,6 +1710,8 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeConvolutionNodes(vx_node nod
     vx_bool     int16_check                 = vx_false_e;
 
     vx_tensor   prelu_alpha                 = VX_NULL;
+    vx_scalar   leayRelu_scalar             = VX_NULL;
+    vx_bool     convert_leaky_to_prelu      = vx_false_e;
 
     gcmHEADER_ARG("nodes=%p, nodeCount=0x%x", nodes, nodeCount);
     inputTensor = (vx_tensor)nodes[0]->paramTable[0];
@@ -1725,12 +1751,51 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeConvolutionNodes(vx_node nod
             case VX_KERNEL_NN_PRELU:
                 {
                     if(gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU))
-                        break;
+                        goto merging; /*break merging node*/
 
                     prelu_alpha = (vx_tensor) nodes[i]->paramTable[1];
                     lastNodeOutputIndex = nodes[i]->numParameters - 1;
                     reluOutputTensor = (vx_tensor)nodes[i]->paramTable[lastNodeOutputIndex];
                     lastNode = i;
+                    break;
+                }
+            case VX_KERNEL_NN_LEAKY:
+                {
+                    if(gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_LEAKY_RELU))
+                        goto merging;
+
+                    if(VX_QUANT_AFFINE_SCALE == TENSOR_QUANT_TYPE(weight))
+                    {
+                        leayRelu_scalar = (vx_scalar) nodes[i]->paramTable[1];
+                        lastNodeOutputIndex = nodes[i]->numParameters - 1;
+                        reluOutputTensor = (vx_tensor)nodes[i]->paramTable[lastNodeOutputIndex];
+                        lastNode = i;
+                    }
+                    else if(gcvSTATUS_TRUE == gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU) && VX_QUANT_AFFINE_SCALE_PER_CHANNEL == TENSOR_QUANT_TYPE(weight))
+                    {
+                        vx_float32 alpha = SCALAR_VALUE((vx_scalar) nodes[i]->paramTable[1], f32);
+                        vx_uint32 j = 0, dims[1] = {TENSOR_SIZE_INDEX((vx_tensor)nodes[i]->paramTable[0], 2)};
+                        vx_float32 *data = NULL;
+
+                        /*create prelu_alpha tensor*/
+                        vx_tensor_create_params_t tt = vxoGraphOptimization_createParamsForTensor(1, dims, VX_TYPE_FLOAT32, 0, 0, 0, 0.0f);
+                        prelu_alpha = vxCreateTensor2(context, &tt, sizeof(tt));/*it needs to be released later*/
+                        if(!prelu_alpha)
+                            goto merging;
+
+                        CHECK_STATUS(vxoTensor_AllocateMemory(prelu_alpha) );
+                        data = (vx_float32 *)TENSOR_LOGICAL_ADDR(prelu_alpha);
+                        for(j = 0; j < dims[0]; j++)
+                            data[j] = alpha;
+
+                        convert_leaky_to_prelu = vx_true_e;
+                        lastNodeOutputIndex = nodes[i]->numParameters - 1;
+                        reluOutputTensor = (vx_tensor)nodes[i]->paramTable[lastNodeOutputIndex];
+                        lastNode = i;
+                    }
+                    else
+                        goto merging; /*stop merging node and start to transform*/
+
                     break;
                 }
             case VX_KERNEL_NN_POOLING_LAYER2:{
@@ -1771,10 +1836,11 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeConvolutionNodes(vx_node nod
         }
     }/*for(i = 0; i < nodeCount; i++)*/
 
+ merging:
     finalOutTensor = (vx_tensor)nodes[lastNode]->paramTable[lastNodeOutputIndex];
     if(!vxoGraphOptimization_isSameShapeTensor(finalOutTensor, convOutputTensor) && pool_type != VX_NN_POOLING_MAX)
     {
-        finalOutTensor = vxoGraphOptimization_CreateShareTensor(finalOutTensor, (vx_int32 *)TENSOR_SIZES(convOutputTensor), TENSOR_DIM_NUM(convOutputTensor));
+        finalOutTensor = vxReshapeTensor(finalOutTensor, (vx_int32 *)TENSOR_SIZES(convOutputTensor), TENSOR_DIM_NUM(convOutputTensor));
         CHECK_NULL(finalOutTensor);
         finalOutTensor->reshape = (vx_tensor)nodes[lastNode]->paramTable[lastNodeOutputIndex];
     }
@@ -1790,9 +1856,14 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeConvolutionNodes(vx_node nod
                                                     dilation, stride, pad,accumulator_bits,
                                                     pool_size, pad_const, pool_type, pad_mode,
                                                     overflow_policy, rounding_policy,
-                                                    down_scale_size_rounding, depth_multiplier, prelu_alpha);
+                                                    down_scale_size_rounding, depth_multiplier, prelu_alpha, leayRelu_scalar);
     CHECK_NULL(newNode);
     vxReleaseNode(&newNode);
+
+    if(prelu_alpha && convert_leaky_to_prelu )
+    {
+        vxReleaseTensor(&prelu_alpha);
+    }
 
     if(!vxoGraphOptimization_isSameShapeTensor(finalOutTensor, (vx_tensor)nodes[lastNode]->paramTable[lastNodeOutputIndex]) )
     {
@@ -1847,7 +1918,7 @@ VX_INTERNAL_API vx_node vxoGraphOptimization_TransferFC2FCRelu(vx_node FCnode, v
                                             VX_NN_FULLYCONNECTED_LAYER,
                                             (vx_nn_convolution_relu_pooling_params_t *)&params,
                                             sizeof(params),
-                                            input, output, output, weight, bias, VX_NULL);
+                                            input, output, output, weight, bias, VX_NULL, VX_NULL);
         CHECK_NULL(wb);
         FCReluNode = vxFullyConnectedReluLayer(FCnode->graph, input, wb,
             pad,
@@ -1961,6 +2032,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeWithChildNodes(vx_node node)
     vx_enum opType = OP_INVALID;
     vx_enum currNodeType;
     vx_enum features[][2] = {
+        {OP_CONVOLUTION, OP_LEAKYRELU},
         {OP_CONVOLUTION, OP_PRELU},
         {OP_CONVOLUTION, OP_RELU | OP_POOLING}, /*conv + relu + pool = convrelupool*/
         {OP_FULLYCONNECTED, OP_RELU}, /*fc + relu = fcRelu*/
@@ -2593,7 +2665,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_ConvertBatchFCtoConv(vx_graph gra
                                     VX_KERNEL_NN_FULLY_CONNECTED_RELU_LAYER,
                                     (vx_nn_convolution_relu_pooling_params_t *)&params,
                                     sizeof(params),
-                                    convInputTensor, convOutputTensor, convOutputTensor, weight, orgBias, VX_NULL);
+                                    convInputTensor, convOutputTensor, convOutputTensor, weight, orgBias, VX_NULL, VX_NULL);
 
                 vx_node newNode = vxConvolutionReluPoolingLayer2(graph, convInputTensor, weights_biases,
                     (vx_nn_convolution_relu_pooling_params_t *)&params, sizeof(params),convOutputTensor);
@@ -3484,7 +3556,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_splitMaxpFromCRL2(vx_graph graph)
                                                         VX_NN_CONVOLUTION_LAYER,
                                                         (vx_nn_convolution_relu_pooling_params_t *)&wb_params,
                                                         sizeof(wb_params),
-                                                        convInTensor, convOutTensor, convOutTensor, weight, bias, VX_NULL);
+                                                        convInTensor, convOutTensor, convOutTensor, weight, bias, VX_NULL, VX_NULL);
                     CHECK_NULL(wb);
 
                     {
@@ -3633,7 +3705,7 @@ VX_PRIVATE_API vx_status vxoGraphOptimization_adjustFC_adjustInput(vx_node *node
         dimNum  = 2;
 
     {
-        vx_tensor newInput = vxoGraphOptimization_CreateShareTensor(input, (vx_int32*)dims, dimNum);
+        vx_tensor newInput = vxReshapeTensor(input, (vx_int32*)dims, dimNum);
         TENSOR_RANK(newInput) = VX_TENSOR_RANK_WHCN;
 
         vxoNode_SetParameter(*node, 0, (vx_reference)newInput);
@@ -4071,14 +4143,26 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_unrollDWConv(vx_graph graph)
                 vx_tensor_create_params_t p; INITIALIZE_STRUCT(p);
                 p.data_format                       = TENSOR_DATA_TYPE(dwweight);
                 p.quant_format                      = TENSOR_QUANT_TYPE(dwweight);
-                if(TENSOR_QUANT_TYPE(dwweight) == VX_QUANT_AFFINE_SCALE)
+                if(VX_QUANT_AFFINE_SCALE == TENSOR_QUANT_TYPE(dwweight))
                 {
                     p.quant_data.affine.scale           = TENSOR_TF_SCALE(dwweight);
                     p.quant_data.affine.zeroPoint       = TENSOR_TF_ZEROPOINT(dwweight);
                 }
-                else
+                else if(VX_QUANT_DYNAMIC_FIXED_POINT == TENSOR_QUANT_TYPE(dwweight))
                 {
                     p.quant_data.dfp.fixed_point_pos    = TENSOR_POS(dwweight);
+                }
+                else if(VX_QUANT_AFFINE_SCALE_PER_CHANNEL == TENSOR_QUANT_TYPE(dwweight))
+                {
+                    p.quant_data.affinePerChannel.scales = TENSOR_TF_SCALE_POINTER(dwweight);
+                    p.quant_data.affinePerChannel.scaleCount = TENSOR_TF_SCALE_COUNT(dwweight);
+                    p.quant_data.affinePerChannel.channelDim = TENSOR_TF_CHANNEL_DIMS(dwweight);
+                    p.quant_data.affinePerChannel.zeroPoint = TENSOR_TF_ZEROPOINT_POINTER(dwweight);
+                    p.quant_data.affinePerChannel.zeroPointCount = TENSOR_TF_SCALE_COUNT(dwweight); //TODO: how to set it.
+                }
+                else
+                {
+                    vxError("unknown quantization type");
                 }
 
                 p.sizes                             = newTensorDims;
@@ -4095,20 +4179,46 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_unrollDWConv(vx_graph graph)
 
                 vx_uint8  *src = TENSOR_LOGICAL_ADDR(dwweight);
                 vx_uint8  *dst = TENSOR_LOGICAL_ADDR(padWeight);
-                vx_int32  padV = TENSOR_QUANT_TYPE(padWeight) == VX_QUANT_AFFINE_SCALE ? TENSOR_TF_ZEROPOINT(padWeight) : 0;
-                if(TENSOR_DATA_TYPE(padWeight) == VX_TYPE_INT8 ||
-                    TENSOR_DATA_TYPE(padWeight) == VX_TYPE_UINT8 ||
-                    TENSOR_QUANT_TYPE(padWeight) != VX_QUANT_AFFINE_SCALE
-                    )
-                    memset(dst, padV, TENSOR_STRIDE_INDEX(padWeight, 4));
+
+                if(VX_QUANT_AFFINE_SCALE_PER_CHANNEL != TENSOR_QUANT_TYPE(padWeight))
+                {
+                    vx_int32  padV = TENSOR_QUANT_TYPE(padWeight) == VX_QUANT_AFFINE_SCALE ? TENSOR_TF_ZEROPOINT(padWeight) : 0;
+                    if(TENSOR_DATA_TYPE(padWeight) == VX_TYPE_INT8 ||
+                        TENSOR_DATA_TYPE(padWeight) == VX_TYPE_UINT8 ||
+                        TENSOR_QUANT_TYPE(padWeight) != VX_QUANT_AFFINE_SCALE
+                        )
+                    {
+                        memset(dst, padV, TENSOR_STRIDE_INDEX(padWeight, 4));
+                    }
+                    else
+                    {
+                        for(i = 0; i < TENSOR_STRIDE_INDEX(padWeight, 4); i+=TENSOR_STRIDE_INDEX(padWeight, 0))
+                        {
+                            if(TENSOR_DATA_SIZE(padWeight) == 2)
+                                *(vx_int16 *)(dst + i) = (vx_int16)padV;
+                            else
+                                *(vx_int32 *)(dst + i) = padV;
+                        }
+                    }
+                }
                 else
                 {
-                    for(i = 0; i < TENSOR_STRIDE_INDEX(padWeight, 4); i+=TENSOR_STRIDE_INDEX(padWeight, 0))
+                    // fill pad data for perchannel weight.
+                    // fill its pad with the relative channel's pad
+                    vx_int32 *padv = TENSOR_TF_ZEROPOINT_POINTER(padWeight);
+                    for(i = 0; i < TENSOR_SIZE_INDEX(padWeight, 3); i++)
                     {
-                        if(TENSOR_DATA_SIZE(padWeight) == 2)
-                            *(vx_int16 *)(dst + i) = (vx_int16)padV;
-                        else
-                            *(vx_int32 *)(dst + i) = padV;
+                        vx_uint8 *startAddress = dst + i * TENSOR_STRIDE_INDEX(padWeight,3) ;
+                        vx_uint32 j = 0;
+                        for(j = 0; j < TENSOR_STRIDE_INDEX(padWeight,3); j += TENSOR_DATA_SIZE(padWeight))
+                        {
+                            if(TENSOR_DATA_SIZE(padWeight) == 1)
+                                startAddress[j] = (vx_int8)padv[i];
+                            else if(TENSOR_DATA_SIZE(padWeight) == 2)
+                                *(vx_int16*)(startAddress+j) = (vx_int16)padv[i];
+                            else if(TENSOR_DATA_SIZE(padWeight) == 4)
+                                *(vx_int32*)(startAddress+j) = padv[i];
+                        }
                     }
                 }
 
@@ -4964,7 +5074,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
                     weight  = WB_WEIGHT_TENSOR(wb);
                     bias    = WB_BIAS_TENSOR(wb);
 
-                    WB_BIAS_SCALE(wb) = scale * TENSOR_TF_SCALE(weight);
+                    WB_BIAS_SCALE(wb,0) = scale * TENSOR_TF_SCALE(weight);
                     WB_INPUT_ZP(wb) = TENSOR_TF_ZEROPOINT(reluOut);
                 }
 

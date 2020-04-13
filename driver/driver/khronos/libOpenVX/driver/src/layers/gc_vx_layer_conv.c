@@ -256,6 +256,8 @@ VX_PRIVATE_API void vxnneConvolutionReluPoolingOperation_Initialize(
     vx_enum conv_rounding_type,
     vx_bool enable_relu,
     vx_bool enable_pooling,
+    vx_uint32 nn_strideX,
+    vx_uint32 nn_strideY,
     vx_enum pool_type,
     vx_uint32 pool_size_x,
     vx_uint32 pool_size_y,
@@ -274,6 +276,8 @@ VX_PRIVATE_API void vxnneConvolutionReluPoolingOperation_Initialize(
     operation->pad_y_bottom     = pad_y_bottom;
     operation->conv_rounding_type = conv_rounding_type;
     operation->enable_relu      = enable_relu;
+    operation->nn_strideX       = nn_strideX;
+    operation->nn_strideY       = nn_strideY;
     operation->enable_pooling   = enable_pooling;
     operation->pool_type        = pool_type;
     operation->pool_size_x      = pool_size_x;
@@ -315,7 +319,8 @@ vx_status vxnneConvolutionReluPoolingInitializer(
     vx_uint32 tmpTensorIndex = 0;
     vx_bool enableBrickMode = vx_false_e;
     vx_bool needExtraBrickOp = vx_true_e;
-    vx_bool do_zdp_opt = vx_false_e, do_1xN = vx_false_e, do_fisrt_pixel_pool = vx_false_e;
+    vx_uint32 nn_stride_x = 1, nn_stride_y = 1;
+    vx_bool do_zdp_opt = vx_false_e, do_1xN = vx_false_e;
     vx_bool hasHwDepthWise = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_NN_DEPTHWISE_SUPPORT);
 
     vx_weights_biases_parameter reshapeWb = VX_NULL;
@@ -416,13 +421,31 @@ vx_status vxnneConvolutionReluPoolingInitializer(
                 do_1xN = vx_true_e;
             }
         }
-        if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_FIRST_PIXEL_POOLING) &&
+
+        if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_FAST_FIRST_PIXEL_POOLING) &&
+        !do_zdp_opt &&
+        TENSOR_SIZE_INDEX(WB_WEIGHT_TENSOR(weights_biases), 0) < 16 &&
+        TENSOR_SIZE_INDEX(WB_WEIGHT_TENSOR(weights_biases), 1)  < 16 &&
+        ((WB_ORG_STRIDE_X(weights_biases) == 2 && WB_ORG_STRIDE_Y(weights_biases) == 2) ||
+        (WB_ORG_STRIDE_X(weights_biases) == 4 && WB_ORG_STRIDE_Y(weights_biases) == 4 && pool_size_x == 0)) &&
+        (WB_ORG_LAYER_TYPE(weights_biases)  == VX_NN_CONVOLUTION_LAYER ||
+         (WB_ORG_LAYER_TYPE(weights_biases)  == VX_NN_DEPTH_WISE_CONVOLUTION_LAYER && hasHwDepthWise)))
+        {
+            /*TODO: handle stride = 4 here*/
+            if (WB_ORG_STRIDE_X(weights_biases) == 4 && WB_ORG_STRIDE_Y(weights_biases) == 4)
+            {
+                pool_size_x = 2,
+                pool_size_y = 2,
+                pool_type = VX_NN_POOLING_FPP;
+            }
+            nn_stride_x = 2;
+            nn_stride_y = 2;
+        }
+        else if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_FIRST_PIXEL_POOLING) &&
             WB_ORG_STRIDE_X(weights_biases) == 2 && WB_ORG_STRIDE_Y(weights_biases) == 2 &&
             !do_zdp_opt &&
             pool_size_x == 0 &&
-            (((WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_INT8 ||
-               WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_UINT8) &&
-              TENSOR_VIEW_SIZE_INDEX(inputs, 0) % 2 == 0 && WB_ORG_LAYER_TYPE(weights_biases) == VX_NN_CONVOLUTION_LAYER) ||
+            ((TENSOR_VIEW_SIZE_INDEX(inputs, 0) % 2 == 0 && WB_ORG_LAYER_TYPE(weights_biases) == VX_NN_CONVOLUTION_LAYER) ||
               (WB_ORG_LAYER_TYPE(weights_biases) == VX_NN_DEPTH_WISE_CONVOLUTION_LAYER && hasHwDepthWise)))
         {
             /* Per Arch, only support INT8 3x3 conv right now*/
@@ -440,7 +463,9 @@ vx_status vxnneConvolutionReluPoolingInitializer(
                    (WB_ORG_KERNEL_X(weights_biases)  == 2 && WB_ORG_KERNEL_Y(weights_biases)  == 1))) &&
                 WB_ORG_KERNEL_X(weights_biases) <= 15 && WB_ORG_KERNEL_Y(weights_biases) <= 15)
             {
-                do_fisrt_pixel_pool = vx_true_e;
+                pool_size_x = 2,
+                pool_size_y = 2,
+                pool_type = VX_NN_POOLING_FPP;
             }
         }
     }
@@ -502,6 +527,8 @@ vx_status vxnneConvolutionReluPoolingInitializer(
             conv.pool_size_x = conv.pool_size_y = 0;
             conv.pool_stride = 1;
             conv.enable_relu = vx_false_e;
+            conv.nn_strideX = nn_stride_x;
+            conv.nn_strideY = nn_stride_y;
             conv.pad_mode = padMode;
             conv.pad_const = (vx_int32)padConstValue + TENSOR_PAD_ZERO_VALUE(inputs);
             conv.tpType = TP_RESHUFFLE;
@@ -661,16 +688,17 @@ vx_status vxnneConvolutionReluPoolingInitializer(
             convolutionReluPoolingLayer->base.temp_tensors[tmpTensorIndex++] = reshuffleWeightTensor;
         }
     }
-    else if (TENSOR_DATA_TYPE(interTensor) != WB_WEIGHT_DATA_FORMAT(weights_biases))
+    else if ((TENSOR_DATA_TYPE(interTensor) != WB_WEIGHT_DATA_FORMAT(weights_biases)) &&  (WB_WEIGHT_QUANT_FORMAT(weights_biases) != VX_QUANT_AFFINE_SCALE_PER_CHANNEL))
     {
         vx_enum        inputFormat             = TENSOR_DATA_TYPE(interTensor);
         vx_enum        weightFormat            = WB_WEIGHT_DATA_FORMAT(weights_biases);
         vx_bool        shExe_flag              = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_INT8);
-        vx_uint32 sizes[3] =
+        vx_uint32 sizes[4] =
         {
             TENSOR_VIEW_SIZE_INDEX(inputs, 0),
             TENSOR_VIEW_SIZE_INDEX(inputs, 1),
-            TENSOR_VIEW_SIZE_INDEX(inputs, 2)
+            TENSOR_VIEW_SIZE_INDEX(inputs, 2),
+            TENSOR_VIEW_SIZE_INDEX(inputs, 3),
         };
 
         vx_tensor_create_params_t tensor_create_params;
@@ -680,6 +708,7 @@ vx_status vxnneConvolutionReluPoolingInitializer(
         tensor_create_params.sizes = sizes;
         tensor_create_params.data_format = WB_WEIGHT_DATA_FORMAT(weights_biases);
         tensor_create_params.quant_format = TENSOR_QUANT_TYPE(inputs);
+
         if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
         {
             tensor_create_params.quant_data.dfp.fixed_point_pos = WB_BIAS_FPP(weights_biases)- WB_WEIGHT_FPP(weights_biases);
@@ -856,7 +885,7 @@ vx_status vxnneConvolutionReluPoolingInitializer(
 
     inputs->brickMode = interTensor->brickMode;
 
-    if (do_fisrt_pixel_pool)
+    if (pool_type == VX_NN_POOLING_FPP)
     {
         vxnneConvolutionReluPoolingOperation_Initialize(
                 &convolutionReluPoolingLayer->convolution_operation,
@@ -870,10 +899,12 @@ vx_status vxnneConvolutionReluPoolingInitializer(
                 pad_y_bottom,
                 conv_rounding_type,
                 enable_relu,
+                nn_stride_x,
+                nn_stride_y,
                 vx_true_e,
-                VX_NN_POOLING_FFP,
-                2,
-                2,
+                pool_type,
+                pool_size_x,
+                pool_size_y,
                 padMode,
                 padConst,
                 convolutionReluPoolingLayer->convolution_operation.outputs);
@@ -892,6 +923,8 @@ vx_status vxnneConvolutionReluPoolingInitializer(
                 pad_y_bottom,
                 conv_rounding_type,
                 enable_relu,
+                nn_stride_x,
+                nn_stride_y,
                 enable_pooling,
                 pool_type,
                 pool_size_x,
@@ -920,28 +953,15 @@ vx_status vxnneConvolutionReluPoolingInitializer(
         conv.pool_stride = 2;
         conv.conv_rounding_type = conv_rounding_type;
         conv.enable_relu = enable_relu;
+        conv.nn_strideX = nn_stride_x;
+        conv.nn_strideY = nn_stride_y;
 
-        if (do_fisrt_pixel_pool)
-        {
-            conv.pool_type = VX_NN_POOLING_FFP;
-            conv.pool_size_x = 2;
-            conv.pool_size_y = 2;
-        }
-        else if (enable_pooling)
-        {
-            conv.pool_size_x = pool_size_x;
-            conv.pool_size_y = pool_size_y;
-        }
-        else
-        {
-            conv.pool_size_x = conv.pool_size_y = 0;
-        }
         memcpy(&convolutionReluPoolingLayer->convolution_operation.base.parameter, &conv, sizeof(vx_op_param_s));
     }
 
     convolutionReluPoolingLayer->convolution_operation.do_zdp_opt = do_zdp_opt;
     convolutionReluPoolingLayer->convolution_operation.do_1xN = do_1xN;
-    convolutionReluPoolingLayer->convolution_operation.do_fisrt_pixel_pool = do_fisrt_pixel_pool;
+    convolutionReluPoolingLayer->convolution_operation.do_fisrt_pixel_pool = (pool_type == VX_NN_POOLING_FPP) ? 1 : 0;
 
     node->layer = &convolutionReluPoolingLayer->base;
     return status;
@@ -1480,8 +1500,7 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
                         {
                             for (w = wStart, m = kernelXStart; w < wEnd; w += dilation_x, m++)
                             {
-                                //const vx_int32 indexSrc = d * inputWidth * inputHeight + h * (inputWidth) + w;
-                                const vx_int32 indexSrc = d * TENSOR_STRIDE_INDEX(inputs, 2)+  h * TENSOR_STRIDE_INDEX(inputs, 1) + w;
+                                const vx_int32 indexSrc = d * inputWidth * inputHeight + h * (inputWidth) + w;
                                 const vx_int32 indexWeight = d * kernelXSize * kernelYSize + n * kernelXSize + m;
 #if QUANT8_SUPPORT
                                 if (TENSOR_DATA_TYPE(inputs) == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(inputs) == VX_QUANT_AFFINE_SCALE)
@@ -1496,7 +1515,16 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
                                 vx_float32 inImg_data, weight_data;
 
                                 inImg_data = vxnneGetDataExt(inputFormat, TENSOR_QUANT_TYPE(inputs), indexSrc, (vx_uint8_ptr)dataSrc, TENSOR_POS(inputs), TENSOR_TF_ZEROPOINT(inputs), TENSOR_TF_SCALE(inputs));
-                                weight_data = vxnneGetDataExt(weightFormat, TENSOR_QUANT_TYPE(weights), indexWeight, (vx_uint8_ptr)dataWeight, TENSOR_POS(weights), TENSOR_TF_ZEROPOINT(weights), TENSOR_TF_SCALE(weights));
+                                if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT) &&
+                                    TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL &&
+                                   (TENSOR_DATA_TYPE(weights) == VX_TYPE_UINT8 || TENSOR_DATA_TYPE(weights) == VX_TYPE_INT8))
+                                {
+                                    weight_data = vxnneGetDataExt(weightFormat, TENSOR_QUANT_TYPE(weights), indexWeight, (vx_uint8_ptr)dataWeight, TENSOR_POS(weights), TENSOR_TF_ZEROPOINTS_WITH_INDEX(weights, p), TENSOR_TF_SCALES_WITH_INDEX(weights,p));
+                                }
+                                else
+                                {
+                                    weight_data = vxnneGetDataExt(weightFormat, TENSOR_QUANT_TYPE(weights), indexWeight, (vx_uint8_ptr)dataWeight, TENSOR_POS(weights), TENSOR_TF_ZEROPOINT(weights), TENSOR_TF_SCALE(weights));
+                                }
                                 sum +=  inImg_data* weight_data;
 #if DUMP_ONE_PIXEL_CPU_CONV
                                 if(pfile != NULL && my_count == dump_index)
@@ -1547,9 +1575,14 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
                     {
                         if (dataBias != VX_NULL)
                         {
-                            if (biasFormat == VX_TYPE_INT32 && TENSOR_QUANT_TYPE(biases) == VX_QUANT_AFFINE_SCALE)
-                                vxmASSERT(gcmABS(TENSOR_TF_SCALE(biases) - TENSOR_TF_SCALE(inputs) * TENSOR_TF_SCALE(weights)) < 0.000001);
-                            sum += vxnneGetDataExt(biasFormat, TENSOR_QUANT_TYPE(biases), indexBias, (vx_uint8_ptr)dataBias, TENSOR_POS(biases), TENSOR_TF_ZEROPOINT(biases), TENSOR_TF_SCALE(biases));
+                            if ((biasFormat == VX_TYPE_INT32 && TENSOR_QUANT_TYPE(biases) == VX_QUANT_AFFINE_SCALE) || (biasFormat == VX_TYPE_INT32 && TENSOR_QUANT_TYPE(biases) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL) )
+                            {
+                                vxmASSERT(gcmABS(TENSOR_TF_SCALES_WITH_INDEX(biases,p) - TENSOR_TF_SCALE(inputs) * TENSOR_TF_SCALES_WITH_INDEX(weights, p)) < 0.000001);
+                                sum += vxnneGetDataExt(biasFormat, TENSOR_QUANT_TYPE(biases), indexBias, (vx_uint8_ptr)dataBias, TENSOR_POS(biases), TENSOR_TF_ZEROPOINTS_WITH_INDEX(biases,p), TENSOR_TF_SCALES_WITH_INDEX(biases,p));
+                                printf("\n bias:%0.9f",vxnneGetDataExt(biasFormat, TENSOR_QUANT_TYPE(biases), indexBias, (vx_uint8_ptr)dataBias, TENSOR_POS(biases), TENSOR_TF_ZEROPOINTS_WITH_INDEX(biases,p), TENSOR_TF_SCALES_WITH_INDEX(biases,p)));
+                            }
+                            else
+                                sum += vxnneGetDataExt(biasFormat, TENSOR_QUANT_TYPE(biases), indexBias, (vx_uint8_ptr)dataBias, TENSOR_POS(biases), TENSOR_TF_ZEROPOINT(biases), TENSOR_TF_SCALE(biases));
                         }
                     }
                     else
@@ -1821,13 +1854,14 @@ VX_PRIVATE_API vx_status vxnneExecuteSWConv_Reshuffle(struct _vxnne_operation_s 
                             convOperation->outputs->dims,/*convolution_outputs_dims,*/
                             convOperation->outputs->dims,/*pool_outputs_dims,*/
                             convOperation->opt, /*optimizations,*/
+                            0,
                             TENSOR_DATA_TYPE(weights),
                             0,
                             VX_TENSOR_RANK_WHCN,
                             convOperation->reshuffled_weights?convOperation->reshuffled_weights:convOperation->weights,
                             convOperation->reshuffled_biases?convOperation->reshuffled_biases:convOperation->bias,
                             VX_NULL,
-                            vx_false_e,
+                            VX_NN_CONV_ONLY,
                             vx_false_e
                             );
 

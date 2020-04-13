@@ -42,19 +42,37 @@ EXTERN_C_BEGIN
     (tensor)->dataFormat
 
 #define TENSOR_POS(tensor) \
-    (tensor)->fixedPointPos
+    ((tensor)->quantData.dfp.fixed_point_pos) \
 
 #define TENSOR_QUANT_TYPE(tensor) \
     (tensor)->quantFormat
 
 #define TENSOR_TF_SCALE(tensor) \
-    (tensor)->scale
+    ((tensor)->quantData.affine.scale)
+
+#define TENSOR_TF_SCALE_POINTER(tensor) \
+    ((tensor)->quantData.affinePerChannel.scales)
 
 #define TENSOR_TF_ZEROPOINT(tensor) \
-    (tensor)->zeroPoint
+    ((tensor)->quantData.affine.zeroPoint)
+
+#define TENSOR_TF_ZEROPOINT_POINTER(tensor) \
+    ((tensor)->quantData.affinePerChannel.zeroPoint)
+
+#define TENSOR_TF_SCALES_WITH_INDEX(tensor, index) \
+    ((tensor)->quantData.affinePerChannel.scales[index])
+
+#define TENSOR_TF_ZEROPOINTS_WITH_INDEX(tensor, index) \
+    ((tensor)->quantData.affinePerChannel.zeroPoint[index])
 
 #define TENSOR_DATA_SIZE(tensor) \
     (tensor)->elementSize
+
+#define TENSOR_TF_CHANNEL_DIMS(tensor)\
+    (tensor->quantData.affinePerChannel.channelDim)
+
+#define TENSOR_TF_SCALE_COUNT(tensor)\
+    (tensor->quantData.affinePerChannel.scaleCount)
 
 #define TENSOR_ROUNDING_MODE(tensor) \
     (tensor)->tensorBuffer->roundingMode

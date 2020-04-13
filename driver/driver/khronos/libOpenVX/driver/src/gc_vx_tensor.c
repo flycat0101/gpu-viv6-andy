@@ -395,27 +395,52 @@ vxoTensor_Create(
     tensor = (vx_tensor)vxoReference_Create(context, VX_TYPE_TENSOR, kind, &context->base);
     if (vxoReference_GetStatus((vx_reference)tensor) != VX_SUCCESS) goto OnError;
 
-    if(tensor_create_params->data_format == VX_TYPE_FLOAT16 || tensor_create_params->data_format == VX_TYPE_BFLOAT16)
+    tensor->quantFormat = tensor_create_params->quant_format;
+
+    TENSOR_POS(tensor) = 0;
+    TENSOR_TF_SCALE(tensor) = 1.0f;
+    TENSOR_TF_ZEROPOINT(tensor) = 0;
+
+    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT) && TENSOR_QUANT_TYPE(tensor) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL/* && (tensor_create_params->data_format == VX_TYPE_UINT8 || tensor_create_params->data_format == VX_TYPE_INT8)*/)
     {
-        tensor->quantFormat = VX_QUANT_NONE;
+        vx_uint32 channelCount = 0;
+        TENSOR_TF_CHANNEL_DIMS(tensor)= tensor_create_params->quant_data.affinePerChannel.channelDim;
+        TENSOR_TF_SCALE_COUNT(tensor) = tensor_create_params->quant_data.affinePerChannel.scaleCount;
+
+        channelCount = viewRegion != VX_NULL ? viewRegion->viewEnds[TENSOR_TF_CHANNEL_DIMS(tensor)] - viewRegion->viewStarts[TENSOR_TF_CHANNEL_DIMS(tensor)] : uSizes[TENSOR_TF_CHANNEL_DIMS(tensor)];
+        if (channelCount != TENSOR_TF_SCALE_COUNT(tensor))
+        {
+            vxError("vxoTensor_Create: Invalid channel count");
+            goto OnError;
+        }
+
+        TENSOR_TF_SCALE_POINTER(tensor) = (vx_float32 *)vxAllocateAndZeroMemory(channelCount * sizeof(vx_float32));
+        if (TENSOR_TF_SCALE_POINTER(tensor) == VX_NULL)
+        {
+            vxError("vxoTensor_Create: Out of memory");
+            goto OnError;
+        }
+
+        gcoOS_MemCopy(TENSOR_TF_SCALE_POINTER(tensor), tensor_create_params->quant_data.affinePerChannel.scales, channelCount * sizeof(vx_float32));
+
+        TENSOR_TF_ZEROPOINT_POINTER(tensor) = (vx_int32 *)vxAllocateAndZeroMemory(channelCount * sizeof(vx_int32));
+        if (TENSOR_TF_ZEROPOINT_POINTER(tensor) == VX_NULL)
+        {
+            vxError("vxoTensor_Create: Out of memory");
+            goto OnError;
+        }
+
+        gcoOS_MemCopy(TENSOR_TF_ZEROPOINT_POINTER(tensor), tensor_create_params->quant_data.affinePerChannel.zeroPoint, channelCount * sizeof(vx_int32));
+
+    }
+    else if (tensor->quantFormat == VX_QUANT_AFFINE_SCALE)
+    {
+        TENSOR_TF_SCALE(tensor) = tensor_create_params->quant_data.affine.scale;
+        TENSOR_TF_ZEROPOINT(tensor) = tensor_create_params->quant_data.affine.zeroPoint;
     }
     else
     {
-        tensor->quantFormat = tensor_create_params->quant_format;
-    }
-
-    tensor->fixedPointPos = 0;
-    tensor->scale = 1.0f;
-    tensor->zeroPoint = 0;
-
-    if (tensor->quantFormat == VX_QUANT_AFFINE_SCALE)
-    {
-        tensor->scale = tensor_create_params->quant_data.affine.scale;
-        tensor->zeroPoint = tensor_create_params->quant_data.affine.zeroPoint;
-    }
-    else if(tensor->quantFormat == VX_QUANT_DYNAMIC_FIXED_POINT)
-    {
-        tensor->fixedPointPos = tensor_create_params->quant_data.dfp.fixed_point_pos;
+        TENSOR_POS(tensor) = tensor_create_params->quant_data.dfp.fixed_point_pos;
     }
 
     elementSize = vxoTensor_GetDataSizeByFormat(tensor_create_params->data_format);
@@ -431,7 +456,7 @@ vxoTensor_Create(
 
         if (tensor->quantFormat == VX_QUANT_AFFINE_SCALE)
         {
-            tensor->tensorBuffer->padZeorValue = tensor->zeroPoint;
+            tensor->tensorBuffer->padZeorValue = TENSOR_TF_ZEROPOINT(tensor);
         }
 
         tensor->tensorBuffer->memory.logicals[0] = VX_NULL;
@@ -2791,6 +2816,19 @@ vxoTensor_Destructor(
         vxFree(tensor->tensorBuffer);
         tensor->tensorBuffer = VX_NULL;
     }
+
+    if (TENSOR_TF_SCALE_POINTER(tensor) != VX_NULL)
+    {
+        vxFree(TENSOR_TF_SCALE_POINTER(tensor));
+        TENSOR_TF_SCALE_POINTER(tensor) = VX_NULL;
+    }
+
+    if (TENSOR_TF_ZEROPOINT_POINTER(tensor) != VX_NULL)
+    {
+        vxFree(TENSOR_TF_ZEROPOINT_POINTER(tensor));
+        TENSOR_TF_ZEROPOINT_POINTER(tensor) = VX_NULL;
+    }
+
     gcmFOOTER_NO();
 }
 

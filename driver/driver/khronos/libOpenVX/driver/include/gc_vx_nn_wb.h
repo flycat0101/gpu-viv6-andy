@@ -61,8 +61,9 @@ typedef struct _vx_weight_bias_general_param_s
     vx_enum                                  data_format;
     vx_int8                                  fixed_point_pos;
     vx_enum                                  quant_format;
-    vx_float32                               quant_scale;
-    vx_int32                                 quant_zero_point;
+    vx_float32*                              quant_scale;
+    vx_int32*                                quant_zero_point;
+    vx_uint32                                scaleCount;
 }
 vx_weight_bias_general_param_s, *vx_weight_bias_general_param;
 
@@ -78,11 +79,15 @@ typedef struct _vx_weight_bias_external_param_s
     vx_uint32                                orig_stride_x;
     vx_uint32                                orig_stride_y;
 
+    vx_float32                               input_scale;
     vx_int32                                 input_zp;
-
+    vx_enum                                  input_format;
+    vx_float32                               output_scale;
+    vx_int32                                 output_zp;
     vx_bool                                  is_depth_wise;
     vx_int8                                  set_zero_length;
     vx_uint32                                skip_value;
+    vx_enum                                  nn_conv_operation_type;
 
     vx_bool                                  do_1xN_config;
     vx_enum                                  orig_layer_type;
@@ -131,12 +136,14 @@ typedef struct _vx_weight_bias_compress_param_s
 }
 vx_weight_bias_compress_param_s, *vx_weight_bias_compress_param;
 
-typedef vx_status (*vx_weight_bias_initialize_f)(vx_weights_biases_parameter wb, vx_weight_bias_general_param weight_param, vx_weight_bias_general_param bias_param, vx_uint32 orig_stride_x, vx_uint32 orig_stride_y, vx_uint32 stride_x, vx_uint32 stride_y, vx_int8 zero_len, vx_uint32 skip_value, vx_bool is_depth_wise, vx_bool do_1xN_config, vx_enum orig_layer_type);
+
+typedef vx_status (*vx_weight_bias_initialize_f)(vx_weights_biases_parameter wb, vx_weight_bias_general_param weight_param, vx_weight_bias_general_param bias_param, vx_uint32 orig_stride_x, vx_uint32 orig_stride_y, vx_uint32 stride_x, vx_uint32 stride_y, vx_int8 zero_len, vx_uint32 *skip_value, vx_bool is_depth_wise, vx_bool do_1xN_config, vx_enum orig_layer_type);
+
 
 typedef vx_status (*vx_weight_bias_deinitialize_f)(vx_weights_biases_parameter wb);
 
 typedef vx_status (*vx_weight_bias_compress_f)(vx_weights_biases_parameter wb, vx_enum target, vx_uint32 kernel_per_core, vx_uint32 z_offset);
-typedef vx_status (*vx_weight_bias_set_1_tensor_f)(vx_weights_biases_parameter wb, vx_tensor tensor);
+typedef vx_status (*vx_weight_bias_set_1_tensor_f)(vx_weights_biases_parameter wb, vx_reference ref);
 typedef vx_status (*vx_weight_bias_set_2_tensor_f)(vx_weights_biases_parameter wb, vx_tensor tensor1, vx_tensor tensor2);
 typedef vx_status (*vx_weight_bias_set_struct_ptr_f)(vx_weights_biases_parameter wb, vx_ptr struct_ptr, vx_uint32 struct_size);
 
@@ -149,7 +156,7 @@ typedef struct _vx_weights_biases_parameter_s
 
     vx_tensor                                weight_tensor;
     vx_tensor                                bias_tensor;
-    vx_tensor                                alpha_tensor;
+    vx_reference                             alpha_ref;
 
     vx_uint8_ptr                             weight_data_ptr;
     vx_uint32_ptr                            bias_data_ptr;
@@ -169,28 +176,45 @@ typedef struct _vx_weights_biases_parameter_s
 vx_weights_biases_parameter_s;
 
 
+enum vx_nn_conv_operation_type
+{
+    VX_NN_CONV_ONLY = 0x0,
+    VX_NN_CONV_PRELU = 0x1,
+    VX_NN_CONV_LEAKYRELU = 0x2,
+
+};
+
 #define WB_EXTERNAL_PARAM(wb)                  (wb)->external_param
 #define WB_IS_DEPTH_WISE(wb)                   (wb)->external_param.is_depth_wise
+
+#define WB_OPERATION_TYPE(wb)                  (wb)->external_param.nn_conv_operation_type
+
 #define WB_DO_1XN_CONFIG(wb)                   (wb)->external_param.do_1xN_config
 #define WB_ORG_LAYER_TYPE(wb)                  (wb)->external_param.orig_layer_type
 #define WB_SKIP_VALUE(wb)                      (wb)->external_param.skip_value
 #define WB_SET_ZERO_LENGTH(wb)                 (wb)->external_param.set_zero_length
+#define WB_INPUT_SCALE(wb)                     ((wb)->external_param.input_scale)
 #define WB_INPUT_ZP(wb)                        (wb)->external_param.input_zp
+#define WB_INPUT_FORMAT(wb)                    (wb)->external_param.input_format
+#define WB_OUTPUT_SCALE(wb)                    ((wb)->external_param.output_scale)
+#define WB_OUTPUT_ZP(wb)                       (wb)->external_param.output_zp
 
 #define WB_STRIDE_X(wb)                        (wb)->external_param.stride_x
 #define WB_STRIDE_Y(wb)                        (wb)->external_param.stride_y
 #define WB_ORG_STRIDE_X(wb)                    (wb)->external_param.orig_stride_x
 #define WB_ORG_STRIDE_Y(wb)                    (wb)->external_param.orig_stride_y
 
-#define WB_WEIGHT_PARAM(wb)                    (wb)->external_param.weight_param
-#define WB_WEIGHT_DIMS_NUM(wb)                 (wb)->external_param.weight_param.num_of_dims
-#define WB_WEIGHT_DIMS_SIZES(wb)               (wb)->external_param.weight_param.dims_sizes
+#define WB_WEIGHT_PARAM(wb)                    ((wb)->external_param.weight_param)
+#define WB_WEIGHT_DIMS_NUM(wb)                 ((wb)->external_param.weight_param.num_of_dims)
+#define WB_WEIGHT_DIMS_SIZES(wb)               ((wb)->external_param.weight_param.dims_sizes)
 #define WB_WEIGHT_ORG_DIMS_SIZES(wb)           (wb)->external_param.weight_param.org_dims_sizes
 #define WB_WEIGHT_DATA_FORMAT(wb)              (wb)->external_param.weight_param.data_format
 #define WB_WEIGHT_FPP(wb)                      (wb)->external_param.weight_param.fixed_point_pos
 #define WB_WEIGHT_QUANT_FORMAT(wb)             (wb)->external_param.weight_param.quant_format
-#define WB_WEIGHT_SCALE(wb)                    (wb)->external_param.weight_param.quant_scale
-#define WB_WEIGHT_ZP(wb)                       (wb)->external_param.weight_param.quant_zero_point
+#define WB_WEIGHT_SCALE(wb, index)             (wb)->external_param.weight_param.quant_scale[index]
+#define WB_WEIGHT_SCALE_POINTER(wb)            ((wb)->external_param.weight_param.quant_scale)
+#define WB_WEIGHT_ZP(wb, index)                ((wb)->external_param.weight_param.quant_zero_point[index])
+#define WB_WEIGHT_ZP_POINTER(wb)               ((wb)->external_param.weight_param.quant_zero_point)
 
 #define WB_BIAS_PARAM(wb)                      (wb)->external_param.bias_param
 #define WB_BIAS_DIMS_NUM(wb)                   (wb)->external_param.bias_param.num_of_dims
@@ -198,16 +222,20 @@ vx_weights_biases_parameter_s;
 #define WB_BIAS_DATA_FORMAT(wb)                (wb)->external_param.bias_param.data_format
 #define WB_BIAS_FPP(wb)                        (wb)->external_param.bias_param.fixed_point_pos
 #define WB_BIAS_QUANT_FORMAT(wb)               (wb)->external_param.bias_param.quant_format
-#define WB_BIAS_SCALE(wb)                      (wb)->external_param.bias_param.quant_scale
-#define WB_BIAS_ZP(wb)                         (wb)->external_param.bias_param.quant_zero_point
+#define WB_BIAS_SCALE(wb, index)               (wb)->external_param.bias_param.quant_scale[index]
+#define WB_BIAS_SCALE_POINTER(wb)              ((wb)->external_param.bias_param.quant_scale)
+#define WB_BIAS_ZP(wb,index)                   (wb)->external_param.bias_param.quant_zero_point[index]
+#define WB_BIAS_ZP_POINTER(wb)                 ((wb)->external_param.bias_param.quant_zero_point)
 
 #define WB_ALPHA_DIMS_NUM(wb)                  (wb)->external_param.alpha_param.num_of_dims
 #define WB_ALPHA_DIMS_SIZES(wb)                (wb)->external_param.alpha_param.dims_sizes
 #define WB_ALPHA_DATA_FORMAT(wb)               (wb)->external_param.alpha_param.data_format
 #define WB_ALPHA_FPP(wb)                       (wb)->external_param.alpha_param.fixed_point_pos
 #define WB_ALPHA_QUANT_FORMAT(wb)              (wb)->external_param.alpha_param.quant_format
-#define WB_ALPHA_SCALE(wb)                     (wb)->external_param.alpha_param.quant_scale
-#define WB_ALPHA_ZP(wb)                        (wb)->external_param.alpha_param.quant_zero_point
+#define WB_ALPHA_SCALE(wb, index)              (wb)->external_param.alpha_param.quant_scale[index]
+#define WB_ALPHA_ZP(wb, index)                 (wb)->external_param.alpha_param.quant_zero_point[index]
+#define WB_ALPHA_SCALE_POINTER(wb)             ((wb)->external_param.alpha_param.quant_scale)
+#define WB_ALPHA_ZP_POINTER(wb)                ((wb)->external_param.alpha_param.quant_zero_point)
 
 #define WB_KERNEL_X(wb)                        (wb)->external_param.weight_param.dims_sizes[0]
 #define WB_KERNEL_Y(wb)                        (wb)->external_param.weight_param.dims_sizes[1]
@@ -268,8 +296,7 @@ vx_weights_biases_parameter_s;
 
 #define WB_WEIGHT_TENSOR(wb)                   (wb)->weight_tensor
 #define WB_BIAS_TENSOR(wb)                     (wb)->bias_tensor
-#define WB_ALPHA_TENSOR(wb)                    (wb)->alpha_tensor
-
+#define WB_ALPHA_REF(wb)                       (wb)->alpha_ref
 #define WB_WEIGHT_DATA(wb)                     (wb)->weight_data_ptr
 #define WB_BIAS_DATA(wb)                       (wb)->bias_data_ptr
 #define WB_ALPHA_DATA(wb)                      (wb)->alpha_data_ptr
@@ -293,13 +320,14 @@ vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromTensors(
     vx_uint32 * convolution_outputs_dims,
     vx_uint32 * pool_outputs_dims,
     vx_weights_biases_parameter_optimizations_t *optimizations,
+    vx_uint32 opt_size,
     vx_enum     output_format,
     vx_enum     convert_format,
     vx_enum     rank_mode,
     vx_tensor   weights,
     vx_tensor   biases,
-    vx_tensor   alpha,
-    vx_bool     do_prelu,
+    vx_reference alpha,
+    vx_enum     conv_operation_type,
     vx_bool     do_1xN
     );
 
@@ -344,7 +372,21 @@ vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromTensorsPRelu(
     vx_tensor   alpha
     );
 
-vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromWeightBias(
+vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromTensorsLeakyRelu(
+    vx_enum     layer_type,
+    vx_uint32 * inputs_dims,
+    vx_uint32 * convolution_outputs_dims,
+    vx_uint32 * pool_outputs_dims,
+    const vx_nn_convolution_relu_pooling_params convolution_relu_pooling_params,
+    vx_size size_of_convolution_relu_pooling_params,
+    vx_weights_biases_parameter_optimizations_t *optimizations,
+    vx_size size_of_optimizations,
+    vx_tensor   weights,
+    vx_tensor   biases,
+    vx_scalar   alpha
+    );
+
+vx_weights_biases_parameter vxoCreateWeightsBiasesFromWeightBias(
     vx_context                  context,
     vx_weights_biases_parameter old_wb,
     vx_uint32*                  weight_dims,
@@ -363,6 +405,25 @@ vx_status vxoCalculateNNCompressionFirstTime(
     vx_context                   context,
     vx_weights_biases_parameter  wb,
     vx_tensor                    output
+    );
+
+
+vx_status calculatePostMultiAndPostShift(
+    vx_context                    context,
+    vx_weights_biases_parameter   wb,
+    vx_uint32                     *post_mul_shift,
+    vx_uint32                     *neg_post_mul_shift
+    );
+
+vx_status checkWeightZp(
+    vx_context                    context,
+    vx_weights_biases_parameter   wb
+    );
+
+VX_PRIVATE_API vx_status vxoWeightBias_ScaleAndZP(
+    vx_weights_biases_parameter wb,
+    vx_weight_bias_general_param        weight_param,
+    vx_weight_bias_general_param        bias_param
     );
 #endif
 

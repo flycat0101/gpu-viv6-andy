@@ -1010,13 +1010,14 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_NN_Initialize(vxnne_layer ops_l
             outputs->dims,/*convolution_outputs_dims,*/
             outputs->dims,/*pool_outputs_dims,*/
             &opt, /*optimizations,*/
+            0,
             TENSOR_DATA_TYPE(weight_dilation),
             0,
             VX_TENSOR_RANK_WHCN,
             weight_dilation,
             biases,
             VX_NULL,
-            vx_false_e,
+            VX_NN_CONV_ONLY,
             vx_false_e
         );
 

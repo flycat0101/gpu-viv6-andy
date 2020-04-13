@@ -412,6 +412,15 @@ vx_float32 Uint8toFp32(vx_uint8 val, vx_int32 zeroPoint, vx_float32 scale)
     return result;
 }
 
+vx_float32 int8toFp32(vx_int8 val, vx_int32 zeroPoint, vx_float32 scale)
+{
+    vx_float32 result = 0.0f;
+
+    result = (val - (vx_int8)zeroPoint) * scale;
+
+    return result;
+}
+
 vx_int8 Fp32toUchar(vx_float32 val, vx_int8 fixedPointPos, vx_int32 roundMode)
 {
     vx_uint8 result = 0;
@@ -860,6 +869,12 @@ vx_float32 vxnneGetDataQuant(vx_type_e format, vx_int32 index, vx_uint8_ptr data
                 value = Uint8toFp32(data_ptr[index], zeroPoint, scale);
             }
             break;
+        case VX_TYPE_INT8:
+            {
+                vx_int8_ptr data_ptr = (vx_int8*)data;
+                value = int8toFp32(data_ptr[index], zeroPoint, scale);
+            }
+            break;
         case VX_TYPE_INT32:
             {
                 vx_int32_ptr data_ptr = (vx_int32*)data;
@@ -1085,7 +1100,7 @@ vx_status vxnneSaveData(vx_type_e format, vx_int32 index, vx_float64 data, vx_pt
 
 vx_float32 vxnneGetDataExt(vx_type_e format, vx_enum quant_format, vx_int32 index, vx_uint8_ptr data, vx_int8 fixPointPos, vx_int32 zeroPoint, vx_float32 scale)
 {
-    if (quant_format == VX_QUANT_AFFINE_SCALE)
+    if (quant_format == VX_QUANT_AFFINE_SCALE || quant_format == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
         return vxnneGetDataQuant(format, index, data, zeroPoint, scale);
     else
         return vxnneGetData(format, index, data, fixPointPos);
@@ -1093,7 +1108,7 @@ vx_float32 vxnneGetDataExt(vx_type_e format, vx_enum quant_format, vx_int32 inde
 
 vx_status vxnneSaveDataExt(vx_type_e format, vx_enum quant_format, vx_int32 index, vx_float64 data, vx_ptr dst_data, vx_int8 fixedPointPos, vx_int32 zeroPoint, vx_float32 scale, vx_enum roundMode)
 {
-    if ((format == VX_TYPE_UINT8 || format == VX_TYPE_INT32)&& quant_format == VX_QUANT_AFFINE_SCALE)
+    if ((quant_format == VX_QUANT_AFFINE_SCALE  && (format == VX_TYPE_UINT8 || format == VX_TYPE_INT32))|| quant_format == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
         return vxnneSaveDataQuant(format, index, data, dst_data, zeroPoint, scale, roundMode);
     else
         return vxnneSaveData(format, index, data, dst_data, fixedPointPos, roundMode);
@@ -1694,7 +1709,7 @@ vx_int32 getHwPoolingType(vx_enum poolingType)
         return VIV_NN_POOLING_MAX;
     case VX_NN_POOLING_AVG:
         return VIV_NN_POOLING_AVG;
-    case VX_NN_POOLING_FFP:
+    case VX_NN_POOLING_FPP:
         return VIV_NN_POOLING_FIRST_PIXEL;
     default:
         break;
@@ -2494,10 +2509,13 @@ vx_status vxnneOperation_GetInfo(vxnne_operation operation, vxnne_operation_info
         info->reshuffStrideX = 1;
         info->reshuffStrideY = 1;
 
+        info->nnStrideX = operation->parameter.nn_strideX;
+        info->nnStrideY = operation->parameter.nn_strideY;
+
         info->normStrideX = 1;
         info->normStrideY = 1;
 
-        vxmASSERT(!info->enablePooling || (info->poolType == VX_NN_POOLING_MAX || info->poolType == VX_NN_POOLING_FFP));
+        vxmASSERT(!info->enablePooling || (info->poolType == VX_NN_POOLING_MAX || info->poolType == VX_NN_POOLING_FPP ));
         vxmASSERT(!info->enablePooling || (info->poolSizeY == 2 || info->poolSizeY == 3));
     }
     else if (operation->target == VXNNE_OPERATION_TARGET_TP)
@@ -4290,9 +4308,13 @@ vx_status vxnneOperation_InitializeCommand(
             vxnne_operation_info_s opInfo;
             vx_uint32 transposeSize = 0;
             vx_uint32 count = 0;
+            vx_uint32 nnStrideX = 1;
+            vx_uint32 nnStrideY = 1;
 
             vxnneOperation_GetInfo(operation, &opInfo);
 
+            nnStrideX = opInfo.nnStrideX;
+            nnStrideY = opInfo.nnStrideY;
             outImageTileX  = convOperation->resultInfo.outImageTileXSize;
             outImageTileY  = convOperation->resultInfo.outImageTileYSize;
             interleaveMode = convOperation->resultInfo.interleaveMode;
@@ -4302,7 +4324,7 @@ vx_status vxnneOperation_InitializeCommand(
             inImageZ = TENSOR_SIZE_INDEX(opInfo.input, 2);
             inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
 
-            imageTileSize = caculate3DTileSize(context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode);
+            imageTileSize = caculate3DTileSize(context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode, nnStrideX, nnStrideY);
 
             kernelbufferSize = (vx_uint32)gcmALIGN_NP2(WB_STREAM_ALIGN_SIZE_INDEX(opInfo.weightsBiases, 0), CACHE_ALIGNMENT_SIZE);
 
@@ -4329,16 +4351,20 @@ vx_status vxnneOperation_InitializeCommand(
 
                     inputZ = TENSOR_STRIDE_INDEX(input, 3) / TENSOR_STRIDE_INDEX(input, 2);
 
-                    transposeSize = caculateInputTransposeBufferSize(VXNNE_SRAM_CACHE_MODE_FULL_CACHE,
-                                                                        outImageTileX,
-                                                                        outImageTileY,
-                                                                        kernelX,
-                                                                        kernelY,
-                                                                        inputZ,
-                                                                        interleaveMode,
-                                                                        context->nnConfig.customizedFeature.ddrLatency,
-                                                                        operation->transposeInChannel,
-                                                                        input->tensorBuffer->dataFormat);
+                    transposeSize = caculateInputTransposeBufferSize(context,
+                                                                    VXNNE_SRAM_CACHE_MODE_FULL_CACHE,
+                                                                    outImageTileX,
+                                                                    outImageTileY,
+                                                                    kernelX,
+                                                                    kernelY,
+                                                                    inputZ,
+                                                                    interleaveMode,
+                                                                    context->nnConfig.customizedFeature.ddrLatency,
+                                                                    operation->transposeInChannel,
+                                                                    input->tensorBuffer->dataFormat,
+                                                                    nnStrideX,
+                                                                    nnStrideY
+                                                                    );
 
                     gcoOS_ZeroMemory(&requestList->transposeIn, sizeof(vx_memory_s));
                     requestList->transposeIn.lastUseId = requestList->transposeIn.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
@@ -4473,12 +4499,20 @@ vx_uint32 caculate3DTileSize(
     vx_uint32 kernelY,
     vx_uint32 inImageZ,
     vx_uint32 dataFormat,
-    vx_uint32 interleaveMode
+    vx_uint32 interleaveMode,
+    vx_uint32 nnStrideX,
+    vx_uint32 nnStrideY
     )
 {
     vx_uint32 inImageTileSizeX = outputTileXSize + kernelX - 1;
     vx_uint32 inImageTileSizeY = outputTileYSize + kernelY - 1;
     vx_uint32 imageTileSize  = 0;
+
+    if (nnStrideX == 2 && nnStrideY == 2)
+    {
+        inImageTileSizeX = outputTileXSize * nnStrideY + kernelX - 1;
+        inImageTileSizeY = outputTileYSize *nnStrideY + kernelY - 1;
+    }
 
     if ((kernelX == 1 && kernelY == 1
         && (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3) || vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP6))
@@ -5061,8 +5095,7 @@ vx_bool vxnneIsNNSupportFormat(
     switch (inputFormat)
     {
     case VX_TYPE_FLOAT16:
-        if ((context->nnConfig.fixedFeature.nnCoreCountFloat16 > 0) &&
-            gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FP16_ALU))
+        if (context->nnConfig.fixedFeature.nnCoreCountFloat16 > 0)
         {
             isNNSupportFormat = vx_true_e;
         }
@@ -5083,8 +5116,9 @@ vx_bool vxnneIsNNSupportFormat(
         }
         break;
     case VX_TYPE_INT8:
-        if ((inputQuantFormat == VX_QUANT_DYNAMIC_FIXED_POINT) &&
-            (context->nnConfig.fixedFeature.nnCoreCountInt8 > 0))
+        if ((context->nnConfig.fixedFeature.nnCoreCountInt8 > 0) &&
+        ((inputQuantFormat == VX_QUANT_AFFINE_SCALE_PER_CHANNEL && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT)) ||
+        (inputQuantFormat == VX_QUANT_DYNAMIC_FIXED_POINT)))
         {
             isNNSupportFormat = vx_true_e;
         }
@@ -5092,8 +5126,8 @@ vx_bool vxnneIsNNSupportFormat(
 
     case VX_TYPE_UINT8:
         if ((context->nnConfig.fixedFeature.nnCoreCountInt8 > 0) &&
-            (((inputQuantFormat == VX_QUANT_AFFINE_SCALE) &&
-            vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT)) ||
+            ((inputQuantFormat == VX_QUANT_AFFINE_SCALE_PER_CHANNEL && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT)) ||
+            ((inputQuantFormat == VX_QUANT_AFFINE_SCALE) && vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT)) ||
             (inputQuantFormat == VX_QUANT_DYNAMIC_FIXED_POINT)))
         {
             isNNSupportFormat = vx_true_e;
@@ -5755,6 +5789,7 @@ vx_bool _IsSameType(
 }
 
 vx_uint32 caculateInputTransposeBufferSize(
+    vx_context context,
     vx_enum imageCacheMode,
     vx_uint32 outputTileXSize,
     vx_uint32 outputTileYSize,
@@ -5764,12 +5799,20 @@ vx_uint32 caculateInputTransposeBufferSize(
     vx_uint32 interleaveMode,
     vx_float32 ddrLatency,
     vx_uint32 transposeInChannel,
-    vx_enum dataFormat
+    vx_enum dataFormat,
+    vx_uint32 nnStrideX,
+    vx_uint32 nnStrideY
     )
 {
     vx_uint32 inImageTileSizeX = outputTileXSize + kernelX - 1;
     vx_uint32 inImageTileSizeY = outputTileYSize + kernelY - 1;
     vx_uint32 result = 0;
+
+    if (nnStrideX == 2 && nnStrideY == 2)
+    {
+        inImageTileSizeX = outputTileXSize * nnStrideX + kernelX - 1;
+        inImageTileSizeY = outputTileYSize * nnStrideY + kernelY - 1;
+    }
 
     if ((kernelX == 1) && (kernelY == 1))
     {
@@ -5970,6 +6013,9 @@ vx_bool estimateNNTransposeSize(vx_context context, vx_graph graph)
             vx_uint32 outputDims[3] = {TENSOR_SIZE_INDEX(opInfo.output, 0), TENSOR_SIZE_INDEX(opInfo.output, 1), TENSOR_SIZE_INDEX(opInfo.output, 2)};
             vx_uint32 inputDims[3]  = {TENSOR_SIZE_INDEX(opInfo.input, 0), TENSOR_SIZE_INDEX(opInfo.input, 1), TENSOR_SIZE_INDEX(opInfo.input, 2)};
             vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat;
+            vx_uint32 nnStrideX = opInfo.nnStrideX;
+            vx_uint32 nnStrideY = opInfo.nnStrideY;
+
 #ifdef ORI_NNARCHPERF
             vx_arch_perf_s archPerfHandle;
 #else
@@ -6024,7 +6070,8 @@ vx_bool estimateNNTransposeSize(vx_context context, vx_graph graph)
             inImageZ        = TENSOR_SIZE_INDEX(opInfo.input, 2);
             inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
 
-            operation->transposeInSize = caculateInputTransposeBufferSize(VXNNE_SRAM_CACHE_MODE_FULL_CACHE,
+            operation->transposeInSize = caculateInputTransposeBufferSize(context,
+                                            VXNNE_SRAM_CACHE_MODE_FULL_CACHE,
                                             outImageTileX,
                                             outImageTileY,
                                             kernelX,
@@ -6033,11 +6080,14 @@ vx_bool estimateNNTransposeSize(vx_context context, vx_graph graph)
                                             interleaveMode,
                                             context->nnConfig.customizedFeature.ddrLatency,
                                             operation->transposeInChannel,
-                                            input->tensorBuffer->dataFormat);
+                                            input->tensorBuffer->dataFormat,
+                                            nnStrideX,
+                                            nnStrideY
+                                            );
 
             operation->transposeOutSize = caculateOutTransposeBufferSize(context, outImageTileX, outImageTileY, convOperation, output->tensorBuffer->dataFormat);
             operation->transposeKernelSize = GetEsitimateWBSize(opInfo.weightsBiases);
-            operation->esitimateImageCacheSize = caculate3DTileSize(context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode);
+            operation->esitimateImageCacheSize = caculate3DTileSize(context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode, nnStrideX, nnStrideY);
         }
     }
     return status;
@@ -6134,6 +6184,7 @@ vx_status nnTransposeChannel(vx_context context, vx_graph graph)
         operation->transposeOutChannel = transposeOutChannel;
         output->tensorBuffer->memory.transposeChannel = operation->transposeOutChannel;
     }
+
     return status;
 }
 

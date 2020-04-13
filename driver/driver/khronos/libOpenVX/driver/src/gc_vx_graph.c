@@ -1023,6 +1023,9 @@ VX_INTERNAL_API vx_bool ComputeMNEx(
             {
                 vx_uint32 outTileY, inputTileY;
                 vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat;
+                vx_uint32 nnStrideX = opInfo.nnStrideX;
+                vx_uint32 nnStrideY = opInfo.nnStrideY;
+
 #ifdef ORI_NNARCHPERF
                 vx_arch_perf_s archPerfHandle;
                 memset(&archPerfHandle, 0, sizeof(vx_arch_perf_s));
@@ -1106,7 +1109,7 @@ VX_INTERNAL_API vx_bool ComputeMNEx(
                 inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
 
                 imageCacheSize =
-                    caculate3DTileSize(layer->graph->base.context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode);
+                    caculate3DTileSize(layer->graph->base.context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode, nnStrideX, nnStrideY);
 
             }
 
@@ -2100,6 +2103,8 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
             vxnne_mem_request requestList = graph->layer->memRequestList + segment->start + i;
             vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat, imageTileSize, kernelbufferSize;
             vx_uint32 transposeSize = 0;
+            vx_uint32 nnStrideX = opInfo.nnStrideX;
+            vx_uint32 nnStrideY = opInfo.nnStrideY;
 
             if (convOperation->resultInfo.kernelsPerCore == 0)
             {
@@ -2170,7 +2175,7 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
             inImageZ = TENSOR_SIZE_INDEX(opInfo.input, 2);
             inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
 
-            imageTileSize = caculate3DTileSize(graph->base.context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode);
+            imageTileSize = caculate3DTileSize(graph->base.context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode, nnStrideX, nnStrideY);
 
             kernelbufferSize = (vx_uint32)gcmALIGN_NP2(WB_STREAM_ALIGN_SIZE_INDEX(opInfo.weightsBiases, 0), CACHE_ALIGNMENT_SIZE);
 
@@ -2194,7 +2199,8 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
 
                     inputZ = TENSOR_STRIDE_INDEX(input, 3) / TENSOR_STRIDE_INDEX(input, 2);
 
-                    transposeSize = caculateInputTransposeBufferSize(VXNNE_SRAM_CACHE_MODE_FULL_CACHE,
+                    transposeSize = caculateInputTransposeBufferSize(graph->base.context,
+                                                                    VXNNE_SRAM_CACHE_MODE_FULL_CACHE,
                                                                      outImageTileX,
                                                                      outImageTileY,
                                                                      kernelX,
@@ -2203,7 +2209,10 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
                                                                      interleaveMode,
                                                                      graph->base.context->nnConfig.customizedFeature.ddrLatency,
                                                                      operation->transposeInChannel,
-                                                                     input->tensorBuffer->dataFormat);
+                                                                     input->tensorBuffer->dataFormat,
+                                                                     nnStrideX,
+                                                                     nnStrideY
+                                                                     );
 
                     gcoOS_ZeroMemory(&requestList->transposeIn, sizeof(vx_memory_s));
                     requestList->transposeIn.lastUseId = requestList->transposeIn.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
@@ -2346,6 +2355,9 @@ VX_PRIVATE_API vx_status GenerateTilingSegmentInfo(
             {
                 vx_uint32 outImageTileX = tilingInfo[j].tilingParam.outImageTileXSize;
                 vx_uint32 outImageTileY = tilingInfo[j].tilingParam.outImageTileYSize;
+                vx_uint32 nnStrideX = opInfo.nnStrideX;
+                vx_uint32 nnStrideY = opInfo.nnStrideY;
+
 
 
                 if (outImageTileY != 0)
@@ -2361,7 +2373,8 @@ VX_PRIVATE_API vx_status GenerateTilingSegmentInfo(
 
                         inputZ = TENSOR_STRIDE_INDEX(input, 3) / TENSOR_STRIDE_INDEX(input, 2);
 
-                        transposeSize = caculateInputTransposeBufferSize(VXNNE_SRAM_CACHE_MODE_FULL_CACHE,
+                        transposeSize = caculateInputTransposeBufferSize(graph->base.context,
+                                                                        VXNNE_SRAM_CACHE_MODE_FULL_CACHE,
                                                                         tilingInfo[j].tilingParam.outImageTileXSize,
                                                                         tilingInfo[j].tilingParam.outImageTileYSize,
                                                                         WB_KERNEL_X(opInfo.weightsBiases),
@@ -2370,7 +2383,9 @@ VX_PRIVATE_API vx_status GenerateTilingSegmentInfo(
                                                                         tilingInfo[j].tilingParam.interleaveMode,
                                                                         graph->base.context->nnConfig.customizedFeature.ddrLatency,
                                                                         operation->transposeInChannel,
-                                                                        input->tensorBuffer->dataFormat);
+                                                                        input->tensorBuffer->dataFormat,
+                                                                        nnStrideX,
+                                                                        nnStrideY);
                         operation->transposeInSize = gcmMAX(operation->transposeInSize, transposeSize);
                     }
                     else
@@ -2383,7 +2398,7 @@ VX_PRIVATE_API vx_status GenerateTilingSegmentInfo(
                         inImageZ = TENSOR_SIZE_INDEX(opInfo.input, 2);
                         inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
 
-                        imageTileSize = caculate3DTileSize(graph->base.context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode);
+                        imageTileSize = caculate3DTileSize(graph->base.context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode, nnStrideX, nnStrideY);
                         operation->imageCacheSize = gcmMAX(operation->imageCacheSize, imageTileSize);
                     }
                 }
@@ -2408,7 +2423,7 @@ VX_PRIVATE_API vx_status GenerateTilingSegmentInfo(
 
             vxmASSERT(convOperation->swtWeightBiases == VX_NULL);
 
-            convOperation->swtWeightBiases = vxoCreateWeightsBiasesParameterFromWeightBias(
+            convOperation->swtWeightBiases = vxoCreateWeightsBiasesFromWeightBias(
                                                  graph->base.context,
                                                  opInfo.weightsBiases,
                                                  WB_WEIGHT_DIMS_SIZES(opInfo.weightsBiases),
@@ -3899,6 +3914,9 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                 vx_uint32 outputDims[3] = {TENSOR_SIZE_INDEX(opInfo.output, 0), TENSOR_SIZE_INDEX(opInfo.output, 1), TENSOR_SIZE_INDEX(opInfo.output, 2)};
                 vx_uint32 inputDims[3]  = {TENSOR_SIZE_INDEX(opInfo.input, 0), TENSOR_SIZE_INDEX(opInfo.input, 1), TENSOR_SIZE_INDEX(opInfo.input, 2)};
                 vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat, outputDataFormat;
+                vx_uint32 nnStrideX = opInfo.nnStrideX;
+                vx_uint32 nnStrideY = opInfo.nnStrideY;
+
 #ifdef ORI_NNARCHPERF
             vx_arch_perf_s archPerfHandle;
             memset(&archPerfHandle, 0, sizeof(vx_arch_perf_s));
@@ -3958,12 +3976,13 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                 outputDataFormat = TENSOR_DATA_TYPE(opInfo.output);
 
                 graph->layer->operations[i]->esitimateImageCacheSize =
-                    caculate3DTileSize(graph->base.context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode);
+                    caculate3DTileSize(graph->base.context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode, nnStrideX, nnStrideY);
                 graph->layer->operations[i]->esitimateKernelCacheSize = GetEsitimateWBSize(opInfo.weightsBiases);
 
                 if (graph->layer->operations[i]->bTransposeIn)
                 {
                     graph->layer->operations[i]->estimateInTransposeSize = caculateInputTransposeBufferSize(
+                                                                                graph->base.context,
                                                                                 VXNNE_SRAM_CACHE_MODE_FULL_CACHE,
                                                                                 outImageTileX,
                                                                                 outImageTileY,
@@ -3973,7 +3992,9 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                                                                                 interleaveMode,
                                                                                 graph->base.context->nnConfig.customizedFeature.ddrLatency,
                                                                                 graph->layer->operations[i]->transposeInChannel,
-                                                                                inputDataFormat);
+                                                                                inputDataFormat,
+                                                                                nnStrideX,
+                                                                                nnStrideY);
                 }
 
                 if (graph->layer->operations[i]->bTransposeOut)

@@ -622,13 +622,14 @@ VX_PRIVATE_API vx_status vxnneExecuteSWDeConv_ReshuffleWeights(struct _vxnne_ope
                                 deconvOperation->outputs->dims,/*convolution_outputs_dims,*/
                                 deconvOperation->outputs->dims,/*pool_outputs_dims,*/
                                 &opt, /*optimizations,*/
+                                0,
                                 TENSOR_DATA_TYPE(weights),
                                 0,
                                 VX_TENSOR_RANK_WHCN,
                                 deconvOperation->reshuffled_weights,
                                 deconvOperation->reshuffled_biases,
                                 VX_NULL,
-                                vx_false_e,
+                                VX_NN_CONV_ONLY,
                                 vx_false_e
                                 );
         }
@@ -652,13 +653,14 @@ VX_PRIVATE_API vx_status vxnneExecuteSWDeConv_ReshuffleWeights(struct _vxnne_ope
                                 deconvOperation->outputs->dims,/*convolution_outputs_dims,*/
                                 deconvOperation->outputs->dims,/*pool_outputs_dims,*/
                                 NULL, /*optimizations,*/
+                                0,
                                 TENSOR_DATA_TYPE(weights),
                                 0,
                                 VX_TENSOR_RANK_WHCN,
                                 deconvOperation->reshuffled_weights,
                                 deconvOperation->reshuffled_biases,
                                 VX_NULL,
-                                vx_false_e,
+                                VX_NN_CONV_ONLY,
                                 vx_false_e
                                 );
         }

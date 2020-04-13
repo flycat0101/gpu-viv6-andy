@@ -609,6 +609,8 @@ typedef enum _gceFEATURE
 
     /* AIGPU feature. */
     gcvFEATURE_AI_GPU,
+    gcvFEATURE_NN_FAST_FIRST_PIXEL_POOLING,
+    gcvFEATURE_NN_FLOAT_POST_MULT,
 
     /* Insert features above this comment only. */
     gcvFEATURE_COUNT                /* Not a feature. */

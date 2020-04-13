@@ -421,10 +421,10 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
                 if (status != VX_SUCCESS) goto OnError;
             }
 
-            scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &input->scale);
+            scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &(TENSOR_TF_SCALE(input)));
             scaleOut = vxCreateScalar(context, VX_TYPE_FLOAT32, &outScaleValue);
-            zeroPointIn = vxCreateScalar(context, VX_TYPE_INT32, &input->zeroPoint);
-            zeroPointOut = vxCreateScalar(context, VX_TYPE_INT32, &output->zeroPoint);
+            zeroPointIn = vxCreateScalar(context, VX_TYPE_INT32, &(TENSOR_TF_ZEROPOINT(input)));
+            zeroPointOut = vxCreateScalar(context, VX_TYPE_INT32, &(TENSOR_TF_ZEROPOINT(output)));
 
             parameters[1] = (vx_reference)poolSizeX;
             parameters[2] = (vx_reference)poolSizeY;
@@ -496,10 +496,10 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
                 if (status != VX_SUCCESS) goto OnError;
             }
 
-            scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &input->scale);
+            scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &(TENSOR_TF_SCALE(input)));
             scaleOut = vxCreateScalar(context, VX_TYPE_FLOAT32, &outScaleValue);
-            zeroPointIn = vxCreateScalar(context, VX_TYPE_INT32, &input->zeroPoint);
-            zeroPointOut = vxCreateScalar(context, VX_TYPE_INT32, &output->zeroPoint);
+            zeroPointIn = vxCreateScalar(context, VX_TYPE_INT32, &(TENSOR_TF_SCALE(input)));
+            zeroPointOut = vxCreateScalar(context, VX_TYPE_INT32, &(TENSOR_TF_ZEROPOINT(output)));
             padX = vxCreateScalar(context, VX_TYPE_INT32, &pool_pad_x_left);
             padY = vxCreateScalar(context, VX_TYPE_INT32, &pool_pad_y_top);
 

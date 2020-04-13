@@ -431,6 +431,8 @@ typedef struct _vx_op_param_s
     vx_uint32    pool_size_y;
     vx_uint32    pool_stride;
     vx_bool      enable_relu;
+    vx_uint32    nn_strideX;
+    vx_uint32    nn_strideY;
     vx_enum      conv_rounding_type;
     vx_uint32    pad_x_left;
     vx_uint32    pad_x_right;
@@ -613,6 +615,8 @@ typedef struct _vxnne_operation_info
     vx_uint32                       poolSizeY;
     vx_uint32                       poolStrideX;
     vx_uint32                       poolStrideY;
+    vx_uint32                       nnStrideX;
+    vx_uint32                       nnStrideY;
     vx_uint32                       reshuffStrideX;
     vx_uint32                       reshuffStrideY;
     vx_enum                         padMode;
@@ -1067,6 +1071,8 @@ typedef struct _vxnne_convolution_relu_pooling_operation_s
     vx_enum                         conv_rounding_type;
     vx_bool                         enable_relu;
     vx_bool                         enable_pooling;
+    vx_uint32                       nn_strideX;
+    vx_uint32                       nn_strideY;
     vx_enum                         pool_type;
     vx_uint32                       pool_size_x;
     vx_uint32                       pool_size_y;
@@ -2748,7 +2754,9 @@ vx_uint32 caculate3DTileSize(
     vx_uint32 kernelY,
     vx_uint32 kernelZ,
     vx_uint32 dataFormat,
-    vx_uint32 interleaveMode
+    vx_uint32 interleaveMode,
+    vx_uint32 nnStrideX,
+    vx_uint32 nnStrideY
     );
 
 

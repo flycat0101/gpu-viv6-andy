@@ -509,8 +509,8 @@ enum vx_kernel_internal_e
 
 enum vx_convolutional_network_pooling_internal_type_e
 {
-    /*! \brief first pixel pooling*/
-    VX_NN_POOLING_FFP = VX_ENUM_BASE(VX_ID_VIVANTE, VX_ENUM_NN_POOLING_TYPE) + 0x2,
+    /*! \brief first pixel pooling, stride 2*/
+    VX_NN_POOLING_FPP = VX_ENUM_BASE(VX_ID_VIVANTE, VX_ENUM_NN_POOLING_TYPE) + 0x2,
 };
 
 enum vx_convolutional_network_layer_internal_type_e
@@ -1973,19 +1973,16 @@ typedef struct _vx_tensor_t
 
     vx_bool                                 alloced;
     vx_bool                                 brickMode;
-
-    vx_int8                                 fixedPointPos;
-
+    vx_tensor_quant_param                   quantData;
     vx_enum                                 dataFormat;
     vx_uint32                               elementSize;
 
-    vx_float32                              scale;
-    vx_int32                                zeroPoint;
     vx_enum                                 quantFormat;
 
     vx_enum                                 rank;
     vx_tensor                               reshape;
     vx_bool                                 useInternalMem;
+
 }
 vx_tensor_s;
 
@@ -2075,6 +2072,7 @@ typedef enum _vx_nn_feature_e
     VX_NN_TP_PARALLEL,
     VX_TP_FEATURE_FP32_BIAS,
     VX_NN_FEATURE_NN_TRANSPOSE,
+    VX_NN_FEATURE_FAST_FIRST_PIXEL_POOLING,
     VX_NN_FEATURE_COUNT,
 }
 vx_nn_feature_e;

@@ -4768,7 +4768,7 @@ void reorderDepthWiseKernelBufferV8Huffman(
     vx_uint32 slice_count,
     vx_uint32 z_count,
     vx_uint32 filters_per_core,
-    vx_uint32 skip_value,
+    vx_int32* weight_zp,
     vx_enum  weight_format,
     vx_uint8_ptr reorder_stream,
     vx_uint8_ptr weight_base_ptr,
@@ -4776,7 +4776,8 @@ void reorderDepthWiseKernelBufferV8Huffman(
     vx_uint32 nn_core_count,
     vx_uint32* reoder_stream_count_per_core,
     vx_uint32* non_coef_index,
-    vx_uint32* limit_zrl_Index
+    vx_uint32* limit_zrl_Index,
+    vx_bool hasNNPerFilterPostMultiply
     )
 {
     vx_uint32 nnCoreCount = nn_core_count;
@@ -4866,6 +4867,18 @@ void reorderDepthWiseKernelBufferV8Huffman(
 
             if (coreIndex == 0)
                 core0FilterCount = actualFilterCount;
+
+            if(hasNNPerFilterPostMultiply && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT_ASYM) && weight_format == VX_TYPE_UINT8)
+            {
+                vx_uint32 index = 0;
+                for(index = 0;  index <= actualFilterCount; ++index)
+                {
+                    *kernelBufferInt8Ptr = (vx_uint8)weight_zp[index];
+                    kernelBufferInt8Ptr++;
+                    elementIndex++;
+                    reoder_stream_count_per_core[coreIndex] ++;
+                }
+            }
 
             for (kid = 0; kid < actualFilterCount; kid++)
             {
@@ -5078,7 +5091,15 @@ void reorderDepthWiseKernelBufferV8Huffman(
                         weightXIndex = (k + sk) % weight_x;
                         /*Packl 0 in the last dp group*/
                         if (sk >= kSize)
+                        {
+                            vx_uint32 skip_value;
+                            if(hasNNPerFilterPostMultiply && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT_ASYM) && weight_format == VX_TYPE_UINT8)
+                                skip_value = weight_zp[filterIndex];
+                            else
+                                skip_value = weight_zp[0];
                             coef = skip_value;
+
+                        }
                         else
                         {
                             realKernelDataPtr = weight_base_ptr + filterIndex * filterSize +
@@ -5094,7 +5115,14 @@ void reorderDepthWiseKernelBufferV8Huffman(
                         }
                         if (weight_format == VX_TYPE_INT8 || weight_format == VX_TYPE_UINT8)
                         {
-                            vx_int8 newCoef = ((vx_int32)coef - (vx_int32)skip_value) & 0xFF;
+                            vx_uint32 skip_value;
+                            vx_int8 newCoef;
+                            if(hasNNPerFilterPostMultiply)
+                                skip_value = weight_zp[filterIndex];
+                            else
+                                skip_value = weight_zp[0];
+
+                            newCoef = ((vx_int32)coef - (vx_int32)skip_value) & 0xFF;
                             *kernelBufferInt8Ptr = (vx_uint8)newCoef;
                             kernelBufferInt8Ptr++;
                         }
@@ -5157,7 +5185,7 @@ void reorderKernelBufferV8Huffman(
     vx_uint32 slice_count,
     vx_uint32 z_count,
     vx_uint32 filters_per_core,
-    vx_uint32 skip_value,
+    vx_int32 *weight_zp,
     vx_enum  weight_format,
     vx_uint8_ptr reorder_stream,
     vx_uint8_ptr weight_base_ptr,
@@ -5165,7 +5193,8 @@ void reorderKernelBufferV8Huffman(
     vx_uint32 nn_core_count,
     vx_uint32* reoder_stream_count_per_core,
     vx_uint32* non_coef_index,
-    vx_uint32* limit_zrl_Index
+    vx_uint32* limit_zrl_Index,
+    vx_bool hasNNPerFilterPostMultiply
     )
 {
     vx_uint32 nnCoreCount = nn_core_count;
@@ -5269,6 +5298,19 @@ void reorderKernelBufferV8Huffman(
                 filterStart = groupIndex * nnCoreCount *filterCount + coreIndex * actualFilterCount;
             }
             filterEnd = filterStart + actualFilterCount - 1;
+
+
+            if(hasNNPerFilterPostMultiply && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT_ASYM) && weight_format == VX_TYPE_UINT8)
+            {
+                vx_uint32 index = 0;
+                for(index = filterStart;  index <= filterEnd; ++index)
+                {
+                    *kernelBufferInt8Ptr = (vx_uint8)weight_zp[index];
+                    kernelBufferInt8Ptr++;
+                    elementIndex++;
+                    reoder_stream_count_per_core[coreIndex] ++;
+                }
+            }
 
             for (k = 0; k < filterWeightCount; k += linesInImageBuffer)
             {
@@ -5475,7 +5517,14 @@ void reorderKernelBufferV8Huffman(
                         weightXIndex = (k + sk) % weight_x;
                         /*Packl 0 in the last dp group*/
                         if (sk >= kSize)
+                        {
+                            vx_uint32 skip_value;
+                            if(hasNNPerFilterPostMultiply && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT_ASYM) && weight_format == VX_TYPE_UINT8)
+                                skip_value = weight_zp[filterIndex];
+                            else
+                                skip_value = weight_zp[0];
                             coef = skip_value;
+                        }
                         else
                         {
                             realKernelDataPtr = weight_base_ptr + filterIndex * filterSize +
@@ -5492,7 +5541,14 @@ void reorderKernelBufferV8Huffman(
 
                         if (weight_format == VX_TYPE_INT8 || weight_format == VX_TYPE_UINT8)
                         {
-                            vx_int8 newCoef = ((vx_int32)coef - (vx_int32)skip_value) & 0xFF;
+                            vx_uint32 skip_value;
+                            vx_int8 newCoef;
+                            if(hasNNPerFilterPostMultiply)
+                                skip_value = weight_zp[filterIndex];
+                            else
+                                skip_value = weight_zp[0];
+
+                            newCoef = ((vx_int32)coef - (vx_int32)skip_value) & 0xFF;
                             *kernelBufferInt8Ptr = (vx_uint8)newCoef;
                             kernelBufferInt8Ptr++;
                         }
@@ -5574,7 +5630,7 @@ void reorderKernelBufferV8HuffmanBalance(
     vx_uint32 slice_count,
     vx_uint32 z_count,
     vx_uint32 filters_per_core,
-    vx_uint32 skip_value,
+    vx_uint32* weight_zp,
     vx_enum  weight_format,
     vx_uint8_ptr reorder_stream,
     vx_uint8_ptr weight_base_ptr,
@@ -5582,7 +5638,8 @@ void reorderKernelBufferV8HuffmanBalance(
     vx_uint32* reoder_stream_count_per_core,
     vx_uint32* non_coef_index,
     vx_uint32* real_vz_index,
-    vx_uint32* limit_zrl_Index
+    vx_uint32* limit_zrl_Index,
+    vx_bool hasNNPerFilterPostMultiply
     )
 {
     vx_uint32 nnCoreCount = nn_core_count;
@@ -5664,6 +5721,11 @@ void reorderKernelBufferV8HuffmanBalance(
     /* calc each filter non-zero weights num*/
     for (filterIndex = 0; filterIndex < filterTotalCount; filterIndex++)
     {
+        vx_uint32 skipValue = weight_zp[0];
+
+        if(hasNNPerFilterPostMultiply)
+            skipValue = weight_zp[filterIndex];
+
         nonZeroWeights[filterIndex].filterIdx = filterIndex;
         for (sliceIndex = 0; sliceIndex < sliceCount; sliceIndex++)
         {
@@ -5684,7 +5746,7 @@ void reorderKernelBufferV8HuffmanBalance(
                         weight = *((vx_uint16 *)kernelDataPtr);
                     kernelDataPtr = kernelDataPtr + weightSize;
 
-                    if (weight != skip_value)
+                    if (weight != skipValue)
                         nonZeroWeights[filterIndex].nonZeroCount++;
 
                 }
@@ -5776,6 +5838,19 @@ void reorderKernelBufferV8HuffmanBalance(
 
             if (coreIndex == 0)
                 core0FilterCount = actualFilterCount;
+
+            if(hasNNPerFilterPostMultiply && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT_ASYM) && weight_format == VX_TYPE_UINT8)
+            {
+                vx_uint32 index = 0;
+                for(index = 0;  index <= actualFilterCount; ++index)
+                {
+                    *kernelBufferInt8Ptr = (vx_uint8)weight_zp[index];
+                    kernelBufferInt8Ptr++;
+                    elementIndex++;
+                    reoder_stream_count_per_core[coreIndex] ++;
+                }
+            }
+
 
             if (actualFilterCount)
             {
@@ -5874,7 +5949,12 @@ void reorderKernelBufferV8HuffmanBalance(
                         weightXIndex = (k + sk) % weight_x;
                         /*Packl 0 in the last dp group*/
                         if (sk >= kSize)
-                            coef = skip_value;
+                        {
+                            if(hasNNPerFilterPostMultiply)
+                                coef = weight_zp[filterIndex];
+                            else
+                                coef = weight_zp[0];
+                        }
                         else
                         {
                             realKernelDataPtr = weight_base_ptr + filterIndex * filterSize +
@@ -5891,7 +5971,15 @@ void reorderKernelBufferV8HuffmanBalance(
 
                         if (weight_format == VX_TYPE_INT8 || weight_format == VX_TYPE_UINT8)
                         {
-                            vx_int8 newCoef = ((vx_int32)coef - (vx_int32)skip_value) & 0xFF;
+                            vx_int8 newCoef = 0;
+                            vx_uint32 skip_value = 0;
+
+                            if(hasNNPerFilterPostMultiply)
+                                skip_value = weight_zp[filterIndex];
+                            else
+                                skip_value = weight_zp[0];
+
+                            newCoef = ((vx_int32)coef - (vx_int32)skip_value) & 0xFF;
                             *kernelBufferInt8Ptr = (vx_uint8)newCoef;
                             kernelBufferInt8Ptr++;
                         }
@@ -7531,10 +7619,11 @@ vx_uint32 calcKernelSizeV8Huffman(
     vx_uint32 z_count,
     vx_uint32 filters_per_core,
     vx_enum   weight_format,
-    vx_uint32 skip_value,
+    vx_uint32 *weight_zp,
     vx_bool   is_depth_wise,
     vx_uint8_ptr weight_base_ptr,
-    vx_uint32* bias_base_ptr
+    vx_uint32* bias_base_ptr,
+    vx_weights_biases_parameter  wb
     )
 {
     vx_uint32 nnCoreCount = (weight_format == VX_TYPE_INT16) ?
@@ -7577,9 +7666,13 @@ vx_uint32 calcKernelSizeV8Huffman(
 
     vx_bool hasNoBias = ((weight_format == VX_TYPE_BFLOAT16) || (weight_format == VX_TYPE_FLOAT16)) ? vx_true_e : vx_false_e;
     vx_bool hasNoZOffset = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_NO_Z_LOCATION_OFFSET);
-    vx_bool hasNNPerFilterPostMultiply = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT);
     vx_bool hasNNPreLU = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU);
     vx_bool hasZDP3 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3);
+    vx_bool hasNNPerFilterPostMultiply = (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT) &&
+                       ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU) && wb->alpha_ref!= VX_NULL && WB_OPERATION_TYPE(wb) == VX_NN_CONV_PRELU) ||
+                       (WB_WEIGHT_QUANT_FORMAT(wb) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)&&(WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_UINT8 || WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_INT8 )));
+
+
     vx_uint32 dpAmount = hasZDP3 ? 3 : 1;
     vx_uint32 zDPLoopCount = 3;
     vx_uint32 linesInImageBuffer = dpAmount * zDPLoopCount;
@@ -7610,8 +7703,11 @@ vx_uint32 calcKernelSizeV8Huffman(
     reorderStreamAllCount = (numOfInImageBuffer * linesInImageBuffer * filterTotalCount)
         + (usedCoreCount * (16 / weightBitSize));/*filterPerCore need 16 bit * nnCoreCount */
     reorderStreamSize = reorderStreamAllCount * weightSize;
-    if (hasNNPerFilterPostMultiply)
+    if(hasNNPerFilterPostMultiply && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT_ASYM) && weight_format == VX_TYPE_UINT8)
+    {
         reorderStreamSize += filterTotalCount; /*Per channel 8 bit zero point*/
+        reorderStreamAllCount += filterTotalCount;
+    }
 
     reorderStream = (vx_uint8 *)vxAllocateAndZeroMemory(reorderStreamSize);
 
@@ -7651,12 +7747,14 @@ vx_uint32 calcKernelSizeV8Huffman(
     }
 
     if (is_depth_wise)
-        reorderDepthWiseKernelBufferV8Huffman(context, weight_x, weight_y, slice_count, z_count, filters_per_core, skip_value, weight_format, reorderStream, weight_base_ptr, bias_base_ptr, nnCoreCount, reorderStreamPerCoreCount, nonCoefIndex, limitZRLIndex);
+        reorderDepthWiseKernelBufferV8Huffman(context, weight_x, weight_y, slice_count, z_count, filters_per_core, (vx_int32 *)weight_zp, weight_format, reorderStream, weight_base_ptr, bias_base_ptr, nnCoreCount, reorderStreamPerCoreCount, nonCoefIndex, limitZRLIndex, hasNNPerFilterPostMultiply);
 
     else if (context->options.enableNonZeroBalance && !hasNoZOffset) /*Only those chip has z_offset support zero balance*/
-        reorderKernelBufferV8HuffmanBalance(context, weight_x, weight_y, slice_count, z_count, filters_per_core, skip_value, weight_format, reorderStream, weight_base_ptr, nnCoreCount, reorderStreamPerCoreCount, nonCoefIndex, VX_NULL, limitZRLIndex);
+        reorderKernelBufferV8HuffmanBalance(context, weight_x, weight_y, slice_count, z_count, filters_per_core, (vx_uint32 *)weight_zp, weight_format, reorderStream, weight_base_ptr, nnCoreCount, reorderStreamPerCoreCount, nonCoefIndex, VX_NULL, limitZRLIndex, hasNNPerFilterPostMultiply);
+
     else
-        reorderKernelBufferV8Huffman(context, weight_x, weight_y, slice_count, z_count, filters_per_core, skip_value, weight_format, reorderStream, weight_base_ptr, bias_base_ptr, nnCoreCount, reorderStreamPerCoreCount, nonCoefIndex, limitZRLIndex);
+        reorderKernelBufferV8Huffman(context, weight_x, weight_y, slice_count, z_count, filters_per_core, (vx_int32 *)weight_zp, weight_format, reorderStream, weight_base_ptr, bias_base_ptr, nnCoreCount, reorderStreamPerCoreCount, nonCoefIndex, limitZRLIndex, hasNNPerFilterPostMultiply);
+
 
     analysisKernelStreamForHuffman(context, huffman_config, weight_format, 0, nnCoreCount, reorderStream, reorderStreamSize, reorderStreamPerCoreCount, invSizeOrder, nonCoefIndex, nonCoefCount, limitZRLIndex, filterTotalCount);
 
@@ -8028,7 +8126,7 @@ vx_uint32 calcKernelSizeV8Huffman(
             kernelStreamSizePerCore += biasSize;
         }
 
-        if (hasNNPerFilterPostMultiply)
+        if (hasNNPerFilterPostMultiply || (hasNNPreLU && WB_OPERATION_TYPE(wb) == VX_NN_CONV_PRELU && wb->alpha_ref != VX_NULL))
         {
             kernelStreamSizePerCore += 4;
         }
@@ -8037,7 +8135,7 @@ vx_uint32 calcKernelSizeV8Huffman(
         {
             kernelStreamSizePerCore += NN_Z_POSITION_OFFSET_BITS_VIP_V7 / 8;
         }
-        else if (hasNNPreLU)
+        else if (hasNNPreLU && WB_OPERATION_TYPE(wb) == VX_NN_CONV_PRELU && wb->alpha_ref != VX_NULL)
         {
             kernelStreamSizePerCore += 4;
         }
@@ -8408,7 +8506,7 @@ void calculateWeightBiasStreamRelatedSize(
     vx_uint32 z_count,
     vx_uint32 kernels_per_core,
     vx_enum weight_format,
-    vx_uint32 weight_zp,
+    vx_uint32 *weight_zp,
     vx_enum bias_format,
     vx_uint32 input_zp,
     vx_uint32 skip_value,
@@ -8423,7 +8521,8 @@ void calculateWeightBiasStreamRelatedSize(
     vx_size* orig_kernel_buf_size,
     vx_size* min_kernel_buf_size,
     vx_uint8*  min_zero_run_len,
-    vx_uint32* max_zero_run_len
+    vx_uint32* max_zero_run_len,
+    vx_weights_biases_parameter  wb
     )
 {
     vx_uint8 minZeroRunLen = 0, zeroRunLen = option_zero_run_len;
@@ -8446,14 +8545,20 @@ void calculateWeightBiasStreamRelatedSize(
                                 z_count,
                                 kernels_per_core,
                                 weight_format,
-                                skip_value,
+                                weight_zp,
                                 is_depth_wise,
                                 (vx_uint8_ptr)weight_data,
-                                (vx_uint32_ptr)bias_data
+                                (vx_uint32_ptr)bias_data,
+                                wb
                                 );
 
         if (all_count != VX_NULL)
+        {
             *all_count = weight_x * weight_y * slice_count * z_count;
+
+            if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT) && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT_ASYM) && weight_format == VX_TYPE_UINT8)
+                *all_count += z_count;
+        }
         if (non_zero_count != VX_NULL)
             *non_zero_count = calcNonZeroCountV8Huffman(context, weight_x, weight_y, slice_count, z_count, kernels_per_core, weight_format, (vx_uint8_ptr)weight_data, skip_value);
         if (orig_kernel_buf_size != VX_NULL)
@@ -8471,7 +8576,7 @@ void calculateWeightBiasStreamRelatedSize(
                                 z_count,
                                 kernels_per_core,
                                 weight_format,
-                                weight_zp,
+                                weight_zp[0],
                                 bias_format,
                                 input_zp,
                                 skip_value,
@@ -12200,6 +12305,7 @@ exit:
 vx_uint32 fillinKernelBufferV8Huffman(
     vx_context context,
     vx_weight_bias_huffman_cfg huffman_config,
+    vx_enum  input_format,
     vx_uint32 weight_x,
     vx_uint32 weight_y,
     vx_uint32 slice_count,
@@ -12207,13 +12313,8 @@ vx_uint32 fillinKernelBufferV8Huffman(
     vx_uint32 filters_per_core,
     vx_enum  weight_format,
     vx_enum  weight_quant_format,
-    vx_int32 weight_zp,
+    vx_int32 *weight_zp,
     vx_enum  bias_format,
-    vx_enum  alpha_format,
-    vx_int8  alpha_fpp,
-    vx_enum  alpha_quant_format,
-    vx_float32 alpha_scale,
-    vx_int32   alpha_zp,
     vx_int32 input_zp,
     vx_uint32 skip_value,
     vx_int32 z_offset,
@@ -12221,9 +12322,8 @@ vx_uint32 fillinKernelBufferV8Huffman(
     vx_uint8_ptr wb_base_ptr,
     vx_uint8_ptr weight_base_ptr,
     vx_uint32* bias_base_ptr,
-    vx_uint8_ptr alpha_ptr,
-    vx_uint32* post_mul,
-    vx_uint32* post_shift,
+    vx_uint32* post_mul_shift,
+    vx_uint32* neg_post_mul_shift,
     vx_size* kernel_align_stream_size,
     vx_size* kernel_stream_full_cache_size,
     vx_size* kernel_max_stream_size_percore
@@ -12273,8 +12373,13 @@ vx_uint32 fillinKernelBufferV8Huffman(
 
     vx_bool hasNoBias = ((weight_format == VX_TYPE_BFLOAT16) || (weight_format == VX_TYPE_FLOAT16)) ? vx_true_e : vx_false_e;
     vx_bool hasNoZOffset = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_NO_Z_LOCATION_OFFSET);
-    vx_bool hasNNPerFilterPostMultiply = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT);
-    vx_bool hasNNPreLU = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU);
+    vx_bool hasNNPerFilterPostMultiply = (post_mul_shift !=  VX_NULL) ? vx_true_e : vx_false_e;/*(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT) &&
+                                            ((weight_quant_format == VX_QUANT_AFFINE_SCALE_PER_CHANNEL
+                                            && (weight_format == VX_TYPE_UINT8 || weight_format == VX_TYPE_INT8)) ||
+                                            (weight_quant_format == VX_QUANT_AFFINE_SCALE && weight_format == VX_TYPE_UINT8)) &&
+                                            input_format == VX_TYPE_UINT8);
+                                            */
+    //vx_bool hasNNPreLU = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU);
     vx_bool hasZDP3 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3);
     vx_bool hasKernelFullCacheInterleaveFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FULLCACHE_KERNEL_INTERLEAVE_FIX);
     vx_uint32 dpAmount = hasZDP3 ? 3 : 1;
@@ -12295,13 +12400,7 @@ vx_uint32 fillinKernelBufferV8Huffman(
     vx_uint32* realVzIndex = VX_NULL;
     vx_uint32* limitZRLIndex = VX_NULL;
     vx_uint32 limitZRLCountIdx = 0;
-    /*prelu parameter alpha*/
-    vx_uint8_ptr alphaBase = alpha_ptr;
-    vx_int32    alphaZP  = alpha_zp;
-    vx_int8     alphaFP  = alpha_fpp;
-    vx_float32  alphaScale = alpha_scale;
-    vx_type_e   alphaFormat = alpha_format;
-    vx_enum     alphaQuantFormat = alpha_quant_format;
+
     vx_weight_bias_huffman_cfg huffmanConfig = huffman_config;
 
     typedef struct _gcVXWeightsMinusZP
@@ -12313,7 +12412,7 @@ vx_uint32 fillinKernelBufferV8Huffman(
 
     vxmASSERT(huffmanConfig != VX_NULL);
 
-    if (weight_format == VX_TYPE_INT16 || weight_format == VX_TYPE_UINT8)
+    if (weight_format == VX_TYPE_INT16 || weight_format == VX_TYPE_UINT8 || (weight_format == VX_TYPE_INT8 && (post_mul_shift)))
     {
         vx_uint32 sliceIndex, weightXIndex, weightYIndex;
         vx_uint32 filterSliceSize = weight_x * weight_y * weightSize;
@@ -12326,10 +12425,13 @@ vx_uint32 fillinKernelBufferV8Huffman(
         }
 
         /*Calc sum((coef[i] - coefZP) * InZP) */
-        if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT) &&
-            input_zp != 0 &&
+        if ((input_zp != 0) &&
+            ((vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT) &&
             weight_quant_format == VX_QUANT_AFFINE_SCALE &&
-            weight_format == VX_TYPE_UINT8)
+            weight_format == VX_TYPE_UINT8) ||
+            (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT) &&
+            weight_quant_format == VX_QUANT_AFFINE_SCALE_PER_CHANNEL
+            && weight_format == VX_TYPE_INT8)))
         {
             weightsMinusZP = (gcVXWeightsMinusZP*)vxAllocateAndZeroMemory(filterTotalCount * sizeof(gcVXWeightsMinusZP));
 
@@ -12342,6 +12444,25 @@ vx_uint32 fillinKernelBufferV8Huffman(
 
         for (filterIndex = 0; filterIndex < filterTotalCount; filterIndex++)
         {
+            vx_int32    weightZp = 0;
+            if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT) &&
+                weight_quant_format == VX_QUANT_AFFINE_SCALE_PER_CHANNEL &&
+                (weight_format == VX_TYPE_UINT8 || weight_format == VX_TYPE_INT8))
+            {
+                weightZp  = weight_zp[filterIndex];
+            }
+            else if(vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT) &&
+                    weight_quant_format == VX_QUANT_AFFINE_SCALE &&
+                    weight_format == VX_TYPE_UINT8)
+            {
+                weightZp = weight_zp[0];
+            }
+            else
+            {
+                weightZp = weight_zp[0];
+                vxmASSERT(weightZp == 0);
+            }
+
             if (weightsMinusZP != VX_NULL)
             {
                 weightsMinusZP[filterIndex].filterIdx = filterIndex;
@@ -12357,22 +12478,30 @@ vx_uint32 fillinKernelBufferV8Huffman(
                     for (weightXIndex = 0; weightXIndex < weight_x; weightXIndex++)
                     {
                         vx_int32 weight = 0;
-                        if (weight_format == VX_TYPE_UINT8)
+                        if (input_format == VX_TYPE_UINT8 || input_format == weight_format) /*VX_TYPE_INVALID :some older case never sent inputFormat*/
                         {
-                            weight = *((vx_uint8 *)kernelDataPtr);
-                            coefSum[filterIndex] += (weight - skip_value);
+                            if(weight_format == VX_TYPE_UINT8)
+                            {
+                                weight = *((vx_uint8 *)kernelDataPtr);
+                                coefSum[filterIndex] += (weight - weightZp);
+                            }
+                            else if(weight_format == VX_TYPE_INT8 && (post_mul_shift))/*only support per-channel quantization*/
+                            {
+                                weight = *((vx_int8 *)kernelDataPtr);
+                                coefSum[filterIndex] += (weight - weightZp);
+                            }
+                            else if(weight_format == VX_TYPE_INT16)
+                            {
+                                weight = *((vx_int16 *)kernelDataPtr);
+                                coefSum[filterIndex] += weight;
+                            }
+                            kernelDataPtr = kernelDataPtr + weightSize;
                         }
-                        else
-                        {
-                            weight = *((vx_int16 *)kernelDataPtr);
-                            coefSum[filterIndex] += weight;
-                        }
-                        kernelDataPtr = kernelDataPtr + weightSize;
 
                         if (weightsMinusZP != VX_NULL)
                         {
                             /*Calc sum((coef[i] - coefZP) * InZP) */
-                            weightsMinusZP[filterIndex].sum += (weight - weight_zp) * input_zp;
+                            weightsMinusZP[filterIndex].sum += (weight - weightZp) * input_zp;
                         }
                     }
                 }
@@ -12390,8 +12519,11 @@ vx_uint32 fillinKernelBufferV8Huffman(
 
     reorderStreamSize = reorderStreamAllCount * weightSize;
 
-    if (hasNNPerFilterPostMultiply)
+    if (hasNNPerFilterPostMultiply && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT_ASYM) && weight_format == VX_TYPE_UINT8)
+    {
         reorderStreamSize += filterTotalCount; /*Per channel 8 bit zero point*/
+        reorderStreamAllCount += filterTotalCount;
+    }
 
     reorderStream = (vx_uint8 *)vxAllocateAndZeroMemory(reorderStreamSize);
 
@@ -12430,7 +12562,7 @@ vx_uint32 fillinKernelBufferV8Huffman(
     }
 
     if (is_depth_wise)
-        reorderDepthWiseKernelBufferV8Huffman(context, weight_x, weight_y, slice_count, z_count, filters_per_core, skip_value, weight_format, reorderStream, weight_base_ptr, bias_base_ptr, nnCoreCount, reorderStreamPerCoreCount, nonCoefIndex, limitZRLIndex);
+        reorderDepthWiseKernelBufferV8Huffman(context, weight_x, weight_y, slice_count, z_count, filters_per_core, weight_zp, weight_format, reorderStream, weight_base_ptr, bias_base_ptr, nnCoreCount, reorderStreamPerCoreCount, nonCoefIndex, limitZRLIndex, hasNNPerFilterPostMultiply);
 
     else if (context->options.enableNonZeroBalance && !hasNoZOffset)
     {
@@ -12441,10 +12573,12 @@ vx_uint32 fillinKernelBufferV8Huffman(
             vxError("fillinKernelBufferV8Huffman: OUT OF MEMORY");
             goto exit;
         }
-        reorderKernelBufferV8HuffmanBalance(context, weight_x, weight_y, slice_count, z_count, filters_per_core, skip_value, weight_format, reorderStream, weight_base_ptr, nnCoreCount, reorderStreamPerCoreCount, nonCoefIndex, realVzIndex, limitZRLIndex);
+        reorderKernelBufferV8HuffmanBalance(context, weight_x, weight_y, slice_count, z_count, filters_per_core, (vx_uint32 *)weight_zp, weight_format, reorderStream, weight_base_ptr, nnCoreCount, reorderStreamPerCoreCount, nonCoefIndex, realVzIndex, limitZRLIndex, hasNNPerFilterPostMultiply);
+
     }
     else
-        reorderKernelBufferV8Huffman(context, weight_x, weight_y, slice_count, z_count, filters_per_core, skip_value, weight_format, reorderStream, weight_base_ptr, bias_base_ptr, nnCoreCount, reorderStreamPerCoreCount, nonCoefIndex, limitZRLIndex);
+        reorderKernelBufferV8Huffman(context, weight_x, weight_y, slice_count, z_count, filters_per_core, weight_zp, weight_format, reorderStream, weight_base_ptr, bias_base_ptr, nnCoreCount, reorderStreamPerCoreCount, nonCoefIndex, limitZRLIndex, hasNNPerFilterPostMultiply);
+
 
     analysisKernelStreamForHuffman(context, huffman_config, weight_format, 0, nnCoreCount, reorderStream, reorderStreamSize, reorderStreamPerCoreCount, invSizeOrder, nonCoefIndex, nonCoefCount, limitZRLIndex, filterTotalCount);
 
@@ -12978,66 +13112,84 @@ vx_uint32 fillinKernelBufferV8Huffman(
                 biasData = 0;
 
             /* NewBias = sum((Coef[i] - CoefZP) * - InZP) + Bias*/
-            if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT)
-                && input_zp != 0
-                && weight_format == VX_TYPE_UINT8)
+            if (weightsMinusZP != VX_NULL)
             {
                 biasData -= weightsMinusZP[realFilterIndex].sum;
             }
 
-            if (weight_format == VX_TYPE_UINT8)
-                biasData += coefSum[realFilterIndex] * 128;
-
-            if (weight_format == VX_TYPE_INT16)
+            if (input_format == VX_TYPE_UINT8 || input_format == weight_format)/*VX_TYPE_INVALID :some older case never sent inputFormat*/
             {
-                vx_int64 sum64 = 0;
-                vx_int32 bias32;
-                vx_int16 bias16;
-
-                if (bias_format != VX_TYPE_INT64)
+                if (weight_format == VX_TYPE_UINT8 || (weight_format == VX_TYPE_INT8 && (post_mul_shift != VX_NULL)))
                 {
-                    if ((vx_int32)biasData < 0)
+                    biasData += coefSum[realFilterIndex] * 128;
+                    writeBits(&kernelBufferPtr, &bit_offset, biasData, biasBitSize);
+                }
+                else if (weight_format == VX_TYPE_INT16 )
+                {
+                    vx_int64 sum64 = 0;
+                    vx_int32 bias32;
+                    vx_int16 bias16;
+
+                    if (bias_format != VX_TYPE_INT64)
                     {
-                        bias64 = ~0;
-                        bias64 = (bias64 >> 32) << 32;
-                        bias64 = bias64 | (vx_int64)biasData;
+                        if ((vx_int32)biasData < 0)
+                        {
+                            bias64 = ~0;
+                            bias64 = (bias64 >> 32) << 32;
+                            bias64 = bias64 | (vx_int64)biasData;
+                        }
+                        else
+                            bias64 = (vx_int64)biasData;
+                    }
+
+                    if (coefSum[realFilterIndex] < 0)
+                    {
+                        sum64 = ~0;
+                        sum64 = (sum64 >> 32) << 32;
+                        sum64 = sum64 | (vx_int64)coefSum[realFilterIndex];
                     }
                     else
-                        bias64 = (vx_int64)biasData;
-                }
+                        sum64 = (vx_int64)coefSum[realFilterIndex];
 
-                if (coefSum[realFilterIndex] < 0)
-                {
-                    sum64 = ~0;
-                    sum64 = (sum64 >> 32) << 32;
-                    sum64 = sum64 | (vx_int64)coefSum[realFilterIndex];
+                    bias64 += sum64 * 128;
+                    bias32 = (vx_int32)bias64;
+                    writeBits(&kernelBufferPtr, &bit_offset, bias32, 32);
+                    bias16 = (vx_int16)(bias64 >> 32);
+                    writeBits(&kernelBufferPtr, &bit_offset, (vx_int32)bias16, 16);
                 }
                 else
-                    sum64 = (vx_int64)coefSum[realFilterIndex];
-
-                bias64 += sum64 * 128;
-                bias32 = (vx_int32)bias64;
-                writeBits(&kernelBufferPtr, &bit_offset, bias32, 32);
-                bias16 = (vx_int16)(bias64 >> 32);
-                writeBits(&kernelBufferPtr, &bit_offset, (vx_int32)bias16, 16);
+                {
+                    writeBits(&kernelBufferPtr, &bit_offset, biasData, biasBitSize);
+                }
             }
             else
+            {
                 writeBits(&kernelBufferPtr, &bit_offset, biasData, biasBitSize);
+            }
         }
 
-        if (hasNNPerFilterPostMultiply)
+        if (post_mul_shift != VX_NULL)
         {
-            vx_uint32 postMul = 0;
-            vx_uint32 postShift = 0;
-            vxmASSERT(post_mul != VX_NULL && post_shift != VX_NULL);
+            if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FLOAT_POST_MULT))
+            {
+                vx_int32 postMul = 0;
+                postMul = *(post_mul_shift + filterIndex);
+                writeBits(&kernelBufferPtr, &bit_offset, postMul, 32);
+            }
+            else
+            {
+                vx_uint32 postMul = 0;
+                vx_uint32 postShift = 0;
+                vx_uint32 postMulShift = *(post_mul_shift  + filterIndex);
 
-            postMul = *(post_mul + filterIndex);
-            postShift = *(post_shift + filterIndex);
+                postMul = postMulShift & 0x7FFFFF;/*23 bits postMultiply*/
+                postShift = (postMulShift >> 23) & 0x7F;/*7 bits postShift*/
 
-            writeBits(&kernelBufferPtr, &bit_offset, postMul, 23);
-            writeBits(&kernelBufferPtr, &bit_offset, postShift, 7);
-            /*unused zero for 10 bit*/
-            writeBits(&kernelBufferPtr, &bit_offset, 0, 2);
+                writeBits(&kernelBufferPtr, &bit_offset, postMul, 23);
+                writeBits(&kernelBufferPtr, &bit_offset, postShift, 7);
+                /*unused zero for 10 bit*/
+                writeBits(&kernelBufferPtr, &bit_offset, 0, 2);
+            }
         }
 
         if (!hasNoZOffset)
@@ -13056,31 +13208,35 @@ vx_uint32 fillinKernelBufferV8Huffman(
 
             writeBits(&kernelBufferPtr, &bit_offset, offsetValue, NN_Z_POSITION_OFFSET_BITS_VIP_V7);
         }
-        else if (hasNNPerFilterPostMultiply && hasNNPreLU)
+        else if (neg_post_mul_shift)
         {
-            /*per PRD, prelu only enable when hasNoZOffset == 1 && hasNNPerFilterPostMultiply == 1*/
-            vx_int32 negPostMul = 0;
-            vx_int32 negPostShift = 0;
-            vx_float32 alphaValue = 0;
-
-            if (alphaBase != VX_NULL)
+            if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FLOAT_POST_MULT))
             {
-                vx_uint32 uintAlpha;
-                vx_int32 exp;
-
-                alphaValue = vxnneGetDataExt(alphaFormat, alphaQuantFormat, filterIndex, alphaBase, alphaFP, alphaZP, alphaScale);
-
-                uintAlpha = *((vx_uint32*)(&alphaValue));
-                exp = (uintAlpha & 0x7F800000) >> 23;
-
-                negPostShift = 127 - exp;
-                negPostMul = (uintAlpha & 0x7FFFFF) >> 8; /* negMultiply only has 15 bit, using high 15-bit of alpha's mantissa*/
+                vx_int32 negPostMul = 0;
+                negPostMul = *(neg_post_mul_shift + filterIndex);
+                writeBits(&kernelBufferPtr, &bit_offset, negPostMul, 32);
             }
+            else
+            {
+                /*per PRD, prelu only enable when hasNoZOffset == 1 && hasNNPerFilterPostMultiply == 1*/
+                vx_int32 negPostMul = 0;
+                vx_int32 negPostShift = 0;
+                vx_uint8 negPostSign = 0;
+                vx_uint32 negPostMulShift = *(neg_post_mul_shift  + filterIndex);
 
-            writeBits(&kernelBufferPtr, &bit_offset, negPostMul, 23);
-            writeBits(&kernelBufferPtr, &bit_offset, negPostShift, 7);
-            /*unused zero for 10 bit*/
-            writeBits(&kernelBufferPtr, &bit_offset, 0, 2);
+                negPostMul = negPostMulShift & 0x7FFFFF;/*23 bits postMultiply*/
+                negPostShift = (negPostMulShift >> 23) & 0x7F;/*7 bits postShift*/
+                negPostSign = (negPostMulShift >> 31) & 0x1; /*1 bit sign*/
+
+
+                writeBits(&kernelBufferPtr, &bit_offset, negPostMul, 23);
+                writeBits(&kernelBufferPtr, &bit_offset, negPostShift, 7);
+
+                /*unused zero for 1 bit*/
+                writeBits(&kernelBufferPtr, &bit_offset, 0, 1);
+                /*PRD put the negSign at the last bit*/
+                writeBits(&kernelBufferPtr, &bit_offset, negPostSign, 1);
+            }
         }
     }
     /*Also align to 64 byte for post processing stream*/
@@ -13255,6 +13411,19 @@ vx_tensor reshuffleKernelTensor(
         {
             params.quant_data.dfp.fixed_point_pos = TENSOR_POS(weight);
         }
+        else if(TENSOR_QUANT_TYPE(weight) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
+        {
+            vx_uint32 channelCount = output_dims[3];
+
+            params.quant_data.affinePerChannel.channelDim = TENSOR_TF_CHANNEL_DIMS(weight);
+            params.quant_data.affinePerChannel.scaleCount = output_dims[3];
+            params.quant_data.affinePerChannel.scales = (vx_float32 *)vxAllocateAndZeroMemory(channelCount * sizeof(vx_float32));
+            params.quant_data.affinePerChannel.zeroPoint = (vx_int32 *)vxAllocateAndZeroMemory(channelCount * sizeof(vx_int32));
+
+            gcoOS_MemCopy(params.quant_data.affinePerChannel.scales, TENSOR_TF_SCALE_POINTER(weight), channelCount * sizeof(vx_float32));
+            gcoOS_MemCopy(params.quant_data.affinePerChannel.zeroPoint, TENSOR_TF_ZEROPOINT_POINTER(weight), channelCount * sizeof(vx_float32));
+
+        }
         else
         {
             params.quant_data.affine.scale = TENSOR_TF_SCALE(weight);
@@ -13318,6 +13487,16 @@ vx_tensor reshuffleKernelTensor(
         if (convertedWeightData != VX_NULL)
         {
             vxFree(convertedWeightData);
+        }
+        if(TENSOR_QUANT_TYPE(weight) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL && params.quant_data.affinePerChannel.scales != VX_NULL)
+        {
+            vxFree(params.quant_data.affinePerChannel.scales);
+            params.quant_data.affinePerChannel.scales = VX_NULL;
+        }
+        if(TENSOR_QUANT_TYPE(weight) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL && params.quant_data.affinePerChannel.zeroPoint != VX_NULL)
+        {
+            vxFree(params.quant_data.affinePerChannel.zeroPoint);
+            params.quant_data.affinePerChannel.zeroPoint= VX_NULL;
         }
 
         return reshuffledTensor;

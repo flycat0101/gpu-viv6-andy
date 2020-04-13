@@ -1868,7 +1868,7 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
                     /* calculate zero count */
                     for(index = 0; index< inputSize; index++)
                     {
-                        if(inputAddress[index] == calNonZeroRatioinputs->zeroPoint)
+                        if(inputAddress[index] == TENSOR_TF_ZEROPOINT(calNonZeroRatioinputs))
                             inputZeroCount++;
                     }
                     /*vxInfo("tensor zero count is:%d.\n", inputZeroCount);*/

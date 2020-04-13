@@ -509,13 +509,14 @@ vx_status vxoFCOperation_Initialize(
                                                               outputs->dims, /* convolution_outputs_dims */
                                                               outputs->dims, /* pool_outputs_dims */
                                                               opt, /*optimizations,*/
+                                                              0,
                                                               TENSOR_DATA_TYPE(outputs),
                                                               0,
                                                               VX_TENSOR_RANK_WHCN,
                                                               weights,
                                                               biases,
                                                               VX_NULL,
-                                                              vx_false_e,
+                                                              VX_NN_CONV_ONLY,
                                                               vx_false_e);
 
                 if (!wb)
@@ -785,13 +786,14 @@ zdp_size:
                                                               output_trans->dims, /* convolution_outputs_dims */
                                                               output_trans->dims, /* pool_outputs_dims */
                                                               opt, /*optimizations,*/
+                                                              0,
                                                               TENSOR_DATA_TYPE(output_trans),
                                                               0,
                                                               VX_TENSOR_RANK_WHCN,
                                                               _weights,
                                                               biases,
                                                               VX_NULL,
-                                                              vx_false_e,
+                                                              VX_NN_CONV_ONLY,
                                                               vx_false_e);
 
                 if (!wb)

@@ -193,14 +193,21 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
     vx_uint32 zArray[MAX_ZGROUP_COUNT], kzArray[MAX_KZGROUP_COUNT];
     vx_size minKernelBufferSizes[MAX_ZGROUP_COUNT*MAX_KZGROUP_COUNT];
     vx_size minTotalKernelBufferSize = 0, origKernelBufferSize = 0, origTotalKernelBufferSize = 0, weightDataBytesOffset = 0, biasDataDWordOffset = 0;
-    vx_uint8_ptr weightPtr = WB_WEIGHT_DATA(wb);
-    vx_uint32_ptr biasPtr = WB_BIAS_DATA(wb);
-    vx_uint8_ptr minZeroRunLensBase = VX_NULL, minZeroRunLens = VX_NULL;
-
-    vxmASSERT(weightPtr != VX_NULL);
+    vx_uint8_ptr weightPtr = VX_NULL, biasPtr = VX_NULL;
+    vx_uint8_ptr minZeroRunLensBase = VX_NULL, minZeroRunLens;
+    vx_bool hasNNPerFilterPostMultiply = vx_false_e;
 
     weightSize = (vx_uint32)vxDataType_GetSize((vx_type_e)WB_WEIGHT_DATA_FORMAT(wb));
     oneFilterSize = WB_KERNEL_X(wb) * WB_KERNEL_Y(wb) * WB_KERNEL_Z(wb) * weightSize;
+
+    vxoTensor_GetTensorViewMemory(WB_WEIGHT_TENSOR(wb), (gctPOINTER*)&weightPtr, VX_NULL);
+
+    if (WB_BIAS_TENSOR(wb) != VX_NULL)
+        vxoTensor_GetTensorViewMemory(WB_BIAS_TENSOR(wb), (gctPOINTER*)&biasPtr, VX_NULL);
+
+    hasNNPerFilterPostMultiply = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT) &&
+                       ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU) && wb->alpha_ref!= VX_NULL && WB_OPERATION_TYPE(wb) == VX_NN_CONV_PRELU) ||
+                       (WB_WEIGHT_QUANT_FORMAT(wb) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)&&(WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_UINT8 || WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_INT8 ));
 
     if (target == VXNNE_OPERATION_TARGET_TP)
     {
@@ -399,7 +406,7 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
                     filterCount, /* z count */
                     kernelPerCore, /* kernel per core */
                     WB_WEIGHT_DATA_FORMAT(wb),
-                    WB_WEIGHT_ZP(wb),
+                    (vx_uint32*)(WB_WEIGHT_ZP_POINTER(wb)),
                     WB_BIAS_DATA_FORMAT(wb),
                     WB_INPUT_ZP(wb),
                     WB_SKIP_VALUE(wb),
@@ -412,9 +419,10 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
                     &totalCount,
                     &nonZeroCount,
                     &origKernelBufferSize,
-                    &minKernelBufferSizes[index],
-                    minZeroRunLens != VX_NULL ? &minZeroRunLens[index] : VX_NULL,
-                    max_zero_run_lens != VX_NULL ? &max_zero_run_lens[index] : VX_NULL);
+                    &min_kernel_buffer_sizes[index],
+                    &minZeroRunLens[index],
+                    &max_zero_run_lens[index],
+                    wb);
             }
 
             allTotalCount += totalCount;
@@ -472,13 +480,116 @@ error:
         WB_SLICE_ARRAY(wb) = VX_NULL;
     }
 
-    if (minZeroRunLensBase != VX_NULL)
+    return status;
+}
+
+vx_status calculatePostMultiAndPostShift(vx_context context, vx_weights_biases_parameter wb, vx_uint32 *post_mul_shift, vx_uint32 *neg_post_mul_shift)
+{
+    vx_uint32   filterCount = WB_OUTPUT_Z_INDEX(wb, 0);
+    vx_uint32   filterIndex = 0;
+    vx_float32  inputScale = WB_INPUT_SCALE(wb);
+    vx_float32  outputScale = WB_OUTPUT_SCALE(wb);
+    vx_float32  weightScale = 1.f;
+
+    gctPOINTER  alphaPtr = VX_NULL;
+    vx_int32    alphaZP = 0;
+    vx_int8     alphaFP = 0;
+    vx_float32  alphaScale = 0;
+    vx_type_e   alphaFormat = VX_TYPE_FLOAT16;
+    vx_enum     alphaQuantFormat = 0;
+
+    if (wb->alpha_ref != VX_NULL && WB_OPERATION_TYPE(wb) == VX_NN_CONV_PRELU)
     {
-        vxFree(minZeroRunLensBase);
-        minZeroRunLensBase = VX_NULL;
+        vx_tensor alpha_tensor;
+        vxmASSERT(vxoReference_GetType(wb->alpha_ref) == VX_TYPE_TENSOR);
+
+        alpha_tensor = (vx_tensor)wb->alpha_ref;
+
+        vxoTensor_GetTensorViewMemory(alpha_tensor, (gctPOINTER*)&alphaPtr, VX_NULL);
+
+        alphaZP           = TENSOR_TF_ZEROPOINT(alpha_tensor);
+        alphaFP          = TENSOR_POS(alpha_tensor);
+        alphaScale        = TENSOR_TF_SCALE(alpha_tensor);
+        alphaFormat       = (vx_type_e)TENSOR_DATA_TYPE(alpha_tensor);
+        alphaQuantFormat  = TENSOR_QUANT_TYPE(alpha_tensor);
     }
 
-    return status;
+    for(filterIndex = 0; filterIndex < filterCount; ++filterIndex)
+    {
+        vx_float32 scale = 0;
+        vx_uint32 uintScale = 0;
+        vx_uint32 exp = 0;
+
+        if (WB_WEIGHT_QUANT_FORMAT(wb) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
+            weightScale = WB_WEIGHT_SCALE(wb, filterIndex);
+        else
+            weightScale = WB_WEIGHT_SCALE(wb, 0);
+        scale = inputScale * weightScale/outputScale;
+        uintScale = *((vx_uint32*)(&scale));
+        exp = (uintScale & 0x7F800000) >> 23; /* postShift is Scale's exp*/
+
+        if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FLOAT_POST_MULT))
+        {
+            post_mul_shift[filterIndex] = uintScale;
+        }
+        else
+        {
+            post_mul_shift[filterIndex] = (((127 - (vx_int8)exp) & 0x7F) << 23) | (uintScale & 0x7FFFFF);
+        }
+
+        if (wb->alpha_ref != VX_NULL &&
+            neg_post_mul_shift != VX_NULL &&
+            WB_OPERATION_TYPE(wb) == VX_NN_CONV_PRELU)
+        {
+            vx_float32 aV = vxnneGetDataExt(alphaFormat, alphaQuantFormat, filterIndex, (vx_uint8_ptr)alphaPtr, alphaFP, alphaZP, alphaScale);
+            scale *= aV;
+
+            if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FLOAT_POST_MULT))
+            {
+                uintScale = *((vx_uint32*)(&scale));
+                neg_post_mul_shift[filterIndex] = uintScale;
+            }
+            else
+            {
+                if (aV == 0.f)
+                    uintScale = 0x20000000;
+                else
+                    uintScale = *((vx_uint32*)(&scale));
+
+                exp = (uintScale & 0x7F800000) >> 23; /* negPostShift is Scale's exp*/
+                neg_post_mul_shift[filterIndex] = (uintScale & 0x80000000) |(((127 - (vx_int8)exp) & 0x7F) << 23) | (uintScale & 0x7FFFFF); /* sign+exp(-bias) +mantissa*/
+
+            }
+        }
+    }
+    return VX_SUCCESS;
+}
+
+vx_status checkWeightZp(vx_context context, vx_weights_biases_parameter wb)
+{
+    vx_uint32 filterIndex = 0;
+
+    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT))
+    {
+        if (WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_INT8)
+        {
+            for(filterIndex = 0 ; filterIndex < WB_WEIGHT_DIMS_SIZES(wb)[3]; ++filterIndex)
+            {
+                vxmASSERT(WB_WEIGHT_ZP(wb, filterIndex) == 0);
+            }
+        }
+        else if (WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_UINT8)
+        {
+            if(0)/*(! COFE_FEATURE))*/
+            {
+                for(filterIndex = 0 ; filterIndex < WB_WEIGHT_DIMS_SIZES(wb)[3]; ++filterIndex)
+                {
+                    vxmASSERT(WB_WEIGHT_ZP(wb, filterIndex) == WB_WEIGHT_ZP(wb, 0));
+                }
+            }
+        }
+    }
+    return VX_SUCCESS;
 }
 
 VX_PRIVATE_API vx_status _vxoWeightBias_Compress(
@@ -494,14 +605,20 @@ VX_PRIVATE_API vx_status _vxoWeightBias_Compress(
     vx_status status = VX_SUCCESS;
     vx_size weightDataBytesOffset = 0, biasDataDWordOffset = 0, compressDataBytesOffset = 0;
     vx_uint32 i, j, index = 0, kzOffset = 0, oneFilterSize, weightSize;
-    vx_uint8_ptr weightPtr = WB_WEIGHT_DATA(wb), alphaPtr = WB_ALPHA_DATA(wb);
-    vx_uint32_ptr biasPtr = WB_BIAS_DATA(wb);
+    vx_uint8_ptr weightPtr = VX_NULL, alphaPtr = VX_NULL;
+    vx_uint32_ptr biasPtr = VX_NULL;
     vx_uint8_ptr zrlTmpPtr = min_zero_run_lens;
-
-    vxmASSERT(weightPtr != VX_NULL);
 
     weightSize = (vx_uint32)vxDataType_GetSize((vx_type_e)WB_WEIGHT_DATA_FORMAT(wb));
     oneFilterSize = WB_KERNEL_X(wb) * WB_KERNEL_Y(wb) * WB_KERNEL_Z(wb) * weightSize;
+
+    vxoTensor_GetTensorViewMemory(WB_WEIGHT_TENSOR(wb), (gctPOINTER*)&weightPtr, VX_NULL);
+
+    if (WB_BIAS_TENSOR(wb) != VX_NULL)
+        vxoTensor_GetTensorViewMemory(WB_BIAS_TENSOR(wb), (gctPOINTER*)&biasPtr, VX_NULL);
+
+    if (WB_ALPHA_REF(wb) != VX_NULL && (vxoReference_GetType(wb->alpha_ref) == VX_TYPE_TENSOR))
+        vxoTensor_GetTensorViewMemory((vx_tensor)(WB_ALPHA_REF(wb)), (gctPOINTER*)&alphaPtr, VX_NULL);
 
     vxAcquireMutex(WB_MEMORY_LOCK(wb));
 
@@ -585,9 +702,27 @@ VX_PRIVATE_API vx_status _vxoWeightBias_Compress(
 
                 if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP0))
                 {
+                    vx_uint32* postMulAndShift = VX_NULL;
+                    vx_uint32* negPostMulAndShift = VX_NULL;
+
+                    if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT) &&
+                       ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU) && wb->alpha_ref!= VX_NULL && WB_OPERATION_TYPE(wb) == VX_NN_CONV_PRELU) ||
+                       (WB_WEIGHT_QUANT_FORMAT(wb) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)&&(WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_UINT8 || WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_INT8 )))
+                    {
+                        checkWeightZp(context, wb);
+                        postMulAndShift = (vx_uint32*)vxAllocateAndZeroMemory(WB_WEIGHT_DIMS_SIZES(wb)[3] * sizeof(vx_uint32));
+
+                        if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU) && wb->alpha_ref!= VX_NULL && WB_OPERATION_TYPE(wb) == VX_NN_CONV_PRELU)
+                        {
+                            negPostMulAndShift = (vx_uint32*)vxAllocateAndZeroMemory(WB_WEIGHT_DIMS_SIZES(wb)[3] * sizeof(vx_uint32));
+                        }
+                        calculatePostMultiAndPostShift(context, wb, postMulAndShift, negPostMulAndShift);
+                    }
+
                     fillSize = fillinKernelBufferV8Huffman(
                         context,
                         WB_HUFFMAN_CONFIG_INDEX(wb, index),
+                        WB_INPUT_FORMAT(wb),
                         WB_KERNEL_X(wb),
                         WB_KERNEL_Y(wb),
                         sliceCount,
@@ -595,13 +730,8 @@ VX_PRIVATE_API vx_status _vxoWeightBias_Compress(
                         kernel_per_core,
                         WB_WEIGHT_DATA_FORMAT(wb),
                         WB_WEIGHT_QUANT_FORMAT(wb),
-                        WB_WEIGHT_ZP(wb),
+                        WB_WEIGHT_ZP_POINTER(wb),
                         WB_BIAS_DATA_FORMAT(wb),
-                        WB_ALPHA_DATA_FORMAT(wb),
-                        WB_ALPHA_FPP(wb),
-                        WB_ALPHA_QUANT_FORMAT(wb),
-                        WB_ALPHA_SCALE(wb),
-                        WB_ALPHA_ZP(wb),
                         WB_INPUT_ZP(wb),
                         WB_SKIP_VALUE(wb),
                         z_offset,
@@ -609,15 +739,34 @@ VX_PRIVATE_API vx_status _vxoWeightBias_Compress(
                         kernelBufferPtr,
                         weightPtr + kzOffset + weightDataBytesOffset,
                         (biasPtr != VX_NULL) ? biasPtr + biasDataDWordOffset : VX_NULL,
-                        alphaPtr,
-                        VX_NULL,
-                        VX_NULL,
+                        postMulAndShift,
+                        negPostMulAndShift,
                         &kernelAlignStreamSize,
                         &kernelStreamFullCacheSize,
                         &kernelMaxStreamSizePerCore);
+
+                    if(postMulAndShift != VX_NULL)
+                    {
+                        vxFree(postMulAndShift);
+                        postMulAndShift = VX_NULL;
+                    }
+                    if(negPostMulAndShift != VX_NULL)
+                    {
+                        vxFree(negPostMulAndShift);
+                        negPostMulAndShift = VX_NULL;
+                    }
                 }
                 else if (WB_IS_DEPTH_WISE(wb))
                 {
+                    vx_uint32* postMulAndShift = VX_NULL;
+                    vx_uint32* negPostMulAndShift = VX_NULL;
+
+                    if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT) && (WB_WEIGHT_QUANT_FORMAT(wb) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)&&(WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_UINT8 || WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_INT8 ))
+                    {
+                        postMulAndShift = (vx_uint32*)vxAllocateAndZeroMemory(WB_OUTPUT_Z_INDEX(wb, 0) * sizeof(vx_uint32));
+                        negPostMulAndShift = (vx_uint32 *)vxAllocateAndZeroMemory(WB_OUTPUT_Z_INDEX(wb, 0) * sizeof(vx_uint8));
+                        calculatePostMultiAndPostShift(context, wb, postMulAndShift, negPostMulAndShift);
+                    }
                     fillSize = fillinDepthWiseKernelBuffer(
                         context,
                         min_zero_run_lens[index],
@@ -629,7 +778,7 @@ VX_PRIVATE_API vx_status _vxoWeightBias_Compress(
                         kernel_per_core,
                         WB_WEIGHT_DATA_FORMAT(wb),
                         WB_WEIGHT_QUANT_FORMAT(wb),
-                        WB_WEIGHT_ZP(wb),
+                        WB_WEIGHT_ZP(wb, 0),
                         WB_BIAS_DATA_FORMAT(wb),
                         WB_INPUT_ZP(wb),
                         WB_SKIP_VALUE(wb),
@@ -653,7 +802,7 @@ VX_PRIVATE_API vx_status _vxoWeightBias_Compress(
                         filterCount,
                         kernel_per_core,
                         WB_WEIGHT_DATA_FORMAT(wb),
-                        WB_WEIGHT_ZP(wb),
+                        WB_WEIGHT_ZP(wb, 0),
                         WB_BIAS_DATA_FORMAT(wb),
                         WB_INPUT_ZP(wb),
                         WB_SKIP_VALUE(wb),
@@ -689,7 +838,7 @@ VX_PRIVATE_API vx_status _vxoWeightBias_Compress(
                             filterCount,
                             kernel_per_core,
                             WB_WEIGHT_DATA_FORMAT(wb),
-                            WB_WEIGHT_ZP(wb),
+                            WB_WEIGHT_ZP(wb, 0),
                             WB_BIAS_DATA_FORMAT(wb),
                             WB_INPUT_ZP(wb),
                             WB_SKIP_VALUE(wb),
@@ -715,7 +864,7 @@ VX_PRIVATE_API vx_status _vxoWeightBias_Compress(
                             filterCount,
                             kernel_per_core,
                             WB_WEIGHT_DATA_FORMAT(wb),
-                            WB_WEIGHT_ZP(wb),
+                            WB_WEIGHT_ZP(wb, 0),
                             WB_BIAS_DATA_FORMAT(wb),
                             WB_INPUT_ZP(wb),
                             WB_SKIP_VALUE(wb),
@@ -772,6 +921,7 @@ exit:
 
     return status;
 }
+
 
 VX_PRIVATE_API vx_status _vxoWeightBias_AddToPool(
     vx_context                    context,
@@ -840,7 +990,7 @@ VX_PRIVATE_API vx_weights_biases_parameter _vxoWeightBias_GetFromPool(
     vx_enum                          layer_type,
     vx_tensor                        weight,
     vx_tensor                        bias,
-    vx_tensor                        alpha
+    vx_reference                     alpha
     )
 {
     vx_wb_list current = context->wbList;
@@ -849,7 +999,7 @@ VX_PRIVATE_API vx_weights_biases_parameter _vxoWeightBias_GetFromPool(
     {
         if (WB_WEIGHT_TENSOR(current->wb)  != weight        ||
             WB_BIAS_TENSOR(current->wb)    != bias          ||
-            WB_ALPHA_TENSOR(current->wb)   != alpha         ||
+            WB_ALPHA_REF(current->wb)      != alpha         ||
             WB_STRIDE_X(current->wb)       != stride_x      ||
             WB_STRIDE_Y(current->wb)       != stride_y      ||
             WB_ORG_STRIDE_X(current->wb)   != orig_stride_x ||
@@ -875,6 +1025,68 @@ VX_PRIVATE_API vx_weights_biases_parameter _vxoWeightBias_GetFromPool(
     return VX_NULL;
 }
 
+
+VX_PRIVATE_API vx_status vxoWeightBias_ScaleAndZP(
+    vx_weights_biases_parameter         wb,
+    vx_weight_bias_general_param        weight_param,
+    vx_weight_bias_general_param        bias_param
+    )
+{
+    vx_context context = wb->base.context;
+
+    if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT) && WB_WEIGHT_QUANT_FORMAT(wb) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL &&(WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_UINT8 || WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_INT8))
+    {
+         vx_uint32 outChannel = weight_param->scaleCount;
+
+        WB_WEIGHT_SCALE_POINTER(wb) = (vx_float32 *)vxAllocateAndZeroMemory(outChannel * sizeof(vx_float32));
+        gcoOS_MemCopy(WB_WEIGHT_SCALE_POINTER(wb), weight_param->quant_scale, outChannel* sizeof(vx_float32));
+        WB_BIAS_SCALE_POINTER(wb) = (vx_float32 *)vxAllocateAndZeroMemory(outChannel * sizeof(vx_float32));
+        gcoOS_MemCopy(WB_BIAS_SCALE_POINTER(wb), bias_param->quant_scale, outChannel * sizeof(vx_float32));
+
+        WB_WEIGHT_ZP_POINTER(wb) = (vx_int32 *)vxAllocateAndZeroMemory(outChannel * sizeof(vx_int32));
+        gcoOS_MemCopy(WB_WEIGHT_ZP_POINTER(wb), weight_param->quant_zero_point, outChannel * sizeof(vx_int32));
+        WB_BIAS_ZP_POINTER(wb) = (vx_int32 *)vxAllocateAndZeroMemory(outChannel * sizeof(vx_int32));
+        gcoOS_MemCopy(WB_BIAS_ZP_POINTER(wb), bias_param->quant_zero_point, outChannel * sizeof(vx_int32));
+    }
+    else if(vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT) && (WB_WEIGHT_QUANT_FORMAT(wb)  == VX_QUANT_AFFINE_SCALE) && WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_UINT8 )
+    {
+        vx_uint32 i= 0;
+        vx_uint32 outChannel = weight_param->dims_sizes[3];
+
+        WB_WEIGHT_SCALE_POINTER(wb) = (vx_float32 *)vxAllocateAndZeroMemory(outChannel * sizeof(vx_float32));
+        WB_BIAS_SCALE_POINTER(wb) = (vx_float32 *)vxAllocateAndZeroMemory(outChannel * sizeof(vx_float32));
+        WB_WEIGHT_ZP_POINTER(wb) = (vx_int32 *)vxAllocateAndZeroMemory(outChannel * sizeof(vx_int32));
+        WB_BIAS_ZP_POINTER(wb) = (vx_int32 *)vxAllocateAndZeroMemory(outChannel * sizeof(vx_int32));
+
+        for(i = 0; i < outChannel; ++i)
+        {
+            gcoOS_MemCopy(WB_WEIGHT_SCALE_POINTER(wb) + i, weight_param->quant_scale, sizeof(vx_float32));
+            gcoOS_MemCopy(WB_BIAS_SCALE_POINTER(wb) + i, bias_param->quant_scale, sizeof(vx_float32));
+            gcoOS_MemCopy(WB_WEIGHT_ZP_POINTER(wb) + i, weight_param->quant_zero_point, sizeof(vx_int32));
+            gcoOS_MemCopy(WB_BIAS_ZP_POINTER(wb) + i, bias_param->quant_zero_point, sizeof(vx_int32));
+        }
+
+    }
+    else
+    {
+        vx_uint32 outChannel = 1;
+        WB_WEIGHT_FPP(wb)= weight_param->fixed_point_pos;
+        WB_BIAS_FPP(wb) = bias_param->fixed_point_pos;
+
+        WB_WEIGHT_SCALE_POINTER(wb) = (vx_float32 *)vxAllocateAndZeroMemory(outChannel * sizeof(vx_float32));
+        gcoOS_MemCopy(WB_WEIGHT_SCALE_POINTER(wb), weight_param->quant_scale, outChannel* sizeof(vx_float32));
+        WB_BIAS_SCALE_POINTER(wb) = (vx_float32 *)vxAllocateAndZeroMemory(outChannel * sizeof(vx_float32));
+        gcoOS_MemCopy(WB_BIAS_SCALE_POINTER(wb), bias_param->quant_scale, outChannel * sizeof(vx_float32));
+
+        WB_WEIGHT_ZP_POINTER(wb) = (vx_int32 *)vxAllocateAndZeroMemory(outChannel * sizeof(vx_int32));
+        WB_WEIGHT_ZP(wb, 0) = 0;
+        WB_BIAS_ZP_POINTER(wb) = (vx_int32 *)vxAllocateAndZeroMemory(outChannel * sizeof(vx_int32));
+        WB_BIAS_ZP(wb, 0) = 0;
+
+    }
+    return vx_true_e;
+}
+
 /******************************************************************/
 
 VX_PRIVATE_API vx_status vxoWeightBias_Initializer(
@@ -886,14 +1098,13 @@ VX_PRIVATE_API vx_status vxoWeightBias_Initializer(
     vx_uint32                                   stride_x,
     vx_uint32                                   stride_y,
     vx_int8                                     zero_len,
-    vx_uint32                                   skip_value,
+    vx_uint32                                   *skip_value,
     vx_bool                                     is_depth_wise,
     vx_bool                                     do_1xN_config,
     vx_enum                                     layer_type
     )
 {
     vx_uint32 strideX, strideY;
-
     if (wb == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
     if (weight_param == VX_NULL || bias_param == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
     if (!vxoReference_IsValidAndSpecific(&wb->base, VX_TYPE_WEIGHTS_BIASES_PARAMETER)) return VX_ERROR_INVALID_TYPE;
@@ -910,12 +1121,16 @@ VX_PRIVATE_API vx_status vxoWeightBias_Initializer(
     WB_STRIDE_X(wb)         = strideX;
     WB_STRIDE_Y(wb)         = strideY;
     WB_SET_ZERO_LENGTH(wb)  = zero_len;
-    WB_SKIP_VALUE(wb)       = skip_value;
+    WB_SKIP_VALUE(wb)       = skip_value[0];
     WB_IS_DEPTH_WISE(wb)    = is_depth_wise;
     WB_DO_1XN_CONFIG(wb)    = do_1xN_config;
     WB_ORG_LAYER_TYPE(wb)   = layer_type;
 
-    RESET_WB_COMPRESS_FLAG(wb);
+    if(WB_INPUT_FORMAT(wb) == VX_TYPE_INVALID)
+        WB_INPUT_FORMAT(wb) = WB_WEIGHT_DATA_FORMAT(wb);
+
+    vxoWeightBias_ScaleAndZP(wb, weight_param, bias_param);
+
 
     return VX_SUCCESS;
 }
@@ -958,42 +1173,48 @@ VX_PRIVATE_API vx_status vxoWeightBias_Deinitializer(
         WB_SLICE_ARRAY(wb) = VX_NULL;
     }
 
-    if (WB_WEIGHT_DATA(wb) != VX_NULL)
+    if(WB_WEIGHT_SCALE_POINTER(wb) != VX_NULL)
     {
-        vxFree(WB_WEIGHT_DATA(wb));
-        WB_WEIGHT_DATA(wb) = VX_NULL;
+        vxFree(WB_WEIGHT_SCALE_POINTER(wb));
+        WB_WEIGHT_SCALE_POINTER(wb) = VX_NULL;
     }
+
+    if(WB_BIAS_SCALE_POINTER(wb) != VX_NULL)
+    {
+        vxFree(WB_BIAS_SCALE_POINTER(wb));
+        WB_BIAS_SCALE_POINTER(wb) = VX_NULL;
+    }
+
+    if(WB_WEIGHT_ZP_POINTER(wb) != VX_NULL)
+    {
+        vxFree(WB_WEIGHT_ZP_POINTER(wb));
+        WB_WEIGHT_ZP_POINTER(wb) = VX_NULL;
+    }
+
+    if(WB_BIAS_ZP_POINTER(wb) != VX_NULL)
+    {
+        vxFree(WB_BIAS_ZP_POINTER(wb));
+        WB_BIAS_ZP_POINTER(wb) = VX_NULL;
+    }
+
     if (WB_WEIGHT_TENSOR(wb) != VX_NULL)
     {
         vxoReference_Release((vx_reference_ptr)&WB_WEIGHT_TENSOR(wb), VX_TYPE_TENSOR, VX_REF_INTERNAL);
     }
 
-    if (WB_BIAS_DATA(wb) != VX_NULL)
-    {
-        vxFree(WB_BIAS_DATA(wb));
-        WB_BIAS_DATA(wb) = VX_NULL;
-    }
     if (WB_BIAS_TENSOR(wb) != VX_NULL)
     {
         vxoReference_Release((vx_reference_ptr)&WB_BIAS_TENSOR(wb), VX_TYPE_TENSOR, VX_REF_INTERNAL);
     }
 
-    if (WB_ALPHA_DATA(wb) != VX_NULL)
+    if (WB_ALPHA_REF(wb) != VX_NULL)
     {
-        WB_ALPHA_DATA(wb) = VX_NULL;
-    }
-    if (WB_ALPHA_TENSOR(wb) != VX_NULL)
-    {
-        vxoReference_Release((vx_reference_ptr)&WB_ALPHA_TENSOR(wb), VX_TYPE_TENSOR, VX_REF_INTERNAL);
-    }
-
-    if (wb->base.context->options.enableWBShare)
-    {
-        _vxoWeightBias_RemoveFromPool(wb->base.context, wb);
+        vxoReference_Release((vx_reference_ptr)&WB_ALPHA_REF(wb), VX_TYPE_TENSOR, VX_REF_INTERNAL);
     }
 
     return VX_SUCCESS;
 }
+
 
 VX_PRIVATE_API vx_status vxoWeightBias_CalculateCompressRatio(
     vx_weights_biases_parameter    wb,
@@ -1092,6 +1313,7 @@ exit:
     return status;
 }
 
+
 VX_PRIVATE_API vx_status vxoWeightBias_Compress(
     vx_weights_biases_parameter    wb,
     vx_enum                        target,
@@ -1159,7 +1381,7 @@ VX_PRIVATE_API vx_status vxoWeightBias_Compress(
 
     /* copy original weight and bias data from non-cache video memory to CPU memory to speed up */
     {
-        vx_uint8_ptr weightOrigPtr = VX_NULL, alphaOrigPtr = VX_NULL;
+        vx_uint8_ptr weightOrigPtr = VX_NULL/*, alphaOrigPtr = VX_NULL*/;
         vx_uint32_ptr biasOrigPtr = VX_NULL;
         vx_uint32 size = 0;
 
@@ -1202,7 +1424,7 @@ VX_PRIVATE_API vx_status vxoWeightBias_Compress(
             }
         }
 
-        if (WB_ALPHA_TENSOR(wb) != VX_NULL)
+        /*if (WB_ALPHA_REF(wb) != VX_NULL)
         {
             vxoTensor_GetTensorViewMemory(WB_ALPHA_TENSOR(wb), (gctPOINTER*)&alphaOrigPtr, VX_NULL);
             if (alphaOrigPtr != VX_NULL)
@@ -1214,7 +1436,7 @@ VX_PRIVATE_API vx_status vxoWeightBias_Compress(
                 status = VX_ERROR_NO_RESOURCES;
                 goto exit;
             }
-        }
+        }*/
     }
 
     kernelPerCore = kernel_per_core;
@@ -1322,8 +1544,8 @@ VX_PRIVATE_API vx_status vxoWeightBias_Set_Weight_Bias_Tensor(
             WB_WEIGHT_DATA_FORMAT(wb)   = TENSOR_DATA_TYPE(weight);
             WB_WEIGHT_FPP(wb)           = TENSOR_POS(weight);
             WB_WEIGHT_QUANT_FORMAT(wb)  = TENSOR_QUANT_TYPE(weight);
-            WB_WEIGHT_SCALE(wb)         = TENSOR_TF_SCALE(weight);
-            WB_WEIGHT_ZP(wb)            = TENSOR_TF_ZEROPOINT(weight);
+            WB_WEIGHT_SCALE(wb, 0)         = TENSOR_TF_SCALE(weight);
+            WB_WEIGHT_ZP(wb, 0)            = TENSOR_TF_ZEROPOINT(weight);
 
             vxMemCopy(&WB_WEIGHT_ORG_DIMS_SIZES(wb), TENSOR_SIZES(weight), sizeof(WB_WEIGHT_DIMS_SIZES(wb)));
             vxMemCopy(&WB_WEIGHT_DIMS_SIZES(wb), TENSOR_SIZES(weight), sizeof(WB_WEIGHT_DIMS_SIZES(wb)));
@@ -1347,8 +1569,8 @@ VX_PRIVATE_API vx_status vxoWeightBias_Set_Weight_Bias_Tensor(
             WB_BIAS_DATA_FORMAT(wb)   = TENSOR_DATA_TYPE(bias);
             WB_BIAS_FPP(wb)           = TENSOR_POS(bias);
             WB_BIAS_QUANT_FORMAT(wb)  = TENSOR_QUANT_TYPE(bias);
-            WB_BIAS_SCALE(wb)         = TENSOR_TF_SCALE(bias);
-            WB_BIAS_ZP(wb)            = TENSOR_TF_ZEROPOINT(bias);
+            WB_BIAS_SCALE(wb, 0)         = TENSOR_TF_SCALE(bias);
+            WB_BIAS_ZP(wb, 0)            = TENSOR_TF_ZEROPOINT(bias);
 
             vxMemCopy(&WB_BIAS_DIMS_SIZES(wb), TENSOR_SIZES(bias), sizeof(WB_BIAS_DIMS_SIZES(wb)));
         }
@@ -1365,37 +1587,38 @@ VX_PRIVATE_API vx_status vxoWeightBias_Set_Weight_Bias_Tensor(
 
 VX_PRIVATE_API vx_status vxoWeightBias_Set_Alpha_Tensor(
     vx_weights_biases_parameter   wb,
-    vx_tensor                     alpha
+    vx_reference                 alpha_ref
     )
 {
     if (wb == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
     if (!vxoReference_IsValidAndSpecific(&wb->base, VX_TYPE_WEIGHTS_BIASES_PARAMETER)) return VX_ERROR_INVALID_TYPE;
 
-    if (alpha == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
-    if (!vxoReference_IsValidAndSpecific(&alpha->base, VX_TYPE_TENSOR)) return VX_ERROR_INVALID_TYPE;
+    if (alpha_ref == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
+    /*if (!vxoReference_IsValidAndSpecific(&alpha, VX_TYPE_TENSOR)) return VX_ERROR_INVALID_TYPE;*/
 
-    if (WB_ALPHA_TENSOR(wb) != VX_NULL)
+    if (WB_ALPHA_REF(wb) != VX_NULL)
     {
-        vxoReference_Release((vx_reference_ptr)&WB_ALPHA_TENSOR(wb), VX_TYPE_TENSOR, VX_REF_INTERNAL);
+        vxoReference_Release((vx_reference_ptr)&WB_ALPHA_REF(wb), VX_TYPE_TENSOR, VX_REF_INTERNAL);
     }
-    else
+    else if(WB_OPERATION_TYPE(wb) == VX_NN_CONV_PRELU)
     {
+        vx_tensor alpha;
+        vxmASSERT(vxoReference_GetType(alpha_ref) == VX_TYPE_TENSOR);
+
+        alpha = (vx_tensor)alpha_ref;
+
         WB_ALPHA_DIMS_NUM(wb)      = TENSOR_DIM_NUM(alpha);
         WB_ALPHA_DATA_FORMAT(wb)   = TENSOR_DATA_TYPE(alpha);
         WB_ALPHA_FPP(wb)           = TENSOR_POS(alpha);
         WB_ALPHA_QUANT_FORMAT(wb)  = TENSOR_QUANT_TYPE(alpha);
-        WB_ALPHA_SCALE(wb)         = TENSOR_TF_SCALE(alpha);
-        WB_ALPHA_ZP(wb)            = TENSOR_TF_ZEROPOINT(alpha);
+        WB_ALPHA_SCALE(wb, 0)      = TENSOR_TF_SCALE(alpha);
+        WB_ALPHA_ZP(wb, 0)         = TENSOR_TF_ZEROPOINT(alpha);
 
         vxMemCopy(&WB_ALPHA_DIMS_SIZES(wb), TENSOR_SIZES(alpha), sizeof(WB_ALPHA_DIMS_SIZES(wb)));
     }
 
-    WB_ALPHA_TENSOR(wb) = alpha;
-    vxoReference_Increment((vx_reference)WB_ALPHA_TENSOR(wb), VX_REF_INTERNAL);
-
-
-
-    RESET_WB_COMPRESS_FLAG(wb);
+    WB_ALPHA_REF(wb) = alpha_ref;
+    vxoReference_Increment((vx_reference)WB_ALPHA_REF(wb), VX_REF_INTERNAL);
 
     return VX_SUCCESS;
 }
@@ -1408,17 +1631,31 @@ VX_PRIVATE_API vx_status vxoWeightBias_Set_Optimization(
 {
     vx_weights_biases_parameter_optimizations_ext2_t* opt;
 
-    if (wb == VX_NULL || opt_ptr == VX_NULL || opt_size == 0) return VX_ERROR_INVALID_PARAMETERS;
+    if (wb == VX_NULL || opt_ptr == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
     if (!vxoReference_IsValidAndSpecific(&wb->base, VX_TYPE_WEIGHTS_BIASES_PARAMETER)) return VX_ERROR_INVALID_TYPE;
-    if (opt_size != sizeof(vx_weights_biases_parameter_optimizations_t) &&
-        opt_size != sizeof(vx_weights_biases_parameter_optimizations_ext_t) &&
-        opt_size != sizeof(vx_weights_biases_parameter_optimizations_ext2_t))
-        return VX_ERROR_INVALID_PARAMETERS;
+    //if (opt_size != sizeof(vx_weights_biases_parameter_optimizations_t) &&
+    //    opt_size != sizeof(vx_weights_biases_parameter_optimizations_ext_t) &&
+    //    opt_size != sizeof(vx_weights_biases_parameter_optimizations_ext2_t))
+    //    return VX_ERROR_INVALID_PARAMETERS;
 
     opt = (vx_weights_biases_parameter_optimizations_ext2_t*)opt_ptr;
 
-    WB_INPUT_ZP(wb) = opt->inputZeroPoint;
-    WB_SET_ZERO_LENGTH(wb) = opt->zrl;
+    if(opt_size == sizeof(vx_weights_biases_parameter_optimizations_ext2_t))
+    {
+        WB_INPUT_ZP(wb) = opt->ext.inputZeroPoint;
+        WB_INPUT_SCALE(wb) = opt->inputScale;
+        WB_INPUT_FORMAT(wb) = opt->inputFormat;
+        WB_OUTPUT_SCALE(wb) = opt->outputScale;
+    }
+    else
+    {
+        WB_INPUT_ZP(wb) = opt->ext.inputZeroPoint;
+        WB_INPUT_SCALE(wb) = 0;
+        WB_INPUT_FORMAT(wb) = WB_WEIGHT_DATA_FORMAT(wb);/*VX_TYPE_INVALID :some older case never sent inputFormat*/
+        WB_OUTPUT_SCALE(wb) = 0;
+    }
+
+    WB_SET_ZERO_LENGTH(wb) = opt->ext.zrl;
 
     return VX_SUCCESS;
 }
@@ -1485,13 +1722,14 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromT
     vx_uint32 * convolution_outputs_dims,
     vx_uint32 * pooling_outputs_dims,
     vx_weights_biases_parameter_optimizations_t * optimizations,
+    vx_uint32 opt_size,
     vx_enum     output_format,
     vx_enum     convert_format,
     vx_enum     rank_mode,
     vx_tensor   weights,
     vx_tensor   biases,
-    vx_tensor   alpha,
-    vx_bool     doPRelu,
+    vx_reference   alpha,
+    vx_enum     conv_operation_type,
     vx_bool     do1xN
     )
 {
@@ -1519,7 +1757,8 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromT
     vx_float32 biasScale        = 0;
     vx_enum biasDataType        = VX_TYPE_FLOAT32;
     vx_enum biasQuantType       = biases ? TENSOR_QUANT_TYPE(biases) : TENSOR_QUANT_TYPE(weights);
-    vx_uint32 i, strideX, strideY, strideXChanged, strideYChanged, skipValue = 0;
+    vx_uint32 i, strideX, strideY, strideXChanged, strideYChanged;
+    vx_uint32 *skipValue = VX_NULL;
 
     vx_weight_bias_general_param_s weight_param, bias_param;
 
@@ -1532,6 +1771,12 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromT
     vx_bool isV8 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP0);
 
     vx_status status = VX_SUCCESS;
+
+    weight_param.quant_scale = VX_NULL;
+    weight_param.quant_zero_point = VX_NULL;
+
+    bias_param.quant_scale = VX_NULL;
+    bias_param.quant_zero_point = VX_NULL;
 
     if (!nnSupportFormat && layer_type == VX_NN_CONVOLUTION_LAYER)
     {
@@ -1784,9 +2029,20 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromT
         }
     }
 
-    if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT) && weightDataType == VX_TYPE_UINT8)
+    if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT) && (weightQuantType == VX_QUANT_AFFINE_SCALE_PER_CHANNEL) && (weightDataType == VX_TYPE_UINT8 || weightDataType == VX_TYPE_INT8))
     {
-        skipValue = TENSOR_TF_ZEROPOINT(weights);
+        skipValue = (vx_uint32 *)vxAllocateAndZeroMemory(weightDims[3] * sizeof(vx_int32));
+        gcoOS_MemCopy(skipValue, TENSOR_TF_ZEROPOINT_POINTER(weights), weightDims[3] * sizeof(vx_int32));
+    }
+    else if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT) && (weightQuantType == VX_QUANT_AFFINE_SCALE) && weightDataType == VX_TYPE_UINT8)
+    {
+        skipValue = (vx_uint32 *)vxAllocateAndZeroMemory(sizeof(vx_int32));
+        skipValue[0] = TENSOR_TF_ZEROPOINT(weights);
+    }
+    else
+    {
+        skipValue = (vx_uint32 *)vxAllocateAndZeroMemory(sizeof(vx_int32));
+        skipValue[0] = 0;
     }
 
     strideX = stride_x;
@@ -1823,17 +2079,31 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromT
         goto exit;
     }
 
-    if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_FIRST_PIXEL_POOLING) &&
+    if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_FAST_FIRST_PIXEL_POOLING) &&
+        !doZdpOpt &&
+        weights->dims[0] < 16 &&
+        weights->dims[1] < 16 &&
+        ((strideX == 2 && strideY == 2) ||
+        (strideX == 4 && strideY == 4 && pooling_size_x == 0)) &&
+        (layer_type == VX_NN_CONVOLUTION_LAYER ||
+         (layer_type == VX_NN_DEPTH_WISE_CONVOLUTION_LAYER && hasHwDepthWise)))
+    {
+        strideXChanged = 1;
+        strideYChanged = 1;
+        weightDimsChanged[0] = weights->dims[0];
+        weightDimsChanged[1] = weights->dims[1];
+        weightDimsChanged[2] = weights->dims[2];
+    }
+    else if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_FIRST_PIXEL_POOLING) &&
         strideX == 2 && strideY == 2 &&
         !doZdpOpt &&
-        (weightDataType == VX_TYPE_INT8 || weightDataType == VX_TYPE_UINT8) &&
         pooling_size_x == 0 &&
         ((inputDims[0] % 2 == 0 && layer_type == VX_NN_CONVOLUTION_LAYER) ||
          (layer_type == VX_NN_DEPTH_WISE_CONVOLUTION_LAYER && hasHwDepthWise)))
     {
         /* Per Arch, only support INT8 3x3 conv right now*/
         /* First pixel pooling is 2x2 poooling stride is 2, so convolution output should be even*/
-        vx_float32 nonZeroRatio = calculateWeightNonZeroRatio(context, skipValue, weights);
+        vx_float32 nonZeroRatio = calculateWeightNonZeroRatio(context, skipValue[0], weights);
 
         /*V8 has limitation for 1x2 & 2x1, those shape with 2x2 stride can't do FFP*/
         if ((nonZeroRatio * weights->dims[0] * weights->dims[1] < 6.3 ||
@@ -1889,17 +2159,14 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromT
     weight_param.data_format      = weightDataType;
     weight_param.fixed_point_pos  = TENSOR_POS(weights);
     weight_param.quant_format     = weightQuantType;
-    weight_param.quant_scale      = TENSOR_TF_SCALE(weights);
-    weight_param.quant_zero_point = TENSOR_TF_ZEROPOINT(weights);
     vxMemCopy(weight_param.org_dims_sizes, weightDims, sizeof(weight_param.org_dims_sizes));
     vxMemCopy(weight_param.dims_sizes, weightDimsChanged, sizeof(weight_param.dims_sizes));
 
+    bias_param.fixed_point_pos  = biasFp;
     bias_param.num_of_dims      = biasDimCount;
     bias_param.data_format      = biasDataType;
-    bias_param.fixed_point_pos  = biasFp;
     bias_param.quant_format     = biasQuantType;
-    bias_param.quant_scale      = biasScale;
-    bias_param.quant_zero_point = 1;
+
     vxMemCopy(bias_param.dims_sizes, biasDims, sizeof(bias_param.dims_sizes));
 
     if (context->options.enableWBShare)
@@ -1909,7 +2176,7 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromT
                                                  &bias_param,
                                                  strideX, strideY,
                                                  strideXChanged, strideYChanged,
-                                                 skipValue,
+                                                 skipValue[0],
                                                  doDepthWise,
                                                  do1xN,
                                                  layer_type,
@@ -1929,6 +2196,39 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromT
     {
         status = VX_FAILURE;
         goto exit;
+    }
+
+
+
+    if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT) && (weightQuantType == VX_QUANT_AFFINE_SCALE_PER_CHANNEL) &&(weightDataType == VX_TYPE_UINT8 || weightDataType == VX_TYPE_INT8))
+    {
+        weight_param.scaleCount = TENSOR_TF_SCALE_COUNT(weights);
+
+        weight_param.quant_scale = (vx_float32 *)vxAllocateAndZeroMemory(weight_param.scaleCount * sizeof(vx_float32));
+        gcoOS_MemCopy(weight_param.quant_scale, TENSOR_TF_SCALE_POINTER(weights), weight_param.scaleCount * sizeof(vx_float32));
+        bias_param.quant_scale = (vx_float32 *)vxAllocateAndZeroMemory(weight_param.scaleCount * sizeof(vx_float32));
+        gcoOS_MemCopy(bias_param.quant_scale, TENSOR_TF_SCALE_POINTER(biases), weight_param.scaleCount * sizeof(vx_float32));
+
+        weight_param.quant_zero_point = (vx_int32 *)vxAllocateAndZeroMemory(weight_param.scaleCount * sizeof(vx_int32));
+        gcoOS_MemCopy(weight_param.quant_zero_point, TENSOR_TF_ZEROPOINT_POINTER(weights), weight_param.scaleCount * sizeof(vx_int32));
+        bias_param.quant_zero_point = (vx_int32 *)vxAllocateAndZeroMemory(weight_param.scaleCount * sizeof(vx_int32));
+        gcoOS_MemCopy(bias_param.quant_zero_point, TENSOR_TF_ZEROPOINT_POINTER(biases), weight_param.scaleCount * sizeof(vx_int32));
+    }
+    else
+    {
+        weight_param.scaleCount = 1;
+
+        weight_param.quant_scale = (vx_float32 *)vxAllocateAndZeroMemory(weight_param.scaleCount * sizeof(vx_float32));
+        bias_param.quant_scale = (vx_float32 *)vxAllocateAndZeroMemory(weight_param.scaleCount * sizeof(vx_float32));
+
+        weight_param.quant_zero_point = (vx_int32 *)vxAllocateAndZeroMemory(weight_param.scaleCount * sizeof(vx_int32));
+        bias_param.quant_zero_point = (vx_int32 *)vxAllocateAndZeroMemory(weight_param.scaleCount * sizeof(vx_int32));
+
+        bias_param.quant_scale[0] = biasScale;
+        bias_param.quant_zero_point[0] = 1;
+        weight_param.quant_scale[0]      = TENSOR_TF_SCALE(weights);
+        weight_param.quant_zero_point[0] = TENSOR_TF_ZEROPOINT(weights);
+
     }
 
     status = weight_bias->initialize(weight_bias,
@@ -1954,21 +2254,49 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromT
         vxoReference_Increment((vx_reference)WB_BIAS_TENSOR(weight_bias), VX_REF_INTERNAL);
     }
 
-    if (doPRelu && alpha != VX_NULL)
+    if (alpha != VX_NULL && (conv_operation_type == VX_NN_CONV_PRELU || conv_operation_type == VX_NN_CONV_LEAKYRELU))
     {
-        WB_ALPHA_TENSOR(weight_bias) = alpha;
-        vxoReference_Increment((vx_reference)WB_ALPHA_TENSOR(weight_bias), VX_REF_INTERNAL);
+        WB_OPERATION_TYPE(weight_bias) = conv_operation_type;
+        WB_ALPHA_REF(weight_bias) = alpha;
+        //weight_bias->set_alpha_tensor(weight_bias, alpha);
+        vxoReference_Increment((vx_reference)WB_ALPHA_REF(weight_bias), VX_REF_INTERNAL);
     }
-
 
     if (optimizations != VX_NULL)
     {
-        weight_bias->set_optimization(weight_bias, optimizations, sizeof(vx_weights_biases_parameter_optimizations_t));
+        weight_bias->set_optimization(weight_bias, optimizations, opt_size);
     }
-
     if (context->options.enableWBShare)
     {
         _vxoWeightBias_AddToPool(context, weight_bias);
+    }
+
+    if(skipValue != VX_NULL)
+    {
+        vxFree(skipValue);
+        skipValue = VX_NULL;
+    }
+
+    if(weight_param.quant_scale != VX_NULL)
+    {
+        vxFree(weight_param.quant_scale);
+        weight_param.quant_scale = VX_NULL;
+    }
+    if(bias_param.quant_scale != VX_NULL)
+    {
+        vxFree(bias_param.quant_scale);
+        bias_param.quant_scale = VX_NULL;
+    }
+
+    if(weight_param.quant_zero_point != VX_NULL)
+    {
+        vxFree(weight_param.quant_zero_point);
+        weight_param.quant_zero_point = VX_NULL;
+    }
+    if(bias_param.quant_zero_point != VX_NULL)
+    {
+        vxFree(bias_param.quant_zero_point);
+        bias_param.quant_zero_point = VX_NULL;
     }
 
 exit:
@@ -1978,6 +2306,29 @@ exit:
         {
             vxoWeightBias_Release(&weight_bias);
         }
+
+        if(weight_param.quant_scale != VX_NULL)
+        {
+            vxFree(weight_param.quant_scale);
+            weight_param.quant_scale = VX_NULL;
+        }
+        if(bias_param.quant_scale != VX_NULL)
+        {
+            vxFree(bias_param.quant_scale);
+            bias_param.quant_scale = VX_NULL;
+        }
+
+        if(weight_param.quant_zero_point != VX_NULL)
+        {
+            vxFree(weight_param.quant_zero_point);
+            weight_param.quant_zero_point = VX_NULL;
+        }
+        if(bias_param.quant_zero_point != VX_NULL)
+        {
+            vxFree(bias_param.quant_zero_point);
+            bias_param.quant_zero_point = VX_NULL;
+        }
+
         return VX_NULL;
     }
     else
@@ -2014,7 +2365,8 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromP
     )
 {
     vx_status status = VX_SUCCESS;
-    vx_uint32 skipValue = 0, strideX = 0, strideY = 0;
+    vx_uint32 *skipValue = VX_NULL;
+    vx_uint32 strideX = 0, strideY = 0;
     vx_weights_biases_parameter wb;
     vx_weight_bias_general_param_s weight_param, bias_param;
 
@@ -2023,15 +2375,15 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromP
 
     if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT) && weights_data_format == VX_TYPE_UINT8)
     {
-        skipValue = 1;
+        skipValue[0] = 1;
     }
 
     weight_param.num_of_dims      = weights_num_of_dims;
     weight_param.data_format      = weights_data_format;
     weight_param.fixed_point_pos  = weights_fixed_point_pos;
     weight_param.quant_format     = weights_quant_format;
-    weight_param.quant_scale      = 1.0f;
-    weight_param.quant_zero_point = 1;
+    //weight_param.quant_scale[0]      = 1.0f;
+    //weight_param.quant_zero_point[0] = 1;
     vxMemCopy(weight_param.org_dims_sizes, weights_dims, sizeof(weight_param.org_dims_sizes));
     vxMemCopy(weight_param.dims_sizes, weights_dims, sizeof(weight_param.dims_sizes));
 
@@ -2039,8 +2391,8 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromP
     bias_param.data_format      = biases_data_format;
     bias_param.fixed_point_pos  = biases_fixed_point_pos;
     bias_param.quant_format     = biases_quant_format;
-    bias_param.quant_scale      = 1.0f;
-    bias_param.quant_zero_point = 1;
+    //bias_param.quant_scale[0]      = 1.0f;
+    //bias_param.quant_zero_point[0] = 1;
     vxMemCopy(bias_param.dims_sizes, biases_dims, sizeof(bias_param.dims_sizes));
 
     _getNNStride(layer_type,
@@ -2144,6 +2496,13 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromT
             num_of_input_dims = opt.num_of_input_dims;
             num_of_output_dims = opt.num_of_output_dims;
         }
+        else if (size_of_optimizations == sizeof(vx_weights_biases_parameter_optimizations_ext2_t))
+        {
+            vx_weights_biases_parameter_optimizations_ext_t opt = *((vx_weights_biases_parameter_optimizations_ext_t *)optimizations);
+            output_format = opt.outputFormat;
+            num_of_input_dims = opt.num_of_input_dims;
+            num_of_output_dims = opt.num_of_output_dims;
+        }
         else
         {
             vxError("Invalid parameter convolution_relu_pooling_params");
@@ -2169,19 +2528,135 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromT
             convolution_outputs_dims,
             pool_outputs_dims,
             optimizations,
+            size_of_optimizations,
             output_format,
             convert_format,
             rank_mode,
             weights,
             biases,
-            alpha,
-            vx_true_e,
+            (vx_reference)alpha,
+            VX_NN_CONV_PRELU,
             vx_true_e);
 
     return wb;
 }
 
-VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromWeightBias(
+
+
+VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromTensorsLeakyRelu(
+    vx_enum     layer_type,
+    vx_uint32 * inputs_dims,
+    vx_uint32 * convolution_outputs_dims,
+    vx_uint32 * pool_outputs_dims,
+    const vx_nn_convolution_relu_pooling_params convolution_relu_pooling_params,
+    vx_size size_of_convolution_relu_pooling_params,
+    vx_weights_biases_parameter_optimizations_t *optimizations,
+    vx_size size_of_optimizations,
+    vx_tensor   weights,
+    vx_tensor   biases,
+    vx_scalar   alpha)
+{
+    vx_weights_biases_parameter wb;
+    vx_context context = vxGetContext((vx_reference)weights);
+    vx_uint32 stride_x = 0;
+    vx_uint32 stride_y = 0;
+    vx_uint32 num_of_input_dims = 0;
+    vx_uint32 num_of_output_dims = 0;
+    vx_enum output_format = TENSOR_DATA_TYPE(weights);
+    vx_enum convert_format = 0;
+    vx_enum rank_mode = VX_TENSOR_RANK_WHCN;
+
+    vx_enum layer = layer_type;
+
+    gcmDUMP_API("$VX vxoCreateWeightsBiasesParameterFromTensorsPRelu: layer_type=0x%x, inputs_dims=%p, "
+        "convolution_outputs_dims=%p, pool_outputs_dims=%p, convolution_relu_pooling_params=%p, "
+        "size_of_convolution_relu_pooling_params=0x%lx, optimizations=%p, size_of_optimizations=0x%lx, weights=%p, biases=%p",
+        layer_type, inputs_dims, convolution_outputs_dims, pool_outputs_dims, convolution_relu_pooling_params, size_of_convolution_relu_pooling_params, optimizations, size_of_optimizations, weights, biases);
+
+    if (!vxoContext_IsValid(context)) return VX_NULL;
+
+    if (size_of_convolution_relu_pooling_params == sizeof(vx_nn_convolution_relu_pooling_params_ext_t))
+    {
+        vx_nn_convolution_relu_pooling_params_ext_t conv_ext = *((vx_nn_convolution_relu_pooling_params_ext_t*)(convolution_relu_pooling_params));
+        stride_x = conv_ext.stride_x;
+        stride_y = conv_ext.stride_y;
+    }
+    else if (size_of_convolution_relu_pooling_params == sizeof(vx_nn_convolution_relu_pooling_params_ext2_t))
+    {
+        vx_nn_convolution_relu_pooling_params_ext2_t conv_ext2 = *((vx_nn_convolution_relu_pooling_params_ext2_t*)(convolution_relu_pooling_params));
+        stride_x = conv_ext2.ext.stride_x;
+        stride_y = conv_ext2.ext.stride_y;
+        rank_mode = conv_ext2.src_rank_mode;
+        convert_format = conv_ext2.convert_dst_format;
+
+        if (conv_ext2.depth_multiplier == 1 &&
+            (TENSOR_DATA_TYPE(weights) == VX_TYPE_INT8 || TENSOR_DATA_TYPE(weights) == VX_TYPE_UINT8) &&
+            vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_NN_DEPTHWISE_SUPPORT))
+            layer = VX_NN_DEPTH_WISE_CONVOLUTION_LAYER;
+    }
+    else if (size_of_convolution_relu_pooling_params != sizeof(vx_nn_convolution_relu_pooling_params_t))
+    {
+        vxError("Invalid parameter convolution_relu_pooling_params");
+        return VX_NULL;
+    }
+
+    if (optimizations)
+    {
+        if (size_of_optimizations == sizeof(vx_weights_biases_parameter_optimizations_t))
+            output_format = optimizations->outputFormat;
+        else if (size_of_optimizations == sizeof(vx_weights_biases_parameter_optimizations_ext_t))
+        {
+            vx_weights_biases_parameter_optimizations_ext_t opt = *((vx_weights_biases_parameter_optimizations_ext_t *)optimizations);
+            output_format = opt.outputFormat;
+            num_of_input_dims = opt.num_of_input_dims;
+            num_of_output_dims = opt.num_of_output_dims;
+        }
+        else if (size_of_optimizations == sizeof(vx_weights_biases_parameter_optimizations_ext2_t))
+        {
+            vx_weights_biases_parameter_optimizations_ext_t opt = *((vx_weights_biases_parameter_optimizations_ext_t *)optimizations);
+            output_format = opt.outputFormat;
+            num_of_input_dims = opt.num_of_input_dims;
+            num_of_output_dims = opt.num_of_output_dims;
+        }
+        else
+        {
+            vxError("Invalid parameter convolution_relu_pooling_params");
+            return VX_NULL;
+        }
+    }
+
+    wb = vxoCreateWeightsBiasesParameterFromTensors(
+            context,
+            layer,
+            inputs_dims,
+            num_of_input_dims,
+            num_of_output_dims,
+            convolution_relu_pooling_params->pad_x_left,
+            convolution_relu_pooling_params->pad_x_right,
+            convolution_relu_pooling_params->pad_y_top,
+            convolution_relu_pooling_params->pad_y_bottom,
+            convolution_relu_pooling_params->pool_size_x,
+            convolution_relu_pooling_params->pool_size_y,
+            stride_x,
+            stride_y,
+            convolution_relu_pooling_params->down_scale_size_rounding,
+            convolution_outputs_dims,
+            pool_outputs_dims,
+            optimizations,
+            size_of_optimizations,
+            output_format,
+            convert_format,
+            rank_mode,
+            weights,
+            biases,
+            (vx_reference)alpha,
+            VX_NN_CONV_LEAKYRELU,
+            vx_true_e);
+
+    return wb;
+}
+
+VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesFromWeightBias(
     vx_context                  context,
     vx_weights_biases_parameter old_wb,
     vx_uint32*                  weight_dims,
@@ -2197,6 +2672,8 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromW
 
     vxMemCopy(&WB_EXTERNAL_PARAM(wb), &WB_EXTERNAL_PARAM(old_wb), sizeof(WB_EXTERNAL_PARAM(wb)));
 
+    vxoWeightBias_ScaleAndZP(wb, &(WB_EXTERNAL_PARAM(old_wb).weight_param), &(WB_EXTERNAL_PARAM(old_wb).bias_param));
+
     if (WB_WEIGHT_TENSOR(old_wb) != VX_NULL)
     {
         WB_WEIGHT_TENSOR(wb) = WB_WEIGHT_TENSOR(old_wb);
@@ -2207,10 +2684,10 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromW
         WB_BIAS_TENSOR(wb) = WB_BIAS_TENSOR(old_wb);
         vxoReference_Increment((vx_reference)WB_BIAS_TENSOR(wb), VX_REF_INTERNAL);
     }
-    if (WB_ALPHA_TENSOR(old_wb) != VX_NULL)
+    if (WB_ALPHA_REF(old_wb) != VX_NULL)
     {
-        WB_ALPHA_TENSOR(wb) = WB_ALPHA_TENSOR(old_wb);
-        vxoReference_Increment((vx_reference)WB_ALPHA_TENSOR(wb), VX_REF_INTERNAL);
+        WB_ALPHA_REF(wb) = WB_ALPHA_REF(old_wb);
+        vxoReference_Increment((vx_reference)WB_ALPHA_REF(wb), VX_REF_INTERNAL);
     }
 
 
@@ -2376,13 +2853,14 @@ VX_API_ENTRY vx_weights_biases_parameter VX_API_CALL vxCreateWeightsBiasesParame
             convolution_outputs_dims,
             pool_outputs_dims,
             optimizations,
+            0,
             outType,
             0,
             VX_TENSOR_RANK_WHCN,
             weights,
             biases,
             VX_NULL,
-            vx_false_e,
+            VX_NN_CONV_ONLY,
             vx_true_e);
 
     return wb;
@@ -2458,13 +2936,14 @@ VX_API_ENTRY vx_weights_biases_parameter VX_API_CALL vxCreateWeightsBiasesParame
             convolution_outputs_dims,
             pool_outputs_dims,
             optimizations,
+            0,
             output_format,
             convert_format,
             rank_mode,
             weights,
             biases,
             VX_NULL,
-            vx_false_e,
+            VX_NN_CONV_ONLY,
             vx_true_e);
 
     return wb;
@@ -2537,6 +3016,13 @@ VX_API_ENTRY vx_weights_biases_parameter VX_API_CALL vxCreateWeightsBiasesParame
             num_of_input_dims = opt.num_of_input_dims;
             num_of_output_dims = opt.num_of_output_dims;
         }
+        else if (size_of_optimizations == sizeof(vx_weights_biases_parameter_optimizations_ext2_t))
+        {
+            vx_weights_biases_parameter_optimizations_ext2_t opt = *((vx_weights_biases_parameter_optimizations_ext2_t *)optimizations);
+            output_format = opt.ext.outputFormat;
+            num_of_input_dims = opt.ext.num_of_input_dims;
+            num_of_output_dims = opt.ext.num_of_output_dims;
+        }
         else
         {
             vxError("Invalid parameter convolution_relu_pooling_params");
@@ -2562,13 +3048,14 @@ VX_API_ENTRY vx_weights_biases_parameter VX_API_CALL vxCreateWeightsBiasesParame
             convolution_outputs_dims,
             pool_outputs_dims,
             optimizations,
+            size_of_optimizations,
             output_format,
             convert_format,
             rank_mode,
             weights,
             biases,
             VX_NULL,
-            vx_false_e,
+            VX_NN_CONV_ONLY,
             vx_true_e);
 
     return wb;
