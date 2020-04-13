@@ -1123,6 +1123,10 @@ VX_PRIVATE_API vx_status vxoNNLeakyReluLayer_SH_EVIS_Initialize_Ext(vxnne_layer 
     vx_scalar negative_slopes = (vx_scalar)parameters[1];
     vx_tensor outputs = (vx_tensor)parameters[2];
     vx_uint32 batchCount = TENSOR_SIZE_INDEX(inputs, 3);
+    vx_uint32  reshpTensor_Sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+    vx_uint32  reshpTensor_Dims = 2;
+    vx_tensor input      = NULL;
+    vx_tensor output     = NULL;
 
     vxnne_activation_layer  activationLayer = (vxnne_activation_layer)ops_layer;
 
@@ -1130,10 +1134,20 @@ VX_PRIVATE_API vx_status vxoNNLeakyReluLayer_SH_EVIS_Initialize_Ext(vxnne_layer 
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
+    vxoElementOptimization_GetTensorShape(inputs, reshpTensor_Sizes, &reshpTensor_Dims);
+
+    input     = vxoTensor_ReshapeTensor(inputs, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+    output     = vxoTensor_ReshapeTensor(outputs, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+
+    batchCount = reshpTensor_Dims > 3 ? reshpTensor_Sizes[3] : 1;
+    activationLayer->base.temp_tensors[0] = input;
+    activationLayer->base.temp_tensors[1] = output;
+    activationLayer->base.num_temp_tensors = 2;
+
     if(evis)
-        shaderExecutable = vxnneGetLeakyReluShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_NN_LEAKY, &ops_layer->node->kernelAttributes.borderMode, inputs, negative_slopes, outputs);
+        shaderExecutable = vxnneGetLeakyReluShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_NN_LEAKY, &ops_layer->node->kernelAttributes.borderMode, input, negative_slopes, output);
     else
-        shaderExecutable = vxnneGetGPULeakyReluShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_NN_LEAKY, &ops_layer->node->kernelAttributes.borderMode, inputs, negative_slopes, outputs);
+        shaderExecutable = vxnneGetGPULeakyReluShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_NN_LEAKY, &ops_layer->node->kernelAttributes.borderMode, input, negative_slopes, output);
 
     if (!shaderExecutable)
     {
@@ -1147,8 +1161,8 @@ VX_PRIVATE_API vx_status vxoNNLeakyReluLayer_SH_EVIS_Initialize_Ext(vxnne_layer 
         batchCount,
         shaderExecutable));
 
-    vxmONERROR(vxnneOperation_AddReference(&activationLayer->activation_SHoperation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT));
-    vxmONERROR(vxnneOperation_AddReference(&activationLayer->activation_SHoperation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    vxmONERROR(vxnneOperation_AddReference(&activationLayer->activation_SHoperation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&activationLayer->activation_SHoperation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT));
 
     vxmONERROR(vxnneLayer_SetOperation(
         &activationLayer->base,
