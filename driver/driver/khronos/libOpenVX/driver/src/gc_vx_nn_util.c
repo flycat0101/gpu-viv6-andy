@@ -5592,7 +5592,7 @@ vx_status vxo_updateSwapHandle(vx_graph graph)
                     vx_node node = graph->nodeTable[executionLayer->swapHandle[j]->u.nodeTable[0]];
                     for(paramIndex = 0; paramIndex < node->numParameters; ++paramIndex)
                     {
-                        if((node->paramTable[paramIndex]->type == VX_TYPE_TENSOR) && (((vx_tensor)executionLayer->swapHandle[j]->ref)->tensorBuffer == ((vx_tensor)node->paramTable[paramIndex])->tensorBuffer))
+                        if(node->paramTable[paramIndex] != VX_NULL && (node->paramTable[paramIndex]->type == VX_TYPE_TENSOR) && (((vx_tensor)executionLayer->swapHandle[j]->ref)->tensorBuffer == ((vx_tensor)node->paramTable[paramIndex])->tensorBuffer))
                          {
                             if(graph->commandBuffer)
                             {
