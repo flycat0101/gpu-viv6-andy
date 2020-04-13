@@ -1906,7 +1906,6 @@ IN gctUINT8 Components
 )
 {
     if(!gcIsVectorDataType(DataType) || Components > cldMaxComponentCount) {
-        gcmASSERT(0);
         clmGEN_CODE_vectorSize_SET(DataType, 0);
     }
     else if(Components == 1) {

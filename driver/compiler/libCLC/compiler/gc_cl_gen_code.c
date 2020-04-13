@@ -30880,6 +30880,45 @@ OnError:
     return status;
 }
 
+static gceSTATUS
+_ComputeReverseComponentSelection(
+    IN cloCOMPILER Compiler,
+    IN clsROPERAND *Operand,
+    OUT clsCOMPONENT_SELECTION *ComponentSelection
+    )
+{
+    clsCOMPONENT_SELECTION    currentComponentSelection = {0};
+
+    currentComponentSelection.components = 0;
+    if (gcIsScalarDataType(Operand->dataType)) {
+        if (gcIsScalarDataType(Operand->u.reg.dataType)) {
+            *ComponentSelection = clGetDefaultComponentSelection(Compiler, Operand->dataType);
+        }
+        else {
+            switch (Operand->vectorIndex.mode) {
+            case clvINDEX_CONSTANT:
+                currentComponentSelection =
+                 _clmConvVectorIndexToComponentSelection(Operand->dataType, Operand->vectorIndex.u.constant);
+
+                currentComponentSelection = _SwizzleComponentSelection(&currentComponentSelection,
+                                                                       &Operand->u.reg.componentSelection);
+                _ReverseComponentSelection(&currentComponentSelection,
+                                           ComponentSelection);
+                break;
+
+            default:
+                gcmASSERT(0);
+                return gcvSTATUS_INVALID_ARGUMENT;
+            }
+        }
+    }
+    else if (gcIsVectorDataType(Operand->dataType)) {
+        _ReverseComponentSelection(&Operand->u.reg.componentSelection,
+                                   ComponentSelection);
+    }
+    return gcvSTATUS_OK;
+}
+
 gceSTATUS
 cloIR_BINARY_EXPR_GenArithmeticAssignCode(
     IN cloCOMPILER Compiler,
@@ -31121,6 +31160,7 @@ cloIR_BINARY_EXPR_GenArithmeticAssignCode(
     }
     else {
        for (i = 0; i < leftParameters.operandCount; i++) {
+          clsCOMPONENT_SELECTION    reversedComponentSelection = {0};
           gctBOOL useLeftReg = gcvFALSE;
           gctBOOL needConvToFuncCall = opcode == clvOPCODE_FMOD || opcode == clvOPCODE_DIV ||
                                        opcode == clvOPCODE_IDIV || opcode == clvOPCODE_MOD ||
@@ -31131,6 +31171,11 @@ cloIR_BINARY_EXPR_GenArithmeticAssignCode(
           useLeftReg = gcmOPT_DriverVIRPath() &&
                        !(needConvToFuncCall || Parameters->hasIOperand || (leftParameters.hint & clvGEN_DEREF_CODE));
           if(useLeftReg) {
+              status =_ComputeReverseComponentSelection(Compiler,
+                                                        &lOperandParameters.rOperands[i],
+                                                        &reversedComponentSelection);
+              if(gcmIS_ERROR(status)) goto OnError;
+
               clsIOPERAND_InitializeWithComponentSelection(intermIOperand,
                                                            lOperandParameters.rOperands[i].dataType,
                                                            lOperandParameters.rOperands[i].u.reg.dataType,
@@ -31163,6 +31208,32 @@ cloIR_BINARY_EXPR_GenArithmeticAssignCode(
                                                  gcvTRUE));
           }
           else {
+             if(useLeftReg)
+             {
+                 clsGEN_CODE_DATA_TYPE dataType;
+
+                 if(lOperandParameters.rOperands[i].isReg)
+                 {
+                     lOperandParameters.rOperands[i].u.reg.componentSelection =
+                         _SwizzleComponentSelection(&reversedComponentSelection,
+                                                    &lOperandParameters.rOperands[i].u.reg.componentSelection);
+
+                     dataType = gcGetVectorComponentSelectionDataType(lOperandParameters.rOperands[i].dataType,
+                                                                      lOperandParameters.rOperands[i].u.reg.componentSelection.components);
+                     lOperandParameters.rOperands[i].dataType = dataType;
+                 }
+
+                 if(rightParameters.rOperands[i].isReg)
+                 {
+                     rightParameters.rOperands[i].u.reg.componentSelection =
+                         _SwizzleComponentSelection(&reversedComponentSelection,
+                                                    &rightParameters.rOperands[i].u.reg.componentSelection);
+
+                     dataType = gcGetVectorComponentSelectionDataType(rightParameters.rOperands[i].dataType,
+                                                                      rightParameters.rOperands[i].u.reg.componentSelection.components);
+                     rightParameters.rOperands[i].dataType = dataType;
+                 }
+             }
              gcmONERROR(clGenArithmeticExprCode(Compiler,
                                    BinaryExpr->exprBase.base.lineNo,
                                    BinaryExpr->exprBase.base.stringNo,
