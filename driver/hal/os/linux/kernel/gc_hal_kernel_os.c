@@ -3092,7 +3092,7 @@ gckOS_AllocatePagedMemory(
         gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
     }
 
-#if defined(CONFIG_ZONE_DMA32)
+#if defined(CONFIG_ZONE_DMA32) || defined(CONFIG_ZONE_DMA)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
     zoneDMA32 = gcvTRUE;
 #endif
