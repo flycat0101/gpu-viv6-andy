@@ -1174,6 +1174,7 @@ gceSTATUS gcoHARDWARE_SetTarget(
             {
                 case gcvSURF_I420:
                 case gcvSURF_YV12:
+                case gcvSURF_I010:
                     /* Dump the memory. */
                     gcmDUMP_2D_SURFACE(gcvFALSE, Surface->node.physical3);
 
@@ -1218,6 +1219,7 @@ gceSTATUS gcoHARDWARE_SetTarget(
                 case gcvSURF_NV16_10BIT:
                 case gcvSURF_NV61_10BIT:
                 case gcvSURF_P010:
+                case gcvSURF_P010_LSB:
                     /* Dump the memory. */
                     gcmDUMP_2D_SURFACE(gcvFALSE, Surface->node.physical2);
 
@@ -1464,7 +1466,7 @@ gceSTATUS gcoHARDWARE_SetTarget(
  7:5) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 7:5) - (0 ? 7:5) + 1))))))) << (0 ? 7:5)));
             }
-            else if (Surface->format == gcvSURF_P010)
+            else if (Surface->format == gcvSURF_P010  || Surface->format == gcvSURF_P010_LSB || Surface->format == gcvSURF_I010)
             {
                 destConfig |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  7:5) - (0 ?
@@ -3604,6 +3606,7 @@ gceSTATUS gcoHARDWARE_TranslateDestinationFormat(
     case 0x1B:
     case 0x7:
     case 0x8:
+    case 0x1E:
         break;
 
     case 0x0F:

@@ -1590,6 +1590,69 @@ _ComputeSurfacePlacement(
             = Surface->uOffset
             + Surface->uStride * Surface->alignedH;
         break;
+    case gcvSURF_P010:
+    case gcvSURF_P010_LSB:
+       if (calcStride)
+       {
+           Surface->stride = Surface->alignedW * 2;
+       }
+       /*compression need 256 aligned*/
+       if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION))
+       {
+           Surface->stride = gcmALIGN(Surface->stride, 256);
+       }
+       else
+       {
+           Surface->stride = gcmALIGN(Surface->stride, 128);
+       }
+
+       /*  WxH Y plane followed by (W)x(H/2) interleaved U/V plane. */
+       Surface->uStride =
+       Surface->vStride = Surface->stride;
+
+       Surface->uOffset =
+       Surface->vOffset = Surface->stride * Surface->alignedH;
+
+       Surface->sliceSize
+           = Surface->uOffset
+           + Surface->uStride * Surface->alignedH / 2;
+       break;
+
+    case gcvSURF_I010:
+       if (calcStride)
+       {
+           Surface->stride = Surface->alignedW * 2;
+       }
+
+       /*  WxH Y plane followed by (W/2)x(H/2) U and V planes. */
+       Surface->uStride =
+       Surface->vStride = (Surface->stride / 2);
+       if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION))
+       {
+           /*If YUV420_OUTPUT_LINEAR feature is enabled,For I420 format, Y need to 64 Bytes alignment,
+                U/V need 32 Bytes alignment*/
+           Surface->stride = gcmALIGN(Surface->stride, 256);
+           Surface->uStride = gcmALIGN(Surface->uStride, 128);
+           Surface->vStride = gcmALIGN(Surface->vStride, 128);
+       }
+       else
+       {
+           Surface->stride = gcmALIGN(Surface->stride, 128);
+           Surface->uStride = gcmALIGN(Surface->uStride, 64);
+           Surface->vStride = gcmALIGN(Surface->vStride, 64);
+       }
+
+       Surface->uOffset
+           = Surface->stride * Surface->alignedH;
+
+       Surface->vOffset
+           = Surface->uOffset
+           + Surface->uStride * Surface->alignedH / 2;
+
+       Surface->sliceSize
+           = Surface->vOffset
+           + Surface->vStride * Surface->alignedH / 2;
+       break;
 
 #if gcdVG_ONLY
     case gcvSURF_ANV12:
@@ -2163,13 +2226,14 @@ _AllocateSurface(
             gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) == gcvTRUE)
         {
             if (Format == gcvSURF_NV12 ||
-                Format == gcvSURF_NV21)
+                Format == gcvSURF_NV21 ||
+                Format == gcvSURF_I010)
             {
                 alignment = gcmALIGN(alignment, 256);
             }
-            else if (Format == gcvSURF_P010)
+            else if (Format == gcvSURF_P010 || Format == gcvSURF_P010_LSB)
             {
-                alignment = gcmALIGN(alignment, 512);
+                alignment = gcmALIGN(alignment, 256);
             }
             else if (Format == gcvSURF_NV12_10BIT ||
                      Format == gcvSURF_NV21_10BIT ||
@@ -4250,6 +4314,7 @@ gcoSURF_Lock(
         {
         case gcvSURF_YV12:
         case gcvSURF_I420:
+        case gcvSURF_I010:
             Surface->node.count = 3;
 
             logical2 = Surface->node2.logical;
@@ -4268,6 +4333,8 @@ gcoSURF_Lock(
         case gcvSURF_NV21_10BIT:
         case gcvSURF_NV16_10BIT:
         case gcvSURF_NV61_10BIT:
+        case gcvSURF_P010:
+        case gcvSURF_P010_LSB:
             Surface->node.count = 2;
 
             logical2 = Surface->node2.logical;
@@ -4314,6 +4381,7 @@ gcoSURF_Lock(
             break;
 #endif
         case gcvSURF_I420:
+        case gcvSURF_I010:
             Surface->node.count = 3;
 
             logical2 = Surface->node.logical
@@ -4359,6 +4427,8 @@ gcoSURF_Lock(
         case gcvSURF_NV21_10BIT:
         case gcvSURF_NV16_10BIT:
         case gcvSURF_NV61_10BIT:
+        case gcvSURF_P010:
+        case gcvSURF_P010_LSB:
             Surface->node.count = 2;
 
             logical2 = Surface->node.logical

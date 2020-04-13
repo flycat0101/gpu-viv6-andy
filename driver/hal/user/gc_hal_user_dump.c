@@ -676,7 +676,7 @@ gcoOS_Dump2DSurface(
             }
             else
             {
-                physical = pMemory->physical + offset;
+                physical = (gctUINT32)pMemory->physical + offset;
                 logical  = gcvNULL;
             }
 

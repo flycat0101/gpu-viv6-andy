@@ -997,6 +997,24 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
         gcvINVALID_TEXTURE_FORMAT, gcmINVALID_TEXTURE_FORMAT_ENTRY
     },
 
+    {
+        gcmNameFormat(P010_LSB), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 32, 8, 2, 240,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
+        {{{ 0, 16 }, { 0, 16 }, { 0, 16 }, {0}, {0}, {0}}},
+        {{{ 0, 16 }, { 0, 16 }, { 0, 16 }, {0}, {0}, {0}}},
+        gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvINVALID_TEXTURE_FORMAT, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+    {
+        gcmNameFormat(I010), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 16, 2, 2, 48,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
+        {{{ 0, 8 }, { 0, 8 }, { 0, 8 }, {0}, {0}, {0}}},
+        {{{ 0, 8 }, { 0, 8 }, { 0, 8 }, {0}, {0}, {0}}},
+        gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvINVALID_TEXTURE_FORMAT, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
 #if gcdVG_ONLY
     /* Just for format query in new 355VG core, not actually rendering usage for 3D core. */
     {
@@ -4828,8 +4846,15 @@ gcoHARDWARE_QueryBPP(
                 break;
 
             case gcvSURF_P010:
+            case gcvSURF_P010_LSB:
                 bpps[0] = 2.0;
                 bpps[1] = 2.0;
+                break;
+
+            case gcvSURF_I010:
+                bpps[0] = 2.0;
+                bpps[1] = 2.0;
+                bpps[2] = 2.0;
                 break;
 
             default:

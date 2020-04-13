@@ -168,6 +168,47 @@ extern "C" {
         &node, gcvNULL, gcvNULL, gcvNULL, &bottom)); \
 } \
 
+#define gcmGETENDIANOPTION(reg,eEndianMode,data) \
+{ \
+    switch(eEndianMode) \
+    {\
+        case gcvENDIAN_MODE0: \
+            data |= gcmSETFIELDVALUE(0, reg, ENDIAN_CONTROL, NO_SWAP) \
+                       | gcmSETFIELDVALUE(0, reg, ENDIAN_CONTROL_EX, NO_SWAP); \
+            break; \
+        case gcvENDIAN_MODE1: \
+            data |= gcmSETFIELDVALUE(0, reg, ENDIAN_CONTROL, NO_SWAP) \
+                       | gcmSETFIELDVALUE(0, reg, ENDIAN_CONTROL_EX, SWAP_BYTE); \
+            break; \
+        case gcvENDIAN_MODE2: \
+            data |= gcmSETFIELDVALUE(0, reg, ENDIAN_CONTROL, SWAP_WORD) \
+                       | gcmSETFIELDVALUE(0, reg, ENDIAN_CONTROL_EX, NO_SWAP); \
+            break; \
+        case gcvENDIAN_MODE3: \
+            data |= gcmSETFIELDVALUE(0, reg, ENDIAN_CONTROL, SWAP_WORD) \
+                       | gcmSETFIELDVALUE(0, reg, ENDIAN_CONTROL_EX, SWAP_BYTE); \
+            break; \
+        case gcvENDIAN_MODE4: \
+            data |= gcmSETFIELDVALUE(0, reg, ENDIAN_CONTROL, SWAP_DWORD) \
+                       | gcmSETFIELDVALUE(0, reg, ENDIAN_CONTROL_EX, NO_SWAP); \
+            break; \
+        case gcvENDIAN_MODE5: \
+            data |= gcmSETFIELDVALUE(0, reg, ENDIAN_CONTROL, SWAP_DWORD) \
+                       | gcmSETFIELDVALUE(0, reg, ENDIAN_CONTROL_EX, SWAP_BYTE); \
+            break; \
+        case gcvENDIAN_MODE6: \
+            data |= gcmSETFIELDVALUE(0, reg, ENDIAN_CONTROL, SWAP_DDWORD) \
+                       | gcmSETFIELDVALUE(0, reg, ENDIAN_CONTROL_EX, NO_SWAP); \
+            break; \
+        case gcvENDIAN_MODE7: \
+            data |= gcmSETFIELDVALUE(0, reg, ENDIAN_CONTROL, SWAP_DDWORD) \
+                       | gcmSETFIELDVALUE(0, reg, ENDIAN_CONTROL_EX, SWAP_BYTE); \
+            break; \
+        default: \
+            gcmASSERT(0); \
+    } \
+}\
+
 /******************************************************************************\
 ********************************** Structures **********************************
 \******************************************************************************/
@@ -4248,6 +4289,7 @@ struct _gcoSURF
     gctSHBUF                    shBuf;
 
     _PFNcalcPixelAddr           pfGetAddr;
+    gceENDIAN_MODE              eEndianMode;
 };
 
 

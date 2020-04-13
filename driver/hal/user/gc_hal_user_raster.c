@@ -179,8 +179,15 @@ static gceSTATUS _CheckFormat(
         break;
 
     case gcvSURF_P010:
+    case gcvSURF_P010_LSB:
         plane = 2;
         bpp = 24;
+        isYUV = gcvTRUE;
+        break;
+
+    case gcvSURF_I010:
+        plane = 3;
+        bpp = 16;
         isYUV = gcvTRUE;
         break;
 
@@ -340,6 +347,7 @@ static gceSTATUS _CheckSurface(
 
         case gcvSURF_YV12:
         case gcvSURF_I420:
+        case gcvSURF_I010:
             if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_YUV420_OUTPUT_LINEAR) && !Src)
             {
                 /*If YUV420_OUTPUT_LINEAR feature is enabled,For gcvSURF_YV12/gcvSURF_I420 format ,
@@ -371,6 +379,7 @@ static gceSTATUS _CheckSurface(
         case gcvSURF_NV16:
         case gcvSURF_NV61:
         case gcvSURF_P010:
+        case gcvSURF_P010_LSB:
             if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION) == gcvTRUE)
             {
                 if (Format == gcvSURF_NV12)
@@ -382,7 +391,7 @@ static gceSTATUS _CheckSurface(
                         return gcvSTATUS_NOT_ALIGNED;
                     }
                 }
-                else if (Format == gcvSURF_P010)
+                else if (Format == gcvSURF_P010 || Format == gcvSURF_P010_LSB)
                 {
                     if (((Address[0] | Address[1]) & 511) ||
                         (( Stride[0] |  Stride[1]) &  63) ||
@@ -394,7 +403,7 @@ static gceSTATUS _CheckSurface(
             }
             else if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) == gcvTRUE)
             {
-                if (Format == gcvSURF_NV12 || Format == gcvSURF_P010)
+                if (Format == gcvSURF_NV12 || Format == gcvSURF_P010  || Format == gcvSURF_P010_LSB)
                 {
                     if (((Address[0] | Address[1]) & 255) ||
                         (( Stride[0] |  Stride[1]) &  15) ||
@@ -406,7 +415,7 @@ static gceSTATUS _CheckSurface(
             }
 
             if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_YUV420_OUTPUT_LINEAR)
-                && !Src && Format != gcvSURF_P010)
+                && !Src && Format != gcvSURF_P010 && Format != gcvSURF_P010_LSB)
             {
                 /*If YUV420_OUTPUT_LINEAR feature is enabled,For NV12/NV21/NV16/NV61 format ,
                      Y stride need to 64 Bytes alignment, U/V stride need 64 Bytes alignment*/
@@ -547,6 +556,7 @@ static gceSTATUS _CheckSurface(
 
         case gcvSURF_YV12:
         case gcvSURF_I420:
+        case gcvSURF_I010:
             if (((Address[0] | Address[1] | Address[2]) & 63)
                 || (Stride[0] & 7) || ((Stride[1] | Stride[2]) & 3))
             {
@@ -566,6 +576,7 @@ static gceSTATUS _CheckSurface(
         case gcvSURF_NV16:
         case gcvSURF_NV61:
         case gcvSURF_P010:
+        case gcvSURF_P010_LSB:
         case gcvSURF_NV12_10BIT:
         case gcvSURF_NV21_10BIT:
         case gcvSURF_NV16_10BIT:
@@ -8427,5 +8438,109 @@ OnError:
     return status;
 #else
     return gcvSTATUS_NOT_SUPPORTED;
+#endif  /* gcdENABLE_2D */
+}
+
+/*******************************************************************************
+**
+**  gco2D_SetSourceEndianMode
+**
+**  Set source endian mode.
+**
+**  INPUT:
+**
+**      gco2D Engine
+**          Pointer to the gco2D object.
+**
+**      gctUINT32 eEndianMode
+**          endian mode.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gco2D_SetSourceEndianMode(
+    IN gco2D Engine,
+    IN gceENDIAN_MODE eEndianMode
+    )
+{
+
+#if gcdENABLE_2D
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER_ARG("Engine=0x%x eEndianMode=0x%x",Engine, eEndianMode);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Engine, gcvOBJ_2D);
+
+    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_ENDIAN_CONTROL) != gcvTRUE)
+    {
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+    }
+
+    /* Fill in the structure. */
+    Engine->state.multiSrc[Engine->state.currentSrcIndex].srcSurface.eEndianMode = eEndianMode;
+
+OnError:
+    /* Return status. */
+    gcmFOOTER_NO();
+    return status;
+
+#else
+
+    return gcvSTATUS_NOT_SUPPORTED;
+
+#endif  /* gcdENABLE_2D */
+}
+
+/*******************************************************************************
+**
+**  gco2D_SetTargetEndianMode
+**
+**  Set target endian mode.
+**
+**  INPUT:
+**
+**      gco2D Engine
+**          Pointer to the gco2D object.
+**
+**      gctUINT32 eEndianMode
+**          endian mode.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+
+gceSTATUS
+gco2D_SetTargetEndianMode(
+    IN gco2D Engine,
+    IN gceENDIAN_MODE eEndianMode
+    )
+{
+
+#if gcdENABLE_2D
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER_ARG("Engine=0x%x eEndianMode=0x%x",Engine, eEndianMode);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Engine, gcvOBJ_2D);
+
+    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_ENDIAN_CONTROL) != gcvTRUE)
+    {
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+    }
+
+    /* Fill in the structure. */
+    Engine->state.dstSurface.eEndianMode = eEndianMode;
+
+OnError:
+    /* Return status. */
+    gcmFOOTER_NO();
+    return status;
+#else
+
+return gcvSTATUS_NOT_SUPPORTED;
+
 #endif  /* gcdENABLE_2D */
 }

@@ -510,6 +510,8 @@ EXPORTS
     gco2D_UnSet2DEngine
     gco2D_Commit
     gco2D_NatureRotateTranslation
+    gco2D_SetSourceEndianMode
+    gco2D_SetTargetEndianMode
 !ENDIF
 
 !IF "$(VIVANTE_ENABLE_3D)" == "1"

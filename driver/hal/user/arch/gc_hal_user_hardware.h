@@ -1519,9 +1519,11 @@ gceSTATUS gcoHARDWARE_SetMonochromeSource(
     IN gctUINT32 FgColor32,
     IN gctUINT32 BgColor32,
     IN gctBOOL ColorConvert,
+    IN gceSURF_FORMAT SrctFormat,
     IN gceSURF_FORMAT DstFormat,
     IN gctBOOL Stream,
-    IN gctUINT32 Transparency
+    IN gctUINT32 Transparency,
+    IN gceENDIAN_MODE eEndianMode
     );
 
 /* Configure color source. */
@@ -1611,7 +1613,9 @@ gcoHARDWARE_SetTransparencyModesEx(
     IN gce2D_TRANSPARENCY PatTransparency,
     IN gctUINT8 FgRop,
     IN gctUINT8 BgRop,
-    IN gctBOOL EnableDFBColorKeyMode
+    IN gctBOOL EnableDFBColorKeyMode,
+    IN gceSURF_FORMAT srcFormat,
+    IN gceENDIAN_MODE eEndianMode
     );
 
 /* Setup the source, target and pattern transparency modes.
@@ -2182,6 +2186,12 @@ gceSTATUS
 gcoHARDWARE_Free2DSurface(
     IN gcoHARDWARE Hardware,
     IN gcoSURF Surface
+    );
+
+gceSTATUS
+gcoHARDWARE_GetEndianOption(
+    IN gceENDIAN_MODE eEndianMode,
+    OUT gctUINT_PTR pData
     );
 
 #ifdef __cplusplus

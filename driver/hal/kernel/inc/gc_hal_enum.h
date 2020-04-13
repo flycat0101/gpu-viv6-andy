@@ -642,6 +642,8 @@ typedef enum _gceFEATURE
     gcvFEATURE_NN_PER_CHANNEL_QUANT_ASYM,
     gcvFEATURE_SMALL_BATCH_FLOPS_RESET_FIX,
     gcvFEATURE_SMALL_BATCH_DISBLE_FIX,
+    gcvFEATURE_FORMAT_10BIT_CROSS_4K,
+    gcvFEATURE_ENDIAN_CONTROL,
 
     /* Insert features above this comment only. */
     gcvFEATURE_COUNT                /* Not a feature. */
@@ -1027,6 +1029,8 @@ typedef enum _gceSURF_FORMAT
     gcvSURF_NV16_10BIT,
     gcvSURF_NV61_10BIT,
     gcvSURF_P010,
+    gcvSURF_P010_LSB,
+    gcvSURF_I010,
 #if gcdVG_ONLY
     gcvSURF_AYUY2,
     gcvSURF_ANV12,
@@ -2246,6 +2250,30 @@ typedef enum _gceCOMPRESSION_OPTION
                                        gcvCOMPRESSION_OPTION_MSAA_DEPTH,
 }
 gceCOMPRESSION_OPTION;
+
+/** endian mode  for each 2Bytes
+* endian mode                          endian
+*endian mode0: 0  1  2  3  4  5  6  7  8  9  10  11  12  13  14  15
+*endian mode1: 1  0  3  2  5  4  7  6  9  8  11  10  13  12  15  14
+*endian mode2: 2  3  0  1  6  7  4  5  10  11  8  9  14  15  12  13
+*endain mode3: 3  2  1  0  7  6  5  4  11  10  9  8  15  14  13  12
+*endain mode4: 12  13  14  15  8  9  10  11  4  5  6  7  0  1  2  3
+*endain mode5: 13  12  15  14  9  8  11  10  5  4  7  6  1  0  3  2
+*endain mode6: 14  15  12  13  10  11  8  9  6  7  4  5  2  3  0  1
+*endain mode7: 15  14  13  12  11  10  9  8  7  6  5  4  3  2  1  0
+**/
+typedef enum _gceENDIAN_MODE
+{
+    gcvENDIAN_MODE0          = 0x0, /* endian mode0 */
+    gcvENDIAN_MODE1          = 0x1, /* endian mode1 */
+    gcvENDIAN_MODE2          = 0x2, /* endian mode2 */
+    gcvENDIAN_MODE3          = 0x3, /* endian mode3 */
+    gcvENDIAN_MODE4          = 0x4, /* endian mode4 */
+    gcvENDIAN_MODE5          = 0x5, /* endian mode5 */
+    gcvENDIAN_MODE6          = 0x6, /* endian mode6 */
+    gcvENDIAN_MODE7          = 0x7, /* endian mode7 */
+}
+gceENDIAN_MODE;
 
 typedef enum _gceHW_FE_TYPE
 {
