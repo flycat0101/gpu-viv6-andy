@@ -1803,7 +1803,7 @@ VX_INTERNAL_API vx_node vxoGraphOptimization_TransferFC2FCRelu(vx_node FCnode, v
             overflow,
             rounding,
             down_scale_round,
-            vx_false_e,
+            isRelu,
             output
         );
 
