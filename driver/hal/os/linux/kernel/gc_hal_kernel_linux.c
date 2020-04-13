@@ -169,6 +169,10 @@ gckKERNEL_GetVideoMemoryPool(
         videoMemory = device->contiguousVidMem;
         break;
 
+    case gcvPOOL_LOCAL_EXCLUSIVE:
+        /* gpu exclusive memory. */
+        videoMemory = device->exclusiveVidMem;
+
     case gcvPOOL_INTERNAL_SRAM:
         /* Internal SRAM memory. */
         videoMemory = Kernel->sRAMVidMem[Kernel->sRAMIndex];

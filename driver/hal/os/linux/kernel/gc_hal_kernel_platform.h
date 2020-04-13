@@ -81,6 +81,10 @@ typedef struct _gcsMODULE_PARAMETERS
     gctPHYS_ADDR_T          externalBase;
     gctSIZE_T               externalSize;
 
+    /* External memory pool. */
+    gctPHYS_ADDR_T          exclusiveBase;
+    gctSIZE_T               exclusiveSize;
+
     /* Per-core SRAM. */
     gctPHYS_ADDR_T          sRAMBases[gcvCORE_COUNT][gcvSRAM_INTER_COUNT];
     gctUINT32               sRAMSizes[gcvCORE_COUNT][gcvSRAM_INTER_COUNT];

@@ -350,6 +350,7 @@ typedef enum _gcePOOL
     gcvPOOL_LOCAL,
     gcvPOOL_LOCAL_INTERNAL,
     gcvPOOL_LOCAL_EXTERNAL,
+    gcvPOOL_LOCAL_EXCLUSIVE,
     gcvPOOL_UNIFIED,
     gcvPOOL_SYSTEM,
     gcvPOOL_SRAM,

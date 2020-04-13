@@ -2366,6 +2366,9 @@ gceVIDMEM_TYPE;
 /* Do not try slow pools (gcvPOOL_VIRTUAL) */
 #define gcvALLOC_FLAG_FAST_POOLS            0x00000100
 
+/* Only accessed by GPU */
+#define gcvALLOC_FLAG_NON_CPU_ACCESS        0x00000200
+
 /* Import DMABUF. */
 #define gcvALLOC_FLAG_DMABUF                0x00001000
 /* Import USERMEMORY. */

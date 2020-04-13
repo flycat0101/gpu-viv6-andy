@@ -1085,6 +1085,12 @@ gckKERNEL_AllocateVideoMemory(
         }
     }
 
+    if (Flag & gcvALLOC_FLAG_NON_CPU_ACCESS)
+    {
+        Flag &= ~gcvALLOC_FLAG_CPU_ACCESS;
+        *Pool = gcvPOOL_LOCAL_EXCLUSIVE;
+    }
+
 AllocateMemory:
 
 #if gcdCAPTURE_ONLY_MODE

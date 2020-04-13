@@ -2138,6 +2138,9 @@ gckGALDEVICE_Construct(
     device->externalBase = Args->externalBase;
     device->externalSize = Args->externalSize;
 
+    /* Set the extern base address and none cpu access */
+    device->exclusiveBase = Args->exclusiveBase;
+    device->exclusiveSize = Args->exclusiveSize;
     for (i = 0; i < gcvSRAM_EXT_COUNT; i++)
     {
         device->extSRAMBases[i] = Args->extSRAMBases[i];
@@ -2173,10 +2176,46 @@ gckGALDEVICE_Construct(
                     device->externalBase, device->externalSize,
                     "galcore external memory",
                     gcvTRUE,
+                    gcvTRUE,
                     &device->externalPhysical
                     ));
 
             device->externalVidMem->physical = device->externalPhysical;
+        }
+    }
+
+    if (device->exclusiveSize > 0)
+    {
+        /* create the exclusive memory heap */
+        status = gckVIDMEM_Construct(
+            device->os,
+            device->exclusiveBase,
+            device->exclusiveSize,
+            64,
+            0,
+            &device->exclusiveVidMem
+            );
+
+        if (gcmIS_ERROR(status))
+        {
+            /* Error, disable exclusive heap. */
+            device->exclusiveSize = 0;
+        }
+        else
+        {
+            gckALLOCATOR allocator;
+            /* Map exclusive memory. */
+            gcmkONERROR(gckOS_RequestReservedMemory(
+                    device->os,
+                    device->exclusiveBase, device->exclusiveSize,
+                    "galcore exclusive memory",
+                    gcvTRUE,
+                    gcvFALSE,
+                    &device->exclusivePhysical
+                    ));
+            allocator = ((PLINUX_MDL)device->exclusivePhysical)->allocator;
+            device->exclusiveVidMem->physical = device->exclusivePhysical;
+            device->exclusiveVidMem->capability |= allocator->capability;
         }
     }
 
@@ -2360,6 +2399,11 @@ gckGALDEVICE_Construct(
     if (device->externalPhysical)
     {
         device->externalPhysName = gcmPTR_TO_NAME(device->externalPhysical);
+    }
+
+    if (device->exclusivePhysical)
+    {
+        device->exclusivePhysName = gcmPTR_TO_NAME(device->exclusivePhysical);
     }
 
     if (device->contiguousPhysical)
