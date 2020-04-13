@@ -3040,7 +3040,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSC(
                             }
                             else
                             {
-                                vxError("nn patch output failed, please check your output format\n");
+                                vxError("binary graph nn patch output failed, please check your output format\n");
                                 vxmONERROR(VX_ERROR_INVALID_FORMAT);
                             }
                         }
@@ -3133,7 +3133,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSC(
                 break;
 
                 default:
-                    vxError("scaler not implement this sourceType: %d\n", scPatchData->sourceType);
+                    vxError("%s[%d]: scaler not implement this sourceType: %d\n", __FUNCTION__, __LINE__, scPatchData->sourceType);
                 break;
             }
         }
@@ -3342,7 +3342,7 @@ VX_PRIVATE_API vx_status binaryGenerateStatesBuffer(
 
             default:
             {
-                vxError("no implement operation type: %d\n", operation->operationType);
+                vxError("%s[%d]: binary graph not implement operation type: %d\n", __FUNCTION__, __LINE__, operation->operationType);
             }
             break;
         }
@@ -6425,8 +6425,13 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveScalerOperation(
 
         if (TENSOR_DIM_NUM(output) > 3)
         {
-            vxError("%s[%d]: not support output dim: %d in scaler output\n", __FUNCTION__, __LINE__, TENSOR_DIM_NUM(output));
-            vxmONERROR(VX_FAILURE);
+            vx_uint32 outputSize = 0;
+            outputSize = TENSOR_VIEW_SIZE_INDEX(output, 3);
+            if (outputSize != 1)
+            {
+                vxError("%s[%d]: not support output dim: %d in scaler output, outputSize: %d\n", __FUNCTION__, __LINE__, TENSOR_DIM_NUM(output), outputSize);
+                vxmONERROR(VX_FAILURE);
+            }
         }
 
         INITIALIZE_STRUCT(patchInfo);
