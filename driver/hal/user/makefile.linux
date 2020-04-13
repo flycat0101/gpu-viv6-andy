@@ -183,6 +183,7 @@ extra_install: all
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_options.h $(SDK_DIR)/include/HAL
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_profiler.h $(SDK_DIR)/include/HAL
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_dump.h $(SDK_DIR)/include/HAL
+	@-cp -rf $(AQROOT)/hal/inc/shared $(SDK_DIR)/include/HAL
 ifeq ($(VIVANTE_ENABLE_VG),1)
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_vg.h $(SDK_DIR)/include/HAL
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_engine_vg.h $(SDK_DIR)/include/HAL
