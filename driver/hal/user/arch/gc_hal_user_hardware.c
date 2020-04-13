@@ -3238,9 +3238,9 @@ if (smallBatch){    Config->vsConstBase  = 0xD000;
     Config->nnConfig.fixedFeature.equivalentVipsramWidthInByte   = featureDatabase->EQUIVALENT_VIP_SRAM_WIDTH_INBYTE;
     Config->nnConfig.fixedFeature.latencyHidingAtFullAxiBw       = featureDatabase->LATENCY_HIDING_AT_FULL_AXI_BW;
     Config->nnConfig.fixedFeature.axiBusWidth                    = featureDatabase->AXI_BUS_WIDTH;
-    Config->nnConfig.fixedFeature.nnMaxKXSize = featureDatabase->NN_KERNEL_X_SIZE;
-    Config->nnConfig.fixedFeature.nnMaxKYSize = featureDatabase->NN_KERNEL_Y_SIZE;
-    Config->nnConfig.fixedFeature.nnMaxKZSize = featureDatabase->NN_KERNEL_Z_SIZE;
+    Config->nnConfig.fixedFeature.nnMaxKXSize = (1 << featureDatabase->NN_KERNEL_X_SIZE_BIT) - 1;
+    Config->nnConfig.fixedFeature.nnMaxKYSize = (1 << featureDatabase->NN_KERNEL_Y_SIZE_BIT) - 1;
+    Config->nnConfig.fixedFeature.nnMaxKZSize = (1 << featureDatabase->NN_KERNEL_Z_SIZE_BIT) - 1;
 
     Config->nnConfig.customizedFeature.vipSRAMSize = featureDatabase->VIP_SRAM_SIZE;
     Config->nnConfig.customizedFeature.axiSRAMSize = featureDatabase->AXI_SRAM_SIZE;
