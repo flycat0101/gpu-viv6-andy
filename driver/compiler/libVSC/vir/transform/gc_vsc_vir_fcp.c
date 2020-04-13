@@ -2757,7 +2757,8 @@ static gctBOOL _VIR_CheckSrcDefinedBySkHp(
 static VSC_ErrCode _VIR_CheckAndSetSkHpForLdInst(
     IN VIR_Shader*      pShader,
     VIR_DEF_USAGE_INFO  *pDuInfo,
-    VSC_MM*             pMM)
+    VSC_MM*             pMM,
+    gctBOOL             hasTexld)
 {
     VSC_ErrCode         status = VSC_ERR_NONE;
 
@@ -2783,15 +2784,16 @@ static VSC_ErrCode _VIR_CheckAndSetSkHpForLdInst(
             {
                 /* if the dest is not used by texld and any source is defined by a .skhp instruction,
                  * set skhp flag to load instruction */
-                VIR_Operand *dest = VIR_Inst_GetDest(inst);
-                gctBOOL destUsedByTexld = _VIR_CheckDestIsUsedByTexld(inst, dest, pDuInfo, visitedInstSet);
                 gctBOOL srcDefinedBySkHp = _VIR_CheckSrcDefinedBySkHp(inst, pDuInfo, srcvisitedInstSet);
-                if ((!destUsedByTexld) && srcDefinedBySkHp)
+                if (srcDefinedBySkHp)
                 {
                     VIR_INST_SetSkHp(inst, gcvTRUE);
                 }
                 /* if dest is used by texld and defined by a skhp, report error */
-                gcmASSERT(!destUsedByTexld || !srcDefinedBySkHp);
+                if (hasTexld)
+                {
+                    gcmASSERT(!(_VIR_CheckDestIsUsedByTexld(inst, VIR_Inst_GetDest(inst), pDuInfo, visitedInstSet)) || !srcDefinedBySkHp);
+                }
                 vscHTBL_Reset(visitedInstSet);
                 vscHTBL_Reset(srcvisitedInstSet);
             }
@@ -2877,16 +2879,21 @@ VSC_ErrCode vscVIR_PostCGCleanup(
     VSC_MM*             pMM = pPassWorker->basePassWorker.pMM;
     VIR_ShLevel         curShLevel = VIR_Shader_GetLevel(pShader);
     VIR_MemoryAccessFlag    memoryAccessFlag = pShader->memoryAccessFlag[curShLevel];
-    VIR_TexldFlag       texldFlag = pShader->texldFlag[curShLevel];
+    VIR_TexldFlag       texldFlag = VIR_TEXLD_FLAG_NONE;
 
-    /* add skHp flag to load instruction if dest of load is not used in any texld instructions. */
+    /* Bug25923: check load need to add skHp flag or not, detailed comments could check the bug comments
+     * the rules to add skHp for a LOAD are summaired here
+     * 1. By default, LOAD instructions should not have the skpHp flag
+     * 2. if the src of LOAD are from an intruction with skpHp flag, add skHp flag to this load instruction
+     * 3. If a LOAD instruction has the skpHp flag but the output is part of the coordinate to a TEXLD instruction,
+     *    then give either a compiler error or a compiler warning.
+     * = > the load is no skHp flag by default and to reduce compile time, we check condition 2 only in release mode
+     *     and condition 3 in debug mode only
+     * /
     /* We need to do this check here because we don't update DU in this pass!!! */
-    if (VIR_Shader_IsFS(pShader)
-        &&
-        /* A rough check here to skip some cases. */
-        (texldFlag & VIR_TEXLD_FLAG_TEXLD) && (memoryAccessFlag & VIR_MA_FLAG_LOAD))
+    if (VIR_Shader_IsFS(pShader) && (memoryAccessFlag & VIR_MA_FLAG_LOAD))
     {
-        status = _VIR_CheckAndSetSkHpForLdInst(pShader, pDuInfo, pMM);
+        status = _VIR_CheckAndSetSkHpForLdInst(pShader, pDuInfo, pMM, (texldFlag & VIR_TEXLD_FLAG_TEXLD));
         ON_ERROR(status, "Check and set skipHp for the LOAD instruction.");
     }
 
