@@ -11,21 +11,21 @@
 *****************************************************************************/
 
 
-#ifndef __gc_hal_edma_h_
-#define __gc_hal_edma_h_
+#ifndef __gc_hal_eioctl_h_
+#define __gc_hal_eioctl_h_
 #include "gc_hal_types.h"
 
 typedef unsigned int gctEDMA_HANDLE;
 
 typedef enum
 {
-    gcvEDMA_IOCTL_CMD_GET_CHAN = 0,
-    gcvEDMA_IOCTL_CMD_CFG_AND_SUBMIT,
-    gcvEDMA_IOCTL_CMD_START,
-    gcvEDMA_IOCTL_CMD_GET_STATUS,
-    gcvEDMA_IOCTL_CMD_TERMINATE_ALL,
-    gcvEDMA_IOCTL_CMD_RELEASE,
-}gcvEDMA_IOCTL_CMD;
+    gcvEXTERN_IOCTL_CMD_EDMA_GET_CHAN = 0,
+    gcvEXTERN_IOCTL_CMD_EDMA_CFG_AND_SUBMIT,
+    gcvEXTERN_IOCTL_CMD_EDMA_START,
+    gcvEXTERN_IOCTL_CMD_EDMA_GET_STATUS,
+    gcvEXTERN_IOCTL_CMD_EDMA_TERMINATE_ALL,
+    gcvEXTERN_IOCTL_CMD_EDMA_RELEASE,
+}gcvEXTERN_IOCTL_CMD;
 
 typedef enum
 {
@@ -41,15 +41,28 @@ typedef enum
 
 typedef struct
 {
-    IN gcvEDMA_IOCTL_CMD cmd;
-
     INOUT gctEDMA_HANDLE edma_chan;
     IN gctUINT32 node;
     INOUT size_t len;
     IN gcvEDMA_DIRECTION dir;
     IN gctBOOL sync_wait;
     OUT gctUINT32 edma_status;
-}gcsEDMA_TRANSFACTION;
+}
+gcsEDMA_TRANSFACTION;
+
+typedef struct
+{
+    gcvEXTERN_IOCTL_CMD cmd;
+
+    union _u
+    {
+        gcsEDMA_TRANSFACTION edma;
+    }
+    u;
+}
+gcsEXTERN_IOCTL_INTERFACE;
+
 #endif
+
 
 
