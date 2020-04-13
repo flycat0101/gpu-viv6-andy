@@ -7513,7 +7513,8 @@ VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
                                                  input,
                                                  output,
                                                  info.vx_nn_general_cmd_info.inImageAddress,
-                                                 info.vx_nn_general_cmd_info.outImageAddress));
+                                                 info.vx_nn_general_cmd_info.outImageAddress,
+                                                 parameter));
             }
 
             if (!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_SMALLBATCH_PHASE1))
@@ -7594,7 +7595,8 @@ VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
                                                  input,
                                                  output,
                                                  info.vx_nn_tp_cmd_info.inImageBaseAddress,
-                                                 info.vx_nn_tp_cmd_info.outBaseAddress));
+                                                 info.vx_nn_tp_cmd_info.outBaseAddress,
+                                                 parameter));
             }
 
             if (operation_command->operation->operatorType == VXNNE_OPERATOR_TENSOR_TRANS && parameter->tp_value->e32[0] == 6)

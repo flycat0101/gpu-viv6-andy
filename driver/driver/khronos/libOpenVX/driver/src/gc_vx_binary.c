@@ -5049,6 +5049,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_ChangeAddressToOffset(
     vx_uint8 *buffer,
     vx_uint32 posOffset,
     vx_uint32 baseAddress,
+    vx_uint32 size,
     vx_uint32 shift6
     )
 {
@@ -5081,16 +5082,71 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_ChangeAddressToOffset(
 
     if (data < baseAddress)
     {
-        vxError("%s[%d]: pos: 0x%x, base address: 0x%x\n", __FUNCTION__, __LINE__, data, baseAddress);
+        vxError("%s[%d]: pos=0x%x, base address=0x%x\n", __FUNCTION__, __LINE__, data, baseAddress);
         return VX_FAILURE;
     }
 
     offset = data - baseAddress;
 
+    if ((size > 0) && (offset > size))
+    {
+        vxError("%s[%d]: offset=0x%x, size=%x\n", __FUNCTION__, __LINE__, offset, size);
+        return VX_FAILURE;
+    }
+
     *pos = offset;
 
     return status;
 }
+
+#if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
+VX_INTERNAL_API vx_uint32 vxoBinaryGraph_GetBlockBufferTotalSize(
+    vx_graph graph,
+    vx_uint32 bufferSize,
+    vx_enum sourceType
+    )
+{
+    vx_uint32 totalSize = 0;
+    vx_context context = graph->base.context;
+
+    switch (sourceType)
+    {
+        case VX_BINARY_SOURCE_MEMORY_POOL:
+        {
+            totalSize = (vx_uint32)graph->memoryPool->size;
+        }
+        break;
+
+        case VX_BINARY_SOURCE_AXI_SRAM:
+        {
+            vx_uint32 totalAXIsramSize = 0;
+            vx_uint32 j = 0;
+            vx_uint32 deviceCount = 0;
+            gcoVX_QueryDeviceCount(&deviceCount);
+            for (j = 0; j < deviceCount; j++)
+            {
+                totalAXIsramSize += context->axiSRAM[j].size;
+            }
+            totalSize = totalAXIsramSize;
+        }
+        break;
+
+        case VX_BINARY_SOURCE_VIP_SRAM:
+        {
+            totalSize = context->vipSRAM.size + VX_VIP_SRAM_IMAGE_STREAM_SIZE;
+        }
+        break;
+
+        default:
+        {
+            totalSize = bufferSize;
+        }
+        break;
+    }
+
+    return totalSize;
+}
+#endif
 
 VX_PRIVATE_API vx_status vxoBinaryGraph_SaveShaderPatchTable(
     vx_node node,
@@ -5320,14 +5376,19 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveShaderPatchTable(
         }
         for (i = 0; i < multiNum; i++)
         {
+#if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
+            vx_uint32 totalSize = 0;
+#endif
             vx_uint32 ret = 0;
             patchInfo.offset = offsetArray[i];
-            #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
+#if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
+            totalSize = vxoBinaryGraph_GetBlockBufferTotalSize(node->graph, wholeSize, patchInfo.sourceType);
             vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(stateBuffer, offsetArray[i],
                                                              patchInfo.originalBaseAddress,
+                                                             totalSize,
                                                              patchInfo.transformation));
             patchInfo.originalBaseAddress = 0;
-            #endif
+#endif
             ret = vxoBinaryGraph_SavePatchEntry(node->graph, (void *)&patchInfo);
             if (ret == 0xFFFFFFFF)
             {
@@ -5356,14 +5417,19 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveShaderPatchTable(
             }
             for (i = 0; i < multiNum; i++)
             {
+#if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
+                vx_uint32 totalSize = 0;
+#endif
                 vx_uint32 ret = 0;
                 patchInfo.offset = offsetArray[i];
-                #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
+#if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
+                totalSize = vxoBinaryGraph_GetBlockBufferTotalSize(node->graph, wholeSize, patchInfo.sourceType);
                 vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(stateBuffer, offsetArray[i],
                                                                  patchInfo.originalBaseAddress,
+                                                                 totalSize,
                                                                  patchInfo.transformation));
                 patchInfo.originalBaseAddress = 0;
-                #endif
+#endif
                 ret = vxoBinaryGraph_SavePatchEntry(node->graph, (void *)&patchInfo);
                 if (ret == 0xFFFFFFFF)
                 {
@@ -5419,6 +5485,146 @@ VX_PRIVATE_API vx_uint32 vxoBinaryGraph_CalculateNNSliceCount(
     commandCount = xcount * ycount;
 
     return commandCount;
+}
+
+VX_PRIVATE_API vx_uint32 vxoBinaryGraph_CalculateTPSliceCount(
+    vx_context context,
+    vxnne_operation_command operationCommand,
+    vx_binary_save_s *binarySave,
+    vxnne_operation operation,
+    vx_uint32 *splitCount
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vxnne_tp_operation tpOperation = (vxnne_tp_operation)operation;
+    vx_uint32 core = operation->parameter.tpType != TP_SINGLE_FC ? context->nnConfig.fixedFeature.tpCoreCount :
+                                          context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
+    vx_uint32 opNum = core;
+    vx_bool mult = context->options.enableMultiTP && core > 1;
+
+    if (opNum < context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount)
+    {
+        opNum = context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
+    }
+
+    if (operation->parameter.tpType == TP_SINGLE_FC)
+    {
+        vx_tensor otherRef = (vx_tensor)operation->parameter.other_ref;
+        vx_tp_value_cmd value = operation->parameter.tp_value;
+        if (!value->e32[0])
+        {
+            vxmASSERT(otherRef != VX_NULL);
+            opNum = WB_TOTAL_SLICE_NUM((vx_weights_biases_parameter)otherRef);
+        }
+    }
+    else if (operation->parameter.tpType == TP_TRANSPOSE)
+    {
+        vx_tensor otherRef = (vx_tensor)operation->parameter.other_ref;
+        vx_tp_value_cmd value = operation->parameter.tp_value;
+        vx_uint32 i, x, y, dnum = value->u32[0], tsize = 1;
+        vx_uint32 dims[VX_CONTEXT_TENSOR_MAX_DIMENSION], strides[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+
+        vxmASSERT(otherRef != VX_NULL);
+        vxoTensor_GetTensorDimStride(otherRef, &dnum, dims, strides);
+        vxmASSERT(dims[0] < TP_MAX_XYSIZE && dims[1] < TP_MAX_XYSIZE);
+
+        for (i = 0; i < TENSOR_DIM_NUM(otherRef); i++)
+        {
+            tsize *= dims[i];
+        }
+        x = dims[0];
+        y = tsize / dims[0];
+        for (i = 1; i < dnum; i++)
+        {
+            if (x >= TP_MAX_XYSIZE || y < TP_MAX_XYSIZE)
+            {
+                break;
+            }
+            else
+            {
+                x *= dims[i];
+                y /= dims[i];
+            }
+        }
+        if (x < TP_MAX_XYSIZE && y < TP_MAX_XYSIZE)
+        {
+            opNum = 1;
+        }
+        else
+        {
+            for (i = dnum - 1; (vx_int32)i >= 0; i--)
+            {
+                if (dims[i] > 1) break;
+            }
+
+            /* TP X/Y size has max size limitation, must split */
+            y = tsize / dims[0];
+            opNum = gcmALIGN_NP2(y, TP_MAX_XYSIZE-1) / (TP_MAX_XYSIZE-1);
+        }
+        if (opNum == 1 && (dnum == 3 || (dnum == 4 && dims[3] == 1)))
+        {
+            vx_uint32_ptr perm = (vx_uint32*)value->p8[0];
+            if (operationCommand->cmdInfo.tpTransposeSize > 0)
+            {
+                vx_uint32 splitXCount = 1;
+                vx_uint32 tempXCount = 0;
+                vx_uint32 slice = mult ? gcmMIN(dims[1], core) : 1;
+                vx_tensor input = tpOperation->input;
+                tempXCount = operationCommand->cmdInfo.tpTransposeSize / (vxnneGetTypeSize(input->dataFormat) * dims[1] * dims[2]);
+                tempXCount = 1 << (vx_uint32) (floor(log(tempXCount)) / log(2));
+                splitXCount = gcmMAX(dims[0] / tempXCount, 1);
+                opNum = splitXCount * slice * 2;
+            }
+            else
+            {
+                if (perm[0] == 1 && perm[1] == 0) /* y, x, z */
+                {
+                    opNum = x * y > 128 && mult ? gcmMIN(dims[2], core) : 1;
+                }
+                else if (perm[0] == 1 && perm[1] == 2) /* y, z, x */ /* use single TP to reduce bandwidth */
+                {
+                    opNum = context->hwChipInfo.customerID == 0xAE && x * y > 128 && mult ? gcmMIN(dims[2], core) : 1;
+                }
+                else if (context->hwChipInfo.customerID == 0xAE)
+                {
+                    if (perm[0] == 2 && perm[1] == 0) /* z, x, y */
+                    {
+                        opNum = mult ? gcmMIN(dims[1], core) : 1;
+                    }
+                    else if (perm[0] == 2 && perm[1] == 1) /* z, y, x */
+                    {
+                        opNum = mult ? gcmMIN(dims[1], core) : 1;
+                    }
+                    else if (perm[0] == 0 && perm[1] == 2) /* x, z, y */
+                    {
+                        opNum = mult ? gcmMIN(dims[1], core) : 1;
+                    }
+                }
+            }
+        }
+
+        if (operationCommand->cmdInfo.tpTransposeSize > 0)
+        {
+            binarySave->patchCount += opNum; /* for patch tp transpose ImageCircularBufEndAddrPlus */
+        }
+    }
+
+    if (opNum < core)
+    {
+        opNum = core;
+    }
+
+    if (splitCount != VX_NULL)
+    {
+        *splitCount = opNum;
+    }
+    else
+    {
+        vxError("%s[%d]: failed to calculate tp slice count\n", __FUNCTION__, __LINE__);
+        status = VX_FAILURE;
+    }
+
+    return status;
 }
 
 VX_PRIVATE_API vx_status vxoBinaryGraph_RefineInputOutput(
@@ -6685,6 +6891,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                 #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
                 status = vxoBinaryGraph_ChangeAddressToOffset(initBuffer, offsetArray[0],
                                                               patchInfo.originalBaseAddress,
+                                                              totalAXIsramSize,
                                                               patchInfo.transformation);
                 if (status != VX_SUCCESS)
                 {
@@ -6721,6 +6928,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                     #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
                     status = vxoBinaryGraph_ChangeAddressToOffset(initBuffer, offsetArray[0],
                                                                   patchInfo.originalBaseAddress,
+                                                                  totalAXIsramSize,
                                                                   patchInfo.transformation);
                     if (status != VX_SUCCESS)
                     {
@@ -6754,6 +6962,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                         #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
                         status = vxoBinaryGraph_ChangeAddressToOffset(initBuffer, patchInfo.offset,
                                                                       patchInfo.originalBaseAddress,
+                                                                      totalAXIsramSize,
                                                                       patchInfo.transformation);
                         if (status != VX_SUCCESS)
                         {
@@ -6797,6 +7006,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                     #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
                     status = vxoBinaryGraph_ChangeAddressToOffset(initBuffer, patchInfo.offset,
                                                                   patchInfo.originalBaseAddress,
+                                                                  totalAXIsramSize,
                                                                   patchInfo.transformation);
                     if (status != VX_SUCCESS)
                     {
@@ -6833,6 +7043,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                         #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
                         status = vxoBinaryGraph_ChangeAddressToOffset(initBuffer, patchInfo.offset,
                                                                       patchInfo.originalBaseAddress,
+                                                                      totalAXIsramSize,
                                                                       patchInfo.transformation);
                         if (status != VX_SUCCESS)
                         {
@@ -6862,6 +7073,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
             }
         }
 
+        /* patch VIP-SRAM */
         if ((context->vipSRAM.size > 0) && (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE3)))
         {
             /*1. patch start remap address for VIP-SRAM */
@@ -6883,6 +7095,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                 #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
                 status = vxoBinaryGraph_ChangeAddressToOffset(initBuffer, patchInfo.offset,
                                                               patchInfo.originalBaseAddress,
+                                                              context->vipSRAM.size + VX_VIP_SRAM_IMAGE_STREAM_SIZE,
                                                               patchInfo.transformation);
                 if (status != VX_SUCCESS)
                 {
@@ -6923,6 +7136,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                     #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
                     status= vxoBinaryGraph_ChangeAddressToOffset(initBuffer, patchInfo.offset,
                                                                  patchInfo.originalBaseAddress,
+                                                                 context->vipSRAM.size + VX_VIP_SRAM_IMAGE_STREAM_SIZE,
                                                                  patchInfo.transformation);
                     if (status != VX_SUCCESS)
                     {
@@ -7087,6 +7301,9 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveScalerOperation(
     vx_uint32 layerId = 0;
     vx_context context = node->base.context;
     vx_uint8 *stateBuffer = VX_NULL;
+ #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
+    vx_uint32 totalSize = 0;
+ #endif
 
     gcmHEADER_ARG("operation=%p, stateLogical=%p, stateSize=0x%x", operation, stateLogical, stateSize);
 
@@ -7236,12 +7453,15 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveScalerOperation(
             vxmONERROR(VX_ERROR_INVALID_VALUE);
         }
         patchInfo.offset = offsetArray[0];
-        #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
+
+#if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
+        totalSize = vxoBinaryGraph_GetBlockBufferTotalSize(graph, planeSize, patchInfo.sourceType);
         vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(stateBuffer, patchInfo.offset,
                                                          patchInfo.originalBaseAddress,
+                                                         totalSize,
                                                          patchInfo.transformation));
         patchInfo.originalBaseAddress = 0;
-        #endif
+#endif
 
         patchIndex = vxoBinaryGraph_SavePatchEntry(graph, (void *)&patchInfo);
         patchCount++;
@@ -7379,12 +7599,14 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveScalerOperation(
             vxmONERROR(VX_ERROR_INVALID_VALUE);
         }
         patchInfo.offset = offsetArray[0];
-        #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
+#if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
+        totalSize = vxoBinaryGraph_GetBlockBufferTotalSize(graph, wholeSize, patchInfo.sourceType);
         vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(stateBuffer, patchInfo.offset,
                                                          patchInfo.originalBaseAddress,
+                                                         totalSize,
                                                          patchInfo.transformation));
         patchInfo.originalBaseAddress = 0;
-        #endif
+#endif
         patchIndex = vxoBinaryGraph_SavePatchEntry(graph, (void *)&patchInfo);
         patchCount++;
         if (patchIndex == 0xFFFFFFFF)
@@ -7402,12 +7624,14 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveScalerOperation(
             vxmONERROR(VX_ERROR_INVALID_VALUE);
         }
         patchInfo.offset = offsetArray[0];
-        #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
+#if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
+        totalSize = vxoBinaryGraph_GetBlockBufferTotalSize(graph, wholeSize, patchInfo.sourceType);
         vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(stateBuffer, patchInfo.offset,
                                                          patchInfo.originalBaseAddress,
+                                                         totalSize,
                                                          patchInfo.transformation));
         patchInfo.originalBaseAddress = 0;
-        #endif
+#endif
         patchIndex = vxoBinaryGraph_SavePatchEntry(graph, (void *)&patchInfo);
         patchCount++;
         if (patchIndex == 0xFFFFFFFF)
@@ -7425,12 +7649,14 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveScalerOperation(
             vxmONERROR(VX_ERROR_INVALID_VALUE);
         }
         patchInfo.offset = offsetArray[0];
-        #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
+#if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
+        totalSize = vxoBinaryGraph_GetBlockBufferTotalSize(graph, wholeSize, patchInfo.sourceType);
         vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(stateBuffer, patchInfo.offset,
                                                          patchInfo.originalBaseAddress,
+                                                         totalSize,
                                                          patchInfo.transformation));
         patchInfo.originalBaseAddress = 0;
-        #endif
+#endif
         patchIndex = vxoBinaryGraph_SavePatchEntry(graph, (void *)&patchInfo);
         patchCount++;
         if (patchIndex == 0xFFFFFFFF)
@@ -7642,7 +7868,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveShaderOperation(
         patchInfo.offset = offsetArray[0];
 #if ENABLE_SAVE_OFFSET_IN_NBG
         patchInfo.originalBaseAddress = 0;
-        vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(stateBuffer, offsetArray[0], address, patchInfo.transformation));
+        vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(stateBuffer, offsetArray[0], address, SHinstrSize, patchInfo.transformation));
 #else
         patchInfo.originalBaseAddress = address;
 #endif
@@ -7964,6 +8190,77 @@ OnError:
     return status;
 }
 
+#if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
+VX_PRIVATE_API vx_status vxoBinaryGraph_SaveTPTranspose(
+    vx_node node,
+    vx_uint8 *cmdLogicalAddress,
+    vx_binary_patch_info_s *patchInfo,
+    vxnne_tensor_info tensorInfo,
+    vx_uint8 inputOroutput,
+    vx_uint32 *patchCount
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vx_uint32 totalSize = 0;
+    vx_binary_patch_info_s patchInfo_cir;
+    vx_uint32 patchIndex = 0;
+    gcmHEADER_ARG("node=%p cmdLogicalAddress=%p patchInfo=%p tensorInfo=%p inputOroutput=%d", node, cmdLogicalAddress, patchInfo, tensorInfo, inputOroutput);
+
+    /* modify transpose input/output address */
+    totalSize = vxoBinaryGraph_GetBlockBufferTotalSize(node->graph, tensorInfo->memorySize, patchInfo->sourceType);
+    status = vxoBinaryGraph_ChangeAddressToOffset(cmdLogicalAddress, patchInfo->offset,
+                                                  patchInfo->originalBaseAddress,
+                                                  totalSize,
+                                                  patchInfo->transformation);
+    if (status != VX_SUCCESS)
+    {
+        vxError("%s[%d]: Failed to modify tp transpose input/output address\n", __FUNCTION__, __LINE__);
+        vxmONERROR(VX_FAILURE);
+    }
+
+    /* modify transpose ImageCircularBufEndAddrPlus address */
+    gcoOS_ZeroMemory(&patchInfo_cir, sizeof(vx_binary_patch_info_s));
+
+    patchInfo_cir.type                = VX_BINARY_PATCH_TYPE_COMMAND;
+    patchInfo_cir.sourceType          = VX_BINARY_SOURCE_VIP_SRAM;
+    patchInfo_cir.index               = -1;
+    patchInfo_cir.originalBaseAddress = patchInfo->originalBaseAddress;
+    patchInfo_cir.transformation      = VX_BINARY_PATCH_TRANSFORMATION_RIGHT_SHIFT_6;
+
+    if (inputOroutput)
+    {/* output outImageCircularBufEndAddrPlus1 WORD28 */
+        patchInfo_cir.offset = 28 * sizeof(vx_uint32);
+    }
+    else
+    {/* input inImageCircularBufEndAddrPlus1 WORD26 */
+        patchInfo_cir.offset = 26 * sizeof(vx_uint32);
+    }
+    status = vxoBinaryGraph_ChangeAddressToOffset(cmdLogicalAddress, patchInfo_cir.offset,
+                                                  patchInfo_cir.originalBaseAddress,
+                                                  totalSize,
+                                                  patchInfo_cir.transformation);
+    patchInfo_cir.originalBaseAddress = 0;
+
+    if (status != VX_SUCCESS)
+    {
+        vxError("%s[%d]: Failed to modify tp transpose ImageCircularBufEndAddrPlus1 address\n", __FUNCTION__, __LINE__);
+        vxmONERROR(VX_FAILURE);
+    }
+
+    *patchCount += 1;
+    patchIndex = vxoBinaryGraph_SavePatchEntry(node->graph, (void *)&patchInfo_cir);
+    if (patchIndex == 0xFFFFFFFF)
+    {
+        vxError("%s[%d]: Failed to save patch entry\n", __FUNCTION__, __LINE__);
+        vxmONERROR(VX_FAILURE);
+    }
+
+OnError:
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+#endif
+
 VX_INTERNAL_API vx_status vxoBinaryGraph_SaveTPNNOperation(
         vx_node node,
         vx_uint8_ptr cmdLogical,
@@ -7976,7 +8273,8 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveTPNNOperation(
         vxnne_tensor_info input,
         vxnne_tensor_info output,
         gctUINT32 inputPhyAddr,
-        gctUINT32 outputPhyAddr
+        gctUINT32 outputPhyAddr,
+        vx_op_param parameter
         )
 {
     vx_uint32 indexOfFirstPatch = 0;
@@ -7995,6 +8293,9 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveTPNNOperation(
     vx_uint32 index = 0, layerId = 0;
     vx_status status = VX_SUCCESS;
     vx_context context = node->base.context;
+#if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
+    vx_uint32 totalSize = 0;
+#endif
     vx_uint8 *cmdLogicalAddress = VX_NULL;
     gcmHEADER_ARG("node=%p, cmdLogical=0x%x, cmdPhysicalAddress=0x%x, cmdSize=0x%x, cmdType=0x%x",
         node, cmdLogical, cmdLogical, cmdSize, cmdType);
@@ -8203,9 +8504,23 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveTPNNOperation(
             binarySave->inputInPatchedNum++;
         }
 #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
-        vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(cmdLogicalAddress, patchInfo.offset,
+        totalSize = vxoBinaryGraph_GetBlockBufferTotalSize(graph, input->memorySize, patchInfo.sourceType);
+        status = vxoBinaryGraph_ChangeAddressToOffset(cmdLogicalAddress, patchInfo.offset,
                                                         patchInfo.originalBaseAddress,
-                                                        patchInfo.transformation));
+                                                        totalSize,
+                                                        patchInfo.transformation);
+        /* tp transpose use VIP-SRAM as a output */
+        if ((status != VX_SUCCESS) && (TP_TRANSPOSE == parameter->tpType) && (!output->sRAM) && context->vipSRAM.size && (context->vipSRAM.size > 0))
+        {
+            patchInfo.sourceType = VX_BINARY_SOURCE_VIP_SRAM;
+            patchInfo.originalBaseAddress = context->vipSRAM.physical - VX_VIP_SRAM_IMAGE_STREAM_SIZE;
+            status = vxoBinaryGraph_SaveTPTranspose(node, cmdLogicalAddress, &patchInfo, input, 0, &patchCount);
+        }
+        if (status != VX_SUCCESS)
+        {
+            vxError("%s[%d]: Failed to save input, target=%s\n", __FUNCTION__, __LINE__, (cmdType == VX_BINARY_OPERATION_TYPE_TP)? "TP":"NN");
+            vxmONERROR(VX_FAILURE);
+        }
         patchInfo.originalBaseAddress = 0;
 #endif
         patchIndex = vxoBinaryGraph_SavePatchEntry(node->graph, (void *)&patchInfo);
@@ -8272,6 +8587,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveTPNNOperation(
 #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
             vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(cmdLogicalAddress, patchInfo.offset,
                                                             patchInfo.originalBaseAddress,
+                                                            0,
                                                             patchInfo.transformation));
             patchInfo.originalBaseAddress = 0;
 #endif
@@ -8428,17 +8744,33 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveTPNNOperation(
 
         patchInfo.originalBaseAddress = (outputSourceType == VX_BINARY_SOURCE_VIP_SRAM) ?
                                         (output->memoryPhysicalBase - VX_VIP_SRAM_IMAGE_STREAM_SIZE) : output->memoryPhysicalBase;
+
         patchInfo.transformation      = VX_BINARY_PATCH_TRANSFORMATION_ORIGINAL;
 #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
-        vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(cmdLogicalAddress, patchInfo.offset,
-                                                        patchInfo.originalBaseAddress,
-                                                        patchInfo.transformation));
+        totalSize = vxoBinaryGraph_GetBlockBufferTotalSize(graph, output->memorySize, patchInfo.sourceType);
+        status = vxoBinaryGraph_ChangeAddressToOffset(cmdLogicalAddress, patchInfo.offset,
+                                                      patchInfo.originalBaseAddress,
+                                                      totalSize,
+                                                      patchInfo.transformation);
+        /* tp transpose use VIP-SRAM as a output */
+        if ((status != VX_SUCCESS) && (TP_TRANSPOSE == parameter->tpType) && (!output->sRAM) && context->vipSRAM.size && (context->vipSRAM.size > 0))
+        {
+            patchInfo.sourceType = VX_BINARY_SOURCE_VIP_SRAM;
+            patchInfo.originalBaseAddress = context->vipSRAM.physical - VX_VIP_SRAM_IMAGE_STREAM_SIZE;
+            status = vxoBinaryGraph_SaveTPTranspose(node, cmdLogicalAddress, &patchInfo, output, 1, &patchCount);
+        }
+        if (status != VX_SUCCESS)
+        {
+            vxError("%s[%d]: Failed to save output, target=%s\n", __FUNCTION__, __LINE__, (cmdType == VX_BINARY_OPERATION_TYPE_TP)? "TP":"NN");
+            vxmONERROR(VX_FAILURE);
+        }
         patchInfo.originalBaseAddress = 0;
 #endif
         patchIndex = vxoBinaryGraph_SavePatchEntry(node->graph, (void *)&patchInfo);
         patchCount++;
         if (patchIndex == 0xFFFFFFFF)
         {
+            vxError("%s[%d]: Failed to save patch info\n", __FUNCTION__, __LINE__);
             vxmONERROR(VX_ERROR_NO_MEMORY);
         }
 
@@ -8463,7 +8795,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveTPNNOperation(
                     {
                         if (offsetArray[count] == 19 * 4)
                         {
-                            offsetArray[0] = 19 * 4;/* 19 * 4 means circularBufEndAddrPlus1 address offset of NN instr*/
+                            offsetArray[0] = 19 * 4;/* 19 * 4 means circularBufEndAddrPlus1 address offset of NN instr, WORD19*/
                             break;
                         }
                     }
@@ -8478,7 +8810,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveTPNNOperation(
                     {
                         if (offsetArray[count] == 28 * 4)
                         {
-                            offsetArray[0] = 28 * 4;/* 28 * 4 means circularBufEndAddrPlus1 offset of TP instr*/
+                            offsetArray[0] = 28 * 4;/* 28 * 4 means circularBufEndAddrPlus1 offset of TP instr, WORD28*/
                             break;
                         }
                     }
@@ -8499,6 +8831,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveTPNNOperation(
 #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
             vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(cmdLogicalAddress, patchInfo.offset,
                                                             patchInfo.originalBaseAddress,
+                                                            0,
                                                             patchInfo.transformation));
             patchInfo.originalBaseAddress = 0;
 #endif
@@ -8506,6 +8839,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveTPNNOperation(
             patchCount++;
             if (patchIndex == 0xFFFFFFFF)
             {
+                vxError("%s[%d]: Failed to save patch info\n", __FUNCTION__, __LINE__);
                 vxmONERROR(VX_ERROR_NO_MEMORY);
             }
             /* debug check point*/
@@ -8624,12 +8958,14 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveTPNNOperation(
         {
             vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(cmdLogicalAddress, patchInfo.offset,
                                                             patchInfo.originalBaseAddress,
+                                                            0,
                                                             11));
         }
         else
         {
             vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(cmdLogicalAddress, patchInfo.offset,
                                                             patchInfo.originalBaseAddress,
+                                                            0,
                                                             patchInfo.transformation));
         }
 
@@ -8640,7 +8976,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveTPNNOperation(
         patchCount++;
         if (patchIndex == 0xFFFFFFFF)
         {
-            vxmONERROR(VX_ERROR_NO_MEMORY);
+            vxError("%s[%d]: Failed to save patch info\n", __FUNCTION__, __LINE__); vxmONERROR(VX_ERROR_NO_MEMORY);
         }
     }
 
@@ -8852,7 +9188,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveNNTPStates(
     }
 
 #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
-    vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(stateBuffer, cmdOffsetInStates, cmdPhysical, 10));
+    vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(stateBuffer, cmdOffsetInStates, cmdPhysical, 0, 10));
 #endif
 
     /* 1. re-write state lcd index to operation table*/
@@ -9885,103 +10221,9 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
             else
             {
                 vxnne_tp_operation tpOperation = (vxnne_tp_operation)operation;
-                vx_enum tpType = parameter->tpType;
-                vx_uint32 core = tpType != TP_SINGLE_FC ? context->nnConfig.fixedFeature.tpCoreCount :
-                                                          context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
-                vx_uint32 opNum = core;
-                vx_bool mult = context->options.enableMultiTP && core > 1;
+                vx_uint32 opNum = 1;
 
-                if (opNum < context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount)
-                {
-                    opNum = context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
-                }
-
-                if (operation->parameter.tpType == TP_SINGLE_FC)
-                {
-                    vx_tensor otherRef = (vx_tensor)operation->parameter.other_ref;
-                    vx_tp_value_cmd value = operation->parameter.tp_value;
-                    if (!value->e32[0])
-                    {
-                        vxmASSERT(otherRef != VX_NULL);
-                        opNum = WB_TOTAL_SLICE_NUM((vx_weights_biases_parameter)otherRef);
-                    }
-                }
-                else if (operation->parameter.tpType == TP_TRANSPOSE)
-                {
-                    vx_tensor otherRef = (vx_tensor)operation->parameter.other_ref;
-                    vx_tp_value_cmd value = operation->parameter.tp_value;
-                    vx_uint32 i, x, y, dnum = value->u32[0], tsize = 1;
-                    vx_uint32 dims[VX_CONTEXT_TENSOR_MAX_DIMENSION], strides[VX_CONTEXT_TENSOR_MAX_DIMENSION];
-
-                    vxmASSERT(otherRef != VX_NULL);
-                    vxoTensor_GetTensorDimStride(otherRef, &dnum, dims, strides);
-                    vxmASSERT(dims[0] < TP_MAX_XYSIZE && dims[1] < TP_MAX_XYSIZE);
-                    for (i = 0; i < TENSOR_DIM_NUM(otherRef); i++)
-                    {
-                        tsize *= dims[i];
-                    }
-                    x = dims[0];
-                    y = tsize / dims[0];
-                    for (i = 1; i < dnum; i++)
-                    {
-                        if (x >= TP_MAX_XYSIZE || y < TP_MAX_XYSIZE)
-                        {
-                            break;
-                        }
-                        else
-                        {
-                            x *= dims[i];
-                            y /= dims[i];
-                        }
-                    }
-                    if (x < TP_MAX_XYSIZE && y < TP_MAX_XYSIZE)
-                    {
-                        opNum = 1;
-                    }
-                    else
-                    {
-                        for (i = dnum - 1; (vx_int32)i >= 0; i--)
-                        {
-                            if (dims[i] > 1) break;
-                        }
-
-                        /* TP X/Y size has max size limitation, must split */
-                        y = tsize / dims[0];
-                        opNum = gcmALIGN_NP2(y, TP_MAX_XYSIZE-1) / (TP_MAX_XYSIZE-1);
-                    }
-                    if (opNum == 1 && (dnum == 3 || (dnum == 4 && dims[3] == 1)))
-                    {
-                        vx_uint32_ptr perm = (vx_uint32*)value->p8[0];
-                        if (perm[0] == 1 && perm[1] == 0) /* y, x, z */
-                        {
-                            opNum = x * y > 128 && mult ? gcmMIN(dims[2], core) : 1;
-                        }
-                        else if (perm[0] == 1 && perm[1] == 2) /* y, z, x */ /* use single TP to reduce bandwidth */
-                        {
-                            opNum = context->hwChipInfo.customerID == 0xAE && x * y > 128 && mult ? gcmMIN(dims[2], core) : 1;
-                        }
-                        else if (context->hwChipInfo.customerID == 0xAE)
-                        {
-                            if (perm[0] == 2 && perm[1] == 0) /* z, x, y */
-                            {
-                                opNum = mult ? gcmMIN(dims[1], core) : 1;
-                            }
-                            else if (perm[0] == 2 && perm[1] == 1) /* z, y, x */
-                            {
-                                opNum = mult ? gcmMIN(dims[1], core) : 1;
-                            }
-                            else if (perm[0] == 0 && perm[1] == 2) /* x, z, y */
-                            {
-                                opNum = mult ? gcmMIN(dims[1], core) : 1;
-                            }
-                        }
-                    }
-                }
-
-                if (opNum < core)
-                {
-                    opNum = core;
-                }
+                vxoBinaryGraph_CalculateTPSliceCount(context, operationCommand, binarySave, operation, &opNum);
 
                 binarySave->tpOperationCount += opNum;
 

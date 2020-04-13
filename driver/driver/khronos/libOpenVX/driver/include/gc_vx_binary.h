@@ -774,7 +774,8 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveTPNNOperation(
     vxnne_tensor_info input,
     vxnne_tensor_info output,
     gctUINT32 inputPhyAddr,
-    gctUINT32 outputPhyAddr
+    gctUINT32 outputPhyAddr,
+    vx_op_param parameter
     );
 
 VX_INTERNAL_API vx_status vxoBinaryGraph_SaveShaderOperation(
