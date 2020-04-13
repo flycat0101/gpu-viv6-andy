@@ -4483,7 +4483,8 @@ VX_PRIVATE_API vx_bool vxoMultiGPU_IsSupport(
         (VXNNE_OPERATOR_ROIPOOLRELU == operation->operatorType) ||
         (VXNNE_OPERATOR_TENSOR_COPY == operation->operatorType) ||
         (VXNNE_OPERATOR_FULLYCONNECTED == operation->operatorType) ||
-        (VXNNE_OPERATOR_CONCATINDEFINITE == operation->operatorType)))
+        (VXNNE_OPERATOR_CONCATINDEFINITE == operation->operatorType) ||
+        (VXNNE_OPERATOR_TENSOR_PAD == operation->operatorType)))
     {
         OpFlag = vx_true_e;
     }
@@ -4721,7 +4722,7 @@ VX_PRIVATE_API vx_bool vxoMultiGPU_IsSupport(
 
         }
     }
-    else if (VXNNE_OPERATOR_CONCATINDEFINITE == operation->operatorType)
+    else if ((VXNNE_OPERATOR_CONCATINDEFINITE == operation->operatorType) || (VXNNE_OPERATOR_TENSOR_PAD == operation->operatorType))
     {
         vxnne_tp_operation srcTpOp = (vxnne_tp_operation)operation;
         vx_uint32 outputDim = 0;
@@ -4734,9 +4735,9 @@ VX_PRIVATE_API vx_bool vxoMultiGPU_IsSupport(
 
         inputZSize = TENSOR_VIEW_SIZE_INDEX(srcTpOp->input, 2);
 
-        if ((inputDim >= 3) && (outputDim >= 3) && (inputZSize != 1))
+        if ((inputDim >= 3) && (outputDim >= 3) && (inputZSize >= gpuCount))
         {
-            *splitCount = gcmMIN(gpuCount, inputZSize);
+            *splitCount = gpuCount;
             splitFlag = vx_true_e;
         }
         else
@@ -5670,7 +5671,7 @@ OnError:
     return status;
 }
 
-VX_PRIVATE_API vx_status vxoMultiGPU_SplitResourceForCOPY4CONCAT(
+VX_PRIVATE_API vx_status vxoMultiGPU_SplitResourceForCONCAT_PAD(
     vx_node node,
     vxnne_tp_operation dstOperation,
     vxnne_operation srcOperation,
@@ -5724,7 +5725,7 @@ VX_PRIVATE_API vx_status vxoMultiGPU_SplitResourceForCOPY4CONCAT(
 
     if ((inputEnd - inputStart) == 0)
     {
-        vxError("%s[%d]: not support TP  COPY4CONCAT\n", __FUNCTION__, __LINE__);
+        vxError("%s[%d]: not support TP  CONCAT or PAD\n", __FUNCTION__, __LINE__);
         vxmONERROR(VX_FAILURE);
     }
     vxmASSERT((inputEnd - inputStart) != 0);
@@ -6472,9 +6473,9 @@ VX_PRIVATE_API vx_status vxoMultiGPU_Handle(
                                                             operation,
                                                             splitCount, gpuIndex));
             }
-            else if (VXNNE_OPERATOR_CONCATINDEFINITE == operation->operatorType)
+            else if ((VXNNE_OPERATOR_CONCATINDEFINITE == operation->operatorType) || (VXNNE_OPERATOR_TENSOR_PAD == operation->operatorType))
             {
-                vxmONERROR(vxoMultiGPU_SplitResourceForCOPY4CONCAT(node, tpOperation,
+                vxmONERROR(vxoMultiGPU_SplitResourceForCONCAT_PAD(node, tpOperation,
                                                             operation,
                                                             splitCount, gpuIndex));
             }
