@@ -10061,11 +10061,13 @@ VIR_Shader_TreatPushConstantAsBuffer(
     )
 {
     VIR_SymIdList*          pFields;
-    VIR_Id                  fieldSymId;
+    VIR_Id                  fieldSymId, nextFieldSymId;
     VIR_Symbol*             pFieldSym;
     VIR_Type*               pFieldType;
+    VIR_Symbol*             pNextFieldSym;
     gctBOOL                 bIsArray;
-    gctUINT                 i;
+    gctUINT                 i, fieldSize;
+    gctUINT                 fieldOffset, nextFieldOffset;
 
     pFields = VIR_Type_GetFields(pPushConstType);
 
@@ -10075,6 +10077,26 @@ VIR_Shader_TreatPushConstantAsBuffer(
         pFieldSym = VIR_Shader_GetSymFromId(pShader, fieldSymId);
         pFieldType = VIR_Symbol_GetType(pFieldSym);
         bIsArray = VIR_Type_isArray(pFieldType);
+
+        /* Any memory gap or overlapping between two consecutive field elements */
+        if ((i + 1) < VIR_IdList_Count(pFields))
+        {
+            nextFieldSymId = VIR_IdList_GetId(pFields, i + 1);
+            pNextFieldSym = VIR_Shader_GetSymFromId(pShader, nextFieldSymId);
+
+            fieldSize = VIR_Type_GetTypeByteSize(pShader, pFieldType);
+            fieldOffset = VIR_FieldInfo_GetOffset(VIR_Symbol_GetFieldInfo(pFieldSym));
+            nextFieldOffset = VIR_FieldInfo_GetOffset(VIR_Symbol_GetFieldInfo(pNextFieldSym));
+
+            if (nextFieldOffset < fieldOffset)
+            {
+                return gcvTRUE;
+            }
+            else if (fieldOffset + fieldSize != nextFieldOffset)
+            {
+                return gcvTRUE;
+            }
+        }
 
         /* Use the non-array struct type to calc and check if it is an arrays of arrays. */
         while (VIR_Type_isArray(pFieldType))
