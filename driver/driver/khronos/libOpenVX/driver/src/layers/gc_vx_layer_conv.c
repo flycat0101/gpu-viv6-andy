@@ -1405,16 +1405,16 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
 
     gcmASSERT(stride_x > 0 && stride_y > 0);
 
-    gcoOS_MemFill(outputBaseLogical, 0, outputWidth * outputHeight * outputDepth * vxnneGetTypeSize(outputFormat));
+    //gcoOS_MemFill(outputBaseLogical, 0, outputWidth * outputHeight * outputDepth * vxnneGetTypeSize(outputFormat));
 
     for (k = 0; k < batch; k++)
     {
 #if DUMP_ONE_PIXEL_CPU_CONV
         vx_int32 my_count;
 #endif
-        dataSrc    = (vx_uint8_ptr)inputBaseLogical + k * inputWidth * inputHeight * inputDepth * vxnneGetTypeSize(inputFormat);
+        dataSrc    = (vx_uint8_ptr)inputBaseLogical + k * TENSOR_STRIDE_INDEX(inputs, 3);
         dataWeight = (vx_uint8_ptr)weightsBaseLogical;
-        dataDst    = (vx_uint8_ptr)outputBaseLogical + k * outputWidth * outputHeight * outputDepth * vxnneGetTypeSize(outputFormat);
+        dataDst    = (vx_uint8_ptr)outputBaseLogical + k * TENSOR_STRIDE_INDEX(outputs, 3);
 
         for (p = 0; p < outputDepth; p ++)
         {
@@ -1458,7 +1458,11 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
                     else
                         wStart = gcmMAX(wStart, 0);
 
-                    indexOut = j * (outputWidth) + i;
+                    //indexOut = j * (outputWidth) + i;
+
+                    indexOut = p * TENSOR_STRIDE_INDEX(outputs, 2) +
+                               j * TENSOR_STRIDE_INDEX(outputs, 1) +
+                               i;
 #if DUMP_ONE_PIXEL_CPU_CONV
                     if(my_count == dump_index)
                     {
@@ -1476,7 +1480,8 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
                         {
                             for (w = wStart, m = kernelXStart; w < wEnd; w += dilation_x, m++)
                             {
-                                const vx_int32 indexSrc = d * inputWidth * inputHeight + h * (inputWidth) + w;
+                                //const vx_int32 indexSrc = d * inputWidth * inputHeight + h * (inputWidth) + w;
+                                const vx_int32 indexSrc = d * TENSOR_STRIDE_INDEX(inputs, 2)+  h * TENSOR_STRIDE_INDEX(inputs, 1) + w;
                                 const vx_int32 indexWeight = d * kernelXSize * kernelYSize + n * kernelXSize + m;
 #if QUANT8_SUPPORT
                                 if (TENSOR_DATA_TYPE(inputs) == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(inputs) == VX_QUANT_AFFINE_SCALE)
@@ -1569,7 +1574,7 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
             }
 
             dataWeight += kernelXSize * kernelYSize * inputDepth * vxnneGetTypeSize(weightFormat);
-            dataDst += outputWidth * outputHeight * vxnneGetTypeSize(outputFormat);
+            //dataDst += outputWidth * outputHeight * vxnneGetTypeSize(outputFormat);
         }
     }
 
