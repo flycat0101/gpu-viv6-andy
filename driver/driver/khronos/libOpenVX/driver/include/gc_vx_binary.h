@@ -18,7 +18,7 @@
 #define VX_MAX_NAME_LEGTH                 64
 #define VX_MAX_IO_NAME_LEGTH              64
 #define NN_MAX_DIMENSION                  4
-#define VX_MAX_NN_INOUT_PARAM_COUNT       1024
+#define VX_MAX_NN_INOUT_PARAM_COUNT       2048
 #define VX_MAX_SH_OPERATION_STATE_SIZE    0xE00
 #define VX_MAX_NNTP_OPERATION_STATE_SIZE  0x200
 #define VX_MAX_INITIALIZE_COMMAND_SIZE    0xC00
