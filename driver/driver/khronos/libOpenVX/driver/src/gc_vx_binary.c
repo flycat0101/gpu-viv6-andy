@@ -534,7 +534,94 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSWRPN(
     }
 
     rpnLayer->base.segmentType = swOpData->swOperationType;
+    vxMemCopy((vx_ptr)rpnLayer->base.name, (vx_const_ptr)swOpData->name, 64);
     segment->base = &rpnLayer->base;
+
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoBinaryGraph_patchSWUser(
+    vx_node node,
+    vx_binary_sw_operation_info_s *swOpData,
+    vx_binary_operation_info_s *operation,
+    vx_binary_loader_s *binLoad,
+    vx_binary_segment_s *segment
+    )
+{
+    vx_status status = VX_SUCCESS;
+    gceSTATUS status_1 = gcvSTATUS_OK;
+    vx_uint32 i = 0;
+    vx_binary_layer_parameter_s *layerParam = VX_NULL;
+    vx_binary_nn_layer_User_s *userLayer = VX_NULL;
+    vx_char *env = VX_NULL;
+    vx_char userLibName[256];
+
+    if (VX_NULL == binLoad->libUserLayerHandle)
+    {
+        gcoOS_GetEnv(gcvNULL, "VIV_VX_USER_LIB_NAME", &env);
+        if (env)
+        {
+            gcoOS_StrCopySafe(userLibName, 256, env);
+        }
+        else
+        {
+        #if defined(_WINDOWS)
+            gcoOS_StrCopySafe(userLibName, 256, "libUserLayer.dll");
+        #else
+            gcoOS_StrCopySafe(userLibName, 256, "libUserLayer.so");
+        #endif
+        }
+
+        status_1 = gcoOS_LoadLibrary(gcvNULL, userLibName, &binLoad->libUserLayerHandle);
+        if(status_1 != gcvSTATUS_OK)
+        {
+            vxError("Can't open library=%s!\n", userLibName);
+            return VX_FAILURE;
+        }
+    }
+
+    userLayer = (vx_binary_nn_layer_User_s*)vxAllocateAndZeroMemory(sizeof(vx_binary_nn_layer_User_s));
+    userLayer->buffers = (vx_binary_layer_buffer_s*)vxAllocateAndZeroMemory(operation->counterOfPatches * sizeof(vx_binary_layer_buffer_s));
+
+    for (i = 0; i < operation->counterOfPatches; i++)
+    {
+        layerParam = &binLoad->layerParam[operation->indexOfFirstPatch + i];
+        vxoBinaryGraph_PaserSWLayerParameter(node, binLoad, layerParam, &userLayer->buffers[i]);
+    }
+
+    userLayer->buffer_num = operation->counterOfPatches;
+    userLayer->base.segmentType = swOpData->swOperationType;
+    vxMemCopy((vx_ptr)userLayer->base.name, (vx_const_ptr)swOpData->name, 64);
+    segment->base = &userLayer->base;
+
+    return status;
+}
+
+typedef void * (*GetUserFuncHandle)(vx_binary_layer_buffer, vx_uint32);
+
+VX_PRIVATE_API vx_status do_UserLayer(
+    vx_binary_loader_s *binLoad,
+    vx_binary_segment_s *segment
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vx_char *name = segment->base->name;
+    vx_binary_nn_layer_User_s *userLayer = (vx_binary_nn_layer_User_s*)segment->base;
+    GetUserFuncHandle userFuncHandle = VX_NULL;
+
+    if (gcoOS_StrCmp(segment->base->name, "\0") == gcvSTATUS_OK)
+    {
+        vxError("%s[%d]: failed, user layer func symbol is NULL\n", __FUNCTION__, __LINE__);
+        return VX_FAILURE;
+    }
+
+    if (gcvSTATUS_OK != gcoOS_GetProcAddress(gcvNULL, binLoad->libUserLayerHandle, name, (gctPOINTER *)&userFuncHandle))
+    {
+        vxError("%s[%d]: Can't get user function pointer\n", __FUNCTION__, __LINE__);
+        return VX_FAILURE;
+    }
+
+    userFuncHandle(userLayer->buffers, userLayer->buffer_num);
 
     return status;
 }
@@ -1058,7 +1145,15 @@ static vx_status readBinDynamic(
     {
         vxmONERROR(readerLocate(reader, binLoad->fixed.swOpDataTable.offset));
         binLoad->swOpsData = (vx_binary_sw_operation_info_s *)(reader->currentData);
-        binLoad->nSwOps = binLoad->fixed.swOpDataTable.size / sizeof(vx_binary_sw_operation_info_s);
+
+        if (binLoad->fixed.header.version >= 0x00010009)
+        {
+            binLoad->nSwOps = binLoad->fixed.swOpDataTable.size / sizeof(vx_binary_sw_operation_info_s);
+        }
+        else
+        {
+            binLoad->nSwOps = binLoad->fixed.swOpDataTable.size / (sizeof(vx_binary_sw_operation_info_s) - sizeof(vx_char) * VX_MAX_REFERENCE_NAME);
+        }
     }
 
     /* load LCD */
@@ -1381,6 +1476,29 @@ VX_INTERNAL_API void* vxoBinaryGraph_GetLayerInfoPtrByIndex(
     return ptr;
 }
 
+VX_INTERNAL_API void* vxoBinaryGraph_GetSoftOpPtrByIndex(
+    vx_binary_loader_s *binLoad,
+    vx_binary_sw_operation_info_s *softOpPtr,
+    vx_int32 index
+    )
+{
+    void *ptr = VX_NULL;
+    vx_uint32 size = 0;
+
+    size = sizeof(vx_binary_sw_operation_info_s) - sizeof(vx_char) * VX_MAX_REFERENCE_NAME;
+
+    if (binLoad->fixed.header.version >= 0x00010009)
+    {
+        ptr = (void*)(softOpPtr + index);
+    }
+    else
+    {
+        ptr = (void*)((vx_char *)softOpPtr + index * size);
+    }
+
+    return ptr;
+}
+
 VX_PRIVATE_API vx_status vxoBinaryGraph_NNLayerDump(
     vx_node node,
     vx_binary_loader_s *binLoad
@@ -1556,6 +1674,11 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_RunOpearation(
                 }
                 break;
 
+                case VX_BINARY_SW_OPERATION_USER_CPU:
+                {
+                    do_UserLayer(binLoad, segment);
+                }
+
                 default:
                     break;
             }
@@ -1592,10 +1715,12 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_Run(
     }
     else if (vx_true_e == isSW)
     {
+        /* have CPU layer in NBG */
         vxmONERROR(vxoBinaryGraph_RunOpearation(node, binLoad));
     }
     else
     {
+        /* All operations runs on VIP */
         vxmONERROR(vxoBinaryGraph_SubmitCommand(node->binLoadMem->statesBuff,
                     node->binLoadMem->statesSize, binLoad, 0, binLoad->nOperations));
     }
@@ -3388,9 +3513,16 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSW(
         }
         break;
 
+        case VX_BINARY_SW_OPERATION_USER_CPU:
+        {
+            vxmONERROR(vxoBinaryGraph_patchSWUser(node, swOpData, operation, binLoad, segment));
+        }
+        break;
+
         default:
         {
             vxError("%s[%d]: not support this sw operation : %d\n", __FUNCTION__, __LINE__, swOpData->swOperationType);
+            vxmONERROR(VX_FAILURE);
         }
         break;
     }
@@ -3530,7 +3662,7 @@ VX_PRIVATE_API vx_status binaryGenerateStatesBuffer(
                     layerIndex++;
 
                     /*2. cpu segment */
-                    swOpData = &binLoad->swOpsData[operation->operationIndex];
+                    swOpData = (vx_binary_sw_operation_info_s*)vxoBinaryGraph_GetSoftOpPtrByIndex(binLoad, binLoad->swOpsData, operation->operationIndex);
                     vxmASSERT(layerIndex < binLoad->segmentsCount);
                     segment = &binLoad->segments[layerIndex];
                     segment->isSWSegment = vx_true_e;
@@ -3971,7 +4103,13 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_InitBinaryLoad(
    {
        binLoad->segments = (vx_binary_segment_s*)vxAllocateAndZeroMemory(binLoad->segmentsCount * sizeof(vx_binary_segment_s));
    }
+   else
+   {
+       vxError("%s[%d]: fail to get segments count\n", __FUNCTION__, __LINE__);
+       vxmONERROR(VX_ERROR_NO_MEMORY);
+   }
 
+OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -4189,31 +4327,26 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_ReleaseNBG(
     }
 
     /* free SW operation segment object */
-    if (binLoad != VX_NULL)
+    for (i= 0 ; i < binLoad->segmentsCount; i++)
     {
-        for (i= 0 ; i < binLoad->segmentsCount; i++)
+        vx_binary_segment_s *segment = &binLoad->segments[i];
+        if ((segment != VX_NULL) && (segment->isSWSegment == vx_true_e) && (segment->base != VX_NULL))
         {
-            vx_binary_segment_s *segment = &binLoad->segments[i];
-            if ((segment != VX_NULL) && (segment->isSWSegment == vx_true_e) && (segment->base != VX_NULL))
+            if (segment->base->segmentType == VX_BINARY_SW_OPERATION_USER_CPU)
             {
-                switch (segment->base->segmentType)
-                {
-                    case VX_BINARY_SW_OPERATION_RPN:
-                    {
-                        vx_binary_nn_layer_RPN_s *rpnLayer = (vx_binary_nn_layer_RPN_s*)segment->base;
-                        gcoOS_Free(gcvNULL, (gctPOINTER)rpnLayer);
-                    }
-                    break;
-
-                    default:
-                    {
-                        vxError("%s[%d]: not release this sw operation : %d\n",
-                            __FUNCTION__, __LINE__, segment->base->segmentType);
-                    }
-                    break;
-                }
+                vx_binary_nn_layer_User_s *useLayer = (vx_binary_nn_layer_User_s*)segment->base;
+                gcoOS_Free(gcvNULL, (gctPOINTER)useLayer->buffers);
             }
+
+            gcoOS_Free(gcvNULL, (gctPOINTER)segment->base); /* free CPU layer object */
+            segment->base = VX_NULL;
         }
+    }
+
+    if(binLoad->libUserLayerHandle)
+    {
+        gcoOS_FreeLibrary(gcvNULL, binLoad->libUserLayerHandle);
+        binLoad->libUserLayerHandle = VX_NULL;
     }
 
     for (i = 0; i < binLoad->fixed.header.inputCount; i++)
@@ -5923,6 +6056,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveErrorHandle(
 }
 
 VX_PRIVATE_API vx_bool vxoBinaryGraph_isSupportSWOperation(
+    vx_context context,
     vxnne_operation operation
     )
 {
@@ -5933,9 +6067,21 @@ VX_PRIVATE_API vx_bool vxoBinaryGraph_isSupportSWOperation(
         return isSupport;
     }
 
-    if (VXNNE_OPERATOR_RPN == operation->operatorType)
+    switch(operation->operatorType)
     {
-        isSupport = vx_true_e;
+        case VXNNE_OPERATOR_RPN:
+            isSupport = vx_true_e;
+            break;
+
+        case VXNNE_OPERATOR_USER_CPU:
+            if (0 == context->options.enableCacheBinaryGraph)
+            {   /* customer CPU layer not support in CACHE mode */
+                isSupport = vx_true_e;
+            }
+            break;
+
+        default:
+            break;
     }
 
     return isSupport;
@@ -5966,17 +6112,72 @@ VX_PRIVATE_API vx_uint32 vxoBinaryGraph_SaveLayerParamTable(
 
 VX_PRIVATE_API vx_status vxoBinaryGraph_SaveSWOperationInfo(
     vx_graph graph,
+    vx_node node,
     vx_uint32 operationType
-)
+    )
 {
     vx_binary_sw_operation_info_s swOperationInfo;
     vx_binary_save binarySave = graph->binarySave;
     vx_status status = VX_SUCCESS;
 
     swOperationInfo.swOperationType = operationType;
+    if (gcoOS_StrCmp(node->base.name, "\0") != gcvSTATUS_OK)
+    {
+        /* use vx_node->reference->name */
+        if (gcoOS_StrStr(node->base.name, ".", VX_NULL))
+        {
+            vxError("%s[%d]: failed, have '.' char in node->reference.name, not support\n", __FUNCTION__, __LINE__);
+            return VX_FAILURE;
+        }
+        gcoOS_StrCopySafe(swOperationInfo.name, VX_MAX_REFERENCE_NAME, node->base.name);
+    }
+    else if ((node->layer->name != VX_NULL) && (gcoOS_StrCmp(node->layer->name, "\0") != gcvSTATUS_OK))
+    {
+        gceSTATUS status = gcvSTATUS_TRUE;
+        gctSTRING pos = (gctSTRING)node->layer->name;
+        vx_uint32 dotNum = 0;
+        vx_uint32 i = 0;
+        /* get the string without '.' */
+        while(status == gcvSTATUS_TRUE)
+        {
+            status = gcoOS_StrStr(pos, ".", (gctSTRING*)&pos);
+            dotNum++;
+            pos += 1;
+        };
+        pos = (gctSTRING)node->layer->name;
+        for (i = 0; i < dotNum - 1; i++)
+        {
+            gcoOS_StrStr(pos, ".", (gctSTRING*)&pos);
+            pos += 1;
+        }
+        /* use layer->name */
+        gcoOS_StrCopySafe(swOperationInfo.name, VX_MAX_REFERENCE_NAME, pos);
+    }
+    else if (gcoOS_StrCmp(node->kernel->name, "\0") != gcvSTATUS_OK)
+    {
+        gceSTATUS status = gcvSTATUS_TRUE;
+        gctSTRING pos = (gctSTRING)node->kernel->name;
+        vx_uint32 dotNum = 0;
+        vx_uint32 i = 0;
+
+        while(status == gcvSTATUS_TRUE)
+        {
+            status = gcoOS_StrStr(pos, ".", (gctSTRING*)&pos);
+            dotNum++;
+            pos += 1;
+        };
+        pos = (gctSTRING)node->kernel->name;
+        for (i = 0; i < dotNum - 1; i++)
+        {
+            gcoOS_StrStr(pos, ".", (gctSTRING*)&pos);
+            pos += 1;
+        }
+        /* use kernel name */
+        gcoOS_StrCopySafe(swOperationInfo.name, VX_MAX_REFERENCE_NAME, pos);
+    }
 
     status = vxoBinaryGraph_Write(binarySave, binarySave->currSWOperationOffset,
-                         sizeof(vx_binary_sw_operation_info_s), &swOperationInfo);
+                                  sizeof(vx_binary_sw_operation_info_s), &swOperationInfo);
     WRITE_NBG_STATUS_CHECK();
 
     binarySave->currSWOperationOffset += sizeof(vx_binary_sw_operation_info_s);
@@ -6059,7 +6260,7 @@ VX_PRIVATE_API vx_uint32 vxoBinaryGraph_GetSourceType(
     vx_uint32 basePhysical,
     vx_uint8_ptr baseLogical,
     vx_int32 *index
-)
+    )
 {
     vx_binary_save binarySave = graph->binarySave;
     vx_uint32 sourceType = 0;
@@ -6197,7 +6398,7 @@ VX_PRIVATE_API vx_uint32 vxoBinaryGraph_SaveScalarToLayerParamTable(
     vxnne_operation operation,
     vx_scalar scalar,
     vx_char *paramName
-)
+    )
 {
     vx_binary_layer_parameter_s layerParam;
     vx_uint32 index = 0;
@@ -6223,7 +6424,7 @@ VX_PRIVATE_API vx_uint32 vxoBinaryGraph_SaveScalarToLayerParamTable(
 
 VX_PRIVATE_API vx_status vxoBinaryGraph_SaveSWRPN(
     vxnne_operation operation
-)
+    )
 {
     vx_status status = VX_SUCCESS;
     vx_uint32 indexOfFirst = 0, paramCount = 0;
@@ -6241,6 +6442,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveSWRPN(
     vx_scalar pre_nms_topn = rpnOperation->pre_nms_topn;
     vx_scalar post_nms_topn = rpnOperation->post_nms_topn;
     vx_scalar nms_thresh = rpnOperation->nms_thresh;
+    vx_node node = operation->layer->node;
     gcmHEADER_ARG("operation=%p", operation);
 
     indexOfFirst = vxoBinaryGraph_SaveTensorToLayerParamTable(graph, operation, score, "score");
@@ -6276,18 +6478,65 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveSWRPN(
     vxoBinaryGraph_SaveScalarToLayerParamTable(graph, operation, nms_thresh, "nms_thresh");
     paramCount++;
 
-    vxoBinaryGraph_SaveOperationTableForSW(graph, operation, indexOfFirst, paramCount);
+    vxmONERROR(vxoBinaryGraph_SaveOperationTableForSW(graph, operation, indexOfFirst, paramCount));
 
     /*5. save SW operation data */
-    vxoBinaryGraph_SaveSWOperationInfo(graph, VX_BINARY_SW_OPERATION_RPN);
+    vxmONERROR(vxoBinaryGraph_SaveSWOperationInfo(graph, node, VX_BINARY_SW_OPERATION_RPN));
 
+OnError:
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoBinaryGraph_SaveUserCPU(
+    vxnne_operation operation
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vx_uint32 indexOfFirst = 0, index = 0;
+    vx_graph graph = operation->layer->node->graph;
+    vx_node node = operation->layer->node;
+    vx_uint32 paramCount = node->kernel->signature.paramCount;
+    vx_reference *paramTable = node->paramTable;
+    vx_uint32 i = 0;
+    vx_char name[50];
+    gcmHEADER_ARG("operation=%p", operation);
+
+    for (i = 0; i < paramCount; i++)
+    {
+        vx_reference ref = paramTable[i];
+        sprintf(name, "%d", i);
+        if (ref->type == VX_TYPE_TENSOR)
+        {
+            index = vxoBinaryGraph_SaveTensorToLayerParamTable(graph, operation, (vx_tensor)ref, name);
+        }
+        else if (ref->type == VX_TYPE_SCALAR)
+        {
+            index = vxoBinaryGraph_SaveScalarToLayerParamTable(graph, operation, (vx_scalar)ref, name);
+        }
+        else if (ref->type == VX_TYPE_ARRAY)
+        {
+            vxInfo("TODO....\n");
+        }
+
+        if (0 == i)
+        {
+            indexOfFirst = index;
+        }
+    }
+
+    vxmONERROR(vxoBinaryGraph_SaveOperationTableForSW(graph, operation, indexOfFirst, paramCount));
+
+    vxmONERROR(vxoBinaryGraph_SaveSWOperationInfo(graph, node, VX_BINARY_SW_OPERATION_USER_CPU));
+
+OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
 }
 
 VX_INTERNAL_API vx_status vxoBinaryGraph_SaveSWOperation(
     vxnne_operation operation
-)
+    )
 {
     vx_context context = operation->layer->node->base.context;
     vx_graph graph = operation->layer->node->graph;
@@ -6306,6 +6555,10 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveSWOperation(
             vxmONERROR(vxoBinaryGraph_SaveSWRPN(operation));
             break;
 
+        case VXNNE_OPERATOR_USER_CPU:
+            vxmONERROR(vxoBinaryGraph_SaveUserCPU(operation));
+            break;
+
         default:
             vxError("not implement this SW layer in binary graph. operator type: %d\n", operation->operatorType);
             break;
@@ -6315,7 +6568,6 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveSWOperation(
     return status;
 
 OnError:
-
     status = vxoBinaryGraph_SaveErrorHandle(graph, status);
 
     vxError("%s[%d]: fail to save SW layer\n", __FUNCTION__, __LINE__);
@@ -9990,7 +10242,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
         else if (operationTarget == VX_BINARY_OPERATION_TYPE_SW)
         {
             vx_node node = operation->layer->node;
-            vx_bool isSupport = vxoBinaryGraph_isSupportSWOperation(operation);
+            vx_bool isSupport = vxoBinaryGraph_isSupportSWOperation(context, operation);
             if (!isSupport)
             {
                 vxError("fail to generate binary, because not support this software operation\n");
@@ -10665,7 +10917,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
     binarySave->headerInfo.magic[1]= 'P';
     binarySave->headerInfo.magic[2]= 'M';
     binarySave->headerInfo.magic[3]= 'N';
-    binarySave->headerInfo.version = 0x00010008;
+    binarySave->headerInfo.version = 0x00010009;
     binarySave->headerInfo.target = context->pid;
     binarySave->headerInfo.layerCount     = graph->nodeCount;
     binarySave->headerInfo.operationCount = binarySave->operationCount;

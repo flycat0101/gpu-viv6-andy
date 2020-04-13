@@ -1963,6 +1963,8 @@ vx_status vxnneUserOperation_Execute(
 
     if (node->kernel->function)
     {
+        vxoBinaryGraph_SaveSWOperation(operation);
+
         vxmONERROR(node->kernel->function(node,
                                           node->paramTable,
                                           node->kernel->signature.paramCount));

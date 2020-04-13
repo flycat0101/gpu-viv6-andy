@@ -14,6 +14,7 @@
 #ifndef __GC_VX_BINARY_H__
 #define __GC_VX_BINARY_H__
 
+#define VX_MAX_SW_LAYER_NAME_LENGTH       64
 #define VX_MAX_LAYER_NAME_LENGTH          64
 #define VX_MAX_NAME_LEGTH                 64
 #define VX_MAX_IO_NAME_LEGTH              64
@@ -114,6 +115,7 @@ typedef enum _vx_binary_sw_operation_type_e
 {
     VX_BINARY_SW_OPERATION_NONE        = 0,
     VX_BINARY_SW_OPERATION_RPN         = 1,
+    VX_BINARY_SW_OPERATION_USER_CPU    = 2,
 }
 vx_binary_sw_operation_type_e;
 
@@ -145,6 +147,7 @@ vx_binary_patch_name_e;
 typedef struct _vx_binary_segment_base_s
 {
     vx_uint32           segmentType;
+    vx_char             name[64];
 }
 vx_binary_segment_base_s;
 
@@ -180,6 +183,13 @@ typedef struct _vx_binary_nn_layer_RPN_s
 }
 vx_binary_nn_layer_RPN_s;
 
+typedef struct _vx_binary_nn_layer_User_s
+{
+    vx_binary_segment_base_s                base;
+    vx_binary_layer_buffer                  buffers;
+    vx_uint32                               buffer_num;
+}
+vx_binary_nn_layer_User_s;
 
 
 /**************CPU Operation Layer Define End**********/
@@ -401,6 +411,7 @@ vx_binary_sh_operation_info_s;
 typedef struct _vx_binary_sw_operation_info_s
 {
     vx_uint32                              swOperationType;
+    vx_char                                name[VX_MAX_SW_LAYER_NAME_LENGTH];
 }
 vx_binary_sw_operation_info_s;
 
@@ -690,6 +701,7 @@ typedef struct _vx_binary_loader
     vx_binary_io_patch_info_s               *outputPatch;
 
     vx_uint32                               status;
+    void                                    *libUserLayerHandle;
 } vx_binary_loader_s;
 
 typedef struct _vx_binary_reader
