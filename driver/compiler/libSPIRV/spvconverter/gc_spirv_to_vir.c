@@ -4240,7 +4240,7 @@ static gctBOOL __SpvIsResultMemoryAddress(gcSPV spv, VIR_Shader * virShader)
         (typeStorageClass == SpvStorageClassStorageBuffer || typeStorageClass == SpvStorageClassWorkgroup))
     {
         /*
-        ** According to spec, a variable pointer that results from one of thos following instructions:
+        ** According to spec, a variable pointer that results from one of those following instructions:
         **  OpSelect, OpPhi, OpFunctionCall, OpPtrAccessChain, OpCopyObject, OpLoad, OpConstantNull.
         ** And we still need to check OpFunction/OpFunctionParameter/OpVariable.
         */
@@ -6722,35 +6722,50 @@ VSC_ErrCode __SpvEmitAccessChain(gcSPV spv, VIR_Shader * virShader)
         baseTypeId = VIR_Symbol_GetTypeId(baseSymbol);
     }
 
-    /* If this is a OpPtrAccessChain, we need to construct an array type based on the array stride from OpDecorate. */
+    /*
+    ** For a OpPtrAccessChain/OpInBoundsAccessChain, according to SPIR-V spec 1.5.2:
+    ** If this is from OpPtrAccessChain/OpInBoundsAccessChain, we need to construct an array type:
+    ** For objects in the Uniform, StorageBuffer, or PushConstant storage classes, the element’s address or location is
+    ** calculated using a stride, which will be the Base-type’s Array Stride when the Base type is decorated with ArrayStride.
+    ** For all other objects, the implementation will calculate the element’s address or location.
+    ** So we need to construct an array type for it.
+    */
     if (virBaseTypeInfo.bIsPtrAccessChain)
     {
+        gctINT                  arrayStride = 0;
+        SpvId                   baseSpvPointerTypeId = SPV_ID_SYM_SPV_POINTER_TYPE(spv->operands[0]);
+        SpvId                   baseSpvTypeId = SPV_ID_SYM_SPV_TYPE(spv->operands[0]);
+        SpvStorageClass         baseStorageClass = SPV_ID_TYPE_POINTER_STORAGE_CLASS(baseSpvPointerTypeId);
         SpvCovDecorator*        pDec = spv->decorationList;
-        SpvId                   baseSpvTypeId = SPV_ID_SYM_SPV_POINTER_TYPE(spv->operands[0]);
 
-        /* Find the decoration by target and member index. */
-        SPV_GET_DECORATOR(pDec, baseSpvTypeId, -1);
+        if (baseStorageClass == SpvStorageClassUniform      ||
+            baseStorageClass == SpvStorageClassPushConstant ||
+            baseStorageClass == SpvStorageClassStorageBuffer)
+        {
+            /* Get the array stride from the decoration. */
+            SPV_GET_DECORATOR(pDec, baseSpvPointerTypeId, -1);
 
-        /* Get the array stride, and according to spec:
-        ** Each OpPtrAccessChain must have a Base whose type is decorated with ArrayStride.
-        */
-        if (pDec == gcvNULL || pDec->decorationData.arrayStride == -1)
-        {
-            /*
-            ** According to spec:
-            ** Each OpPtrAccessChain must have a base whose type is decorated with ArrayStride.
-            */
-            gcmASSERT(gcvFALSE);
+            if (pDec == gcvNULL || pDec->decorationData.arrayStride == -1)
+            {
+                gcmASSERT(gcvFALSE);
+            }
+            else
+            {
+                arrayStride = pDec->decorationData.arrayStride;
+            }
         }
-        else
+        else if (virBaseTypeInfo.bIsBaseVarMemory)
         {
-            /* Construct the array type. */
-            VIR_Shader_AddArrayType(virShader,
-                                    baseTypeId,
-                                    (gctUINT)-1,
-                                    pDec->decorationData.arrayStride,
-                                    &baseTypeId);
+            while (SPV_ID_TYPE_IS_POINTER(baseSpvTypeId))
+            {
+                baseSpvTypeId = SPV_ID_TYPE_POINTER_OBJECT_SPV_TYPE(baseSpvTypeId);
+            };
+
+            arrayStride = VIR_Type_GetTypeByteSize(virShader, SPV_ID_TYPE_VIR_TYPE(baseSpvTypeId));
         }
+
+        /* Construct the array type. */
+        VIR_Shader_AddArrayType(virShader, baseTypeId, (gctUINT)-1, arrayStride, &baseTypeId);
     }
     gcmASSERT(baseTypeId != VIR_TYPE_UNKNOWN);
 
