@@ -1689,6 +1689,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
             info->vx_nn_general_cmd_info.imageStartAddress = 0;
             info->vx_nn_general_cmd_info.imageEndAddress = 2048;
 
+            info->vx_nn_general_cmd_info.kernelDirectStreamFromVipSram = 0;
             info->vx_nn_general_cmd_info.kernelCachingMode = 0;
             info->vx_nn_general_cmd_info.partialCacheDataUnit = 0;
             info->vx_nn_general_cmd_info.kernelPatternMsb = 0;
