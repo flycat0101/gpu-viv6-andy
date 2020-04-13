@@ -1829,7 +1829,18 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNetworkNameAndRank(
         gcoOS_StrCatSafe(networkName, VX_MAX_NAME_LEGTH, env);
     }
 
-    gcoOS_StrCopySafe(binarySave->headerInfo.networkName, VX_MAX_NAME_LEGTH, networkName);
+    gcoOS_GetEnv(gcvNULL, "VIV_VX_DISABLE_SET_NBG_NAME", &env);
+    if (env != VX_NULL)
+    {
+        gcoOS_StrCopySafe(binarySave->headerInfo.networkName, VX_MAX_NAME_LEGTH, "dummy_network_name");
+    }
+    else
+    {
+        gcoOS_StrCopySafe(binarySave->headerInfo.networkName, VX_MAX_NAME_LEGTH, networkName);
+    }
+
+    vxInfo("NBG network name field : %s\n", binarySave->headerInfo.networkName);
+
     return VX_SUCCESS;
 }
 
@@ -5223,12 +5234,6 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_RefineInputOutput(
                 useUserSet = 0;
                 break;
             }
-
-            if (j == inCount)
-            {
-                vxError("%s[%d]: can't search this input ref in inputEntry, index: %d \n",
-                    __FUNCTION__, __LINE__, i);
-            }
         }
 
         if (1 == useUserSet)
@@ -5274,12 +5279,6 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_RefineInputOutput(
                 /* doesn't allocate mmeory for this reference object, let bypass */
                 useUserSet = 0;
                 break;
-            }
-
-            if (j == outCount)
-            {
-                vxError("%s[%d]: can't search this output ref in outputEntry, index: %d \n",
-                    __FUNCTION__, __LINE__, i);
             }
         }
 
@@ -5781,7 +5780,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_unInitial(
         gcoOS_Flush(gcvNULL, binarySave->binarySaveFile);
         gcmVERIFY_OK(gcoOS_Close(gcvNULL, binarySave->binarySaveFile));
         binarySave->binarySaveFile = VX_NULL;
-        vxInfo("network binary graph file has been closed\n");
+        vxInfo("network binary graph file has been closed, NBG name: %s\n", binarySave->binaryFileName);
     }
 
     if (graph->binarySave->inputInfo != VX_NULL)
@@ -8956,7 +8955,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
                         binarySave->inputParamCount++;
                     }
 
-                    if (i >= binarySave->inputTableRefCount)
+                    if ((i >= binarySave->inputTableRefCount) && (0 == graph->inputCount))
                     {
                         vxError("generate binary graph input not match for scale....\n");
                     }
@@ -9213,7 +9212,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
                         binarySave->outputParamCount++;
                     }
 
-                    if (i >= binarySave->outputTableRefCount)
+                    if ((i >= binarySave->outputTableRefCount) && (0 == graph->outputCount))
                     {
                         vxError("generate binary graph output not match for scale....\n");
                     }
@@ -9277,7 +9276,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
                         }
                     }
 
-                    if (i >= binarySave->outputTableRefCount)
+                    if ((i >= binarySave->outputTableRefCount) && (0 == graph->outputCount))
                     {
                         vxError("generate binary graph output not match....\n");
                     }
@@ -10701,7 +10700,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_FindNodeIndexForWeight(
         /* use FC's weight/bias to match if this graph doesn't CONV node*/
         if (nodeIndex < 0)
         {
-            for (nodeIndex = nodeCount - 1; nodeIndex > 0; nodeIndex--)
+            for (nodeIndex = nodeCount - 1; nodeIndex >= 0; nodeIndex--)
             {
                 node = nodeTable[graph->allNodeIndexTable[nodeIndex]];
                 if (vxoBinaryGraph_isFC(node))
@@ -10715,7 +10714,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_FindNodeIndexForWeight(
         {
             /* the graph doesn't CONV and FC */
             *index = -1;
-            vxInfo("the graph doesn't CONV and FC, right or not?\n");
+            vxInfo("the graph has branch. doesn't CONV and FC, right or not?\n");
         }
     }
     else
@@ -10771,6 +10770,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_FindNodeIndexForWeight(
             {
                 /* the graph doesn't CONV and FC */
                 *index = -1;
+                vxInfo("the graph no branch. doesn't CONV and FC, right or not?\n");
             }
         }
     }
@@ -11675,6 +11675,7 @@ VX_INTERNAL_API void vxoBinaryGraph_CacheOrImport(
     if ((graph->base.context->options.enableSaveBinary) ||
         (graph->base.context->options.enableNNLayerDump) ||
         (graph->base.context->options.enableCNNPerf) ||
+         /* NBG doesn't support MCFE hardware */
          mcfeEnabled ||
         (0 == graph->base.context->options.enableCacheBinaryGraph))
     {
@@ -11716,6 +11717,10 @@ VX_INTERNAL_API void vxoBinaryGraph_CacheOrImport(
             vxError("%s[%d]: no weight data in weight_bias_parameter\n", __FUNCTION__, __LINE__);
             vxmONERROR(VX_FAILURE);
         }
+    }
+    else
+    {
+        vxInfo("can't find weight in this network\n");
     }
 
     /* generate a key */
