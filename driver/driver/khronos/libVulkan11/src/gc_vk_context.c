@@ -551,8 +551,9 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyDevice(
             {
                 __VK_FREE(devCtx->pEnabledExtensions);
             }
-
             __VK_FREE(devCtx);
+
+            vscFreeVirIntrinsicLib();
         }
     }
 }
