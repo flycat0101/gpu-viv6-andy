@@ -3762,6 +3762,7 @@ vx_status vxnnePoolingMax(
 
 vx_status vxnnePoolingAvg(
     vx_uint8_ptr src,
+    vx_int32 type,
     vx_int8 srcFixPointPos,
     vx_type_e srcFormat,
     vx_int32 input_width,
@@ -3844,7 +3845,7 @@ vx_status vxnnePoolingAvg(
                         }
                     }
                     if(count != 0)
-                        vxnneSaveDataExt(dstFormat, dstQuantFormat, pool_index, sum/count, data_d, dstFixPointPos, outputZP, outputScale, dstRoundingMode);
+                        vxnneSaveDataExt(dstFormat, dstQuantFormat, pool_index, sum/((type == 3) ? (kernel_y_v * kernel_x_v) : count), data_d, dstFixPointPos, outputZP, outputScale, dstRoundingMode);
                 }
 
             }
@@ -3921,7 +3922,9 @@ vx_status vxnnePoolingCpu(
                             outputScale);
         break;
         case 2:
+        case 3:
             vxnnePoolingAvg(src,
+                            type,
                             srcFixPointPos,
                             srcFormat,
                             input_width,

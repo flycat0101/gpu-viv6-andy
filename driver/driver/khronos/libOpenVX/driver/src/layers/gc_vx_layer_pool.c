@@ -58,8 +58,10 @@ vx_status vxnneExecuteSWPooling(struct _vxnne_operation_s *operation)
         type = 1;
         break;
     case VX_NN_POOLING_AVG:
-    case VX_NN_POOLING_AVG_ANDROID:
         type = 2;
+        break;
+    case VX_NN_POOLING_AVG_ANDROID:
+        type = 3;
         break;
     default:
         vxError("not support this pool type");

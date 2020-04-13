@@ -316,6 +316,7 @@ vx_status vxnnePoolingCpu(
 
 vx_status vxnnePoolingAvg(
     vx_uint8_ptr src,
+    vx_int32 type,
     vx_int8 srcFixPointPos,
     vx_type_e srcFormat,
     vx_int32 input_width,
