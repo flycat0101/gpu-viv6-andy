@@ -4448,10 +4448,24 @@ struct _VIR_UNIFORM
             */
             VIR_SymId       ycbcrPlaneSymId[__YCBCR_PLANE_COUNT__];
 
-            /* The sampled image symbol ID. */
-            VIR_SymId       sampledImageSymId;
-
             gctUINT         arrayIdxInParent;
+
+            /*
+            ** The sampled image information for both a sampled-image and a sampler.
+            ** So far it is for vulkan only.
+            */
+            struct
+            {
+                /* For a parent sampler only. */
+                /* Record the sampled image associated to this sampler. */
+                VIR_IdList* pSampledImageSymIdList;
+                /* Record the total physical for the sampled image list. */
+                gctUINT     totalPhysicalCount;
+
+                /* For a sampled image only. */
+                /* Record the physical offset.*/
+                gctUINT     physicalOffset;
+            } sampledImageInfo;
         } samplerOrImageAttr;
         struct
         {
@@ -6496,6 +6510,13 @@ VIR_Shader_BubbleSortSymIdList(
     IN VIR_IdList*      pIdList,
     IN SortCompartFunc  pFunc,
     IN gctUINT          length
+    );
+
+VSC_ErrCode
+VIR_Shader_CollectSampledImageInfo(
+    IN VSC_SHADER_RESOURCE_LAYOUT*  pResLayout,
+    IN VIR_Shader*                  pShader,
+    IN VSC_MM *                     pMM
     );
 
 /* setters */

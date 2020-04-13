@@ -8887,7 +8887,6 @@ VIR_Shader_AddSymbolContents(
                         uniform->u.samplerOrImageAttr.levelsSamples = VIR_INVALID_ID;
                         uniform->u.samplerOrImageAttr.extraImageLayer = VIR_INVALID_ID;
                         uniform->u.samplerOrImageAttr.texelBufferToImageSymId   = VIR_INVALID_ID;
-                        uniform->u.samplerOrImageAttr.sampledImageSymId   = VIR_INVALID_ID;
                         for (i = 0; i < __YCBCR_PLANE_COUNT__; i++)
                         {
                             uniform->u.samplerOrImageAttr.ycbcrPlaneSymId[i] = VIR_INVALID_ID;
@@ -8901,7 +8900,6 @@ VIR_Shader_AddSymbolContents(
                     uniform->u.samplerOrImageAttr.levelsSamples = VIR_INVALID_ID;
                     uniform->u.samplerOrImageAttr.extraImageLayer = VIR_INVALID_ID;
                     uniform->u.samplerOrImageAttr.texelBufferToImageSymId   = VIR_INVALID_ID;
-                    uniform->u.samplerOrImageAttr.sampledImageSymId   = VIR_INVALID_ID;
                     for (i = 0; i < __YCBCR_PLANE_COUNT__; i++)
                     {
                         uniform->u.samplerOrImageAttr.ycbcrPlaneSymId[i] = VIR_INVALID_ID;
@@ -9852,6 +9850,82 @@ VIR_Shader_BubbleSortSymIdList(
             }
         }
     }
+}
+
+/* Collect the sampled image information. */
+VSC_ErrCode
+VIR_Shader_CollectSampledImageInfo(
+    IN VSC_SHADER_RESOURCE_LAYOUT*  pResLayout,
+    IN VIR_Shader*                  pShader,
+    IN VSC_MM *                     pMM
+    )
+{
+    VSC_ErrCode                     errCode = VSC_ERR_NONE;
+    gctUINT                         i;
+
+    for (i = 0; i < VIR_IdList_Count(&pShader->uniforms); i++)
+    {
+        VIR_Id                      id  = VIR_IdList_GetId(&pShader->uniforms, i);
+        VIR_Symbol*                 pUniformSym = VIR_Shader_GetSymFromId(pShader, id);
+        VIR_Uniform*                pUniform = gcvNULL;
+        VIR_Type*                   pUniformType = VIR_Symbol_GetType(pUniformSym);
+        gctUINT                     physicalCount = VIR_Type_isArray(pUniformType) ? VIR_Type_GetArrayLength(pUniformType) : 1;
+        VIR_Symbol*                 pSeparateSamplerSym;
+        VIR_Uniform*                pSeparateSamplerUniform = gcvNULL;
+        VIR_IdList*                 pSymIdList = gcvNULL;
+
+        /* Check sampled_image only. */
+        if (VIR_Symbol_GetUniformKind(pUniformSym) != VIR_UNIFORM_SAMPLED_IMAGE)
+        {
+            continue;
+        }
+
+        /* Check active uniforms only. */
+        if (!isSymUniformUsedInShader(pUniformSym)      &&
+            !isSymUniformUsedInLTC(pUniformSym)         &&
+            !isSymUniformImplicitlyUsed(pUniformSym)    &&
+            !VIR_Uniform_AlwaysAlloc(pShader, pUniformSym))
+        {
+            continue;
+        }
+
+        /* Get the sampled image uniform. */
+        pUniform = VIR_Symbol_GetUniformPointer(pShader, pUniformSym);
+
+        /* Get the separate sampler uniform. */
+        pSeparateSamplerUniform = VIR_Symbol_GetHwMappingSeparateSamplerUniform(pResLayout, pShader, pUniformSym);
+        if (pSeparateSamplerUniform == gcvNULL)
+        {
+            pSeparateSamplerSym =  VIR_Symbol_GetSeparateSampler(pShader, pUniformSym);
+            pSeparateSamplerUniform = VIR_Symbol_GetUniformPointer(pShader, pSeparateSamplerSym);
+        }
+        gcmASSERT(pSeparateSamplerUniform != gcvNULL);
+
+        /* Get the sampled image list. */
+        pSymIdList = pSeparateSamplerUniform->u.samplerOrImageAttr.sampledImageInfo.pSampledImageSymIdList;
+        if (pSymIdList == gcvNULL)
+        {
+            errCode = VIR_IdList_Init(pMM, 8, &pSymIdList);
+            ON_ERROR(errCode, "Initialize the list.");
+
+            pSeparateSamplerUniform->u.samplerOrImageAttr.sampledImageInfo.pSampledImageSymIdList = pSymIdList;
+        }
+        gcmASSERT(pSymIdList != gcvNULL);
+
+        /* Insert this symbol ID. */
+        errCode = VIR_IdList_Add(pSymIdList, id);
+        ON_ERROR(errCode, "Add a new sym ID.");
+
+        /* Set the physical offset. */
+        pUniform->u.samplerOrImageAttr.sampledImageInfo.physicalOffset =
+            pSeparateSamplerUniform->u.samplerOrImageAttr.sampledImageInfo.totalPhysicalCount;
+
+        /* Update the total physical count. */
+        pSeparateSamplerUniform->u.samplerOrImageAttr.sampledImageInfo.totalPhysicalCount += physicalCount;
+    }
+
+OnError:
+    return errCode;
 }
 
 /* setters */

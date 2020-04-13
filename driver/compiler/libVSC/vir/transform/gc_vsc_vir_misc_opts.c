@@ -11602,10 +11602,6 @@ _GenCombinedSamplerOpnd(
         /* clear the flag */
         VIR_Symbol_ClrFlag(separateSampler, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
         VIR_Symbol_ClrFlag(separateImage, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
-
-        /* Save the sampledImage symbol ID. */
-        pSeparateSamplerUniform->u.samplerOrImageAttr.sampledImageSymId = id;
-        pSeparateImageUniform->u.samplerOrImageAttr.sampledImageSymId = id;
     }
 
     VIR_Operand_SetSym(pOpnd, VIR_Shader_GetSymFromId(pShader, pUniform->sym));

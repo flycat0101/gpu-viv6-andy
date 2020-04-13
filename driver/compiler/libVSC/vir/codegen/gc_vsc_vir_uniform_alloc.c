@@ -1461,6 +1461,7 @@ VSC_ErrCode _VIR_CG_MapSamplerUniforms(
     IN gctBOOL          unblockUniformBlock,
     IN gctBOOL          allocateSamplerReverse,
     IN gctBOOL          alwaysAllocate,
+    IN gctBOOL          useSizeFromSampledImageInfo,
     IN gctINT           maxSampler,
     IN VSC_MM           *pMM,
     OUT gctUINT         *pSamplerSize,
@@ -1472,8 +1473,7 @@ VSC_ErrCode _VIR_CG_MapSamplerUniforms(
     VIR_Symbol  *pSym = VIR_Shader_GetSymFromId(pShader, VIR_Uniform_GetSymID(pUniform));
     gctBOOL   treatSamplerAsConst = gcvFALSE;
 
-    if (isSymUniformTreatSamplerAsConst(pSym) &&
-        isSymUniformUsedInShader(pSym))
+    if (isSymUniformTreatSamplerAsConst(pSym) && isSymUniformUsedInShader(pSym))
     {
         treatSamplerAsConst = gcvTRUE;
 
@@ -1500,6 +1500,11 @@ VSC_ErrCode _VIR_CG_MapSamplerUniforms(
         if (VIR_Type_GetKind(symType) == VIR_TY_ARRAY)
         {
             arrayLength = (gctINT)VIR_Type_GetArrayLength(symType);
+        }
+
+        if (useSizeFromSampledImageInfo)
+        {
+            arrayLength = vscMAX(arrayLength, (gctINT)pUniform->u.samplerOrImageAttr.sampledImageInfo.totalPhysicalCount);
         }
 
         /* Test if sampler is in range */
@@ -1655,6 +1660,7 @@ VSC_ErrCode VIR_CG_MapUniforms(
                     unblockUniformBlock,
                     allocateSamplerReverse,
                     gcvFALSE, /* always allocate */
+                    gcvFALSE,
                     maxSampler,
                     pMM,
                     gcvNULL,
@@ -2054,8 +2060,9 @@ _VIR_CG_AllocateSampledImage(
     }
 
     /* Get the address from the separate sampler. */
+    gcmASSERT(pUniform->u.samplerOrImageAttr.sampledImageInfo.physicalOffset < pSeparateSamplerUniform->u.samplerOrImageAttr.sampledImageInfo.totalPhysicalCount);
     pUniform->swizzle  = pSeparateSamplerUniform->swizzle;
-    pUniform->physical = pSeparateSamplerUniform->physical + index;
+    pUniform->physical = pSeparateSamplerUniform->physical + pUniform->u.samplerOrImageAttr.sampledImageInfo.physicalOffset;
     pUniform->address  = pSeparateSamplerUniform->address;
 
     return;
@@ -2260,13 +2267,13 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                         unblockUniformBlock,
                         allocateSamplerReverse,
                         gcvTRUE, /* always allocate */
+                        gcvTRUE,
                         maxSampler,
                         pMM,
                         &uniformSize,
                         &sampler);
                     ON_ERROR(retValue, "Failed to Allocate Uniform");
                 }
-                gcmASSERT(uniformSize <= resBinding.arraySize);
 
                 if (!bIsSeparateImage)
                 {
@@ -2333,6 +2340,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                         unblockUniformBlock,
                         allocateSamplerReverse,
                         gcvTRUE, /* always allocate */
+                        gcvFALSE,
                         maxSampler,
                         pMM,
                         &uniformSize,
@@ -2369,6 +2377,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                         unblockUniformBlock,
                         allocateSamplerReverse,
                         gcvTRUE, /* always allocate */
+                        gcvFALSE,
                         maxSampler,
                         pMM,
                         &uniformSize,
@@ -2443,8 +2452,8 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
             }
 
             case VSC_SHADER_RESOURCE_TYPE_SAMPLER:
-                /* no need to assign hw reg */
-                if (pUniform->u.samplerOrImageAttr.sampledImageSymId != VIR_INVALID_ID)
+                /* no need to assign hw reg if it is not used. */
+                if (pUniform->u.samplerOrImageAttr.sampledImageInfo.pSampledImageSymIdList != gcvNULL)
                 {
                     /* sampler allocation */
                     retValue = _VIR_CG_MapSamplerUniforms(pShader,
@@ -2456,13 +2465,12 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                                                           unblockUniformBlock,
                                                           allocateSamplerReverse,
                                                           gcvTRUE, /* always allocate */
+                                                          gcvTRUE,
                                                           maxSampler,
                                                           pMM,
                                                           &uniformSize,
                                                           &sampler);
                     ON_ERROR(retValue, "Failed to Allocate Uniform");
-
-                    gcmASSERT(uniformSize <= resBinding.arraySize);
 
                     pResAllocLayout->pResAllocEntries[i].bUse = gcvTRUE;
                     pResAllocLayout->pResAllocEntries[i].hwRegNo = pUniform->physical;
@@ -2695,6 +2703,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                     unblockUniformBlock,
                     allocateSamplerReverse,
                     gcvTRUE, /* always allocate */
+                    gcvFALSE,
                     maxSampler,
                     pMM,
                     &uniformSize,
@@ -2967,6 +2976,10 @@ VSC_ErrCode VIR_RA_PerformUniformAlloc(
                 gctBOOL                 bChanged = gcvFALSE;
                 VIR_DEF_USAGE_INFO*     pDuInfo = pPassWorker->pDuInfo;
 
+                /* Collect the sampled image information. */
+                retValue = VIR_Shader_CollectSampledImageInfo(pShResourceLayout, pShader, pMM);
+                ON_ERROR(retValue, "Collect the sampled image information.");
+
                 pUnbindUniformHash = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 8);
                 retValue = VIR_CG_MapUniformsWithLayout(pShader, pHwCfg, pShResourceLayout, pUnbindUniformHash, pMM);
                 ON_ERROR(retValue, "VIR_CG_MapUniformsWithLayout");
@@ -3208,6 +3221,7 @@ VSC_ErrCode VIR_CG_Unified_MapUniforms(
                             unblockUniformBlock,
                             allocateSamplerReverse,
                             gcvFALSE, /* always allocate */
+                            gcvFALSE,
                             maxSampler,
                             pMM,
                             gcvNULL,
@@ -3340,6 +3354,7 @@ VSC_ErrCode VIR_CG_Unified_MapUniforms(
                         unblockUniformBlock,
                         allocateSamplerReverse,
                         gcvFALSE, /* always allocate */
+                        gcvFALSE,
                         maxSampler,
                         pMM,
                         gcvNULL,
