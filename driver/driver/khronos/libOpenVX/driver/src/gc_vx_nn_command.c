@@ -5843,8 +5843,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
     vx_bool hasInputQuant = vx_false_e;
     vx_bool hasOutputQuant = vx_false_e;
     vx_bool hasWQuant = vx_false_e;
-    vx_bool tpRealInt16 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16);
-    //vx_bool tpSimpleInt16 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_SIMPLE_INT16);
+    /*vx_bool tpRealInt16 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16);*/
+    /*vx_bool tpSimpleInt16 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_SIMPLE_INT16);*/
     vx_bool tfQuant = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT);
     vx_bool tpBF16 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16);
     vx_tensor other_tensor, data_buff;
@@ -6909,8 +6909,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             info->vx_nn_tp_cmd_info.aluFilterPwlSwap    = 0;
             info->vx_nn_tp_cmd_info.aluPwlSignSupport   = 0;
             info->vx_nn_tp_cmd_info.aluReluEnable       = 0;
-            info->vx_nn_tp_cmd_info.aluI2FEnable        = (tfQuant && hasInputQuant) ? 1 : (tpBF16 ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : (inFormat == outFormat ? 0 : 1)));
-            info->vx_nn_tp_cmd_info.aluF2IEnable        = (tfQuant && hasOutputQuant) ? 1 : (tpBF16 ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : (inFormat == outFormat ? 0 : 1)));
+            info->vx_nn_tp_cmd_info.aluI2FEnable        = (tfQuant && hasInputQuant) ? 1 : (tpBF16 ? 1 : (inFormat == outFormat ? 0 : (inFormat == VX_TYPE_FLOAT16 ? 0 : 1)));
+            info->vx_nn_tp_cmd_info.aluF2IEnable        = (tfQuant && hasOutputQuant) ? 1 : (tpBF16 ? 1 : (inFormat == outFormat ? 0 : (outFormat == VX_TYPE_FLOAT16 ? 0 : 1)));
             if (tp_type == TP_TENSOR_STRIDED_SLICE)
             {
                 info->vx_nn_tp_cmd_info.aluInputPreshift = (inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0;
@@ -6928,8 +6928,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             info->vx_nn_tp_cmd_info.aluFilterPwlSwap    = 0;
             info->vx_nn_tp_cmd_info.aluPwlSignSupport   = 0;
             info->vx_nn_tp_cmd_info.aluReluEnable       = 0;
-            info->vx_nn_tp_cmd_info.aluI2FEnable        = (tfQuant && hasInputQuant) ? 1 : (tpBF16 ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : (inFormat == outFormat ? 0 : 1)));
-            info->vx_nn_tp_cmd_info.aluF2IEnable        = (tfQuant && hasOutputQuant) ? 1 : (tpBF16 ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : (inFormat == outFormat ? 0 : 1)));
+            info->vx_nn_tp_cmd_info.aluI2FEnable        = (tfQuant && hasInputQuant) ? 1 : (tpBF16 ? 1 : (inFormat == outFormat ? 0 : (inFormat == VX_TYPE_FLOAT16 ? 0 : 1)));
+            info->vx_nn_tp_cmd_info.aluF2IEnable        = (tfQuant && hasOutputQuant) ? 1 : (tpBF16 ? 1 : (inFormat == outFormat ? 0 : (outFormat == VX_TYPE_FLOAT16 ? 0 : 1)));
             info->vx_nn_tp_cmd_info.aluInputPreshift    = 0;
             info->vx_nn_tp_cmd_info.aluOutputPostshift  = ((inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0) - ((outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? outFPP : 0);
             break;
