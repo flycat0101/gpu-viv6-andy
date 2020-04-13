@@ -24,6 +24,7 @@
 #define VX_MAX_INITIALIZE_COMMAND_SIZE    0xC00
 #define VX_MAX_SC_OPERATION_STATE_SIZE    0x400
 #define VX_MAX_WAIT_STATE_SIZE            0x200
+#define VX_MAX_TEMP_TENSORS_NUM           6144
 
 enum
 {
@@ -473,7 +474,7 @@ typedef struct _vx_binary_save_s
         vx_uint32                            size;
         vx_uint32                            tensorPhysical;
         vx_uint32                            LCDTIndex;
-    } tempTensorsPhysical[VX_MAX_TEMP_TENSORS];
+    } tempTensorsPhysical[VX_MAX_TEMP_TENSORS_NUM];
     vx_uint32                                numberOfTempTensorInfo;
 
     /* operation data info */
