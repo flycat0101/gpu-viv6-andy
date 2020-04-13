@@ -947,16 +947,20 @@ static gceSTATUS gcoHARDWARE_Set2DState(
         }
 
         if ((Hardware->features[gcvFEATURE_2D_SEPARATE_CACHE]
-            || Hardware->features[gcvFEATURE_DEC400_COMPRESSION]) &&
+            || Hardware->features[gcvFEATURE_DEC400_COMPRESSION]
+            || Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION]) &&
             !srcCacheType)
         {
-            if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] && srcYUV420)
+            if ((Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+                 Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])&&
+                srcYUV420)
             {
                 srcCacheType = 1;
             }
             else if (gcmHASCOMPRESSION(&src->srcSurface) &&
                 (Hardware->features[gcvFEATURE_2D_V4COMPRESSION] ||
-                 Hardware->features[gcvFEATURE_DEC400_COMPRESSION]))
+                 Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+                 Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION]))
             {
                 srcCacheType = 1;
             }
@@ -1626,7 +1630,8 @@ static gceSTATUS gcoHARDWARE_Set2DState(
                                     power2BlockWidth = 5;
                                     power2BlockHeight = 3;
                                 }
-                                else if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] &&
+                                else if ((Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+                                          Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION]) &&
                                          (anyCompress & 0x100) &&
                                          State->dstSurface.tiling != gcvTILED_8X8_YMAJOR)
                                 {
@@ -2206,7 +2211,8 @@ static gceSTATUS gcoHARDWARE_Set2DState(
             horBlk = 0x1;
             verBlk = 0x3;
         }
-        else if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] &&
+        else if ((Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+                 Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])&&
                  (anyCompress & 0x100) &&
                  State->dstSurface.tiling != gcvTILED_8X8_YMAJOR)
         {
@@ -2868,7 +2874,8 @@ static gceSTATUS gcoHARDWARE_Set2DState(
                 ));
         }
     }
-    else if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+    else if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+             Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
     {
         gcmONERROR(gcoHARDWARE_Load2DState32(
             Hardware,

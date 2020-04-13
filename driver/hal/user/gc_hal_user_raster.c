@@ -270,7 +270,8 @@ static gceSTATUS _CheckSurface(
     case gcvTILED_8X8_YMAJOR:
     case gcvSUPERTILED_128B:
     case gcvSUPERTILED_256B:
-        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) != gcvTRUE)
+        if ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) != gcvTRUE) &&
+            (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400EX_COMPRESSION) != gcvTRUE))
         {
             return gcvSTATUS_NOT_SUPPORTED;
         }
@@ -401,7 +402,8 @@ static gceSTATUS _CheckSurface(
                     }
                 }
             }
-            else if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) == gcvTRUE)
+            else if ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) == gcvTRUE) ||
+                      gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400EX_COMPRESSION) == gcvTRUE)
             {
                 if (Format == gcvSURF_NV12 || Format == gcvSURF_P010  || Format == gcvSURF_P010_LSB)
                 {
@@ -455,7 +457,8 @@ static gceSTATUS _CheckSurface(
                     return gcvSTATUS_NOT_ALIGNED;
                 }
             }
-            else if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) == gcvTRUE)
+            else if ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) == gcvTRUE) ||
+                      (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400EX_COMPRESSION) == gcvTRUE))
             {
                 if (((Address[0] + Address[1]) % 80) ||
                     ((Stride[0] + Stride[1]) % 80))
@@ -3234,7 +3237,8 @@ gco2D_Line(
     gcmVERIFY_ARGUMENT(DstFormat != gcvSURF_UNKNOWN);
 
     if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_ANDROID_ONLY) == gcvTRUE &&
-        !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION))
+        (!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) &&
+         !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400EX_COMPRESSION)))
     {
         gcmFOOTER_ARG("status=%d", gcvSTATUS_NOT_SUPPORTED);
         return gcvSTATUS_NOT_SUPPORTED;
@@ -3346,7 +3350,8 @@ gco2D_ColorLine(
     gcmVERIFY_ARGUMENT(DstFormat != gcvSURF_UNKNOWN);
 
     if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_ANDROID_ONLY) == gcvTRUE &&
-        !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION))
+        (!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) &&
+         !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) ))
     {
         gcmFOOTER_ARG("status=%d", gcvSTATUS_NOT_SUPPORTED);
         return gcvSTATUS_NOT_SUPPORTED;
@@ -6756,7 +6761,8 @@ gco2D_MultiSourceBlit(
             case gcvTILED_64X4:
             case gcvSUPERTILED_128B:
             case gcvSUPERTILED_256B:
-                if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) != gcvTRUE)
+                if ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) != gcvTRUE) &&
+                    (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400EX_COMPRESSION) != gcvTRUE))
                 {
                     return gcvSTATUS_NOT_SUPPORTED;
                 }

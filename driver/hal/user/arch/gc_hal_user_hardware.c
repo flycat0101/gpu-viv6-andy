@@ -1775,8 +1775,14 @@ Fill2DFeaturesByDatabase(
 
     Features[gcvFEATURE_DEC300_COMPRESSION] = database->REG_DEC;
     Features[gcvFEATURE_DEC400_COMPRESSION] = database->G2D_DEC400;
+    Features[gcvFEATURE_DEC400EX_COMPRESSION] = database->G2D_DEC400EX;
+    /*The unified DEC400 core is preffered*/
+    if(Features[gcvFEATURE_DEC400EX_COMPRESSION])
+        Features[gcvFEATURE_DEC400_COMPRESSION] = 0;
     Features[gcvFEATURE_DEC_COMPRESSION] = Features[gcvFEATURE_DEC300_COMPRESSION] |
-                                           Features[gcvFEATURE_DEC400_COMPRESSION];
+                                           Features[gcvFEATURE_DEC400_COMPRESSION] |
+                                           Features[gcvFEATURE_DEC400EX_COMPRESSION];
+
 
     Features[gcvFEATURE_DEC_COMPRESSION_TILE_NV12_8BIT] = database->REG_VSTileNV12;
     Features[gcvFEATURE_DEC_COMPRESSION_TILE_NV12_10BIT] = database->REG_VSTileNV12_10BIT;

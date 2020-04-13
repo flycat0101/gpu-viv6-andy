@@ -2223,7 +2223,8 @@ _AllocateSurface(
 
 #if gcdENABLE_2D
         if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION) == gcvTRUE ||
-            gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) == gcvTRUE)
+            gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) == gcvTRUE ||
+            gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400EX_COMPRESSION) == gcvTRUE)
         {
             if (Format == gcvSURF_NV12 ||
                 Format == gcvSURF_NV21 ||

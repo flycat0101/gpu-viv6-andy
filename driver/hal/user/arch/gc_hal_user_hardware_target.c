@@ -228,7 +228,8 @@ static gceSTATUS _SetTargetCompression(
                     Surface
                     ));
 
-        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+                Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             if (Surface->tileStatusConfig & gcv2D_TSC_DEC_COMPRESSED)
             {
@@ -341,7 +342,8 @@ _SetTargetTileStatus(
 
     gcmHEADER_ARG("Hardware=0x%x Target=0x%x", Hardware, Target);
 
-    if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] &&
+    if ((Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+        Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION]) &&
         gcmHASOTHERCOMPRESSION(Target))
     {
         if (Target->tiling == gcvSUPERTILED_128B)
@@ -1342,7 +1344,8 @@ gceSTATUS gcoHARDWARE_SetTarget(
     case gcvSUPERTILED_128B:
     case gcvSUPERTILED_256B:
         if (Hardware->features[gcvFEATURE_2D_MAJOR_SUPER_TILE] ||
-            Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+            Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             destConfig |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  8:8) - (0 ?
@@ -1394,7 +1397,8 @@ gceSTATUS gcoHARDWARE_SetTarget(
         break;
 
     case gcvTILED_8X8_XMAJOR:
-        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             destConfig |=  ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  8:8) - (0 ?
@@ -1430,7 +1434,8 @@ gceSTATUS gcoHARDWARE_SetTarget(
         break;
 
     case gcvTILED_8X8_YMAJOR:
-        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             destConfig |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  8:8) - (0 ?
@@ -1483,7 +1488,8 @@ gceSTATUS gcoHARDWARE_SetTarget(
         break;
 
     case gcvTILED_8X4:
-        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             destConfig |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  8:8) - (0 ?
@@ -1519,7 +1525,8 @@ gceSTATUS gcoHARDWARE_SetTarget(
         break;
 
     case gcvTILED_4X8:
-        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             destConfig |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  8:8) - (0 ?
@@ -1555,7 +1562,8 @@ gceSTATUS gcoHARDWARE_SetTarget(
         break;
 
     case gcvTILED_32X4:
-        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             destConfig |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  8:8) - (0 ?
@@ -1591,7 +1599,8 @@ gceSTATUS gcoHARDWARE_SetTarget(
         break;
 
     case gcvTILED_64X4:
-        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             destConfig |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  8:8) - (0 ?

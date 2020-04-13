@@ -594,7 +594,8 @@ static gceSTATUS _CheckOPFBlock(
     {
         res = gcvTRUE;
     }
-    else if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+    else if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+        Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
     {
         res = gcvTRUE;
     }
@@ -685,7 +686,8 @@ static gceSTATUS _SetOPFBlockSize(
 
     do
     {
-        if (!Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+        if ((!Hardware->features[gcvFEATURE_DEC400_COMPRESSION] &&
+            !Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION]) ||
             DstSurface->tiling == gcvLINEAR)
         {
             gcmONERROR(gcoHARDWARE_ConvertFormat(SrcSurface->format, &srcBPP, gcvNULL));
@@ -2215,7 +2217,8 @@ static gceSTATUS _StartVR(
                         ));
                 }
             }
-            else if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+            else if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+                     Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
             {
                 gcmONERROR(gcoHARDWARE_Load2DState32(
                     Hardware,
@@ -4541,7 +4544,8 @@ gceSTATUS gcoHARDWARE_Begin2DRender(
             ));
     }
 
-    if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+    if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+        Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
     {
         gctUINT32 config = 0x00000000, i;
 

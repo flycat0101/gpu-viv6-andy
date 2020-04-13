@@ -118,7 +118,8 @@ _SetSourceTileStatus(
     gcmHEADER_ARG("Hardware=0x%x RegGroupIndex=%d Source=0x%x CacheMode=0x%x",
                     Hardware, RegGroupIndex, Source, CacheMode);
 
-    if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] &&
+    if ((Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+         Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION]) &&
         gcmHASOTHERCOMPRESSION(Source))
     {
         if (Source->tiling == gcvSUPERTILED_128B)
@@ -1053,7 +1054,8 @@ _SetSourceCompression(
                     Surface
                     ));
 
-        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             if (Surface->tileStatusConfig & gcv2D_TSC_DEC_COMPRESSED)
             {
@@ -1462,7 +1464,8 @@ gcoHARDWARE_GetCompressionCmdSize(
             Command,
             &size));
 
-        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             size += 2 * gcdMULTI_SOURCE_NUM;
         }
@@ -2555,7 +2558,8 @@ gceSTATUS gcoHARDWARE_SetColorSource(
  ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
 
         if (Hardware->features[gcvFEATURE_2D_MAJOR_SUPER_TILE] ||
-            Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+            Hardware->features[gcvFEATURE_DEC400_COMPRESSION]  ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             data[3] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  10:9) - (0 ?
@@ -2588,7 +2592,8 @@ gceSTATUS gcoHARDWARE_SetColorSource(
  ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
 
         if (Hardware->features[gcvFEATURE_2D_MAJOR_SUPER_TILE] ||
-            Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+            Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             data[3] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  10:9) - (0 ?
@@ -2662,7 +2667,8 @@ gceSTATUS gcoHARDWARE_SetColorSource(
  7:7) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
 
-        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             data[3] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  10:9) - (0 ?
@@ -2700,7 +2706,8 @@ gceSTATUS gcoHARDWARE_SetColorSource(
  7:7) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
 
-        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             data[3] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  10:9) - (0 ?
@@ -2754,7 +2761,8 @@ gceSTATUS gcoHARDWARE_SetColorSource(
  7:7) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
 
-        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             data[3] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  10:9) - (0 ?
@@ -2792,7 +2800,8 @@ gceSTATUS gcoHARDWARE_SetColorSource(
  7:7) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
 
-        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             data[3] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  10:9) - (0 ?
@@ -2830,7 +2839,8 @@ gceSTATUS gcoHARDWARE_SetColorSource(
  7:7) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
 
-        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             data[3] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  10:9) - (0 ?
@@ -2868,7 +2878,8 @@ gceSTATUS gcoHARDWARE_SetColorSource(
  7:7) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
 
-        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             data[3] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  10:9) - (0 ?
@@ -7634,7 +7645,8 @@ gcoHARDWARE_SetMultiSourceEx(
  ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
 
         if (Hardware->features[gcvFEATURE_2D_MAJOR_SUPER_TILE] ||
-            Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+            Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             data[0] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  10:9) - (0 ?
@@ -7672,7 +7684,8 @@ gcoHARDWARE_SetMultiSourceEx(
  7:7) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
 
-        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             data[0] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  10:9) - (0 ?
@@ -7710,7 +7723,8 @@ gcoHARDWARE_SetMultiSourceEx(
  7:7) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
 
-        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             data[0] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  10:9) - (0 ?
@@ -7764,7 +7778,8 @@ gcoHARDWARE_SetMultiSourceEx(
  7:7) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
 
-        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             data[0] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  10:9) - (0 ?
@@ -7802,7 +7817,8 @@ gcoHARDWARE_SetMultiSourceEx(
  7:7) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
 
-        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             data[0] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  10:9) - (0 ?
@@ -7840,7 +7856,8 @@ gcoHARDWARE_SetMultiSourceEx(
  7:7) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
 
-        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             data[0] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  10:9) - (0 ?
@@ -7878,7 +7895,8 @@ gcoHARDWARE_SetMultiSourceEx(
  7:7) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
 
-        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             data[0] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  10:9) - (0 ?
