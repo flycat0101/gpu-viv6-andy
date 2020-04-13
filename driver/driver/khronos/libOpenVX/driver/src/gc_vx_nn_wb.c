@@ -1105,7 +1105,7 @@ VX_PRIVATE_API vx_status vxoWeightBias_Compress(
     vx_size minKernelBufferSizes[MAX_ZGROUP_COUNT*MAX_KZGROUP_COUNT];
     vx_uint8* minZeroRunLens = VX_NULL;
     vx_uint32 maxZeroRunLens[MAX_ZGROUP_COUNT] = {0}, kernelPerCore;
-    vx_uint32 nnCoreCount = 0;
+    vx_uint32 nnCoreCount = 0, tpCoreCount = 0;
 
     if (wb == VX_NULL || z_offset == 0) return VX_ERROR_INVALID_PARAMETERS;
     if (kernel_per_core == 0 && target != VXNNE_OPERATION_TARGET_TP) return VX_ERROR_INVALID_PARAMETERS;
@@ -1122,15 +1122,39 @@ VX_PRIVATE_API vx_status vxoWeightBias_Compress(
 
     context = wb->base.context;
 
-    nnCoreCount = (WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_INT16) ?
-                  context->nnConfig.fixedFeature.nnCoreCountInt16 : (WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_FLOAT16) ?
-                  context->nnConfig.fixedFeature.nnCoreCountFloat16 : (WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_BFLOAT16) ?
-                  context->nnConfig.fixedFeature.nnCoreCountBFloat16 :context->nnConfig.fixedFeature.nnCoreCount;
-
-    if(!(WB_IS_TP_COMPRESS(wb)) && (0 == nnCoreCount))
+    switch (target)
     {
-        vxError("\n  No NN Core Count \n");
+    case VXNNE_OPERATION_TARGET_NN:
+        nnCoreCount = (WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_INT16) ?
+                      context->nnConfig.fixedFeature.nnCoreCountInt16 : (WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_FLOAT16) ?
+                      context->nnConfig.fixedFeature.nnCoreCountFloat16 : (WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_BFLOAT16) ?
+                      context->nnConfig.fixedFeature.nnCoreCountBFloat16 :context->nnConfig.fixedFeature.nnCoreCount;
+
+        if (!nnCoreCount)
+        {
+            vxError("\n  No NN Core Count \n");
+            goto exit;
+        }
+
+        break;
+
+    case VXNNE_OPERATION_TARGET_TP:
+        tpCoreCount = context->nnConfig.fixedFeature.tpCoreCount +
+                      context->nnConfig.fixedFeature.tpliteCoreCount;
+
+        if (!tpCoreCount)
+        {
+            vxError("\n  No TP Core Count \n");
+            goto exit;
+        }
+
+        break;
+
+    default:
+        vxError("\n  Unsupported Target \n");
         goto exit;
+
+        break;
     }
 
     /* copy original weight and bias data from non-cache video memory to CPU memory to speed up */
