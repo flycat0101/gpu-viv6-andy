@@ -31260,6 +31260,13 @@ cloIR_BINARY_EXPR_GenArithmeticAssignCode(
                                                                       rightParameters.rOperands[i].u.reg.componentSelection.components);
                      rightParameters.rOperands[i].dataType = dataType;
                  }
+                 else if(gcIsVectorDataType(dataType) &&
+                         (gcIsScalarDataType(rightParameters.rOperands[i].dataType) ||
+                          rightParameters.rOperands[i].u.constant.allValuesEqual))
+                 {
+                     rightParameters.rOperands[i].dataType = dataType;
+                     rightParameters.rOperands[i].u.constant.allValuesEqual = gcvTRUE;
+                 }
              }
              gcmONERROR(clGenArithmeticExprCode(Compiler,
                                    BinaryExpr->exprBase.base.lineNo,
