@@ -5209,7 +5209,7 @@ VX_INTERNAL_API vx_bool vxoGraphOptimization_avgPoolAnd1x1Conv_isValid(vx_node a
     avgPoolSize[0] = SCALAR_VALUE(avgNode->paramTable[PARAM_POOLING_POOL_SIZE_X_INDEX], u32);
     avgPoolSize[1] = SCALAR_VALUE(avgNode->paramTable[PARAM_POOLING_POOL_SIZE_Y_INDEX], u32);
     avgPoolStride[0] = SCALAR_VALUE(avgNode->paramTable[PARAM_POOLING_POOL_STRIDE_X_INDEX], u32);
-    avgPoolStride[0] = SCALAR_VALUE(avgNode->paramTable[PARAM_POOLING_POOL_STRIDE_Y_INDEX], u32);
+    avgPoolStride[1] = SCALAR_VALUE(avgNode->paramTable[PARAM_POOLING_POOL_STRIDE_Y_INDEX], u32);
 
     if(pwConvNode == NULL || pwConvNode->numParents > 1 || pwConvNode->merged == vx_true_e)
         goto out;
