@@ -1425,6 +1425,7 @@ static void _VIR_RA_LS_Init(
     VIR_RA_LS_SetExtendLSEndPoint(pRA, gcvFALSE);
     VIR_RA_LS_SetInstIdChanged(pRA, gcvFALSE);
     VIR_RA_LS_SetEnableDebug(pRA, gcvFALSE);
+    VIR_RA_LS_SetDisableDual16AndRecolor(pRA, gcvFALSE);
 }
 
 static VSC_ErrCode
@@ -11733,7 +11734,8 @@ _VIR_RA_LS_ClearUsedColorFromActiveLR(
 VSC_ErrCode _VIR_RA_LS_AssignColorForA0B0Inst(
     VIR_RA_LS           *pRA,
     VIR_Function        *pFunc,
-    VIR_Instruction     *pInst)
+    VIR_Instruction     *pInst
+    )
 {
     VSC_ErrCode         retValue  = VSC_ERR_NONE;
     VIR_Shader          *pShader = VIR_RA_LS_GetShader(pRA);
@@ -11749,8 +11751,15 @@ VSC_ErrCode _VIR_RA_LS_AssignColorForA0B0Inst(
     VIR_DEF_USAGE_INFO  *pDuInfo = VIR_RA_LS_GetLvInfo(pRA)->pDuInfo;
     gctBOOL             bClearUsedColor = gcvFALSE;
     gctBOOL             bRegisterSpill = pShader->hasRegisterSpill;
+    gctBOOL             bTryToDisableDual16AndRecolor = gcvFALSE;
+    gctBOOL             bUnderDual16 = gcvFALSE;
 
     curColor = InvalidColor;
+
+    if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetOPTS(pOption), VSC_OPTN_RAOptions_DISABLE_DUAL16_FOR_A0B0))
+    {
+        bTryToDisableDual16AndRecolor = gcvTRUE;
+    }
 
     if (opcode == VIR_OP_MOVA)
     {
@@ -11864,10 +11873,23 @@ VSC_ErrCode _VIR_RA_LS_AssignColorForA0B0Inst(
             else
             {
                 curColor = _VIR_RA_LS_FindNewColor(pRA, webIdx, VIR_Shader_isDual16Mode(pShader), 0, -1, gcvNULL);
+                bUnderDual16 = VIR_Shader_isDual16Mode(pShader);
             }
 
+            /*
+            ** Here are two solutions when failing to find a new color:
+            **  1) Disable dual16 if it is possible and re-color.
+            **  2) Clear the used color from the active LRs, then try to find the new color again.
+            */
             if (_VIR_RA_LS_IsInvalidColor(curColor))
             {
+                /* Disable dual16 if it is possible and re-color. */
+                if (bTryToDisableDual16AndRecolor && bUnderDual16)
+                {
+                    VIR_RA_LS_SetDisableDual16AndRecolor(pRA, gcvTRUE);
+                    return retValue;
+                }
+
                 /* Clear the used color from the active LRs, then try to find the new color again. */
                 bClearUsedColor = _VIR_RA_LS_ClearUsedColorFromActiveLR(pRA, webIdx);
 
@@ -11898,7 +11920,7 @@ VSC_ErrCode _VIR_RA_LS_AssignColorForA0B0Inst(
                 }
                 else
                 {
-                    retValue = VSC_RA_ERR_OUT_OF_REG_FAIL;
+                    retValue = VSC_RA_ERR_OUT_OF_A0B0_REG_FAIL;
                     return retValue;
                 }
             }
@@ -11995,7 +12017,7 @@ VSC_ErrCode _VIR_RA_LS_AssignColorForA0B0Inst(
 
                 if(_VIR_RA_LS_IsInvalidColor(curColor))
                 {
-                    retValue = VSC_RA_ERR_OUT_OF_REG_FAIL;
+                    retValue = VSC_RA_ERR_OUT_OF_A0B0_REG_FAIL;
                     return retValue;
                 }
             }
@@ -12139,13 +12161,14 @@ VSC_ErrCode _VIR_RA_LS_AssignColorForA0B0Inst(
 VSC_ErrCode
 _VIR_RA_LS_AssignColorForA0B0(
     VIR_RA_LS       *pRA,
-    VIR_Function    *pFunc)
+    VIR_Function    *pFunc
+    )
 {
     VSC_ErrCode         retValue  = VSC_ERR_NONE;
     VIR_Instruction     *pInst;
     VIR_InstIterator    instIter;
-    VIR_Dumper              *pDumper = VIR_RA_LS_GetDumper(pRA);
-    VSC_OPTN_RAOptions      *pOption = VIR_RA_LS_GetOptions(pRA);
+    VIR_Dumper          *pDumper = VIR_RA_LS_GetDumper(pRA);
+    VSC_OPTN_RAOptions  *pOption = VIR_RA_LS_GetOptions(pRA);
 
     if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption),
         VSC_OPTN_RAOptions_TRACE_ASSIGN_COLOR))
@@ -12163,6 +12186,12 @@ _VIR_RA_LS_AssignColorForA0B0(
     {
         retValue = _VIR_RA_LS_AssignColorForA0B0Inst(pRA, pFunc, pInst);
         CHECK_ERROR(retValue, "Fail to assign A0/B0 color instruction.");
+
+        /* No need to check the left instructions when we need to re-color. */
+        if (VIR_RA_LS_GetDisableDual16AndRecolor(pRA))
+        {
+            return retValue;
+        }
     }
 
     return retValue;
@@ -12228,7 +12257,8 @@ static VSC_ErrCode _VIR_RA_LS_PerformOnFunction_Pre(
 */
 static VSC_ErrCode _VIR_RA_LS_PerformOnFunction_Post(
     VIR_RA_LS       *pRA,
-    gctUINT         reservedDataReg)
+    gctUINT         reservedDataReg
+    )
 {
     VSC_ErrCode             retValue  = VSC_ERR_NONE;
     VIR_Shader              *pShader = VIR_RA_LS_GetShader(pRA);
@@ -12244,8 +12274,15 @@ static VSC_ErrCode _VIR_RA_LS_PerformOnFunction_Post(
         VIR_LOG_FLUSH(pDumper);
     }
 
+    /* I: Assign colors for A0/B0. */
     retValue = _VIR_RA_LS_AssignColorForA0B0(pRA, pFunc);
     CHECK_ERROR(retValue, "Fail to assign colors for the A0/B0 registers.");
+
+    /* No need to check the left instructions when we need to re-color. */
+    if (VIR_RA_LS_GetDisableDual16AndRecolor(pRA))
+    {
+        return retValue;
+    }
 
     return retValue;
 }
@@ -13078,6 +13115,7 @@ _VIR_RA_ClearColorPool(
 
     (pRA)->currentMaxGRCount = VIR_RA_LS_REG_MAX;
     _VIR_RA_FlaseDepReg_ClearAll(pRA);
+    VIR_RA_LS_SetDisableDual16AndRecolor(pRA, gcvFALSE);
 }
 
 DEF_QUERY_PASS_PROP(VIR_RA_LS_PerformTempRegAlloc)
@@ -13213,7 +13251,7 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
                 gctBOOL     reColor = gcvFALSE;
                 gctBOOL     bSpillReg = gcvFALSE;
 
-                /* build the live range and assign color for the general registers. */
+                /* I: build the live range and assign color for the general registers. */
                 for (funcIdx = 0; funcIdx < countOfFuncBlk; funcIdx ++)
                 {
                     pFunc = ppFuncBlkRPO[funcIdx]->pVIRFunc;
@@ -13290,6 +13328,7 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
                     ON_ERROR(retValue, "_VIR_RA_LS_PerformOnFunction");
                 }
 
+                /* II: check if we need to re-color. */
                 if (!reColor)
                 {
                     if (pShader->hasRegisterSpill)
@@ -13320,29 +13359,50 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
                         else
                         {
                             colorSucceed = gcvTRUE;
-                            break;
                         }
                     }
                     else
                     {
                         colorSucceed = gcvTRUE;
+                    }
+                }
+
+                /* III: do the post perform on functions. */
+                if (colorSucceed)
+                {
+                    /*
+                    ** All general LRs are assigned successfully, now we can do some post works,
+                    ** including assign colors for the A0/B0 registers.
+                    */
+                    for (funcIdx = 0; funcIdx < countOfFuncBlk; funcIdx ++)
+                    {
+                        pFunc = ppFuncBlkRPO[funcIdx]->pVIRFunc;
+                        VIR_Shader_SetCurrentFunction(pShader, pFunc);
+                        retValue = _VIR_RA_LS_PerformOnFunction_Post(&ra, reservedDataReg);
+                        CHECK_ERROR(retValue, "Fail to post perform on the functions.");
+
+                        if (VIR_RA_LS_GetDisableDual16AndRecolor(&ra))
+                        {
+                            gcmASSERT(VIR_Shader_isDual16Mode(pShader));
+                            VIR_Shader_SetDual16Mode(pShader, gcvFALSE);
+                            reColor = gcvTRUE;
+                            colorSucceed = gcvFALSE;
+                            VIR_RA_LS_SetDisableDual16AndRecolor(&ra, gcvFALSE);
+                            break;
+                        }
+                    }
+
+                    if (colorSucceed)
+                    {
                         break;
                     }
                 }
 
-                /* We need to clear the color pool if we need to re-color. */
+                /* IV: We need to clear the color pool if we need to re-color. */
                 if (reColor)
                 {
                     _VIR_RA_ClearColorPool(&ra, bSpillReg, reservedDataReg, gcvFALSE);
                 }
-            }
-
-            /* All general LRs are assigned successfully, now we can do some post works, including assign colors for the A0/B0 registers. */
-            for (funcIdx = 0; funcIdx < countOfFuncBlk; funcIdx ++)
-            {
-                pFunc = ppFuncBlkRPO[funcIdx]->pVIRFunc;
-                VIR_Shader_SetCurrentFunction(pShader, pFunc);
-                retValue = _VIR_RA_LS_PerformOnFunction_Post(&ra, reservedDataReg);
             }
 
             /* set reserved baseRegiter and dataRegister */

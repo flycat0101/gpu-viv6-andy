@@ -309,6 +309,9 @@ typedef struct VIR_REG_ALLOC_LINEAR_SCAN
     /* Change the instruction ID. */
     gctBOOL                     bInstIdChanged;
 
+    /* Whether disable dual16 and re-color. */
+    gctBOOL                     bDisableDual16AndRecolor;
+
     gctUINT                     trueDepPoint;
 
     /* registers that are occupied because of false dep */
@@ -322,41 +325,43 @@ typedef struct VIR_REG_ALLOC_LINEAR_SCAN
 
 } VIR_RA_LS;
 
-#define VIR_RA_LS_GetShader(ra)                 ((ra)->pShader)
-#define VIR_RA_LS_SetShader(ra, s)              ((ra)->pShader = (s))
-#define VIR_RA_LS_GetDumper(ra)                 ((ra)->pDumper)
-#define VIR_RA_LS_SetDumper(ra, d)              ((ra)->pDumper = (d))
-#define VIR_RA_LS_GetOptions(ra)                ((ra)->pOptions)
-#define VIR_RA_LS_SetOptions(ra, o)             ((ra)->pOptions = (o))
-#define VIR_RA_LS_GetMM(ra)                     ((ra)->pMM)
-#define VIR_RA_LS_GetHwCfg(ra)                  ((ra)->pHwCfg)
-#define VIR_RA_LS_SetHwCfg(ra, hc)              ((ra)->pHwCfg = (hc))
-#define VIR_RA_LS_GetLvInfo(ra)                 ((ra)->pLvInfo)
-#define VIR_RA_LS_SetLvInfo(ra, lv)             ((ra)->pLvInfo = (lv))
-#define VIR_RA_LS_GetCallGraph(ra)              ((ra)->pCG)
-#define VIR_RA_LS_SetCallGraph(ra, cg)          ((ra)->pCG = (cg))
-#define VIR_RA_LS_GetNumWeb(ra)                 ((ra)->numWeb)
-#define VIR_RA_LS_SetNumWeb(ra, s)              ((ra)->numWeb = (s))
-#define VIR_RA_LS_GetNumDef(ra)                 ((ra)->numDef)
-#define VIR_RA_LS_SetNumDef(ra, s)              ((ra)->numDef = (s))
-#define VIR_RA_LS_SetFlags(ra, f)               ((ra)->raFlags = (f))
-#define VIR_RA_LS_SetFlag(ra, f)                do {(ra)->raFlags |= (f); } while (gcvFALSE)
-#define VIR_RA_LS_ClrFlag(ra, f)                do {(ra)->raFlags &= ~(f); } while (gcvFALSE)
-#define VIR_RA_LS_GetColorPool(ra)              (&((ra)->colorPool))
-#define VIR_RA_LS_GetLRTable(ra)                (&((ra)->LRTable))
-#define VIR_RA_LS_GetLiveLRVec(ra)              (&((ra)->liveLRVec))
-#define VIR_RA_LS_GetCurrPos(ra)                ((ra)->currPos)
-#define VIR_RA_LS_GetSortedLRHead(ra)           ((ra)->sortedLRHead)
-#define VIR_RA_LS_SetSortedLRHead(ra, h)        ((ra)->sortedLRHead = (h))
-#define VIR_RA_LS_GetActiveLRHead(ra)           ((ra)->activeLRHead)
-#define VIR_RA_LS_SetActiveLRHead(ra, h)        ((ra)->activeLRHead = (h))
-#define VIR_RA_LS_GetFalseDepRegVec(ra)         (&((ra)->falseDepRegVec))
-#define VIR_RA_LS_GetExtendLSEndPoint(ra)       ((ra)->bExtendedLSEndPoint)
-#define VIR_RA_LS_SetExtendLSEndPoint(ra, h)    ((ra)->bExtendedLSEndPoint = (h))
-#define VIR_RA_LS_GetInstIdChanged(ra)          ((ra)->bInstIdChanged)
-#define VIR_RA_LS_SetInstIdChanged(ra, h)       ((ra)->bInstIdChanged = (h))
-#define VIR_RA_LS_GetEnableDebug(ra)            ((ra)->bEnableDebug)
-#define VIR_RA_LS_SetEnableDebug(ra, h)         ((ra)->bEnableDebug = (h))
+#define VIR_RA_LS_GetShader(ra)                     ((ra)->pShader)
+#define VIR_RA_LS_SetShader(ra, s)                  ((ra)->pShader = (s))
+#define VIR_RA_LS_GetDumper(ra)                     ((ra)->pDumper)
+#define VIR_RA_LS_SetDumper(ra, d)                  ((ra)->pDumper = (d))
+#define VIR_RA_LS_GetOptions(ra)                    ((ra)->pOptions)
+#define VIR_RA_LS_SetOptions(ra, o)                 ((ra)->pOptions = (o))
+#define VIR_RA_LS_GetMM(ra)                         ((ra)->pMM)
+#define VIR_RA_LS_GetHwCfg(ra)                      ((ra)->pHwCfg)
+#define VIR_RA_LS_SetHwCfg(ra, hc)                  ((ra)->pHwCfg = (hc))
+#define VIR_RA_LS_GetLvInfo(ra)                     ((ra)->pLvInfo)
+#define VIR_RA_LS_SetLvInfo(ra, lv)                 ((ra)->pLvInfo = (lv))
+#define VIR_RA_LS_GetCallGraph(ra)                  ((ra)->pCG)
+#define VIR_RA_LS_SetCallGraph(ra, cg)              ((ra)->pCG = (cg))
+#define VIR_RA_LS_GetNumWeb(ra)                     ((ra)->numWeb)
+#define VIR_RA_LS_SetNumWeb(ra, s)                  ((ra)->numWeb = (s))
+#define VIR_RA_LS_GetNumDef(ra)                     ((ra)->numDef)
+#define VIR_RA_LS_SetNumDef(ra, s)                  ((ra)->numDef = (s))
+#define VIR_RA_LS_SetFlags(ra, f)                   ((ra)->raFlags = (f))
+#define VIR_RA_LS_SetFlag(ra, f)                    do {(ra)->raFlags |= (f); } while (gcvFALSE)
+#define VIR_RA_LS_ClrFlag(ra, f)                    do {(ra)->raFlags &= ~(f); } while (gcvFALSE)
+#define VIR_RA_LS_GetColorPool(ra)                  (&((ra)->colorPool))
+#define VIR_RA_LS_GetLRTable(ra)                    (&((ra)->LRTable))
+#define VIR_RA_LS_GetLiveLRVec(ra)                  (&((ra)->liveLRVec))
+#define VIR_RA_LS_GetCurrPos(ra)                    ((ra)->currPos)
+#define VIR_RA_LS_GetSortedLRHead(ra)               ((ra)->sortedLRHead)
+#define VIR_RA_LS_SetSortedLRHead(ra, h)            ((ra)->sortedLRHead = (h))
+#define VIR_RA_LS_GetActiveLRHead(ra)               ((ra)->activeLRHead)
+#define VIR_RA_LS_SetActiveLRHead(ra, h)            ((ra)->activeLRHead = (h))
+#define VIR_RA_LS_GetFalseDepRegVec(ra)             (&((ra)->falseDepRegVec))
+#define VIR_RA_LS_GetExtendLSEndPoint(ra)           ((ra)->bExtendedLSEndPoint)
+#define VIR_RA_LS_SetExtendLSEndPoint(ra, h)        ((ra)->bExtendedLSEndPoint = (h))
+#define VIR_RA_LS_GetInstIdChanged(ra)              ((ra)->bInstIdChanged)
+#define VIR_RA_LS_SetInstIdChanged(ra, h)           ((ra)->bInstIdChanged = (h))
+#define VIR_RA_LS_GetDisableDual16AndRecolor(ra)    ((ra)->bDisableDual16AndRecolor)
+#define VIR_RA_LS_SetDisableDual16AndRecolor(ra, h) ((ra)->bDisableDual16AndRecolor = (h))
+#define VIR_RA_LS_GetEnableDebug(ra)                ((ra)->bEnableDebug)
+#define VIR_RA_LS_SetEnableDebug(ra, h)             ((ra)->bEnableDebug = (h))
 
 extern VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
     IN VSC_SH_PASS_WORKER* pPassWorker);
