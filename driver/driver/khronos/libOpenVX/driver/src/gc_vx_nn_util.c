@@ -5690,11 +5690,11 @@ vx_status vxo_updateSwapHandle(vx_graph graph)
                 {
                     vx_uint32 paramIndex;
                     vx_node node = graph->nodeTable[executionLayer->swapHandle[j]->u.nodeTable[0]];
-                    for(paramIndex = 0; paramIndex < node->numParameters; ++paramIndex)
+                    for (paramIndex = 0; paramIndex < node->numParameters; ++paramIndex)
                     {
-                        if(node->paramTable[paramIndex] != VX_NULL && (node->paramTable[paramIndex]->type == VX_TYPE_TENSOR) && (((vx_tensor)executionLayer->swapHandle[j]->ref)->tensorBuffer == ((vx_tensor)node->paramTable[paramIndex])->tensorBuffer))
+                        if (node->paramTable[paramIndex] != VX_NULL && (node->paramTable[paramIndex]->type == VX_TYPE_TENSOR) && (((vx_tensor)executionLayer->swapHandle[j]->ref)->tensorBuffer == ((vx_tensor)node->paramTable[paramIndex])->tensorBuffer))
                          {
-                            if(graph->commandBuffer && node->patchLocation[paramIndex][0] != 0xFFFFFFFF)
+                            if (graph->commandBuffer && node->patchLocation[paramIndex][0] != 0xFFFFFFFF)
                             {
                                 vxInfo("\n SH:  pre_physical:0x%08X, new_physical:0x%08X", graph->commandBuffer[node->patchLocation[paramIndex][0]], ((vx_tensor)executionLayer->swapHandle[j]->ref)->tensorBuffer->memory.physicals[0] + offset);
                                 graph->commandBuffer[node->patchLocation[paramIndex][0]] = ((vx_tensor)executionLayer->swapHandle[j]->ref)->tensorBuffer->memory.physicals[0] + offset;
@@ -5728,7 +5728,7 @@ vx_status vxo_updateSwapHandle(vx_graph graph)
                     {
                         if((node->paramTable[paramIndex] ->type == VX_TYPE_IMAGE) && (executionLayer->swapHandle[j]->ref == node->paramTable[paramIndex]))
                         {
-                            if(graph->commandBuffer)
+                            if(graph->commandBuffer && node->patchLocation[paramIndex][0] != 0xFFFFFFFF)
                                 graph->commandBuffer[node->patchLocation[paramIndex][0]] = ((vx_image)executionLayer->swapHandle[j]->ref)->memory.physicals[0];
                             break;
                         }
@@ -6009,6 +6009,9 @@ vx_status patchNodeParamLocation(vx_node node)
                 vx_uint32 commandSizeInUint = graph->commandBufferSizeInByte / 4;
                 vx_uint32 physical = tensor->tensorBuffer->memory.physicals[0];
                 vx_uint32 location = 0;
+                vx_uint32 offset;
+                vxoTensor_GetTensorViewOffset(tensor, &offset);
+                physical += offset;
                 for (location = 0; location < commandSizeInUint; location++)
                 {
                     if (physical == graph->commandBuffer[location])
@@ -6037,7 +6040,7 @@ vx_status patchNodeParamLocation(vx_node node)
                             break;
                     }
                     if (location == commandSizeInUint)
-                        location = 0;
+                        location = 0xFFFFFFFF;
                     node->patchLocation[j][planeIndx] = location;
 
                 }
@@ -6055,7 +6058,7 @@ vx_status patchNodeParamLocation(vx_node node)
                         break;
                 }
                 if (location == commandSizeInUint)
-                    location = 0;
+                    location = 0xFFFFFFFF;
                 node->patchLocation[j][0] = location;
             }
             break;
