@@ -4258,59 +4258,6 @@ vx_status vxnneOperation_InitializeCommand(
         output->height  = TENSOR_VIEW_SIZE_INDEX(op->output, 1);
         output->yStride = TENSOR_STRIDE_INDEX(op->output, 1);
         output->zStride = TENSOR_STRIDE_INDEX(op->output, 2);
-
-        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE3) && operation->operatorType == VXNNE_OPERATOR_TENSOR_TRANS && operation->parameter.tpType == TP_TRANSPOSE && (context->vipSRAM.size > 0/* || context->axiSRAM[0].size > 0*/))
-        {
-            vx_uint32* perm = (vx_uint32 *)operation->parameter.tp_value->p8[0];
-
-            if ((perm[0] == 1 && perm[1] == 0 && perm[2] == 2) || /* y, x, z */
-                (perm[0] == 1 && perm[1] == 2 && perm[2] == 0) || /* y, z, x */
-                (perm[0] == 2 && perm[1] == 1 && perm[2] == 0) || /* z, y, x */
-                (perm[0] == 2 && perm[1] == 0 && perm[2] == 1)) /* z, x, y */
-            {
-                vxnne_mem_request requestList;
-                vxnne_operation_info_s opInfo;
-                vx_uint32 count = 0;
-                vx_uint32 tpTransposeBufferSize = context->vipSRAM.size;;
-
-                vxnneOperation_GetInfo(operation, &opInfo);
-                requestList = graph->layer->memRequestList + command->operationID;
-                gcoOS_ZeroMemory(&requestList->tpTransposeBuffer, sizeof(vx_memory_s));
-
-                vxmASSERT(context->vipSRAM.size > 0);
-
-                /*TODO: VIP/AXI both can be used as TP transpose buffer*/
-                requestList->tpTransposeBuffer.lastUseId = requestList->tpTransposeBuffer.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
-                requestList->tpTransposeBuffer.sizes[0] = tpTransposeBufferSize;
-                requestList->tpTransposeBuffer.allocType = VXNNE_MEM_POOL_TYPE_VIP_SRAM;
-                requestList->tpTransposeBuffer.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
-                requestList->tpTransposeBuffer.allocPartial = vx_false_e;
-                requestList->inputMemory[requestList->inputCount] = &requestList->tpTransposeBuffer;
-                requestList->inputCount++;
-                count++;
-                status = vxoMemoryPool_RequestList(graph, graph->layer->memRequestList, graph->layer->base.num_operations, command->operationID, 1, VX_NULL, VX_NULL);
-
-                if (requestList->tpTransposeBuffer.physicals[0] != 0)
-                {
-                    command->cmdInfo.tpTransposeSize  = (vx_uint32)requestList->tpTransposeBuffer.sizes[0];
-                    command->cmdInfo.tpTransposeStart = requestList->tpTransposeBuffer.physicals[0];
-                    vxmASSERT(requestList->tpTransposeBuffer.allocPartial == vx_false_e);
-                }
-                else
-                {
-                    command->cmdInfo.tpTransposeSize = 0;
-                }
-                if (context->vipSRAM.size > VX_VIP_SRAM_IMAGE_STREAM_SIZE)
-                {
-                    requestList->inputCount = requestList->inputCount - count;
-                }
-            }
-            else
-            {
-                command->cmdInfo.tpTransposeSize = 0;
-            }
-        }
-        else
         {
             command->cmdInfo.tpTransposeSize = 0;
         }
