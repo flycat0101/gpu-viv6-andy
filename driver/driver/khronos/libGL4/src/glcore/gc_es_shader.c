@@ -670,9 +670,9 @@ GLvoid GL_APIENTRY __glim_ShaderSource(__GLcontext *gc, GLuint shader, GLsizei c
             continue;
         }
 
-        len = (length && length[i] >= 0) ? (GLsizei)length[i] : (GLsizei)gcoOS_StrLen(string[i], gcvNULL);
+        len = (length && length[i] >= 0) ? (GLsizei)length[i] : (GLsizei)strlen(string[i]);
 
-        gcoOS_StrCatSafe(source, len, string[i]);
+        strncat(source, string[i], len);
     }
 
     /* Free the previsou shader source. */
