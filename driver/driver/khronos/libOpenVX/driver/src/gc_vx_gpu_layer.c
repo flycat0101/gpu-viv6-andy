@@ -6492,13 +6492,14 @@ vxnne_shader_executable vxnneGetGPUMaxPoolingShaderExecutable(
     vx_uint32    width              = (out_width - 1) * stride_h + kernel_size_x - pad_left - pad_right;
     vx_tensor    output_rs          = NULL;
     vx_bool      enable_2d_image    = vx_false_e;
-    vx_scalar inZP = NULL;
-    vx_scalar outZP = NULL;
-    vx_scalar scaleIn = NULL;
-    vx_scalar scaleOut = NULL;
-    vx_scalar padX = NULL;
-    vx_scalar padY = NULL;
-    vx_scalar stride_y = NULL;
+    vx_bool      is_no_pad          = (vx_bool)(pad_left == 0 && pad_right == 0 && pad_top == 0 && pad_bottom == 0);
+    vx_scalar    inZP               = NULL;
+    vx_scalar    outZP              = NULL;
+    vx_scalar    scaleIn            = NULL;
+    vx_scalar    scaleOut           = NULL;
+    vx_scalar    padX               = NULL;
+    vx_scalar    padY               = NULL;
+    vx_scalar    stride_y           = NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input=%p, output=%p", context, kernelEnum, input, output);
 
@@ -6566,53 +6567,129 @@ vxnne_shader_executable vxnneGetGPUMaxPoolingShaderExecutable(
 
     if (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
     {
-        if (_IsSameType(input, output) && stride_w == 2 && stride_h == 2 && kernel_size_x == 3 && kernel_size_y == 3
-            && pad_left == 0 && pad_right == 0 && pad_top == 0 && pad_bottom == 0)
+        vx_bool is_sam_type = _IsSameType(input, output);
+        vx_bool stride_less_256 = (stride_w < 256 && stride_h < 256);
+        vx_bool kernel_less_256 = (kernel_size_x < 256 && kernel_size_y < 256);
+        vx_uint64 pack_key = 0;
+        vx_uint32 paramNum = 2;
+        vx_reference parameters[3] = {(vx_reference)input, (vx_reference)output, (vx_reference)NULL};
+
+#define _OVX_PACK_SELECT_KEY(is_sam_type, stride_less_256, stride_w, stride_h, kernel_less_256, kernel_size_x, kernel_size_y, is_no_pad )    \
+        ((vx_uint64)is_sam_type | ((vx_uint64)stride_less_256 << 1) | ((vx_uint64)stride_w << 2) | ((vx_uint64)stride_h << 10) \
+        | ((vx_uint64)kernel_less_256 << 18) | ((vx_uint64)kernel_size_x << 19) | ((vx_uint64)kernel_size_y << 27) | ((vx_uint64)is_no_pad << 35))
+
+        pack_key = _OVX_PACK_SELECT_KEY(is_sam_type, stride_less_256, stride_w, stride_h, kernel_less_256, kernel_size_x, kernel_size_y, is_no_pad);
+
+        if ((pack_key == _OVX_PACK_SELECT_KEY(vx_true_e, vx_true_e, 2, 2, vx_true_e, 3, 3, vx_true_e)
+            || pack_key == _OVX_PACK_SELECT_KEY(vx_true_e, vx_true_e, 1, 1, vx_true_e, 3, 3, vx_true_e)
+            || pack_key == _OVX_PACK_SELECT_KEY(vx_true_e, vx_true_e, 2, 2, vx_true_e, 2, 2, vx_true_e))
+            && out_height * depth < IMG_MAX_WIDTH )
         {
-            vx_uint32 paramNum = 2;
-            vx_reference parameters[3] = {(vx_reference)input, (vx_reference)output, (vx_reference)NULL};
+            vx_uint32 sizes[4] = {1};
+            vx_uint32 dims = TENSOR_DIM_NUM(output);
 
-            execution_parameters.globalWorkScale[0] = 7;
+            sizes[0] = out_width;
+            sizes[1] = out_height * depth;
+            sizes[2] = 1;
+            sizes[3] = dims > 3 ? TENSOR_VIEW_SIZE_INDEX(output, 3) : 1;
 
-            if (out_height * depth < IMG_MAX_WIDTH)
-            {
-                vx_uint32 sizes[4] = {1};
-                vx_uint32 dims = TENSOR_DIM_NUM(output);
+            output_rs = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims);
+            enable_2d_image = vx_true_e;
+            paramNum = 3;
 
-                sizes[0] = out_width;
-                sizes[1] = out_height * depth;
-                sizes[2] = 1;
-                sizes[3] = dims > 3 ? TENSOR_VIEW_SIZE_INDEX(output, 3) : 1;
+            stride_y = vxCreateScalar(context, VX_TYPE_INT32, &out_height);
+            parameters[1] = (vx_reference)output_rs;
+            parameters[2] = (vx_reference)stride_y;
+        }
 
-                output_rs = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims);
-                enable_2d_image = vx_true_e;
-                paramNum = 3;
+        if (pack_key == _OVX_PACK_SELECT_KEY(vx_true_e, vx_true_e, 2, 2, vx_true_e, 3, 3, vx_true_e)
+          || pack_key == _OVX_PACK_SELECT_KEY(vx_true_e, vx_true_e, 1, 1, vx_true_e, 3, 3, vx_true_e)
+          || pack_key == _OVX_PACK_SELECT_KEY(vx_true_e, vx_true_e, 2, 2, vx_true_e, 2, 2, vx_true_e)
+           )
+        {
+            vx_bool _is_algn4 = (vx_bool)(out_width % 4 == 0);
+            vx_bool _is_algn2 = _is_algn4 ? vx_false_e : (vx_bool)(out_width % 4 == 0);
+            vx_uint32  pack_kernel_key = 0;
+#define _OVX_SELECT_KERNEL_KEY(stride, kernel, enable_2d_image, _is_algn4, _is_algn2) \
+    (stride | (kernel << 8)| (enable_2d_image << 16) | (_is_algn4 << 17) | (_is_algn2 << 18))
 
-                stride_y = vxCreateScalar(context, VX_TYPE_INT32, &out_height);
-                parameters[1] = (vx_reference)output_rs;
-                parameters[2] = (vx_reference)stride_y;
-            }
-
-            if (enable_2d_image)
-            {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoPadSameFLQuant8_k3_s2_2D", borderMode);
-            }
+            if (kernel_size_x == 3)
+                execution_parameters.globalWorkScale[0] = 12;
             else
+                execution_parameters.globalWorkScale[0] = 8;
+
+            pack_kernel_key = _OVX_SELECT_KERNEL_KEY(stride_w, kernel_size_x, enable_2d_image, _is_algn4, _is_algn2);
+            switch (pack_kernel_key)
             {
+            case _OVX_SELECT_KERNEL_KEY(1, 3, vx_true_e, vx_true_e, vx_false_e):
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoPadSameFLQuant8_k3_s1_ALN4_2D", borderMode);
+                break;
+            case _OVX_SELECT_KERNEL_KEY(1, 3, vx_true_e, vx_false_e, vx_true_e):
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoPadSameFLQuant8_k3_s1_ALN2_2D", borderMode);
+                break;
+            case _OVX_SELECT_KERNEL_KEY(1, 3, vx_true_e, vx_false_e, vx_false_e):
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoPadSameFLQuant8_k3_s1_2D", borderMode);
+                break;
+            case _OVX_SELECT_KERNEL_KEY(1, 3, vx_false_e, vx_true_e, vx_false_e):
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoPadSameFLQuant8_k3_s1_ALN4", borderMode);
+                break;
+            case _OVX_SELECT_KERNEL_KEY(1, 3, vx_false_e, vx_false_e, vx_true_e):
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoPadSameFLQuant8_k3_s1_ALN2", borderMode);
+                break;
+            case _OVX_SELECT_KERNEL_KEY(1, 3, vx_false_e, vx_false_e, vx_false_e):
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoPadSameFLQuant8_k3_s1", borderMode);
+                break;
+            case _OVX_SELECT_KERNEL_KEY(2, 3, vx_true_e, vx_true_e, vx_false_e):
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoPadSameFLQuant8_k3_s2_ALN4_2D", borderMode);
+                break;
+            case _OVX_SELECT_KERNEL_KEY(2, 3, vx_true_e, vx_false_e, vx_true_e):
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoPadSameFLQuant8_k3_s2_ALN2_2D", borderMode);
+                break;
+            case _OVX_SELECT_KERNEL_KEY(2, 3, vx_true_e, vx_false_e, vx_false_e):
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoPadSameFLQuant8_k3_s2_2D", borderMode);
+                break;
+            case _OVX_SELECT_KERNEL_KEY(2, 3, vx_false_e, vx_true_e, vx_false_e):
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoPadSameFLQuant8_k3_s2_ALN4", borderMode);
+                break;
+            case _OVX_SELECT_KERNEL_KEY(2, 3, vx_false_e, vx_false_e, vx_true_e):
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoPadSameFLQuant8_k3_s2_ALN2", borderMode);
+                break;
+            case _OVX_SELECT_KERNEL_KEY(2, 3, vx_false_e, vx_false_e, vx_false_e):
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoPadSameFLQuant8_k3_s2", borderMode);
+                break;
+            case _OVX_SELECT_KERNEL_KEY(2, 2, vx_true_e, vx_true_e, vx_false_e):
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoPadSameFLQuant8_k2_s2_ALN4_2D", borderMode);
+                break;
+            case _OVX_SELECT_KERNEL_KEY(2, 2, vx_true_e, vx_false_e, vx_true_e):
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoPadSameFLQuant8_k2_s2_ALN2_2D", borderMode);
+                break;
+            case _OVX_SELECT_KERNEL_KEY(2, 2, vx_true_e, vx_false_e, vx_false_e):
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoPadSameFLQuant8_k2_s2_2D", borderMode);
+                break;
+            case _OVX_SELECT_KERNEL_KEY(2, 2, vx_false_e, vx_true_e, vx_false_e):
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoPadSameFLQuant8_k2_s2_ALN4", borderMode);
+                break;
+            case _OVX_SELECT_KERNEL_KEY(2, 2, vx_false_e, vx_false_e, vx_true_e):
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoPadSameFLQuant8_k2_s2_ALN2", borderMode);
+                break;
+            case _OVX_SELECT_KERNEL_KEY(2, 2, vx_false_e, vx_false_e, vx_false_e):
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoPadSameFLQuant8_k2_s2", borderMode);
+                break;
+            default:
+                break;
             }
-            if (!shaderExecutable)
-            {
-                goto OnError;
-            }
+#undef _OVX_SELECT_KERNEL_KEY
+#undef _OVX_PACK_SELECT_KEY
+            if (!shaderExecutable) goto OnError;
 
             status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, paramNum);
-            if (status != VX_SUCCESS)
-            {
-                goto OnError;
-            }
+            if (_is_algn4)
+                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            else if (_is_algn2)
+                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_TWO_COMPONENTS);
+            if (status != VX_SUCCESS) goto OnError;
         }
-        else if (pad_left == 0 && pad_right == 0 && pad_top == 0 && pad_bottom == 0)
+        else if (is_no_pad)
         {
             vx_reference parameters[10] = {(vx_reference)input, (vx_reference)poolSizeX, (vx_reference)poolSizeY, (vx_reference)stride_x,
                 (vx_reference)NULL, (vx_reference)scaleIn, (vx_reference)scaleOut, (vx_reference)inZP,
