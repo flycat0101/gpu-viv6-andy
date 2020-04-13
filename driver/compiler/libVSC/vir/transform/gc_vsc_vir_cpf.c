@@ -1692,6 +1692,8 @@ _VSC_CPF_PropagateConst(
             floatValue = (gctFLOAT) intValue;
         }
 
+        /* Change the operand type to the scalar type. */
+        VIR_Operand_SetTypeId(pOpnd, srcType);
         if (VIR_TypeId_isFloat(srcType))
         {
             VIR_Operand_SetImmFloat(pOpnd, floatValue);
