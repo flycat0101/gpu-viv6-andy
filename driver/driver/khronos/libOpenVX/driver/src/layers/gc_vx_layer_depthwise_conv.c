@@ -506,23 +506,23 @@ VX_PRIVATE_API vx_bool vxoNNDepthwiseConvLayer_SH_EVIS_Support_Ext(vx_node node,
 
     if (evis)
     {
-        dataformat_flag[0] = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16);
+        dataformat_flag[0] = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && (biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_FLOAT32) && outputFormat == VX_TYPE_FLOAT16);
         dataformat_flag[3] = (vx_bool)(inputFormat == VX_TYPE_INT16 && weightFormat == VX_TYPE_INT16
-            && (biasFormat == VX_TYPE_INT32 || biasFormat == VX_TYPE_INT64)
+            && (biasFormat == VX_TYPE_INT32 || biasFormat == VX_TYPE_INT64 || biasFormat == VX_TYPE_INVALID)
             && outputFormat == VX_TYPE_INT16);
-        dataformat_flag[2] = (vx_bool)(inputFormat == VX_TYPE_INT8 && weightFormat == VX_TYPE_INT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT8);
+        dataformat_flag[2] = (vx_bool)(inputFormat == VX_TYPE_INT8 && weightFormat == VX_TYPE_INT8 && (biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_INT32) && outputFormat == VX_TYPE_INT8);
     }
     else
     {
-        dataformat_flag[0] = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16) ||
-            (inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && biasFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16) ||
-            (inputFormat == VX_TYPE_FLOAT32 && weightFormat == VX_TYPE_FLOAT32 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32));
-        dataformat_flag[3] = (vx_bool)(inputFormat == VX_TYPE_INT16 && weightFormat == VX_TYPE_INT16 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT16);
+        dataformat_flag[0] = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && (biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_FLOAT32) && outputFormat == VX_TYPE_FLOAT16) ||
+            (inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && (biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_FLOAT16) && outputFormat == VX_TYPE_FLOAT16) ||
+            (inputFormat == VX_TYPE_FLOAT32 && weightFormat == VX_TYPE_FLOAT32 && (biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_FLOAT32) && outputFormat == VX_TYPE_FLOAT32));
+        dataformat_flag[3] = (vx_bool)(inputFormat == VX_TYPE_INT16 && weightFormat == VX_TYPE_INT16 && (biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_INT32) && outputFormat == VX_TYPE_INT16);
     }
     dataformat_flag[4] = (vx_bool)(inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_INT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_UINT8 && is_sym_per_channel_quant);
-    dataformat_flag[1] = (vx_bool)(inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_UINT8);
+    dataformat_flag[1] = (vx_bool)(inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && (biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_INT32) && outputFormat == VX_TYPE_UINT8);
 
-    support = support && (vx_bool)((dataformat_flag[0] || dataformat_flag[1] || dataformat_flag[2] || dataformat_flag[3] || dataformat_flag[4]) && biases);
+    support = support && (vx_bool)(dataformat_flag[0] || dataformat_flag[1] || dataformat_flag[2] || dataformat_flag[3] || dataformat_flag[4]);
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
     return support;
@@ -591,7 +591,7 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_EVIS_Initialize(vxnne_layer 
 
     vx_uint32  batchCount = TENSOR_SIZE_INDEX(inputs, 3);
 
-    vx_enum  biasFormat = VX_TYPE_INT32;
+    vx_enum  biasFormat = VX_TYPE_INVALID;
     vx_uint32  operation_idx = 0;
     vx_int32   strideXvalue  = 0;
     vx_int32   strideYvalue  = 0;
@@ -690,30 +690,58 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_EVIS_Initialize(vxnne_layer 
 
     newBiases = biases;
     tensorCopy = inputs;
-    shaderExecutable = vxnneGetDepthwiseConvShaderExecutable(ops_layer->node->base.context,
-        VXNNE_KERNEL_DEPTHWISE_CONV,
-        &ops_layer->node->kernelAttributes.borderMode,
-        tensorCopy,
-        weights,
-        newBiases,
-        padXLeft,
-        padXRight,
-        padYTop,
-        padYBottom,
-        VX_PAD_CONSTANT,
-        VX_NULL,
-        dilationX,
-        dilationY,
-        depth_multiplier,
-        VX_NULL,
-        VX_NULL,
-        VX_NULL,
-        VX_NULL,
-        downScaleSizeRounding,
-        strideXvalue,
-        strideYvalue,
-        scales,
-        outputs);
+    if (newBiases)
+    {
+        shaderExecutable = vxnneGetDepthwiseConvShaderExecutable(ops_layer->node->base.context,
+            VXNNE_KERNEL_DEPTHWISE_CONV,
+            &ops_layer->node->kernelAttributes.borderMode,
+            tensorCopy,
+            weights,
+            newBiases,
+            padXLeft,
+            padXRight,
+            padYTop,
+            padYBottom,
+            VX_PAD_CONSTANT,
+            VX_NULL,
+            dilationX,
+            dilationY,
+            depth_multiplier,
+            VX_NULL,
+            VX_NULL,
+            VX_NULL,
+            VX_NULL,
+            downScaleSizeRounding,
+            strideXvalue,
+            strideYvalue,
+            scales,
+            outputs);
+     }
+     else
+     {
+         shaderExecutable = vxnneGetDepthwiseConvNoBiasShaderExecutable(ops_layer->node->base.context,
+            VXNNE_KERNEL_DEPTHWISE_CONV,
+            &ops_layer->node->kernelAttributes.borderMode,
+            tensorCopy,
+            weights,
+            padXLeft,
+            padXRight,
+            padYTop,
+            padYBottom,
+            VX_PAD_CONSTANT,
+            VX_NULL,
+            dilationX,
+            dilationY,
+            depth_multiplier,
+            VX_NULL,
+            VX_NULL,
+            VX_NULL,
+            VX_NULL,
+            downScaleSizeRounding,
+            strideXvalue,
+            strideYvalue,
+            outputs);
+     }
 
     if (!shaderExecutable)
     {
@@ -735,7 +763,10 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_EVIS_Initialize(vxnne_layer 
 
     vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->depthwise_convolution_sh_operation.base, (vx_reference)tensorCopy, VXNNE_OPERATION_REFENRENCE_INPUT));
     vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->depthwise_convolution_sh_operation.base, (vx_reference)weights, VXNNE_OPERATION_REFENRENCE_INPUT));
-    vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->depthwise_convolution_sh_operation.base, (vx_reference)newBiases, VXNNE_OPERATION_REFENRENCE_INPUT));
+    if (newBiases)
+    {
+        vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->depthwise_convolution_sh_operation.base, (vx_reference)newBiases, VXNNE_OPERATION_REFENRENCE_INPUT));
+    }
     vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->depthwise_convolution_sh_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
 
     vxmONERROR(vxnneLayer_SetOperation(
@@ -1050,7 +1081,10 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_Initialize(vxnne_layer ops_l
 
     vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->depthwise_convolution_sh_operation.base, (vx_reference)tensorCopy, VXNNE_OPERATION_REFENRENCE_INPUT));
     vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->depthwise_convolution_sh_operation.base, (vx_reference)weights, VXNNE_OPERATION_REFENRENCE_INPUT));
-    vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->depthwise_convolution_sh_operation.base, (vx_reference)newBiases, VXNNE_OPERATION_REFENRENCE_INPUT));
+    if (newBiases)
+    {
+        vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->depthwise_convolution_sh_operation.base, (vx_reference)newBiases, VXNNE_OPERATION_REFENRENCE_INPUT));
+    }
     vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->depthwise_convolution_sh_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
 
     vxmONERROR(vxnneLayer_SetOperation(
@@ -1528,22 +1562,22 @@ vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(vx_node node,
 
         if(context->evisNoInst.supportEVIS)
         {
-            dataformat_flag[0]        = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16);
+            dataformat_flag[0]        = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && ((biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_FLOAT32) && outputFormat == VX_TYPE_FLOAT16);
             dataformat_flag[3]        = (vx_bool)(inputFormat == VX_TYPE_INT16 && weightFormat == VX_TYPE_INT16
-                                                && (biasFormat == VX_TYPE_INT32 || biasFormat == VX_TYPE_INT64)
+                                                && ((biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_INT32 || biasFormat == VX_TYPE_INT64)
                                                 && outputFormat == VX_TYPE_INT16);
-            dataformat_flag[2]        = (vx_bool)(inputFormat == VX_TYPE_INT8 && weightFormat == VX_TYPE_INT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT8);
+            dataformat_flag[2]        = (vx_bool)(inputFormat == VX_TYPE_INT8 && weightFormat == VX_TYPE_INT8 && ((biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_INT32) && outputFormat == VX_TYPE_INT8);
         }
         else
         {
-            dataformat_flag[0]        = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16) ||
-                                                  (inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && biasFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16) ||
-                                                  (inputFormat == VX_TYPE_FLOAT32 && weightFormat == VX_TYPE_FLOAT32 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32));
-            dataformat_flag[3]        = (vx_bool)(inputFormat == VX_TYPE_INT16 && weightFormat == VX_TYPE_INT16 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT16);
+            dataformat_flag[0]        = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && (biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_FLOAT32) && outputFormat == VX_TYPE_FLOAT16) ||
+                                                  (inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && (biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_FLOAT16) && outputFormat == VX_TYPE_FLOAT16) ||
+                                                  (inputFormat == VX_TYPE_FLOAT32 && weightFormat == VX_TYPE_FLOAT32 && (biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_FLOAT32) && outputFormat == VX_TYPE_FLOAT32));
+            dataformat_flag[3]        = (vx_bool)(inputFormat == VX_TYPE_INT16 && weightFormat == VX_TYPE_INT16 && (biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_INT32) && outputFormat == VX_TYPE_INT16);
         }
-        dataformat_flag[1]        = (vx_bool)(inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_UINT8);
+        dataformat_flag[1]        = (vx_bool)(inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && (biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_INT32) && outputFormat == VX_TYPE_UINT8);
         dataformat_flag[4]        = (vx_bool)(inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_INT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_UINT8 && is_sym_per_channel_quant);
-        depthwiseConv_shader_flag = (vx_bool) ((dataformat_flag[0] || dataformat_flag[1] || dataformat_flag[2] || dataformat_flag[3] || dataformat_flag[4]) && biases);
+        depthwiseConv_shader_flag = (vx_bool) (dataformat_flag[0] || dataformat_flag[1] || dataformat_flag[2] || dataformat_flag[3] || dataformat_flag[4]);
         if (depthwiseConv_shader_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
         {
             vxnne_shader_executable shaderExecutable = NULL;

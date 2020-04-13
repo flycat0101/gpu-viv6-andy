@@ -3516,6 +3516,30 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
     vx_tensor               scales,
     vx_tensor               outputs);
 
+vxnne_shader_executable vxnneGetDepthwiseConvNoBiasShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               inputs,
+    vx_tensor               weights,
+    vx_scalar               padXLeft,
+    vx_scalar               padXRight,
+    vx_scalar               padYTop,
+    vx_scalar               padYBottom,
+    vx_enum                 padMode,
+    vx_scalar               padConstant,
+    vx_scalar               dilationX,
+    vx_scalar               dilationY,
+    vx_scalar               channel_multiplier,
+    vx_scalar               relu_s,
+    vx_scalar               pooling_s,
+    vx_scalar               poolingX,
+    vx_scalar               poolingY,
+    vx_scalar               downScaleSizeRounding,
+    vx_int32                strideXvalue,
+    vx_int32                strideYvalue,
+    vx_tensor               outputs);
+
 vxnne_shader_executable vxnneGetLSTMUnitProjectionShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
