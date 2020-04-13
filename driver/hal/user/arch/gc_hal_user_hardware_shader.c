@@ -365,6 +365,16 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
     pVscHwCfg->hwFeatureFlags.FEDrawDirect           = IS_HW_SUPPORT(gcvFEATURE_FE_DRAW_DIRECT);
     pVscHwCfg->hwFeatureFlags.hasUSCAtomicFix2       = IS_HW_SUPPORT(gcvFEATURE_USC_ATOMIC_FIX2);
 
+    /* Only those chips with VX2 really have this issue, other chips don't have this issue. */
+    if (IS_HW_SUPPORT(gcvFEATURE_EVIS_VX2))
+    {
+        pVscHwCfg->hwFeatureFlags.hasFloatingMadFix  = IS_HW_SUPPORT(gcvFEATURE_SH_VX2_FLOATING_MAD_FIX);
+    }
+    else
+    {
+        pVscHwCfg->hwFeatureFlags.hasFloatingMadFix  = gcvTRUE;
+    }
+
 OnError:
     gcmFOOTER();
     return status;
