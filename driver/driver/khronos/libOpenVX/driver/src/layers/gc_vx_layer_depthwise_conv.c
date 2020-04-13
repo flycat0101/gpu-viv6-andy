@@ -331,14 +331,12 @@ VX_PRIVATE_API vx_tensor _mergeInputZeroPoint2Bias(vx_graph graph, vx_tensor inp
     if (TENSOR_TF_ZEROPOINT(input) != 0)
     {
         vx_uint32 filterIndex   = 0;
-        vx_uint32 sliceIndex    = 0;
         vx_uint32 x             = 0;
         vx_uint32 y             = 0;
         vx_int32  weightZp      = 0;
         vx_int32  input_zp      = TENSOR_TF_ZEROPOINT(input);
         vx_uint32 weight_x      = TENSOR_VIEW_SIZE_INDEX(weight, 0);
         vx_uint32 weight_y      = TENSOR_VIEW_SIZE_INDEX(weight, 1);
-        vx_uint32 sliceCount    = TENSOR_VIEW_SIZE_INDEX(weight, 2);
         vx_enum   weight_format = TENSOR_DATA_TYPE(weight);
         vx_uint32 weightSize    = (vx_uint32)vxDataType_GetSize((vx_type_e)weight_format);
 
@@ -349,28 +347,25 @@ VX_PRIVATE_API vx_tensor _mergeInputZeroPoint2Bias(vx_graph graph, vx_tensor inp
                 weightZp = TENSOR_TF_ZEROPOINT(weight);
             }
 
-            for (sliceIndex = 0; sliceIndex < sliceCount; sliceIndex++)
+            for (y = 0; y < weight_y; y++)
             {
-                for (y = 0; y < weight_y; y++)
+                for (x = 0; x < weight_x; x++)
                 {
-                    for (x = 0; x < weight_x; x++)
+                    vx_int32 weight = 0;
+
+                    if(weight_format == VX_TYPE_UINT8)
                     {
-                        vx_int32 weight = 0;
-
-                        if(weight_format == VX_TYPE_UINT8)
-                        {
-                            weight = *((vx_uint8 *)kernelDataPtr);
-                        }
-                        else if(weight_format == VX_TYPE_INT8)
-                        {
-                            weight = *((vx_int8 *)kernelDataPtr);
-                        }
-
-                        kernelDataPtr = kernelDataPtr + weightSize;
-
-                        /*Calc sum((coef[i] - coefZP) * InZP) */
-                        bias_base_ptr[filterIndex] -= (weight - weightZp) * input_zp;
+                        weight = *((vx_uint8 *)kernelDataPtr);
                     }
+                    else if(weight_format == VX_TYPE_INT8)
+                    {
+                        weight = *((vx_int8 *)kernelDataPtr);
+                    }
+
+                    kernelDataPtr = kernelDataPtr + weightSize;
+
+                    /*Calc sum((coef[i] - coefZP) * InZP) */
+                    bias_base_ptr[filterIndex] -= (weight - weightZp) * input_zp;
                 }
             }
         }
