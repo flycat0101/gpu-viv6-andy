@@ -606,7 +606,7 @@ VX_PRIVATE_API vx_bool vxoGraphOptimization_matchTensorInNode(vx_node node, vx_t
     vx_uint32 k = 0;
     for(k = 0; k < node->numParameters; k++)
     {
-        if(vxoReference_HasWriteDependency(node->paramTable[k], (vx_reference)tensor))
+        if(node->paramTable[k] == (vx_reference)tensor)
         {
             if(index != VX_NULL)
                 *index = k;
@@ -4185,7 +4185,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_multiTranspose(vx_graph graph)
                 }
             }
 
-            if(!invalidChild)
+            if(!invalidChild && node->numChildren == childTcnt)
             {
                 transposeNodes[0] = node;
                 transposeCnt++;
