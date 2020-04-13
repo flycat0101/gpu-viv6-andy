@@ -2950,7 +2950,7 @@ gckKERNEL_Dispatch(
             gckOS_AllocateNonPagedMemory(
                 Kernel->os,
                 gcvTRUE,
-                gcvALLOC_FLAG_CONTIGUOUS,
+                Interface->u.AllocateNonPagedMemory.flags | gcvALLOC_FLAG_CONTIGUOUS,
                 &bytes,
                 &physical,
                 &logical));
