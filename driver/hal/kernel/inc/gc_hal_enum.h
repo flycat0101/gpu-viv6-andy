@@ -647,6 +647,9 @@ typedef enum _gceFEATURE
     gcvFEATURE_FORMAT_10BIT_CROSS_4K,
     gcvFEATURE_ENDIAN_CONTROL,
 
+    /* AIGPU feature. */
+    gcvFEATURE_AI_GPU,
+
     /* Insert features above this comment only. */
     gcvFEATURE_COUNT                /* Not a feature. */
 }
