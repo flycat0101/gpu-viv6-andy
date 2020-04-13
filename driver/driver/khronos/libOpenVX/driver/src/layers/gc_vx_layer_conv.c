@@ -3224,11 +3224,17 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_NN_TP_Initialize(vxnne_la
         vxnneOperation_AddReference(&convolutionLayer->convolution_tp_reshuffle_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
         vxnneOperation_AddReference(&convolutionLayer->convolution_tp_reshuffle_operation.base, (vx_reference)reshuffled_input, VXNNE_OPERATION_REFENRENCE_OUTPUT);
 
+        conv.tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(sizeof(vx_tp_value_cmd_s));
+        conv.tp_value->u32[0] = inputs->dims[2];
+        conv.tp_value->u32[1] = dilation_x;
+        conv.tp_value->u32[2] = dilation_y;
         conv.pad_x_left = 0;
         conv.pad_y_top = 0;
         conv.pool_size_x = 0;
         conv.pool_size_y = 0;
         conv.pool_stride = 1;
+        conv.dilationX = dilation_x;
+        conv.dilationY = dilation_y;
         conv.enable_relu = vx_false_e;
         conv.pad_mode = padModes->value->e;
         conv.pad_const = padConstant ? padConstant->value->n32 : 0;
@@ -3556,11 +3562,17 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_NN_TP_Initialize(vxnne_la
         vxnneOperation_AddReference(&convolutionLayer->convolution_tp_upsample_operation.base, (vx_reference)reshuffled_output, VXNNE_OPERATION_REFENRENCE_INPUT);
         vxnneOperation_AddReference(&convolutionLayer->convolution_tp_upsample_operation.base, (vx_reference)(need_correct?reshuffled_output2:outputs), VXNNE_OPERATION_REFENRENCE_OUTPUT);
 
+        conv.tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(sizeof(vx_tp_value_cmd_s));
+        conv.tp_value->u32[0] = inputs->dims[2];
+        conv.tp_value->u32[1] = dilation_x;
+        conv.tp_value->u32[2] = dilation_y;
         conv.pad_x_left = 0;
         conv.pad_y_top = 0;
         conv.pool_size_x = 0;
         conv.pool_size_y = 0;
         conv.pool_stride = 1;
+        conv.dilationX = dilation_x;
+        conv.dilationY = dilation_y;
         conv.enable_relu = vx_false_e;
         conv.pad_mode = padModes->value->e;
         conv.pad_const = padConstant ? padConstant->value->n32 : 0;

@@ -4226,10 +4226,13 @@ void _fill_TP_DILATE_UPSAMPLE_Command(
     vx_uint32 i;
     vx_int32 dilationX, dilationY, stride = 1;
     vx_uint32 batch;
+    vx_uint32 strideY = 0;
+
     DEFINE_TP_GENERAL_PARAMETER();
 
-    dilationX = outXSize/inXSize;
-    dilationY = outYSize/inYSize;
+    dilationX = parameter->tp_value->u32[1];
+    strideY = parameter->tp_value->u32[2];
+    dilationY = parameter->dilationY;
     batch = dilationX * dilationY;
 
     for (i = 0; i < split_count; i++)
@@ -4251,10 +4254,10 @@ void _fill_TP_DILATE_UPSAMPLE_Command(
         info_array[i].vx_tp_general_cmd_split_info.inTileYInc          = 1;
         info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc         = dilationX;
         info_array[i].vx_tp_general_cmd_split_info.outLoop0Count       = inXSize;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc         = inXSize * dilationX * dilationY;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc         = inXSize * dilationX * strideY;
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Count       = inYSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset       = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc         = (batch > 1)?(inXSize * dilationX * inYSize * dilationY):stride;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc         = (batch > 1)?(inXSize * dilationX * inYSize * strideY):stride;
         info_array[i].vx_tp_general_cmd_split_info.outLoop2Count       = (batch > 1)?inZSize:dilationX;
         info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset       = 0;
         info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc         = (batch > 1)?1:(inXSize * dilationX);
@@ -4340,12 +4343,14 @@ void _fill_TP_DILATE_RESHUFFLE_Command(
     )
 {
     vx_uint32 i;
-    vx_scalar dilationX;
-    vx_int32 dilate;
+    vx_uint32 dilationX, dilationY;
+    vx_uint32 orgoutZSize = 0;
+
     DEFINE_TP_GENERAL_PARAMETER();
 
-    dilationX = (vx_scalar)other_tensor;
-    dilate = dilationX->value->n32 + 1;
+    dilationX = parameter->dilationX;
+    dilationY = parameter->dilationY;
+    orgoutZSize = parameter->tp_value->u32[0];
 
     for (i = 0; i < split_count; i++)
     {
@@ -4358,19 +4363,19 @@ void _fill_TP_DILATE_RESHUFFLE_Command(
         info_array[i].vx_tp_general_cmd_split_info.inImageSlice        = inXSize * inYSize;
         info_array[i].vx_tp_general_cmd_split_info.inWindowXStart      = 0;
         info_array[i].vx_tp_general_cmd_split_info.inWindowYStart      = 0;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd        = outXSize * dilate - 1;//inXSize - 1;/**/
-        info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd        = outYSize * dilate - 1;//inYSize - 1;/**/
+        info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd        = outXSize * dilationX - 1;/*inXSize - 1;*/
+        info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd        = outYSize * dilationY - 1;/*inYSize - 1;*/
         info_array[i].vx_tp_general_cmd_split_info.inTileXSize         = 1;
         info_array[i].vx_tp_general_cmd_split_info.inTileYSize         = 1;
         info_array[i].vx_tp_general_cmd_split_info.inTileXInc          = 1;
         info_array[i].vx_tp_general_cmd_split_info.inTileYInc          = 1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc         = outXSize * outYSize * inZSize;/* 4*4*21=336 */
-        info_array[i].vx_tp_general_cmd_split_info.outLoop0Count       = dilate;/* 6 */
+        info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc         = outXSize * outYSize * orgoutZSize;/* 4*4*21=336 */
+        info_array[i].vx_tp_general_cmd_split_info.outLoop0Count       = dilationX;/* 6 */
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc         = 1;
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Count       = outXSize;/* 4 * 4 */
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset       = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc         = outXSize * outYSize * inZSize * dilate;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Count       = dilate;/* 6 */
+        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc         = outXSize * outYSize * orgoutZSize * dilationX;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop2Count       = dilationY;/* 6 */
         info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset       = 0;
         info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc         = outXSize;/* 4 */
         info_array[i].vx_tp_general_cmd_split_info.outLoop3Count       = outYSize * inZSize;/* 21 */
