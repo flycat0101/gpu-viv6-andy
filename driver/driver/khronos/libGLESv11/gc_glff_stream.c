@@ -313,6 +313,11 @@ void glfSetStreamParameters(
     /* Mark stream dirty. */
     Stream->dirty = GL_TRUE;
 
+    if (!Stride)
+    {
+        Stride =  Components * componentSize;
+    }
+
     if (Stream->format != format || Stream->normalize != normalize || Stream->components != (GLuint)Components
         || Stream->stride != Stride || Stream->pointer != Pointer || Stream->buffer != Buffer)
     {
@@ -326,7 +331,7 @@ void glfSetStreamParameters(
     Stream->attributeType  = attributeType[Components];
     Stream->varyingType    = varyingType[Components];
     Stream->varyingSwizzle = varyingSwizzle[Components];
-    Stream->stride         = Stride? Stride : Components * componentSize;
+    Stream->stride         = Stride;
     Stream->pointer        = Pointer;
     Stream->buffer         = Buffer;
     Stream->attributeSize  = Components * componentSize;
@@ -427,8 +432,7 @@ void glfSetStreamParameters(
     vertexPtr->size       = Components;
     vertexPtr->format     = format;
     vertexPtr->normalized = normalize;
-    vertexPtr->stride     = (Stride != 0) ? Stride
-                                          : (Components * componentSize);
+    vertexPtr->stride     = Stride;
     vertexPtr->pointer    = Pointer;
     gcmFOOTER_NO();
     return;
