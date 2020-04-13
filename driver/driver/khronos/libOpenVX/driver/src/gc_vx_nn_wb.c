@@ -2528,7 +2528,7 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromT
             convolution_outputs_dims,
             pool_outputs_dims,
             optimizations,
-            size_of_optimizations,
+            (vx_uint32)size_of_optimizations,
             output_format,
             convert_format,
             rank_mode,
