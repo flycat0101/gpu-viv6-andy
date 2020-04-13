@@ -5114,7 +5114,7 @@ VX_PRIVATE_API vx_status vxoMultiGPU_SplitResourceForDilaReshuffle(
     vxmONERROR(vxQueryTensor(output, VX_TENSOR_NUMBER_OF_DIMS, &outputDim, sizeof(outputDim)));
     vxmONERROR(vxQueryTensor(input, VX_TENSOR_NUMBER_OF_DIMS, &inputDim, sizeof(inputDim)));
 
-    if ((outputDim != 4) && (inputDim != 3))
+    if ((outputDim != 4) || (inputDim < 3))
     {
         vxError("%s[%d]: not support split dila reshuffle\n", __FUNCTION__, __LINE__);
         vxmONERROR(VX_FAILURE);

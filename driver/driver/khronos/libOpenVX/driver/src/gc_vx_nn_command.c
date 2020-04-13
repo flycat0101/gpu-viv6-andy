@@ -4226,7 +4226,7 @@ void _fill_TP_DILATE_UPSAMPLE_Command(
     )
 {
     vx_uint32 i;
-    vx_int32 dilationX, dilationY, stride = 1;
+    vx_uint32 dilationX, dilationY, stride = 1;
     vx_uint32 batch;
     vx_uint32 strideY = 0;
 
