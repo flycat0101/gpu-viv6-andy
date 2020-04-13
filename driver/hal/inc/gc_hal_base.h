@@ -105,6 +105,9 @@ typedef struct _gcsNN_FIXED_FEATURE
     gctUINT  shaderCoreCount;
     gctUINT  latencyHidingAtFullAxiBw;
     gctUINT  axiBusWidth;
+    gctUINT  nnMaxKXSize;
+    gctUINT  nnMaxKYSize;
+    gctUINT  nnMaxKZSize;
 } gcsNN_FIXED_FEATURE;
 
 /* Features can be customized from outside */
