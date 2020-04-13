@@ -1613,7 +1613,7 @@ GLvoid loadLineStippleImage(__GLcontext *gc, __GLchipContext *chipCtx)
 
         gcoTEXTURE_Upload(textureInfo->object,
                           0,
-                          0,
+                          gcvFACE_NONE,
                           16*repeatCnt,
                           1,
                           0,
@@ -1777,27 +1777,17 @@ GLvoid loadPolygonStippleImage(__GLcontext *gc, __GLchipContext *chipCtx)
         gcoHAL_Commit(chipCtx->hal, gcvTRUE);
     }
 
-    if (textureInfo->object) {
-        gcoSURF mipsurf;
-        gctUINT mipW;
-        gctUINT mipH;
-        gctINT mipStride;
-
-        gcoTEXTURE_GetMipMap(textureInfo->object,
-                          0,
-                          &mipsurf);
-
-        gcoSURF_GetAlignedSize(mipsurf, &mipW, &mipH, &mipStride);
-
-
+    if (textureInfo->object)
+    {
+        /* To load polygon stipple image, may need use 32 Bytes stripe, rather than the stride of gcvSURF_L8. */
         gcoTEXTURE_Upload(textureInfo->object,
                           0,
-                          0,
+                          gcvFACE_NONE,
                           32,
                           32,
                           0,
                           &texImage[0][0],
-                          mipStride,
+                          32,
                           textureInfo->imageFormat,
                           gcvSURF_COLOR_SPACE_LINEAR);
     }
