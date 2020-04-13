@@ -434,7 +434,11 @@ VX_INTERNAL_CALLBACK_API void vxoNode_Destructor(vx_reference ref)
     if (gpuCount > 1)
     {
         /* release multiGPU operations memory*/
-        status |= vxoMultiGpu_FreeMemory(node);
+        status = vxoMultiGpu_FreeMemory(node);
+        if (status != VX_SUCCESS)
+        {
+            vxError("failed to free memory for multiGPU\n");
+        }
     }
 
     /* Wrapped user node need to deinitialize layer/op first */
