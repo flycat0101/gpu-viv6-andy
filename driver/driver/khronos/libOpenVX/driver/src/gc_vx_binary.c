@@ -6369,12 +6369,20 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
         vx_uint32 offsetArray[20] = {0};
         vx_int32 ret = 0;
         vx_binary_patch_info_s patchInfo;
+        vx_uint32 deviceCount = 0, i = 0;
+        vx_uint32 totalAXIsramSize = 0;
 
-        if (context->axiSRAM[deviceID].size > 0)
+        vxmONERROR(gcoVX_QueryDeviceCount(&deviceCount));
+        for (i = 0; i < deviceCount; i++)
+        {
+            totalAXIsramSize += context->axiSRAM[i].size;
+        }
+
+        if (totalAXIsramSize > 0)
         {
             /*1. patch start/end remap address for AXI-SRAM */
-            vx_uint32 axiSRAMPhysical = context->axiSRAM[deviceID].physical;
-            vx_uint32 axiSRAMPhysicalEnd = context->axiSRAM[deviceID].physical + context->axiSRAM[deviceID].size;
+            vx_uint32 axiSRAMPhysical = context->axiSRAM[0].physical;
+            vx_uint32 axiSRAMPhysicalEnd = context->axiSRAM[0].physical + totalAXIsramSize;
 
             ret = vxoBinaryGraph_SearchPattern((gctUINT32 *)initBuffer,
                                           context->binaryGraphInitSize[deviceID]/gcmSIZEOF(gctUINT32),
