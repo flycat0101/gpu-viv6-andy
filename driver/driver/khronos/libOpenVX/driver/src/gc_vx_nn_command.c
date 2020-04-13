@@ -4767,6 +4767,10 @@ void _fill_TP_TENSOR_PAD_Command(
 
     for (i = 0; i < split_count; i++)
     {
+        vx_int32 z_front_offset = (i == 0 && parameter->pad_z_front != 0)?(parameter->pad_z_front):0;
+        vx_int32 z_back_offset = (i == (split_count - 1) && parameter->pad_z_back != 0)?(parameter->pad_z_back):0;
+        vx_int32 z_out_offset = (i != 0 && parameter->pad_z_front != 0)?(parameter->pad_z_front * outZStride):0;
+
         info_array[i].vx_tp_general_cmd_split_info.inImageXSize = inXSize;
         info_array[i].vx_tp_general_cmd_split_info.inImageYSize = inYSize;
         info_array[i].vx_tp_general_cmd_split_info.inImageZSize = split_sizes[i];
@@ -4778,11 +4782,13 @@ void _fill_TP_TENSOR_PAD_Command(
         info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = info_array[i].vx_tp_general_cmd_split_info.inWindowYStart + outYSize - 1;
         info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
         info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inZStride * split_offsets[i];
+        info_array[i].vx_tp_general_cmd_split_info.inWindowZStartOverfetch2 = z_front_offset;
+        info_array[i].vx_tp_general_cmd_split_info.inWindowZEndOverfetch2 = z_back_offset;
         info_array[i].vx_tp_general_cmd_split_info.inTileXSize = outXSize;
         info_array[i].vx_tp_general_cmd_split_info.inTileYSize = outYSize;
         info_array[i].vx_tp_general_cmd_split_info.inTileXInc = outXSize;
         info_array[i].vx_tp_general_cmd_split_info.inTileYInc = outYSize;
-        info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + outZStride * split_offsets[i];
+        info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + outZStride * split_offsets[i] + z_out_offset;
         info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = 0;
         info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = 1;
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = 1;
@@ -7384,6 +7390,8 @@ VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
             else
             {
                 vxMemCopy(&info.vx_nn_tp_cmd_info, &sinfo[i].vx_tp_general_cmd_split_info, sizeof(struct _vx_tp_general_cmd_split_info));
+                info.vx_nn_tp_cmd_info.inWindowZStartOverfetch = info.vx_nn_tp_cmd_info.inWindowZStartOverfetch2;
+                info.vx_nn_tp_cmd_info.inWindowZEndOverfetch = info.vx_nn_tp_cmd_info.inWindowZEndOverfetch2;
             }
 
             gcoVX_ProgrammCrossEngine((void*)&info, gcvVX_ACCELERATOR_TP, VX_NULL, (vx_uint32_ptr*)&cmdBufTPtr);

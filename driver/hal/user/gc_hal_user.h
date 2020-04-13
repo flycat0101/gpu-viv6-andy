@@ -3162,7 +3162,8 @@ typedef union _vx_nn_cmd_split_info_union
         gctUINT32 inTileXInc;
         gctUINT32 inTileYInc;
         gctUINT32 inTileSequence;
-
+        gctUINT32 inWindowZStartOverfetch2;
+        gctUINT32 inWindowZEndOverfetch2;
         gctUINT32 outBaseAddress;
         gctUINT32 outLoop1Reset;
         gctUINT32 outLoop2Reset;
@@ -3213,7 +3214,8 @@ typedef union _vx_nn_cmd_split_info_union
         gctUINT32 inTileXInc;
         gctUINT32 inTileYInc;
         gctUINT32 inTileSequence;
-
+        gctUINT32 inWindowZStartOverfetch2;
+        gctUINT32 inWindowZEndOverfetch2;
         gctUINT32 outBaseAddress;
         gctUINT32 outLoop1Reset;
         gctUINT32 outLoop2Reset;
@@ -3374,6 +3376,8 @@ typedef union _vx_nn_cmd_info_union
         gctUINT32 inTileXInc;
         gctUINT32 inTileYInc;
         gctUINT32 inTileSequence;
+        gctUINT32 inWindowZStartOverfetch2;
+        gctUINT32 inWindowZEndOverfetch2;
         gctUINT32 outBaseAddress;
         gctUINT32 outLoop1Reset;
         gctUINT32 outLoop2Reset;

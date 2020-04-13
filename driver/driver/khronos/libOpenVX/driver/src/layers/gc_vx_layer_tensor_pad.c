@@ -1500,7 +1500,21 @@ VX_PRIVATE_API vx_bool vxoNNTensorPad2_TP_Support(vx_node node, const vx_referen
 {
     vx_tensor  src = (vx_tensor)parameters[0];
     vx_tensor  dst = (vx_tensor)parameters[1];
+    vx_tensor  pad_dims = (vx_tensor)parameters[2];
+    vx_scalar  padMode = (vx_scalar)parameters[3];
+
+    vx_int32_ptr pad_base = VX_NULL;
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_TP, VX_TYPE_INVALID, VX_NULL);
+    vxoTensor_GetTensorViewMemory(pad_dims, (gctPOINTER *)&pad_base, VX_NULL);
+
+    if((padMode->value->e != VX_PAD_CONSTANT) && ((pad_base[4] != 0) || (pad_base[5] != 0)))
+    {
+        return vx_false_e;
+    }
+    else if ((padMode->value->e == VX_PAD_CONSTANT) && (pad_base[5] > 3))
+    {
+        return vx_false_e;
+    }
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
@@ -1542,10 +1556,12 @@ VX_PRIVATE_API vx_status vxoNNTensorPad2_TP_Initialize(vxnne_layer ops_layer, co
 
     conv.pad_x_left = pad_base[0];
     conv.pad_y_top = pad_base[2];
+    conv.pad_z_front = pad_base[4];
     conv.pad_x_right = pad_base[1];
     conv.pad_y_bottom = pad_base[3];
+    conv.pad_z_back = pad_base[5];
     conv.pad_mode = padMode->value->e;
-    conv.pad_const = TENSOR_PAD_ZERO_VALUE(src);
+    conv.pad_const = 0;
     conv.pool_size_x = conv.pool_size_y = 0;
     conv.pool_stride = 1;
     conv.enable_relu = vx_false_e;
