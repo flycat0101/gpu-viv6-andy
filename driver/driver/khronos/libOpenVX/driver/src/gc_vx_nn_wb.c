@@ -452,7 +452,7 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
     }
     else
     {
-        WB_NON_ZERO_RATIO(wb) = gcmMIN(1.0f, (vx_float64)nonZeroCount / allTotalCount);
+        WB_NON_ZERO_RATIO(wb) = gcmMIN(1.0f, (vx_float64)nonZeroTotalCount / allTotalCount);
     }
 
     WB_COMPRESS_RATIO(wb) = (vx_float64)minTotalKernelBufferSize / origTotalKernelBufferSize;
@@ -591,7 +591,7 @@ vx_status checkWeightZp(vx_context context, vx_weights_biases_parameter wb)
     }
     return VX_SUCCESS;
 }
-
+static gctUINT64 currentTime = 0, totalTime = 0;
 VX_PRIVATE_API vx_status _vxoWeightBias_Compress(
     vx_context                   context,
     vx_weights_biases_parameter  wb,
@@ -608,7 +608,7 @@ VX_PRIVATE_API vx_status _vxoWeightBias_Compress(
     vx_uint8_ptr weightPtr = VX_NULL, alphaPtr = VX_NULL;
     vx_uint32_ptr biasPtr = VX_NULL;
     vx_uint8_ptr zrlTmpPtr = min_zero_run_lens;
-
+    gctUINT64 start, end;
     weightSize = (vx_uint32)vxDataType_GetSize((vx_type_e)WB_WEIGHT_DATA_FORMAT(wb));
     oneFilterSize = WB_KERNEL_X(wb) * WB_KERNEL_Y(wb) * WB_KERNEL_Z(wb) * weightSize;
 
@@ -718,7 +718,7 @@ VX_PRIVATE_API vx_status _vxoWeightBias_Compress(
                         }
                         calculatePostMultiAndPostShift(context, wb, postMulAndShift, negPostMulAndShift);
                     }
-
+                    gcoOS_GetTime(&start);
                     fillSize = fillinKernelBufferV8Huffman(
                         context,
                         WB_HUFFMAN_CONFIG_INDEX(wb, index),
@@ -744,7 +744,10 @@ VX_PRIVATE_API vx_status _vxoWeightBias_Compress(
                         &kernelAlignStreamSize,
                         &kernelStreamFullCacheSize,
                         &kernelMaxStreamSizePerCore);
-
+                    gcoOS_GetTime(&end);
+                    currentTime = end-start;
+                    totalTime += currentTime;
+                    vxInfo("PRINT-TIME: time cost current: %d, totla %d.\n", currentTime, totalTime);
                     if(postMulAndShift != VX_NULL)
                     {
                         vxFree(postMulAndShift);
