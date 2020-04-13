@@ -1340,7 +1340,6 @@ IN clsDECL *TargetDecl,
 IN OUT clsROPERAND *Operand
 )
 {
-   gceSTATUS status;
    clsGEN_CODE_DATA_TYPE resultType;
    cltELEMENT_TYPE fromElementType, toElementType;
 
