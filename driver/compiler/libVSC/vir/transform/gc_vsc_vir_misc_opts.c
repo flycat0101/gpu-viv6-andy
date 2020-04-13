@@ -9983,17 +9983,15 @@ OnError:
     return errCode;
 }
 
-static VSC_ErrCode _ReplaceLocalMemoryAddress(
-    VIR_DEF_USAGE_INFO  *pDuInfo,
+static gctBOOL _IsLocalMemoryCalculateInst(
     VIR_Shader          *pShader,
-    VIR_Function        *pFunc,
-    VIR_Instruction     *pInst
+    VIR_Instruction     *pInst,
+    VIR_Symbol          **ppLocalMemAddrSym,
+    VIR_Symbol          **ppLocalMemSym
     )
 {
-    VSC_ErrCode         errCode = VSC_ERR_NONE;
     VIR_OpCode          opCode = VIR_Inst_GetOpcode(pInst);
     VIR_Symbol          *localMemAddrSym = gcvNULL;
-    VIR_Operand         *pOpnd = gcvNULL;
     VIR_Symbol          *localMemSym = gcvNULL;
     gctBOOL             isOCL = VIR_Shader_IsCL(pShader);
 
@@ -10021,6 +10019,34 @@ static VSC_ErrCode _ReplaceLocalMemoryAddress(
 
     if (localMemAddrSym &&
         strcmp(VIR_Shader_GetSymNameString(pShader, localMemAddrSym), _sldLocalMemoryAddressName) == 0)
+    {
+        if (ppLocalMemSym)
+        {
+            *ppLocalMemSym = localMemSym;
+        }
+        if (ppLocalMemAddrSym)
+        {
+            *ppLocalMemAddrSym = localMemAddrSym;
+        }
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
+static VSC_ErrCode _ReplaceLocalMemoryAddress(
+    VIR_DEF_USAGE_INFO  *pDuInfo,
+    VIR_Shader          *pShader,
+    VIR_Function        *pFunc,
+    VIR_Instruction     *pInst
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Symbol          *localMemSym = gcvNULL;
+    VIR_Symbol          *localMemAddrSym = gcvNULL;
+    VIR_Operand         *pOpnd = gcvNULL;
+
+    if (_IsLocalMemoryCalculateInst(pShader, pInst, &localMemSym, &localMemAddrSym))
     {
         VIR_Symbol          *pLocIdSym = gcvNULL;
         VIR_SymId           outRegId, outRegSymId;
@@ -10346,22 +10372,16 @@ _UpdateWorkGroupIdForMultiGPU(
             VIR_InstIterator    inst_iter;
             VIR_Instruction*    pInst;
             VIR_Instruction*    pInsertPosInst = gcvNULL;
-            VIR_OperandInfo     opndInfo;
 
             VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(VIR_Shader_GetMainFunction(pShader)));
             for (pInst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
                  pInst != gcvNULL;
                  pInst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
             {
-                if (VIR_OPCODE_hasDest(VIR_Inst_GetOpcode(pInst)))
+                if (_IsLocalMemoryCalculateInst(pShader, pInst, gcvNULL, gcvNULL))
                 {
-                    VIR_Operand_GetOperandInfo(pInst, VIR_Inst_GetDest(pInst), &opndInfo);
-
-                    if (opndInfo.isVreg && opndInfo.u1.virRegInfo.virReg == VIR_OCL_LocalMemoryAddressRegIndex)
-                    {
-                        pInsertPosInst = pInst;
-                        break;
-                    }
+                    pInsertPosInst = pInst;
+                    break;
                 }
             }
 
@@ -11019,7 +11039,7 @@ VSC_ErrCode vscVIR_PreprocessMCShader(VSC_SH_PASS_WORKER* pPassWorker)
         &&
         pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.supportMultiGPU
         &&
-        VIR_Shader_IsCL(pShader))
+        (VIR_Shader_IsCL(pShader) || VIR_Shader_IsGlCompute(pShader)))
     {
         _UpdateWorkGroupIdForMultiGPU(pPassWorker, &bChanged);
     }
