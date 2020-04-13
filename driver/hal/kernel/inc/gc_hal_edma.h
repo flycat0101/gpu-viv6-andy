@@ -11,8 +11,9 @@
 *****************************************************************************/
 
 
+#ifndef __gc_hal_edma_h_
+#define __gc_hal_edma_h_
 #include "gc_hal_types.h"
-
 
 typedef unsigned int gctEDMA_HANDLE;
 
@@ -47,9 +48,9 @@ typedef struct
     IN gctUINT64 dst;
     INOUT size_t len;
     IN gcvEDMA_DIRECTION dir;
-    IN bool sync_wait;
+    IN gctBOOL sync_wait;
     OUT gctUINT32 edma_status;
 }gcsEDMA_TRANSFACTION;
-
+#endif
 
 
