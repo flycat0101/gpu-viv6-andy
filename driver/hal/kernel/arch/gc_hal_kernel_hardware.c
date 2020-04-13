@@ -1645,10 +1645,11 @@ _QueryFeatureDatabase(
 
     case gcvFEATURE_USC_EVICT_CTRL_FIFO_FLOP_RESET_FIX:
         available = database->USC_EVICT_CTRL_FIFO_FLOP_RESET_FIX;
-
+        /*FALLTHRU*/
     default:
         gcmkFATAL("Invalid feature has been requested.");
         available = gcvFALSE;
+        /*FALLTHRU*/
     }
 
     gcmkFOOTER_ARG("%d", available ? gcvSTATUS_TRUE : gcvSTATUS_FALSE);
