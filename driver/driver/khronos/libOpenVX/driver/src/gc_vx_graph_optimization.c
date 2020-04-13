@@ -599,14 +599,21 @@ VX_PRIVATE_API vx_status vxoGraphOptimization_updateTensorInNodeWithIndex(vx_nod
 
 /*
     find the related tensor's position in node's paramTable, and return it with index.
-    if return false, it do not find the related tensor's index.
+    if return false,
+        1. it do not find the related tensor's index.
+        2. or the tensor is viewed, which is not allowed.
 */
 VX_PRIVATE_API vx_bool vxoGraphOptimization_matchTensorInNode(vx_node node, vx_tensor tensor, vx_uint32 *index)
 {
     vx_uint32 k = 0;
     for(k = 0; k < node->numParameters; k++)
     {
-        if(node->paramTable[k] == (vx_reference)tensor)
+        if(node->paramTable[k]->type != VX_TYPE_TENSOR)
+            continue;
+        if(((vx_tensor)node->paramTable[k])->isViewed || tensor->isViewed)
+            continue;
+
+        if(((vx_tensor)node->paramTable[k])->tensorBuffer == tensor->tensorBuffer)
         {
             if(index != VX_NULL)
                 *index = k;
@@ -3068,6 +3075,10 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_TensorAdd2Conv(vx_graph graph)
                 gcmFOOTER_ARG("%d", VX_SUCCESS);
                 return VX_SUCCESS;
             }
+
+            /*can not do it for viewed tensor*/
+            if(tensorIn[0]->isViewed || tensorIn[1]->isViewed)
+                continue;
 
             /*do not process the head node*/
             if(node->numParents != 2 || tensorIn[0]->isViewed || tensorIn[1]->isViewed )
