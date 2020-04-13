@@ -102,7 +102,7 @@ _RemoveUnreachableBlockOnFunction(
         /* Change all instructions in this block to NOPs*/
         for (instIter = labelInst; instIter && instIter != VIR_Inst_GetNext(inst); instIter = VIR_Inst_GetNext(instIter))
         {
-            VIR_Function_ChangeInstToNop(Func, callerInst);
+            VIR_Function_ChangeInstToNop(Func, instIter);
         }
     }
 
