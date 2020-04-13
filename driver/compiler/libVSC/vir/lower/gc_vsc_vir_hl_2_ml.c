@@ -215,6 +215,12 @@ _RemoveRedundantLabelForFunction(
             pOrigLabel = VIR_Inst_GetJmpLabel(pInst);
             pUpdateLabel = VIR_Inst_GetJmpLabel(pNextNonNopInst);
 
+            /* Skip the loop here, actually this is a dead loop here. */
+            if (pOrigLabel == pUpdateLabel)
+            {
+                continue;
+            }
+
             caller = pOrigLabel->referenced;
             while (caller)
             {
