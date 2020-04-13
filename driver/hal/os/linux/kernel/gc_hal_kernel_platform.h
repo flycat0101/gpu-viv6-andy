@@ -305,7 +305,7 @@ typedef struct _gcsPLATFORM_OPERATIONS
     */
     gceSTATUS
     (*extendControl)(
-        IN gcsPLATFORM *Platform,
+        IN gctPOINTER Object,
         INOUT gcsDEVICE_EXTEND_CONTROL_ARGS *Args
         );
 #endif

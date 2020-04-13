@@ -1142,15 +1142,6 @@ gckOS_GetPolicyID(
     OUT gctUINT32_PTR AXIConfig
     );
 
-
-#if gcdDEVICE_EXTEND_IOCTL
-/* platform device extend ioctl function */
-gceSTATUS
-gckOS_ExtendDeviceControl(
-    IN gckOS Os,
-    INOUT gcsDEVICE_EXTEND_CONTROL_ARGS *Args
-    );
-#endif
 /******************************************************************************\
 ************************** Android Native Fence Sync ***************************
 \******************************************************************************/
@@ -1719,6 +1710,15 @@ gckKERNEL_Notify(
     IN gckKERNEL Kernel,
     IN gceNOTIFY Notifcation
     );
+
+#if gcdDEVICE_EXTEND_IOCTL
+/* platform device extend ioctl function */
+gceSTATUS
+gckKERNEL_ExtendDeviceControl(
+    IN gckKERNEL Kernel,
+    INOUT gcsDEVICE_EXTEND_CONTROL_ARGS *Args
+    );
+#endif
 
 /*******************************************************************************
 **

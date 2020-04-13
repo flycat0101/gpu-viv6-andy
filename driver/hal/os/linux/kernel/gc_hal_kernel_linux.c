@@ -663,3 +663,31 @@ gckKERNEL_Notify(
     gcmkFOOTER();
     return status;
 }
+
+#if gcdDEVICE_EXTEND_IOCTL
+gceSTATUS
+gckKERNEL_ExtendDeviceControl(
+    IN gckKERNEL Kernel,
+    INOUT gcsDEVICE_EXTEND_CONTROL_ARGS *Args
+    )
+{
+    gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
+    gcsPLATFORM * platform;
+
+    gcmkHEADER();
+
+    /* Verify the arguments. */
+    gcmkVERIFY_OBJECT(Kernel, gcvOBJ_KERNEL);
+
+    platform = Kernel->os->device->platform;
+
+    if (platform && platform->ops->extendControl)
+    {
+        status = platform->ops->extendControl(Kernel, Args);
+    }
+
+    gcmkFOOTER();
+    return status;
+}
+#endif
+

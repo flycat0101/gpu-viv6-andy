@@ -3798,7 +3798,7 @@ gckKERNEL_Dispatch(
 
 #if gcdDEVICE_EXTEND_IOCTL
     case gcvHAL_DEVICE_EXTEND_CONTROL:
-        gcmkONERROR(gckOS_ExtendDeviceControl(Kernel->os, &Interface->u.ExtendControlArgs));
+        gcmkONERROR(gckKERNEL_ExtendDeviceControl(Kernel, &Interface->u.ExtendControlArgs));
         break;
 #endif
 
