@@ -9478,28 +9478,28 @@ gckHARDWARE_UpdateContextProfile(
         gcmkONERROR(
             gckOS_ReadRegisterEx(Hardware->os,
             Hardware->core,
-            0x00438,
-            &profiler_part2->hi_total_cycle_count));
+            0x00078,
+            &profiler_part2->hi_total_idle_cycle_count));
 
         gcmkONERROR(
             gckOS_ReadRegisterEx(Hardware->os,
             Hardware->core,
-            0x00078,
-            &profiler_part2->hi_total_idle_cycle_count));
+            0x00438,
+            &profiler_part2->hi_total_cycle_count));
     }
     else
     {
         gcmkONERROR(
             gckOS_ReadRegisterEx(Hardware->os,
             Hardware->core,
-            0x00078,
-            &profiler_part2->hi_total_cycle_count));
+            0x0007C,
+            &profiler_part2->hi_total_idle_cycle_count));
 
         gcmkONERROR(
             gckOS_ReadRegisterEx(Hardware->os,
             Hardware->core,
-            0x0007C,
-            &profiler_part2->hi_total_idle_cycle_count));
+            0x00078,
+            &profiler_part2->hi_total_cycle_count));
     }
     gcmkUPDATE_PROFILE_DATA_PART2(hi_total_cycle_count);
     gcmkUPDATE_PROFILE_DATA_PART2(hi_total_idle_cycle_count);
@@ -9689,6 +9689,8 @@ gckHARDWARE_UpdateContextProfile(
         0x00000,
         clock));
 
+    gcmkONERROR(
+        gckOS_WriteRegisterEx(Hardware->os, Hardware->core, 0x0007C, 0));
     gcmkONERROR(
         gckOS_WriteRegisterEx(Hardware->os, Hardware->core, 0x00438, 0));
     gcmkONERROR(
@@ -12990,12 +12992,12 @@ gckHARDWARE_GetFrameInfo(
         /* Read cycle registers. */
         gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os,
                                          Hardware->core,
-                                         0x00078,
-                                         &info.cycles[i]));
-        gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os,
-                                         Hardware->core,
                                          0x0007C,
                                          &info.idleCycles[i]));
+        gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os,
+                                         Hardware->core,
+                                         0x00078,
+                                         &info.cycles[i]));
         gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os,
                                          Hardware->core,
                                          0x00438,

@@ -10597,6 +10597,7 @@ VX_PRIVATE_API void vxoGraph_GenerateCommandBuffer(vx_graph graph)
         graph->binarySave                                      ||
         !graph->base.context->options.enableGraphCommandBuffer ||
         !graph->layer                                          ||
+        graph->base.context->profiler.enable ||
         mcfeEnabled)
     {
         vxmONERROR(VX_ERROR_NOT_SUPPORTED);
@@ -10615,9 +10616,6 @@ VX_PRIVATE_API void vxoGraph_GenerateCommandBuffer(vx_graph graph)
         VX_GRAPH_COMMAND_BUFFER_SIZE, gcvNULL, gcvTRUE, gcvTRUE));
 
     bCaptureOn = vx_true_e;
-#if VIVANTE_PROFILER
-    graph->cmdCaptureOn = vx_true_e;
-#endif
     vxmONERROR(vxoGraph_ProcessInternal(graph));
 
     vxmONERROR(gcfVX_CaptureState(gcvNULL, 0, &outCommandBufferSize, gcvFALSE, gcvFALSE));
@@ -10630,10 +10628,6 @@ VX_PRIVATE_API void vxoGraph_GenerateCommandBuffer(vx_graph graph)
     return;
 
 OnError:
-
-#if VIVANTE_PROFILER
-    graph->cmdCaptureOn = vx_false_e;
-#endif
     if (bCaptureOn)
     {
         gcfVX_CaptureState(gcvNULL, 0, &outCommandBufferSize, gcvFALSE, gcvFALSE);
@@ -11520,12 +11514,6 @@ VX_INTERNAL_API vx_status vxoGraph_Submit(vx_graph graph)
         return VX_ERROR_NOT_IMPLEMENTED;
     }
 
-#if VIVANTE_PROFILER
-    if (graph->cmdCaptureOn)
-    {
-        vxoProfiler_Begin((vx_reference)graph);
-    }
-#endif
     gcmONERROR(gcoVX_Replay((gctPOINTER)graph->commandBuffer, (gctUINT32)graph->commandBufferSizeInByte));
 
 OnError:
@@ -11542,6 +11530,13 @@ VX_PRIVATE_API vx_status vxoGraph_Process(vx_graph graph)
 
     vxmASSERT(graph);
 
+#if VIVANTE_PROFILER
+    /* Only top-level graph needs to profile. */
+    if (!graph->isChildGraph)
+    {
+        vxoProfiler_Begin((vx_reference)graph);
+    }
+#endif
 
     if (!graph->verified)
     {

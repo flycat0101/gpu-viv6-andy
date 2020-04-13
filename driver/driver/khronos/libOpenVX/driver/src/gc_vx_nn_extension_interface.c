@@ -1663,13 +1663,6 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
     vx_graph graph = executionLayer->graph;
     vx_node node = VX_NULL;
 
-#if VIVANTE_PROFILER
-    if (!graph->cmdCaptureOn)
-    {
-        vxoProfiler_Begin((vx_reference)executionLayer->graph);
-    }
-#endif
-
     vxnneMultiChannel_GetCurrentChannel(&operationTarget);
 
     for (i = 0; i < executionLayer->opIndicesNum; i++)
