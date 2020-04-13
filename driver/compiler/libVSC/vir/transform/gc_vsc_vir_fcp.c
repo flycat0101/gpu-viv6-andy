@@ -2891,7 +2891,7 @@ VSC_ErrCode vscVIR_PostCGCleanup(
      *    then give either a compiler error or a compiler warning.
      * = > the load is no skHp flag by default and to reduce compile time, we check condition 2 only in release mode
      *     and condition 3 in debug mode only
-     * /
+     */
     /* We need to do this check here because we don't update DU in this pass!!! */
     if (VIR_Shader_IsFS(pShader) && (memoryAccessFlag & VIR_MA_FLAG_LOAD))
     {
