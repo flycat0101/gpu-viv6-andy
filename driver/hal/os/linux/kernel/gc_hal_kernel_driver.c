@@ -1212,7 +1212,12 @@ static int __devinit gpu_probe(struct platform_device *pdev)
     contiguousBaseCap = moduleParam.contiguousBase;
     contiguousSizeCap = moduleParam.contiguousSize;
 
-    gcmkPRINT("Capture only mode is enabled");
+    gcmkPRINT("Capture only mode is enabled in Hal Kernel.");
+
+    if ((contiguousBaseCap + contiguousSizeCap) > 0x80000000)
+    {
+        gcmkPRINT("Capture only mode: contiguousBase + contiguousSize > 2G, there is error in CModel and old MMU version vsimulation.");
+    }
 
     for (i = 0; i < gcvCORE_COUNT; i++)
     {
