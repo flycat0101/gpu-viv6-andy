@@ -5482,7 +5482,6 @@ _gcoDECHARDWARE_SetDstDEC400EXCompression(
                 configEx
                 ));
 
-
         configW = ((((gctUINT32) (configW)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:1) - (0 ?
  2:1) + 1) == 32) ?
@@ -5622,7 +5621,6 @@ _gcoDECHARDWARE_SetDstDEC400EXCompression(
                 0x18A00 + regOffsetW[1],
                 configEx
                 ));
-
 
         gcmONERROR(gcoDECHARDWARE_UploadData(
             Hardware,
