@@ -1668,7 +1668,7 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
     for (i = 0; i < executionLayer->opIndicesNum; i++)
     {
         gctUINT64 operatorStart = 0;
-        vx_uint32 opertorExcuteTime = 0;
+        vx_uint64 opertorExcuteTime = 0;
         vx_bool wait = vx_false_e;
 
         operation = executionLayer->operations[executionLayer->opIndices[i].operationID];
@@ -1763,7 +1763,7 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
 
         vxnneBatch_SetCurrentBatchArray(operation, executionLayer->opIndices[i].batchID);
 
-        if (executionLayer->graph->base.context->options.enableCNNPerf)
+        if (executionLayer->graph->base.context->options.enableCNNPerf && executionLayer->opIndices[i].operation->mGpuSync)
         {
             operatorStart = gcfVX_PerfStart((vx_reference)executionLayer->graph);
 
@@ -1823,14 +1823,14 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
             executionLayer->opIndices[i].dump(&executionLayer->opIndices[i], operation, VXNNE_DUMP_POST_EXECUTION);
         }
 
-        if (operation->layer->node->base.context->options.enableNNLayerDump)
+        if (operation->layer->node->base.context->options.enableNNLayerDump && executionLayer->opIndices[i].operation->mGpuSync)
         {
             gcfVX_Flush(gcvTRUE);
             vxnneOperation_NodeDump(&executionLayer->opIndices[i]);
         }
 
         vxnneMultiChannel_ApplySyncMode(executionLayer->opIndices[i].wakeMode, executionLayer->opIndices[i].semaWakeHandle);
-        if (executionLayer->graph->base.context->options.enableCNNPerf)
+        if (executionLayer->graph->base.context->options.enableCNNPerf && executionLayer->opIndices[i].operation->mGpuSync)
         {
             vxInfo("layer id: %d layer name:%s operation[%d]:%s target:%s.\n",
                 operation->layer->node->id,
@@ -1843,7 +1843,7 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
 
             opertorExcuteTime = gcfVX_PerfEnd((vx_reference)executionLayer->graph, operatorStart);
 
-            vxInfo("execution time:%10d us\n", opertorExcuteTime);
+            vxInfo("execution time:%18d us\n", opertorExcuteTime);
 
             /* Calculate non-zero ratio, only for TP target */
             if (operation->layer->node->base.context->options.enableNNLayerDump

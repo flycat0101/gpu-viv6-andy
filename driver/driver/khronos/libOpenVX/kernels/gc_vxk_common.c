@@ -26,15 +26,15 @@ VX_INTERNAL_API gctUINT64 gcfVX_PerfStart(vx_reference ref)
     return start;
 }
 
-VX_INTERNAL_API vx_uint32 gcfVX_PerfEnd(vx_reference ref, gctUINT64 start)
+VX_INTERNAL_API vx_uint64 gcfVX_PerfEnd(vx_reference ref, gctUINT64 start)
 {
-    vx_uint32 interval = 0;
+    vx_uint64 interval = 0;
 
     if(ref->context->options.enableCNNPerf)
     {
         gctUINT64 end;
         gcoOS_GetTime(&end);
-        interval = (vx_uint32)(end - start);
+        interval = (vx_uint64)(end - start);
     }
 
     return interval;

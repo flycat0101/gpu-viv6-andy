@@ -2538,7 +2538,7 @@ typedef enum _vx_nn_round_mode_e
 vx_nn_round_mode_e;
 
 VX_INTERNAL_API gctUINT64 gcfVX_PerfStart(vx_reference ref);
-VX_INTERNAL_API vx_uint32 gcfVX_PerfEnd(vx_reference ref, gctUINT64 start);
+VX_INTERNAL_API vx_uint64 gcfVX_PerfEnd(vx_reference ref, gctUINT64 start);
 VX_INTERNAL_API vx_int32 vxoContext_GetUserStructIndex(vx_context context, vx_enum dataType);
 enum {
     VX_DEBUG_LEVEL_NONE = 0,
