@@ -4657,6 +4657,12 @@ _DetectProcess(
 #endif
             gcvFALSE
         },
+        {
+            gcvPATCH_OPENCV_TEST_PHOTO,
+            "\x90\x8f\x9a\x91\x9c\x89\xa0\x8b\x9a\x8c\x8b\xa0\x8f\x97\x90\x8b\x90",
+            gcvFALSE
+        },
+
 #if defined(ANDROID)
         {
             gcvPATCH_NATIVEHARDWARE_CTS,
