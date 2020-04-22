@@ -4768,7 +4768,7 @@ static VkResult halti5_pip_build_check(
 {
      uint32_t i = 0;
 
-    /*check the valid descriptorsetLayout*/
+    /*check whether the descriptorsetLayout is valid*/
     if (pip->pipelineLayout)
     {
         uint32_t descSetLayoutCount = pip->pipelineLayout->descSetLayoutCount;
@@ -4776,7 +4776,7 @@ static VkResult halti5_pip_build_check(
         for (i = 0; i < descSetLayoutCount; i++)
         {
             __vkDescriptorSetLayout *descSetLayout = pip->pipelineLayout->descSetLayout[i];
-            if (descSetLayout->validFlag != 0xff)
+            if (!__vk_SearchObject(devCtx, __VK_OBJECT_DESCRIPTORSET_LAYOUT, (__vkObject*)descSetLayout))
             {
                 realCount--;
                 if ((i+1) < descSetLayoutCount)

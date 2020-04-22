@@ -760,7 +760,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDescriptorSetLayout(
     /* Initialize __vkDescriptorSetLayout specific data fields here */
     dsl->bindingCount = pCreateInfo->bindingCount;
     dsl->dynamicDescriptorCount = 0;
-    dsl->validFlag = 0xff;
 
     if (dsl->bindingCount)
     {
@@ -832,6 +831,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDescriptorSetLayout(
     /* Return the object pointer as a 64-bit handle */
     *pSetLayout = (VkDescriptorSetLayout)(uintptr_t)dsl;
 
+    __vk_InsertObject(devCtx, __VK_OBJECT_DESCRIPTORSET_LAYOUT, __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkObject*, *pSetLayout));
+
     return VK_SUCCESS;
 
 OnError:
@@ -884,6 +885,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyDescriptorSetLayout(
             dsl->binding = NULL;
         }
 
+        __vk_RemoveObject(devCtx, __VK_OBJECT_DESCRIPTORSET_LAYOUT, (__vkObject*)dsl);
         __vk_DestroyObject(devCtx, __VK_OBJECT_DESCRIPTORSET_LAYOUT, (__vkObject *)dsl);
     }
 }

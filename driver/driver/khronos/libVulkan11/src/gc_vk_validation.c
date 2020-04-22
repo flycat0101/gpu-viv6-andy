@@ -2854,7 +2854,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyDescriptorSetLayout(VkDevice device, V
     __vkDescriptorSetLayout *dsl = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSetLayout *, descriptorSetLayout);
     VkResult result = VK_SUCCESS;
 
-    __VK_LOG_API("(tid=%p): vkDestroySampler(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, descriptorSetLayout, pAllocator);
+    __VK_LOG_API("(tid=%p): vkDestroyDescriptorSetLayout(%p, 0x%llx, %p)", gcoOS_GetCurrentThreadID(), device, descriptorSetLayout, pAllocator);
 
     /* API validation logic that can be skipped at runtime */
     if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)

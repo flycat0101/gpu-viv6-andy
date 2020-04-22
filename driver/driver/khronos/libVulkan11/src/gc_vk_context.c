@@ -424,6 +424,11 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDevice(
     /* Return the device context */
     *pDevice = (VkDevice)devCtx;
 
+    if (result == VK_SUCCESS)
+    {
+        __vk_InitObjectLists(*pDevice);
+    }
+
     return result;
 
 OnError:
@@ -475,6 +480,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyDevice(
     )
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
+
     if (devCtx)
     {
         __vkPhysicalDevice *phyDev = devCtx->pPhyDevice;
@@ -482,6 +488,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyDevice(
 
         /* Set the allocator to the parent allocator or API defined allocator if valid */
         __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
+
+        __vk_FiniObjectLists(devCtx);
 
         /* Lock the phyDev->mutex */
         gcoOS_AcquireMutex(gcvNULL, phyDev->mutex, gcvINFINITE);
