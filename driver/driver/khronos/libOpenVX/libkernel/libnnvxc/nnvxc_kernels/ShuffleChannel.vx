@@ -2,7 +2,6 @@
 
 /******************shuffle channel float16/int16********************/
 _viv_uniform int group_column;
-_viv_uniform float rgroup_column;
 
 __kernel void shuffleChannel_16Bits(
     image2d_array_t input,
@@ -21,7 +20,7 @@ __kernel void shuffleChannel_16Bits(
         VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 
     int coordz = coord.z;
-    int index_col = coordz * rgroup_column;
+    int index_col = (int)((short)coordz / (short)group_column);
     int index_row = coordz - index_col * group_column;
     coord.z = index_row * group_number + index_col;
     VXC_WriteImage2DArray(output, coord, src0, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
@@ -52,7 +51,7 @@ __kernel void shuffleChannel_8Bits(
         VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
 
     int coordz = coord.z;
-    int index_col = coordz * rgroup_column;
+    int index_col = (int)((short)coordz / (short)group_column);
     int index_row = coordz - index_col * group_column;
     coord.z = index_row * group_number + index_col;
     VXC_WriteImage2DArray(output, coord, src0, VXC_MODIFIER(0, 15, 0,VXC_RM_TowardZero, 0));
@@ -86,7 +85,7 @@ __kernel void shuffleChannel_16Bits_Axis1(
         VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 
     int coordy = coord.y;
-    int index_col = coordy * rgroup_column;
+    int index_col = (int)((short)coordy / (short)group_column);
     int index_row = coordy - index_col * group_column;
     coord_out.y = index_row * group_number + index_col;
     VXC_WriteImage2DArray(output, coord_out, src0, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
@@ -115,7 +114,7 @@ __kernel void shuffleChannel_8Bits_Axis1(
         VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
 
     int coordy = coord.y;
-    int index_col = coordy * rgroup_column;
+    int index_col = (int)((short)coordy / (short)group_column);
     int index_row = coordy - index_col * group_column;
     coord_out.y = index_row * group_number + index_col;
     VXC_WriteImage2DArray(output, coord_out, src0, VXC_MODIFIER(0, 15, 0,VXC_RM_TowardZero, 0));
