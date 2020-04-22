@@ -375,8 +375,7 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
                     if(SCALAR_VALUE(node->paramTable[PARAM_CONV_DEPTH_MULTIPLIER_INDEX], u32) == 1 &&
                         vxoGraphOptimization_dwConvHalSupport(weight) &&
                         (TENSOR_SIZE_INDEX(weight, 0) != 1 || TENSOR_SIZE_INDEX(weight, 1) != 1 ) &&
-                        (strideX <= 2 && strideY <=2)
-                        )
+                        (strideX == strideY && (strideX == 1 || strideX == 2) ))
                     {
                         if(TENSOR_SIZE_INDEX(weight, 0) * TENSOR_SIZE_INDEX(weight, 1) != 2)
                         {
@@ -2754,6 +2753,9 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_ConvertAvgPool2Conv(vx_graph grap
                 vx_uint32 actual_y = stride_y > 1? vxoGraphOptimization_computeFinalKernelSize(kernel_y, stride_y): kernel_y;
                 if(actual_x > 15 || actual_y>15)
                     continue;
+
+                if(stride_x > 2 || stride_y > 2 || stride_x != stride_y)
+                    continue;
             }
             else
             {
@@ -3981,7 +3983,8 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_unrollDWConv(vx_graph graph)
                     &depth_mult, &pad_mode, &pad_const);
 
             if(vxoGraphOptimization_dwConvHalSupport(input) && depth_mult == 1 &&
-                (TENSOR_SIZE_INDEX(dwweight, 0) != 1 || TENSOR_SIZE_INDEX(dwweight, 1) != 1) )
+                (TENSOR_SIZE_INDEX(dwweight, 0) != 1 || TENSOR_SIZE_INDEX(dwweight, 1) != 1) &&
+                stride[0] == stride[1] &&  (stride[0] == 1 || stride[0] == 2) )
                 continue;
 
             if(!vxoGraphOptimization_nnHalSupport(dwweight))
