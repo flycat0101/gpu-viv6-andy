@@ -1767,8 +1767,14 @@ vx_status vxnneCommandBuffer_ExecuteCommands(
             }
         }
 
-        status = gcfVX_Accel(commandBuffer->physical + i * commandSize, type,
-                             commandBuffer->eventID[i], 0, (gctUINT32)gpuId, (gctBOOL)needMultiGpuSync, syncEventID[i]);
+        status = gcfVX_Accel(commandBuffer->physical + i * commandSize,
+                             type,
+                             commandBuffer->eventID[i],
+                             0,
+                             (gctUINT32)gpuId,
+                             (gctBOOL)needMultiGpuSync,
+                             syncEventID[i]
+                             );
         if (status != VX_SUCCESS)
         {
             break;

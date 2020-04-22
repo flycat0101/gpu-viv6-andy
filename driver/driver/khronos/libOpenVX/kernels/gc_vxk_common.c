@@ -1083,7 +1083,15 @@ vx_status gcfVX_Accel(
     gcmHEADER_ARG("CmdAddress=0x%x Type=%d EventId=%d waitEvent=%d", CmdAddress, Type, EventId, waitEvent);
 
     gcmASSERT(gcoVX_VerifyHardware());
-    gcmONERROR(gcoVX_TriggerAccelerator(CmdAddress, Type, EventId, waitEvent, gpuId, sync, syncEventID));
+    gcmONERROR(gcoVX_TriggerAccelerator(
+        CmdAddress,
+        Type,
+        EventId,
+        waitEvent,
+        gpuId,
+        sync,
+        syncEventID
+        ));
 
 OnError:
     gcmFOOTER_ARG("%d", status);
