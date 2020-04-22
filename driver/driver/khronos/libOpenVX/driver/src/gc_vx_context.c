@@ -1270,33 +1270,6 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitSRAM(
     vxmASSERT(vipSRAMSize != 0);
     vxmASSERT(axiSRAMSize == 0 || (axiSRAMPhysical != gcvINVALID_ADDRESS && axiSRAMGpuPhysical != gcvINVALID_PHYSICAL_ADDRESS));
 
-    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE3))
-    {
-        vxmASSERT(vipSRAMPhysical != gcvINVALID_ADDRESS);
-        gcmVERIFY_OK(gcoVX_SetRemapAddress(vipSRAMPhysical, 0, gcvVX_SRAM_REMAP));
-    }
-
-    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1))
-    {
-        if (axiSRAMSize != 0)
-        {
-            if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_XYDP0))
-            {
-                /* v8 */
-                gcmVERIFY_OK(gcoVX_SetRemapAddress(axiSRAMPhysical, axiSRAMPhysical + axiSRAMSize, gcvVX_OCB_REMAP));
-            }
-            else
-            {
-                gcmVERIFY_OK(gcoVX_SetRemapAddress(axiSRAMGpuPhysical, axiSRAMGpuPhysical + axiSRAMSize, gcvVX_OCB_REMAP));
-            }
-        }
-        else
-        {
-            gcmVERIFY_OK(gcoVX_SetRemapAddress(0, 0, gcvVX_OCB_REMAP));
-        }
-    }
-
-
     if (axiSRAMSize != 0)
     {
         vx_uint32 i, deviceCount, gpuCountArray[MAX_GPU_CORE_COUNT], gpuTotalCount = 0, quot;

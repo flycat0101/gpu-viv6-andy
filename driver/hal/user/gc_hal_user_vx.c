@@ -596,16 +596,19 @@ gcoVX_InvokeThreadWalker(
 {
     gceSTATUS status;
     gceAPI currentApi;
+    gcoHARDWARE hardware = gcvNULL;
 
     gcmHEADER_ARG("Info=0x%x", Info);
 
+    gcmGETHARDWARE(hardware);
+
     /* Get Current API. */
-    gcmONERROR(gcoHARDWARE_GetAPI(gcvNULL, &currentApi, gcvNULL));
+    gcmONERROR(gcoHARDWARE_GetAPI(hardware, &currentApi, gcvNULL));
 
     if (currentApi != gcvAPI_OPENCL)
     {
         /* Set HAL API to OpenCL. */
-        gcmONERROR(gcoHARDWARE_SetAPI(gcvNULL, gcvAPI_OPENCL));
+        gcmONERROR(gcoHARDWARE_SetAPI(hardware, gcvAPI_OPENCL));
     }
 
     /* add env to skip shader execution */
@@ -620,16 +623,80 @@ gcoVX_InvokeThreadWalker(
 
         if (!bSkipShader)
         {
+            {
+                gctUINT32 gpuVirtAddr = 0;
+                gctPHYS_ADDR_T gpuPhysAddr = gcvINVALID_PHYSICAL_ADDRESS;
+                gctUINT32 size = 0;
+
+                if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE3))
+                {
+                    /* Program VIP-SRAM REMAP state. */
+                    gcmONERROR(gcoHARDWARE_QuerySRAM(hardware,
+                                                     gcvPOOL_INTERNAL_SRAM,
+                                                     &size,
+                                                     &gpuVirtAddr,
+                                                     gcvNULL,
+                                                     gcvNULL,
+                                                     gcvNULL
+                                                     ));
+
+                    if (size > 0)
+                    {
+                        gcmONERROR(gcoHARDWAREVX_SetRemapAddress(hardware,
+                                                                 gpuVirtAddr,
+                                                                 0,
+                                                                 gcvVX_SRAM_REMAP
+                                                                 ));
+                    }
+                }
+
+                if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1))
+                {
+                    /* Program AXI-SRAM REMAP state. */
+                    gcmONERROR(gcoHARDWARE_QuerySRAM(hardware,
+                                                     gcvPOOL_EXTERNAL_SRAM,
+                                                     &size,
+                                                     &gpuVirtAddr,
+                                                     &gpuPhysAddr,
+                                                     gcvNULL,
+                                                     gcvNULL
+                                                     ));
+
+                    if (size == 0)
+                    {
+                        gpuVirtAddr = 0;
+                        gpuPhysAddr = 0;
+                    }
+
+                    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_XYDP0))
+                    {
+                        /* V8. */
+                        gcmONERROR(gcoHARDWAREVX_SetRemapAddress(hardware,
+                                                                 gpuVirtAddr,
+                                                                 gpuVirtAddr + size,
+                                                                 gcvVX_OCB_REMAP
+                                                                 ));
+                    }
+                    else
+                    {
+                        gcmONERROR(gcoHARDWAREVX_SetRemapAddress(hardware,
+                                                                 (gctUINT32)gpuPhysAddr,
+                                                                 (gctUINT32)gpuPhysAddr + size,
+                                                                 gcvVX_OCB_REMAP
+                                                                 ));
+                    }
+                }
+            }
+
             /* Route to hardware. */
-            gcmONERROR(gcoHARDWARE_InvokeThreadWalkerCL(gcvNULL, Info));
+            gcmONERROR(gcoHARDWARE_InvokeThreadWalkerCL(hardware, Info));
         }
     }
-
 
     if (currentApi != gcvAPI_OPENCL && currentApi != 0 )
     {
         /* Restore HAL API. */
-        gcmONERROR(gcoHARDWARE_SetAPI(gcvNULL, currentApi));
+        gcmONERROR(gcoHARDWARE_SetAPI(hardware, currentApi));
     }
 
 OnError:
@@ -1085,7 +1152,6 @@ gcoVX_InvokeKernelShader(
     info.bDual16           = bDual16;
 
     gcmONERROR(gcoVX_InvokeThreadWalker(&info));
-
 OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
@@ -1135,7 +1201,16 @@ gcoVX_TriggerAccelerator(
     gcmHEADER_ARG("Cmd Address=%d", CmdAddress);
 
     gcmASSERT(gcoVX_VerifyHardware());
-    gcmONERROR(gcoHARDWAREVX_TriggerAccelerator(gcvNULL, CmdAddress, Type, EventId, waitEvent, coreId, sync, syncEventID));
+    gcmONERROR(gcoHARDWAREVX_TriggerAccelerator(
+        gcvNULL,
+        CmdAddress,
+        Type,
+        EventId,
+        waitEvent,
+        coreId,
+        sync,
+        syncEventID
+        ));
 
 OnError:
 

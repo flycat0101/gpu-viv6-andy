@@ -141,7 +141,6 @@ gcoVX_InvokeKernel(
     IN gcsVX_KERNEL_PARAMETERS_PTR  Parameters
     );
 
-
 gceSTATUS
 gcoVX_AllocateMemory(
     IN gctUINT32        Size,
