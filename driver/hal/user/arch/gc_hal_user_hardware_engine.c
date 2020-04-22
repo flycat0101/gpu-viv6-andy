@@ -15901,6 +15901,11 @@ gcoHARDWARE_FlushShaders(
  24:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 24:24) - (0 ? 24:24) + 1))))))) << (0 ? 24:24)))
             );
+    if (Hardware->config->chipModel == gcv3000 && Hardware->config->chipRevision == 0x5450)
+      {
+        gcoHARDWARE_FlushSHL1Cache(Hardware);
+        gcoHARDWARE_Semaphore(Hardware, gcvWHERE_COMMAND, gcvWHERE_PIXEL, gcvHOW_SEMAPHORE, gcvNULL);
+      }
 
 #if TEMP_SHADER_PATCH
     switch (hints->pachedShaderIdentifier)
