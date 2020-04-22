@@ -1056,6 +1056,13 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
     }
 
     envctrl = gcvNULL;
+    globalData->options.vipTimeOut = gcdGPU_TIMEOUT;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_VIP_TIMEOUT", &envctrl)) && envctrl)
+    {
+        globalData->options.vipTimeOut = atoi(envctrl);
+    }
+
+    envctrl = gcvNULL;
     globalData->options.enableForce64BitsBiasNN = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_64BITS_BIAS_NN", &envctrl)) && envctrl)
     {
@@ -1382,6 +1389,11 @@ VX_PRIVATE_API void vxoGlobalData_Initialize(vx_global_data globalData)
     gcoVX_ForceTpCoreCount(globalData);
     initUndefinedHardwareConfig(globalData);
 
+    if (globalData->options.vipTimeOut != gcdGPU_TIMEOUT)
+    {
+        gcoHAL_SetTimeOut(gcvNULL, globalData->options.vipTimeOut);
+    }
+
     vxoGlobalData_InitSRAM(globalData);
 
 }
@@ -1664,6 +1676,11 @@ VX_PRIVATE_API vx_uint32 vxoGlobalData_Release(vx_global_data globalData)
     refCount = globalData->refGlobalDataCount;
     if (refCount == 0)
     {
+        if (globalData->options.vipTimeOut != gcdGPU_TIMEOUT)
+        {
+            gcoHAL_SetTimeOut(gcvNULL, gcdGPU_TIMEOUT);
+        }
+
         if (globalData->options.flagTPFunc)
             vxFree(globalData->options.flagTPFunc);
 
