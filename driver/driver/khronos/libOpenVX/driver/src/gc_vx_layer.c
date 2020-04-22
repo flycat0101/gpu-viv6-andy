@@ -29265,7 +29265,8 @@ vxnne_shader_executable vxnneGetTensorMeanAxisShaderExecutable(
     vx_float32              axis_coef,
     vx_tensor               input,
     vx_tensor               output,
-    vx_uint32               axis)
+    vx_uint32               axis,
+    vx_bool                 is_sum_op)
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength    = 0;
@@ -29649,6 +29650,11 @@ vxnne_shader_executable vxnneGetTensorMeanAxisShaderExecutable(
             gcoOS_PrintStrSafe(subKernelName, sizeof(subKernelName), &offset, "_2D");
         }
 
+        if (is_sum_op && (VX_TYPE_FLOAT16 == input_format) && (VX_TYPE_FLOAT16 == output_format))
+        {
+            gcoOS_PrintStrSafe(subKernelName, sizeof(subKernelName), &offset, "_SUM");
+        }
+
         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, subKernelName, borderMode);
         if (!shaderExecutable) goto OnError;
     }
@@ -29727,7 +29733,21 @@ vxnne_shader_executable vxnneGetTensorMeanAxisShaderExecutable(
 
     if (0 == last_axis)
     {
-        if (VX_TYPE_FLOAT16 == input_format)
+
+        if (VX_TYPE_FLOAT16 == input_format && VX_TYPE_FLOAT16 == output_format && is_sum_op)
+        {
+            vx_uint32 uniFp16AddFp16_2x8[16] = {
+                0x55555555, // TCfg
+                0x55550000, // ASelt
+                0x76543210, 0x76543210, // ABin
+                0xaaaaaaaa, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00000100, // AccumType, ConstantType, and PostShift
+                0x3c003c00, 0x3c003c00, 0x3c003c00, 0x3c003c00, 0x3c003c00, 0x3c003c00, 0x3c003c00, 0x3c003c00 // Constant
+            };
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniFp16AddFp16_2x8", 1, uniFp16AddFp16_2x8);
+        }
+        else if (VX_TYPE_FLOAT16 == input_format)
         {
              vx_uint32 uniSumFp16toFp32_16x1[16] = {
                 0x55555555, // TCfg
@@ -29786,7 +29806,31 @@ vxnne_shader_executable vxnneGetTensorMeanAxisShaderExecutable(
         };
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumOrder0_2x8", 1, uniSumOrder0_2x8);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumOrder1_2x8", 1, uniSumOrder1_2x8);
-        if ((VX_TYPE_FLOAT16 == output_format) || (VX_TYPE_INT16 == output_format))
+
+        if ((VX_TYPE_FLOAT16 == output_format) && (VX_TYPE_FLOAT16 == input_format) && is_sum_op)
+        {
+            vx_uint32 uniSumFp16AddFp16_2x8[16] = {
+                0x55555555, // TCfg
+                0x44444444, // ASelt
+                0x33221100, 0x77665544, // ABin
+                0xaaaaaaaa, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00000400, // AccumType, ConstantType, and PostShift
+                0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001 // Constant
+            };
+            vx_uint32 uniSumFp16MulScale_2x8[16] =  {
+                0x11111111, // TCfg
+                0x00000000, // ASelt
+                0x03020100, 0x07060504, // ABin
+                0x11111111, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00000400, // AccumType, ConstantType, and PostShift
+                0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
+            };
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumFp16AddFp16_2x8", 1, uniSumFp16AddFp16_2x8);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumFp16MulScale_2x8", 1, uniSumFp16MulScale_2x8);
+        }
+        else if ((VX_TYPE_FLOAT16 == output_format) || (VX_TYPE_INT16 == output_format))
         {
             vx_uint32 uniSumOrderShort4_2x8[16] = {
                 0x11111111, // TCfg

@@ -816,7 +816,7 @@ VX_PRIVATE_API vx_status vxoNNTensorMean_SH_EVIS_Initialize_Ext(vxnne_layer ops_
 
         if(evis)
         {
-            shaderExecutable = vxnneGetTensorMeanAxisShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS, &ops_layer->node->kernelAttributes.borderMode, axis_coef, transTensor, dst, input_axis);
+            shaderExecutable = vxnneGetTensorMeanAxisShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS, &ops_layer->node->kernelAttributes.borderMode, axis_coef, transTensor, dst, input_axis, vx_false_e);
         }
         else
         {
@@ -1463,7 +1463,7 @@ OnError:
 
             if(node->base.context->evisNoInst.supportEVIS)
             {
-                shaderExecutable = vxnneGetTensorMeanAxisShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS, &node->kernelAttributes.borderMode, axis_coef, transTensor, dst, input_axis);
+                shaderExecutable = vxnneGetTensorMeanAxisShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS, &node->kernelAttributes.borderMode, axis_coef, transTensor, dst, input_axis, vx_false_e);
             }
             else
             {

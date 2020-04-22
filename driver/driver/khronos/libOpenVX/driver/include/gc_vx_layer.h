@@ -3586,7 +3586,8 @@ vxnne_shader_executable vxnneGetTensorMeanAxisShaderExecutable(
     vx_float32              axis_coef,
     vx_tensor               input,
     vx_tensor               output,
-    vx_uint32               axis);
+    vx_uint32               axis,
+    vx_bool                 is_sum_op);
 
 vxnne_shader_executable vxnneGetTensorCropShaderExecutable(
     vx_context              context,

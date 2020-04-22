@@ -60,7 +60,7 @@ vx_status vxnneExecuteSWTensorReduceSum(struct _vxnne_operation_s *operation)
     {
         vxmASSERT(src->viewRegion.dimCount == dst->viewRegion.dimCount);
     }
-    else if (rDim && src->viewRegion.dimCount > 1)
+    else if (rDim && src->viewRegion.dimCount > 2)
     {
         vxmASSERT(src->viewRegion.dimCount == dst->viewRegion.dimCount + 1);
     }
@@ -721,7 +721,7 @@ VX_PRIVATE_API vx_status vxoNNTensorReduceSum_SH_EVIS_Initialize_Ext(vxnne_layer
 
         if(evis)
         {
-            shaderExecutable = vxnneGetTensorMeanAxisShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS, &ops_layer->node->kernelAttributes.borderMode, axis_coef, transTensor, dst, axis);
+            shaderExecutable = vxnneGetTensorMeanAxisShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS, &ops_layer->node->kernelAttributes.borderMode, axis_coef, transTensor, dst, axis, vx_true_e);
         }
         else
         {
@@ -1130,7 +1130,7 @@ OnError:
 
             if(node->base.context->evisNoInst.supportEVIS)
             {
-                shaderExecutable = vxnneGetTensorMeanAxisShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS, &node->kernelAttributes.borderMode, axis_coef, transTensor, dst, axis);
+                shaderExecutable = vxnneGetTensorMeanAxisShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS, &node->kernelAttributes.borderMode, axis_coef, transTensor, dst, axis, vx_true_e);
             }
             else
             {
