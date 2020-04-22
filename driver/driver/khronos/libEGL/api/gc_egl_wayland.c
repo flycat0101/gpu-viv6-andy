@@ -2209,7 +2209,7 @@ _BindWindow(
             switch (format)
             {
             case gcvSURF_A8B8G8R8:
-                format = gcvSURF_A8R8G8B8;
+                format = gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_PE_A8B8G8R8) ? gcvSURF_A8B8G8R8 : gcvSURF_A8R8G8B8;
                 formatSupported = EGL_TRUE;
                 break;
             case gcvSURF_X8B8G8R8:

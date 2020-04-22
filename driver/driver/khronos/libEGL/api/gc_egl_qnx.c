@@ -136,7 +136,7 @@ _ConvertWindowFormat(
 
         case SCREEN_FORMAT_RGBA8888:
             bpp = 32;
-            fmt = gcvSURF_A8R8G8B8;
+            fmt = gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_PE_A8B8G8R8) ? gcvSURF_A8B8G8R8 : gcvSURF_A8R8G8B8;
             break;
 
         case SCREEN_FORMAT_RGBX8888:
