@@ -2660,6 +2660,22 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
 
                 convolutionLayer->base.temp_tensors[numTmpTensor++] = t;
             }
+            else if (enable_ofm_gt_xy)
+            {
+                vx_tensor t = NULL;
+
+                sizes[0] = TENSOR_VIEW_SIZE_INDEX(weights_new, 0);
+                sizes[1] = 1;
+                sizes[2] = 1;
+                sizes[3] = TENSOR_VIEW_SIZE_INDEX(weights_new, 1);
+                dims     = 4;
+
+                t = vxoTensor_ReshapeTensor(weights_new, (vx_int32*)sizes, dims);
+                convolutionLayer->base.temp_tensors[numTmpTensor++] = t;
+
+                weights_new_rs = vxoTensor_ReformatTensor(t, VX_TYPE_UINT32);
+                convolutionLayer->base.temp_tensors[numTmpTensor++] = weights_new_rs;
+            }
             else
             {
                 sizes[0] = ifm_rs;
