@@ -3189,7 +3189,6 @@ vxnne_shader_executable vxnneGetShuffleChannelShaderExecutable(
     vx_int32      axis                       = 0;
     vx_int32      chs                        = 0;
     vx_int32      group_column               = 0;
-    float         rgroup_column              = 0.0f;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
          context, kernelEnum, borderMode, input, output);
@@ -3266,7 +3265,6 @@ vxnne_shader_executable vxnneGetShuffleChannelShaderExecutable(
 
     kernel = vxnneGetKernelShadersByEnum(context, kernelEnum);
     group_column = chs / num_group;
-    rgroup_column = 1.0f / group_column;
 
     if (!kernel)
     {
@@ -3328,7 +3326,6 @@ vxnne_shader_executable vxnneGetShuffleChannelShaderExecutable(
     }
 
     status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "group_column", 1, &group_column);
-    status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "rgroup_column", 1, &rgroup_column);
     if (status != VX_SUCCESS) goto OnError;
 
     status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 3);

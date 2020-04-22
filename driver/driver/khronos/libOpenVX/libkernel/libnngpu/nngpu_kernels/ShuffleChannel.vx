@@ -3,14 +3,13 @@ __kernel void shuffleChannel_##name##_4X( \
     image2d_array_t input, \
     image2d_array_t output, \
     int group_number, \
-    int group_column, \
-    float rgroup_column) \
+    int group_column) \
 { \
     int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0); \
     src_type inPixel; \
     inPixel = read_fun(input, coord); \
     int coordz = coord.z; \
-    int index_col = coordz * rgroup_column; \
+    int index_col = (int)((short)coordz / (short)group_column); \
     int index_row = coordz - index_col * group_column; \
     coord.z = index_row * group_number + index_col; \
     write_fun(output, coord, inPixel); \
@@ -25,14 +24,13 @@ __kernel void shuffleChannel_##name##_4S( \
     image2d_array_t input, \
     image2d_array_t output, \
     int group_number, \
-    int group_column, \
-    float rgroup_column) \
+    int group_column) \
 { \
     int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0); \
     src_type inPixel; \
     inPixel = read_fun(input, coord); \
     int coordz = coord.z; \
-    int index_col = coordz * rgroup_column; \
+    int index_col = (int)((short)coordz / (short)group_column); \
     int index_row = coordz - index_col * group_column; \
     coord.z = index_row * group_number + index_col; \
     write_fun(output, coord, inPixel.xxxx); \
@@ -54,14 +52,13 @@ __kernel void shuffleChannel_##name##_4X_Axis1( \
     image2d_array_t input, \
     image2d_array_t output, \
     int group_number, \
-    int group_column, \
-    float rgroup_column) \
+    int group_column) \
 { \
     int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0); \
     src_type inPixel; \
     inPixel = read_fun(input, coord); \
     int coordy = coord.y; \
-    int index_col = coordy * rgroup_column; \
+    int index_col = (int)((short)coordy / (short)group_column); \
     int index_row = coordy - index_col * group_column; \
     coord.y = index_row * group_number + index_col; \
     write_fun(output, coord, inPixel); \
@@ -76,14 +73,13 @@ __kernel void shuffleChannel_##name##_4S_Axis1( \
     image2d_array_t input, \
     image2d_array_t output, \
     int group_number, \
-    int group_column, \
-    float rgroup_column) \
+    int group_column) \
 { \
     int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0); \
     src_type inPixel; \
     inPixel = read_fun(input, coord); \
     int coordy = coord.y; \
-    int index_col = coordy * rgroup_column; \
+    int index_col = (int)((short)coordy / (short)group_column); \
     int index_row = coordy - index_col * group_column; \
     coord.y = index_row * group_number + index_col; \
     write_fun(output, coord, inPixel.xxxx); \

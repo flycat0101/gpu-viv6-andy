@@ -9510,7 +9510,7 @@ vxnne_shader_executable vxnneGetGPUShuffleChannelShaderExecutable(
     vxnne_kernel_shaders        kernel;
 
     vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-    vx_reference  parameters[5]              = {(vx_reference)input, (vx_reference)output, (vx_reference)num_group_s, (vx_reference)NULL, (vx_reference)NULL};
+    vx_reference  parameters[4]              = {(vx_reference)input, (vx_reference)output, (vx_reference)num_group_s, (vx_reference)NULL};
     vx_enum       inputFormat                = TENSOR_DATA_TYPE(input);
     vx_enum       outputFormat               = TENSOR_DATA_TYPE(output);
     vx_uint32     input_dim                  = TENSOR_DIM_NUM(input);
@@ -9531,9 +9531,7 @@ vxnne_shader_executable vxnneGetGPUShuffleChannelShaderExecutable(
     vx_int32      axis                       = 0;
     vx_int32      chs                        = 0;
     vx_int32      group_column               = 0;
-    float         rgroup_column              = 0.0f;
     vx_scalar     group_column_s             = NULL;
-    vx_scalar     rgroup_column_s            = NULL;
     vx_bool        is_write_4x               = vx_false_e;
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
          context, kernelEnum, borderMode, input, output);
@@ -9578,12 +9576,9 @@ vxnne_shader_executable vxnneGetGPUShuffleChannelShaderExecutable(
 
     kernel = vxnneGetKernelShadersByEnum(context, kernelEnum);
     group_column = chs / num_group;
-    rgroup_column = 1.0f / group_column;
 
     group_column_s = vxCreateScalar(context, VX_TYPE_INT32, &group_column);
-    rgroup_column_s = vxCreateScalar(context, VX_TYPE_FLOAT32, &rgroup_column);
     parameters[3] = (vx_reference)group_column_s;
-    parameters[4] = (vx_reference)rgroup_column_s;
 
     if (!kernel)
     {
@@ -9613,7 +9608,7 @@ vxnne_shader_executable vxnneGetGPUShuffleChannelShaderExecutable(
         status = vxBuildProgram(program, VX_NULL);
         if (status != VX_SUCCESS) goto OnError;
 
-        kernel = vxnneAddKernelShadersInProgram(context, "shuffleChannel", program, 7, kernelEnum);
+        kernel = vxnneAddKernelShadersInProgram(context, "shuffleChannel", program, 4, kernelEnum);
         if (!kernel) goto OnError;
 
         vxReleaseProgram(&program);
@@ -9711,7 +9706,7 @@ vxnne_shader_executable vxnneGetGPUShuffleChannelShaderExecutable(
         goto OnError;
     }
 
-    status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 5);
+    status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
     status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
     if (is_write_4x)
     {
@@ -9725,7 +9720,6 @@ vxnne_shader_executable vxnneGetGPUShuffleChannelShaderExecutable(
     if (output_rs) vxoTensor_ReleaseTensor(&output_rs);
     if (input_rs) vxoTensor_ReleaseTensor(&input_rs);
     if (group_column_s) vxReleaseScalar(&group_column_s);
-    if (rgroup_column_s) vxReleaseScalar(&rgroup_column_s);
 
     gcmFOOTER_ARG("%p", shaderExecutable);
     return shaderExecutable;
@@ -9736,7 +9730,6 @@ OnError:
     if (output_rs) vxoTensor_ReleaseTensor(&output_rs);
     if (input_rs) vxoTensor_ReleaseTensor(&input_rs);
     if (group_column_s) vxReleaseScalar(&group_column_s);
-    if (rgroup_column_s) vxReleaseScalar(&rgroup_column_s);
 
 #if !gcdUSE_VXC_BINARY
     if (programSources)
