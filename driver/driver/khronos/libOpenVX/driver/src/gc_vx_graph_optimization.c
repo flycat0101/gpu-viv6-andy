@@ -375,6 +375,7 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
                     if(SCALAR_VALUE(node->paramTable[PARAM_CONV_DEPTH_MULTIPLIER_INDEX], u32) == 1 &&
                         vxoGraphOptimization_dwConvHalSupport(weight) &&
                         (TENSOR_SIZE_INDEX(weight, 0) != 1 || TENSOR_SIZE_INDEX(weight, 1) != 1 ) &&
+                        (TENSOR_SIZE_INDEX(weight, 0) <= 15 || TENSOR_SIZE_INDEX(weight, 1) <= 15 ) &&
                         (strideX == strideY && (strideX == 1 || strideX == 2) ))
                     {
                         if(TENSOR_SIZE_INDEX(weight, 0) * TENSOR_SIZE_INDEX(weight, 1) != 2)
@@ -2749,9 +2750,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_ConvertAvgPool2Conv(vx_graph grap
             /*V8 support depwiseConv hardware feature*/
             if(vxoGraphOptimization_dwConvHalSupport(input))
             {
-                vx_uint32 actual_x = stride_x > 1? vxoGraphOptimization_computeFinalKernelSize(kernel_x, stride_x) : kernel_x;
-                vx_uint32 actual_y = stride_y > 1? vxoGraphOptimization_computeFinalKernelSize(kernel_y, stride_y): kernel_y;
-                if(actual_x > 15 || actual_y>15)
+                if(kernel_x > 15 || kernel_y>15)
                     continue;
 
                 if(stride_x > 2 || stride_y > 2 || stride_x != stride_y)
