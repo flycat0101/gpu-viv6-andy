@@ -374,10 +374,18 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
                 {
                     if(SCALAR_VALUE(node->paramTable[PARAM_CONV_DEPTH_MULTIPLIER_INDEX], u32) == 1 &&
                         vxoGraphOptimization_dwConvHalSupport(weight) &&
-                        (TENSOR_SIZE_INDEX(weight, 0) != 1 || TENSOR_SIZE_INDEX(weight, 1) != 1 )
+                        (TENSOR_SIZE_INDEX(weight, 0) != 1 || TENSOR_SIZE_INDEX(weight, 1) != 1 ) &&
+                        (strideX <= 2 && strideY <=2)
                         )
                     {
-                        nodeOpType = OP_CONVOLUTION;
+                        if(TENSOR_SIZE_INDEX(weight, 0) * TENSOR_SIZE_INDEX(weight, 1) != 2)
+                        {
+                           nodeOpType = OP_CONVOLUTION;
+                        }
+                        else
+                        {
+                            nodeOpType = OP_CONVOLUTION_NxM;
+                        }
                     }
                     else
                     {
@@ -3704,7 +3712,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_transformConvNxM(vx_graph graph)
                 },
                 (vx_size)pad[1], (vx_size)pad[3], pad_mode, padconst
                 },
-                (vx_uint32)stride[0], (vx_uint32)stride[1], 0
+                (vx_uint32)stride[0], (vx_uint32)stride[1], depth_multiplier
             };
             vx_node newNode = vxConvolutionLayer(graph, (vx_tensor)node->paramTable[0],
                                     padedWeight, bias,
