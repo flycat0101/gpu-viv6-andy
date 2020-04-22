@@ -193,6 +193,7 @@ vx_status vxoNNFullyConnectedLayerInitializer(
     vxnne_shader_operation sh_operation,
 
     vxnne_fully_connected_sw_operation_fp16 sw_fp16,
+    vxnne_shader_operation sh_fp16,
     vx_tensor inputs0,
     vx_weights_biases_parameter weights_biases,
 
@@ -274,60 +275,89 @@ vx_status vxoNNFullyConnectedLayerInitializer(
  weights_biases->weights_sizes[2] / weights_biases->slice_array[0].kz_count + 1;
         vx_uint32 zoffset = 0;
 
-        if(!gcoHAL_IsFeatureAvailable1(gcvNULL, gcFEATURE_BIT_TP_FC_FLOAT_LAST_PIXEL_NEGATIVE_0_FIX)  && sw_fp16 != VX_NULL && TENSOR_DATA_TYPE(inputs0) == VX_TYPE_FLOAT16)
+        if(!gcoHAL_IsFeatureAvailable1(gcvNULL, gcFEATURE_BIT_TP_FC_FLOAT_LAST_PIXEL_NEGATIVE_0_FIX) && TENSOR_DATA_TYPE(inputs0) == VX_TYPE_FLOAT16 )
         {
-            vx_tensor tmpTensor0;
-            vx_uint32 i = 0;
-            vx_tensor_create_params_t tensor_create_params;
-            vx_uint32 size[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1, 1, 1, 1, 1, 1};
-            gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
-
-            for(i = 0; i < inputs0->dimCount; ++i)
-                size[i] = TENSOR_SIZE_INDEX(inputs0, i);
-
-            tensor_create_params.num_of_dims = inputs0->dimCount;
-            tensor_create_params.sizes = size;
-            tensor_create_params.data_format = TENSOR_DATA_TYPE(inputs0);
-            tensor_create_params.quant_format = TENSOR_QUANT_TYPE(inputs0);
-            if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+            if (VX_NULL != sh_fp16 && vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER))
             {
-                tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(outputs);
+                vx_node node = layer->node;
+                vxnne_shader_executable shaderExecutable;
+                vx_uint32 tp_fc_ksize = (0x1 << MAX_KZGROUP_COUNT);
+
+                shaderExecutable = vxnneGetFC_TPCheckShaderExecutable(node->base.context, VXNNE_KERNEL_FC_TP_CHECK,
+                                            &node->kernelAttributes.borderMode, inputs, tp_fc_ksize);
+
+                if (!shaderExecutable)
+                {
+                    vxmONERROR(VX_FAILURE);
+                }
+
+                vxmONERROR(vxnneShaderOperation_Initialize(sh_fp16,
+                    layer,
+                    VXNNE_OPERATOR_FULLYCONNECTED,
+                    batchCount,
+                    shaderExecutable));
+
+                vxmONERROR(vxnneLayer_SetOperation(
+                    layer,
+                    &sh_fp16->base,
+                    (*count) ++));
+
+                vxnneOperation_AddReference(&sh_fp16->base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
             }
-            else
+            else if (sw_fp16 != VX_NULL )
             {
-                tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(outputs);
-                tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(outputs);
+                vx_tensor tmpTensor0;
+                vx_uint32 i = 0;
+                vx_tensor_create_params_t tensor_create_params;
+                vx_uint32 size[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1, 1, 1, 1, 1, 1};
+                gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+
+                for(i = 0; i < inputs0->dimCount; ++i)
+                    size[i] = TENSOR_SIZE_INDEX(inputs0, i);
+
+                tensor_create_params.num_of_dims = inputs0->dimCount;
+                tensor_create_params.sizes = size;
+                tensor_create_params.data_format = TENSOR_DATA_TYPE(inputs0);
+                tensor_create_params.quant_format = TENSOR_QUANT_TYPE(inputs0);
+                if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+                {
+                    tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(outputs);
+                }
+                else
+                {
+                    tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(outputs);
+                    tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(outputs);
+                }
+
+                tmpTensor0 = vxoTensor_CreateTensor(context, node->graph, &tensor_create_params, vx_true_e);
+
+                vxmONERROR(vxnneOperation_Initialize(&sw_fp16->base,
+                                            layer,
+                                            VXNNE_OPERATION_TARGET_SW,
+                                            VXNNE_OPERATOR_FULLYCONNECTED,
+                                            vxnneExecuteSWfp16Clamp,
+                                            VX_NULL,
+                                            batchCount,
+                                            0));
+
+                vxnneOperation_AddReference(&sw_fp16->base, (vx_reference)inputs0, VXNNE_OPERATION_REFENRENCE_INPUT);
+                vxnneOperation_AddReference(&sw_fp16->base, (vx_reference)tmpTensor0, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+                vxnneLayer_SetOperation(
+                    layer,
+                    &sw_fp16->base,
+                    (*count) ++);
+
+                sw_fp16->inputs          = inputs0;
+                sw_fp16->outputs         = tmpTensor0;
+
+                layer->temp_tensors[tempTensorCount] = tmpTensor0;
+                tempTensorCount++;
+                layer->num_temp_tensors = tempTensorCount;
+
+                inputs = tmpTensor0;
             }
-
-            tmpTensor0 = vxoTensor_CreateTensor(context, node->graph, &tensor_create_params, vx_true_e);
-
-            vxmONERROR(vxnneOperation_Initialize(&sw_fp16->base,
-                                        layer,
-                                        VXNNE_OPERATION_TARGET_SW,
-                                        VXNNE_OPERATOR_FULLYCONNECTED,
-                                        vxnneExecuteSWfp16Clamp,
-                                        VX_NULL,
-                                        batchCount,
-                                        0));
-
-            vxnneOperation_AddReference(&sw_fp16->base, (vx_reference)inputs0, VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&sw_fp16->base, (vx_reference)tmpTensor0, VXNNE_OPERATION_REFENRENCE_OUTPUT);
-            vxnneLayer_SetOperation(
-                layer,
-                &sw_fp16->base,
-                (*count) ++);
-
-            sw_fp16->inputs          = inputs0;
-            sw_fp16->outputs         = tmpTensor0;
-
-            layer->temp_tensors[tempTensorCount] = tmpTensor0;
-            tempTensorCount++;
-            layer->num_temp_tensors = tempTensorCount;
-
-            inputs = tmpTensor0;
         }
-
-
        vxmONERROR(vxnneOperation_Initialize(&tp_operation0->base,
                                             layer,
                                             VXNNE_OPERATION_TARGET_TP,
@@ -692,6 +722,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedReluLayer_Initializer(vx
         &fullyConnectReluLayer->fully_connected_relu_operation,
         &fullyConnectReluLayer->fully_connected_SHoperation,
         &fullyConnectReluLayer->fully_connected_sw_operation_fp16,
+        &fullyConnectReluLayer->fully_connected_sh_operation_fp16,
         inputs,
         weights_biases,
         pad,
