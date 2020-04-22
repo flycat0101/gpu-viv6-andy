@@ -143,6 +143,47 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedReluLayer_ValidateOutput
     return VX_SUCCESS;
 }
 
+VX_PRIVATE_API vx_status vxnneExecuteSWfp16Clamp(struct _vxnne_operation_s *operation
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vx_tensor input = (vx_tensor)(((vxnne_fully_connected_sw_operation_fp16)operation)->inputs);
+    vx_tensor output = (vx_tensor)(((vxnne_fully_connected_sw_operation_fp16)operation)->outputs);
+    vx_uint32 size = 0;
+    vx_uint32 index = (0x1 << MAX_KZGROUP_COUNT);
+    gctPOINTER inputLogical = VX_NULL;
+    gctPOINTER outputLogical = VX_NULL;
+    vx_uint32 inputPhysical = 0, outputPhysical = 0;
+    vx_uint32 elementCount = 0;
+    vx_int16 negativeZero = 0x8000;
+    vx_int16 checkData = 0;
+
+    vxoTensor_GetTensorSize(input, &size);
+    vxoTensor_GetTensorViewMemory(input, &inputLogical, &inputPhysical);
+    vxoTensor_GetTensorViewMemory(output, &outputLogical, &outputPhysical);
+
+    gcoOS_MemCopy(outputLogical, inputLogical, size);
+
+    elementCount = size/TENSOR_DATA_SIZE(input);
+
+    while(index < elementCount - 1)
+    {
+        checkData = (vx_int16)*(((vx_int16 *)inputLogical) + (index - 1));
+        if(checkData == negativeZero)
+            *(((vx_int16 *)outputLogical) + (index - 1)) = 0x0;
+
+        index += (0x1 << MAX_KZGROUP_COUNT);
+    }
+
+    checkData = (vx_int16)*(((vx_int16 *)inputLogical) + (elementCount - 1));
+
+    if(checkData == negativeZero)
+        *(((vx_int16 *)outputLogical) + (elementCount - 1)) = 0x0;
+
+    return status;
+
+}
+
 vx_status vxoNNFullyConnectedLayerInitializer(
     vx_node node,
     vxnne_layer layer,
@@ -150,8 +191,11 @@ vx_status vxoNNFullyConnectedLayerInitializer(
     vxnne_tp_operation tp_operation1,
     vxnne_convolution_relu_pooling_operation nn_operation,
     vxnne_shader_operation sh_operation,
-    vx_tensor inputs,
+
+    vxnne_fully_connected_sw_operation_fp16 sw_fp16,
+    vx_tensor inputs0,
     vx_weights_biases_parameter weights_biases,
+
     vx_uint32 pad,
     vx_enum conv_rounding_type,
     vx_bool enable_relu,
@@ -168,16 +212,18 @@ vx_status vxoNNFullyConnectedLayerInitializer(
     vx_bool   supportDataFormat1          = vx_false_e;
     vx_bool   supportDataFormat2          = vx_false_e;
     vx_bool   supportDataFormat3          = vx_false_e;
-    vx_enum   input_dataformat            = TENSOR_DATA_TYPE(inputs);
+    vx_enum   input_dataformat            = TENSOR_DATA_TYPE(inputs0);
     vx_enum   weight_dataformat           = TENSOR_DATA_TYPE(weights_biases->wb_base->origWeight);
     vx_enum   bias_dataformat             = weights_biases->wb_base->origBias ? TENSOR_DATA_TYPE(weights_biases->wb_base->origBias) : VX_TYPE_INVALID;
     vx_enum   output_dataformat           = TENSOR_DATA_TYPE(outputs);
-    vx_uint32 dims                        = TENSOR_VIEW_DIM_NUM(inputs);
-    vx_uint32 width                       = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
-    vx_uint32 height                      = (dims > 1) ? TENSOR_VIEW_SIZE_INDEX(inputs, 1) : 1;
-    vx_uint32 depth                       = (dims > 2) ? TENSOR_VIEW_SIZE_INDEX(inputs, 2) : 1;
+    vx_uint32 dims                        = TENSOR_VIEW_DIM_NUM(inputs0);
+    vx_uint32 width                       = TENSOR_VIEW_SIZE_INDEX(inputs0, 0);
+    vx_uint32 height                      = (dims > 1) ? TENSOR_VIEW_SIZE_INDEX(inputs0, 1) : 1;
+    vx_uint32 depth                       = (dims > 2) ? TENSOR_VIEW_SIZE_INDEX(inputs0, 2) : 1;
     vx_uint32 inputDims                   = width * height * depth;
     vx_uint32 op_index = 0;
+    vx_uint32 tempTensorCount = 0;
+    vx_tensor inputs = inputs0;
 
     supportDataFormat0 = (vx_bool)(input_dataformat == VX_TYPE_FLOAT16 && weight_dataformat == VX_TYPE_FLOAT16 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_FLOAT32) && output_dataformat == VX_TYPE_FLOAT16);
     supportDataFormat1 = (vx_bool)(input_dataformat == VX_TYPE_INT8 && weight_dataformat == VX_TYPE_INT8 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_INT32) && output_dataformat == VX_TYPE_INT8);
@@ -227,6 +273,60 @@ vx_status vxoNNFullyConnectedLayerInitializer(
  weights_biases->weights_sizes[2] / weights_biases->slice_array[0].kz_count :
  weights_biases->weights_sizes[2] / weights_biases->slice_array[0].kz_count + 1;
         vx_uint32 zoffset = 0;
+
+        if(!gcoHAL_IsFeatureAvailable1(gcvNULL, gcFEATURE_BIT_TP_FC_FLOAT_LAST_PIXEL_NEGATIVE_0_FIX)  && sw_fp16 != VX_NULL && TENSOR_DATA_TYPE(inputs0) == VX_TYPE_FLOAT16)
+        {
+            vx_tensor tmpTensor0;
+            vx_uint32 i = 0;
+            vx_tensor_create_params_t tensor_create_params;
+            vx_uint32 size[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1, 1, 1, 1, 1, 1};
+            gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+
+            for(i = 0; i < inputs0->dimCount; ++i)
+                size[i] = TENSOR_SIZE_INDEX(inputs0, i);
+
+            tensor_create_params.num_of_dims = inputs0->dimCount;
+            tensor_create_params.sizes = size;
+            tensor_create_params.data_format = TENSOR_DATA_TYPE(inputs0);
+            tensor_create_params.quant_format = TENSOR_QUANT_TYPE(inputs0);
+            if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+            {
+                tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(outputs);
+            }
+            else
+            {
+                tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(outputs);
+                tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(outputs);
+            }
+
+            tmpTensor0 = vxoTensor_CreateTensor(context, node->graph, &tensor_create_params, vx_true_e);
+
+            vxmONERROR(vxnneOperation_Initialize(&sw_fp16->base,
+                                        layer,
+                                        VXNNE_OPERATION_TARGET_SW,
+                                        VXNNE_OPERATOR_FULLYCONNECTED,
+                                        vxnneExecuteSWfp16Clamp,
+                                        VX_NULL,
+                                        batchCount,
+                                        0));
+
+            vxnneOperation_AddReference(&sw_fp16->base, (vx_reference)inputs0, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&sw_fp16->base, (vx_reference)tmpTensor0, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+            vxnneLayer_SetOperation(
+                layer,
+                &sw_fp16->base,
+                (*count) ++);
+
+            sw_fp16->inputs          = inputs0;
+            sw_fp16->outputs         = tmpTensor0;
+
+            layer->temp_tensors[tempTensorCount] = tmpTensor0;
+            tempTensorCount++;
+            layer->num_temp_tensors = tempTensorCount;
+
+            inputs = tmpTensor0;
+        }
+
 
        vxmONERROR(vxnneOperation_Initialize(&tp_operation0->base,
                                             layer,
@@ -591,6 +691,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedReluLayer_Initializer(vx
         &fullyConnectReluLayer->fully_connected_TPoperation[1],
         &fullyConnectReluLayer->fully_connected_relu_operation,
         &fullyConnectReluLayer->fully_connected_SHoperation,
+        &fullyConnectReluLayer->fully_connected_sw_operation_fp16,
         inputs,
         weights_biases,
         pad,
