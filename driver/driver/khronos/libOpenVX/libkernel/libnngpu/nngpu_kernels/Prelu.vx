@@ -11,8 +11,8 @@ __kernel void gpuPrelu_FP32
     data = read_imagef(input, coord);
     para = read_imagef(alpha, coord.zwww);
 
-    float maxData = max(data.x, 0);
-    float minData = min(data.x, 0);
+    float maxData = data.x >= 0 ? data.x : 0;
+    float minData = data.x <  0 ? data.x : 0;
     dst.x = minData * para.x + maxData;
 
     write_imagef(output, coord, dst);
@@ -38,8 +38,8 @@ __kernel void gpuPrelu_Quant8
     para = read_imagef(alpha, coord.zwww);
     data = (convert_int(tmp.x-zpIn))*scaleIn;
 
-    float maxData = max(data, 0);
-    float minData = min(data, 0);
+    float maxData = data >= 0 ? data : 0;
+    float minData = data <  0 ? data : 0;
     data = minData * para.x + maxData;
 
     dst.x = floor(data * scaleOut + zpOut + 0.5);
@@ -60,8 +60,8 @@ __kernel void gpuPrelu_VecFP32
     data = read_imagef(input, coord);
     para = read_imagef(alpha, coord.zwww);
 
-    float4 maxData = max(data, 0);
-    float4 minData = min(data, 0);
+    float4 maxData = data >= 0 ? data : 0;
+    float4 minData = data  < 0 ? data : 0;
     dst = minData * para.x + maxData;
 
     write_imagef(output, coord, dst);
@@ -89,8 +89,8 @@ __kernel void gpuPrelu_VecQuant8
     tmpData = convert_int4(tmp);
     data = (convert_float4(tmpData-zpIn))*scaleIn;
 
-    float4 maxData = max(data, 0);
-    float4 minData = min(data, 0);
+    float4 maxData = data >= 0 ? data : 0;
+    float4 minData = data  < 0 ? data : 0;
     data = minData * para.x + maxData;
 
     dst = convert_uint4(data * scaleOut + zpOut + 0.5);
