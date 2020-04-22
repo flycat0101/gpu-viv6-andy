@@ -9,6 +9,8 @@ _viv_uniform float       offset_asymmetric;
 _viv_uniform VXC_512Bits uniSumFp16toFp32_16x1;
 _viv_uniform VXC_512Bits uniSumI16toFp32_16x1;
 _viv_uniform VXC_512Bits uniSumI8toFp32_32x1;
+_viv_uniform VXC_512Bits uniSumFp16MulScale_2x8;
+_viv_uniform VXC_512Bits uniSumFp16AddFp16_2x8;
 
 #define TENSOR_MEAN_AXIS0_F16_2D(dst_name, dst_type, copy_type, conv_mode, copy_byte_num) \
 __kernel void vxcTensorMeanAxis0_F16to##dst_name##_2D \
@@ -91,6 +93,59 @@ TENSOR_MEAN_AXIS0_F16(F16, half,  short, CONV, 2)
 TENSOR_MEAN_AXIS0_F16(I16, short, short, CONV_SAT_RTE, 2)
 TENSOR_MEAN_AXIS0_F16(I8,  char,  char,  CONV_SAT_RTE, 1)
 TENSOR_MEAN_AXIS0_F16(U8,  unsigned char, unsigned char, CONV_SAT_RTE, 1)
+
+_viv_uniform VXC_512Bits uniFp16AddFp16_2x8;
+
+#define TENSORMEANAXIS0_FP16TOFP16_PROCESS() \
+    vxc_half8 sum, zero_half; \
+    vxc_short8 zeors = {0, 0, 0, 0, 0, 0, 0, 0}; \
+    _viv_asm(COPY, sum, zeors, 16); \
+    _viv_asm(COPY, zero_half, zeors, 16); \
+    for (coord.x = 16; coord.x < line_align; ) \
+    { \
+        vxc_short8 vec0, vec1, vec2, vec3; \
+        vxc_half8  src0, src1, src2, src3; \
+        VXC_ReadImage(vec0, inputs, coord, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+        _viv_asm(COPY, src0, vec0, 16); \
+        VXC_ReadImage(vec1, inputs, coord, VXC_5BITOFFSET_XY(-8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+        _viv_asm(COPY, src1, vec1, 16); \
+        VXC_ReadImage(vec2, inputs, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+        _viv_asm(COPY, src2, vec2, 16); \
+        VXC_ReadImage(vec3, inputs, coord, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+        _viv_asm(COPY, src3, vec3, 16); \
+        coord.x += 32; \
+        VXC_DP2x8(sum, sum, src0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniFp16AddFp16_2x8); \
+        VXC_DP2x8(sum, sum, src1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniFp16AddFp16_2x8); \
+        VXC_DP2x8(sum, sum, src2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniFp16AddFp16_2x8); \
+        VXC_DP2x8(sum, sum, src3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniFp16AddFp16_2x8); \
+    } \
+    vxc_short8 dst; \
+    VXC_DP2x8(sum, sum, zero_half, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0), uniFp16AddFp16_2x8); \
+    VXC_DP2x8(sum, sum, zero_half, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0), uniFp16AddFp16_2x8); \
+    VXC_DP2x8(sum, sum, zero_half, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0), uniFp16AddFp16_2x8); \
+    _viv_asm(COPY, dst, sum, 16); \
+    coord.x = 0; \
+    VXC_WriteImage(outputs, coord, dst, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+
+__kernel void vxcTensorMeanAxis0_F16toF16_2D_SUM
+    (
+    __read_only  image2d_array_t inputs,
+    __write_only image2d_array_t outputs
+    )
+{
+    int2 coord = (int2)(16, get_global_id(1));
+    TENSORMEANAXIS0_FP16TOFP16_PROCESS()
+}
+
+__kernel void vxcTensorMeanAxis0_F16toF16_SUM
+    (
+    __read_only  image2d_array_t inputs,
+    __write_only image2d_array_t outputs
+    )
+{
+    int4 coord = (int4)(16, get_global_id(1), get_global_id(2), 0);
+    TENSORMEANAXIS0_FP16TOFP16_PROCESS()
+}
 
 #define TENSOR_MEAN_AXIS0_I16_2D(dst_name, dst_type, copy_type, conv_mode) \
 __kernel void vxcTensorMeanAxis0_I16to##dst_name##_2D \
@@ -407,6 +462,61 @@ TENSOR_MEAN_AXIS1_F16(I16, short8, short8, short4, CONV_SAT_RTE, uniSumOrderShor
 TENSOR_MEAN_AXIS1_F16(I8, vxc_char8, vxc_char8, char4, CONV_SAT_RTE, uniSumOrderChar4_2x8)
 TENSOR_MEAN_AXIS1_F16(U8, vxc_uchar8, vxc_uchar8, uchar4, CONV_SAT_RTE, uniSumOrderChar4_2x8)
 
+#define TENSORMEANAXIS1_FP16TOFP16_PROCESS() \
+    vxc_half8 sum0; \
+    vxc_half8 sum1; \
+    vxc_short8 zeors = {0, 0, 0, 0, 0, 0, 0, 0}; \
+    _viv_asm(COPY, sum1, zeors, 16); \
+    _viv_asm(COPY, sum0, zeors, 16); \
+    for (coord.y = 0; coord.y < line_align; coord.y += 4) \
+    { \
+        vxc_short8 vec0, vec1, vec2, vec3; \
+        vxc_half8  src0, src1, src2, src3; \
+        vxc_half8  src0_1, src1_1, src2_1, src3_1; \
+        VXC_ReadImage(vec0, inputs, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+        _viv_asm(COPY, src0, vec0, 16); \
+        VXC_ReadImage(vec1, inputs, coord, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+        _viv_asm(COPY, src1, vec1, 16); \
+        VXC_ReadImage(vec2, inputs, coord, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+        _viv_asm(COPY, src2, vec2, 16); \
+        VXC_ReadImage(vec3, inputs, coord, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+        _viv_asm(COPY, src3, vec3, 16); \
+        VXC_DP2x8(src0_1, src0, src1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniSumOrder0_2x8); \
+        VXC_DP2x8(src1_1, src0, src1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniSumOrder1_2x8); \
+        VXC_DP2x8(src2_1, src2, src3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniSumOrder0_2x8); \
+        VXC_DP2x8(src3_1, src2, src3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniSumOrder1_2x8); \
+        VXC_DP4x4(sum0, src0_1, src2_1, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniSumAxi1F16ToF32_4x4); \
+        VXC_DP4x4(sum0, src1_1, src3_1, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0), uniSumAxi1F16ToF32_4x4); \
+        VXC_DP2x8(sum1, sum0, sum1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniSumFp16AddFp16_2x8); \
+    } \
+    vxc_half8 dst_tmp; \
+    vxc_short8 dst; \
+    half scale_Val; \
+    _viv_asm(CONV, scale_Val, axis_scale); \
+    VXC_DP4x4(dst_tmp, sum1, scale_Val, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniSumFp16MulScale_2x8); \
+    _viv_asm(COPY, dst, dst_tmp, 16); \
+    coord.y = 0; \
+    VXC_WriteImage(outputs, coord, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+
+__kernel void vxcTensorMeanAxis1_F16toF16_2D_SUM(
+    __read_only  image2d_array_t inputs,
+    __write_only image2d_array_t outputs
+    )
+{
+    int2 coord = (int2)(get_global_id(0), 0);
+    TENSORMEANAXIS1_FP16TOFP16_PROCESS()
+}
+
+__kernel void vxcTensorMeanAxis1_F16toF16_SUM(
+    __read_only  image2d_array_t inputs,
+    __write_only image2d_array_t outputs
+    )
+{
+    int4 coord = (int4)(get_global_id(0), 0, get_global_id(2), 0);
+    TENSORMEANAXIS1_FP16TOFP16_PROCESS()
+}
+
+
 #define TENSOR_MEAN_AXIS2_F16(dst_name, dst_type, copy_type, tmp_type, conv_mode, order_choice) \
 __kernel void vxcTensorMeanAxis2_F16to##dst_name \
     ( \
@@ -420,7 +530,7 @@ __kernel void vxcTensorMeanAxis2_F16to##dst_name \
     vxc_short8 vec[4]; \
     vxc_half8  src[4]; \
     vxc_half8  src1[4]; \
-    vxc_half8  zero8 = (vxc_half8)(0, 0, 0, 0, 0, 0, 0, 0); \
+    vxc_short8  zero8 = (vxc_short8)(0, 0, 0, 0, 0, 0, 0, 0); \
     for (coord.z = 0; coord.z < line_align; ) \
     { \
         VXC_ReadImage2DArray(vec[0], inputs, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
@@ -456,7 +566,7 @@ __kernel void vxcTensorMeanAxis2_F16to##dst_name \
         } \
         while (i < 4) \
         { \
-            src[i] = zero8; \
+            _viv_asm(COPY, src[i], zero8, 16); \
             i++; \
         } \
         VXC_DP2x8(src1[0], src[0], src[1], VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniSumOrder0_2x8); \
@@ -485,6 +595,77 @@ TENSOR_MEAN_AXIS2_F16(F16, half8, short8, half4, CONV, uniSumOrderShort4_2x8)
 TENSOR_MEAN_AXIS2_F16(I16, short8, short8, short4, CONV_SAT_RTE, uniSumOrderShort4_2x8)
 TENSOR_MEAN_AXIS2_F16(I8, vxc_char8, vxc_char8, char4, CONV_SAT_RTE, uniSumOrderChar4_2x8)
 TENSOR_MEAN_AXIS2_F16(U8, vxc_uchar8, vxc_uchar8, uchar4, CONV_SAT_RTE, uniSumOrderChar4_2x8)
+
+__kernel void vxcTensorMeanAxis2_F16toF16_SUM
+    (
+    __read_only  image2d_array_t inputs,
+    __write_only image2d_array_t outputs
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), 0, 0);
+    vxc_half8 sum0;
+    vxc_half8 sum1;
+    vxc_short8 vec[4];
+    vxc_half8  src[4];
+    vxc_half8  src1[4];
+    vxc_short8  zero8 = (vxc_short8)(0, 0, 0, 0, 0, 0, 0, 0);
+    _viv_asm(COPY, sum1, zero8, 16);
+    _viv_asm(COPY, sum0, zero8, 16);
+    for (coord.z = 0; coord.z < line_align; )
+    {
+        VXC_ReadImage2DArray(vec[0], inputs, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, src[0], vec[0], 16);
+        coord.z++;
+        VXC_ReadImage2DArray(vec[1], inputs, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, src[1], vec[1], 16);
+        coord.z++;
+        VXC_ReadImage2DArray(vec[2], inputs, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, src[2], vec[2], 16);
+        coord.z++;
+        VXC_ReadImage2DArray(vec[3], inputs, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, src[3], vec[3], 16);
+        coord.z++;
+        VXC_DP2x8(src1[0], src[0], src[1], VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniSumOrder0_2x8);
+        VXC_DP2x8(src1[1], src[0], src[1], VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniSumOrder1_2x8);
+        VXC_DP2x8(src1[2], src[2], src[3], VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniSumOrder0_2x8);
+        VXC_DP2x8(src1[3], src[2], src[3], VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniSumOrder1_2x8);
+        VXC_DP4x4(sum0, src1[0], src1[2], VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniSumAxi1F16ToF32_4x4);
+        VXC_DP4x4(sum0, src1[1], src1[3], VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0), uniSumAxi1F16ToF32_4x4);
+        VXC_DP2x8(sum1, sum0, sum1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniSumFp16AddFp16_2x8);
+    }
+    if (line_ret > 0)
+    {
+        int i = 0;
+        while (i < line_ret)
+        {
+            VXC_ReadImage2DArray(vec[i], inputs, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+            _viv_asm(COPY, src[i], vec[i], 16);
+            coord.z++;
+            i++;
+        }
+        while (i < 4)
+        {
+            _viv_asm(COPY, src[i], zero8, 16);
+            i++;
+        }
+        VXC_DP2x8(src1[0], src[0], src[1], VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniSumOrder0_2x8);
+        VXC_DP2x8(src1[1], src[0], src[1], VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniSumOrder1_2x8);
+        VXC_DP2x8(src1[2], src[2], src[3], VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniSumOrder0_2x8);
+        VXC_DP2x8(src1[3], src[2], src[3], VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniSumOrder1_2x8);
+        VXC_DP4x4(sum0, src1[0], src1[2], VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniSumAxi1F16ToF32_4x4);
+        VXC_DP4x4(sum0, src1[1], src1[3], VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0), uniSumAxi1F16ToF32_4x4);
+        VXC_DP2x8(sum1, sum0, sum1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniSumFp16AddFp16_2x8);
+    }
+    vxc_half8 dst_tmp;
+    vxc_short8 dst;
+    half scale_Val;
+    _viv_asm(CONV, scale_Val, axis_scale);
+    VXC_DP4x4(dst_tmp, sum1, scale_Val, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniSumFp16MulScale_2x8);
+    _viv_asm(COPY, dst, dst_tmp, 16);
+    coord.z = 0;
+    VXC_WriteImage2DArray(outputs, coord, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+}
+
 
 #define TENSOR_MEAN_AXIS1_I16_2D(dst_name, dst_type, copy_type, tmp_type, conv_mode) \
 __kernel void vxcTensorMeanAxis1_I16to##dst_name##_2D( \
