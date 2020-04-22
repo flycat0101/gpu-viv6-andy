@@ -794,6 +794,26 @@ static vx_uint32 getStateSize(
     return size;
 }
 
+static vx_uint32 getInitStateSize(
+    vx_binary_loader_s *binaryLoad
+    )
+{
+    vx_uint32 size = 0;
+    vx_uint32 i = 0;
+    gcmHEADER_ARG("binaryLoad=%p", binaryLoad);
+
+    for (i = 0; i < binaryLoad->nOperations; i++)
+    {
+        if (VX_BINARY_OPERATION_TYPE_INIT == binaryLoad->operations[i].operationType)
+        {
+            size += binaryLoad->LCDT[binaryLoad->operations[i].stateLCDTIndex].size;
+        }
+    }
+
+    gcmFOOTER_ARG("0x%x", size);
+    return size;
+}
+
 static vx_status readBinDynamic(
     vx_binary_reader_s *reader,
     vx_binary_loader_s *binLoad,
@@ -1277,6 +1297,7 @@ OnError:
 }
 
 VX_PRIVATE_API vx_status vxoBinaryGraph_SubmitCommand(
+    vx_node node,
     gctPOINTER statesBuff,
     vx_uint32 statesSize,
     vx_binary_loader_s *binLoad,
@@ -1288,9 +1309,14 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SubmitCommand(
     vx_uint32 maxSize = gcmALIGN_BASE(gcdCMD_BUFFER_SIZE, 64);
 
     gcmHEADER_ARG("statesBuff=%p, binLoad=%p, statesSize=%d", statesBuff, binLoad, statesSize);
+    /* commit initialize command buffer, remap vip-sram and axi-sram */
+    if ((node->binLoadMem->initStatesSize > 0) && (node->binLoadMem->initStatesBuff != VX_NULL))
+    {
+        gcmONERROR(gcoVX_Replay(node->binLoadMem->initStatesBuff, node->binLoadMem->initStatesSize));
+    }
     if (maxSize == gcdCMD_BUFFER_SIZE)
     {
-        maxSize = maxSize - 0x800;
+        maxSize = maxSize - 0x800 - node->binLoadMem->initStatesSize;
     }
 
     if (statesSize > maxSize)
@@ -1366,7 +1392,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_RunOpearation(
         else if (segment->statesSize > 0)
         {
             vx_uint8_ptr buffer = statesBuff + segment->statesStartPos;
-            vxmONERROR(vxoBinaryGraph_SubmitCommand(buffer, segment->statesSize, binLoad,
+            vxmONERROR(vxoBinaryGraph_SubmitCommand(node, buffer, segment->statesSize, binLoad,
                               segment->startOperationIndex, segment->endOperationIndex));
         }
         else
@@ -1395,11 +1421,13 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_Run(
     }
     else if (vx_true_e == isSW)
     {
+        /* have CPU layer in NBG */
         vxmONERROR(vxoBinaryGraph_RunOpearation(node, binLoad));
     }
     else
     {
-        vxmONERROR(vxoBinaryGraph_SubmitCommand(node->binLoadMem->statesBuff,
+        /* All operations runs on VIP */
+        vxmONERROR(vxoBinaryGraph_SubmitCommand(node, node->binLoadMem->statesBuff,
                     node->binLoadMem->statesSize, binLoad, 0, binLoad->nOperations));
     }
 
@@ -1700,6 +1728,115 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetFeatureDB(
     }
 
 OnError:
+    return status;
+}
+VX_PRIVATE_API vx_status vxoBinaryGraph_patchInit(
+    vx_node node,
+    gctPOINTER commandBuf,
+    vx_binary_operation_info_s *operation,
+    vx_binary_loader_s *binLoad,
+    vx_uint32 *size
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vx_uint8 *initCommand = (vx_uint8*)commandBuf;
+    vx_binary_entry_s *lcdtDate = VX_NULL;
+    vx_uint32 i = 0;
+    vx_binary_patch_info_s *patchData = VX_NULL;
+    vx_int32 patchFlag = 0;
+    gctUINT32 VIPSRAMPhyAddr = 0;
+    gctUINT32 AXISRAMStart = 0;
+    gctUINT32 AXISRAMEnd = 0;
+    gctUINT32 AXISRAMSize = 0;
+    gctUINT32 AXISRAMgpuVirtAddr = 0;
+    gctPHYS_ADDR_T AXISRAMgpuPhyAddr = gcvINVALID_PHYSICAL_ADDRESS;
+
+    gcmHEADER_ARG("node=%p, commandBuf=%p, operation=%p, binLoad=%p, size=%p", node, commandBuf, operation, binLoad, size);
+
+    if ((initCommand == VX_NULL) || (binLoad == VX_NULL) || (operation == VX_NULL))
+    {
+        vxError("failed to patch initialize command, parameter is NULL\n");
+        vxmONERROR(VX_ERROR_INVALID_PARAMETERS);
+    }
+
+    lcdtDate = &binLoad->LCDT[operation->stateLCDTIndex];
+    vxMemCopy((vx_ptr)initCommand, (vx_const_ptr)((vx_uint8 *)binLoad->LCD.logical+ lcdtDate->offset), (vx_size)lcdtDate->size);
+    if (size != VX_NULL)
+    {
+        *size = lcdtDate->size;
+    }
+
+    /* Program VIP-SRAM REMAP address. */
+    gcmONERROR(gcoHAL_QuerySRAM(gcvNULL, gcvPOOL_INTERNAL_SRAM, gcvNULL, &VIPSRAMPhyAddr, gcvNULL, gcvNULL, gcvNULL));
+
+    /* Program AXI-SRAM REMAP state. */
+    gcmONERROR(gcoHAL_QuerySRAM(gcvNULL, gcvPOOL_EXTERNAL_SRAM, &AXISRAMSize, &AXISRAMgpuVirtAddr, &AXISRAMgpuPhyAddr, gcvNULL, gcvNULL));
+
+    if (AXISRAMSize == 0)
+    {
+        AXISRAMgpuVirtAddr = 0;
+        AXISRAMgpuPhyAddr = 0;
+    }
+
+    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_XYDP0))
+    {
+        /* V8. */
+        AXISRAMStart = AXISRAMgpuVirtAddr;
+    }
+    else
+    {
+        AXISRAMStart = (gctUINT32)AXISRAMgpuPhyAddr;
+    }
+
+    AXISRAMEnd = AXISRAMStart + AXISRAMSize;
+
+    /* Patch sram patch item */
+    for (i = 0; i < operation->counterOfPatches; i++)
+    {
+        patchData = &binLoad->patchData[operation->indexOfFirstPatch + i];
+        if (patchData->type == VX_BINARY_PATCH_TYPE_COMMAND)
+        {
+            switch (patchData->sourceType) {
+                case VX_BINARY_SOURCE_AXI_SRAM:
+                {
+                    vx_uint32 *patchAddr;
+                    if (patchFlag == 0) {
+                        patchFlag = 1;
+                        /* SramStart to be patched. */
+                        patchAddr = (vx_uint32 *)(initCommand + patchData->offset);
+                        *patchAddr = AXISRAMStart;
+                    }
+                    else if (patchFlag == 1){
+                        patchFlag = 0;
+                        /* SramEnd to be patched. */
+                        patchAddr = (vx_uint32 *)(initCommand + patchData->offset);
+                        *patchAddr = AXISRAMEnd;
+                        patchFlag = -1;
+                    }
+                }
+                break;
+
+                case VX_BINARY_SOURCE_VIP_SRAM:
+                {
+                    vx_uint32 *patchAddr = VX_NULL;
+                    vx_uint32 newAddr = 0xFFFF;
+                    patchAddr = (vx_uint32 *)(initCommand + patchData->offset);
+                    newAddr = VIPSRAMPhyAddr;
+                    *patchAddr = newAddr;
+                }
+                break;
+
+                default:
+                    break;
+            }
+        }
+        else {
+            vxError("not support INIT patch type=%d\n", patchData->type);
+        }
+    }
+
+OnError:
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -2755,7 +2892,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSH(
                 gcmDUMP(gcvNULL, "#[info: SH misc dynamic]");
                 gcmDUMP_BUFFER(gcvNULL, gcvDUMP_BUFFER_MEMORY, binLoad->LCD.physical,
                                 binLoad->LCD.logical, binLoad->LCDT[lcdtIndex].offset,
-                                (binLoad->LCDT[lcdtIndex].size, 64));
+                                gcmALIGN(binLoad->LCDT[lcdtIndex].size, 64));
             }
             break;
 
@@ -2958,7 +3095,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSC(
                             }
                             else
                             {
-                                vxError("nn patch output failed, please check your output format\n");
+                                vxError("binary graph nn patch output failed, please check your output format\n");
                                 vxmONERROR(VX_ERROR_INVALID_FORMAT);
                             }
                         }
@@ -3051,7 +3188,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSC(
                 break;
 
                 default:
-                    vxError("scaler not implement this sourceType: %d\n", scPatchData->sourceType);
+                    vxError("%s[%d]: scaler not implement this sourceType: %d\n", __FUNCTION__, __LINE__, scPatchData->sourceType);
                 break;
             }
         }
@@ -3089,6 +3226,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSW(
         default:
         {
             vxError("%s[%d]: not support this sw operation : %d\n", __FUNCTION__, __LINE__, swOpData->swOperationType);
+            vxmONERROR(VX_FAILURE);
         }
         break;
     }
@@ -3122,6 +3260,7 @@ VX_PRIVATE_API vx_status binaryGenerateStatesBuffer(
     vx_uint32 preSegmentStatesPos = 0;
     vx_uint32 sumSegmentStatesSize = 0;
     vx_uint32 startOPIndex = 0;
+    vx_uint32 initStateSize = 0;
     gcmHEADER_ARG("node=%p, binLoad=%p", node, binLoad);
 
     nntpCommands = (vx_uint8 *)node->binLoadMem->nntpCmdBuff.logical;
@@ -3199,11 +3338,16 @@ VX_PRIVATE_API vx_status binaryGenerateStatesBuffer(
 
             case VX_BINARY_OPERATION_TYPE_INIT:
             {
-                gcmDUMP(gcvNULL, "#[info: INIT command in the binary]");
-                gcmDUMP_BUFFER(gcvNULL, gcvDUMP_BUFFER_MEMORY, binLoad->LCD.physical,
-                            binLoad->LCD.logical, binLoad->LCDT[operation->stateLCDTIndex].offset,
-                            gcmALIGN(binLoad->LCDT[operation->stateLCDTIndex].size, 64));
-                /* ignore INIT operation */
+                if (initStateSize < node->binLoadMem->initStatesSize)
+                {
+                    vx_uint32 size = 0;
+                    vxmONERROR(vxoBinaryGraph_patchInit(node, (vx_uint8_ptr)node->binLoadMem->initStatesBuff + initStateSize, operation, binLoad, &size));
+                    initStateSize = size;
+                    gcmDUMP(gcvNULL, "#[info: INIT command in the binary]");
+                    gcmDUMP_BUFFER(gcvNULL, gcvDUMP_BUFFER_MEMORY, binLoad->LCD.physical,
+                                binLoad->LCD.logical, binLoad->LCDT[operation->stateLCDTIndex].offset,
+                                gcmALIGN(binLoad->LCDT[operation->stateLCDTIndex].size, 64));
+                }
             }
             break;
 
@@ -3260,7 +3404,7 @@ VX_PRIVATE_API vx_status binaryGenerateStatesBuffer(
 
             default:
             {
-                vxError("no implement operation type: %d\n", operation->operationType);
+                vxError("%s[%d]: binary graph not implement operation type: %d\n", __FUNCTION__, __LINE__, operation->operationType);
             }
             break;
         }
@@ -3477,7 +3621,19 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_GenerateStatesBuffer(
     /* 2. Create states/command buffer*/
     shCmdsSize = getSHCmdSize(binLoad);
     stateSize = getStateSize(binLoad);
+    initStateSize = getInitStateSize(binLoad);
     nntpCmdsSize = NNE_COMMAND_SIZE * binLoad->nNnOps + TP_COMMAND_SIZE * binLoad->nTpOps;
+
+    if (initStateSize > 0)
+    {
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(vx_uint8) * initStateSize, (gctPOINTER*)&node->binLoadMem->initStatesBuff)))
+        {
+            vxError("%s[%d]: fail to allocate memory for initialize states buffer\n", __FUNCTION__, __LINE__);
+            vxmONERROR(VX_ERROR_NO_MEMORY);
+        }
+        gcoOS_MemFill((gctPOINTER)node->binLoadMem->initStatesBuff, 0, sizeof(vx_uint8) * initStateSize);
+        node->binLoadMem->initStatesSize = initStateSize;
+    }
 
     if (stateSize > 0)
     {
@@ -3558,6 +3714,12 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_ReleaseStatesBuffer(
         return VX_SUCCESS;
     }
 
+    if (node->binLoadMem->initStatesBuff != VX_NULL)
+    {
+        gcmONERROR(gcoOS_Free(gcvNULL, (gctPOINTER)node->binLoadMem->initStatesBuff));
+        node->binLoadMem->initStatesBuff = VX_NULL;
+    }
+
     if (node->binLoadMem->statesBuff != VX_NULL)
     {
         gcmONERROR(gcoOS_Free(gcvNULL, (gctPOINTER)node->binLoadMem->statesBuff));
@@ -3605,19 +3767,19 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_InitBinaryLoad(
     gcmHEADER_ARG("context=%p, binLoad=%p", context, binLoad);
 
     /* Preprocess graph input/output table data. The table entries record where to modify the addresses. */
-   if (binLoad->fixed.header.inputCount > 0)
-   {
+    if (binLoad->fixed.header.inputCount > 0)
+    {
        binLoad->inputPatch = (vx_binary_io_patch_info_s*)vxAllocateAndZeroMemory(binLoad->nInputs * sizeof(vx_binary_io_patch_info_s));
-   }
+    }
 
-   if (binLoad->fixed.header.outputCount > 0)
-   {
+    if (binLoad->fixed.header.outputCount > 0)
+    {
        binLoad->outputPatch = (vx_binary_io_patch_info_s*)vxAllocateAndZeroMemory(binLoad->nOutputs * sizeof(vx_binary_io_patch_info_s));
-   }
+    }
 
-   /* find out network inputs/outputs count */
-   for (i = 0; i < binLoad->nOperations; i++)
-   {
+    /* find out network inputs/outputs count */
+    for (i = 0; i < binLoad->nOperations; i++)
+    {
        vx_uint32 j = 0;
        vx_int32 ioIndex = -1;
        vx_binary_patch_info_s *patchData = VX_NULL;
@@ -3756,6 +3918,7 @@ OnError:
     {
         vxoBinaryGraph_ReleaseNBG(binLoad);
     }
+    vxError("NBG error, please provide genereating NBG logs first\n");
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -3823,7 +3986,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_LoadFromPointer(
 
 OnError:
     vxError("fail to load binary from pointer to create graph\n");
-
+    vxError("NBG error, please provide genereating NBG logs first\n");
     if (binLoad != NULL)
     {
         vxoBinaryGraph_ReleaseNBG(binLoad);
@@ -11389,11 +11552,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GenerateNBG(
     vx_uint32 enableDumpNBG = 0;
     gctSTRING envctrl = gcvNULL;
 
-    if (((vx_int8_ptr)buffer + graph->binarySave->NBGFileSize) == VX_NULL)
-    {
-        vxError("%s[%d]: buffer is not enough\n", __FUNCTION__, __LINE__);
-        vxmONERROR(VX_FAILURE);
-    }
+    /* set env VIV_VX_ENABLE_SAVE_NETWORK_BINARY */
+    gcoOS_SetEnv(gcvNULL, "VIV_VX_ENABLE_SAVE_NETWORK_BINARY", "1");
 
     /* enable save binary */
     context->options.enableSaveBinary = 1;
@@ -11404,11 +11564,6 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GenerateNBG(
     vxmONERROR(vxoBinaryGraph_GeneratNBG(graph));
 
     vxmONERROR(vxProcessGraph(graph));
-
-    if (size != VX_NULL)
-    {
-        *size = (vx_size)nbgSize;
-    }
 
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_DUMP_NBG", &envctrl)) && envctrl)
     {
@@ -11425,7 +11580,12 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GenerateNBG(
         gcmVERIFY_OK(gcoOS_Close(gcvNULL, binarySaveFile));
     }
 
-    vxInfo("Actual NBG size : %d bytes\n", nbgSize);
+    vxInfo("Generate NBG in memory Actual NBG size : %d bytes\n", nbgSize);
+
+    if (size != VX_NULL)
+    {
+        *size = (vx_size)nbgSize;
+    }
 
 OnError:
     context->options.enableSaveBinary = 0;
@@ -11470,6 +11630,12 @@ VX_API_ENTRY vx_status VX_API_CALL vxGenerateNBG(vx_graph graph, void *buffer, v
 
     if (((buffer == VX_NULL) && (size != VX_NULL)) || (graph->verified == vx_false_e))
     {
+        /* capture initalize command buffer */
+        if (0 == graph->base.context->options.enableSaveBinary)
+        {
+            vxmONERROR(vxoContext_CaptureInitState(context));
+        }
+
         /* 1. allocate memory for binarySave */
         graph->binarySave = (vx_binary_save)vxAllocateAndZeroMemory(sizeof(vx_binary_save_s));
         if (VX_NULL == graph->binarySave)
@@ -11486,7 +11652,9 @@ VX_API_ENTRY vx_status VX_API_CALL vxGenerateNBG(vx_graph graph, void *buffer, v
     }
     else if (buffer != VX_NULL)
     {
+        vxInfo("generate NBG into memory start.\n");
         vxmONERROR(vxoBinaryGraph_GenerateNBG(graph, buffer, size));
+        vxInfo("generate NBG into memory successfully.\n");
     }
     else
     {
