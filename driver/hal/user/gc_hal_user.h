@@ -3055,6 +3055,8 @@ typedef struct _vx_drv_option
     gctUINT enableAllocateContigousMemForKernel;
     gctUINT enableNNTranspose;
     gctUINT disableTPNNEvis;
+
+    gctUINT vipTimeOut;
 }
 vx_drv_option;
 
