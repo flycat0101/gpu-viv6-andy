@@ -1452,6 +1452,7 @@ static VkResult __vki_ImportDmabuf(
     iface.u.WrapUserMemory.desc.flag   = gcvALLOC_FLAG_DMABUF;
     iface.u.WrapUserMemory.desc.handle = fd;
     iface.u.WrapUserMemory.desc.dmabuf = 0;
+    iface.u.WrapUserMemory.type        = gcvVIDMEM_TYPE_GENERIC;
 
     __VK_ONERROR(__vk_DeviceControl(&iface, 0));
 
@@ -1531,6 +1532,7 @@ static VkResult __vki_ImportUserMemory(
     iface.u.WrapUserMemory.desc.size     = (gctUINT32)size;
     iface.u.WrapUserMemory.desc.flag     = gcvALLOC_FLAG_USERMEMORY;
     iface.u.WrapUserMemory.node          = 0;
+    iface.u.WrapUserMemory.type          = gcvVIDMEM_TYPE_GENERIC;
 
     __VK_ONERROR(__vk_DeviceControl(&iface, 0));
 
