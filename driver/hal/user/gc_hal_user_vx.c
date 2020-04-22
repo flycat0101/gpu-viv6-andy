@@ -14,6 +14,7 @@
 #include "gc_hal_user_precomp.h"
 #if gcdUSE_VX && gcdENABLE_3D
 #include "gc_hal_vx.h"
+#include <stdlib.h>
 
 #define _GC_OBJ_ZONE            gcdZONE_VX
 
@@ -623,6 +624,19 @@ gcoVX_InvokeThreadWalker(
 
         if (!bSkipShader)
         {
+            gctSTRING envSave = gcvNULL;
+            gctSTRING envCache = gcvNULL;
+            gctUINT32 enableSaveBinary = 0;
+            if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_SAVE_NETWORK_BINARY", &envSave)) && envSave)
+            {
+                enableSaveBinary = atoi(envSave);
+                if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_CACHE_GRAPH_BINARY", &envCache)) && envCache)
+                {
+                    enableSaveBinary |= atoi(envCache);
+                }
+            }
+
+            if (0 == enableSaveBinary)
             {
                 gctUINT32 gpuVirtAddr = 0;
                 gctPHYS_ADDR_T gpuPhysAddr = gcvINVALID_PHYSICAL_ADDRESS;

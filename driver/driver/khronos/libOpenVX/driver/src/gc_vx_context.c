@@ -1316,12 +1316,18 @@ OnError:
     return status;
 }
 
-VX_PRIVATE_API vx_status vxoContext_CaptureInitState(
+VX_INTERNAL_API vx_status vxoContext_CaptureInitState(
     vx_context context
     )
 {
     vx_status status = VX_SUCCESS;
     vx_uint32 i = 0;
+    gctUINT32 axiSRAMPhysical = gcvINVALID_ADDRESS;
+    gctUINT32 axiSRAMSize = 0;
+    gctUINT32 axiSRAMGpuPhysical = gcvINVALID_ADDRESS;
+
+    gctUINT32 vipSRAMPhysical = gcvINVALID_ADDRESS;
+    gctUINT32 vipSRAMSize = 0;
     gcmHEADER_ARG("context=%p", context);
 
     context->binaryGraphInitBuffer = (vx_ptr_ptr)vxAllocateAndZeroMemory(sizeof(vx_ptr) * context->deviceCount);
@@ -1329,6 +1335,47 @@ VX_PRIVATE_API vx_status vxoContext_CaptureInitState(
 
     context->binaryGraphInitSize = (vx_uint32_ptr)vxAllocateAndZeroMemory(sizeof(vx_uint32) * context->deviceCount);
     vxmONERROR_NULLPTR(context->binaryGraphInitSize);
+
+    /* program SRAM commands for NBG start */
+    vxmONERROR(QuerySRAM(context->globalData, gcvPOOL_EXTERNAL_SRAM, &axiSRAMPhysical, gcvNULL, &axiSRAMGpuPhysical, &axiSRAMSize, gcvNULL));
+    vxmONERROR(QuerySRAM(context->globalData, gcvPOOL_INTERNAL_SRAM, &vipSRAMPhysical, gcvNULL, gcvNULL, &vipSRAMSize, gcvNULL));
+
+    vxmASSERT(vipSRAMSize != 0);
+    vxmASSERT(axiSRAMSize == 0 || (axiSRAMPhysical != gcvINVALID_ADDRESS && axiSRAMGpuPhysical != gcvINVALID_PHYSICAL_ADDRESS));
+
+    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE3))
+    {
+        vxmASSERT(vipSRAMPhysical != gcvINVALID_ADDRESS);
+        gcmVERIFY_OK(gcoVX_SetRemapAddress(vipSRAMPhysical, 0, gcvVX_SRAM_REMAP));
+        vxInfo("generate NBG, map VIP-SRAM start address=0x%x\n", vipSRAMPhysical);
+    }
+
+    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1))
+    {
+        gctUINT32 axiSRAMEndAddr = 0;
+
+        if (axiSRAMSize != 0)
+        {
+            if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_XYDP0))
+            {
+                /* v8 */
+                axiSRAMEndAddr =  axiSRAMPhysical + axiSRAMSize;
+            }
+            else
+            {
+                axiSRAMEndAddr =  axiSRAMGpuPhysical + axiSRAMSize;
+            }
+        }
+        else
+        {
+            axiSRAMPhysical = 0;
+            axiSRAMEndAddr = 0;
+        }
+
+        gcmVERIFY_OK(gcoVX_SetRemapAddress(axiSRAMPhysical, axiSRAMEndAddr, gcvVX_OCB_REMAP));
+        vxInfo("generate NBG, map AXI-SRAM size=0x%x, start address=0x%x, end address=0x%x\n", axiSRAMSize, axiSRAMPhysical, axiSRAMEndAddr);
+    }
+    /* program SRAM commands for NBG end */
 
     for (i = 0; i < context->deviceCount; i++)
     {
@@ -1527,7 +1574,7 @@ VX_PRIVATE_API vx_context vxoContext_Create()
     vxoProfiler_Initialize(context);
 #endif
 
-    if (context->options.enableSaveBinary)
+    if ((context->options.enableSaveBinary) || (context->options.enableCacheBinaryGraph))
     {
         vxoContext_CaptureInitState(context);
     }
@@ -1754,7 +1801,7 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
     vxoProfiler_Destroy(context);
 #endif
 
-    if (context->options.enableSaveBinary)
+    if ((context->options.enableSaveBinary) || (context->options.enableCacheBinaryGraph))
     {
         if (context->binaryGraphInitBuffer != VX_NULL)
         {

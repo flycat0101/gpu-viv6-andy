@@ -21,6 +21,7 @@
 #if gcdENABLE_3D && gcdUSE_VX
 #include <stdio.h>
 #include <assert.h>
+#include <stdlib.h>
 
 /* Zone used for header/footer. */
 #define _GC_OBJ_ZONE    gcvZONE_HARDWARE
@@ -35529,6 +35530,9 @@ gcoHARDWAREVX_TriggerAccelerator(
     gceSTATUS status = gcvSTATUS_OK;
     gctPOINTER *cmdBuffer = gcvNULL;
     gctUINT gpuCount;
+    gctSTRING envSave = gcvNULL;
+    gctSTRING envCache = gcvNULL;
+    gctUINT32 enableSaveBinary = 0;
 
      /* Define state buffer variables. */
     gcmDEFINESTATEBUFFER_NEW(reserve, stateDelta, memory);
@@ -35562,6 +35566,15 @@ gcoHARDWAREVX_TriggerAccelerator(
 
     }
 
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_SAVE_NETWORK_BINARY", &envSave)) && envSave)
+    {
+        enableSaveBinary = atoi(envSave);
+        if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_CACHE_GRAPH_BINARY", &envCache)) && envCache)
+        {
+            enableSaveBinary |= atoi(envCache);
+        }
+    }
+    if (0 == enableSaveBinary)
     {
         gctUINT32 gpuVirtAddr = 0;
         gctPHYS_ADDR_T gpuPhysAddr = gcvINVALID_PHYSICAL_ADDRESS;
@@ -36317,13 +36330,26 @@ gcoHARDWAREVX_TriggerAccelerator(
 #if gcdFRAMEINFO_STATISTIC
         {
             gctUINT32 drawID;
+            gctSTRING envSave = gcvNULL;
+            gctSTRING envCache = gcvNULL;
+            gctUINT32 enableSaveBinary = 0;
+            if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_SAVE_NETWORK_BINARY", &envSave)) && envSave)
+            {
+                enableSaveBinary = atoi(envSave);
+                if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_CACHE_GRAPH_BINARY", &envCache)) && envCache)
+                {
+                    enableSaveBinary |= atoi(envCache);
+                }
+            }
 
-            gcoHAL_FrameInfoOps(gcvNULL,
-                                gcvFRAMEINFO_COMPUTE_NUM,
-                                gcvFRAMEINFO_OP_GET,
-                                &drawID);
+            if (0 == enableSaveBinary)
+            {
+                gcoHAL_FrameInfoOps(gcvNULL,
+                                    gcvFRAMEINFO_COMPUTE_NUM,
+                                    gcvFRAMEINFO_OP_GET,
+                                    &drawID);
 
-            {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+                {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -36375,6 +36401,7 @@ gcoHARDWAREVX_TriggerAccelerator(
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
+            }
         }
 #endif
 

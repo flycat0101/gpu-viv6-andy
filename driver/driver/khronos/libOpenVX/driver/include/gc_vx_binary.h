@@ -566,6 +566,8 @@ typedef struct _vx_binary_memory
     vx_binary_allocation_s                  shCmdBuff;   /*shader instruction command buffer on GPU*/
     gctPOINTER                              statesBuff; /*states buffer on system*/
     vx_uint32                               statesSize;
+    gctPOINTER                              initStatesBuff; /* initalize command buffer */
+    vx_uint32                               initStatesSize;
 } vx_binaryLoad_memory_s;
 
 typedef struct _vx_binary_entry
