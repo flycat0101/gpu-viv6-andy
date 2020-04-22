@@ -89,6 +89,10 @@ typedef struct _khrEGL_IMAGE
      * source sibling pixels. Returns true if pixels are updated.
      */
     gctBOOL                  (* update)(struct _khrEGL_IMAGE *);
+#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 29)
+    /* add update timestamp for android 10 surfaceflinger as it won't call eglSwapBuffers*/
+    gctBOOL                  (* updateStatus)(struct _khrEGL_IMAGE *);
+#endif
 
     union
     {

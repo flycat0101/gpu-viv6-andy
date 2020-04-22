@@ -516,6 +516,55 @@ gcChipFboSyncFromShadow(
     return status;
 }
 
+#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 29)
+/*
+** For android 10, this function is to update timestamps in surfaceflinger as it no longer call eglSwapBuffers
+*/
+gceSTATUS
+gcChipFboUpdateStatus(
+    __GLcontext *gc,
+    __GLframebufferObject *fbo
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("gc=0x%x fbo=0x%x", gc, fbo);
+
+    /*
+    ** Default fbo(window drawable) won't have indirectly rendering.
+    */
+    if (fbo->name)
+    {
+        GLuint attachIdx;
+        __GLfboAttachPoint *attachPoint;
+        khrEGL_IMAGE_PTR image;
+
+        /* Loop through all draw buffer, if it was from texture */
+        for (attachIdx = 0; attachIdx < __GL_MAX_ATTACHMENTS; ++attachIdx)
+        {
+            attachPoint = &fbo->attachPoint[attachIdx];
+            if (attachPoint->objType == GL_TEXTURE)
+            {
+                __GLtextureObject *texObj = (__GLtextureObject*)attachPoint->object;
+                __GLchipTextureInfo *texInfo = (__GLchipTextureInfo*)texObj->privateData;
+
+                if (texInfo->eglImage.image)
+                {
+                    image = (khrEGL_IMAGE_PTR) texInfo->eglImage.image;
+                    if (image->updateStatus)
+                        image->updateStatus(image);
+                }
+            }
+        }
+    }
+
+    return status;
+ OnError:
+    gcmFOOTER();
+    return status;
+}
+#endif
+
 /* Temporarily for chrome freon. */
 gceSTATUS
 gcChipFboSyncFromShadowFreon(
@@ -1899,7 +1948,19 @@ __glChipBindDrawFramebuffer(
         chipCtx->chipModel == gcv600 && chipCtx->chipRevision == 0x4653
         ))
 #endif
+    {
         gcmONERROR(gcChipFboSyncFromShadow(gc, preFBO));
+    }
+#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 29)
+    else
+    {
+    /* sufaceflinger won't call eglSwapBuffers on android 10 when compose,
+    ** so we add update timestamp here to avoid render error issue for chips can't support texture direct-sampling
+    */
+        gcmONERROR(gcChipFboUpdateStatus(gc, preFBO));
+    }
+#endif
+
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
     return GL_TRUE;

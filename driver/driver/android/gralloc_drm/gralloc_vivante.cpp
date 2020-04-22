@@ -329,7 +329,14 @@ gralloc_vivante_alloc_bo(struct gralloc_vivante_t *drv, buffer_handle_t handle)
         };
         drm_vivante_bo_set_tiling(bo->bo, &tiling_args);
 
-        if (!(gralloc_handle_usage(handle) & GRALLOC_USAGE_HW_RENDER)) {
+        if (!(gralloc_handle_usage(handle) & GRALLOC_USAGE_HW_RENDER)
+#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 29)
+            /* also zero memory for GPU linear buffers */
+            || ((gralloc_handle_usage(handle) & GRALLOC_USAGE_HW_TEXTURE) &&
+            (gralloc_handle_usage(handle) & GRALLOC_USAGE_HW_RENDER) &&
+            tiling == DRM_VIV_GEM_TILING_LINEAR)
+#endif
+            ) {
             /* zero memory for non GPU buffers. */
             void *vaddr = NULL;
 
