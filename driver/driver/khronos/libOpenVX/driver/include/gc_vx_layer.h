@@ -374,6 +374,7 @@ enum vxnne_kernel_e
     VXNNE_KERNEL_GPU_BATCH2SPACE,
     VXNNE_KERNEL_SHUFFLECHANNEL,
     VXNNE_KERNEL_GPU_SHUFFLECHANNEL,
+    VXNNE_KERNEL_FC_TP_CHECK,
     VXNNE_KERNEL_FIXED_COUNT,
 };
 
@@ -1135,6 +1136,7 @@ typedef struct _vxnne_fully_connected_relu_layer_s
     vxnne_convolution_relu_pooling_operation_s      fully_connected_relu_operation;
     vxnne_tp_operation_s                            fully_connected_TPoperation[2];
     vxnne_fully_connected_sw_operation_fp16_s       fully_connected_sw_operation_fp16;
+    vxnne_shader_operation_s                        fully_connected_sh_operation_fp16;
 }
 vxnne_fully_connected_relu_layer_s, *vxnne_fully_connected_relu_layer;
 
@@ -2217,6 +2219,7 @@ typedef struct _vxnne_svdf_layer_s
 
     vxnne_convolution_relu_pooling_operation_s      svdf_nn_operation[2];
     vxnne_fully_connected_sw_operation_fp16_s       svdf_sw_operation_fp16;
+    vxnne_shader_operation_s                        svdf_sh_operation_fp16;
 }
 vxnne_svdf_layer_s, *vxnne_svdf_layer;
 
@@ -2395,6 +2398,7 @@ typedef struct _vxnne_lstm_unit_s
     vxnne_tp_operation_s                            lstm_tp_fc_operation;
     vxnne_fc_operation_s                            fc_operation;
     vxnne_fully_connected_sw_operation_fp16_s       fully_connected_sw_operation_fp16;
+    vxnne_shader_operation_s                        fully_connected_sh_operation_fp16;
 }
 vxnne_lstm_unit_s, *vxnne_lstm_unit;
 
@@ -2455,6 +2459,7 @@ typedef struct _vxnne_lstm_hidden_unit_s
     vxnne_fully_connected_sw_operation_s            lstm_sw_operation;
     vxnne_fc_operation_s                            recurrent_fc_operation;
     vxnne_fully_connected_sw_operation_fp16_s       fully_connected_sw_operation_fp16;
+    vxnne_shader_operation_s                        fully_connected_sh_operation_fp16;
 }
 vxnne_lstm_hidden_unit_s, *vxnne_lstm_hidden_unit;
 
@@ -2866,6 +2871,14 @@ vxnne_shader_executable vxnneGetLeakyReluShaderExecutable(
     vx_scalar               alpha,
     vx_tensor               output
     );
+
+vxnne_shader_executable vxnneGetFC_TPCheckShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_uint32               tp_fc_ksize);
+
 vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
