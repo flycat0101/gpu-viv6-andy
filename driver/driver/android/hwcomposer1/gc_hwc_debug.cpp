@@ -1008,8 +1008,9 @@ again:
         /* Process each line. */
         switch (format) {
             case RGBA_8888:
-                /* Swap RB to BGRA 8888. */
+                if (!gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_PE_A8B8G8R8))
                 {
+                    /* Swap RB to BGRA 8888. */
                     size_t j;
                     uint32_t *s = (uint32_t *) line;
                     uint32_t *p = (uint32_t *) buff;

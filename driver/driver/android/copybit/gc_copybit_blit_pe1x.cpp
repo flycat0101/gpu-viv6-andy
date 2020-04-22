@@ -274,12 +274,24 @@ _StretchBlitPE1x(
     }
 
     /* Convert to supported Source format. */
-    siFormat = (siFormat == gcvSURF_A8B8G8R8) ? gcvSURF_A8R8G8B8 : siFormat;
-    siFormat = (siFormat == gcvSURF_X8B8G8R8) ? gcvSURF_X8R8G8B8 : siFormat;
+    if (siFormat == gcvSURF_A8B8G8R8)
+    {
+       siFormat = gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_PE_A8B8G8R8) ? gcvSURF_A8B8G8R8 : gcvSURF_A8R8G8B8;
+    }
+    else
+    {
+        siFormat = (siFormat == gcvSURF_X8B8G8R8) ? gcvSURF_X8R8G8B8 : siFormat;
+    }
 
     /* Convert to supported Dest format. */
-    diFormat = (diFormat == gcvSURF_A8B8G8R8) ? gcvSURF_A8R8G8B8 : diFormat;
-    diFormat = (diFormat == gcvSURF_X8B8G8R8) ? gcvSURF_X8R8G8B8 : diFormat;
+    if (diFormat == gcvSURF_A8B8G8R8)
+    {
+        diFormat = gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_PE_A8B8G8R8) ? gcvSURF_A8B8G8R8 : gcvSURF_A8R8G8B8;
+    }
+    else
+    {
+        diFormat = (diFormat == gcvSURF_X8B8G8R8) ? gcvSURF_X8R8G8B8 : diFormat;
+    }
 
     do
     {

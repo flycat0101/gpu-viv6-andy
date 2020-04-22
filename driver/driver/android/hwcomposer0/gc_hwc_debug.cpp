@@ -905,8 +905,16 @@ again:
         switch (format)
         {
         case RGBA_8888:
-            /* Swap RB to BGRA 8888. */
-            _fconv(buff, BGRA_8888, line, RGBA_8888, width);
+            if (gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_PE_A8B8G8R8))
+            {
+                /* No conversion RGBA 8888. */
+                memcpy(buff, line, width * 4);
+            }
+            else
+            {
+                /* Swap RB to BGRA 8888. */
+                _fconv(buff, BGRA_8888, line, RGBA_8888, width);
+            }
             break;
 
         case BGRA_8888:

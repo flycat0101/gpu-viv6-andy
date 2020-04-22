@@ -3602,7 +3602,7 @@ gcoHARDWARE_ClearSoftware(
     case gcvSURF_X8R8G8B8: /* 24-bit RGB without alpha channel. */
     case gcvSURF_A8R8G8B8: /* 24-bit RGB with alpha channel. */
     case gcvSURF_X8B8G8R8: /* Treat as X8R8G8B8, RB channel flipped. */
-    case gcvSURF_A8B8G8R8: /* Treat as A8R8G8B8, RB channel flipped. */
+    case gcvSURF_A8B8G8R8: /* Treat as A8R8G8B8, RB channel flipped,if not support gcvFEATURE_PE_A8B8G8R8 */
     case gcvSURF_G8R8:     /* The clear value do not have channel 2 and 3 */
     case gcvSURF_R8_1_X8R8G8B8:
     case gcvSURF_G8R8_1_X8R8G8B8:

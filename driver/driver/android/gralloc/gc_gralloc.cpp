@@ -425,6 +425,9 @@ gc_gralloc_alloc_buffer(
             break;
 
         case gcvSURF_A8B8G8R8:
+            halFormat = gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_PE_A8B8G8R8) ? gcvSURF_A8B8G8R8 : gcvSURF_A8R8G8B8;
+            break;
+
         case gcvSURF_A8R8G8B8:
             halFormat = gcvSURF_A8R8G8B8;
             break;
