@@ -1255,7 +1255,7 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
     VIR_Operand     *inst_dest          = gcvNULL;
     VIR_Enable      inst_dest_enable;
     VIR_Operand     *inst_src0          = gcvNULL;
-    VIR_Swizzle     inst_src0_swizzle;
+    VIR_Swizzle     inst_src0_swizzle, movInst_remapSwizzle;
     VIR_Enable      inst_src0_enable    = VIR_ENABLE_NONE;
     VIR_OperandInfo inst_dest_info, inst_src0_info;
 
@@ -1274,6 +1274,7 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
     VIR_NATIVE_DEF_FLAGS      nativeDefFlags;
 
     gctBOOL covered_channels[VIR_CHANNEL_NUM] = {gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE};
+    gctBOOL movInstRemappable, needRemapChannel = gcvFALSE, def2UsageRemappable;
 
     gcmASSERT(VIR_Inst_GetOpcode(inst) == VIR_OP_MOV);
 
@@ -1436,10 +1437,13 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
         }
         return errCode;
     }
+    /* mov Inst channel is one-one mapping s*/
+    movInstRemappable = VIR_Swizzle_GetMappingSwizzle2Enable(inst_src0_swizzle, inst_dest_enable, &movInst_remapSwizzle);
 
     for(; def != gcvNULL && (!invalid_case);  def = vscVIR_GeneralUdIterator_Next(&ud_iter))
     {
         VIR_OpCode opcode;
+        gctBOOL    remappableChannel = gcvFALSE;
 
         def_inst        = def->defKey.pDefInst;
 
@@ -1537,14 +1541,37 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
             break;
         }
 
+        /* now the remap case would be following 2 cases, which could use one time remap
+         * opcode t1.xy =
+         * MOV    t2.xy = t1.yx
+         * or case 2:
+         * opcode t1.xy =
+         * MOV    t2.zw = t1.xy
+         * case 3:
+         * opcode t1.xy =
+         * MOV    t2.yz = t1.yx
+         */
+        def2UsageRemappable = (VIR_Swizzle_2_Enable(inst_src0_swizzle) == def_inst_enable);
+        remappableChannel =  (VIR_OPCODE_isComponentwise(opcode) &&
+                              movInstRemappable &&
+                              (VIR_Enable_Channel_Count(inst_dest_enable) == VIR_Enable_Channel_Count(def_inst_enable)) &&
+                              (def2UsageRemappable || inst_dest_enable == def_inst_enable));
+
         for(channel = 0; channel < VIR_CHANNEL_COUNT; ++channel)
         {
             if(inst_dest_enable & (1 << channel))
             {
                 if((VIR_Swizzle)channel != VIR_Swizzle_GetChannel(inst_src0_swizzle, channel))
                 {
-                    invalid_case = gcvTRUE;
-                    break;
+                    if (!remappableChannel)
+                    {
+                        invalid_case = gcvTRUE;
+                        break;
+                    }
+                    else
+                    {
+                        needRemapChannel |= gcvTRUE;
+                    }
                 }
             }
         }
@@ -1609,7 +1636,8 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
             opcode != VIR_OP_CMADCJ &&
             opcode != VIR_OP_CMULCJ &&
             opcode != VIR_OP_CADDCJ &&
-            opcode != VIR_OP_CSUBCJ )
+            opcode != VIR_OP_CSUBCJ &&
+            (!remappableChannel))
         {
             if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
                               VSC_OPTN_CPPOptions_TRACE_BACKWARD_OPT))
@@ -1804,10 +1832,12 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
             4. mov t3.zw, t0.zw
 
         */
-        /* there should be no use of inst_dest between def_inst and inst */
+        /* there should be no use of inst_dest between def_inst and inst
+         * the final enable is enable of inst_dest
+         */
         {
             VIR_Instruction* next = VIR_Inst_GetNext(def_inst);
-            VIR_Enable defInstEnable = VIR_Inst_GetEnable(def_inst);
+            VIR_Enable defInstEnable = VIR_Inst_GetEnable(inst);
             gctSIZE_T i = 0;
 
             while(next && next != inst)
@@ -1846,6 +1876,7 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
             break;
         }
     }
+
     /* check the covered channel */
     for(channel = 0; channel < VIR_CHANNEL_NUM; channel++)
     {
@@ -1861,8 +1892,8 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
             VIR_Inst_GetOpcode(def_inst) != VIR_OP_CMADCJ &&
             VIR_Inst_GetOpcode(def_inst) != VIR_OP_CMULCJ &&
             VIR_Inst_GetOpcode(def_inst) != VIR_OP_CADDCJ &&
-            VIR_Inst_GetOpcode(def_inst) != VIR_OP_CSUBCJ
-            )
+            VIR_Inst_GetOpcode(def_inst) != VIR_OP_CSUBCJ &&
+            (!needRemapChannel))
         {
             if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
                               VSC_OPTN_CPPOptions_TRACE_BACKWARD_OPT))
@@ -1968,7 +1999,53 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
                 {
                     def_inst_enable = VIR_ENABLE_ZW;
                 }
-
+                else if (needRemapChannel)
+                {
+                    /*keep original MOV dest enable mask */
+                    gctUINT idx;
+                    gcmASSERT(VIR_OPCODE_isComponentwise(VIR_Inst_GetOpcode(def_inst)));
+                    /* remap the swizzle of all sources of the def-instruction
+                     * def_inst: def_inst_enable
+                     * mov:   inst_dest_enable, inst_src0_swizzle
+                     */
+                    for (idx = 0; idx < VIR_Inst_GetSrcNum(def_inst); idx++) {
+                        VIR_Operand *src = VIR_Inst_GetSource(def_inst, idx);
+                        VIR_Swizzle old_swizzle, new_swizzle = (VIR_Swizzle)0;
+                        if (VIR_Operand_isImm(src)) continue;
+                        old_swizzle = VIR_Operand_GetSwizzle(src);
+                        if (inst_dest_enable == def_inst_enable)
+                        {
+                            /*
+                             *  t1.xy = t3.yz    => t2.xy = t3.zy
+                             *  t2.xy = t1.yx
+                             */
+                            VIR_Swizzle mappingSwizzle = VIR_Enable_GetMappingSwizzle(def_inst_enable, inst_src0_swizzle);
+                            new_swizzle = VIR_Swizzle_ApplySwizzlingSwizzle(old_swizzle, mappingSwizzle);
+                        }
+                        else
+                        {
+                            /* t1.zw = t3.zzzw  => t2.xy = t3.zw
+                             * t2.xy = t1.zw
+                             */
+                            gctUINT i = 0;
+                            VIR_Swizzle swizzle0;
+                            VIR_Swizzle swizzle1;
+                            new_swizzle = old_swizzle;
+                            for (i = 0; i < VIR_CHANNEL_COUNT; i++)
+                            {
+                                if(inst_dest_enable & (1 << i))
+                                {
+                                    swizzle0 = VIR_Swizzle_GetChannel(inst_src0_swizzle, i);
+                                    swizzle1 = VIR_Swizzle_GetChannel(old_swizzle, swizzle0);
+                                    VIR_Swizzle_SetChannel(new_swizzle, i, swizzle1);
+                                }
+                            }
+                        }
+                        VIR_Operand_SetSwizzle(src, new_swizzle);
+                    }
+                    /*set def_inst_enable with inst_dest_enalbe */
+                    def_inst_enable = inst_dest_enable;
+                }
                 /* keep the def_inst_dest's type:
                  *   004: RSHIFT   uchar_P2  temp(276).x, uchar_P2 temp(6).x, int 7
                  *   005: MOV      short  temp(278).x, short temp(276).x
