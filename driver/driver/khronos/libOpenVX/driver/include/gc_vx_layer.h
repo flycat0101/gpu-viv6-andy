@@ -1106,6 +1106,14 @@ typedef struct _vxnne_fully_connected_sw_operation_s
 }
 vxnne_fully_connected_sw_operation_s, *vxnne_fully_connected_sw_operation;
 
+typedef struct _vxnne_fully_connected_sw_operation_fp16_s
+{
+    vxnne_operation_s                base;
+    vx_tensor                        inputs;
+    vx_tensor                        outputs;
+}
+vxnne_fully_connected_sw_operation_fp16_s, *vxnne_fully_connected_sw_operation_fp16;
+
 typedef struct _vxnne_intput_convert_weight_operation_s
 {
     vxnne_operation_s               base;
@@ -1120,12 +1128,13 @@ vxnne_intput_convert_weight_operation_s, *vxnne_intput_convert_weight_operation;
 typedef struct _vxnne_fully_connected_relu_layer_s
 {
     vxnne_layer_s                                   base;
-    vxnne_operation                                 operations[2];
+    vxnne_operation                                 operations[3];
     vxnne_intput_convert_weight_operation_s         input_convert_weight_operation;
     vxnne_fully_connected_sw_operation_s            fully_connected_operation;
     vxnne_shader_operation_s                        fully_connected_SHoperation;
     vxnne_convolution_relu_pooling_operation_s      fully_connected_relu_operation;
     vxnne_tp_operation_s                            fully_connected_TPoperation[2];
+    vxnne_fully_connected_sw_operation_fp16_s       fully_connected_sw_operation_fp16;
 }
 vxnne_fully_connected_relu_layer_s, *vxnne_fully_connected_relu_layer;
 
@@ -2207,6 +2216,7 @@ typedef struct _vxnne_svdf_layer_s
     vxnne_svdf_operation_s                          svdf_sw_operations[2];
 
     vxnne_convolution_relu_pooling_operation_s      svdf_nn_operation[2];
+    vxnne_fully_connected_sw_operation_fp16_s       svdf_sw_operation_fp16;
 }
 vxnne_svdf_layer_s, *vxnne_svdf_layer;
 
@@ -2384,6 +2394,7 @@ typedef struct _vxnne_lstm_unit_s
 
     vxnne_tp_operation_s                            lstm_tp_fc_operation;
     vxnne_fc_operation_s                            fc_operation;
+    vxnne_fully_connected_sw_operation_fp16_s       fully_connected_sw_operation_fp16;
 }
 vxnne_lstm_unit_s, *vxnne_lstm_unit;
 
@@ -2443,6 +2454,7 @@ typedef struct _vxnne_lstm_hidden_unit_s
 
     vxnne_fully_connected_sw_operation_s            lstm_sw_operation;
     vxnne_fc_operation_s                            recurrent_fc_operation;
+    vxnne_fully_connected_sw_operation_fp16_s       fully_connected_sw_operation_fp16;
 }
 vxnne_lstm_hidden_unit_s, *vxnne_lstm_hidden_unit;
 

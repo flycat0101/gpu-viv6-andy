@@ -652,6 +652,7 @@ typedef enum _gceFEATURE
     gcvFEATURE_AI_GPU,
     gcvFEATURE_NN_FAST_FIRST_PIXEL_POOLING,
     gcvFEATURE_NN_FLOAT_POST_MULT,
+    gcFEATURE_BIT_TP_FC_FLOAT_LAST_PIXEL_NEGATIVE_0_FIX,
 
     /* Insert features above this comment only. */
     gcvFEATURE_COUNT                /* Not a feature. */
