@@ -2812,7 +2812,7 @@ gckHARDWARE_InitializeHardware(
             gckOS_WriteRegisterEx(Hardware->os,
                                   Hardware->core,
                                   0x0010C,
-                                  ((((gctUINT32) (0x01590880)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                                  ((((gctUINT32) (0x015B0880)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  23:23) - (0 ?
  23:23) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -2834,7 +2834,7 @@ gckHARDWARE_InitializeHardware(
     {
         gctUINT32 pulseEater;
 
-        pulseEater = ((((gctUINT32) (0x01590880)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        pulseEater = ((((gctUINT32) (0x015B0880)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  16:16) - (0 ?
  16:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -12902,7 +12902,7 @@ _ResetGPU(
                     0x00104,
                     0x00000000));
 
-        control = ((((gctUINT32) (0x01590880)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        control = ((((gctUINT32) (0x015B0880)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  17:17) - (0 ?
  17:17) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
