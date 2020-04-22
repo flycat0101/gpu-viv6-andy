@@ -962,6 +962,7 @@ void veglGetFormat(
             break;
 
         case 24:
+        case 32:
             if (Config->stencilSize > 0)
             {
                 requestFormat = gcvSURF_D24S8;
