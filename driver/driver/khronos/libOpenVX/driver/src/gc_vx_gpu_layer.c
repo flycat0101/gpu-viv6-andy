@@ -3764,8 +3764,16 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
             }
             else
             {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32", borderMode);
-                paraNum = 13;
+                if (is_dilation_one)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32", borderMode);
+                    paraNum = 11;
+                }
+                else
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_Dilation", borderMode);
+                    paraNum = 13;
+                }
                 if (!shaderExecutable) goto OnError;
             }
             status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, paraNum);
@@ -3921,8 +3929,15 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
             }
             else
             {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
-                dilation_flag = vx_true_e;
+               if (is_dilation_one)
+               {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
+               }
+               else
+               {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Dilation", borderMode);
+                    dilation_flag = vx_true_e;
+                }
                 if (!shaderExecutable)
                 {
                     goto OnError;
@@ -4037,8 +4052,16 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
             }
             else
             {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoBias_FP32", borderMode);
-                paraNum = 12;
+                if (is_dilation_one)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoBias_FP32", borderMode);
+                    paraNum = 10;
+                }
+                else
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoBias_FP32_Dilation", borderMode);
+                    paraNum = 12;
+                }
                 if (!shaderExecutable) goto OnError;
             }
 
@@ -4067,13 +4090,22 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
             parameters[13] = (vx_reference)zpWeight;
             parameters[14] = (vx_reference)zpOut;
 
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoBias_Quant8", borderMode);
+            if (is_dilation_one)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoBias_Quant8", borderMode);
+                paraNum = 16;
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoBias_Quant8_Dilation", borderMode);
+                paraNum = 18;
+            }
             if (!shaderExecutable)
             {
                 goto OnError;
             }
 
-            status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 18);
+            status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, paraNum);
             if (status != VX_SUCCESS) goto OnError;
         }
     }
