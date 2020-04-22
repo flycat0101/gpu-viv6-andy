@@ -48,7 +48,7 @@ translate_format(buffer_handle_t handle)
         /* Use internal format for direct rendering. */
         switch (gralloc_handle_format(handle)) {
         case HAL_PIXEL_FORMAT_RGBA_8888:
-            return gcvSURF_A8R8G8B8;
+            return gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_PE_A8B8G8R8) ? gcvSURF_A8B8G8R8 : gcvSURF_A8R8G8B8;
 
         case HAL_PIXEL_FORMAT_RGBX_8888:
             return gcvSURF_X8R8G8B8;
