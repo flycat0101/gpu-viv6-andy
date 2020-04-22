@@ -3581,16 +3581,27 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint
     return status;
 }
 
+VX_PRIVATE_API vx_status  vxoNNDilationConvolutionLayer_DeInitialize(vxnne_layer_s* layer)
+{
+    vxnne_operation *dynamic_operations = ((vxnne_convolution_layer)layer)->dynamic_operations;
+    vxnneLayer_Deinitialize(layer);
+    if (dynamic_operations != NULL)
+    {
+        vxFree(dynamic_operations);
+    }
+
+    return VX_SUCCESS;
+}
 VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayerInitializer_Ext(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
 
     vxnne_layer_imp_s registerTensorDilationConvLayers[] = {/* Please DON'T adjust the order, it's importent */
-        { "RPNLAYER NN/TP", vxoNNDilationConvolutionLayer_NN_TP_Support, vxoNNDilationConvolutionLayer_NN_TP_Initialize, VX_NULL },
-        { "RPNLAYER TP", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
-        { "RPNLAYER SH EVIS", vxoNNDilationConvolutionLayer_SH_EVIS_Support, vxoNNDilationConvolutionLayer_SH_EVIS_Initialize, VX_NULL },
-        { "RPNLAYER SH F32", vxoNNDilationConvolutionLayer_SH_Support, vxoNNDilationConvolutionLayer_SH_Initialize, VX_NULL },
-        { "RPNLAYER SW", vxoNNCommon_Support, vxoNNDilationConvolutionLayer_SW_Initialize, VX_NULL },
+        { "RPNLAYER NN/TP", vxoNNDilationConvolutionLayer_NN_TP_Support, vxoNNDilationConvolutionLayer_NN_TP_Initialize, vxoNNDilationConvolutionLayer_DeInitialize },
+        { "RPNLAYER TP", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, vxoNNDilationConvolutionLayer_DeInitialize },
+        { "RPNLAYER SH EVIS", vxoNNDilationConvolutionLayer_SH_EVIS_Support, vxoNNDilationConvolutionLayer_SH_EVIS_Initialize, vxoNNDilationConvolutionLayer_DeInitialize },
+        { "RPNLAYER SH F32", vxoNNDilationConvolutionLayer_SH_Support, vxoNNDilationConvolutionLayer_SH_Initialize, vxoNNDilationConvolutionLayer_DeInitialize },
+        { "RPNLAYER SW", vxoNNCommon_Support, vxoNNDilationConvolutionLayer_SW_Initialize, vxoNNDilationConvolutionLayer_DeInitialize },
     };
 
     REGISTER_LAYERS(registerTensorDilationConvLayers, vxnne_convolution_layer_s, "ConvolutionLayer", vxoNNLayer_GetOperations);
