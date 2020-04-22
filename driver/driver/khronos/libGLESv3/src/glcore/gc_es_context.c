@@ -643,6 +643,7 @@ __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable)
             glDrawable->dsFormatInfo = &__glFormatInfoTable[__GL_FMT_Z16];
             break;
         case 24:
+        case 32:
             glDrawable->dsFormatInfo = eglConfig->stencilSize
                                      ? &__glFormatInfoTable[__GL_FMT_Z24S8]
                                      : &__glFormatInfoTable[__GL_FMT_Z24];
