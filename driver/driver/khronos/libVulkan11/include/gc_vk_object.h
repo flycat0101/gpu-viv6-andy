@@ -80,6 +80,7 @@ typedef struct __vkObjectListRec
     __vkObject *objList;
     gctPOINTER  objMutex;
     PFN_ObjectStatFunc objectStatFunc;
+    VkBool32 mutexClosed;
 } __vkObjectList;
 
 typedef struct __vkFenceRec
@@ -136,6 +137,7 @@ VkResult __vk_InitObjectLists(VkDevice device);
 VkResult __vk_FiniObjectLists(__vkDevContext *devCtx);
 VkResult __vk_InsertObject(__vkDevContext *devCtx, __vkObjectIndex index, __vkObject *obj);
 VkResult __vk_RemoveObject(__vkDevContext *devCtx, __vkObjectIndex index, __vkObject *obj);
+VkBool32 __vk_SearchObject(__vkDevContext *devCtx, __vkObjectIndex index,__vkObject *obj);
 
 
 #endif /* __gc_vk_object_h__ */

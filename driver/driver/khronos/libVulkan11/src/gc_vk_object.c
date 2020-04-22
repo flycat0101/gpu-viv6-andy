@@ -335,12 +335,17 @@ VkResult __vk_InitObjectLists(
     __vkDevContext *devCtx = (__vkDevContext *)device;
     uint32_t i;
 
+    if (devCtx->vkObject[0].objectStatFunc != VK_NULL_HANDLE)
+        return VK_SUCCESS;
+
     /* Initialize devCtx->vkObject[i] */
     for (i = 0; i < __VK_DEV_OBJECT_COUNT; i++)
     {
         devCtx->vkObject[i].objectStatFunc = __vkObjectStatFuncTable[i];
 
         gcoOS_CreateMutex(gcvNULL, &devCtx->vkObject[i].objMutex);
+
+        devCtx->vkObject[i].mutexClosed = VK_FALSE;
     }
 
     return VK_SUCCESS;
@@ -355,6 +360,11 @@ VkResult __vk_FiniObjectLists(
     uint32_t i;
 
     __VK_SET_ALLOCATIONCB(&devCtx->memCb);
+
+    if (devCtx->vkObject[0].mutexClosed)
+    {
+        return VK_SUCCESS;
+    }
 
     /* Final check on devCtx->vkObject[i] lists */
     for (i = 0; i < __VK_DEV_OBJECT_COUNT; i++)
@@ -378,6 +388,13 @@ VkResult __vk_FiniObjectLists(
         gcoOS_ReleaseMutex(gcvNULL, list->objMutex);
     }
 
+    /* delete devCtx->vkObject[i].objMutex */
+    for (i = 0; i < __VK_DEV_OBJECT_COUNT; i++)
+    {
+        gcoOS_DeleteMutex(gcvNULL, devCtx->vkObject[i].objMutex);
+        devCtx->vkObject[i].mutexClosed = VK_TRUE;
+    }
+
     return VK_SUCCESS;
 }
 
@@ -388,21 +405,45 @@ VkResult __vk_InsertObject(
     )
 {
     __vkObjectList *list = &devCtx->vkObject[index];
+    __vkObject *tmpobj;
+    VkBool32 needInsert = VK_TRUE;
 
-    /* Lock down the linked list */
-    gcoOS_AcquireMutex(gcvNULL, list->objMutex, gcvINFINITE);
+    tmpobj = list->objList;
 
-    /* Insert obj to the beginning of the linked list */
     if (obj)
     {
+        if (tmpobj)
+        {
+            while (tmpobj != obj && tmpobj->pNext)
+            {
+                tmpobj = tmpobj->pNext;
+            }
+
+            if (tmpobj == obj)
+            {
+                needInsert = VK_FALSE;
+            }
+        }
+    }
+    else
+    {
+        needInsert = VK_FALSE;
+    }
+
+    if (needInsert)
+    {
+        /* Lock down the linked list */
+        gcoOS_AcquireMutex(gcvNULL, list->objMutex, gcvINFINITE);
+
+        /* Insert obj to the beginning of the linked list */
         (*list->objectStatFunc)(devCtx, obj, 1);
 
         obj->pNext = list->objList;
         list->objList = obj;
-    }
 
-    /* Release the linked list */
-    gcoOS_ReleaseMutex(gcvNULL, list->objMutex);
+        /* Release the linked list */
+        gcoOS_ReleaseMutex(gcvNULL, list->objMutex);
+    }
 
     return VK_SUCCESS;
 }
@@ -449,5 +490,33 @@ VkResult __vk_RemoveObject(
     return VK_SUCCESS;
 }
 
+VkBool32 __vk_SearchObject(
+    __vkDevContext *devCtx,
+    __vkObjectIndex index,
+    __vkObject *obj
+    )
+{
+    __vkObjectList *list = &devCtx->vkObject[index];
+    __vkObject *tmpobj;
+
+    if (list->objList == gcvNULL)
+        return VK_FALSE;
+
+    /* try to find the obj from the linked list */
+    tmpobj = list->objList;
+    while (tmpobj != obj && tmpobj->pNext)
+    {
+        tmpobj = tmpobj->pNext;
+    }
+
+    if (tmpobj == obj)
+    {
+        return VK_TRUE;
+    }
+    else
+    {
+        return VK_FALSE;
+    }
+}
 
 
