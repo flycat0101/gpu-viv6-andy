@@ -3556,6 +3556,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_GenerateStatesBuffer(
     vx_status status = VX_SUCCESS;
     vx_uint32 nntpCmdsSize = 0;
     vx_uint32 stateSize = 0;
+    vx_uint32 initStateSize = 0;
     vx_uint32 shCmdsSize = 0;
     vx_graph graph = VX_NULL;
     vx_context context = VX_NULL;
