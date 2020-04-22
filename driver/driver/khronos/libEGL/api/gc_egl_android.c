@@ -3898,6 +3898,27 @@ OnError:
 #endif
 }
 
+#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 29)
+static gctBOOL
+_UpdateANativeBufferStatus(
+    khrEGL_IMAGE * Image
+    )
+{
+    android_native_buffer_t * buffer;
+    gcoSURF surface = Image->surface;
+
+    buffer = Image->u.ANativeBuffer.nativeBuffer;
+
+    /* Update buffer ts info and timestamp. */
+    _PushBufferStatus(buffer, surface);
+
+    /* Update surface metadata. */
+    /* _UpdateBufferMetadata(Surface, BackBuffer->surface);*/
+
+    return gcvTRUE;
+}
+#endif
+
 EGLenum
 _CreateImageFromANativeBuffer(
     VEGLThreadData Thread,
@@ -3944,6 +3965,9 @@ _CreateImageFromANativeBuffer(
     /* Stores image buffer */
     Image->image.surface = surface;
     Image->image.update  = _UpdateANativeBuffer;
+#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 29)
+    Image->image.updateStatus = _UpdateANativeBufferStatus;
+#endif
 
     /* Store android native buffer. */
     Image->image.u.ANativeBuffer.nativeBuffer = (gctPOINTER) nativeBuffer;
