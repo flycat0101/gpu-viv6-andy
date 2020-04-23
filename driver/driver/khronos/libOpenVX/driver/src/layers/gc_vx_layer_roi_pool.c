@@ -86,13 +86,6 @@ vx_status vxnneExecuteSWROIPooling(struct _vxnne_operation_s *operation)
         vx_int32 roi_height = 0, roi_width = 0;
         vx_float32 roi_size_scale_h = 0, roi_size_scale_w = 0;
         vx_uint8_ptr batch_data = VX_NULL;
-
-        if (stride_w == 5)
-        {
-            offset = 1;
-            roi_batch_ind = (vx_int32)vxnneGetDataExt(in_roi_format, TENSOR_QUANT_TYPE(input_roi), 0, rois_data_ptr, in_roi_fp, TENSOR_TF_ZEROPOINT(input_roi), TENSOR_TF_SCALE(input_roi));
-        }
-
         /* map the roi coordinates to the feature map */
         roi_start_w = (vx_int32)vxnneRound((vx_float32)vxnneGetDataExt(in_roi_format, TENSOR_QUANT_TYPE(input_roi), offset, rois_data_ptr, in_roi_fp, TENSOR_TF_ZEROPOINT(input_roi), TENSOR_TF_SCALE(input_roi)) * spatial_scale, in_roi_rMode);
         roi_start_h = (vx_int32)vxnneRound((vx_float32)vxnneGetDataExt(in_roi_format, TENSOR_QUANT_TYPE(input_roi), offset + 1, rois_data_ptr, in_roi_fp, TENSOR_TF_ZEROPOINT(input_roi), TENSOR_TF_SCALE(input_roi)) * spatial_scale, in_roi_rMode);

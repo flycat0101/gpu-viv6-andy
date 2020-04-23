@@ -29,7 +29,7 @@ vx_status vxnneExecuteSWFullyConnected(struct _vxnne_operation_s *operation)
     vx_uint32 i = 0, j = 0, b = 0;
     vx_uint32 inputCount, outputCount;
     vx_float32 madValue, inputValue, weightValue, biasValue = 0.0f;
-    vx_enum srcType, dstType, weightsType, biasesType, outputRoundingMode;
+    vx_enum srcType, dstType, weightsType, biasesType =  VX_TYPE_INVALID, outputRoundingMode;
     vx_int8 inputFpPos = 0, weightFpPos = 0, biasFpPos = 0, outputFpPos = 0;
     vx_float32 result = 0.0f;
     vx_status status = VX_SUCCESS;
@@ -39,6 +39,7 @@ vx_status vxnneExecuteSWFullyConnected(struct _vxnne_operation_s *operation)
     vx_uint32  depth         = dims > 2 ? TENSOR_VIEW_SIZE_INDEX(inputs, 2) : 1;
     vx_uint32  batch         = dims > 3 ? TENSOR_VIEW_SIZE_INDEX(inputs, 3) : 1;
     vx_uint32  batchCount    = 1;
+    vx_enum overflow_policy = fullyConnectedOperation->overflow_policy->value->u16;
 
     if (TENSOR_DIM_NUM(inputs) == 2)
     {
@@ -52,12 +53,10 @@ vx_status vxnneExecuteSWFullyConnected(struct _vxnne_operation_s *operation)
     srcType = TENSOR_DATA_TYPE(inputs);
     dstType = TENSOR_DATA_TYPE(outputs);
     weightsType = TENSOR_DATA_TYPE(weights);
-    biasesType = TENSOR_DATA_TYPE(biases);
 
     vxoTensor_GetTensorViewMemory(inputs, &inputsBaseLogicalAddr, VX_NULL);
     vxoTensor_GetTensorViewMemory(outputs, &outputsBaseLogicalAddr, VX_NULL);
     vxoTensor_GetTensorViewMemory(weights, &weightsBaseLogicalAddr, VX_NULL);
-    vxoTensor_GetTensorViewMemory(biases, &biasesBaseLogicalAddr, VX_NULL);
 
     inputCount = (vx_uint32)(width * height * depth * batch) / batchCount;
     dims          = TENSOR_VIEW_DIM_NUM(outputs);
@@ -69,10 +68,15 @@ vx_status vxnneExecuteSWFullyConnected(struct _vxnne_operation_s *operation)
 
     inputFpPos = TENSOR_POS(inputs);
     weightFpPos = TENSOR_POS(weights);
-    biasFpPos = TENSOR_POS(biases);
     outputFpPos = TENSOR_POS(outputs);
     outputRoundingMode = TENSOR_ROUNDING_MODE(outputs);
 
+    if (biases)
+    {
+        biasesType = TENSOR_DATA_TYPE(biases);
+        vxoTensor_GetTensorViewMemory(biases, &biasesBaseLogicalAddr, VX_NULL);
+        biasFpPos = TENSOR_POS(biases);
+    }
     for (b = 0; b < batchCount; b ++)
     {
         for (i = 0; i < outputCount; i++)
@@ -80,34 +84,69 @@ vx_status vxnneExecuteSWFullyConnected(struct _vxnne_operation_s *operation)
             madValue = 0.0;
             for (j = 0; j < inputCount; j++)
             {
-                if (((srcType == VX_TYPE_FLOAT16) && (weightsType == VX_TYPE_FLOAT16) && (biasesType == VX_TYPE_FLOAT32)) ||
-                    ((srcType == VX_TYPE_FLOAT32) && (weightsType == VX_TYPE_FLOAT32) && (biasesType ==  VX_TYPE_FLOAT32)) ||
-                    ((srcType == VX_TYPE_INT8) && (weightsType == VX_TYPE_INT8) && (biasesType == VX_TYPE_INT32 || biasesType == VX_TYPE_FLOAT32)) ||
-                    ((srcType == VX_TYPE_INT16) && (weightsType == VX_TYPE_INT16) && (biasesType == VX_TYPE_INT32 || biasesType == VX_TYPE_INT64 || biasesType == VX_TYPE_FLOAT32)))
+                if (biases)
                 {
-                    inputValue  = vxnneGetDataExt((vx_type_e)srcType, TENSOR_QUANT_TYPE(inputs), j + b * inputCount, (vx_uint8_ptr)inputsBaseLogicalAddr, inputFpPos, TENSOR_TF_ZEROPOINT(inputs), TENSOR_TF_SCALE(inputs));
-                    weightValue = vxnneGetDataExt((vx_type_e)weightsType, TENSOR_QUANT_TYPE(weights), inputCount * i + j, (vx_uint8_ptr)weightsBaseLogicalAddr, weightFpPos, TENSOR_TF_ZEROPOINT(weights), TENSOR_TF_SCALE(weights));
+                    if (((srcType == VX_TYPE_FLOAT16) && (weightsType == VX_TYPE_FLOAT16) && (biasesType == VX_TYPE_FLOAT32)) ||
+                        ((srcType == VX_TYPE_FLOAT32) && (weightsType == VX_TYPE_FLOAT32) && (biasesType ==  VX_TYPE_FLOAT32)) ||
+                        ((srcType == VX_TYPE_INT8) && (weightsType == VX_TYPE_INT8) && (biasesType == VX_TYPE_INT32 || biasesType == VX_TYPE_FLOAT32)) ||
+                        ((srcType == VX_TYPE_INT16) && (weightsType == VX_TYPE_INT16) && (biasesType == VX_TYPE_INT32 || biasesType == VX_TYPE_INT64 || biasesType == VX_TYPE_FLOAT32)) ||
+                        ((srcType == VX_TYPE_UINT8) && (weightsType == VX_TYPE_UINT8) && (biasesType ==  VX_TYPE_UINT8)))
+                    {
+                        inputValue  = vxnneGetDataExt((vx_type_e)srcType, TENSOR_QUANT_TYPE(inputs), j + b * inputCount, (vx_uint8_ptr)inputsBaseLogicalAddr, inputFpPos, TENSOR_TF_ZEROPOINT(inputs), TENSOR_TF_SCALE(inputs));
+                        weightValue = vxnneGetDataExt((vx_type_e)weightsType, TENSOR_QUANT_TYPE(weights), inputCount * i + j, (vx_uint8_ptr)weightsBaseLogicalAddr, weightFpPos, TENSOR_TF_ZEROPOINT(weights), TENSOR_TF_SCALE(weights));
 
-                    madValue += inputValue * weightValue;
-                }
-                else if((srcType == VX_TYPE_UINT8) && (weightsType == VX_TYPE_UINT8) && (biasesType == VX_TYPE_INT32 || biasesType == VX_TYPE_FLOAT32) && TENSOR_QUANT_TYPE(inputs) == VX_QUANT_AFFINE_SCALE)
-                {
-                    inputValue  = vxnneGetDataQuant((vx_type_e)srcType, j + b * inputCount, (vx_uint8_ptr)inputsBaseLogicalAddr, TENSOR_TF_ZEROPOINT(inputs), TENSOR_TF_SCALE(inputs));
-                    weightValue = vxnneGetDataQuant((vx_type_e)weightsType, inputCount * i + j, (vx_uint8_ptr)weightsBaseLogicalAddr, TENSOR_TF_ZEROPOINT(weights), TENSOR_TF_SCALE(weights));
+                        madValue += inputValue * weightValue;
+                    }
+                    else if((srcType == VX_TYPE_UINT8) && (weightsType == VX_TYPE_UINT8) && (biasesType == VX_TYPE_INT32 || biasesType == VX_TYPE_FLOAT32) && TENSOR_QUANT_TYPE(inputs) == VX_QUANT_AFFINE_SCALE)
+                    {
+                        inputValue  = vxnneGetDataQuant((vx_type_e)srcType, j + b * inputCount, (vx_uint8_ptr)inputsBaseLogicalAddr, TENSOR_TF_ZEROPOINT(inputs), TENSOR_TF_SCALE(inputs));
+                        weightValue = vxnneGetDataQuant((vx_type_e)weightsType, inputCount * i + j, (vx_uint8_ptr)weightsBaseLogicalAddr, TENSOR_TF_ZEROPOINT(weights), TENSOR_TF_SCALE(weights));
 
-                    madValue += inputValue * weightValue;
+                        madValue += inputValue * weightValue;
+                    }
+                    else
+                    {
+                        /* other format not surpport now */
+                        vxError("can't support this input data format\n");
+                        gcmASSERT(0);
+                    }
                 }
                 else
                 {
-                    /* other format not surpport now */
-                    vxError("can't support this input data format\n");
-                    gcmASSERT(0);
+                    if (((srcType == VX_TYPE_FLOAT16) && (weightsType == VX_TYPE_FLOAT16)) ||
+                        ((srcType == VX_TYPE_FLOAT32) && (weightsType == VX_TYPE_FLOAT32)) ||
+                        ((srcType == VX_TYPE_INT8) && (weightsType == VX_TYPE_INT8)) ||
+                        ((srcType == VX_TYPE_INT16) && (weightsType == VX_TYPE_INT16)) ||
+                        ((srcType == VX_TYPE_UINT8) && (weightsType == VX_TYPE_UINT8)))
+                    {
+                        inputValue  = vxnneGetDataExt((vx_type_e)srcType, TENSOR_QUANT_TYPE(inputs), j + b * inputCount, (vx_uint8_ptr)inputsBaseLogicalAddr, inputFpPos, TENSOR_TF_ZEROPOINT(inputs), TENSOR_TF_SCALE(inputs));
+                        weightValue = vxnneGetDataExt((vx_type_e)weightsType, TENSOR_QUANT_TYPE(weights), inputCount * i + j, (vx_uint8_ptr)weightsBaseLogicalAddr, weightFpPos, TENSOR_TF_ZEROPOINT(weights), TENSOR_TF_SCALE(weights));
+
+                        madValue += inputValue * weightValue;
+                    }
+                    else if((srcType == VX_TYPE_UINT8) && (weightsType == VX_TYPE_UINT8) && (biasesType == VX_TYPE_INT32 || biasesType == VX_TYPE_FLOAT32) && TENSOR_QUANT_TYPE(inputs) == VX_QUANT_AFFINE_SCALE)
+                    {
+                        inputValue  = vxnneGetDataQuant((vx_type_e)srcType, j + b * inputCount, (vx_uint8_ptr)inputsBaseLogicalAddr, TENSOR_TF_ZEROPOINT(inputs), TENSOR_TF_SCALE(inputs));
+                        weightValue = vxnneGetDataQuant((vx_type_e)weightsType, inputCount * i + j, (vx_uint8_ptr)weightsBaseLogicalAddr, TENSOR_TF_ZEROPOINT(weights), TENSOR_TF_SCALE(weights));
+
+                        madValue += inputValue * weightValue;
+                    }
+                    else
+                    {
+                        /* other format not surpport now */
+                        vxError("can't support this input data format\n");
+                        gcmASSERT(0);
+                    }
                 }
             }
 
-            if (biasesType == VX_TYPE_FLOAT32 || biasesType == VX_TYPE_INT32 || biasesType == VX_TYPE_INT64)
+            if (biases && (biasesType == VX_TYPE_FLOAT32 || biasesType == VX_TYPE_INT32 || biasesType == VX_TYPE_INT64 || biasesType == VX_TYPE_UINT8))
             {
                 biasValue = vxnneGetDataExt((vx_type_e)biasesType, TENSOR_QUANT_TYPE(biases), i, (vx_uint8_ptr)biasesBaseLogicalAddr, biasFpPos, TENSOR_TF_ZEROPOINT(biases), TENSOR_TF_SCALE(biases));
+            }
+            else if (!biases)
+            {
+                biasValue = 0;
             }
             else
             {
@@ -115,7 +154,14 @@ vx_status vxnneExecuteSWFullyConnected(struct _vxnne_operation_s *operation)
                 gcmASSERT(0);
             }
 
-            result = madValue + biasValue;
+            if (overflow_policy == VX_CONVERT_POLICY_WRAP)
+            {
+                result = (vx_float32)vxnneWarp(madValue + biasValue, dstType);
+            }
+            else
+            {
+                result = madValue + biasValue;
+            }
 
             vxnneSaveDataExt((vx_type_e)dstType, TENSOR_QUANT_TYPE(outputs), i + b * outputCount, result, outputsBaseLogicalAddr, outputFpPos, TENSOR_TF_ZEROPOINT(outputs), TENSOR_TF_SCALE(outputs), outputRoundingMode);
         }
@@ -142,7 +188,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedReluLayer_ValidateOutput
 
     return VX_SUCCESS;
 }
-
 VX_PRIVATE_API vx_status vxnneExecuteSWfp16Clamp(struct _vxnne_operation_s *operation
     )
 {
@@ -191,16 +236,15 @@ vx_status vxoNNFullyConnectedLayerInitializer(
     vxnne_tp_operation tp_operation1,
     vxnne_convolution_relu_pooling_operation nn_operation,
     vxnne_shader_operation sh_operation,
-
     vxnne_fully_connected_sw_operation_fp16 sw_fp16,
     vxnne_shader_operation sh_fp16,
     vx_tensor inputs0,
     vx_weights_biases_parameter weights_biases,
-
     vx_uint32 pad,
     vx_enum conv_rounding_type,
     vx_bool enable_relu,
     vx_int32_ptr count,
+    vx_uint32    overflow_policy,
     vx_tensor outputs)
 {
     vx_status status = VX_SUCCESS;
@@ -519,7 +563,7 @@ vx_status vxoNNFullyConnectedLayerInitializer(
         }
     }
     else if (vxnneIsNNSupportFormat(context, inputs, weights_biases, outputs) &&
-        (nn_operation != VX_NULL))
+        (nn_operation != VX_NULL) && (VX_CONVERT_POLICY_SATURATE == overflow_policy))
     {
         vx_op_param_s conv = {0};
         vx_tensor reshapeInput = VX_NULL, reshapeOutput = VX_NULL;
@@ -644,15 +688,15 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedReluLayer_Initializer(vx
     vx_tensor                   inputs = (vx_tensor)parameters[0];
     vx_weights_biases_parameter weights_biases = (vx_weights_biases_parameter)parameters[1]; // need modify
     vx_scalar                   pad_s = (vx_scalar)parameters[2];
+    vx_scalar                   overflow_policy_s = (vx_scalar)parameters[4];
     vx_scalar                   down_scale_size_rounding_s = (vx_scalar)parameters[6];
     vx_scalar                   enable_relu_s = (vx_scalar)parameters[7];
     vx_tensor                   outputs = (vx_tensor)parameters[8];
-
+    vx_uint32                   overflow_policy  = VX_CONVERT_POLICY_SATURATE;
     vx_uint32                   pad;
     vx_enum                     conv_rounding_type;
     vx_bool                     enable_relu;
     vx_int32                    count = 0;
-
     vx_status                   status = VX_SUCCESS;
     vxnne_fully_connected_relu_layer  fullyConnectReluLayer = gcvNULL;
 
@@ -664,6 +708,10 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedReluLayer_Initializer(vx
         goto exit;
     }
 
+    if (overflow_policy_s)
+    {
+        overflow_policy = overflow_policy_s->value->u32;
+    }
 
     if (TENSOR_DIM_NUM(inputs) == 2)
     {
@@ -729,6 +777,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedReluLayer_Initializer(vx
         conv_rounding_type,
         enable_relu,
         &count,
+        overflow_policy,
         outputs);
 
     if (status != VX_SUCCESS && fullyConnectReluLayer) gcoOS_Free(gcvNULL, (gctPOINTER)fullyConnectReluLayer);
@@ -771,8 +820,17 @@ VX_PRIVATE_API vx_status vxoNNFullyConnectedLayer_SW_Initialize(vxnne_layer ops_
     vx_tensor  inputs                     = (vx_tensor)parameters[0];
     vx_tensor  weights                    = (vx_tensor)parameters[1];
     vx_tensor  biases                     = (vx_tensor)parameters[2];
+    vx_scalar  overflow_policy_s          = VX_NULL;
     vx_tensor  outputs                    = (vx_tensor)parameters[ops_layer->node->numParameters - 1];
 
+    if (6 == ops_layer->node->numParameters)
+    {
+        overflow_policy_s = (vx_scalar)parameters[3];
+    }
+    else if (9 == ops_layer->node->numParameters)
+    {
+        overflow_policy_s = (vx_scalar)parameters[5];
+    }
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
     vxmONERROR(vxnneOperation_Initialize(&fullyConnectedLayer->fully_connected_operation.base,
@@ -792,11 +850,13 @@ VX_PRIVATE_API vx_status vxoNNFullyConnectedLayer_SW_Initialize(vxnne_layer ops_
     fullyConnectedLayer->fully_connected_operation.inputs           = inputs;
     fullyConnectedLayer->fully_connected_operation.weights          = weights;
     fullyConnectedLayer->fully_connected_operation.biases           = biases;
+    fullyConnectedLayer->fully_connected_operation.overflow_policy  = overflow_policy_s;
     fullyConnectedLayer->fully_connected_operation.outputs          = outputs;
 
     vxmONERROR(vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT));
     vxmONERROR(vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_operation.base, (vx_reference)weights, VXNNE_OPERATION_REFENRENCE_INPUT));
-    vxmONERROR(vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_operation.base, (vx_reference)biases, VXNNE_OPERATION_REFENRENCE_INPUT));
+    if (biases)
+        vxmONERROR(vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_operation.base, (vx_reference)biases, VXNNE_OPERATION_REFENRENCE_INPUT));
     vxmONERROR(vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
 OnError:
     vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
@@ -1031,6 +1091,7 @@ OnError:
     vx_tensor  inputs                     = (vx_tensor)parameters[0];
     vx_tensor  weights                    = (vx_tensor)parameters[1];
     vx_tensor  biases                     = (vx_tensor)parameters[2];
+    vx_scalar  overflow_policy_s          = NULL;
     vx_tensor  outputs                    = (vx_tensor)parameters[node->numParameters - 1];
 
     vx_bool   enable_shader               = vx_false_e;
@@ -1048,12 +1109,27 @@ OnError:
     vx_uint32 depth                       = (dims > 2) ? TENSOR_VIEW_SIZE_INDEX(inputs, 2) : 1;
     vx_uint32 inputDims                   = dims > 2 ? width * height * depth : width;
     vx_uint32 batch                       = 1;
+    vx_uint32 overflow_policy             = VX_CONVERT_POLICY_SATURATE;
     vxnne_fully_connected_relu_layer  fullyConnectedLayer = gcvNULL;
     /* destroy the existing layer */
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
         node->layer = VX_NULL;
+    }
+
+    if (6 == node->numParameters)
+    {
+        overflow_policy_s = (vx_scalar)parameters[3];
+    }
+    else if (9 == node->numParameters)
+    {
+        overflow_policy_s = (vx_scalar)parameters[5];
+    }
+
+    if (overflow_policy_s)
+    {
+        overflow_policy = overflow_policy_s->value->u32;
     }
 
     if (TENSOR_DIM_NUM(inputs) == 2)
@@ -1182,11 +1258,13 @@ OnError:
         fullyConnectedLayer->fully_connected_operation.inputs           = inputs;
         fullyConnectedLayer->fully_connected_operation.weights          = weights;
         fullyConnectedLayer->fully_connected_operation.biases           = biases;
+        fullyConnectedLayer->fully_connected_operation.overflow_policy  = overflow_policy;
         fullyConnectedLayer->fully_connected_operation.outputs          = outputs;
 
         vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
         vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_operation.base, (vx_reference)weights, VXNNE_OPERATION_REFENRENCE_INPUT);
-        vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_operation.base, (vx_reference)biases, VXNNE_OPERATION_REFENRENCE_INPUT);
+        if (biases)
+            vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_operation.base, (vx_reference)biases, VXNNE_OPERATION_REFENRENCE_INPUT);
         vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
     }
 

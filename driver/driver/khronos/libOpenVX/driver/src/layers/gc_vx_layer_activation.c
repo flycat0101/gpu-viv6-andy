@@ -601,7 +601,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
 
     vxnne_layer_imp_s registerActivationLayers[] = {/* Please DON'T adjust the order, it's importent */
         { "ActivationLayer NN", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
-        { "ActivationLayer TP", vxoNNActivationLayer_TP_Support, vxoNNActivationLayer_TP_Initialize, vxoNNCommon_Deinitialize },
+        { "ActivationLayer TP", vxoNNActivationLayer_TP_Support, vxoNNActivationLayer_TP_Initialize, VX_NULL },
         { "ActivationLayer SH EVIS", vxoNNActivationLayer_SH_EVIS_Support, vxoNNActivationLayer_SH_EVIS_Initialize, VX_NULL },
         { "ActivationLayer SH F32", vxoNNActivationLayer_SH_Support, vxoNNActivationLayer_SH_Initialize, VX_NULL },
         { "ActivationLayer SW support", vxoNNCommon_Support, vxoNNActivationLayer_SW_Initialize, VX_NULL },

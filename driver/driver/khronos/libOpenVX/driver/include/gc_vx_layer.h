@@ -1842,7 +1842,9 @@ typedef struct _vxnne_deconvolution_operation_s
     vx_scalar                        rounding_policy;
     vx_scalar                        a_x;
     vx_scalar                        a_y;
-    vx_scalar                         group;
+    vx_scalar                        group;
+    vx_scalar                        stride_x;
+    vx_scalar                        stride_y;
     vx_tensor                        outputs;
 }
 vxnne_deconvolution_operation_s, * vxnne_deconvolution_operation;

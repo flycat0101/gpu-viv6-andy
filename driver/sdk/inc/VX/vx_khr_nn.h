@@ -57,6 +57,9 @@ enum vx_graph_attribute_internal_type_e
  */
 #define VX_WRAP_USER_MEMORY_SIZE_ALIGNMENT (0x40)
 
+/*! \brief OpenVX Version Compatibility set*/
+#define VX_KHR_COMPATIBILITY (0x1)
+
 /*==============================================================================
 CONVOLUTIONAL_NETWORK structs and enums
 =============================================================================*/
