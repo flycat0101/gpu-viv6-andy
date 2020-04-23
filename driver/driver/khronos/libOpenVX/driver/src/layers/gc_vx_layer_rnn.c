@@ -38,6 +38,7 @@ extern vx_status vxoNNFullyConnectedLayerInitializer(
     vx_enum conv_rounding_type,
     vx_bool enable_relu,
     vx_int32_ptr count,
+    vx_uint32    overflow_policy,
     vx_tensor outputs);
 
 vx_tensor _createTensor(vx_graph graph, vx_bool is_virtual,
@@ -2162,6 +2163,7 @@ VX_PRIVATE_API vx_status vxoSVDFLayer_NN_TP_Initialize(vxnne_layer ops_layer, co
             0,
             vx_false_e,
             &count,
+            VX_CONVERT_POLICY_SATURATE,
             output_feature));
     }
     else
@@ -2372,6 +2374,7 @@ VX_PRIVATE_API vx_status vxoSVDFLayer_NN_TP_Initialize(vxnne_layer ops_layer, co
             0,
             vx_false_e,
             &count,
+            VX_CONVERT_POLICY_SATURATE,
             outputs));
     }
     else
@@ -2667,6 +2670,7 @@ OnError:
                 0,
                 vx_false_e,
                 &count,
+                VX_CONVERT_POLICY_SATURATE,
                 output_feature);
         }
         else
@@ -2879,6 +2883,7 @@ OnError:
                 0,
                 vx_false_e,
                 &count,
+                VX_CONVERT_POLICY_SATURATE,
                 outputs);
         }
         else
@@ -5202,7 +5207,7 @@ VX_PRIVATE_API vx_status vxoNN_LSTMUnit_SH_EVIS_Initialize_Ext(vxnne_layer ops_l
     vx_tensor_create_params_t tensor_create_params;
     vx_bool   isDynamicInput = vx_false_e;
     vx_uint32 opIdx = 0;
-
+    vx_uint32 overflow_policy  = VX_CONVERT_POLICY_SATURATE;
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
     /* Concat input weights. */
@@ -5532,7 +5537,7 @@ VX_PRIVATE_API vx_status vxoNN_LSTMUnit_SH_EVIS_Initialize_Ext(vxnne_layer ops_l
     /*op1 : fc*/
     if (evis)
     {
-        shaderExecutable = vxnneGetFullyConnectedShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_FULLYCONNECTED, &ops_layer->node->kernelAttributes.borderMode, input, w_x, bias, VX_NN_ACTIVATION_NONE, fc_output);
+        shaderExecutable = vxnneGetFullyConnectedShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_FULLYCONNECTED, &ops_layer->node->kernelAttributes.borderMode, input, w_x, bias, VX_NN_ACTIVATION_NONE, overflow_policy, fc_output);
     }
     else
     {
@@ -5931,7 +5936,7 @@ OnError:
     vx_float32 projClipValue = (vx_float32)((proj_clip == NULL) ? 0.0f : *((vx_float32*)TENSOR_LOGICAL_ADDR(proj_clip)));
     vx_bool enable_layernorm = ((layernorm2input_weight != VX_NULL) && (layernorm2forget_weight != VX_NULL) && (layernorm2cell_weight != VX_NULL) && (layernorm2output_weight != VX_NULL)) ? vx_true_e : vx_false_e;
     vxnne_lstm_unit  lstmUnitNode = VX_NULL;
-
+    vx_uint32 overflow_policy             = VX_CONVERT_POLICY_SATURATE;
     /* make compiler happy */
     enable_layernorm = enable_layernorm;
 
@@ -6390,7 +6395,7 @@ OnError:
             /*op1 : fc*/
             if (node->base.context->evisNoInst.supportEVIS)
             {
-                shaderExecutable = vxnneGetFullyConnectedShaderExecutable(node->base.context, VXNNE_KERNEL_FULLYCONNECTED, &node->kernelAttributes.borderMode, input, w_x, bias, VX_NN_ACTIVATION_NONE, fc_output);
+                shaderExecutable = vxnneGetFullyConnectedShaderExecutable(node->base.context, VXNNE_KERNEL_FULLYCONNECTED, &node->kernelAttributes.borderMode, input, w_x, bias, VX_NN_ACTIVATION_NONE, overflow_policy, fc_output);
             }
             else
             {
@@ -7269,7 +7274,7 @@ vx_status vxnneExecuteLSTMLayer_NN_TP_LAYER(vx_node node, vx_tensor input,
                                              VX_NULL,
                                              w_x,
                                              bias,
-                                             0,
+                                             VX_CONVERT_POLICY_SATURATE,
                                              0,
                                              0,
                                              input_fc_output,
@@ -7479,7 +7484,7 @@ vx_status vxnneExecuteLSTMLayer_NN_TP_LAYER(vx_node node, vx_tensor input,
                                                  &weights_biases,
                                                  w_h, /* weights tensor */
                                                  bias_zero, /* biases tensor */
-                                                 0,
+                                                 VX_CONVERT_POLICY_SATURATE,
                                                  0,
                                                  0,
                                                  recurrent_fc_output,
@@ -8649,7 +8654,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMLayer_Initializer(vx_node node, c
                     dims = 2;
                     input_conv = vxoTensor_ReshapeTensor(input, sizes, dims);
 
-                    shaderExecutable = vxnneGetFullyConnectedShaderExecutable(node->base.context, VXNNE_KERNEL_FULLYCONNECTED, &node->kernelAttributes.borderMode, input_conv, w_x, bias, VX_NN_ACTIVATION_NONE, w_x_x);
+                    shaderExecutable = vxnneGetFullyConnectedShaderExecutable(node->base.context, VXNNE_KERNEL_FULLYCONNECTED, &node->kernelAttributes.borderMode, input_conv, w_x, bias, VX_NN_ACTIVATION_NONE, VX_CONVERT_POLICY_SATURATE, w_x_x);
 
                     if (!shaderExecutable)
                     {

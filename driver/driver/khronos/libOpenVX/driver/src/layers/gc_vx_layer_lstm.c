@@ -566,7 +566,7 @@ vx_status vxoLSTMLayer_Initialize(
                                              VX_NULL,
                                              input_fc_weights,
                                              bias,
-                                             VX_CONVERT_POLICY_WRAP,
+                                             VX_CONVERT_POLICY_SATURATE,
                                              VX_ROUND_POLICY_TO_ZERO,
                                              vx_false_e,
                                              input_fc_output,
@@ -598,7 +598,7 @@ vx_status vxoLSTMLayer_Initialize(
                                                  VX_NULL,
                                                  input_fc_weights_array[i],
                                                  biases_array[i],
-                                                 VX_CONVERT_POLICY_WRAP,
+                                                 VX_CONVERT_POLICY_SATURATE,
                                                  VX_ROUND_POLICY_TO_ZERO,
                                                  vx_false_e,
                                                  input_fc_output_sub_tensors[i],
@@ -889,7 +889,7 @@ vx_status vxoLSTMLayer_Initialize(
                                                  &weights_biases[0],
                                                  recurrent_fc_weights, /* weights tensor */
                                                  bias_zero[0], /* biases tensor */
-                                                 VX_CONVERT_POLICY_WRAP,
+                                                 VX_CONVERT_POLICY_SATURATE,
                                                  VX_ROUND_POLICY_TO_ZERO,
                                                  vx_false_e,
                                                  recurrent_fc_sub_output,
@@ -921,7 +921,7 @@ vx_status vxoLSTMLayer_Initialize(
                                                      &weights_biases[i],
                                                      recurrent_fc_weights_array[i], /* weights tensor */
                                                      bias_zero[i], /* biases tensor */
-                                                     VX_CONVERT_POLICY_WRAP,
+                                                     VX_CONVERT_POLICY_SATURATE,
                                                      VX_ROUND_POLICY_TO_ZERO,
                                                      vx_false_e,
                                                      recurrent_fc_sub_output_sub_tensors[i],

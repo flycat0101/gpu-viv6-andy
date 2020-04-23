@@ -3764,22 +3764,27 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_conv2fc(vx_graph graph)
         if(node->kernel->enumeration == VX_KERNEL_CONVOLUTION_LAYER)
         {
             vx_tensor convInput     = (vx_tensor)node->paramTable[0];
-            vx_tensor convWeight    = (vx_tensor)node->paramTable[1];
-            vx_tensor bias          = (vx_tensor)node->paramTable[2];
-            vx_tensor convOutput    = (vx_tensor)node->paramTable[node->numParameters - 1];
+            vx_tensor convWeight    = VX_NULL;
+            vx_tensor bias          = VX_NULL;
+            vx_tensor convOutput    = (vx_tensor)vxoGraphOptimization_getOutputParameter(node);
+            vx_size   dilation[2]   = {0, 0};
+            vx_uint32 stride[2]     = {1, 1};
+            vx_uint32 pad[4]        = {0,0,0,0};
+            vx_uint32 depth_multipler = 0;
+            vx_enum   overflow_policy = VX_CONVERT_POLICY_SATURATE;
+            vx_enum   rounding_policy = VX_ROUND_POLICY_TO_ZERO;
 
-            if(SCALAR_VALUE(node->paramTable[PARAM_CONV_DEPTH_MULTIPLIER_INDEX], u32) != 0)
+            vxoGraphOptimization_MergeConvolutionNodes_GetParmFromConv(node, &convWeight, &bias, dilation, stride,
+                        pad, &overflow_policy, &rounding_policy, VX_NULL, &depth_multipler, VX_NULL, VX_NULL);
+
+            if(depth_multipler != 0)
                 continue;
 
-            if(SCALAR_VALUE(node->paramTable[PARAM_CONV_DILATION_INDEX], u32) != 0 ||
-                SCALAR_VALUE(node->paramTable[PARAM_CONV_DILATION_INDEX + 1], u32) != 0 ||
-                SCALAR_VALUE(node->paramTable[PARAM_CONV_STRIDE_INDEX], u32) != 1 ||
-                SCALAR_VALUE(node->paramTable[PARAM_CONV_STRIDE_INDEX + 1], u32) != 1)
+            if(dilation[0] != 0 || dilation[1] != 0 || stride[0]!= 1 || stride[1] != 1)
                 continue;
 
-            for(i = 0; i < 4; i++)
-                if(SCALAR_VALUE(node->paramTable[PARAM_CONV_PAD_INDEX + i], u32) != 0)
-                    diff = vx_true_e;
+            if(pad[0] != 0 || pad[1] != 0 || pad[2] != 0 || pad[3] != 0)
+                continue;
 
             for(i = 0; i < 3; i++)
                 if(TENSOR_SIZE_INDEX(convWeight, i)  != TENSOR_SIZE_INDEX(convInput, i) )
@@ -3799,8 +3804,8 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_conv2fc(vx_graph graph)
                                                     input,
                                                     weight,
                                                     bias,
-                                                    VX_CONVERT_POLICY_SATURATE,
-                                                    VX_ROUND_POLICY_TO_ZERO,
+                                                    overflow_policy,
+                                                    rounding_policy,
                                                     output);
                 vxReleaseNode(&fcNode);
                 }

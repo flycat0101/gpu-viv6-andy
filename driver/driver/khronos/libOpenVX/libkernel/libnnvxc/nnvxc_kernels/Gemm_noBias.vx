@@ -4,6 +4,7 @@
 _viv_uniform int inputSize_aln8;
 _viv_uniform int Cycles;
 _viv_uniform VXC_512Bits uniMulAcc;
+_viv_uniform int overflow_mode;
 
 __kernel void gemm_noBias_fp16
     (
@@ -110,7 +111,7 @@ __kernel void gemm_noBias_uint8
     } while (coord_in.x < Cycles_uint8);
 
     dst = dst * uint8Scale + outputZP;
-    unsigned char val = convert_uchar_sat_rte(dst);
+    unsigned char val = overflow_mode? convert_uchar_sat_rte(dst) : (unsigned char)dst;
     unsigned char min, max;
     _viv_asm(COPY, min, minData, 4);
     _viv_asm(COPY, max, maxData, 4);
@@ -158,7 +159,7 @@ __kernel void gemm_noBias_int8
         dst = dst > 0 ? dst : 0;
 
     dst = in_scale * dst;
-    char val = convert_char_sat_rte(dst);
+    char val = overflow_mode ? convert_char_sat_rte(dst) : (char)dst;
 
     VXC_WriteImage(output, coord_in.zy, val, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
 }
@@ -265,7 +266,7 @@ __kernel void gemm_noBias_Tensor_uint8
     } while (coord_in.x < Cycles_uint8);
 
     dst = dst * uint8Scale + outputZP;
-    unsigned char val = convert_uchar_sat_rte(dst);
+    unsigned char val = overflow_mode ? convert_uchar_sat_rte(dst) : (unsigned char)dst;
     unsigned char min, max;
     _viv_asm(COPY, min, minData, 4);
     _viv_asm(COPY, max, maxData, 4);
@@ -317,7 +318,7 @@ __kernel void gemm_noBias_Tensor_int8
         dst = dst > 0 ? dst : 0;
 
     dst = in_scale * dst;
-    char val = convert_char_sat_rte(dst);
+    char val = overflow_mode ? convert_char_sat_rte(dst) : (char)dst;
 
     coord    = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
     VXC_WriteImage2DArray(output, coord, val, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
@@ -365,7 +366,7 @@ __kernel void gemm_noBias_int16
         dst = dst > 0 ? dst : 0;
 
     dst = in_scale * dst;
-    short val = convert_short_sat_rte(dst);
+    short val = overflow_mode ? convert_short_sat_rte(dst) : (short)dst;
 
     VXC_WriteImage(output, coord_in.zy, val, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
 }
@@ -412,7 +413,7 @@ __kernel void gemm_noBias_Tensor_int16
         dst = dst > 0 ? dst : 0;
 
     dst = in_scale * dst;
-    short val = convert_short_sat_rte(dst);
+    short val = overflow_mode ? convert_short_sat_rte(dst) : (short)dst;
 
     coord    = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
     VXC_WriteImage2DArray(output, coord, val, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
