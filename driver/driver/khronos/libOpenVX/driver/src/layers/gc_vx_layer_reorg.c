@@ -542,6 +542,19 @@ exit:
     return status;
 }
 
+VX_PRIVATE_API vx_bool IsTPSupport_CheckOutPixel(vx_context context, vx_tensor inputs, vx_tensor outputs)
+{
+    vx_bool support = vx_true_e;
+    vx_uint32 outputsWidth   = TENSOR_SIZE_INDEX(outputs, 0);
+    vx_uint32 outputsHeight  = TENSOR_SIZE_INDEX(outputs, 1);
+    vx_uint32 outputsDepth   = TENSOR_SIZE_INDEX(outputs, 2);
+    vx_uint32 outputsBatch   = TENSOR_VIEW_SIZE_INDEX(outputs, 3);
+
+    support = support && ((outputsWidth * outputsHeight * outputsDepth * outputsBatch) > 1);
+
+    return support;
+}
+
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNReorgLayer_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     if (node->layer)
@@ -1777,6 +1790,8 @@ VX_PRIVATE_API vx_bool vxoNNReorgLayer2_TP_Support(vx_node node, const vx_refere
 
     support = support && (vxnneIsTPSupportFormat(node->base.context, inputs, VX_NULL, outputs) &&
         !vxmIS_ERROR(_GetTPReorgCmdType(type, &tp_cmd_type)));
+
+    support = support && IsTPSupport_CheckOutPixel(node->base.context, inputs, outputs);
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
