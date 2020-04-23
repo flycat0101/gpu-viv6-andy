@@ -53,7 +53,6 @@ vx_status vxnneExecuteSWFullyConnected(struct _vxnne_operation_s *operation)
     srcType = TENSOR_DATA_TYPE(inputs);
     dstType = TENSOR_DATA_TYPE(outputs);
     weightsType = TENSOR_DATA_TYPE(weights);
-
     vxoTensor_GetTensorViewMemory(inputs, &inputsBaseLogicalAddr, VX_NULL);
     vxoTensor_GetTensorViewMemory(outputs, &outputsBaseLogicalAddr, VX_NULL);
     vxoTensor_GetTensorViewMemory(weights, &weightsBaseLogicalAddr, VX_NULL);
@@ -94,14 +93,12 @@ vx_status vxnneExecuteSWFullyConnected(struct _vxnne_operation_s *operation)
                     {
                         inputValue  = vxnneGetDataExt((vx_type_e)srcType, TENSOR_QUANT_TYPE(inputs), j + b * inputCount, (vx_uint8_ptr)inputsBaseLogicalAddr, inputFpPos, TENSOR_TF_ZEROPOINT(inputs), TENSOR_TF_SCALE(inputs));
                         weightValue = vxnneGetDataExt((vx_type_e)weightsType, TENSOR_QUANT_TYPE(weights), inputCount * i + j, (vx_uint8_ptr)weightsBaseLogicalAddr, weightFpPos, TENSOR_TF_ZEROPOINT(weights), TENSOR_TF_SCALE(weights));
-
                         madValue += inputValue * weightValue;
                     }
                     else if((srcType == VX_TYPE_UINT8) && (weightsType == VX_TYPE_UINT8) && (biasesType == VX_TYPE_INT32 || biasesType == VX_TYPE_FLOAT32) && TENSOR_QUANT_TYPE(inputs) == VX_QUANT_AFFINE_SCALE)
                     {
                         inputValue  = vxnneGetDataQuant((vx_type_e)srcType, j + b * inputCount, (vx_uint8_ptr)inputsBaseLogicalAddr, TENSOR_TF_ZEROPOINT(inputs), TENSOR_TF_SCALE(inputs));
                         weightValue = vxnneGetDataQuant((vx_type_e)weightsType, inputCount * i + j, (vx_uint8_ptr)weightsBaseLogicalAddr, TENSOR_TF_ZEROPOINT(weights), TENSOR_TF_SCALE(weights));
-
                         madValue += inputValue * weightValue;
                     }
                     else
@@ -122,6 +119,7 @@ vx_status vxnneExecuteSWFullyConnected(struct _vxnne_operation_s *operation)
                         inputValue  = vxnneGetDataExt((vx_type_e)srcType, TENSOR_QUANT_TYPE(inputs), j + b * inputCount, (vx_uint8_ptr)inputsBaseLogicalAddr, inputFpPos, TENSOR_TF_ZEROPOINT(inputs), TENSOR_TF_SCALE(inputs));
                         weightValue = vxnneGetDataExt((vx_type_e)weightsType, TENSOR_QUANT_TYPE(weights), inputCount * i + j, (vx_uint8_ptr)weightsBaseLogicalAddr, weightFpPos, TENSOR_TF_ZEROPOINT(weights), TENSOR_TF_SCALE(weights));
 
+
                         madValue += inputValue * weightValue;
                     }
                     else if((srcType == VX_TYPE_UINT8) && (weightsType == VX_TYPE_UINT8) && (biasesType == VX_TYPE_INT32 || biasesType == VX_TYPE_FLOAT32) && TENSOR_QUANT_TYPE(inputs) == VX_QUANT_AFFINE_SCALE)
@@ -141,8 +139,11 @@ vx_status vxnneExecuteSWFullyConnected(struct _vxnne_operation_s *operation)
             }
 
             if (biases && (biasesType == VX_TYPE_FLOAT32 || biasesType == VX_TYPE_INT32 || biasesType == VX_TYPE_INT64 || biasesType == VX_TYPE_UINT8))
+
             {
+
                 biasValue = vxnneGetDataExt((vx_type_e)biasesType, TENSOR_QUANT_TYPE(biases), i, (vx_uint8_ptr)biasesBaseLogicalAddr, biasFpPos, TENSOR_TF_ZEROPOINT(biases), TENSOR_TF_SCALE(biases));
+
             }
             else if (!biases)
             {
@@ -664,7 +665,7 @@ vx_status vxoNNFullyConnectedLayerInitializer(
                                                1,
                                                weights_biases->wb_base->origWeight,
                                                weights_biases->wb_base->origBias,
-                                               0,
+                                               overflow_policy,
                                                0,
                                                enable_relu,
                                                outputs,
@@ -699,6 +700,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedReluLayer_Initializer(vx
     vx_int32                    count = 0;
     vx_status                   status = VX_SUCCESS;
     vxnne_fully_connected_relu_layer  fullyConnectReluLayer = gcvNULL;
+
+    if (overflow_policy_s)
+    {
+        overflow_policy = overflow_policy_s->value->u32;
+    }
 
     if (!vxnneIsNNSupportFormat(context, inputs, weights_biases, outputs) &&
         !vxnneIsTPSupportFormat(context, inputs, weights_biases, outputs))
@@ -831,6 +837,7 @@ VX_PRIVATE_API vx_status vxoNNFullyConnectedLayer_SW_Initialize(vxnne_layer ops_
     {
         overflow_policy_s = (vx_scalar)parameters[5];
     }
+
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
     vxmONERROR(vxnneOperation_Initialize(&fullyConnectedLayer->fully_connected_operation.base,
@@ -896,7 +903,8 @@ VX_PRIVATE_API vx_bool vxoNNFullyConnectedLayer_SH_EVIS_Support_Ext(vx_node node
         supportDataFormat2 = (vx_bool)(input_type == VX_TYPE_INT16 && weight_type == VX_TYPE_INT16
                              && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_INT32 || bias_type == VX_TYPE_INT64 || bias_type == VX_TYPE_INT16) && output_type == VX_TYPE_INT16);
         supportDataFormat3 = (vx_bool)(input_type == VX_TYPE_UINT8 && weight_type == VX_TYPE_UINT8
-                             && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_INT32 || bias_type == VX_TYPE_UINT8) && output_type != VX_TYPE_FLOAT32);
+                             && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_INT32 || bias_type == VX_TYPE_UINT8)
+                             && (output_type == VX_TYPE_UINT8 || output_type == VX_TYPE_INT16 || output_type == VX_TYPE_FLOAT16));
         support = support && (supportDataFormat0 || supportDataFormat1 || supportDataFormat2 || supportDataFormat3) && (inputDims < IMG_MAX_WIDTH);
     }
     else
@@ -940,8 +948,8 @@ VX_PRIVATE_API vx_status vxoNNFullyConnectedLayer_SH_EVIS_Initialize_Ext(vxnne_l
     vx_tensor  inputs                     = (vx_tensor)parameters[0];
     vx_tensor  weights                    = (vx_tensor)parameters[1];
     vx_tensor  biases                     = (vx_tensor)parameters[2];
+    vx_scalar  overflow_policy_s          = NULL;
     vx_tensor  outputs                    = (vx_tensor)parameters[ops_layer->node->numParameters - 1];
-
     vx_enum   input_type                  = TENSOR_DATA_TYPE(inputs);
     vx_enum   weight_type                 = TENSOR_DATA_TYPE(weights);
     vx_enum   output_type                 = TENSOR_DATA_TYPE(outputs);
@@ -950,6 +958,7 @@ VX_PRIVATE_API vx_status vxoNNFullyConnectedLayer_SH_EVIS_Initialize_Ext(vxnne_l
     vx_uint32 height                      = (dims > 1) ? TENSOR_VIEW_SIZE_INDEX(inputs, 1) : 1;
     vx_uint32 depth                       = (dims > 2) ? TENSOR_VIEW_SIZE_INDEX(inputs, 2) : 1;
     vx_uint32 inputDims                   = dims > 2 ? width * height * depth : width;
+    vx_uint32 overflow_policy             = VX_CONVERT_POLICY_SATURATE;
 
     vxnne_fully_connected_relu_layer  fullyConnectedLayer = (vxnne_fully_connected_relu_layer)ops_layer;
 
@@ -959,6 +968,20 @@ VX_PRIVATE_API vx_status vxoNNFullyConnectedLayer_SH_EVIS_Initialize_Ext(vxnne_l
     vx_tensor weights_rs = NULL;
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    if (6 == ops_layer->node->numParameters)
+    {
+        overflow_policy_s = (vx_scalar)parameters[3];
+    }
+    else if (9 == ops_layer->node->numParameters)
+    {
+        overflow_policy_s = (vx_scalar)parameters[5];
+    }
+
+    if (overflow_policy_s)
+    {
+        overflow_policy = overflow_policy_s->value->u32;
+    }
 
     if ((inputDims % 16 == 0) && input_type == VX_TYPE_UINT8 && weight_type == VX_TYPE_UINT8 && biases
         && evis == vx_false_e && (output_type  == VX_TYPE_UINT8))
@@ -982,7 +1005,7 @@ VX_PRIVATE_API vx_status vxoNNFullyConnectedLayer_SH_EVIS_Initialize_Ext(vxnne_l
     if(evis)
     {
         shaderExecutable = vxnneGetFullyConnectedShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_FULLYCONNECTED,
-            &ops_layer->node->kernelAttributes.borderMode, input_rs, weights, biases, VX_NN_ACTIVATION_NONE, outputs);
+            &ops_layer->node->kernelAttributes.borderMode, input_rs, weights, biases, VX_NN_ACTIVATION_NONE, overflow_policy, outputs);
     }
     else
     {
@@ -1009,7 +1032,10 @@ VX_PRIVATE_API vx_status vxoNNFullyConnectedLayer_SH_EVIS_Initialize_Ext(vxnne_l
 
     vxmONERROR(vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_SHoperation.base, (vx_reference)input_rs, VXNNE_OPERATION_REFENRENCE_INPUT));
     vxmONERROR(vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_SHoperation.base, (vx_reference)weights_rs, VXNNE_OPERATION_REFENRENCE_INPUT));
-    vxmONERROR(vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_SHoperation.base, (vx_reference)biases, VXNNE_OPERATION_REFENRENCE_INPUT));
+    if (biases)
+    {
+        vxmONERROR(vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_SHoperation.base, (vx_reference)biases, VXNNE_OPERATION_REFENRENCE_INPUT));
+    }
     vxmONERROR(vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_SHoperation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
 
     vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
@@ -1148,7 +1174,8 @@ OnError:
         supportDataFormat2 = (vx_bool)(input_type == VX_TYPE_INT16 && weight_type == VX_TYPE_INT16
                              && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_INT32 || bias_type == VX_TYPE_INT64 || bias_type == VX_TYPE_INT16) && output_type == VX_TYPE_INT16);
         supportDataFormat3 = (vx_bool)(input_type == VX_TYPE_UINT8 && weight_type == VX_TYPE_UINT8
-                             && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_INT32 || bias_type == VX_TYPE_UINT8) && output_type != VX_TYPE_FLOAT32);
+                             && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_INT32 || bias_type == VX_TYPE_UINT8)
+                             && (output_type == VX_TYPE_UINT8 || output_type == VX_TYPE_INT16 || output_type == VX_TYPE_FLOAT16));
         enable_shader      = (supportDataFormat0 || supportDataFormat1 || supportDataFormat2 || supportDataFormat3) && (inputDims < IMG_MAX_WIDTH);
     }
     else
@@ -1207,7 +1234,7 @@ OnError:
         if(node->base.context->evisNoInst.supportEVIS)
         {
             shaderExecutable = vxnneGetFullyConnectedShaderExecutable(node->base.context, VXNNE_KERNEL_FULLYCONNECTED,
-                &node->kernelAttributes.borderMode, input_rs, weights, biases, VX_NN_ACTIVATION_NONE, outputs);
+                &node->kernelAttributes.borderMode, input_rs, weights, biases, VX_NN_ACTIVATION_NONE, overflow_policy, outputs);
         }
         else
         {

@@ -1390,10 +1390,9 @@ vx_status vxoFCOperationSH_Initialize(
     )
 {
     vx_node node = layer->node;
-    enum vx_nn_activation_function_e activation = VX_NN_ACTIVATION_NONE;
     vxnne_shader_executable shaderExecutable;
-
-    vx_status status = VX_SUCCESS;
+    enum vx_nn_activation_function_e activation = VX_NN_ACTIVATION_NONE;
+    vx_status status                            = VX_SUCCESS;
 
     if (enable_relu)
     {
@@ -1405,7 +1404,7 @@ vx_status vxoFCOperationSH_Initialize(
     if (node->base.context->evisNoInst.supportEVIS)
     {
         shaderExecutable = vxnneGetFullyConnectedShaderExecutable(node->base.context, VXNNE_KERNEL_FULLYCONNECTED,
-                                    &node->kernelAttributes.borderMode, inputs, weights, biases, activation, outputs);
+                                    &node->kernelAttributes.borderMode, inputs, weights, biases, activation, overflow_policy, outputs);
     }
     else
     {

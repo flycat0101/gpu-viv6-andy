@@ -374,6 +374,8 @@ enum vxnne_kernel_e
     VXNNE_KERNEL_GPU_BATCH2SPACE,
     VXNNE_KERNEL_SHUFFLECHANNEL,
     VXNNE_KERNEL_GPU_SHUFFLECHANNEL,
+    VXNNE_KERNEL_TENSOREXPAND,
+    VXNNE_KERNEL_GPU_TENSOREXPAND,
     VXNNE_KERNEL_FC_TP_CHECK,
     VXNNE_KERNEL_FIXED_COUNT,
 };
@@ -1892,6 +1894,9 @@ typedef struct _vxnne_deconvolution_layer_s
 
     vxnne_convolution_relu_pooling_operation_s      convolution_operation;
 
+    vxnne_shader_operation_s                        deconvolutionTensorExpand_sh_operation;
+    vxnne_shader_operation_s                        deconvolutionTensor2Row_sh_operation;
+    vxnne_shader_operation_s                        deconvolutionGemm_sh_operation;
     vxnne_shader_operation_s                        deconvolution_sh_operation;
 
     vxnne_tp_operation_s                            upsample_tp_operation;
@@ -2889,6 +2894,7 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
     vx_tensor               weights,
     vx_tensor               bias,
     vx_int32                activation,
+    vx_uint32               overflow_policy,
     vx_tensor               output);
 vxnne_shader_executable vxnneGetTensorDivShaderExecutable(
     vx_context              context,
@@ -3345,6 +3351,15 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
     vx_int32                outputHeight,
     vx_tensor               output);
 
+vxnne_shader_executable vxnneTensorExpandShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_int32                upsample_x,
+    vx_int32                upsample_y,
+    vx_tensor               output);
+
 vxnne_shader_executable vxnneGemmShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
@@ -3354,6 +3369,9 @@ vxnne_shader_executable vxnneGemmShaderExecutable(
     vx_tensor               bias,
     vx_int32                fuseCode,
     vx_bool                 enable_2dTensor,
+    vx_bool                 is_share_bias,
+    vx_bool                 enable_adjust_biases,
+    vx_uint32               overflow_policy,
     vx_tensor               output);
 
 vxnne_shader_executable vxnneGemm_noBiasShaderExecutable(
@@ -3364,6 +3382,7 @@ vxnne_shader_executable vxnneGemm_noBiasShaderExecutable(
     vx_tensor               weight,
     vx_int32                fuseCode,
     vx_bool                 enable_2dTensor,
+    vx_uint32               overflow_policy,
     vx_tensor               output);
 
 vxnne_shader_executable vxnneL2NormSumSqrtShaderExecutable(

@@ -1421,6 +1421,234 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
     {
     case gcoNNE_DECONV_MODE_SHADER1:
         {
+            vx_uint32  inputDepth        = TENSOR_VIEW_SIZE_INDEX(inputs, 2);
+            vx_uint32  size              = out_w * out_h;
+            vx_bool    enable_2dTensor   = vx_false_e;
+            vx_bool    is_share_bias     = bias ? (1 == TENSOR_DIM_NUM(bias)) : vx_true_e;
+            vx_uint32  overflow_flag     = VX_CONVERT_POLICY_SATURATE;
+            vx_uint32  batchCount        = TENSOR_SIZE_INDEX(inputs, 3);
+            vx_uint32  sizes[]           = {1, 1, 1, 1};
+            vx_uint32  dims              = TENSOR_DIM_NUM(inputs);
+            vx_uint32  numTmpTensor      = 0;
+            vx_tensor  tensor2RowIn      = NULL;
+            vx_tensor  tensor2Row        = NULL;
+            vx_tensor  tensorexpand      = NULL;
+            vx_int32   dilation_x        = 1;
+            vx_int32   dilation_y        = 1;
+            vx_int32   strideX2          = 1;
+            vx_int32   strideY2          = 1;
+            vx_uint32  idx               = 0;
+            vx_int32   start_pad_x       = kernel_x - pad_x - 1;
+            vx_int32   start_pad_y       = kernel_y - pad_y - 1;
+            vx_bool    enable_adjust_biases = vx_false_e;
+            vxnne_shader_executable   shaderExecutable = VX_NULL;
+            vx_tensor_create_params_t tensor_expand_params;
+            vx_tensor_create_params_t tensor_create_params;
+            vx_bool    is_small_input     = vx_false_e;
+            vx_bool    is_expand_tensor   = vx_false_e;
+
+            enable_2dTensor = (vx_bool)(size < IMG_MAX_WIDTH);
+            if (bias && (2 == TENSOR_DIM_NUM(bias)))
+            {
+                if (1 == TENSOR_VIEW_SIZE_INDEX(bias, 1))
+                {
+                    is_share_bias = vx_true_e;
+                }
+            }
+
+            if (overflow_policy)
+            {
+                overflow_flag = overflow_policy->value->u32;
+            }
+
+            if (inputFormat == VX_TYPE_INT8 || inputFormat == VX_TYPE_UINT8)
+            {
+                if ((stride_w * (in_w - 1) + 1) < 16)
+                {
+                    is_small_input = vx_true_e;
+                }
+            }
+            else
+            {
+                if ((stride_w * (in_w - 1) + 1) < 8)
+                {
+                    is_small_input = vx_true_e;
+                }
+            }
+
+            if ((!((1 == stride_w) && (1 == stride_h))) || (is_small_input && (in_w < (vx_int32)kernel_x)))
+            {
+                is_expand_tensor = vx_true_e;
+                sizes[0] = stride_w * (in_w - 1) + 1;
+                sizes[1] = stride_h * (in_h - 1) + 1;
+                sizes[2] = inputDepth;
+                sizes[3] = batchCount;
+                dims = gcmMAX(2, TENSOR_DIM_NUM(outputs));
+
+                if (is_small_input && (sizes[0] < kernel_x))
+                {
+                    sizes[0] = kernel_x - 1;
+                }
+
+                gcoOS_MemFill(&tensor_expand_params, 0, sizeof(vx_tensor_create_params_t));
+                tensor_expand_params.num_of_dims = dims;
+                tensor_expand_params.sizes = sizes;
+                tensor_expand_params.data_format = TENSOR_DATA_TYPE(inputs);
+                tensor_expand_params.quant_format = TENSOR_QUANT_TYPE(inputs);
+                if (tensor_expand_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+                {
+                    tensor_expand_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(inputs);
+                }
+                else
+                {
+                    tensor_expand_params.quant_data.affine.scale = TENSOR_TF_SCALE(inputs);
+                    tensor_expand_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(inputs);
+                }
+                tensorexpand = vxoTensor_CreateTensor(node->base.context, node->graph, &tensor_expand_params, vx_true_e);
+                if (tensorexpand == VX_NULL)
+                {
+                    vxError("vxoTensor_CreateTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
+                    status = VX_ERROR_NO_MEMORY;
+                    goto exit;
+                }
+
+                shaderExecutable = vxnneTensorExpandShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOREXPAND, &node->kernelAttributes.borderMode,
+                                   inputs, stride_w, stride_h, tensorexpand);
+                if (!shaderExecutable)
+                {
+                    status = VX_FAILURE;
+                    return status;
+                }
+
+                status = vxnneShaderOperation_Initialize(&deconvolutionLayer->deconvolutionTensorExpand_sh_operation,
+                    &deconvolutionLayer->base,
+                    VXNNE_OPERATOR_DECONVOLUTION,
+                    batchCount,
+                    shaderExecutable);
+
+                vxnneLayer_SetOperation(
+                        &deconvolutionLayer->base,
+                        &deconvolutionLayer->deconvolutionTensorExpand_sh_operation.base,
+                        idx++);
+
+                vxnneOperation_AddReference(&deconvolutionLayer->deconvolutionTensorExpand_sh_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+                vxnneOperation_AddReference(&deconvolutionLayer->deconvolutionTensorExpand_sh_operation.base, (vx_reference)tensorexpand, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+            }
+
+            if (is_expand_tensor)
+            {
+                tensor2RowIn = tensorexpand;
+            }
+            else
+            {
+                tensor2RowIn = inputs;
+            }
+
+            if (enable_2dTensor)
+            {
+                sizes[0] = kernel_x * kernel_y * inputDepth;
+                sizes[1] = out_w * out_h;
+                sizes[2] = 1;
+                sizes[3] = batchCount;
+                dims = gcmMAX(2, TENSOR_DIM_NUM(outputs));
+            }
+            else
+            {
+                sizes[0] = kernel_x * kernel_y * inputDepth;
+                sizes[1] = out_w;
+                sizes[2] = out_h;
+                sizes[3] = batchCount;
+                dims = 4;
+            }
+
+            gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+            tensor_create_params.num_of_dims = dims;
+            tensor_create_params.sizes = sizes;
+            tensor_create_params.data_format = TENSOR_DATA_TYPE(inputs);
+            tensor_create_params.quant_format = TENSOR_QUANT_TYPE(inputs);
+            if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+            {
+                tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(inputs);
+            }
+            else
+            {
+                tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(inputs);
+                tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(inputs);
+            }
+            tensor2Row = vxoTensor_CreateTensor(node->base.context, node->graph, &tensor_create_params, vx_true_e);
+            if (tensor2Row == VX_NULL)
+            {
+                vxError("vxoTensor_CreateTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
+                status = VX_ERROR_NO_MEMORY;
+                goto exit;
+            }
+            shaderExecutable = vxnneTensor2RowShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR2ROW, &node->kernelAttributes.borderMode,
+                               tensor2RowIn, kernel_x, kernel_y, dilation_x, dilation_y, strideX2, strideY2, start_pad_x, start_pad_y, out_w, out_h, tensor2Row);
+            if (!shaderExecutable)
+            {
+                status = VX_FAILURE;
+                return status;
+            }
+
+            status = vxnneShaderOperation_Initialize(&deconvolutionLayer->deconvolutionTensor2Row_sh_operation,
+                &deconvolutionLayer->base,
+                VXNNE_OPERATOR_DECONVOLUTION,
+                batchCount,
+                shaderExecutable);
+
+            vxnneLayer_SetOperation(
+                    &deconvolutionLayer->base,
+                    &deconvolutionLayer->deconvolutionTensor2Row_sh_operation.base,
+                    idx++);
+
+            vxnneOperation_AddReference(&deconvolutionLayer->deconvolutionTensor2Row_sh_operation.base, (vx_reference)tensor2RowIn, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&deconvolutionLayer->deconvolutionTensor2Row_sh_operation.base, (vx_reference)tensor2Row, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
+            if (bias)
+            {
+                shaderExecutable = vxnneGemmShaderExecutable(node->base.context, VXNNE_KERNEL_GEMM, &node->kernelAttributes.borderMode,
+                tensor2Row, weights, bias, VX_NN_ACTIVATION_NONE, enable_2dTensor, is_share_bias, enable_adjust_biases, overflow_flag, outputs);
+            }
+            else
+            {
+                shaderExecutable = vxnneGemm_noBiasShaderExecutable(node->base.context, VXNNE_KERNEL_GEMM_NOBIAS, &node->kernelAttributes.borderMode,
+                tensor2Row, weights, VX_NN_ACTIVATION_NONE, enable_2dTensor, overflow_flag, outputs);
+            }
+
+            if (!shaderExecutable)
+            {
+                status = VX_FAILURE;
+                return status;
+            }
+
+            status = vxnneShaderOperation_Initialize(&deconvolutionLayer->deconvolutionGemm_sh_operation,
+                &deconvolutionLayer->base,
+                VXNNE_OPERATOR_DECONVOLUTION,
+                batchCount,
+                shaderExecutable);
+
+            if (batchCount > 1)
+            {
+                vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_NO_BATCH_BIT);
+                vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_NO_BATCH_BIT);
+            }
+
+            vxnneLayer_SetOperation(
+                &deconvolutionLayer->base,
+                &deconvolutionLayer->deconvolutionGemm_sh_operation.base,
+                idx++);
+
+            vxnneOperation_AddReference(&deconvolutionLayer->deconvolutionGemm_sh_operation.base, (vx_reference)tensor2Row, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&deconvolutionLayer->deconvolutionGemm_sh_operation.base, (vx_reference)weights, VXNNE_OPERATION_REFENRENCE_INPUT);
+            if (bias)
+            {
+                vxnneOperation_AddReference(&deconvolutionLayer->deconvolutionGemm_sh_operation.base, (vx_reference)bias, VXNNE_OPERATION_REFENRENCE_INPUT);
+            }
+            vxnneOperation_AddReference(&deconvolutionLayer->deconvolutionGemm_sh_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
+            deconvolutionLayer->base.temp_tensors[numTmpTensor++] = tensorexpand;
+            deconvolutionLayer->base.temp_tensors[numTmpTensor++] = tensor2Row;
+            deconvolutionLayer->base.num_temp_tensors             = numTmpTensor;
             break;
         }
     case gcoNNE_DECONV_MODE_SHADER:

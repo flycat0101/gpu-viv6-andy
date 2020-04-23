@@ -30,7 +30,6 @@ __kernel void gpuGemm_noBias_Quant8
     (
     image2d_array_t input,
     image2d_array_t weights,
-    image2d_array_t bias,
     int Cycles,
     float scaleIn,
     float scaleWeight,

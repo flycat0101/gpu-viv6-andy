@@ -2107,7 +2107,8 @@ VX_PRIVATE_API vx_bool vxoNNDilationConvolutionLayer_SH_EVIS_Support_Ext(vx_node
 
     vx_scalar pooling_s             = (vx_scalar)parameters[15];
     vx_scalar poolingx              = (vx_scalar)parameters[16];
-    vx_tensor outputs               = (vx_tensor)parameters[num-1];
+    vx_scalar overflowPolicyScalar  = (vx_scalar)parameters[19];
+    vx_tensor outputs               = (vx_tensor)parameters[num - 1];
 
     vx_int32 dilation_x = dilationX->value->n32 + 1;
     vx_int32 dilation_y = dilationY->value->n32 + 1;
@@ -2121,8 +2122,8 @@ VX_PRIVATE_API vx_bool vxoNNDilationConvolutionLayer_SH_EVIS_Support_Ext(vx_node
     vx_bool    has_pool          = (pooling_s == NULL && poolingx == 0) ? vx_false_e : vx_true_e;
     vx_bool    enable_2dTensor   = vx_false_e;
     vx_bool    is_share_bias     = biases ? (1 == TENSOR_DIM_NUM(biases)) : vx_true_e;
-
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+    vx_uint32    overflow_policy                = VX_CONVERT_POLICY_SATURATE;
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
@@ -2134,6 +2135,11 @@ VX_PRIVATE_API vx_bool vxoNNDilationConvolutionLayer_SH_EVIS_Support_Ext(vx_node
         {
             is_share_bias = vx_true_e;
         }
+    }
+
+    if (overflowPolicyScalar)
+    {
+        overflow_policy = overflowPolicyScalar->value->u32;
     }
 
     if (weights != NULL)
@@ -2155,7 +2161,7 @@ VX_PRIVATE_API vx_bool vxoNNDilationConvolutionLayer_SH_EVIS_Support_Ext(vx_node
             vx_int32  input_width           = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
 
             is_cross_width_read = (vx_bool)(paddingLeft > 0 && paddingRight > 0
-                                        && (input_width + paddingLeft) <= 8);
+                                        && (input_width + paddingLeft) < 8);
 
             if (biases)
             {
@@ -2170,7 +2176,6 @@ VX_PRIVATE_API vx_bool vxoNNDilationConvolutionLayer_SH_EVIS_Support_Ext(vx_node
                     || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_UINT8 && outputFormat != VX_TYPE_FLOAT32)
                     || (inputFormat == VX_TYPE_BFLOAT16 && weightFormat == VX_TYPE_BFLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_BFLOAT16));
 
-                support_type = support_type && (is_cross_width_read == vx_false_e);
             }
             else
             {
@@ -2180,7 +2185,7 @@ VX_PRIVATE_API vx_bool vxoNNDilationConvolutionLayer_SH_EVIS_Support_Ext(vx_node
                     || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
                     || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8));
             }
-
+            support_type = support_type && (is_cross_width_read == vx_false_e);
             support = (vx_bool)(convsize < IMG_MAX_WIDTH && support_type && has_pool == vx_false_e);
             enable_2dTensor = (vx_bool)(size < IMG_MAX_WIDTH && dilation_x == 1 && dilation_y == 1);
         }
@@ -2210,6 +2215,10 @@ VX_PRIVATE_API vx_bool vxoNNDilationConvolutionLayer_SH_EVIS_Support_Ext(vx_node
 
             /*enable_2dTensor = (vx_bool)(size < IMG_MAX_WIDTH && dilation_x == 1 && dilation_y == 1);*/
             support = (vx_bool)(support_type && has_pool == vx_false_e);
+            if (outputFormat == VX_TYPE_UINT8)
+            {
+                support = (vx_bool)(support && (VX_CONVERT_POLICY_SATURATE == overflow_policy));
+            }
         }
 
         if (!support)return support;
@@ -2575,11 +2584,15 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
         outputs_rs = outputs;
         if (biases)
         {
-            shaderExecutable = vxnneGemmShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GEMM, &ops_layer->node->kernelAttributes.borderMode, tensor2Row, weights_new_rs, newBiases, VX_NN_ACTIVATION_NONE, enable_2dTensor, outputs_rs);
+            shaderExecutable = vxnneGemmShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GEMM,
+            &ops_layer->node->kernelAttributes.borderMode, tensor2Row, weights_new_rs, newBiases, VX_NN_ACTIVATION_NONE,
+            enable_2dTensor, is_share_bias, enable_adjust_biases, overflow_policy, outputs_rs);
         }
         else
         {
-            shaderExecutable = vxnneGemm_noBiasShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GEMM_NOBIAS, &ops_layer->node->kernelAttributes.borderMode, tensor2Row, weights_new_rs, VX_NN_ACTIVATION_NONE, enable_2dTensor, outputs_rs);
+            shaderExecutable = vxnneGemm_noBiasShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GEMM_NOBIAS,
+            &ops_layer->node->kernelAttributes.borderMode, tensor2Row, weights_new_rs, VX_NN_ACTIVATION_NONE, enable_2dTensor,
+            overflow_policy, outputs_rs);
         }
     }
     else
@@ -2888,11 +2901,14 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
 
     vxmONERROR(vxnneOperation_AddReference(&convolutionLayer->convolutionGemm_sh_operation.base, (vx_reference)input_rs, VXNNE_OPERATION_REFENRENCE_INPUT));
     vxmONERROR(vxnneOperation_AddReference(&convolutionLayer->convolutionGemm_sh_operation.base, (vx_reference)weights_new_rs, VXNNE_OPERATION_REFENRENCE_INPUT));
-    vxmONERROR(vxnneOperation_AddReference(&convolutionLayer->convolutionGemm_sh_operation.base, (vx_reference)newBiases, VXNNE_OPERATION_REFENRENCE_INPUT));
+    if (biases)
+    {
+        vxmONERROR(vxnneOperation_AddReference(&convolutionLayer->convolutionGemm_sh_operation.base, (vx_reference)newBiases, VXNNE_OPERATION_REFENRENCE_INPUT));
+    }
     vxmONERROR(vxnneOperation_AddReference(&convolutionLayer->convolutionGemm_sh_operation.base, (vx_reference)outputs_rs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
 
     convolutionLayer->base.temp_tensors[numTmpTensor++] = tensor2Row;
-
+    convolutionLayer->base.num_temp_tensors             = numTmpTensor;
 OnError:
     vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
 
@@ -2948,8 +2964,13 @@ VX_PRIVATE_API vx_bool vxoNNDilationConvolutionLayer_NN_TP_Support(vx_node node,
     vx_tensor weights               = (vx_tensor)parameters[2];
     vx_scalar dilationX             = (vx_scalar)parameters[10];
     vx_scalar dilationY             = (vx_scalar)parameters[11];
-    vx_tensor outputs               = (vx_tensor)parameters[num-1];
+    vx_scalar stridesX              = (vx_scalar)parameters[12];
+    vx_scalar stridesY              = (vx_scalar)parameters[13];
 
+    vx_tensor outputs               = (vx_tensor)parameters[num - 1];
+
+    vx_int32 stride_x = stridesX->value->n32;
+    vx_int32 stride_y = stridesY->value->n32;
     vx_int32 dilation_x = dilationX->value->n32 + 1;
     vx_int32 dilation_y = dilationY->value->n32 + 1;
 
@@ -2966,7 +2987,8 @@ VX_PRIVATE_API vx_bool vxoNNDilationConvolutionLayer_NN_TP_Support(vx_node node,
 
     support =  (tpSupportFormat &&
         vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP) &&
-        ((dilation_x > 1) || (dilation_y > 1)));
+        ((dilation_x > 1) || (dilation_y > 1)) &&
+        (stride_x == 1) && (stride_y == 1));
 
     if (!support)return support;
 
@@ -3736,6 +3758,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
 
     vx_int32 dilation_x = dilationX->value->n32 + 1;
     vx_int32 dilation_y = dilationY->value->n32 + 1;
+    vx_int32 stride_x = stridesX->value->n32;
+    vx_int32 stride_y = stridesY->value->n32;
 
     vx_bool relu = relu_s?relu_s->value->b:vx_false_e;
 
@@ -5158,6 +5182,15 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConvolutionLayer_Initializer(vx_node n
     vx_scalar overflowPolicyScalar  = (vx_scalar)parameters[15];
     vx_tensor outputs               = (vx_tensor)parameters[17];
 
+    if (NULL == strideX || strideX->value->n32 <= 0)
+    {
+        strideX = NULL;
+    }
+
+    if (NULL == strideY || strideY->value->n32 <= 0)
+    {
+        strideY = NULL;
+    }
 
     if ((depth_multiplier != NULL) && (depth_multiplier->value->n32 > 0))
     {
