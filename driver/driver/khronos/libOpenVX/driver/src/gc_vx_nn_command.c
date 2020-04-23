@@ -633,8 +633,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
         }
 
         if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT) &&
-           (WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_INT8 && outDataFormat != VX_TYPE_FLOAT16) &&
-           !isV8)
+        ((WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_INT8 || WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_UINT8) && outDataFormat != VX_TYPE_FLOAT16) &&
+        !isV8)
         {
             tmpPostShift += 15;
         }

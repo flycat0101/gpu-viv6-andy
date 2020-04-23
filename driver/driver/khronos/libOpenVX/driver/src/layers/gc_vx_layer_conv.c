@@ -65,6 +65,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
         vx_scalar poolingX,
         vx_scalar poolingY,
         vx_scalar downScaleSizeRounding,
+        vx_scalar overflowPolicyScalar,
         vx_tensor outputs);
 #endif
 
@@ -972,7 +973,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConvolutionReluPoolingLayer2_Initializ
             (vx_reference)pad_mode_s, (vx_reference)pad_const_s, /*padmode, padconstant*/
             (vx_reference)dilation_x_s, (vx_reference)dilation_y_s, parameters[8], parameters[9], /*dilation x/y, stride x/y */
             (vx_reference)enable_relu_s, (vx_reference)pool_type_s, (vx_reference)pool_size_x_s, (vx_reference)pool_size_y_s, /*relu, pool type, x, y */
-            (vx_reference)down_scale_size_rounding_s, (vx_reference)outputs, /*rounding, output */
+            (vx_reference)down_scale_size_rounding_s, VX_NULL, (vx_reference)outputs, /*rounding, output */
         };
 
         gcmASSERT(TENSOR_SIZE_INDEX(inputs, 3) == 1);/* not support batch while dilation enabled */
@@ -988,6 +989,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConvolutionReluPoolingLayer2_Initializ
             enable_relu_s,
             pool_type_s, pool_size_x_s, pool_size_y_s,
             down_scale_size_rounding_s,
+            VX_NULL,
             outputs
             );
 #endif
@@ -1197,6 +1199,7 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
     vx_scalar strideY               = convolutionOperation->strideY;
     vx_scalar relu                  = convolutionOperation->relu;
     vx_scalar downScaleSizeRounding = convolutionOperation->downScaleSizeRounding;
+    vx_scalar overflowPolicy        = convolutionOperation->overflowPolicy;
     vx_tensor outputs               = convolutionOperation->outputs;
 
     vx_int32 batch = 1;
@@ -1205,7 +1208,7 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
 
     void *weightsBaseLogical = VX_NULL;
     void *biasesBaseLogical = VX_NULL;
-
+    vx_bool    is_share_bias     = biases ? (1 == TENSOR_DIM_NUM(biases)) : vx_true_e;
     vx_int32 inputWidth, inputHeight, inputDepth, outputWidth, outputHeight, outputDepth;
     vx_int32 kernelXSize, kernelYSize, stride_x, stride_y;
     vx_int32 k, p, j, i;
@@ -1219,6 +1222,7 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
     vx_type_e outputFormat;
 
     vx_enum downScaleSizeRoundingValue = downScaleSizeRounding->value->e;
+    vx_enum overflow  = overflowPolicy? overflowPolicy->value->u32: VX_CONVERT_POLICY_SATURATE;
     vx_uint32 padXLeft;
     vx_uint32 padXRight;
     vx_uint32 padYTop;
@@ -1267,6 +1271,14 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
 
     kernelXSize = TENSOR_VIEW_SIZE_INDEX(weights, 0);
     kernelYSize = TENSOR_VIEW_SIZE_INDEX(weights, 1);
+
+    if (biases && (2 == TENSOR_DIM_NUM(biases)))
+    {
+        if (1 == TENSOR_VIEW_SIZE_INDEX(biases, 1))
+        {
+            is_share_bias = vx_true_e;
+        }
+    }
 
     if (strideX != VX_NULL && strideY != VX_NULL)
     {
@@ -1349,12 +1361,12 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
                     kernelXStart = wStart < 0 ? (gcmALIGN_NP2_SAFE(-wStart, dilation_x)/dilation_x) : 0;
 
                     if (hStart < 0 && dilation_y > 1)
-                        hStart = gcmMAX(hStart, (j * stride_y)%dilation_y);
+                        hStart = gcmMAX(hStart + dilation_y, (j * stride_y)%dilation_y);
                     else
                         hStart = gcmMAX(hStart, 0);
 
                     if (wStart < 0 && dilation_x > 1)
-                        wStart = gcmMAX(wStart, (i * stride_x)%dilation_x);
+                        wStart = gcmMAX(wStart + dilation_x, (i * stride_x)%dilation_x);
                     else
                         wStart = gcmMAX(wStart, 0);
 
@@ -1406,7 +1418,10 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
                         }
                     }
 
-                    indexBias = p;
+                    if(is_share_bias)
+                        indexBias = p;
+                    else
+                        indexBias = indexOut;
 #if QUANT8_SUPPORT
                     if (biasFormat == VX_TYPE_FLOAT32 || biasFormat == VX_TYPE_INT32 || biasFormat == VX_TYPE_FLOAT16)
                     {
@@ -1462,7 +1477,10 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
 
                     if (relu)
                         sum = vxnneActivation(relu->value->e, 0, 0, sum);
-
+                    if (overflow == VX_CONVERT_POLICY_WRAP && biasFormat == VX_TYPE_UINT8)
+                    {
+                        sum = (vx_float32)vxnneWarp(sum, outputFormat);
+                    }
                     vxnneSaveDataExt(outputFormat, TENSOR_QUANT_TYPE(outputs), indexOut, sum, dataDst, TENSOR_POS(outputs), TENSOR_TF_ZEROPOINT(outputs), TENSOR_TF_SCALE(outputs), TENSOR_ROUNDING_MODE(outputs));
 #endif
                 }
@@ -2010,12 +2028,14 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SW_Initialize(vxnne_layer
     vx_scalar padYBottom            = (vx_scalar)parameters[7];
     vx_scalar dilationX             = (vx_scalar)parameters[10];
     vx_scalar dilationY             = (vx_scalar)parameters[11];
-
+    vx_scalar stridesX              = (vx_scalar)parameters[12];
+    vx_scalar stridesY              = (vx_scalar)parameters[13];
     vx_scalar relu_s                = (vx_scalar)parameters[14];
     vx_scalar pooling_s             = (vx_scalar)parameters[15];
 
     vx_scalar downScaleSizeRounding = (vx_scalar)parameters[18];
-    vx_tensor outputs               = (vx_tensor)parameters[19];
+    vx_scalar overflowPolicy        = (vx_scalar)parameters[19];
+    vx_tensor outputs               = (vx_tensor)parameters[num - 1];
 
     vxnne_convolution_layer  convolutionLayer = (vxnne_convolution_layer)ops_layer;
 
@@ -2056,12 +2076,18 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SW_Initialize(vxnne_layer
     convolutionLayer->convolutionSW.padYBottom            = padYBottom;
     convolutionLayer->convolutionSW.dilationX             = dilationX;
     convolutionLayer->convolutionSW.dilationY             = dilationY;
+    convolutionLayer->convolutionSW.strideX               = stridesX;
+    convolutionLayer->convolutionSW.strideY               = stridesY;
     convolutionLayer->convolutionSW.downScaleSizeRounding = downScaleSizeRounding;
+    convolutionLayer->convolutionSW.overflowPolicy        = overflowPolicy;
     convolutionLayer->convolutionSW.outputs               = outputs;
 
     vxmONERROR(vxnneOperation_AddReference(&convolutionLayer->convolutionSW.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT));
     vxmONERROR(vxnneOperation_AddReference(&convolutionLayer->convolutionSW.base, (vx_reference)weights, VXNNE_OPERATION_REFENRENCE_INPUT));
-    vxmONERROR(vxnneOperation_AddReference(&convolutionLayer->convolutionSW.base, (vx_reference)biases, VXNNE_OPERATION_REFENRENCE_INPUT));
+    if (biases)
+    {
+        vxmONERROR(vxnneOperation_AddReference(&convolutionLayer->convolutionSW.base, (vx_reference)biases, VXNNE_OPERATION_REFENRENCE_INPUT));
+    }
     vxmONERROR(vxnneOperation_AddReference(&convolutionLayer->convolutionSW.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
 OnError:
     vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
@@ -2081,7 +2107,7 @@ VX_PRIVATE_API vx_bool vxoNNDilationConvolutionLayer_SH_EVIS_Support_Ext(vx_node
 
     vx_scalar pooling_s             = (vx_scalar)parameters[15];
     vx_scalar poolingx              = (vx_scalar)parameters[16];
-    vx_tensor outputs               = (vx_tensor)parameters[19];
+    vx_tensor outputs               = (vx_tensor)parameters[num-1];
 
     vx_int32 dilation_x = dilationX->value->n32 + 1;
     vx_int32 dilation_y = dilationY->value->n32 + 1;
@@ -2094,12 +2120,21 @@ VX_PRIVATE_API vx_bool vxoNNDilationConvolutionLayer_SH_EVIS_Support_Ext(vx_node
     //vx_bool    enable_shader     = vx_false_e;
     vx_bool    has_pool          = (pooling_s == NULL && poolingx == 0) ? vx_false_e : vx_true_e;
     vx_bool    enable_2dTensor   = vx_false_e;
+    vx_bool    is_share_bias     = biases ? (1 == TENSOR_DIM_NUM(biases)) : vx_true_e;
 
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
     if (!support)return support;
+
+    if (biases && (2 == TENSOR_DIM_NUM(biases)))
+    {
+        if (1 == TENSOR_VIEW_SIZE_INDEX(biases, 1))
+        {
+            is_share_bias = vx_true_e;
+        }
+    }
 
     if (weights != NULL)
     {
@@ -2162,6 +2197,7 @@ VX_PRIVATE_API vx_bool vxoNNDilationConvolutionLayer_SH_EVIS_Support_Ext(vx_node
                     || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16  && biasFormat == VX_TYPE_INT64 && outputFormat == VX_TYPE_INT16)
                     || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_UINT8)
                     || (inputFormat == VX_TYPE_BFLOAT16 && weightFormat == VX_TYPE_BFLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_BFLOAT16));
+                support_type    = (vx_bool)(support_type && is_share_bias);
             }
             else
             {
@@ -2232,7 +2268,8 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
     vx_scalar stridesY              = (vx_scalar)parameters[13];
 
     vx_scalar downScaleSizeRounding = (vx_scalar)parameters[18];
-    vx_tensor outputs               = (vx_tensor)parameters[19];
+    vx_scalar overflowPolicyScalar  = (vx_scalar)parameters[19];
+    vx_tensor outputs               = (vx_tensor)parameters[num - 1];
 
     vx_uint32 batchCount = TENSOR_SIZE_INDEX(inputs, 3);
 
@@ -2240,7 +2277,7 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
     vx_int32 dilation_y = dilationY->value->n32 + 1;
 
     vx_bool    enable_2dTensor   = GETBIT(reg_param->flag, 0);
-
+    vx_bool    is_share_bias     = biases ? (1 == TENSOR_DIM_NUM(biases)) : vx_true_e;
     vx_context context = vxGetContext((vx_reference)inputs);
     vx_uint32 idx = 0;
     vx_uint32 numTmpTensor = 0;
@@ -2265,8 +2302,8 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
     vx_int32  outputDepth   = TENSOR_VIEW_SIZE_INDEX(outputs, 2);
     vx_uint32 input_size    = k_w * k_h * inputDepth;
     /* Calculate stride     = (w + padXLeft + padXRight - weight)/(output_w - 1) */
-    vx_int32  strideX       = (stridesX != VX_NULL) ? (stridesX->value->n32) : (vxoNNExternsionConvlutionRound((vx_float32)(inputWidth + paddingLeft + paddingRight - k_w) / (outputWidth - 1), downScaleSizeRoundingValue));
-    vx_int32  strideY       = (stridesY != VX_NULL) ? (stridesY->value->n32) : (vxoNNExternsionConvlutionRound((vx_float32)(inputHeight + paddingTop + paddingBottom - k_h) / (outputHeight - 1), downScaleSizeRoundingValue));
+    vx_int32  strideX       = 1;
+    vx_int32  strideY       = 1;
     vx_bool   enableAlign4  = vx_false_e;
     vx_bool   enableAlign16  = vx_false_e;
     vxnne_shader_executable shaderExecutable = VX_NULL;
@@ -2279,8 +2316,54 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
     vx_bool      enable_adjust_biases           = vx_false_e;
     vx_bool      enable_conv2d_1x1              = vx_false_e;
     vx_bool      is_conv_3x3_s2                 = vx_false_e;
+    vx_uint32    overflow_policy                = VX_CONVERT_POLICY_SATURATE;
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    if (biases && (2 == TENSOR_DIM_NUM(biases)))
+    {
+        if (1 == TENSOR_VIEW_SIZE_INDEX(biases, 1))
+        {
+            is_share_bias = vx_true_e;
+        }
+    }
+
+    if (stridesX)
+    {
+        strideX = stridesX->value->n32;
+    }
+    else
+    {
+        if (1 == outputWidth)
+        {
+            strideX = 1;
+        }
+        else
+        {
+            strideX = vxoNNExternsionConvlutionRound((vx_float32)(inputWidth + paddingLeft + paddingRight - k_w) / (outputWidth - 1), downScaleSizeRoundingValue);
+        }
+    }
+
+    if (stridesY)
+    {
+        strideY = stridesY->value->n32;
+    }
+    else
+    {
+        if (1 == outputHeight)
+        {
+            strideY = 1;
+        }
+        else
+        {
+            strideY = vxoNNExternsionConvlutionRound((vx_float32)(inputHeight + paddingTop + paddingBottom - k_h) / (outputHeight - 1), downScaleSizeRoundingValue);
+        }
+    }
+
+    if (overflowPolicyScalar)
+    {
+        overflow_policy = overflowPolicyScalar->value->u32;
+    }
 
     // step 1, tensor to row
     if (enable_2dTensor)
@@ -2865,7 +2948,7 @@ VX_PRIVATE_API vx_bool vxoNNDilationConvolutionLayer_NN_TP_Support(vx_node node,
     vx_tensor weights               = (vx_tensor)parameters[2];
     vx_scalar dilationX             = (vx_scalar)parameters[10];
     vx_scalar dilationY             = (vx_scalar)parameters[11];
-    vx_tensor outputs               = (vx_tensor)parameters[19];
+    vx_tensor outputs               = (vx_tensor)parameters[num-1];
 
     vx_int32 dilation_x = dilationX->value->n32 + 1;
     vx_int32 dilation_y = dilationY->value->n32 + 1;
@@ -2921,7 +3004,7 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_NN_TP_Initialize(vxnne_la
     vx_scalar poolingX              = (vx_scalar)parameters[16];
     vx_scalar poolingY              = (vx_scalar)parameters[17];
 
-    vx_tensor outputs               = (vx_tensor)parameters[19];
+    vx_tensor outputs               = (vx_tensor)parameters[num-1];
 
     vx_uint32 batchCount = TENSOR_SIZE_INDEX(inputs, 3);
 
@@ -3640,6 +3723,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
         vx_scalar poolingX,
         vx_scalar poolingY,
         vx_scalar downScaleSizeRounding,
+        vx_scalar overflowPolicyScalar,
         vx_tensor outputs)
 {
     vx_status status = VX_SUCCESS;
@@ -3671,7 +3755,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
     vx_bool   tpSupportFormat    = vx_false_e;
     vx_uint32 idx = 0;
     vx_uint32 numTmpTensor = 0;
+    vx_uint32 overflow_policy    = VX_CONVERT_POLICY_SATURATE;
 
+    if (overflowPolicyScalar)
+    {
+        overflow_policy = overflowPolicyScalar->value->u32;
+    }
     if (weights != NULL)
     {
         vx_uint32 kernel_x            = TENSOR_VIEW_SIZE_INDEX(weights, 0);
@@ -5066,7 +5155,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConvolutionLayer_Initializer(vx_node n
     vx_scalar strideY               = (vx_scalar)parameters[12];
     vx_scalar depth_multiplier      = (vx_scalar)parameters[13];
     vx_scalar downScaleSizeRounding = (vx_scalar)parameters[14];
+    vx_scalar overflowPolicyScalar  = (vx_scalar)parameters[15];
     vx_tensor outputs               = (vx_tensor)parameters[17];
+
 
     if ((depth_multiplier != NULL) && (depth_multiplier->value->n32 > 0))
     {
@@ -5092,7 +5183,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConvolutionLayer_Initializer(vx_node n
             (vx_reference)vxCreateScalar(node->base.context, VX_TYPE_ENUM, &padmode), VX_NULL, /*padmode, padconstant*/
             (vx_reference)dilationX, (vx_reference)dilationY, (vx_reference)strideX, (vx_reference)strideY, /*dilation x/y, stride x/y */
             VX_NULL, VX_NULL, VX_NULL, VX_NULL, /*relu, pool type, x, y */
-            (vx_reference)downScaleSizeRounding, (vx_reference)outputs, /*rounding, output */
+            (vx_reference)downScaleSizeRounding, (vx_reference)overflowPolicyScalar, (vx_reference)outputs, /*rounding, output */
         };
 
         status = vxoNNDilationConvolutionLayerInitializer_Ext(node, params, gcmCOUNTOF(params));
@@ -5111,6 +5202,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConvolutionLayer_Initializer(vx_node n
             VX_NULL,
             VX_NULL, VX_NULL, VX_NULL,
             downScaleSizeRounding,
+            overflowPolicyScalar,
             outputs);
 #endif
     }

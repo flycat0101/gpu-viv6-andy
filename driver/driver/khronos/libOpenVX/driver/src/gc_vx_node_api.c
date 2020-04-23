@@ -3608,7 +3608,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxROIPoolingLayer(
         graph, input_data, input_rois, roi_pool_params, size_of_roi_params, output_arr);
 
 
-    if (size_of_roi_params != sizeof(vx_nn_roi_pool_params_ext_t))
+    if (size_of_roi_params != sizeof(vx_nn_roi_pool_params_ext_t) && size_of_roi_params != sizeof(vx_nn_roi_pool_params_t))
     {
         gcmFOOTER_NO();
         return VX_NULL;
@@ -3633,25 +3633,40 @@ VX_API_ENTRY vx_node VX_API_CALL vxROIPoolingLayer(
         vx_scalar spatial_scales = NULL;
         vx_scalar pooled_heights = NULL;
         vx_scalar pooled_widths = NULL;
+        vx_size pool_type, pool_height, pool_width;
+        vx_float32 spatial_scale;
 
-        vx_nn_roi_pool_params_ext_t * roi_pool_params_ext = (vx_nn_roi_pool_params_ext_t *)roi_pool_params;
-
-        pool_types = vxCreateScalar(context, VX_TYPE_ENUM, &roi_pool_params_ext->khr.pool_type);
+        if (size_of_roi_params == sizeof(vx_nn_roi_pool_params_t))
+        {
+            pool_type = roi_pool_params->pool_type;
+            spatial_scale = 1.0;
+            pool_height = output_arr->dims[1];
+            pool_width = output_arr->dims[0];
+        }
+        else
+        {
+            vx_nn_roi_pool_params_ext_t * roi_pool_params_ext = (vx_nn_roi_pool_params_ext_t *)roi_pool_params;
+            pool_type = roi_pool_params_ext->khr.pool_type;
+            spatial_scale = roi_pool_params_ext->spatial_scale;
+            pool_height = roi_pool_params_ext->pooled_height;
+            pool_width = roi_pool_params_ext->pooled_width;
+        }
+        pool_types = vxCreateScalar(context, VX_TYPE_ENUM, &pool_type);
         if (vxoReference_GetStatus((vx_reference)pool_types) != VX_SUCCESS) {
             gcmFOOTER_NO();
             return (vx_node)pool_types;
         }
-        spatial_scales = vxCreateScalar(context, VX_TYPE_FLOAT32, &roi_pool_params_ext->spatial_scale);
+        spatial_scales = vxCreateScalar(context, VX_TYPE_FLOAT32, &spatial_scale);
         if (vxoReference_GetStatus((vx_reference)spatial_scales) != VX_SUCCESS) {
             gcmFOOTER_NO();
             return (vx_node)spatial_scales;
         }
-        pooled_heights = vxCreateScalar(context, VX_TYPE_INT32, &roi_pool_params_ext->pooled_height);
+        pooled_heights = vxCreateScalar(context, VX_TYPE_INT32, &pool_height);
         if (vxoReference_GetStatus((vx_reference)pooled_heights) != VX_SUCCESS) {
             gcmFOOTER_NO();
             return (vx_node)pooled_heights;
         }
-        pooled_widths = vxCreateScalar(context, VX_TYPE_INT32, &roi_pool_params_ext->pooled_width);
+        pooled_widths = vxCreateScalar(context, VX_TYPE_INT32, &pool_width);
         if (vxoReference_GetStatus((vx_reference)pooled_widths) != VX_SUCCESS) {
             gcmFOOTER_NO();
             return (vx_node)pooled_widths;
@@ -3795,6 +3810,18 @@ VX_API_ENTRY vx_node VX_API_CALL vxDeconvolutionLayer(
         stride_x = deconvolution_params_ext2->stride_x;
         stride_y = deconvolution_params_ext2->stride_y;
         down_scale_size_rounding = deconvolution_params_ext2->down_scale_size_rounding;
+    }
+    else if (size_of_deconv_params == sizeof(vx_nn_deconvolution_params_t))
+    {
+        pad_x = deconvolution_params->padding_x;
+        pad_x_right = deconvolution_params->padding_x;
+        pad_y = deconvolution_params->padding_y;
+        pad_y_bottom = deconvolution_params->padding_y;
+        overflow_policy = deconvolution_params->overflow_policy;
+        rounding_policy = deconvolution_params->rounding_policy;
+        a_x = deconvolution_params->a_x;
+        a_y = deconvolution_params->a_y;
+        channel_group = 1;
     }
     else
     {
