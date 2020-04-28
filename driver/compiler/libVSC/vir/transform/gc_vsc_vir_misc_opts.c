@@ -966,6 +966,7 @@ VSC_ErrCode vscVIR_CheckCstRegFileReadPortLimitation(VSC_SH_PASS_WORKER* pPassWo
         VIR_InstIterator inst_iter;
         VIR_Instruction* inst;
         VIR_OpCode       opCode;
+
         CFG_ITERATOR_INIT(&cfgIter, &func->pFuncBlock->cfg);
         for (pBB = CFG_ITERATOR_FIRST(&cfgIter); pBB != gcvNULL;
              pBB = CFG_ITERATOR_NEXT(&cfgIter))
@@ -1000,6 +1001,10 @@ VSC_ErrCode vscVIR_CheckCstRegFileReadPortLimitation(VSC_SH_PASS_WORKER* pPassWo
 
                     for (j = 0; j < VIR_Inst_GetSrcNum(inst); ++j)
                     {
+                        VIR_Precision       precision;
+                        VIR_TypeId          newTempRegTypeId, symTypeId;
+                        gctBOOL             bUseSymType = gcvTRUE;
+
                         opnd = VIR_Inst_GetSource(inst, j);
 
                         pUniform = gcvNULL;
@@ -1009,211 +1014,241 @@ VSC_ErrCode vscVIR_CheckCstRegFileReadPortLimitation(VSC_SH_PASS_WORKER* pPassWo
                             pUniform = VIR_Symbol_GetUniformPointer(pShader, pSym);
                         }
 
-                        if (pUniform)
+                        if (pUniform == gcvNULL)
                         {
-                            bHitReadPortLimitation = gcvFALSE;
+                            continue;
+                        }
 
-                            thisConstRegNo = pUniform->physical +
-                                             VIR_Operand_GetMatrixConstIndex(opnd) +
-                                             ((VIR_Operand_GetRelAddrMode(opnd) == VIR_INDEXED_NONE) ?
-                                              VIR_Operand_GetRelIndexing(opnd) : 0);
+                        bHitReadPortLimitation = gcvFALSE;
 
-                            /* Check whether shader hits the limitation that HW does not support two read port on reg file. */
-                            if (firstConstRegNo == NOT_ASSIGNED)
+                        thisConstRegNo = pUniform->physical +
+                                            VIR_Operand_GetMatrixConstIndex(opnd) +
+                                            ((VIR_Operand_GetRelAddrMode(opnd) == VIR_INDEXED_NONE) ?
+                                            VIR_Operand_GetRelIndexing(opnd) : 0);
+
+                        /* Check whether shader hits the limitation that HW does not support two read port on reg file. */
+                        if (firstConstRegNo == NOT_ASSIGNED)
+                        {
+                            firstOpnd = opnd;
+                            firstSym  = pSym;
+                            firstConstRegNo = thisConstRegNo;
+                            bFirstConstRegIndexing = (VIR_Operand_GetRelAddrMode(opnd) != VIR_INDEXED_NONE);
+                        }
+                        else
+                        {
+                            if (!bFirstConstRegIndexing && VIR_Operand_GetRelAddrMode(opnd) == VIR_INDEXED_NONE)
                             {
-                                firstOpnd = opnd;
-                                firstSym  = pSym;
-                                firstConstRegNo = thisConstRegNo;
-                                bFirstConstRegIndexing = (VIR_Operand_GetRelAddrMode(opnd) != VIR_INDEXED_NONE);
-                            }
-                            else
-                            {
-                                if (!bFirstConstRegIndexing && VIR_Operand_GetRelAddrMode(opnd) == VIR_INDEXED_NONE)
-                                {
-                                    if (firstConstRegNo != thisConstRegNo)
-                                    {
-                                        bHitReadPortLimitation = gcvTRUE;
-                                    }
-                                }
-                                else if (bFirstConstRegIndexing || VIR_Operand_GetRelAddrMode(opnd) != VIR_INDEXED_NONE)
+                                if (firstConstRegNo != thisConstRegNo)
                                 {
                                     bHitReadPortLimitation = gcvTRUE;
                                 }
                             }
-
-                            if (bHitReadPortLimitation)
+                            else if (bFirstConstRegIndexing || VIR_Operand_GetRelAddrMode(opnd) != VIR_INDEXED_NONE)
                             {
-                                VIR_Precision precision;
-                                VIR_TypeId newTempRegTypeId;
-
-                                /* decide which operand to replace, do not replace image uniform, 512 bit uniform */
-                                if (VIR_Symbol_GetKind(pSym) == VIR_SYM_IMAGE ||
-                                    VIR_Symbol_GetKind(pSym) == VIR_SYM_IMAGE_T ||
-                                    (VIR_OPCODE_U512_SrcNo(VIR_Inst_GetOpcode(inst)) > 0 &&
-                                    VIR_OPCODE_U512_SrcNo(VIR_Inst_GetOpcode(inst)) == (gctINT)j) )
-                                {
-                                    VIR_Operand * tmpOpnd = opnd;
-                                    VIR_Symbol *  tmpSym  = pSym;
-
-                                    /* swap current opnd/sym with firstOpnd/firstSym */
-                                    gcmASSERT(firstOpnd != gcvNULL);
-                                    opnd = firstOpnd;
-                                    pSym = firstSym;
-                                    firstOpnd = tmpOpnd;
-                                    firstSym = tmpSym;
-                                }
-                                gcmASSERT(pSym);
-                                pNewInsertedInst = gcvNULL;
-                                newDstSymId = 0;
-                                newDstRegNo = 0;
-                                precision = VIR_Operand_GetPrecision(opnd);
-                                /* if the symbol has the corresponding defInst and the operand has no indexing and relmode,
-                                 * use the dest symbol of the defInst in opnd to reduce a MOV instruction
-                                 */
-                                if (vscHTBL_DirectTestAndGet(replacedUniformSet, (void*)pSym, (void**)&pNewInsertedInst))
-                                {
-                                    VIR_Operand *dest = VIR_Inst_GetDest(pNewInsertedInst);
-
-                                    pNewSym = VIR_Operand_GetSymbol(dest);
-                                    gcmASSERT(pNewSym && VIR_Symbol_GetKind(pNewSym) == VIR_SYM_VIRREG);
-
-                                    newTempRegTypeId = VIR_Symbol_GetTypeId(pNewSym);
-
-                                    if (VIR_Operand_GetPrecision(opnd) == VIR_Symbol_GetPrecision(pNewSym) &&
-                                        (!VIR_Operand_GetIsConstIndexing(opnd)) &&
-                                        (!VIR_Operand_GetMatrixConstIndex(opnd)) &&
-                                        (VIR_Operand_GetRelAddrMode(opnd) == VIR_INDEXED_NONE) &&
-                                        /* In case the inserted MOV instruction is not cover this channel, insert a new one. */
-                                        (VIR_GetTypeComponents(newTempRegTypeId) >= _GetCompCountFromEnable(VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(opnd)))))
-                                    {
-                                        newDstSymId = VIR_Symbol_GetIndex(pNewSym);
-                                        newDstRegNo = VIR_Symbol_GetVregIndex(pNewSym);
-                                    }
-                                    else
-                                    {
-                                        pNewInsertedInst = gcvNULL;
-                                    }
-                                }
-                                if (pNewInsertedInst == gcvNULL)
-                                {
-                                    /* Try to use the uniform type first so we can cover all channels. */
-                                    if (VIR_TypeId_isPrimitive(VIR_Symbol_GetTypeId(pSym)))
-                                    {
-                                        newTempRegTypeId = VIR_Symbol_GetTypeId(pSym);
-                                    }
-                                    else
-                                    {
-                                        pType = VIR_Symbol_GetType(pSym);
-                                        if (VIR_Type_isArray(pType))
-                                        {
-                                            while (VIR_Type_isArray(pType))
-                                            {
-                                                pType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(pType));
-                                            }
-                                            if (VIR_Type_isPrimitive(pType))
-                                            {
-                                                newTempRegTypeId = VIR_Type_GetIndex(pType);
-                                            }
-                                            else
-                                            {
-                                                newTempRegTypeId = VIR_Operand_GetTypeId(opnd);
-                                            }
-                                        }
-                                        else
-                                        {
-                                            newTempRegTypeId = VIR_Operand_GetTypeId(opnd);
-                                        }
-                                    }
-
-                                    /* make new created symbol type consistent with src's swizzle channel
-                                     * if newTempRegTypeId is float32 computed by operand type while .w is used like following inst
-                                     * MUL                hp temp(3).hp.w, hp  uColor.hp.w, hp  uTexCombScale[2].hp.w
-                                     * extend newTempRegTypeId to be float32_x3
-                                     */
-                                    if (VIR_GetTypeComponents(newTempRegTypeId) < _GetCompCountFromEnable(VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(opnd))))
-                                    {
-                                        VIR_TypeId componentTypeId = VIR_GetTypeComponentType(newTempRegTypeId);
-                                        newTempRegTypeId = VIR_TypeId_ComposeNonOpaqueType(componentTypeId,
-                                                                                           _GetCompCountFromEnable(VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(opnd))),
-                                                                                           1);
-                                    }
-                                    precision = VIR_Operand_GetPrecision(opnd);
-
-                                    /* Add a new-temp-reg number */
-                                    newDstRegNo = VIR_Shader_NewVirRegId(pShader, 1);
-
-                                    errCode = VIR_Shader_AddSymbol(pShader,
-                                                                   VIR_SYM_VIRREG,
-                                                                   newDstRegNo,
-                                                                   VIR_Shader_GetTypeFromId(pShader, newTempRegTypeId),
-                                                                   VIR_STORAGE_UNKNOWN,
-                                                                   &newDstSymId);
-                                    ON_ERROR(errCode, "Add symbol");
-                                    pNewSym = VIR_Shader_GetSymFromId(pShader, newDstSymId);
-
-                                    /* Add following inst just before current inst:
-
-                                        mov new-temp-reg, uniform
-                                    */
-                                    errCode = VIR_Function_AddInstructionBefore(func, VIR_OP_MOV, newTempRegTypeId, inst, gcvTRUE, &pNewInsertedInst);
-                                    ON_ERROR(errCode, "Add instruction before");
-
-                                    /* dst */
-                                    newOpnd = VIR_Inst_GetDest(pNewInsertedInst);
-                                    VIR_Operand_SetSymbol(newOpnd, func, newDstSymId);
-                                    VIR_Operand_SetEnable(newOpnd, VIR_TypeId_Conv2Enable(newTempRegTypeId));
-                                    VIR_Symbol_SetPrecision(pNewSym, precision);
-                                    VIR_Operand_SetPrecision(newOpnd, precision);
-                                    if(precision == VIR_PRECISION_HIGH)
-                                    {
-                                        VIR_Inst_SetThreadMode(pNewInsertedInst, VIR_THREAD_D16_DUAL_32);
-                                    }
-
-                                    /* src */
-                                    newOpnd = VIR_Inst_GetSource(pNewInsertedInst, VIR_Operand_Src0);
-                                    VIR_Operand_SetSymbol(newOpnd, func, pSym->index);
-                                    VIR_Operand_SetSwizzle(newOpnd, VIR_TypeId_Conv2Swizzle(newTempRegTypeId));
-                                    VIR_Operand_SetTypeId(newOpnd, newTempRegTypeId);
-                                    VIR_Operand_SetPrecision(newOpnd, VIR_Operand_GetPrecision(opnd));
-                                    VIR_Operand_SetMatrixConstIndex(newOpnd, VIR_Operand_GetMatrixConstIndex(opnd));
-                                    VIR_Operand_SetIsConstIndexing(newOpnd, VIR_Operand_GetIsConstIndexing(opnd));
-                                    VIR_Operand_SetRelAddrMode(newOpnd, VIR_Operand_GetRelAddrMode(opnd));
-                                    if (VIR_Operand_GetIsConstIndexing(opnd))
-                                    {
-                                        VIR_Operand_SetRelIndexingImmed(newOpnd, VIR_Operand_GetRelIndexing(opnd));
-                                    }
-                                    else
-                                    {
-                                        VIR_Operand_SetRelIndexing(newOpnd, VIR_Operand_GetRelIndexing(opnd));
-                                    }
-                                    if ((!VIR_Operand_GetIsConstIndexing(opnd)) &&
-                                        (!VIR_Operand_GetMatrixConstIndex(opnd)) &&
-                                        (VIR_Operand_GetRelAddrMode(opnd) == VIR_INDEXED_NONE))
-                                    {
-                                        vscHTBL_DirectSet(replacedUniformSet, (void*)pSym, (void*)pNewInsertedInst);
-                                    }
-                                }
-                                /* Change operand of current inst to new-temp-reg */
-                                VIR_Operand_SetMatrixConstIndex(opnd, 0);
-                                VIR_Operand_SetRelAddrMode(opnd, VIR_INDEXED_NONE);
-                                VIR_Operand_SetRelIndexing(opnd, 0);
-                                VIR_Operand_SetTempRegister(opnd, func, newDstSymId, VIR_Operand_GetTypeId(opnd));
-                                if (precision == VIR_PRECISION_HIGH)
-                                {
-                                    VIR_Inst_SetThreadMode(inst, VIR_THREAD_D16_DUAL_32);
-                                }
-
-                                vscVIR_AddNewDef(pDuInfo, pNewInsertedInst, newDstRegNo, 1, VIR_ENABLE_XYZW, VIR_HALF_CHANNEL_MASK_FULL,
-                                                 gcvNULL, gcvNULL);
-
-                                vscVIR_AddNewUsageToDef(pDuInfo, pNewInsertedInst, inst, opnd,
-                                                        gcvFALSE, newDstRegNo, 1, VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(opnd)),
-                                                        VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
-
-                                /* Change happens. */
-                                bChanged = gcvTRUE;
+                                bHitReadPortLimitation = gcvTRUE;
                             }
                         }
+
+                        if (!bHitReadPortLimitation)
+                        {
+                            continue;
+                        }
+
+                        /* decide which operand to replace, do not replace image uniform, 512 bit uniform */
+                        if (VIR_Symbol_GetKind(pSym) == VIR_SYM_IMAGE ||
+                            VIR_Symbol_GetKind(pSym) == VIR_SYM_IMAGE_T ||
+                            (VIR_OPCODE_U512_SrcNo(VIR_Inst_GetOpcode(inst)) > 0 &&
+                            VIR_OPCODE_U512_SrcNo(VIR_Inst_GetOpcode(inst)) == (gctINT)j) )
+                        {
+                            VIR_Operand * tmpOpnd = opnd;
+                            VIR_Symbol *  tmpSym  = pSym;
+
+                            /* swap current opnd/sym with firstOpnd/firstSym */
+                            gcmASSERT(firstOpnd != gcvNULL);
+                            opnd = firstOpnd;
+                            pSym = firstSym;
+                            firstOpnd = tmpOpnd;
+                            firstSym = tmpSym;
+                        }
+
+                        gcmASSERT(pSym);
+                        pNewInsertedInst = gcvNULL;
+                        newDstSymId = 0;
+                        newDstRegNo = 0;
+                        precision = VIR_Operand_GetPrecision(opnd);
+
+                        /* For a virtual uniform of UBO, the type is always UINT_X4, so we need to use the type from operand. */
+                        if (VIR_Symbol_GetUniformKind(pSym) == VIR_UNIFORM_VIRTUAL_FOR_UBO)
+                        {
+                            bUseSymType = gcvFALSE;
+                        }
+
+                        /* if the symbol has the corresponding defInst and the operand has no indexing and relmode,
+                            * use the dest symbol of the defInst in opnd to reduce a MOV instruction
+                            */
+                        if (vscHTBL_DirectTestAndGet(replacedUniformSet, (void*)pSym, (void**)&pNewInsertedInst))
+                        {
+                            VIR_Operand *dest = VIR_Inst_GetDest(pNewInsertedInst);
+
+                            pNewSym = VIR_Operand_GetSymbol(dest);
+                            gcmASSERT(pNewSym && VIR_Symbol_GetKind(pNewSym) == VIR_SYM_VIRREG);
+
+                            newTempRegTypeId = VIR_Symbol_GetTypeId(pNewSym);
+
+                            if (VIR_Operand_GetPrecision(opnd) == VIR_Symbol_GetPrecision(pNewSym) &&
+                                (!VIR_Operand_GetIsConstIndexing(opnd)) &&
+                                (!VIR_Operand_GetMatrixConstIndex(opnd)) &&
+                                (VIR_Operand_GetRelAddrMode(opnd) == VIR_INDEXED_NONE) &&
+                                /* In case the inserted MOV instruction is not cover this channel, insert a new one. */
+                                (VIR_GetTypeComponents(newTempRegTypeId) >= _GetCompCountFromEnable(VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(opnd)))))
+                            {
+                                newDstSymId = VIR_Symbol_GetIndex(pNewSym);
+                                newDstRegNo = VIR_Symbol_GetVregIndex(pNewSym);
+                            }
+                            else
+                            {
+                                pNewInsertedInst = gcvNULL;
+                            }
+                        }
+
+                        if (pNewInsertedInst == gcvNULL)
+                        {
+                            /* Get the uniform sym type first. */
+                            if (VIR_TypeId_isPrimitive(VIR_Symbol_GetTypeId(pSym)))
+                            {
+                                symTypeId = VIR_Symbol_GetTypeId(pSym);
+                            }
+                            else
+                            {
+                                pType = VIR_Symbol_GetType(pSym);
+                                if (VIR_Type_isArray(pType))
+                                {
+                                    while (VIR_Type_isArray(pType))
+                                    {
+                                        pType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(pType));
+                                    }
+                                    if (VIR_Type_isPrimitive(pType))
+                                    {
+                                        symTypeId = VIR_Type_GetIndex(pType);
+                                    }
+                                    else
+                                    {
+                                        symTypeId = VIR_Operand_GetTypeId(opnd);
+                                    }
+                                }
+                                else
+                                {
+                                    symTypeId = VIR_Operand_GetTypeId(opnd);
+                                }
+                            }
+
+                            /* make new created symbol type consistent with src's swizzle channel
+                                * if symTypeId is float32 computed by operand type while .w is used like following inst
+                                * MUL                hp temp(3).hp.w, hp  uColor.hp.w, hp  uTexCombScale[2].hp.w
+                                * extend symTypeId to be float32_x3
+                                */
+                            if (VIR_GetTypeComponents(symTypeId) < _GetCompCountFromEnable(VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(opnd))))
+                            {
+                                VIR_TypeId componentTypeId = VIR_GetTypeComponentType(symTypeId);
+                                symTypeId = VIR_TypeId_ComposeNonOpaqueType(componentTypeId,
+                                                                            _GetCompCountFromEnable(VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(opnd))),
+                                                                            1);
+                            }
+
+                            /* Try to use the uniform type first so we can cover all channels. */
+                            if (bUseSymType)
+                            {
+                                newTempRegTypeId = symTypeId;
+                            }
+                            else
+                            {
+                                newTempRegTypeId = VIR_Operand_GetTypeId(opnd);
+
+                                if (VIR_GetTypeComponents(newTempRegTypeId) < VIR_GetTypeComponents(symTypeId))
+                                {
+                                    VIR_TypeId componentTypeId = VIR_GetTypeComponentType(newTempRegTypeId);
+                                    newTempRegTypeId = VIR_TypeId_ComposeNonOpaqueType(componentTypeId,
+                                                                                       VIR_GetTypeComponents(symTypeId),
+                                                                                       1);
+                                }
+                            }
+
+                            precision = VIR_Operand_GetPrecision(opnd);
+
+                            /* Add a new-temp-reg number */
+                            newDstRegNo = VIR_Shader_NewVirRegId(pShader, 1);
+
+                            errCode = VIR_Shader_AddSymbol(pShader,
+                                                           VIR_SYM_VIRREG,
+                                                           newDstRegNo,
+                                                           VIR_Shader_GetTypeFromId(pShader, newTempRegTypeId),
+                                                           VIR_STORAGE_UNKNOWN,
+                                                           &newDstSymId);
+                            ON_ERROR(errCode, "Add symbol");
+                            pNewSym = VIR_Shader_GetSymFromId(pShader, newDstSymId);
+
+                            /* Add following inst just before current inst:
+
+                                mov new-temp-reg, uniform
+                            */
+                            errCode = VIR_Function_AddInstructionBefore(func, VIR_OP_MOV, newTempRegTypeId, inst, gcvTRUE, &pNewInsertedInst);
+                            ON_ERROR(errCode, "Add instruction before");
+
+                            /* dst */
+                            newOpnd = VIR_Inst_GetDest(pNewInsertedInst);
+                            VIR_Operand_SetSymbol(newOpnd, func, newDstSymId);
+                            VIR_Operand_SetEnable(newOpnd, VIR_TypeId_Conv2Enable(newTempRegTypeId));
+                            VIR_Symbol_SetPrecision(pNewSym, precision);
+                            VIR_Operand_SetPrecision(newOpnd, precision);
+                            if(precision == VIR_PRECISION_HIGH)
+                            {
+                                VIR_Inst_SetThreadMode(pNewInsertedInst, VIR_THREAD_D16_DUAL_32);
+                            }
+
+                            /* src */
+                            newOpnd = VIR_Inst_GetSource(pNewInsertedInst, VIR_Operand_Src0);
+                            VIR_Operand_SetSymbol(newOpnd, func, pSym->index);
+                            VIR_Operand_SetSwizzle(newOpnd, VIR_TypeId_Conv2Swizzle(newTempRegTypeId));
+                            VIR_Operand_SetTypeId(newOpnd, newTempRegTypeId);
+                            VIR_Operand_SetPrecision(newOpnd, VIR_Operand_GetPrecision(opnd));
+                            VIR_Operand_SetMatrixConstIndex(newOpnd, VIR_Operand_GetMatrixConstIndex(opnd));
+                            VIR_Operand_SetIsConstIndexing(newOpnd, VIR_Operand_GetIsConstIndexing(opnd));
+                            VIR_Operand_SetRelAddrMode(newOpnd, VIR_Operand_GetRelAddrMode(opnd));
+                            if (VIR_Operand_GetIsConstIndexing(opnd))
+                            {
+                                VIR_Operand_SetRelIndexingImmed(newOpnd, VIR_Operand_GetRelIndexing(opnd));
+                            }
+                            else
+                            {
+                                VIR_Operand_SetRelIndexing(newOpnd, VIR_Operand_GetRelIndexing(opnd));
+                            }
+                            if ((!VIR_Operand_GetIsConstIndexing(opnd)) &&
+                                (!VIR_Operand_GetMatrixConstIndex(opnd)) &&
+                                (VIR_Operand_GetRelAddrMode(opnd) == VIR_INDEXED_NONE))
+                            {
+                                vscHTBL_DirectSet(replacedUniformSet, (void*)pSym, (void*)pNewInsertedInst);
+                            }
+                        }
+
+                        /* Change operand of current inst to new-temp-reg */
+                        VIR_Operand_SetMatrixConstIndex(opnd, 0);
+                        VIR_Operand_SetRelAddrMode(opnd, VIR_INDEXED_NONE);
+                        VIR_Operand_SetRelIndexing(opnd, 0);
+                        VIR_Operand_SetTempRegister(opnd, func, newDstSymId, VIR_Operand_GetTypeId(opnd));
+                        if (precision == VIR_PRECISION_HIGH)
+                        {
+                            VIR_Inst_SetThreadMode(inst, VIR_THREAD_D16_DUAL_32);
+                        }
+
+                        vscVIR_AddNewDef(pDuInfo, pNewInsertedInst, newDstRegNo, 1, VIR_ENABLE_XYZW, VIR_HALF_CHANNEL_MASK_FULL,
+                                            gcvNULL, gcvNULL);
+
+                        vscVIR_AddNewUsageToDef(pDuInfo, pNewInsertedInst, inst, opnd,
+                                                gcvFALSE, newDstRegNo, 1, VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(opnd)),
+                                                VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+
+                        /* Change happens. */
+                        bChanged = gcvTRUE;
                     }
                 }
             }
