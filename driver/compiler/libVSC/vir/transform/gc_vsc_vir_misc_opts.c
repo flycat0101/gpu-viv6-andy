@@ -343,46 +343,12 @@ static gctBOOL _NeedPutImmValue2Uniform(VIR_Shader* pShader,
             return gcvTRUE;
         }
 
-        /* For non-dual16 shader, imm supported by HW is only 20-bit;
-           For dual16 shader, imm supported by HW is only 16-bit (two 16-bits pack into one 32-bits) */
-        switch (VIR_GetTypeComponentType(VIR_Operand_GetTypeId(Opnd)))
-        {
-        case VIR_TYPE_FLOAT32:
-            if (bIsInDual16Check || VIR_Shader_isDual16Mode(pShader))
-            {
-                return gcvTRUE;
-            }
-            else
-            {
-                return !CAN_EXACTLY_CVT_S23E8_2_S11E8(VIR_Operand_GetImmediateUint(Opnd));
-            }
-        case VIR_TYPE_INT32:
-        case VIR_TYPE_BOOLEAN:
-            if (bIsInDual16Check || VIR_Shader_isDual16Mode(pShader))
-            {
-                return !CAN_EXACTLY_CVT_S32_2_S16(VIR_Operand_GetImmediateInt(Opnd));
-            }
-            else
-            {
-                return !CAN_EXACTLY_CVT_S32_2_S20(VIR_Operand_GetImmediateInt(Opnd));
-            }
-
-        case VIR_TYPE_UINT32:
-            if (bIsInDual16Check || VIR_Shader_isDual16Mode(pShader))
-            {
-                return !CAN_EXACTLY_CVT_U32_2_U16(VIR_Operand_GetImmediateUint(Opnd));
-            }
-            else
-            {
-                return !CAN_EXACTLY_CVT_U32_2_U20(VIR_Operand_GetImmediateUint(Opnd));
-            }
-        default:
-            if (bPackedChanged)
-            {
-                return !CAN_EXACTLY_CVT_U32_2_U20(VIR_Operand_GetImmediateUint(Opnd));
-            }
-            return gcvFALSE;
-        }
+        return VIR_Shader_NeedPutImmValue2Uniform(pShader,
+                                                  pHwCfg,
+                                                  bIsInDual16Check,
+                                                  bPackedChanged,
+                                                  VIR_Operand_GetImmediateUint(Opnd),
+                                                  VIR_GetTypeComponentType(VIR_Operand_GetTypeId(Opnd)));
     }
     else if (VIR_Operand_isConst(Opnd))
     {
