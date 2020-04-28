@@ -5359,6 +5359,9 @@ struct _VIR_SHADER
     gctUINT             sampleMaskIdRegStart;
     gctUINT             sampleMaskIdChannelStart;
 
+    /* PS reg start index, exclude #position. */
+    gctUINT             psRegStartIndex;
+
     /* shader has spill */
     gctBOOL             hasRegisterSpill;
     gctUINT             vidmemSizeOfSpill;

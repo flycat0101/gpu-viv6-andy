@@ -2649,6 +2649,7 @@ static void _CollectExeHints(VSC_SHADER_COMPILER_PARAM* pCompilerParam, VSC_SEP_
         pOutSEP->exeHints.derivedHints.prvStates.ps.bDsyBeforeLowering = VIR_Shader_hasDsyBeforeLowering(pShader);
         pOutSEP->exeHints.derivedHints.prvStates.ps.hwRegNoForSampleMaskId = pShader->sampleMaskIdRegStart;
         pOutSEP->exeHints.derivedHints.prvStates.ps.hwRegChannelForSampleMaskId = pShader->sampleMaskIdChannelStart;
+        pOutSEP->exeHints.derivedHints.prvStates.ps.psStartRegIndex = pShader->psRegStartIndex;
         pOutSEP->exeHints.derivedHints.prvStates.ps.bExecuteOnSampleFreq = VIR_Shader_PS_RunOnSampleShading(pShader);
         pOutSEP->exeHints.derivedHints.prvStates.ps.bNeedRtRead = pShader->useLastFragData;
         pOutSEP->exeHints.derivedHints.prvStates.ps.fragColorUsage = pShader->fragColorUsage;
