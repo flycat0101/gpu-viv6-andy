@@ -30224,17 +30224,7 @@ vxnne_shader_executable vxnneGetTensorMeanAxisShaderExecutable(
                 0x00000400, // AccumType, ConstantType, and PostShift
                 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001 // Constant
             };
-            vx_uint32 uniSumFp16MulScale_2x8[16] =  {
-                0x11111111, // TCfg
-                0x00000000, // ASelt
-                0x03020100, 0x07060504, // ABin
-                0x11111111, // BSelt
-                0x00000000, 0x00000000, // BBin
-                0x00000400, // AccumType, ConstantType, and PostShift
-                0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
-            };
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumFp16AddFp16_2x8", 1, uniSumFp16AddFp16_2x8);
-            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumFp16MulScale_2x8", 1, uniSumFp16MulScale_2x8);
         }
         else if ((VX_TYPE_FLOAT16 == output_format) || (VX_TYPE_INT16 == output_format))
         {
