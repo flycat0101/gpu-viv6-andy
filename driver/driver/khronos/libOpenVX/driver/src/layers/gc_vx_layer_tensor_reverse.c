@@ -376,7 +376,7 @@ VX_PRIVATE_API vx_status vxoNNTensorReverse_SH_Initialize_Ext(vxnne_layer ops_la
     vx_tensor  input      = (vx_tensor)parameters[0];
     vx_tensor  output     = (vx_tensor)parameters[6];
     vx_uint32  numOfAxis  = ((vx_scalar)parameters[1])->value->u32;
-    vx_uint32  batchCount = (TENSOR_SIZE_INDEX(input, TENSOR_VIEW_DIM_NUM(input)) == 0) ? 1 : TENSOR_SIZE_INDEX(input, TENSOR_VIEW_DIM_NUM(input));
+    vx_uint32  batchCount = TENSOR_VIEW_DIM_NUM(input) < 4 ? 1 : TENSOR_SIZE_INDEX(input, 3);
     vxnne_tensor_reverse  reverseNode = (vxnne_tensor_reverse)ops_layer;
     vx_uint32 i;
 
