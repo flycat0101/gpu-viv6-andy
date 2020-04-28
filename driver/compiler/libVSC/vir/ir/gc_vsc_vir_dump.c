@@ -480,6 +480,8 @@ _GetUniformKindString(
         return "threadIdMemAddr";
     case VIR_UNIFORM_YCBCR_PLANE:
         return "ycbcrPlane";
+    case VIR_UNIFORM_VIRTUAL_FOR_UBO:
+        return "virtualForUbo";
     default:
         gcmASSERT(0);
         return "";
@@ -2215,6 +2217,10 @@ _DumpOperand(
             if(VIR_Operand_isUniformIndex(Operand))
             {
                 VERIFY_OK(VIR_LOG(Dumper, "Uniform_Index "));
+            }
+            if (VIR_Operand_useOpndPrecision(Operand))
+            {
+                VERIFY_OK(VIR_LOG(Dumper, "Opnd_precision "));
             }
             VERIFY_OK(VIR_LOG(Dumper, ">"));
         }

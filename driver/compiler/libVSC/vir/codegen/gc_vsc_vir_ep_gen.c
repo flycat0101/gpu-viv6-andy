@@ -5119,6 +5119,7 @@ static VSC_ErrCode _AddVkUbEntryToUbTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHelper
     PROG_VK_UNIFORM_BUFFER_TABLE_ENTRY*  pUbEntry = gcvNULL;
     gctUINT                              i, ubEntryIndex, channel, hwChannel;
     SHADER_CONSTANT_HW_LOCATION_MAPPING* pHwDirectAddrBase;
+    VIR_SHADER_RESOURCE_ALLOC_ENTRY*     pConstReg = pResAllocEntry->pConstRegForUbo;
 
     for (i = 0; i < pUbTable->countOfEntries; i ++)
     {
@@ -5138,7 +5139,16 @@ static VSC_ErrCode _AddVkUbEntryToUbTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHelper
     }
     pUbEntry->activeStageMask |= pResAllocEntry->bUse ? (1 << stageIdx) : 0;
     pUbEntry->stageBits |= VSC_SHADER_STAGE_2_STAGE_BIT(stageIdx);
-    pUbEntry->hwMappings[stageIdx].hwAccessMode = SHADER_HW_ACCESS_MODE_MEMORY;
+    if (pConstReg != gcvNULL)
+    {
+        pUbEntry->hwMappings[stageIdx].hwAccessMode = SHADER_HW_ACCESS_MODE_BOTH_REG_AND_MEM;
+    }
+    else
+    {
+        pUbEntry->hwMappings[stageIdx].hwAccessMode = SHADER_HW_ACCESS_MODE_MEMORY;
+    }
+
+    /* I: Program the direct memory address. */
     pUbEntry->hwMappings[stageIdx].hwLoc.memAddr.hwMemAccessMode = SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR;
     pUbEntry->hwMappings[stageIdx].validHWChannelMask = WRITEMASK_ALL;
 
@@ -5160,6 +5170,19 @@ static VSC_ErrCode _AddVkUbEntryToUbTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHelper
     {
         hwChannel = (((pResAllocEntry->swizzle) >> ((channel) * 2)) & 0x3);
         _SetValidChannelForHwConstantLoc(pHwDirectAddrBase, hwChannel);
+    }
+
+    /* II: Program the constant register if needed. */
+    if (pConstReg != gcvNULL)
+    {
+        pUbEntry->hwMappings[stageIdx].hwLoc.constReg.hwRegNo = pConstReg->hwRegNo;
+        pUbEntry->hwMappings[stageIdx].hwLoc.constReg.hwRegRange = pConstReg->hwRegRange;
+
+        for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
+        {
+            hwChannel = (((pConstReg->swizzle) >> ((channel) * 2)) & 0x3);
+            _SetValidChannelForHwConstantLoc(&pUbEntry->hwMappings[stageIdx], hwChannel);
+        }
     }
 
     return VSC_ERR_NONE;

@@ -6412,6 +6412,126 @@ VIR_Type_Identical(
     return gcvFALSE;
 }
 
+gctBOOL
+VIR_Type_Contain8Bit16BitField(
+    VIR_Shader*         pShader,
+    VIR_Type*           pType
+    )
+{
+    VIR_Type*           pBaseType = pType;
+    VIR_SymIdList*      pFields = gcvNULL;
+    gctUINT             i;
+
+    while (VIR_Type_isArray(pBaseType))
+    {
+        pBaseType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(pBaseType));
+    }
+
+    if (!VIR_Type_isStruct(pBaseType))
+    {
+        return gcvFALSE;
+    }
+
+    pFields = VIR_Type_GetFields(pBaseType);
+    for (i = 0; i < VIR_IdList_Count(pFields); i++)
+    {
+        VIR_Id          id = VIR_IdList_GetId(VIR_Type_GetFields(pBaseType), i);
+        VIR_Type*       pFieldType = VIR_Symbol_GetType(VIR_Shader_GetSymFromId(pShader, id));
+        gctUINT         componentSizeInByte;
+
+        if (VIR_Type_IsBaseTypeStruct(pShader, pFieldType))
+        {
+            if (VIR_Type_Contain8Bit16BitField(pShader, pFieldType))
+            {
+                return gcvTRUE;
+            }
+        }
+        else
+        {
+            while (VIR_Type_isArray(pFieldType))
+            {
+                pFieldType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(pFieldType));
+            }
+
+            gcmASSERT(VIR_Type_isPrimitive(pFieldType));
+            componentSizeInByte = VIR_GetTypeSize(VIR_GetTypeComponentType(VIR_Type_GetIndex(pFieldType)));
+            if (componentSizeInByte < 4)
+            {
+                return gcvTRUE;
+            }
+        }
+    }
+
+    return gcvFALSE;
+}
+
+VIR_SymId
+VIR_Type_FindFieldSymIdByOffset(
+    VIR_Shader*         pShader,
+    VIR_Type*           pType,
+    gctUINT             offset
+    )
+{
+    VIR_Type*           pBaseType = pType;
+    VIR_SymIdList*      pFields = gcvNULL;
+    gctUINT             i;
+
+    while (VIR_Type_isArray(pBaseType))
+    {
+        pBaseType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(pBaseType));
+    }
+
+    if (!VIR_Type_isStruct(pBaseType))
+    {
+        return VIR_INVALID_ID;
+    }
+
+    pFields = VIR_Type_GetFields(pBaseType);
+    for (i = 0; i < VIR_IdList_Count(pFields); i++)
+    {
+        VIR_Id          id = VIR_IdList_GetId(VIR_Type_GetFields(pBaseType), i);
+        VIR_Symbol*     pFieldSym = VIR_Shader_GetSymFromId(pShader, id);
+        VIR_Type*       pFieldType = VIR_Symbol_GetType(pFieldSym);
+        gctUINT         fieldOffset = VIR_FieldInfo_GetOffset(VIR_Symbol_GetFieldInfo(pFieldSym));
+        gctBOOL         bFound = gcvFALSE;
+
+        if (offset < fieldOffset)
+        {
+            /* Something is wrong here. Maybe find the wrong structure. */
+            break;
+        }
+        else if (i == VIR_IdList_Count(pFields) - 1)
+        {
+            bFound = gcvTRUE;
+        }
+        else
+        {
+            VIR_Id      nextId = VIR_IdList_GetId(VIR_Type_GetFields(pBaseType), i + 1);
+            VIR_Symbol* pNextFieldSym = VIR_Shader_GetSymFromId(pShader, nextId);
+            gctUINT     nextFieldOffset = VIR_FieldInfo_GetOffset(VIR_Symbol_GetFieldInfo(pNextFieldSym));
+
+            if (offset < nextFieldOffset)
+            {
+                bFound = gcvTRUE;
+            }
+        }
+
+        if (bFound)
+        {
+            if (VIR_Type_IsBaseTypeStruct(pShader, pFieldType))
+            {
+                return VIR_Type_FindFieldSymIdByOffset(pShader, pFieldType, offset);
+            }
+            else
+            {
+                return id;
+            }
+        }
+    }
+
+    return VIR_INVALID_ID;
+}
+
 static VIR_Precision
 _fixUniformPrecision(
     IN VIR_Shader* Shader,
@@ -8797,7 +8917,7 @@ VIR_Shader_AddSymbolContents(
                 uniform->blockIndex = -1;
                 uniform->offset = -1;
                 uniform->lastIndexingIndex = -1;
-                uniform->realUseArraySize = -1;
+                VIR_Uniform_SetRealUseArraySize(uniform, -1);
                 VIR_Uniform_SetPhysical(uniform, -1);
                 VIR_Uniform_SetSamplerPhysical(uniform, -1);
 
@@ -8843,6 +8963,8 @@ VIR_Shader_AddSymbolContents(
                         uniform->u.samplerOrImageAttr.ycbcrPlaneSymId[i] = VIR_INVALID_ID;
                     }
                 }
+                uniform->u1.baseAddrSymId = VIR_INVALID_ID;
+                uniform->u1.virtualUniformSymId = VIR_INVALID_ID;
                 uniform->auxAddrSymId = VIR_INVALID_ID;
                 if (PresetId == VIR_INVALID_ID)
                 {
@@ -19399,6 +19521,22 @@ VIR_Resouce_FindResUniform(
                 pRetUniform[0] = pRetUniform[1];
                 pRetUniform[1] = tempUniform;
             }
+        }
+    }
+    /* We may use the virtual constant uniform to save the UBO. */
+    else if (uniformCount != 0
+             &&
+             (pResBinding->type == VSC_SHADER_RESOURCE_TYPE_UNIFORM_BUFFER ||
+              pResBinding->type == VSC_SHADER_RESOURCE_TYPE_UNIFORM_BUFFER_DYNAMIC))
+    {
+        gcmASSERT(uniformCount == 1);
+
+        if (VIR_Uniform_IsUseConstRegForUbo(pRetUniform[0]) &&
+            pRetUniform[0]->u1.virtualUniformSymId != VIR_INVALID_ID)
+        {
+            VIR_Symbol*     pVirtualUniformSym = VIR_Shader_GetSymFromId(pShader, pRetUniform[0]->u1.virtualUniformSymId);
+            pRetUniform[1] = VIR_Symbol_GetUniformPointer(pShader, pVirtualUniformSym);
+            uniformCount++;
         }
     }
 
