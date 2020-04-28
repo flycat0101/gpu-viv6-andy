@@ -3069,6 +3069,7 @@ _FillInConfigTable(
     Config->pixelPipes             = featureDatabase->NumPixelPipes;
     Config->resolvePipes           = featureDatabase->NumResolvePipes;
     Config->coreCount              = featureDatabase->CoreCount;
+    Config->hwCoreCount            = featureDatabase->CoreCount;
 
     /* Multiple core information may be not reported by feature bit, try to get it from gcoHAL */
     _QueryCoreCount(Hardware, Config);

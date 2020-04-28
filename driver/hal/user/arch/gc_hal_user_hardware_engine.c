@@ -23652,7 +23652,7 @@ gcoHARDWARE_SetProbeCmd(
     gctUINT32 offset = 0;
     gctUINT32 i,j;
     gctUINT32 clusterIDWidth = 0;
-    gctBOOL hostInterface1 = gcvTRUE;
+    gctBOOL hostInterface1 = gcvFALSE;
 
     static const gctUINT32 moduleXlate[] =
     {
@@ -23728,9 +23728,9 @@ gcoHARDWARE_SetProbeCmd(
     /* Reserve space in the command buffer. */
     gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, Memory);
 
-    if ((Hardware->config->chipModel == gcv7000) && ((Hardware->config->chipRevision == 0x6203) || (Hardware->config->chipRevision == 0x6204)))
+    if (Hardware->config->hwCoreCount == 1 && Hardware->config->clusterCount == 1 && Hardware->config->shaderCoreCount >= 4)
     {
-        hostInterface1 = gcvFALSE;
+        hostInterface1 = gcvTRUE;
     }
 
     if (ProbeAddress != ~0U)

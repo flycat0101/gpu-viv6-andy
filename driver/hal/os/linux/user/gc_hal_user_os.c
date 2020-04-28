@@ -5214,7 +5214,7 @@ gcoOS_SetProfileSetting(
     IN gctCONST_STRING FileName
     )
 {
-    gcsHAL_INTERFACE iface;
+    gcsHAL_PROFILER_INTERFACE iface;
 
     if (strlen(FileName) >= gcdMAX_PROFILE_FILE_NAME)
     {
@@ -5228,7 +5228,7 @@ gcoOS_SetProfileSetting(
 
     /* Call the kernel. */
     return gcoOS_DeviceControl(gcvNULL,
-                               IOCTL_GCHAL_INTERFACE,
+                               IOCTL_GCHAL_PROFILER_INTERFACE,
                                &iface, gcmSIZEOF(iface),
                                &iface, gcmSIZEOF(iface));
 }

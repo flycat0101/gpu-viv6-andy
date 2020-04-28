@@ -893,7 +893,7 @@ _UpdateCounters(
     }
     else
     {
-        gcsHAL_INTERFACE iface;
+        gcsHAL_PROFILER_INTERFACE iface;
         gctUINT32 context;
         gctUINT32 coreId;
         gctUINT32 originalCoreIndex;
@@ -918,7 +918,7 @@ _UpdateCounters(
 
             /* Call the kernel. */
             gcmONERROR(gcoOS_DeviceControl(gcvNULL,
-                IOCTL_GCHAL_INTERFACE,
+                IOCTL_GCHAL_PROFILER_INTERFACE,
                 &iface, gcmSIZEOF(iface),
                 &iface, gcmSIZEOF(iface)));
         }
@@ -941,7 +941,7 @@ _UpdateCounters(
 
             /* Call the kernel. */
             gcmONERROR(gcoOS_DeviceControl(gcvNULL,
-                IOCTL_GCHAL_INTERFACE,
+                IOCTL_GCHAL_PROFILER_INTERFACE,
                 &iface, gcmSIZEOF(iface),
                 &iface, gcmSIZEOF(iface)));
             Profiler->counterBuf->counters[coreId].counters_part1 = iface.u.RegisterProfileData_part1.Counters;
@@ -965,7 +965,7 @@ _UpdateCounters(
 
             /* Call the kernel. */
             gcmONERROR(gcoOS_DeviceControl(gcvNULL,
-                IOCTL_GCHAL_INTERFACE,
+                IOCTL_GCHAL_PROFILER_INTERFACE,
                 &iface, gcmSIZEOF(iface),
                 &iface, gcmSIZEOF(iface)));
             Profiler->counterBuf->counters[coreId].counters_part2 = iface.u.RegisterProfileData_part2.Counters;
@@ -1094,7 +1094,7 @@ gcoPROFILER_Destroy(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gcsHAL_INTERFACE iface;
+    gcsHAL_PROFILER_INTERFACE iface;
     gcsCounterBuffer_PTR counterBuffer = Profiler->counterBuf;
 
     gcmHEADER_ARG("Profiler=0x%x", Profiler);
@@ -1147,7 +1147,7 @@ gcoPROFILER_Destroy(
 
     /* Call the kernel. */
     gcoOS_DeviceControl(gcvNULL,
-        IOCTL_GCHAL_INTERFACE,
+        IOCTL_GCHAL_PROFILER_INTERFACE,
         &iface, gcmSIZEOF(iface),
         &iface, gcmSIZEOF(iface));
 
@@ -1166,7 +1166,7 @@ gcoPROFILER_Initialize(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gcsHAL_INTERFACE iface;
+    gcsHAL_PROFILER_INTERFACE iface;
     gcsCounterBuffer_PTR counterBuffer = gcvNULL;
     gctUINT32 i = 0;
 
@@ -1216,7 +1216,7 @@ gcoPROFILER_Initialize(
 
         /* Call the kernel. */
         gcmONERROR(gcoOS_DeviceControl(gcvNULL,
-            IOCTL_GCHAL_INTERFACE,
+            IOCTL_GCHAL_PROFILER_INTERFACE,
             &iface, gcmSIZEOF(iface),
             &iface, gcmSIZEOF(iface)));
 
@@ -1268,7 +1268,7 @@ gcoPROFILER_Initialize(
 
             /* Call the kernel. */
             gcmONERROR(gcoOS_DeviceControl(gcvNULL,
-                IOCTL_GCHAL_INTERFACE,
+                IOCTL_GCHAL_PROFILER_INTERFACE,
                 &iface, gcmSIZEOF(iface),
                 &iface, gcmSIZEOF(iface)));
         }
@@ -1309,7 +1309,7 @@ gcoPROFILER_Disable(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gcsHAL_INTERFACE iface;
+    gcsHAL_PROFILER_INTERFACE iface;
     gcmHEADER();
 
     gcoHAL_ConfigPowerManagement(gcvTRUE);
@@ -1320,7 +1320,7 @@ gcoPROFILER_Disable(
 
     /* Call the kernel. */
     status = gcoOS_DeviceControl(gcvNULL,
-        IOCTL_GCHAL_INTERFACE,
+        IOCTL_GCHAL_PROFILER_INTERFACE,
         &iface, gcmSIZEOF(iface),
         &iface, gcmSIZEOF(iface));
 
@@ -1358,7 +1358,7 @@ gcoPROFILER_EnableCounters(
         }
         else
         {
-            gcsHAL_INTERFACE iface;
+            gcsHAL_PROFILER_INTERFACE iface;
             gctUINT32 context;
             gctUINT32 coreId;
             gctUINT32 originalCoreIndex;
@@ -1384,7 +1384,7 @@ gcoPROFILER_EnableCounters(
 
                 /* Call the kernel. */
                 gcmONERROR(gcoOS_DeviceControl(gcvNULL,
-                    IOCTL_GCHAL_INTERFACE,
+                    IOCTL_GCHAL_PROFILER_INTERFACE,
                     &iface, gcmSIZEOF(iface),
                     &iface, gcmSIZEOF(iface)));
             }
@@ -1401,12 +1401,13 @@ gcoPROFILER_EnableCounters(
                 gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, coreIndex));
 
                 gcmVERIFY_OK(gcoHARDWARE_GetContext(gcvNULL, &context));
+
                 if (context != 0)
                     iface.u.RegisterProfileData_part2.context = context;
 
                 /* Call the kernel. */
                 gcmONERROR(gcoOS_DeviceControl(gcvNULL,
-                    IOCTL_GCHAL_INTERFACE,
+                    IOCTL_GCHAL_PROFILER_INTERFACE,
                     &iface, gcmSIZEOF(iface),
                     &iface, gcmSIZEOF(iface)));
             }

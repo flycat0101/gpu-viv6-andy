@@ -2359,6 +2359,14 @@ gckDEVICE_Dispatch(
     IN gcsHAL_INTERFACE_PTR Interface
     );
 
+#if VIVANTE_PROFILER
+gceSTATUS
+gckDEVICE_Profiler_Dispatch(
+    IN gckDEVICE Device,
+    IN gcsHAL_PROFILER_INTERFACE_PTR Interface
+    );
+#endif
+
 gceSTATUS
 gckDEVICE_GetMMU(
     IN gckDEVICE Device,
