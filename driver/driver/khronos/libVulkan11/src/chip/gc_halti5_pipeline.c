@@ -1782,14 +1782,14 @@ static VkResult halti5_pip_emit_graphicsShaderInstance(
         {
             if (chipGfxPipeline->subSampleZUsedInPS)
             {
-                msaaExtraPsTemp = 1;
-                msaaExtraPsInput = hints->fsIsDual16 ? 2 : 1;
+                msaaExtraPsTemp = hints->fsIsDual16 ? 2 : 1;
+                msaaExtraPsInput = 1;
             }
         }
         else
         {
-            msaaExtraPsTemp = 1;
-            msaaExtraPsInput = hints->fsIsDual16 ? 2 : 1;
+            msaaExtraPsTemp = hints->fsIsDual16 ? 2 : 1;
+            msaaExtraPsInput = 1;
         }
     }
 
