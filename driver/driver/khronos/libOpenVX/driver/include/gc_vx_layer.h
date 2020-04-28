@@ -414,7 +414,7 @@ typedef vx_status (*vxnne_operation_calDimSize_f)(
 typedef struct _vx_tp_value_cmd_s
 {
     vx_float32    f32[3];
-    vx_uint32     u32[7];
+    vx_uint32     u32[8];
     vx_enum       e32[1];
     vx_uint8*     p8[1];
 }

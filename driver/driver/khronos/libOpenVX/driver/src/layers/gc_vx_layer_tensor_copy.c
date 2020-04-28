@@ -376,10 +376,41 @@ VX_PRIVATE_API vx_status vxoNNTensorCopy_TP_Initialize(vxnne_layer ops_layer, co
 
     vx_tensor  src = (vx_tensor)parameters[0];
     vx_tensor  dst = (vx_tensor)parameters[1];
-    vx_uint32  batchCount = TENSOR_VIEW_DIM_NUM(src) > 3 ? TENSOR_SIZE_INDEX(src, TENSOR_VIEW_DIM_NUM(src) - 1) : 1;
+    vx_uint32  batchCount;
     vx_op_param_s conv = { 0 };
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    memset(&conv, 0, sizeof(vx_op_param_s));
+
+    if (TENSOR_VIEW_DIM_NUM(src) != TENSOR_VIEW_DIM_NUM(dst) ||
+        ((TENSOR_VIEW_SIZE_INDEX(src, 0) != TENSOR_VIEW_SIZE_INDEX(dst, 0)) ||
+         (TENSOR_VIEW_SIZE_INDEX(src, 1) != TENSOR_VIEW_SIZE_INDEX(dst, 1)) ||
+         (TENSOR_VIEW_SIZE_INDEX(src, 2) != TENSOR_VIEW_SIZE_INDEX(dst, 2))))
+    {
+        vx_uint32 i, dstDepth, dstDimCount = 1;
+
+        for (i = 0; i < TENSOR_VIEW_DIM_NUM(dst); i++)
+        {
+            dstDimCount *= TENSOR_VIEW_SIZE_INDEX(dst, i);
+        }
+
+        dstDepth = dstDimCount / (TENSOR_VIEW_SIZE_INDEX(dst, 0) * TENSOR_VIEW_SIZE_INDEX(dst, 1));
+
+        batchCount = 1;
+
+        conv.tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(sizeof(vx_tp_value_cmd_s));
+        conv.tp_value->e32[0] = 1;
+        conv.tp_value->u32[0] = dstDepth;
+        conv.tp_value->u32[1] = TENSOR_VIEW_SIZE_INDEX(dst, 0);
+        conv.tp_value->u32[2] = TENSOR_VIEW_SIZE_INDEX(dst, 1);
+        conv.tp_value->u32[3] = TENSOR_STRIDE_INDEX(dst, 1);
+        conv.tp_value->u32[4] = TENSOR_STRIDE_INDEX(dst, 2);
+    }
+    else
+    {
+        batchCount = TENSOR_VIEW_DIM_NUM(src) > 3 ? TENSOR_SIZE_INDEX(src, TENSOR_VIEW_DIM_NUM(src) - 1) : 1;
+    }
 
     vxmONERROR(vxnneOperation_Initialize(&copyNode->tensor_copy_tp_operation.base,
         &copyNode->base,
