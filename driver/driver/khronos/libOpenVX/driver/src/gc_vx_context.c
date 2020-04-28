@@ -1082,14 +1082,29 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
         globalData->options.disableTPNNEvis = (atoi(envctrl) == 0) ? 0 : 1;
         if (globalData->options.disableTPNNEvis)
         {
-            globalData->nnConfig.fixedFeature.nnCoreCount        =
-            globalData->nnConfig.fixedFeature.nnCoreCountFloat16 =
-            globalData->nnConfig.fixedFeature.nnCoreCountInt16   =
-            globalData->nnConfig.fixedFeature.nnCoreCountInt8    =
-            globalData->nnConfig.fixedFeature.nnMadPerCore       =
-            globalData->nnConfig.fixedFeature.tpCoreCount        =
-            globalData->nnConfig.fixedFeature.tpliteCoreCount    =
-            globalData->nnConfig.fixedFeature.tpPwlLUTCount      =
+            globalData->nnConfig.fixedFeature.nnCoreCount        = 0;
+            globalData->nnConfig.fixedFeature.nnCoreCountFloat16 = 0;
+            globalData->nnConfig.fixedFeature.nnCoreCountInt16   = 0;
+            globalData->nnConfig.fixedFeature.nnCoreCountInt8    = 0;
+            globalData->nnConfig.fixedFeature.nnMadPerCore       = 0;
+            globalData->nnConfig.fixedFeature.tpCoreCount        = 0;
+            globalData->nnConfig.fixedFeature.tpliteCoreCount    = 0;
+            globalData->nnConfig.fixedFeature.tpPwlLUTCount      = 0;
+            globalData->nnConfig.fixedFeature.vipCoreCount       = 0;
+        }
+    }
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DISABLE_TP_NN", &envctrl)) && envctrl)
+    {
+        if (atoi(envctrl) !=0)
+        {
+            globalData->nnConfig.fixedFeature.nnCoreCount        = 0;
+            globalData->nnConfig.fixedFeature.nnCoreCountFloat16 = 0;
+            globalData->nnConfig.fixedFeature.nnCoreCountInt16   = 0;
+            globalData->nnConfig.fixedFeature.nnCoreCountInt8    = 0;
+            globalData->nnConfig.fixedFeature.nnMadPerCore       = 0;
+            globalData->nnConfig.fixedFeature.tpCoreCount        = 0;
+            globalData->nnConfig.fixedFeature.tpliteCoreCount    = 0;
+            globalData->nnConfig.fixedFeature.tpPwlLUTCount      = 0;
             globalData->nnConfig.fixedFeature.vipCoreCount       = 0;
         }
     }
