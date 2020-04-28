@@ -907,7 +907,7 @@ static VSC_ErrCode _CompileShaderAtMCLevel(VSC_SHADER_PASS_MANAGER* pShPassMnger
     {
         CALL_SH_PASS(vscVIR_PreprocessMCShader, 0, gcvNULL);
         CALL_SH_PASS(vscVIR_PerformSpecialHwPatches, 0, gcvNULL);
-        CALL_SH_PASS(VIR_Shader_CheckDual16able, 0, gcvNULL);
+        CALL_SH_PASS(vscVIR_CheckDual16able, 0, gcvNULL);
         CALL_SH_PASS(vscVIR_PutScalarConstToImm, 0, gcvNULL);
         CALL_SH_PASS(vscVIR_PutImmValueToUniform, 0, gcvNULL);
         /* vscVIR_PutImmValueToUniform may generate uniform variable for constant vector

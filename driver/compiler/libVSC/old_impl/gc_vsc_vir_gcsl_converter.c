@@ -160,7 +160,9 @@ _CalculateInstCount(
     case VIR_OP_IMG_ADDR:
     case VIR_OP_CLAMP0MAX:
     case VIR_OP_CLAMPCOORD:
-    case VIR_OP_NOP:        case VIR_OP_MOV:
+    case VIR_OP_NOP:
+    case VIR_OP_MOV:
+    case VIR_OP_MOV_DUAL16:
     case VIR_OP_COMPARE:        case VIR_OP_SAT:
     case VIR_OP_ABS:
     case VIR_OP_FLOOR:      case VIR_OP_CEIL:
@@ -1346,6 +1348,7 @@ _ConvVirOpcode2Opcode(
     case VIR_OP_CLAMPCOORD:     return gcSL_CLAMPCOORD;
     case VIR_OP_NOP:            return gcSL_NOP;
     case VIR_OP_MOV:            return gcSL_MOV;
+    case VIR_OP_MOV_DUAL16:     return gcSL_MOV;
     case VIR_OP_SET:         return gcSL_SET;
     case VIR_OP_COMPARE:            return gcSL_CMP;
     case VIR_OP_SAT:            return gcSL_SAT;
@@ -1961,7 +1964,9 @@ _ConvVirInst2Inst(
     case VIR_OP_IMG_LOAD_3D:
     case VIR_OP_CLAMP0MAX:
     case VIR_OP_CLAMPCOORD:
-    case VIR_OP_NOP:        case VIR_OP_MOV:
+    case VIR_OP_NOP:
+    case VIR_OP_MOV:
+    case VIR_OP_MOV_DUAL16:
     case VIR_OP_COMPARE:        case VIR_OP_SAT:
     case VIR_OP_ABS:
     case VIR_OP_FLOOR:      case VIR_OP_CEIL:

@@ -59,9 +59,9 @@ VSC_ErrCode vscVIR_ConvFrontFacing(VSC_SH_PASS_WORKER* pPassWorker);
 DECLARE_QUERY_PASS_PROP(vscVIR_ConvFrontFacing);
 DECLARE_SH_NECESSITY_CHECK(vscVIR_ConvFrontFacing);
 
-VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker);
-DECLARE_QUERY_PASS_PROP(VIR_Shader_CheckDual16able);
-DECLARE_SH_NECESSITY_CHECK(VIR_Shader_CheckDual16able);
+VSC_ErrCode vscVIR_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_CheckDual16able);
+DECLARE_SH_NECESSITY_CHECK(vscVIR_CheckDual16able);
 
 VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker);
 DECLARE_QUERY_PASS_PROP(vscVIR_AddOutOfBoundCheckSupport);

@@ -1460,7 +1460,7 @@ VIR_ConditionOp_SwitchLeftRight(
     IN VIR_ConditionOp cond_op
     )
 {
-    gcmASSERT(VIR_ConditionOp_DoubleOperand(cond_op));
+    gcmASSERT(VIR_ConditionOp_BinaryComparison(cond_op));
     switch(cond_op)
     {
     case VIR_COP_GREATER:
@@ -1577,7 +1577,7 @@ VIR_ConditionOp_EvaluateOneChannelConstantCondition(
     else
     {
         gcmASSERT(VIR_TypeId_isUnSignedInteger(Src0Type) || VIR_TypeId_isBoolean(Src0Type));
-        gcmASSERT(VIR_ConditionOp_SingleOperand(COP) || VIR_TypeId_isUnSignedInteger(Src1Type) || VIR_TypeId_isBoolean(Src0Type));
+        gcmASSERT(VIR_ConditionOp_UnaryComparison(COP) || VIR_TypeId_isUnSignedInteger(Src1Type) || VIR_TypeId_isBoolean(Src0Type));
 
         switch (COP)
         {
@@ -12180,7 +12180,7 @@ VIR_Inst_CanGetConditionResult(
         {
             VIR_Operand *src0 = VIR_Inst_GetSource(pInst, 0);
 
-            if(VIR_ConditionOp_SingleOperand(cop))
+            if(VIR_ConditionOp_UnaryComparison(cop))
             {
                 return VIR_Operand_ContainsConstantValue(src0);
             }
@@ -12188,7 +12188,7 @@ VIR_Inst_CanGetConditionResult(
             {
                 VIR_Operand *src1 = VIR_Inst_GetSource(pInst, 1);
 
-                gcmASSERT(VIR_ConditionOp_DoubleOperand(cop));
+                gcmASSERT(VIR_ConditionOp_BinaryComparison(cop));
 
                 if(VIR_Operand_ContainsConstantValue(src0) &&
                    VIR_Operand_ContainsConstantValue(src1))
@@ -12230,7 +12230,7 @@ VIR_Inst_EvaluateConditionResult(
     VIR_Shader      *pShader = VIR_Inst_GetShader(pInst);
     VIR_OpCode      opc = VIR_Inst_GetOpcode(pInst);
     VIR_ConditionOp comp = VIR_Inst_GetConditionOp(pInst);
-    gctBOOL         compDouble = VIR_ConditionOp_DoubleOperand(comp);
+    gctBOOL         compDouble = VIR_ConditionOp_BinaryComparison(comp);
     VIR_Operand     *src0, *src1;
 
     gcmASSERT(VIR_Inst_CanGetConditionResult(pInst));
@@ -16066,10 +16066,13 @@ VIR_Operand_GetPrecision(
     )
 {
     VIR_OperandKind     opndKind = VIR_Operand_GetOpKind(Operand);
+
     /* deprecate the operand's precision, instead, using symbol's precision */
-    if (opndKind == VIR_OPND_VIRREG ||
-        opndKind == VIR_OPND_SYMBOL ||
-        opndKind == VIR_OPND_SAMPLER_INDEXING)
+    if (!VIR_Operand_useOpndPrecision(Operand)
+        &&
+        (opndKind == VIR_OPND_VIRREG ||
+         opndKind == VIR_OPND_SYMBOL ||
+         opndKind == VIR_OPND_SAMPLER_INDEXING))
     {
         VIR_Symbol* pSym = VIR_Operand_GetSymbol(Operand);
         if(VIR_Symbol_GetPrecision(pSym) != VIR_PRECISION_ANY)
@@ -16093,10 +16096,13 @@ VIR_Operand_SetPrecision(
     )
 {
     VIR_OperandKind     opndKind = VIR_Operand_GetOpKind(Operand);
+
     /* deprecate the operand's precision, instead, using symbol's precision */
-    if (opndKind == VIR_OPND_VIRREG ||
-        opndKind == VIR_OPND_SYMBOL ||
-        opndKind == VIR_OPND_SAMPLER_INDEXING)
+    if (!VIR_Operand_useOpndPrecision(Operand)
+        &&
+        (opndKind == VIR_OPND_VIRREG ||
+         opndKind == VIR_OPND_SYMBOL ||
+         opndKind == VIR_OPND_SAMPLER_INDEXING))
     {
         VIR_Symbol* pSym = VIR_Operand_GetSymbol(Operand);
         if(VIR_Symbol_GetPrecision(pSym) != VIR_PRECISION_ANY)
@@ -18018,6 +18024,7 @@ _VIR_Inst_NeedRunSingleThreadInDual16HighpVec2(
 VSC_ErrCode
 VIR_Inst_Check4Dual16(
     IN VIR_Instruction          *pInst,
+    IN VSC_HASH_TABLE           *pWorkingInstSet,
     OUT gctBOOL                 *runSingleT,
     OUT gctBOOL                 *isDual16NotSupported,
     OUT gctBOOL                 *isDual16Highpvec2,
@@ -18026,17 +18033,27 @@ VIR_Inst_Check4Dual16(
     IN  gctBOOL                 HwSupportHIGHVEC2
     )
 {
-    VSC_ErrCode errCode = VSC_ERR_NONE;
-    gctUINT     i;
-    gctBOOL     needRunSingleT = gcvFALSE;
-    gctBOOL     isDestHighPrecision = gcvFALSE;
-    gctBOOL     isHighPrecisionOperand = gcvFALSE;
-    gctBOOL     isDestVec2orless = gcvFALSE;
-    gctBOOL     isSrcVec2orless = gcvFALSE;
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    gctUINT                     i;
+    gctBOOL                     needRunSingleT = gcvFALSE;
+    gctBOOL                     isDestHighPrecision = gcvFALSE;
+    gctBOOL                     isHighPrecisionOperand = gcvFALSE;
+    gctBOOL                     isDestVec2orless = gcvFALSE;
+    gctBOOL                     isSrcVec2orless = gcvFALSE;
+    gctBOOL                     srcMediumpReg[VIR_MAX_SRC_NUM] = { gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE };
+    VIR_OperandInfo             opndInfo;
+    VIR_OpCode                  opCode = VIR_Inst_GetOpcode(pInst);
+    VIR_ConditionOp             condOp = VIR_Inst_GetConditionOp(pInst);
 
     gcmASSERT(runSingleT && isDual16NotSupported);
 
-    if (VIR_Opcode_Dual16NeedRunInSingleT(VIR_Inst_GetOpcode(pInst), VIR_Inst_isIntType(pInst)))
+    if (opCode == VIR_OP_MOV_DUAL16)
+    {
+        *runSingleT = needRunSingleT;
+        return errCode;
+    }
+
+    if (VIR_Opcode_Dual16NeedRunInSingleT(opCode, VIR_Inst_isIntType(pInst)))
     {
         if(options && VSC_UTILS_MASK(VSC_OPTN_DUAL16Options_GetTrace(options), VSC_OPTN_DUAL16Options_TRACE_DETAIL))
         {
@@ -18071,7 +18088,13 @@ VIR_Inst_Check4Dual16(
         VIR_Operand *operand =  VIR_Inst_GetSource(pInst, i);
         isHighPrecisionOperand = gcvFALSE;
         isSrcVec2orless = gcvFALSE;
+
         errCode = VIR_Operand_Check4Dual16(pInst, operand, &isHighPrecisionOperand, isDual16NotSupported, &isSrcVec2orless);
+
+        VIR_Operand_GetOperandInfo(pInst, operand, &opndInfo);
+
+        srcMediumpReg[i] = opndInfo.isVreg && !isHighPrecisionOperand;
+
         if(isHighPrecisionOperand &&
            (!HwSupportHIGHVEC2 || !isSrcVec2orless || !isDestHighPrecision)) /* implicit conversion from highp to mediump is not supported in highpvec2 mode */
         {
@@ -18106,6 +18129,46 @@ VIR_Inst_Check4Dual16(
         if (!needRunSingleT && isDual16Highpvec2)
         {
             *isDual16Highpvec2 = gcvTRUE;
+        }
+    }
+
+    /* Check those COMPARE instructions taht DEST is MP but running under single-t. */
+    if (pWorkingInstSet && needRunSingleT && VIR_Inst_GetDest(pInst) && !isDestHighPrecision)
+    {
+        /*
+        ** If this COMPARE instructions use a unary compare condition and src0/src1 have different data type,
+        ** we need to generate a extra MOV to handle this.
+        */
+        if (VIR_OPCODE_isCompare(opCode) && VIR_ConditionOp_UnaryComparison(condOp))
+        {
+            VIR_TypeId      src0TypeId = VIR_Operand_GetTypeId(VIR_Inst_GetSource(pInst, 0));
+            VIR_TypeId      src1TypeId = VIR_Operand_GetTypeId(VIR_Inst_GetSource(pInst, 1));
+            gctBOOL         bMatched = gcvTRUE;
+
+            if (!((VIR_TypeId_isFloat(src0TypeId) && VIR_TypeId_isInteger(src1TypeId))
+                  ||
+                  (VIR_TypeId_isFloat(src1TypeId) && VIR_TypeId_isInteger(src0TypeId))))
+            {
+                bMatched = gcvFALSE;
+            }
+
+            for (i = 1; i < VIR_Inst_GetSrcNum(pInst); i++)
+            {
+                /*
+                ** If there is any source which is a mediump reg, we can't change this instruction to single-t because
+                ** we don't know if the original data of this reg is 32bit or 16bit.
+                */
+                if (srcMediumpReg[i])
+                {
+                    bMatched = gcvFALSE;
+                    break;
+                }
+            }
+
+            if (bMatched)
+            {
+                vscHTBL_DirectSet(pWorkingInstSet, (void *)pInst, gcvNULL);
+            }
         }
     }
 

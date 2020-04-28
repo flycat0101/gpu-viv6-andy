@@ -483,7 +483,8 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
      (Opcode) == VIR_OP_IMG_LOAD_3D     ||      \
      (Opcode) == VIR_OP_BITFIND_LSB     ||      \
      (Opcode) == VIR_OP_BITFIND_MSB     ||      \
-     (Opcode) == VIR_OP_MOV)
+     (Opcode) == VIR_OP_MOV             ||      \
+     (Opcode) == VIR_OP_MOV_DUAL16)
 
 #define VIR_OPCODE_useSrc2AsInstType(Opcode)    \
     ((Opcode) == VIR_OP_STORE           ||      \
@@ -545,6 +546,14 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
 
 #define VIR_OPCODE_isNonUniform(Opcode)         \
     ((Opcode) == VIR_OP_NONUNIFORM_ELECT)
+
+#define VIR_OPCODE_isCompare(Opcode)            \
+    ((Opcode) == VIR_OP_SELECT          ||      \
+     (Opcode) == VIR_OP_CSELECT         ||      \
+     (Opcode) == VIR_OP_CMP             ||      \
+     (Opcode) == VIR_OP_SET             ||      \
+     (Opcode) == VIR_OP_SETP            ||      \
+     (Opcode) == VIR_OP_CMOV)
 
 #define VIR_SymTable_MaxValidId(SymTable)   BT_GET_MAX_VALID_ID(SymTable)
 
@@ -715,6 +724,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Operand_is5BitOffset(Opnd)      VIR_Operand_HasFlag((Opnd), VIR_OPNDFLAG_5BITOFFSET)
 #define VIR_Operand_isUniformIndex(Opnd)    VIR_Operand_HasFlag((Opnd), VIR_OPNDFLAG_UNIFORM_INDEX)
 #define VIR_Operand_isRestrict(Opnd)        VIR_Operand_HasFlag((Opnd), VIR_OPNDFLAG_RESTRICT)
+#define VIR_Operand_useOpndPrecision(Opnd)  VIR_Operand_HasFlag((Opnd), VIR_OPNDFLAG_USE_OPND_PRECISION)
 #define VIR_Operand_GetHwRegClass(Opnd)     ((Opnd)->u.n._regClass)
 #define VIR_Operand_GetHwRegId(Opnd)        ((VIR_HwRegId)(Opnd)->u.n._hwRegId)
 #define VIR_Operand_GetHwShift(Opnd)        ((Opnd)->u.n._hwShift)
@@ -2217,30 +2227,30 @@ typedef enum _VIR_ConditionOp
 }
 VIR_ConditionOp;
 
-#define VIR_ConditionOp_ComparingWithZero(c)        ((c) == VIR_COP_NOT || \
-                                                     (c) == VIR_COP_NOT_ZERO || \
-                                                     (c) == VIR_COP_GREATER_OR_EQUAL_ZERO || \
-                                                     (c) == VIR_COP_GREATER_ZERO || \
-                                                     (c) == VIR_COP_LESS_OREQUAL_ZERO || \
+#define VIR_ConditionOp_ComparingWithZero(c)        ((c) == VIR_COP_NOT                     || \
+                                                     (c) == VIR_COP_NOT_ZERO                || \
+                                                     (c) == VIR_COP_GREATER_OR_EQUAL_ZERO   || \
+                                                     (c) == VIR_COP_GREATER_ZERO            || \
+                                                     (c) == VIR_COP_LESS_OREQUAL_ZERO       || \
                                                      (c) == VIR_COP_LESS_ZERO)
 
-#define VIR_ConditionOp_SingleOperand(c)            (VIR_ConditionOp_ComparingWithZero(c) || \
-                                                     (c) == VIR_COP_FINITE || \
-                                                     (c) == VIR_COP_INFINITE || \
-                                                     (c) == VIR_COP_NAN || \
-                                                     (c) == VIR_COP_NORMAL || \
-                                                     (c) == VIR_COP_ANYMSB || \
-                                                     (c) == VIR_COP_ALLMSB || \
+#define VIR_ConditionOp_UnaryComparison(c)          (VIR_ConditionOp_ComparingWithZero(c)   || \
+                                                     (c) == VIR_COP_FINITE                  || \
+                                                     (c) == VIR_COP_INFINITE                || \
+                                                     (c) == VIR_COP_NAN                     || \
+                                                     (c) == VIR_COP_NORMAL                  || \
+                                                     (c) == VIR_COP_ANYMSB                  || \
+                                                     (c) == VIR_COP_ALLMSB                  || \
                                                      (c) == VIR_COP_SELMSB)
 
-#define VIR_ConditionOp_DoubleOperand(c)            ((c) == VIR_COP_GREATER || \
-                                                     (c) == VIR_COP_LESS || \
-                                                     (c) == VIR_COP_GREATER_OR_EQUAL || \
-                                                     (c) == VIR_COP_LESS_OR_EQUAL || \
-                                                     (c) == VIR_COP_EQUAL || \
-                                                     (c) == VIR_COP_NOT_EQUAL || \
-                                                     (c) == VIR_COP_AND || \
-                                                     (c) == VIR_COP_OR || \
+#define VIR_ConditionOp_BinaryComparison(c)         ((c) == VIR_COP_GREATER                 || \
+                                                     (c) == VIR_COP_LESS                    || \
+                                                     (c) == VIR_COP_GREATER_OR_EQUAL        || \
+                                                     (c) == VIR_COP_LESS_OR_EQUAL           || \
+                                                     (c) == VIR_COP_EQUAL                   || \
+                                                     (c) == VIR_COP_NOT_EQUAL               || \
+                                                     (c) == VIR_COP_AND                     || \
+                                                     (c) == VIR_COP_OR                      || \
                                                      (c) == VIR_COP_XOR)
 
 #define VIR_ConditionOp_Unordered(c)                ((c) == VIR_COP_EQUAL_UQ                || \
@@ -3838,6 +3848,7 @@ typedef enum _VIR_OPNDFLAG
     VIR_OPNDFLAG_5BITOFFSET          = 0x0008,
     VIR_OPNDFLAG_UNIFORM_INDEX       = 0x0010, /* A0 indexing uniform (should use B0) */
     VIR_OPNDFLAG_RESTRICT            = 0x0020, /* Strict enable/swizzle */
+    VIR_OPNDFLAG_USE_OPND_PRECISION  = 0x0040, /* Use the precision of the operand itself, instread of symbol. */
 } VIR_OPNDFLAG;
 
 struct _VIR_OPERAND_HEADER
@@ -7627,6 +7638,7 @@ VIR_Symbol_SpecialRegAlloc(
 VSC_ErrCode
 VIR_Inst_Check4Dual16(
     IN VIR_Instruction          *pInst,
+    IN VSC_HASH_TABLE           *pWorkingInstSet,
     OUT gctBOOL                 *runSingleT,
     OUT gctBOOL                 *isDual16NotSupported,
     OUT gctBOOL                 *isDual16Highpvec2,

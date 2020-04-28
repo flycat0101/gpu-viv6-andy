@@ -2195,7 +2195,7 @@ _VSC_CPF_SourceChannelCouldBeNonConst(
                     return gcvFALSE;
                 case 1:
                 {
-                    if(VIR_ConditionOp_SingleOperand(VIR_Inst_GetConditionOp(pInst)))
+                    if(VIR_ConditionOp_UnaryComparison(VIR_Inst_GetConditionOp(pInst)))
                     {
                         gctBOOL isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, VIR_Inst_GetSource(pInst, 0), channel, 0, tmpFlow, &constVal0, gcvNULL);
                         gctBOOL cmpResult;
@@ -2208,14 +2208,14 @@ _VSC_CPF_SourceChannelCouldBeNonConst(
 
                         return !cmpResult;
                     }
-                    else if(VIR_ConditionOp_DoubleOperand(VIR_Inst_GetConditionOp(pInst)))
+                    else if(VIR_ConditionOp_BinaryComparison(VIR_Inst_GetConditionOp(pInst)))
                     {
                         return gcvFALSE;
                     }
                 }
                 case 2:
                 {
-                    if(VIR_ConditionOp_SingleOperand(VIR_Inst_GetConditionOp(pInst)))
+                    if(VIR_ConditionOp_UnaryComparison(VIR_Inst_GetConditionOp(pInst)))
                     {
                         gctBOOL isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, VIR_Inst_GetSource(pInst, 0), channel, 0, tmpFlow, &constVal0, gcvNULL);
                         gctBOOL cmpResult;
@@ -2228,7 +2228,7 @@ _VSC_CPF_SourceChannelCouldBeNonConst(
 
                         return cmpResult;
                     }
-                    else if(VIR_ConditionOp_DoubleOperand(VIR_Inst_GetConditionOp(pInst)))
+                    else if(VIR_ConditionOp_BinaryComparison(VIR_Inst_GetConditionOp(pInst)))
                     {
                         gctBOOL isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, VIR_Inst_GetSource(pInst, 0), channel, 0, tmpFlow, &constVal0, gcvNULL);
                         gctBOOL cmpResult;
@@ -2614,7 +2614,7 @@ _VSC_CPF_PerformOnInst(
         gctUINT     channelCount = 0;
         gctUINT     constChannelCount = 0;
         gctUINT     nopChannelCount = 0;
-        gctBOOL     singleCond = VIR_ConditionOp_SingleOperand(conditionOp);
+        gctBOOL     singleCond = VIR_ConditionOp_UnaryComparison(conditionOp);
 
         if (_VSC_CPF_GetVRegNo(pInst, dstOpnd) != VIR_INVALID_ID)
         {

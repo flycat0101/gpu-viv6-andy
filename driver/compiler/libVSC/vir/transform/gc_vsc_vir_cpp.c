@@ -2218,7 +2218,6 @@ static VSC_ErrCode _VSC_CPP_CopyPropagationForBB(
 
         if (VIR_Inst_GetOpcode(inst) == VIR_OP_MOV)
         {
-
             if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetOPTS(options),
                 VSC_OPTN_CPPOptions_BACKWARD_OPT))
             {

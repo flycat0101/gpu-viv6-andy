@@ -6762,11 +6762,101 @@ VIR_Inst_Dual16NotSupported(
     return gcvFALSE;
 }
 
+static VSC_ErrCode
+_vscVIR_HandleCompareInstWithMediumDest(
+    IN VIR_Shader*          pShader,
+    IN VSC_HASH_TABLE*      pWorkingInstSet,
+    IN VSC_MM*              pMM,
+    INOUT gctBOOL*          pChanged
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    gctBOOL                 bChanged = gcvFALSE;
+    VSC_HASH_ITERATOR       iter;
+    VSC_DIRECT_HNODE_PAIR   pair;
+
+    vscHTBLIterator_Init(&iter, pWorkingInstSet);
+    for (pair = vscHTBLIterator_DirectFirst(&iter);
+         IS_VALID_DIRECT_HNODE_PAIR(&pair);
+         pair = vscHTBLIterator_DirectNext(&iter))
+    {
+        VIR_Instruction*    pWorkingInst = (VIR_Instruction*)VSC_DIRECT_HNODE_PAIR_FIRST(&pair);
+        VIR_Function*       pWorkingFunc = VIR_Inst_GetFunction(pWorkingInst);
+        VIR_Operand*        pWorkingDestOpnd = VIR_Inst_GetDest(pWorkingInst);
+        VIR_TypeId          origOpndTypeId = VIR_Operand_GetTypeId(pWorkingDestOpnd);
+        VIR_TypeId          origSymTypeId;
+        VIR_Instruction*    pNewMovInst = gcvNULL;
+        VIR_Operand*        pNewOpnd = gcvNULL;
+        VIR_VirRegId        newRegId = VIR_INVALID_ID;
+        VIR_SymId           newSymId = VIR_INVALID_ID;
+        VIR_Symbol*         pNewSym = gcvNULL;
+
+        if (!VIR_Operand_isSymbol(pWorkingDestOpnd))
+        {
+            gcmASSERT(gcvFALSE);
+            continue;
+        }
+        origSymTypeId = VIR_Symbol_GetTypeId(VIR_Operand_GetSymbol(pWorkingDestOpnd));
+
+        /* Add a new symbol, which is HIGHP. */
+        newRegId = VIR_Shader_NewVirRegId(pShader, 1);
+        errCode = VIR_Shader_AddSymbol(pShader,
+                                       VIR_SYM_VIRREG,
+                                       newRegId,
+                                       VIR_Shader_GetTypeFromId(pShader, origSymTypeId),
+                                       VIR_STORAGE_UNKNOWN,
+                                       &newSymId);
+        ON_ERROR(errCode, "Fail to add a new symbol.");
+
+        pNewSym = VIR_Shader_GetSymFromId(pShader, newSymId);
+        VIR_Symbol_SetPrecision(pNewSym, VIR_PRECISION_HIGH);
+
+        /*
+        ** Insert a MOV after the working instruction:
+        **  MOV.t0, origDest, newReg
+        */
+        errCode = VIR_Function_AddInstructionAfter(pWorkingFunc,
+                                                   VIR_OP_MOV_DUAL16,
+                                                   origOpndTypeId,
+                                                   pWorkingInst,
+                                                   gcvTRUE,
+                                                   &pNewMovInst);
+        ON_ERROR(errCode, "Fail to insert a new instruction.");
+
+        /* Set DEST. */
+        pNewOpnd = VIR_Inst_GetDest(pNewMovInst);
+        VIR_Operand_Copy(pNewOpnd, pWorkingDestOpnd);
+        gcmASSERT(VIR_Operand_GetPrecision(pNewOpnd) != VIR_PRECISION_HIGH);
+
+        /* Set SOURCE0. */
+        pNewOpnd = VIR_Inst_GetSource(pNewMovInst, 0);
+        VIR_Operand_SetSymbol(pNewOpnd, pWorkingFunc, newSymId);
+        VIR_Operand_SetPrecision(pNewOpnd, VIR_PRECISION_HIGH);
+        VIR_Operand_SetSwizzle(pNewOpnd, VIR_Enable_2_Swizzle_WShift(VIR_Operand_GetEnable(pWorkingDestOpnd)));
+
+        /* This MOV instruciton is running under single-t. */
+        VIR_Inst_SetThreadMode(pNewMovInst, VIR_THREAD_D16_DUAL_32);
+
+        /* Change the original instruction. */
+        VIR_Operand_SetSymbol(pWorkingDestOpnd, pWorkingFunc, newSymId);
+
+        bChanged = gcvTRUE;
+    }
+
+    if (pChanged)
+    {
+        *pChanged = bChanged;
+    }
+
+OnError:
+    return errCode;
+}
+
 static gctBOOL
-VIR_Inst_Dual16NotSupportedShader(
+_vscVIR_Dual16NotSupportedShader(
     IN VIR_Function *pFunc,
     IN VIR_Instruction *  pInst
-)
+    )
 {
     if (VIR_Function_GetInstCount(pFunc) > 512 &&
         VIR_Inst_GetOpcode(pInst) == VIR_OP_EXP2)
@@ -6774,40 +6864,6 @@ VIR_Inst_Dual16NotSupportedShader(
         return gcvTRUE;
     }
     return gcvFALSE;
-}
-
-DEF_QUERY_PASS_PROP(VIR_Shader_CheckDual16able)
-{
-    pPassProp->supportedLevels = VSC_PASS_LEVEL_MC;
-    pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_DUAL16;
-}
-
-DEF_SH_NECESSITY_CHECK(VIR_Shader_CheckDual16able)
-{
-    VSC_COMPILER_CONFIG     *compCfg = &pPassWorker->pCompilerParam->cfg;
-    VIR_Shader              *Shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
-
-    VIR_Shader_SetDual16Mode(Shader, gcvFALSE);
-
-    /* only fragment shader or ocl with VC_OPTION=DUAL16:num>0 can be dual16 shader,
-    ** and exclude OpenVG shader due to precision issue
-    */
-    if (!compCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.supportDual16 ||
-        (VIR_Shader_GetKind(Shader) != VIR_SHADER_FRAGMENT)       ||
-        (!VIR_Shader_IsFS(Shader) &&
-         !(VIR_Shader_IsCL(Shader) && gcGetDualFP16Mode(compCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasHalti2)))    ||
-        VIR_Shader_IsDesktopGL(Shader)                            ||
-        VIR_Shader_IsVulkan(Shader)                               ||
-        VIR_Shader_IsOpenVG(Shader)                               ||
-        VIR_Shader_HasOutputArrayHighp(Shader)                    || /* currently, we disable dual16 if the output array is highp */
-        !VirSHADER_DoDual16(VIR_Shader_GetId(Shader))             ||
-        gcmOPT_DisableOPTforDebugger()                               /* we disable dual16 for debugging mode */
-        )
-    {
-        return gcvFALSE;
-    }
-
-    return gcvTRUE;
 }
 
 static gctINT
@@ -6894,7 +6950,49 @@ _CheckCstRegFileReadPortLimitation(VIR_Shader* pShader, VIR_Instruction* pInst, 
     return addedInstCount;
 }
 
-VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
+DEF_QUERY_PASS_PROP(vscVIR_CheckDual16able)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_MC;
+    pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_DUAL16;
+    pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
+}
+
+DEF_SH_NECESSITY_CHECK(vscVIR_CheckDual16able)
+{
+    VSC_COMPILER_CONFIG     *compCfg = &pPassWorker->pCompilerParam->cfg;
+    VIR_Shader              *Shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+
+    VIR_Shader_SetDual16Mode(Shader, gcvFALSE);
+
+    /* only fragment shader or ocl with VC_OPTION=DUAL16:num>0 can be dual16 shader,
+    ** and exclude OpenVG shader due to precision issue
+    */
+    if (!compCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.supportDual16 ||
+        (VIR_Shader_GetKind(Shader) != VIR_SHADER_FRAGMENT)       ||
+        (!VIR_Shader_IsFS(Shader) &&
+         !(VIR_Shader_IsCL(Shader) && gcGetDualFP16Mode(compCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasHalti2)))    ||
+        VIR_Shader_IsDesktopGL(Shader)                            ||
+        VIR_Shader_IsOpenVG(Shader)                               ||
+        VIR_Shader_HasOutputArrayHighp(Shader)                    || /* currently, we disable dual16 if the output array is highp */
+        !VirSHADER_DoDual16(VIR_Shader_GetId(Shader))             ||
+        gcmOPT_DisableOPTforDebugger()                               /* we disable dual16 for debugging mode */
+        )
+    {
+        return gcvFALSE;
+    }
+
+    if (VIR_Shader_IsVulkan(Shader))
+    {
+        if ((pPassWorker->pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_ENABLE_DUAL16_FOR_VK) == 0)
+        {
+            return gcvFALSE;
+        }
+    }
+
+    return gcvTRUE;
+}
+
+VSC_ErrCode vscVIR_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
 {
     VSC_ErrCode             errCode = VSC_ERR_NONE;
     VIR_Shader              *Shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
@@ -6909,6 +7007,9 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
     gctBOOL                 isPerfBench = gcvFALSE;
     VSC_HW_CONFIG*          pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
     gctBOOL                 bHasOneConstFix = pHwCfg->hwFeatureFlags.noOneConstLimit;
+    VSC_MM*                 pMM = pPassWorker->basePassWorker.pMM;
+    VSC_HASH_TABLE*         pWorkingInstSet = gcvNULL;
+    gctBOOL                 bChanged = gcvFALSE;
 
     if (compCfg->ctx.appNameId == gcvPATCH_GLBM21 ||
         compCfg->ctx.appNameId == gcvPATCH_GLBM25 ||
@@ -6985,6 +7086,8 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
             VIR_Shader_Dump(gcvNULL, "before dual16 shader check.", Shader, gcvTRUE);
         }
 
+        pWorkingInstSet = (VSC_HASH_TABLE*)vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 16);
+
         gcoOS_ZeroMemory(&codeInfo, gcmSIZEOF(codeInfo));
         /* Calculate HW inst count */
         VIR_FuncIterator_Init(&funcIter, &Shader->functions);
@@ -7015,7 +7118,7 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
                     /* A WAR to disable dual16 for some CTS cases because our HW can't support denormalize F16. */
                     (isAppConformance && (VIR_Inst_GetOpcode(pInst) == VIR_OP_SINPI || VIR_Inst_GetOpcode(pInst) == VIR_OP_COSPI)) ||
                     /* nxp benchmark render error caused by dual16, this is a workround to disable shader with pow API */
-                    ((!isPerfBench) && (compCfg->ctx.appNameId == gcvPATCH_KANZI) && (VIR_Inst_Dual16NotSupportedShader(pFunc, pInst))))
+                    ((!isPerfBench) && (compCfg->ctx.appNameId == gcvPATCH_KANZI) && (_vscVIR_Dual16NotSupportedShader(pFunc, pInst))))
                 {
                     if(VSC_UTILS_MASK(VSC_OPTN_DUAL16Options_GetTrace(options), VSC_OPTN_DUAL16Options_TRACE_DETAIL))
                     {
@@ -7026,7 +7129,15 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
                     break;
                 }
 
-                VIR_Inst_Check4Dual16(pInst, &needRunSingleT, &dual16NotSupported, &isDual16Highpvec2, options, dumper, HWSUPPORTDUAL16HIGHVEC2);
+                VIR_Inst_Check4Dual16(pInst,
+                                      pWorkingInstSet,
+                                      &needRunSingleT,
+                                      &dual16NotSupported,
+                                      &isDual16Highpvec2,
+                                      options,
+                                      dumper,
+                                      HWSUPPORTDUAL16HIGHVEC2
+                                      );
                 if(dual16NotSupported && VSC_UTILS_MASK(VSC_OPTN_DUAL16Options_GetTrace(options), VSC_OPTN_DUAL16Options_TRACE_DETAIL))
                 {
                     VIR_LOG(dumper, "inst not supported by dual16.\n", i);
@@ -7109,6 +7220,13 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
                 VIR_LOG(dumper, "dual16 not supported.\n", i);
                 VIR_LOG_FLUSH(dumper);
             }
+
+            if (pWorkingInstSet)
+            {
+                vscHTBL_Destroy(pWorkingInstSet);
+                pWorkingInstSet = gcvNULL;
+            }
+
             return errCode;
         }
     }
@@ -7116,12 +7234,30 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
     /* In dual16, we need to put all HP attributes in front of MP attributes */
     _SortAttributesOfDual16Shader(Shader, &compCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg);
 
+    /* Handle those COMPARE instructions that DEST is MP but running under single-t. */
+    errCode = _vscVIR_HandleCompareInstWithMediumDest(Shader,
+                                                      pWorkingInstSet,
+                                                      pMM,
+                                                      &bChanged);
+    ON_ERROR(errCode, "Fail to handle the compare instruction with a mediump dest.");
+
+    pPassWorker->pResDestroyReq->s.bInvalidateDu = bChanged;
+    pPassWorker->pResDestroyReq->s.bInvalidateRdFlow= bChanged;
+
+    /* Enable dual16 for this shader. */
     VIR_Shader_SetDual16Mode(Shader, gcvTRUE);
 
     if(VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(Shader), VIR_Shader_GetId(Shader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE) ||
        VSC_UTILS_MASK(VSC_OPTN_DUAL16Options_GetTrace(options), VSC_OPTN_DUAL16Options_TRACE_OUTPUT))
     {
         VIR_Shader_Dump(gcvNULL, "After dual16 shader transform.", Shader, gcvTRUE);
+    }
+
+OnError:
+    if (pWorkingInstSet)
+    {
+        vscHTBL_Destroy(pWorkingInstSet);
+        pWorkingInstSet = gcvNULL;
     }
 
     return errCode;
@@ -11040,6 +11176,7 @@ VSC_ErrCode vscVIR_PreprocessCGShader(VSC_SH_PASS_WORKER* pPassWorker)
                 gctBOOL bDual16NotSupported = gcvFALSE;
 
                 VIR_Inst_Check4Dual16(inst,
+                                      gcvNULL,
                                       &bNeedRunSingleT,
                                       &bDual16NotSupported,
                                       gcvNULL,
