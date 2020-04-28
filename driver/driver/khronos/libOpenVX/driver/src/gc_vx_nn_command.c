@@ -3910,7 +3910,22 @@ void _fill_TP_TENSOR_STRIDED_SLICE_Command(
     vx_int32 begin_dims[2] = { parameter->tp_value->u32[0], parameter->tp_value->u32[1]};
     vx_int32 end_dims[2] = { parameter->tp_value->u32[2], parameter->tp_value->u32[3] };
     vx_int32 stride_dims[2] = { parameter->tp_value->u32[4], parameter->tp_value->u32[5] };
+    vx_int32 x_start, x_end, y_start, y_end;
     DEFINE_TP_GENERAL_PARAMETER();
+
+    x_start = gcmMAX(0, begin_dims[0]);
+    y_start = gcmMAX(0, begin_dims[1]);
+    x_end = gcmMIN((vx_int32)inXSize - 1, end_dims[0] - 1);
+    y_end = gcmMIN((vx_int32)inYSize - 1, end_dims[1] - 1);
+    /* For strides > 1, the end of window must be on the valid pixel within the last stride. */
+    if (stride_dims[0] > 1)
+    {
+        x_end = x_start + ((x_end - x_start) / stride_dims[0] * stride_dims[0]);
+    }
+    if (stride_dims[1] > 1)
+    {
+        y_end = y_start + ((y_end - y_start) / stride_dims[1] * stride_dims[1]);
+    }
 
     for (i = 0; i < split_count; i++)
     {
@@ -3919,10 +3934,11 @@ void _fill_TP_TENSOR_STRIDED_SLICE_Command(
         info_array[i].vx_tp_general_cmd_split_info.inImageZSize = split_sizes[i];
         info_array[i].vx_tp_general_cmd_split_info.inImageStride = inYStride / inputElemSize;
         info_array[i].vx_tp_general_cmd_split_info.inImageSlice = inZStride / inputElemSize;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = gcmMAX(0, begin_dims[0]);
-        info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = gcmMAX(0, begin_dims[1]);
-        info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = gcmMIN((vx_int32)inXSize - 1, end_dims[0] - 1);
-        info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = gcmMIN((vx_int32)inYSize - 1, end_dims[1] - 1);
+        info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = x_start;
+        info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = y_start;
+
+        info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = x_end;
+        info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = y_end;
         info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
         info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inZStride * split_offsets[i];
         if (stride_dims[0] == 1)
