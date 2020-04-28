@@ -478,6 +478,14 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
     info->vx_nn_general_cmd_info.outImageXstride = output->yStride;
     info->vx_nn_general_cmd_info.outImageYstride = output->zStride / output->yStride;
 
+    vxmASSERT(info->vx_nn_general_cmd_info.kernelXSize < 16 && info->vx_nn_general_cmd_info.kernelYSize < 16);
+
+    if (!gcoHAL_IsFeatureAvailable(gcvNULL, gcFEATURE_BIT_NN_HW_LIMITATION_NATIVE_KER_1x2_2x1))
+    {
+        /* Not support 1x2 or 2x1 kernel. */
+        vxmASSERT(info->vx_nn_general_cmd_info.kernelXSize * info->vx_nn_general_cmd_info.kernelYSize != 2);
+    }
+
     if (output->sRAM)
     {
         info->vx_nn_general_cmd_info.outImageCircularBufSize = output->circleBufferSize;
