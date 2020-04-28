@@ -1394,12 +1394,14 @@ static VkResult halti5_program_blit_const(
     uint32_t hwConstRegAddr;
     SHADER_CONSTANT_HW_LOCATION_MAPPING *hwMapping = gcvNULL;
     gcsHINT_PTR pHints = &blitProg->hwStates.hints;
-    __vkScratchMem *pScratchMem = __vkGetScratchMem(cmdBuf, 144);
+    /* We need to get the ubo size from the spirv binary. */
+    uint32_t uboSizeInByte = 144;
+    __vkScratchMem *pScratchMem = __vkGetScratchMem(cmdBuf, uboSizeInByte);
     VkResult result = VK_SUCCESS;
 
     __VK_ONERROR(__vk_MapMemory((VkDevice)devCtx, (VkDeviceMemory)(uintptr_t)pScratchMem->memory,
-                                0, 128, 0, (void**)&pF));
-    __VK_MEMZERO(pF, 128);
+                                0, uboSizeInByte, 0, (void**)&pF));
+    __VK_MEMZERO(pF, uboSizeInByte);
 
     /* > srcOffset, srcExtent, dstOffset, dstExtent, invert: same as parameter
        > scale: srcExtent / (float)dstExtent
