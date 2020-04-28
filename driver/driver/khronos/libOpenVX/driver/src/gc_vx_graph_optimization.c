@@ -4201,11 +4201,14 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_multiTranspose(vx_graph graph)
             /*find the same transpose node*/
             for(i = 0; i < node->numChildren; i++)
             {
-                if(vxoGraphOptimization_getKernelType(nodeTable[node->childNodes[i]]) == OP_TRANSPOSE)
+                vx_node child = nodeTable[node->childNodes[i]];
+                vx_tensor transposeOutput = (vx_tensor)vxoGraphOptimization_getOutputParameter(child);
+                if(vxoGraphOptimization_getKernelType(child) == OP_TRANSPOSE &&
+                    vxoTensor_IsVirtualTensor(transposeOutput) )
                 {
                     if(transposeDims[0] == 0xff)
                     {
-                        vxMemCopy(transposeDims, ((vx_array)nodeTable[node->childNodes[i]]->paramTable[1])->memory.logicals[0],
+                        vxMemCopy(transposeDims, ((vx_array)child->paramTable[1])->memory.logicals[0],
                             sizeof(vx_uint32) * dimNum);
 
                         sameTranspose[childTcnt++] = node->childNodes[i];
@@ -4213,7 +4216,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_multiTranspose(vx_graph graph)
                     else
                     {
                         vx_uint32 j = 0;
-                        vx_uint32 *ptr = (vx_uint32 *)((vx_array)nodeTable[node->childNodes[i]]->paramTable[1])->memory.logicals[0];
+                        vx_uint32 *ptr = (vx_uint32 *)((vx_array)child->paramTable[1])->memory.logicals[0];
                         for(j = 0; j < dimNum; j++)
                         {
                             if(transposeDims[j] != ptr[j])
@@ -4280,11 +4283,15 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_multiTranspose(vx_graph graph)
             /*for one branch case*/
             while(vxoGraphOptimization_getKernelType(node) == OP_TRANSPOSE && transposeCnt < 6)
             {
+                /*do not merge node whose output is normal tensor*/
+                vx_tensor outputTensor = (vx_tensor)vxoGraphOptimization_getOutputParameter(node);
+                if (outputTensor == VX_NULL || !vxoTensor_IsVirtualTensor(outputTensor))
+                    break;
+
                 transposeNodes[transposeCnt++] = node;
                 if(node->numChildren != 1)
                     break;
                 node = nodeTable[node->childNodes[0]];
-
                 if(node->numParents > 1 || node->merged)
                     break;
             }
