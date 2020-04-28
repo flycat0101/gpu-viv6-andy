@@ -1255,6 +1255,9 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
             gctUINT               hwRegNoForSampleMaskId          : 9;
             gctUINT               hwRegChannelForSampleMaskId     : 2;
 
+            /* PS reg start index, exclude #position. */
+            gctUINT               psStartRegIndex                 : 2;
+
             /* Shader will run on per-sample frequency */
             gctUINT               bExecuteOnSampleFreq            : 1;
 
@@ -1270,12 +1273,10 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
                implements alpha-blend, or for OGL, lastFragData is presented) */
             gctUINT               bNeedRtRead                     : 1;
 
-#if gcdALPHA_KILL_IN_SHADER
             gctUINT               alphaClrKillInstsGened          : 1;
-#else
-            gctUINT               reserved                        : 1;
-#endif
             gctUINT               fragColorUsage                  : 2;
+
+            gctUINT               reserved                        : 28;
         } ps;
 
         /* States acted on gps */
@@ -1305,7 +1306,6 @@ typedef struct SHADER_EXECUTABLE_HINTS
     SHADER_EXECUTABLE_NATIVE_HINTS          nativeHints;
     SHADER_EXECUTABLE_DERIVED_HINTS         derivedHints;
 }SHADER_EXECUTABLE_HINTS;
-
 
 struct SHADER_EXECUTABLE_INSTANCE;
 

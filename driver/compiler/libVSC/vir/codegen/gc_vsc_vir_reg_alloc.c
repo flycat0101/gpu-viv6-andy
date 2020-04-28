@@ -5490,6 +5490,9 @@ _VIR_RA_LS_GetStartReg(
         {
             startReg = 1;
         }
+
+        pShader->psRegStartIndex = startReg;
+
         break;
     case VIR_SHADER_TESSELLATION_CONTROL:
         {

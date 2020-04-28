@@ -5398,6 +5398,9 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
             )
         {
             pStatesPgmer->pHints->psInputControlHighpPosition = 0x1;
+
+            /* The ps start reg index must be 2, so we can match the hw behavior. */
+            gcmASSERT(pPsSEP->exeHints.derivedHints.prvStates.ps.psStartRegIndex == 2);
         }
     }
 
