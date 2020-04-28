@@ -154,6 +154,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDescriptorPool(
             size.resource, 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 
         __VK_ONERROR((dsp->resourceInfo ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY));
+
+        __VK_MEMZERO(dsp->resourceInfo, size.resource);
     }
 
     if (size.sampler)
@@ -162,6 +164,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDescriptorPool(
             size.sampler, 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 
         __VK_ONERROR((dsp->sampler ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY));
+
+        __VK_MEMZERO(dsp->sampler, size.sampler);
     }
 
     __vk_utils_region_set(&dsp->cur, 0, 0);

@@ -12101,7 +12101,6 @@ VkResult halti5_updateDescriptorSet(
                 break;
 
             case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
-            case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
                 if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
                 {
                     __vkImageView *imgv = resInfo->u.imageInfo.imageView;
@@ -12128,6 +12127,30 @@ VkResult halti5_updateDescriptorSet(
                             if (samplers[0] != VK_NULL_HANDLE)
                                 patchInfos[entryIdx].compareOp = samplers[0]->createInfo.compareOp;
                         }
+                        patchInfos[entryIdx].swizzles[0] = __vkConvertSwizzle(imgv->createInfo.components.r, SWIZZLE_RED);
+                        patchInfos[entryIdx].swizzles[1] = __vkConvertSwizzle(imgv->createInfo.components.g, SWIZZLE_GREEN);
+                        patchInfos[entryIdx].swizzles[2] = __vkConvertSwizzle(imgv->createInfo.components.b, SWIZZLE_BLUE);
+                        patchInfos[entryIdx].swizzles[3] = __vkConvertSwizzle(imgv->createInfo.components.a, SWIZZLE_ALPHA);
+                        patchIdx++;
+                    }
+                }
+                entryIdx++;
+                break;
+
+            case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
+                if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
+                {
+                    __vkImageView *imgv = resInfo->u.imageInfo.imageView;
+                    halti5_imageView *chipImgv = (halti5_imageView *)imgv->chipPriv;
+                    __VK_ASSERT(resInfo->type == __VK_DESC_RESOURCE_IMAGEVIEW_INFO);
+                    if (chipImgv->patchKey)
+                    {
+                        patchKeys[entryIdx] = chipImgv->patchKey;
+                        patchInfos[entryIdx].binding = binding->std.binding;
+                        patchInfos[entryIdx].arrayIndex = j;
+                        patchInfos[entryIdx].patchStages = binding->std.stageFlags;
+                        patchInfos[entryIdx].patchFormat = chipImgv->patchFormat;
+                        patchInfos[entryIdx].viewType = imgv->createInfo.viewType;
                         patchInfos[entryIdx].swizzles[0] = __vkConvertSwizzle(imgv->createInfo.components.r, SWIZZLE_RED);
                         patchInfos[entryIdx].swizzles[1] = __vkConvertSwizzle(imgv->createInfo.components.g, SWIZZLE_GREEN);
                         patchInfos[entryIdx].swizzles[2] = __vkConvertSwizzle(imgv->createInfo.components.b, SWIZZLE_BLUE);
