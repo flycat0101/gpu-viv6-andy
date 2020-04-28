@@ -362,9 +362,40 @@ VX_PRIVATE_API vx_bool vxoNNTensorCopy_TP_Support(vx_node node, const vx_referen
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
-    support = support && ((TENSOR_VIEW_SIZE_INDEX(dst, 0) * TENSOR_VIEW_SIZE_INDEX(dst, 1) * TENSOR_VIEW_SIZE_INDEX(dst, 2) > 1) &&
-                        vxnneIsTPSupportFormat(context, src, VX_NULL, dst));
-                        vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+    support = support && (TENSOR_VIEW_SIZE_INDEX(dst, 0) * TENSOR_VIEW_SIZE_INDEX(dst, 1) * TENSOR_VIEW_SIZE_INDEX(dst, 2) > 1);
+    support = support && vxnneIsTPSupportFormat(context, src, VX_NULL, dst);
+
+    if (support)
+    {
+        if (TENSOR_VIEW_DIM_NUM(src) == TENSOR_VIEW_DIM_NUM(dst))
+        {
+            if ((TENSOR_VIEW_DIM_NUM(src) > 4) ||
+                ((TENSOR_VIEW_DIM_NUM(src) == 4) && (TENSOR_VIEW_SIZE_INDEX(src, 3) != TENSOR_VIEW_SIZE_INDEX(dst, 3))))
+            {
+                support = vx_false_e;
+            }
+        }
+        else
+        {
+            vx_uint32 i, srcDimCount = 1, dstDimCount = 1;
+
+            for (i = 0; i < gcmMAX(TENSOR_VIEW_DIM_NUM(src), TENSOR_VIEW_DIM_NUM(dst)); i++)
+            {
+                srcDimCount *= TENSOR_VIEW_SIZE_INDEX(src, i);
+                dstDimCount *= TENSOR_VIEW_SIZE_INDEX(dst, i);
+
+                if (i > 1 && (TENSOR_VIEW_START_INDEX(src, i) != 0 || TENSOR_VIEW_START_INDEX(dst, i) != 0))
+                {
+                    support = vx_false_e;
+                    break;
+                }
+            }
+
+            support = support && (srcDimCount == dstDimCount);
+        }
+    }
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
     return support;
 }
@@ -420,8 +451,6 @@ VX_PRIVATE_API vx_status vxoNNTensorCopy_TP_Initialize(vxnne_layer ops_layer, co
         vxnneOperation_TP_Deinitialize,
         batchCount,
         0));
-
-    memset(&conv, 0, sizeof(vx_op_param_s));
 
     conv.enable_relu = vx_false_e;
     conv.pool_stride = 1;
