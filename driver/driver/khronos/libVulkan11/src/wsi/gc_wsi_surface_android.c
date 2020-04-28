@@ -413,7 +413,17 @@ static void __SelectNativeWindowRenderMode(
     ANativeWindow *win
     )
 {
-    sc->renderMode = __VK_WSI_INDIRECT_RENDERING;
+    __vkDevContext * devCtx = (__vkDevContext *) sc->device;
+    __VkDirectRenderMode renderMode = __VK_WSI_INDIRECT_RENDERING;
+
+    if (devCtx->database->REG_SuperTiledTexture)
+    {
+         renderMode = __VK_WSI_DIRECT_RENDERING_NOFC;
+    }
+
+    /* sc->enableTileStatus = VK_FALSE; */
+    sc->renderMode = renderMode;
+
     ALOGV(" %s: sc=%p win=%p renderMode=%d", __func__, sc, win, sc->renderMode);
 }
 
@@ -823,27 +833,31 @@ static VkResult __CreateImageBuffer(
     imgInfo.tiling        = VK_IMAGE_TILING_OPTIMAL;
 
     imageBuffer->renderTarget = VK_NULL_HANDLE;
+    imageBuffer->resolveTarget = VK_NULL_HANDLE;
+
     __VK_ONERROR(__vk_CreateImage(sc->device, &imgInfo, gcvNULL, &imageBuffer->renderTarget));
 
-    /* allocate memory for image. */
-    __VK_MEMZERO(&memAlloc, sizeof(memAlloc));
-    memAlloc.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    memAlloc.allocationSize  = (__VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imageBuffer->renderTarget))->memReq.size;
-    memAlloc.memoryTypeIndex = 0;
-    __VK_ONERROR(__vk_AllocateMemory(sc->device, &memAlloc, gcvNULL, &imageBuffer->renderTargetMemory));
+    if (sc->renderMode == __VK_WSI_INDIRECT_RENDERING)
+    {
+        /* allocate memory for image. */
+        __VK_MEMZERO(&memAlloc, sizeof(memAlloc));
+        memAlloc.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        memAlloc.allocationSize  = (__VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imageBuffer->renderTarget))->memReq.size;
+        memAlloc.memoryTypeIndex = 0;
+        __VK_ONERROR(__vk_AllocateMemory(sc->device, &memAlloc, gcvNULL, &imageBuffer->renderTargetMemory));
 
-    /* bind memory to image. */
-    __VK_ONERROR(__vk_BindImageMemory(sc->device, imageBuffer->renderTarget, imageBuffer->renderTargetMemory, 0));
+        /* bind memory to image. */
+        __VK_ONERROR(__vk_BindImageMemory(sc->device, imageBuffer->renderTarget, imageBuffer->renderTargetMemory, 0));
 
-    /* Create the swap chain resolve buffers */
-    __VK_MEMZERO(&bufInfo, sizeof(VkBufferCreateInfo));
-    bufInfo.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufInfo.usage       = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    bufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    bufInfo.size        = (__VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imageBuffer->renderTarget))->pImgLevels[0].size;
+        /* Create the swap chain resolve buffers */
+        __VK_MEMZERO(&bufInfo, sizeof(VkBufferCreateInfo));
+        bufInfo.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufInfo.usage       = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+        bufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        bufInfo.size        = (__VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imageBuffer->renderTarget))->pImgLevels[0].size;
 
-    imageBuffer->resolveTarget = VK_NULL_HANDLE;
-    __VK_ONERROR(__vk_CreateBuffer(sc->device, &bufInfo, gcvNULL, &imageBuffer->resolveTarget));
+        __VK_ONERROR(__vk_CreateBuffer(sc->device, &bufInfo, gcvNULL, &imageBuffer->resolveTarget));
+    }
 
     imageBuffer->nativeBuffer = NULL;
 
@@ -1061,7 +1075,14 @@ static VkResult __AcquireNextImage(
         /* Wrap native window buffer as VkDeviceMemory. */
         __VK_ONERROR(__WrapNativeWindowBufferMemory(sc->device, nativeBuffer, NULL, &memory));
 
-        result = __vk_BindBufferMemory(sc->device, imageBuffer->resolveTarget, memory, 0);
+        if (sc->renderMode == __VK_WSI_INDIRECT_RENDERING)
+        {
+            result = __vk_BindBufferMemory(sc->device, imageBuffer->resolveTarget, memory, 0);
+        }
+        else if (sc->renderMode == __VK_WSI_DIRECT_RENDERING_NOFC)
+        {
+            result = __vk_BindImageMemory(sc->device, imageBuffer->renderTarget, memory, 0);
+        }
 
         if (result != VK_SUCCESS)
         {
@@ -1072,7 +1093,15 @@ static VkResult __AcquireNextImage(
         imageBuffer->bufferRowLength   = bufferRowLength;
         imageBuffer->bufferImageHeight = bufferHeight;
         imageBuffer->nativeBuffer = nativeBuffer;
-        imageBuffer->resolveTargetMemory = memory;
+
+        if (sc->renderMode == __VK_WSI_INDIRECT_RENDERING)
+        {
+            imageBuffer->resolveTargetMemory = memory;
+        }
+        else if (sc->renderMode == __VK_WSI_DIRECT_RENDERING_NOFC)
+        {
+            imageBuffer->renderTargetMemory = memory;
+        }
 
         imageBuffer->acquired = VK_TRUE;
 
@@ -1220,7 +1249,10 @@ static VkResult __QueuePresentSwapchainImage(
     imageBuffer->acquired = VK_FALSE;
 
     /* Generate queue commands. */
-    __VK_ONERROR(__GenPresentCommand(devCtx, sc, imageBuffer));
+    if (sc->renderMode == __VK_WSI_INDIRECT_RENDERING)
+    {
+        __VK_ONERROR(__GenPresentCommand(devCtx, sc, imageBuffer));
+    }
     __VK_ONERROR(__CommitPresentCommand(queue, sc, &fenceFd));
 
     result = __QueueNativeWindowBuffer(surf->window, nativeBuffer, fenceFd);
