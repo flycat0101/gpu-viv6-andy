@@ -4579,10 +4579,11 @@ DEF_QUERY_PASS_PROP(VSC_UF_UseConstRegForUBO)
 
 DEF_SH_NECESSITY_CHECK(VSC_UF_UseConstRegForUBO)
 {
+    gctBOOL                     bEnable = (pPassWorker->pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_USE_CONST_REG_FOR_UBO);
     VIR_Shader*                 pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
 
     /* For Vulkan only. */
-    if (VIR_Shader_IsVulkan(pShader))
+    if (bEnable && VIR_Shader_IsVulkan(pShader))
     {
         return gcvTRUE;
     }
@@ -4590,7 +4591,6 @@ DEF_SH_NECESSITY_CHECK(VSC_UF_UseConstRegForUBO)
     return gcvFALSE;
 }
 
-/* AUBO pass for openCL Compute shader */
 VSC_ErrCode VSC_UF_UseConstRegForUBO(
     IN VSC_SH_PASS_WORKER* pPassWorker
     )
@@ -4638,6 +4638,13 @@ VSC_ErrCode VSC_UF_UseConstRegForUBO(
         }
 
         pBaseAddrSym = VIR_Shader_GetSymFromId(pShader, VIR_UBO_GetBaseAddress(pUbo));
+        pBaseAddrUniform = VIR_Symbol_GetUniformPointer(pShader, pBaseAddrSym);
+
+        /* Skip if we have check this before. */
+        if (VIR_Uniform_IsUseConstRegForUbo(pBaseAddrUniform))
+        {
+            continue;
+        }
 
         /* Skip if this UBO is not used. */
         if (!isSymUniformUsedInShader(pBaseAddrSym)         &&
