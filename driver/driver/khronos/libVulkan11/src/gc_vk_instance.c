@@ -336,6 +336,9 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateInstance(
             const char* deqpName = "\x9b\x9a\x8e\x8f"; /* "deqp".*/
             const char* saschaWillemsName = "\x89\x8a\x93\x94\x9e\x91\xba\x87\x9e\x92\x8f\x93\x9a"; /* "vulkanExample".*/
             const char* vkMarkName = "\x89\x94\x92\x9e\x8d\x94";/*vkmark*/
+            const char* vkT3DStressTest = "\xa9\x8a\x93\x94\x9e\x91\xd1\xab\xcc\xbb\xac\x8b\x8d\x9a\x8c\x8c\xab\x9a\x8c\x8b"; /* Vulkan.T3DStressTest */
+            const char* vkHDR02FBBasicToneMapping = "\xa9\x8a\x93\x94\x9e\x91\xd1\xb7\xbb\xad\xcf\xcd\xa0\xb9\xbd\xbd\x9e\x8c\x96\x9c\xab\x90\x91\x9a\xb2\x9e\x8f\x8f\x96\x91\x98"; /* Vulkan.HDR02_FBBasicToneMapping */
+
             gcoOS_StrCopySafe((gctSTRING)inst->applicationName, __VK_MAX_NAME_LENGTH, pAppInfo->pApplicationName);
 
             if (__vk_utils_reverseMatch(inst->applicationName, deqpName))
@@ -349,6 +352,14 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateInstance(
             else if (__vk_utils_reverseMatch(inst->applicationName, vkMarkName))
             {
                 inst->patchID = gcvPATCH_VKMARK;
+            }
+            else if (__vk_utils_reverseMatch(inst->applicationName, vkT3DStressTest))
+            {
+                inst->patchID = gcvPATCH_VK_T3DSTRESSTEST;
+            }
+            else if (__vk_utils_reverseMatch(inst->applicationName, vkHDR02FBBasicToneMapping))
+            {
+                inst->patchID = gcvPATCH_VK_HDR02_FBBASICTONEMAPPING;
             }
         }
         if (pAppInfo->pEngineName)

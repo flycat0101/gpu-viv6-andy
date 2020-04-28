@@ -6156,6 +6156,11 @@ static VkResult halti5_pip_build_gfxshaders(
     __VK_MEMCOPY(&vscLinkParams.cfg, &vscCompileParams.cfg, sizeof(VSC_COMPILER_CONFIG));
     vscLinkParams.cfg.cFlags |= (VSC_COMPILER_FLAG_COMPILE_FULL_LEVELS | VSC_COMPILER_FLAG_COMPILE_CODE_GEN);
 
+    if (devCtx->pPhyDevice->pInst->patchID == gcvPATCH_VK_T3DSTRESSTEST || devCtx->pPhyDevice->pInst->patchID == gcvPATCH_VK_HDR02_FBBASICTONEMAPPING)
+    {
+        vscLinkParams.cfg.cFlags |= (VSC_COMPILER_FLAG_ENABLE_DUAL16_FOR_VK | VSC_COMPILER_FLAG_USE_CONST_REG_FOR_UBO);
+    }
+
     if (devCtx->enabledFeatures.robustBufferAccess)
     {
         vscLinkParams.cfg.cFlags |= VSC_COMPILER_FLAG_NEED_OOB_CHECK;
@@ -6732,6 +6737,11 @@ static VkResult halti5_pip_build_computeshader(
     if (devCtx->enabledFeatures.robustBufferAccess)
     {
         vscLinkParams.cfg.cFlags |= VSC_COMPILER_FLAG_NEED_OOB_CHECK;
+    }
+
+    if (devCtx->pPhyDevice->pInst->patchID == gcvPATCH_VK_T3DSTRESSTEST || devCtx->pPhyDevice->pInst->patchID == gcvPATCH_VK_HDR02_FBBASICTONEMAPPING)
+    {
+        vscLinkParams.cfg.cFlags |=  VSC_COMPILER_FLAG_USE_CONST_REG_FOR_UBO;
     }
 
     __VK_ONERROR((gcvSTATUS_OK == vscLinkProgram(&vscLinkParams, &masterInstance->pep, &masterInstance->hwStates))
