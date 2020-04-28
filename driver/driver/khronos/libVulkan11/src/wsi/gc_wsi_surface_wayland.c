@@ -145,6 +145,7 @@ struct __vkWaylandSwapchainKHRRec
     VkPresentModeKHR                presentMode;
     VkBool32                        clipped;
 
+    int32_t                         enableTileStatus;
     __VkDirectRenderMode            renderMode;
     __vkWaylandImageBuffer *        imageBuffers;
     uint32_t                        imageCount;
@@ -170,7 +171,8 @@ struct __vkWaylandImageBufferRec
 
     VkImage                         resolveTarget;
     VkDeviceMemory                  resolveTargetMemory;
-    int32_t                         resolveFd;
+
+    int32_t                         imageBufferFd;
 
     struct wl_buffer *              wl_buf;
     struct wl_callback *            frame_callback;
@@ -571,6 +573,45 @@ static struct wl_buffer_listener buffer_listener = {
     buffer_handle_release
 };
 
+static void __SetWindowRenderMode(
+    __vkWaylandSwapchainKHR  *sc,
+    gceSURF_TYPE * type
+    )
+{
+    __vkDevContext * devCtx = (__vkDevContext *) sc->device;
+    __VkDirectRenderMode renderMode = __VK_WSI_INDIRECT_RENDERING;
+
+    if (devCtx->database->REG_SuperTiledTexture)
+    {
+         renderMode = __VK_WSI_DIRECT_RENDERING_NOFC;
+    }
+
+    sc->enableTileStatus = VK_FALSE;
+
+    switch (renderMode)
+    {
+    case __VK_WSI_INDIRECT_RENDERING:
+    default:
+        *type = gcvSURF_BITMAP;
+        break;
+
+    case __VK_WSI_DIRECT_RENDERING_NOFC:
+        *type = gcvSURF_RENDER_TARGET_NO_TILE_STATUS;
+        break;
+
+    case __VK_WSI_DIRECT_RENDERING_FCFILL:
+    case __VK_WSI_DIRECT_RENDERING_FC_NOCC:
+        *type = gcvSURF_RENDER_TARGET_NO_COMPRESSION;
+        break;
+
+    case __VK_WSI_DIRECT_RENDERING:
+        *type = gcvSURF_RENDER_TARGET;
+        break;
+    }
+
+    sc->renderMode = renderMode;
+}
+
 static VkResult __CreateImageBuffer(
     __vkWaylandSwapchainKHR  *sc,
     __vkWaylandImageBuffer *imageBuffer
@@ -580,13 +621,15 @@ static VkResult __CreateImageBuffer(
     VkImageCreateInfo imgInfo;
     VkMemoryAllocateInfo memAlloc;
     VkResult result = VK_SUCCESS;
+    gceSURF_TYPE type;
 
     imageBuffer->swapchain = sc;
     imageBuffer->renderTarget = VK_NULL_HANDLE;
     imageBuffer->renderTargetMemory = VK_NULL_HANDLE;
     imageBuffer->resolveTarget = VK_NULL_HANDLE;
     imageBuffer->resolveTargetMemory = VK_NULL_HANDLE;
-    imageBuffer->resolveFd = -1;
+    imageBuffer->imageBufferFd = -1;
+    __vkDevContext * devCtx = (__vkDevContext *) sc->device;
 
     alignedWidth = (sc->imageExtent.width + 15) & ~15;
 
@@ -616,31 +659,36 @@ static VkResult __CreateImageBuffer(
     /* bind memory to image. */
     __VK_ONERROR(__vk_BindImageMemory(sc->device, imageBuffer->renderTarget, imageBuffer->renderTargetMemory, 0));
 
-    /* Create the swap chain resolve buffers */
-    __VK_MEMZERO(&imgInfo, sizeof(VkImageCreateInfo));
-    imgInfo.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    imgInfo.imageType     = VK_IMAGE_TYPE_2D;
-    imgInfo.format        = sc->imageFormat;
-    imgInfo.extent.width  = alignedWidth;
-    imgInfo.extent.height = sc->imageExtent.height;
-    imgInfo.extent.depth  = 1;
-    imgInfo.mipLevels     = 1;
-    imgInfo.arrayLayers   = sc->imageArrayLayers;
-    imgInfo.samples       = VK_SAMPLE_COUNT_1_BIT;
-    imgInfo.tiling        = VK_IMAGE_TILING_LINEAR;
-    imgInfo.usage         = sc->imageUsage;
-    imgInfo.flags         = 0;
-    __VK_ONERROR(__vk_CreateImage(sc->device, &imgInfo, gcvNULL, &imageBuffer->resolveTarget));
+    __SetWindowRenderMode(sc, &type);
 
-    /* allocate memory for image. */
-    __VK_MEMZERO(&memAlloc, sizeof(memAlloc));
-    memAlloc.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    memAlloc.allocationSize  = (__VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imageBuffer->resolveTarget))->memReq.size;
-    memAlloc.memoryTypeIndex = 0;
-    __VK_ONERROR(__vk_AllocateMemory(sc->device, &memAlloc, gcvNULL, &imageBuffer->resolveTargetMemory));
+    if (sc->renderMode == __VK_WSI_INDIRECT_RENDERING)
+    {
+        /* Create the swap chain resolve buffers */
+        __VK_MEMZERO(&imgInfo, sizeof(VkImageCreateInfo));
+        imgInfo.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imgInfo.imageType     = VK_IMAGE_TYPE_2D;
+        imgInfo.format        = sc->imageFormat;
+        imgInfo.extent.width  = alignedWidth;
+        imgInfo.extent.height = sc->imageExtent.height;
+        imgInfo.extent.depth  = 1;
+        imgInfo.mipLevels     = 1;
+        imgInfo.arrayLayers   = sc->imageArrayLayers;
+        imgInfo.samples       = VK_SAMPLE_COUNT_1_BIT;
+        imgInfo.tiling        = VK_IMAGE_TILING_LINEAR;
+        imgInfo.usage         = sc->imageUsage;
+        imgInfo.flags         = 0;
+        __VK_ONERROR(__vk_CreateImage(sc->device, &imgInfo, gcvNULL, &imageBuffer->resolveTarget));
 
-    /* bind memory to image. */
-    __VK_ONERROR(__vk_BindImageMemory(sc->device, imageBuffer->resolveTarget, imageBuffer->resolveTargetMemory, 0));
+        /* allocate memory for image. */
+        __VK_MEMZERO(&memAlloc, sizeof(memAlloc));
+        memAlloc.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        memAlloc.allocationSize  = (__VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imageBuffer->resolveTarget))->memReq.size;
+        memAlloc.memoryTypeIndex = 0;
+        __VK_ONERROR(__vk_AllocateMemory(sc->device, &memAlloc, gcvNULL, &imageBuffer->resolveTargetMemory));
+
+        /* bind memory to image. */
+        __VK_ONERROR(__vk_BindImageMemory(sc->device, imageBuffer->resolveTarget, imageBuffer->resolveTargetMemory, 0));
+    }
 
     {
         int32_t stride;
@@ -651,18 +699,26 @@ static VkResult __CreateImageBuffer(
         __vkImage *image;
         gceSTATUS status;
 
-        image = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imageBuffer->resolveTarget);
+        if (sc->renderMode == __VK_WSI_INDIRECT_RENDERING)
+        {
+            image = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imageBuffer->resolveTarget);
+        }
+        else
+        {
+            image = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imageBuffer->renderTarget);
+        }
+
         surfNode = &image->memory->node;
 
         switch (sc->imageFormat)
         {
         case VK_FORMAT_B8G8R8A8_UNORM:
-            format = gcvSURF_A8R8G8B8;
+            format = devCtx->database->PE_A8B8G8R8 ? gcvSURF_A8B8G8R8 : gcvSURF_A8R8G8B8;
             stride = alignedWidth * 4;
             break;
 
         case VK_FORMAT_B8G8R8A8_SRGB:
-            format = gcvSURF_A8R8G8B8;
+            format = devCtx->database->PE_A8B8G8R8 ? gcvSURF_A8B8G8R8 : gcvSURF_A8R8G8B8;
             stride = alignedWidth * 4;
             break;
 
@@ -720,7 +776,8 @@ static VkResult __CreateImageBuffer(
             result = VK_ERROR_OUT_OF_HOST_MEMORY;
             goto OnError;
         }
-        imageBuffer->resolveFd = iface.u.ExportVideoMemory.fd;
+
+        imageBuffer->imageBufferFd = iface.u.ExportVideoMemory.fd;
 
         imageBuffer->wl_buf = wl_viv_create_buffer(
             sc->wl_viv,
@@ -728,14 +785,20 @@ static VkResult __CreateImageBuffer(
             sc->imageExtent.height,
             stride,
             format,
-            gcvSURF_BITMAP,
+            type,
             node,
             surfNode->pool,
             surfNode->size,
             0,
             0,
             0,
-            imageBuffer->resolveFd);
+            imageBuffer->imageBufferFd);
+
+        /* VIV [ToDo]: enable tileStatus here */
+        if (!sc->enableTileStatus)
+        {
+            wl_viv_enable_tile_status(sc->wl_viv, imageBuffer->wl_buf, 0, 0, 0, 0, 0);
+        }
 
         /* When not using explicit synchronization listen to
          * wl_buffer.release for release notifications, otherwise we
@@ -769,12 +832,6 @@ OnError:
 
     if (imageBuffer->resolveTarget)
     {
-        if (imageBuffer->resolveFd >= 0)
-        {
-            close(imageBuffer->resolveFd);
-            imageBuffer->resolveFd = -1;
-        }
-
         if (imageBuffer->resolveTargetMemory)
         {
             __vk_FreeMemory(sc->device, imageBuffer->resolveTargetMemory, gcvNULL);
@@ -783,6 +840,12 @@ OnError:
 
         __vk_DestroyImage(sc->device, imageBuffer->resolveTarget, gcvNULL);
         imageBuffer->resolveTarget = VK_NULL_HANDLE;
+    }
+
+    if (imageBuffer->imageBufferFd >= 0)
+    {
+        close(imageBuffer->imageBufferFd);
+        imageBuffer->imageBufferFd = -1;
     }
 
     return result;
@@ -816,12 +879,6 @@ static void __DestroyImageBuffer(
 
     if (imageBuffer->resolveTarget)
     {
-        if (imageBuffer->resolveFd >= 0)
-        {
-            close(imageBuffer->resolveFd);
-            imageBuffer->resolveFd = -1;
-        }
-
         if (imageBuffer->resolveTargetMemory)
         {
             __vk_FreeMemory(sc->device, imageBuffer->resolveTargetMemory, gcvNULL);
@@ -830,6 +887,12 @@ static void __DestroyImageBuffer(
 
         __vk_DestroyImage(sc->device, imageBuffer->resolveTarget, gcvNULL);
         imageBuffer->resolveTarget = VK_NULL_HANDLE;
+    }
+
+    if (imageBuffer->imageBufferFd >= 0)
+    {
+        close(imageBuffer->imageBufferFd);
+        imageBuffer->imageBufferFd = -1;
     }
 
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
@@ -1172,8 +1235,11 @@ static VkResult __QueuePresentSwapchainImage(
     __vkDevContext *devCtx = (__vkDevContext *)sc->device;
 
     /* Generate queue commands. */
-    __VK_ONERROR(__GenPresentCommand(devCtx, sc, imageBuffer));
-    __VK_ONERROR(__CommitPresentCommand(queue, sc));
+    if (sc->renderMode == __VK_WSI_INDIRECT_RENDERING)
+    {
+        __VK_ONERROR(__GenPresentCommand(devCtx, sc, imageBuffer));
+    }
+     __VK_ONERROR(__CommitPresentCommand(queue, sc));
 
     /*
      * This is to block read & dispatch events in other threads, so that the
