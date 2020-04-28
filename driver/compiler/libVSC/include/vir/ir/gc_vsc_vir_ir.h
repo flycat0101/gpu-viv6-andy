@@ -690,7 +690,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_ComplexSrcModifier_GetName(SMod) (VIR_ComplexSrcModifierName[(SMod)])
 
 
-#define VIR_Operand_GetOpKind(Opnd)         ((Opnd)->header._opndKind)
+#define VIR_Operand_GetOpKind(Opnd)         ((VIR_OperandKind)((Opnd)->header._opndKind))
 #define VIR_Operand_isUndef(Opnd)           (VIR_Operand_GetOpKind(Opnd) == VIR_OPND_UNDEF)
 #define VIR_Operand_isVirReg(Opnd)          (VIR_Operand_GetOpKind(Opnd) == VIR_OPND_VIRREG)
 #define VIR_Operand_isSymbol(Opnd)          (VIR_Operand_GetOpKind(Opnd) == VIR_OPND_SYMBOL)
