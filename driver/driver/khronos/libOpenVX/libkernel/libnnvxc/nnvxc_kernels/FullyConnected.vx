@@ -385,7 +385,7 @@ __kernel void vxcFullyConnected_NoReluI16_noBias(
 
     } while (coord_in.x < Cycles);
     dst = in_scale * dst;
-    short val = overflow_mode == 0 ? (short)(dst) : convert_char_sat_rte(dst);
+    short val = overflow_mode == 0 ? (short)(dst) : convert_short_sat_rte(dst);
     VXC_WriteImage(output, coord_out, val, VXC_MODIFIER(0, 0, 0,VXC_RM_TowardZero, 0));
 }
 
@@ -427,7 +427,7 @@ __kernel void vxcFullyConnected_NoReluI16(
 
     } while (coord_in.x < Cycles);
     dst = in_scale * dst;
-    short val = overflow_mode == 0 ? (short)dst : convert_char_sat_rte(dst);
+    short val = overflow_mode == 0 ? (short)dst : convert_short_sat_rte(dst);
     VXC_WriteImage(output, coord_out, val, VXC_MODIFIER(0, 0, 0,VXC_RM_TowardZero, 0));
 }
 
@@ -473,7 +473,7 @@ __kernel void vxcFullyConnected_NoReluI16_BI64(
 
     } while (coord_in.x < Cycles);
     dst = in_scale * dst;
-    short val =  overflow_mode == 0 ? (short)dst : convert_char_sat_rte(dst);
+    short val =  overflow_mode == 0 ? (short)dst : convert_short_sat_rte(dst);
     VXC_WriteImage(output, coord_out, val, VXC_MODIFIER(0, 0, 0,VXC_RM_TowardZero, 0));
 }
 
