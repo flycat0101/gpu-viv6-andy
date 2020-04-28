@@ -7782,6 +7782,16 @@ VIR_Shader_CanRemoveUnusedFunctions(
     IN  VIR_Shader*         pShader
     );
 
+gctBOOL
+VIR_Shader_NeedPutImmValue2Uniform(
+    IN  VIR_Shader*         pShader,
+    IN  VSC_HW_CONFIG*      pHwCfg,
+    IN  gctBOOL             bIsInDual16Check,
+    IN  gctBOOL             bPackedChanged,
+    IN  gctUINT32           immValue,
+    IN  VIR_TypeId          valueTypeId
+    );
+
 void
 VIR_Inst_ChangeDest(
     IN OUT VIR_Instruction * Inst,

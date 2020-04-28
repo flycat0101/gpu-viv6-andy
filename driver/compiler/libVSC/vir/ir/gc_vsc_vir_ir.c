@@ -19316,6 +19316,68 @@ VIR_Shader_GenInvocationIndex(
     return errCode;
 }
 
+gctBOOL
+VIR_Shader_NeedPutImmValue2Uniform(
+    IN  VIR_Shader*         pShader,
+    IN  VSC_HW_CONFIG*      pHwCfg,
+    IN  gctBOOL             bIsInDual16Check,
+    IN  gctBOOL             bPackedChanged,
+    IN  gctUINT32           immValue,
+    IN  VIR_TypeId          valueTypeId
+    )
+{
+    /* For chips that do not support imm values, we must put imm to uniform */
+    if (!pHwCfg->hwFeatureFlags.hasSHEnhance2)
+    {
+        return gcvTRUE;
+    }
+
+    /*
+    ** For non-dual16 shader, imm supported by HW is only 20-bit;
+    ** For dual16 shader, imm supported by HW is only 16-bit (two 16-bits pack into one 32-bits).
+    */
+    switch (valueTypeId)
+    {
+    case VIR_TYPE_FLOAT32:
+        if (bIsInDual16Check || VIR_Shader_isDual16Mode(pShader))
+        {
+            return gcvTRUE;
+        }
+        else
+        {
+            return !CAN_EXACTLY_CVT_S23E8_2_S11E8(immValue);
+        }
+
+    case VIR_TYPE_INT32:
+    case VIR_TYPE_BOOLEAN:
+        if (bIsInDual16Check || VIR_Shader_isDual16Mode(pShader))
+        {
+            return !CAN_EXACTLY_CVT_S32_2_S16((gctINT32)immValue);
+        }
+        else
+        {
+            return !CAN_EXACTLY_CVT_S32_2_S20((gctINT32)immValue);
+        }
+
+    case VIR_TYPE_UINT32:
+        if (bIsInDual16Check || VIR_Shader_isDual16Mode(pShader))
+        {
+            return !CAN_EXACTLY_CVT_U32_2_U16(immValue);
+        }
+        else
+        {
+            return !CAN_EXACTLY_CVT_U32_2_U20(immValue);
+        }
+
+    default:
+        if (bPackedChanged)
+        {
+            return !CAN_EXACTLY_CVT_U32_2_U20(immValue);
+        }
+        return gcvFALSE;
+    }
+}
+
 /* Those functions are used in the PASS only. */
 VSC_ErrCode
 VIR_Pass_RemoveInstruction(
