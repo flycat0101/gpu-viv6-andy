@@ -3830,14 +3830,22 @@ static VIR_TypeId __SpvImage2VirImageType(gcSPV spv, SpvId targetId, VIR_TypeId 
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDim1D, 0, 0, 0, 0, 0):
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDim1D, 0, 0, 0, 0, 1):
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDim1D, 0, 0, 0, 0, 2):
+        virType = VIR_TYPE_IMAGE_1D;
+        sampledImageType = VIR_TYPE_SAMPLER_1D;
+        break;
+
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDim1D, 1, 0, 0, 0, 0):
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDim1D, 1, 0, 0, 0, 1):
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDim1D, 1, 0, 0, 0, 2):
+        virType = VIR_TYPE_IIMAGE_1D;
+        sampledImageType = VIR_TYPE_ISAMPLER_1D;
+        break;
+
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDim1D, 2, 0, 0, 0, 0):
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDim1D, 2, 0, 0, 0, 1):
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDim1D, 2, 0, 0, 0, 2):
-        virType = VIR_TYPE_IMAGE_1D;
-        sampledImageType = VIR_TYPE_SAMPLER_1D;
+        virType = VIR_TYPE_UIMAGE_1D;
+        sampledImageType = VIR_TYPE_USAMPLER_1D;
         break;
 
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDim2D, 0, 0, 0, 0, 0):
@@ -3878,14 +3886,22 @@ static VIR_TypeId __SpvImage2VirImageType(gcSPV spv, SpvId targetId, VIR_TypeId 
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDim1D, 0, 0, 1, 0, 0):
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDim1D, 0, 0, 1, 0, 1):
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDim1D, 0, 0, 1, 0, 2):
+        virType = VIR_TYPE_IMAGE_1D_ARRAY;
+        sampledImageType = VIR_TYPE_SAMPLER_1D_ARRAY;
+        break;
+
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDim1D, 1, 0, 1, 0, 0):
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDim1D, 1, 0, 1, 0, 1):
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDim1D, 1, 0, 1, 0, 2):
+        virType = VIR_TYPE_IIMAGE_1D_ARRAY;
+        sampledImageType = VIR_TYPE_ISAMPLER_1D_ARRAY;
+        break;
+
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDim1D, 2, 0, 1, 0, 0):
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDim1D, 2, 0, 1, 0, 1):
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDim1D, 2, 0, 1, 0, 2):
-        virType = VIR_TYPE_IMAGE_1D_ARRAY;
-        sampledImageType = VIR_TYPE_SAMPLER_1D_ARRAY;
+        virType = VIR_TYPE_UIMAGE_1D_ARRAY;
+        sampledImageType = VIR_TYPE_USAMPLER_1D_ARRAY;
         break;
 
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDim1D, 0, 1, 0, 0, 1):
