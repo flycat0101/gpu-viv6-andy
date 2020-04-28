@@ -77,6 +77,7 @@ veglParseAttributes(
     Configuration->transparentBlueValue   = EGL_DONT_CARE;
 #if defined(ANDROID)
     Configuration->supportFBTarget   = EGL_DONT_CARE;
+    Configuration->colorComponentType = EGL_COLOR_COMPONENT_TYPE_FIXED_EXT;
 #endif
 
     /* Parse the attribute list. */
@@ -343,6 +344,20 @@ veglParseAttributes(
                           "%s: EGL_ANDROID_framebuffer_target=%d",
                           __FUNCTION__, value);
             Configuration->supportFBTarget = value;
+            break;
+
+        case EGL_COLOR_COMPONENT_TYPE_EXT:
+            gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_EGL_CONFIG,
+                          "%s: EGL_COLOR_COMPONENT_TYPE_EXT=%d",
+                          __FUNCTION__, value);
+            if ((value != EGL_COLOR_COMPONENT_TYPE_FIXED_EXT) &&
+                (value != EGL_COLOR_COMPONENT_TYPE_FLOAT_EXT))
+            {
+                /* Bad attribute. */
+                veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
+                return EGL_FALSE;
+            }
+            Configuration->colorComponentType = value;
             break;
 #endif
 
@@ -1493,6 +1508,10 @@ eglGetConfigAttrib(
 #if defined(ANDROID)
     case EGL_ANDROID_framebuffer_target:
         *value = eglConfig->supportFBTarget;
+        break;
+
+    case EGL_COLOR_COMPONENT_TYPE_EXT:
+        *value = eglConfig->colorComponentType;
         break;
 #endif
 

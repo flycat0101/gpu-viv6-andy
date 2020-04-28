@@ -377,6 +377,7 @@ struct eglConfig
 #if defined(ANDROID)
     /* Bool for EGL_ANDROID_framebuffer_target */
     gctBOOL                     supportFBTarget;
+    EGLint                      colorComponentType;
 #endif
 };
 

@@ -279,6 +279,7 @@ struct eglWindowInfo
      * Native window buffer count.
      * -1 if not set.
      *  0 when unknown.
+     * -2 when it is a single buffer mode window
      */
     int                 bufferCount;
 
@@ -849,6 +850,35 @@ _SetBufferCount(
         Info->bufferWidth  = buffer->width;
         Info->bufferHeight = buffer->height;
 
+        /* From libgui: BufferQueueProducer::waitForFreeSlotThenRelock
+         * if this buffer is a single mode buffer, system only allow dequeue one buffer
+         * if the first dequeued buffer didn't queued before,
+         * when trying to dequeue second buffer, BufferQueueProducer will wait for first dequeued buffer cancel/queue
+         * it would cause dead lock under this situation.
+         * to fix such problem, we queue the first dequeued buffer and get it again,
+         * then BufferQueueProducer will return fail immediately.
+         */
+
+        rel = _QueueBuffer(win, buffer, -1);
+        if (rel != 0)
+        {
+            LOGE("%s (%d) queue buffer failed" , __func__ , __LINE__);
+            return;
+        }
+        LOGV("%s(%d) dequeue first buffer again " , __func__ , __LINE__);
+        rel = _TryDequeueBuffer(win, &buffer);
+
+        if (rel != 0)
+        {
+            /* This is error case. But let's blindly set buffer count. */
+            LOGE("%s: Failed to dequeue buffer", __func__);
+
+            /* Set native buffer count. */
+            native_window_set_buffer_count(win, bufferCount);
+            Info->bufferCount = bufferCount;
+            return;
+        }
+
         /* Try dequeue second buffer. */
         rel = _TryDequeueBuffer(win, &buffer2);
 
@@ -877,7 +907,26 @@ _SetBufferCount(
 
             /* Set native buffer count. */
             LOGV("%s: Surface: set bufferCount to %d", __func__, bufferCount);
-            native_window_set_buffer_count(win, bufferCount);
+            if(native_window_set_buffer_count(win, bufferCount) != 0)
+            {
+#if (gcdANDROID_NATIVE_FENCE_SYNC >= 2)
+                LOGV("%s: win=%p set bufferCount to %d failed, return", __func__, win, bufferCount);
+                /* Set buffer count to 0. */
+                Info->bufferCount = 0;
+#else
+                /* From libgui: BufferQueueProducer::setMaxDequeuedBufferCount
+                 * if failed to dequeue second buffer and failed to set buffer count
+                 * it might because this is a single mode buffer,
+                 * mMaxDequeuedBuffer was set to 1 in BufferQueueConsumer
+                 * set bufferCount to -2 to mark it, as this buffer can't be used in swapworker
+                 * this mark is usless if native fence is enabled.
+                 * Because it will NEVER dequeue multiple buffers when native fence
+                 * sync is enabled.
+                 */
+                Info->bufferCount = -2;
+#endif
+                return;
+            }
 
             /* Store buffer count set for the window. */
             Info->bufferCount = bufferCount;
@@ -3193,6 +3242,16 @@ _SynchronousPost(
     do
     {
         gcePATCH_ID patchId = gcvPATCH_INVALID;
+#if (gcdANDROID_NATIVE_FENCE_SYNC < 2)
+        if (info->bufferCount == -2)
+        {
+            /* this is a single buffer mode window, swap worker can't deal with it
+             * because swap worker need dequeue mutiple buffer.
+             */
+            sync = EGL_TRUE;
+            break;
+        }
+#   endif
 
         if (info->initialFrame)
         {

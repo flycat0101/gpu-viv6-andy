@@ -382,6 +382,7 @@ _FillIn(
     config->maxSwapInterval = Display->maxSwapInterval;
 #if defined(ANDROID)
     config->supportFBTarget = Display->supportFBTarget;
+    config->colorComponentType = EGL_COLOR_COMPONENT_TYPE_FIXED_EXT;
 #endif
 
     config->level                 = 0;
