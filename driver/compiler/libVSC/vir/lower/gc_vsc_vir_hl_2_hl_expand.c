@@ -1786,7 +1786,7 @@ _AllocateInterfaceBlock(
         if (symbolKind == VIR_SYM_UBO)
         {
             VIR_UBO_SetBaseAddress(uniformBlock, baseAddrSymId);
-            if (VIR_UBO_GetFlags(uniformBlock) & VIR_IB_FOR_PUSH_CONST)
+            if (VIR_UBO_IsPushConst(uniformBlock))
             {
                 VIR_Uniform_SetFlag(symUniform, VIR_UNIFORMFLAG_PUSH_CONSTANT_BASE_ADDR);
                 VIR_Symbol_SetLayoutOffset(symbol, VIR_Symbol_GetLayoutOffset(IBSymbol));

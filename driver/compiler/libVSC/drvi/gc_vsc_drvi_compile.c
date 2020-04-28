@@ -807,6 +807,7 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
     VSC_ErrCode         errCode = VSC_ERR_NONE;
     VIR_Shader*         pShader = (VIR_Shader*)pShPassMnger->pCompilerParam->hShader;
     gctBOOL             bRAEnabled = VSC_OPTN_RAOptions_GetSwitchOn(VSC_OPTN_Options_GetRAOptions(pShPassMnger->basePM.pOptions, 0));
+    gctBOOL             bUseConstRegForUBO = (pShPassMnger->pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_USE_CONST_REG_FOR_UBO);
     VSC_PRELL_PASS_DATA preLLPassData = { gcvFALSE };
     VSC_CPP_PASS_DATA   cppPassData = { VSC_CPP_NONE, gcvTRUE };
     VSC_IL_PASS_DATA    ilPassData = { 3, gcvFALSE };
@@ -854,6 +855,12 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
     CALL_SH_PASS(VSC_PARAM_Optimization_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VSC_SCL_Scalarization_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VSC_PH_Peephole_PerformOnShader, 0, gcvNULL);
+
+    if (bUseConstRegForUBO)
+    {
+        CALL_SH_PASS(VSC_UF_UseConstRegForUBO, 0, gcvNULL);
+    }
+
     CALL_SH_PASS(VSC_LCSE_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VSC_DCE_Perform, 0, gcvNULL);
     CALL_SH_PASS(VIR_CFO_PerformOnShader, 1, gcvNULL);

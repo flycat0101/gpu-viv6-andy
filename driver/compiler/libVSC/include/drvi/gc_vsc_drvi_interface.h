@@ -891,6 +891,7 @@ typedef gcsGLSLCaps VSC_GL_API_CONFIG, *PVSC_GL_API_CONFIG;
 #define VSC_COMPILER_FLAG_DISABLE_IR_DUMP              0x00080000  /* used by driver to disable patch lib IR dump */
 #define VSC_COMPILER_FLAG_ADD_GLOBAL_OFFSET            0x00100000  /* gl_GlobalInvocationID = gl_GlobalInvocationID + #global_offset. */
 #define VSC_COMPILER_FLAG_ENABLE_DUAL16_FOR_VK         0x00200000  /* It is a temp option to enable dual16 for vulkan. we need to remove after verify all vulkan cases. */
+#define VSC_COMPILER_FLAG_USE_CONST_REG_FOR_UBO        0x00400000
 
 #define VSC_COMPILER_FLAG_COMPILE_FULL_LEVELS          0x0000000F
 

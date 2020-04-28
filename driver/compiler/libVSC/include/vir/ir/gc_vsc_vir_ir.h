@@ -2770,6 +2770,7 @@ typedef enum _VIR_UNIFORMKIND
     VIR_UNIFORM_VIEW_INDEX,
     VIR_UNIFORM_THREAD_ID_MEM_ADDR,
     VIR_UNIFORM_YCBCR_PLANE,
+    VIR_UNIFORM_VIRTUAL_FOR_UBO,
     /* should not larger than 2^6, since it is using storageClass,
      * in case it is >= 64, need to enlarge _storageClass */
 } VIR_UniformKind;
@@ -4315,6 +4316,8 @@ struct _VIR_UNIFORMBLOCK
 #define VIR_UBO_GetUniforms(UBlock)                ((UBlock)->uniforms)
 #define VIR_UBO_SetUniforms(UBlock, s)             (VIR_UBO_GetUniforms(UBlock) = s)
 
+#define VIR_UBO_IsPushConst(UBlock)                (((UBlock)->flags & VIR_IB_FOR_PUSH_CONST) != 0)
+
 typedef enum VIR_UNIFORMFLAG
 {
     VIR_UNIFORMFLAG_NONE                        = 0x00000000,
@@ -4322,11 +4325,13 @@ typedef enum VIR_UNIFORMFLAG
     /* Treat a texel buffer as an image, now it only happens in recompilation. */
     VIR_UNIFORMFLAG_TREAT_TEXELBUFFE_AS_IMG     = 0x00000002,
     VIR_UNIFORMFLAG_PUSH_CONSTANT_BASE_ADDR     = 0x00000004,
+    VIR_UNIFORMFLAG_USE_CONST_REG_FOR_UBO       = 0x00000008,
 } VIR_UniformFlag;
 
 #define VIR_Uniform_IsImageCanBeSampled(u)      (((u)->flags & VIR_UNIFORMFLAG_IMAGE_CAN_BE_SAMPLED) != 0)
 #define VIR_Uniform_IsTreatTexelBufferAsImg(u)  (((u)->flags & VIR_UNIFORMFLAG_TREAT_TEXELBUFFE_AS_IMG) != 0)
 #define VIR_Uniform_IsPushConstantBaseAddr(u)   (((u)->flags & VIR_UNIFORMFLAG_PUSH_CONSTANT_BASE_ADDR) != 0)
+#define VIR_Uniform_IsUseConstRegForUbo(u)      (((u)->flags & VIR_UNIFORMFLAG_USE_CONST_REG_FOR_UBO) != 0)
 
 /* Structure that defines an uniform (constant register) for a shader. */
 struct _VIR_UNIFORM
@@ -4441,6 +4446,14 @@ struct _VIR_UNIFORM
                                               * SSBO it represents. */
         VSC_SamplerValue    samplerValue;  /* OCL sampler value assigned to sampler kernel arg */
     } u;
+
+    union
+    {
+        /* Save the base address symbol ID for a virtual uniform of a UBO. */
+        VIR_SymId       baseAddrSymId;
+        /* Save the virtual uniform symbol ID for a base address symbol. */
+        VIR_SymId       virtualUniformSymId;
+    } u1;
 
     VIR_SymId           sym;    /* the symbol for this uniform */
     VIR_SymId           auxAddrSymId;    /* the following defaultUBO addresses */
@@ -5105,6 +5118,9 @@ struct _VIR_SHADER_RESOURCE_ALLOC_ENTRY
     ** then the sampler variable is saved in the main element,the sampled image variable is saved in the "combinedSampledImage".
     */
     VIR_SHADER_RESOURCE_ALLOC_ENTRY*    pCombinedSampledImage;
+
+    /* We may use the virtual constant uniform to save the UBO. */
+    VIR_SHADER_RESOURCE_ALLOC_ENTRY*    pConstRegForUbo;
 };
 
 typedef struct _VIR_SHADER_PUSH_CONSTANT_ALLOC_ENTRY
@@ -6122,6 +6138,19 @@ VIR_Type_Identical(
     VIR_Type*   Type1,
     VIR_Shader* Shader2,
     VIR_Type*   Type2
+    );
+
+gctBOOL
+VIR_Type_Contain8Bit16BitField(
+    VIR_Shader*         pShader,
+    VIR_Type*           pType
+    );
+
+VIR_SymId
+VIR_Type_FindFieldSymIdByOffset(
+    VIR_Shader*         pShader,
+    VIR_Type*           pType,
+    gctUINT             offset
     );
 
 VSC_ErrCode

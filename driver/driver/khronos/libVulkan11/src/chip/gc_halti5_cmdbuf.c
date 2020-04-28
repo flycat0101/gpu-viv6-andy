@@ -9748,11 +9748,14 @@ static VkResult halti5_helper_setDescSetUniformBuffer(
         if (activeStageMask & (1 << stageIdx))
         {
             SHADER_CONSTANT_HW_LOCATION_MAPPING *hwMapping = &uniformBufferEntry->hwMappings[stageIdx];
+            SHADER_HW_ACCESS_MODE accessMode = hwMapping->hwAccessMode;
             uint32_t hwConstRegNo;
             uint32_t hwConstRegAddrBase = hints->hwConstRegBases[stageIdx];
             uint32_t hwConstRegAddr;
 
-            __VK_ASSERT(hwMapping->hwAccessMode == SHADER_HW_ACCESS_MODE_MEMORY);
+            __VK_ASSERT(accessMode == SHADER_HW_ACCESS_MODE_MEMORY || accessMode == SHADER_HW_ACCESS_MODE_BOTH_REG_AND_MEM);
+
+            /* I: Program the direct memory address. */
             __VK_ASSERT(hwMapping->hwLoc.memAddr.hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR);
             __VK_ASSERT(hwMapping->hwLoc.memAddr.memBase.pHwDirectAddrBase->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
 
@@ -9823,6 +9826,68 @@ static VkResult halti5_helper_setDescSetUniformBuffer(
 
                 }
             }
+
+            /* II: Program the constant register if needed. */
+            if (accessMode == SHADER_HW_ACCESS_MODE_BOTH_REG_AND_MEM)
+            {
+                uint32_t hwConstRegStride;
+
+                /* Always use the resource size here. */
+                arraySize = descriptorBinding->std.descriptorCount;
+                __VK_ASSERT(arraySize);
+
+                /* Get the reg stride. Follow the same policy in compiler. */
+                hwConstRegStride = gcmCEIL((float)hwMapping->hwLoc.constReg.hwRegRange / (float)arraySize);
+
+                for (arrayIdx = 0; arrayIdx < arraySize; arrayIdx++)
+                {
+                    __vkDescriptorResourceRegion curRegion;
+                    __vkDescriptorResourceInfo *resInfo;
+
+                    __vk_utils_region_mad(&curRegion, &descriptorBinding->perElementSize, arrayIdx, &descriptorBinding->offset);
+                    resInfo = (__vkDescriptorResourceInfo *)((uint8_t*)descSet->resInfos + curRegion.resource);
+
+                    if (resInfo->type == __VK_DESC_RESOURCE_INVALID_INFO)
+                    {
+                        break;
+                    }
+
+                    hwConstRegNo = hwMapping->hwLoc.constReg.hwRegNo + arrayIdx * hwConstRegStride;
+                    hwConstRegAddr = (hwConstRegAddrBase >> 2) + (hwConstRegNo * 4) + hwMapping->firstValidHwChannel;
+
+                    switch (descriptorBinding->std.descriptorType)
+                    {
+                    case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+                        {
+                            __vkBuffer *buf = resInfo->u.bufferInfo.buffer;
+
+                            __vkCmdLoadBatchHWStates(commandBuffer,
+                                                     hwConstRegAddr,
+                                                     VK_FALSE,
+                                                     hwConstRegStride * 4,
+                                                     ((gctPOINTER)((uint8_t *)buf->memory->hostAddr + (buf->memOffset + resInfo->u.bufferInfo.offset))));
+                        }
+                        break;
+                    case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
+                        {
+                            __vkBuffer *buf = resInfo->u.bufferInfo.buffer;
+
+                            __vkCmdLoadBatchHWStates(commandBuffer,
+                                                     hwConstRegAddr,
+                                                     VK_FALSE,
+                                                     hwConstRegStride * 4,
+                                                     ((gctPOINTER)((uint8_t *)buf->memory->hostAddr + ((uint32_t)resInfo->u.bufferInfo.offset + dynamicOffsets[(*dynamicOffsetIndex) + arrayIdx]))));
+                        }
+                        break;
+
+                    default:
+                        __VK_ASSERT(!"Wrong descriptor type which should not fall in unfiorm buffer set function");
+                        break;
+
+                    }
+                }
+            }
+
             activeStageMask &= ~(1 << stageIdx);
         }
         stageIdx++;

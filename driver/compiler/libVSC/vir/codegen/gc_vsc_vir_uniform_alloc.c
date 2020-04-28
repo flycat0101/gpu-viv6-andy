@@ -1062,6 +1062,7 @@ static gctBOOL _VIR_CG_isUniformAllocable(
         case VIR_UNIFORM_VIEW_INDEX:
         case VIR_UNIFORM_THREAD_ID_MEM_ADDR:
         case VIR_UNIFORM_YCBCR_PLANE:
+        case VIR_UNIFORM_VIRTUAL_FOR_UBO:
 
             if (isSymUniformMovedToAUBO(pSym))
             {
@@ -2167,10 +2168,14 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
             continue;
         }
 
-        /* So far only COMBINED_IMAGE_SAMPLER can map to two uniforms. */
+        /* So far only COMBINED_IMAGE_SAMPLER/UNIFORM_BUFFER can map to two uniforms. */
         if (resCount == 2)
         {
-            gcmASSERT(resBinding.type == VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER);
+            gcmASSERT(resBinding.type == VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER
+                      ||
+                      resBinding.type == VSC_SHADER_RESOURCE_TYPE_UNIFORM_BUFFER_DYNAMIC
+                      ||
+                      resBinding.type == VSC_SHADER_RESOURCE_TYPE_UNIFORM_BUFFER);
         }
 
         /* Found, allocate all uniforms. */
@@ -2348,6 +2353,8 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
             /* Treat input attachment as a image. */
             case VSC_SHADER_RESOURCE_TYPE_INPUT_ATTACHMENT:
             {
+                gctBOOL bIsVirtualUniform = (j == 1);
+
                 if (isSymUniformTreatImageAsSampler(pSym))
                 {
                     retValue = _VIR_CG_MapSamplerUniforms(pShader,
@@ -2382,6 +2389,22 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                         gcvNULL);
                 }
                 ON_ERROR(retValue, "Failed to Allocate Uniform");
+
+                if (bIsVirtualUniform)
+                {
+                    pResAllocLayout->pResAllocEntries[i].pConstRegForUbo =
+                        (VIR_SHADER_RESOURCE_ALLOC_ENTRY*)vscMM_Alloc(&pShader->pmp.mmWrapper, sizeof(VIR_SHADER_RESOURCE_ALLOC_ENTRY));
+                    memset(pResAllocLayout->pResAllocEntries[i].pConstRegForUbo, 0, sizeof(VIR_SHADER_RESOURCE_ALLOC_ENTRY));
+
+                    memcpy(&pResAllocLayout->pResAllocEntries[i].pConstRegForUbo->resBinding, &resBinding, sizeof(VSC_SHADER_RESOURCE_BINDING));
+
+                    pResAllocLayout->pResAllocEntries[i].pConstRegForUbo->resBinding.type = VSC_SHADER_RESOURCE_TYPE_UNIFORM_BUFFER;
+                    pResAllocLayout->pResAllocEntries[i].pConstRegForUbo->bUse = gcvTRUE;
+                    pResAllocLayout->pResAllocEntries[i].pConstRegForUbo->hwRegNo = pUniform->physical;
+                    pResAllocLayout->pResAllocEntries[i].pConstRegForUbo->hwRegRange = uniformSize;
+                    pResAllocLayout->pResAllocEntries[i].pConstRegForUbo->swizzle = pUniform->swizzle;
+                    break;
+                }
 
                 gcmASSERT(uniformSize <= resBinding.arraySize);
 
@@ -2643,6 +2666,12 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
         if (VIR_Symbol_GetIndex(sym) == VIR_Shader_GetBaseSamplerId(pShader))
         {
             VIR_Uniform_SetPhysical(symUniform, 0);
+            continue;
+        }
+
+        /* A virtual uniform should be handled in UNIFORM_BUFFER. */
+        if (VIR_Symbol_GetUniformKind(sym) == VIR_UNIFORM_VIRTUAL_FOR_UBO)
+        {
             continue;
         }
 

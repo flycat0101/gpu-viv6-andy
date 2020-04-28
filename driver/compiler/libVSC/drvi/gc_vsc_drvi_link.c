@@ -2379,7 +2379,7 @@ static VSC_ErrCode _LinkUboBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pBaseL
         upperUbo = VIR_Symbol_GetUBO(upperUboSym);
 
         /* Skip push-constant. */
-        if (VIR_UBO_GetFlags(upperUbo) & VIR_IB_FOR_PUSH_CONST)
+        if (VIR_UBO_IsPushConst(upperUbo))
         {
             continue;
         }
@@ -2435,7 +2435,7 @@ static VSC_ErrCode _LinkUbosBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pBase
         lowerUBO = VIR_Symbol_GetUBO(lowerUBOSym);
 
         /* Skip push-constant. */
-        if (VIR_UBO_GetFlags(lowerUBO) & VIR_IB_FOR_PUSH_CONST)
+        if (VIR_UBO_IsPushConst(lowerUBO))
         {
             continue;
         }

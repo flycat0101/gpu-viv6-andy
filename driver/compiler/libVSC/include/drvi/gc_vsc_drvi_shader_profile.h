@@ -308,7 +308,8 @@ SHADER_UAV_ACCESS_MODE;
 typedef enum SHADER_HW_ACCESS_MODE
 {
     SHADER_HW_ACCESS_MODE_REGISTER           = 0,
-    SHADER_HW_ACCESS_MODE_MEMORY             = 1
+    SHADER_HW_ACCESS_MODE_MEMORY             = 1,
+    SHADER_HW_ACCESS_MODE_BOTH_REG_AND_MEM   = 2,
 }
 SHADER_HW_ACCESS_MODE;
 
@@ -665,7 +666,8 @@ struct _SHADER_CONSTANT_HW_LOCATION_MAPPING
 {
     SHADER_HW_ACCESS_MODE                            hwAccessMode;
 
-    union
+    /* Use a structure here because it might save the constant into the reigster and memomry at the same time. */
+    struct
     {
         /* Case to map to constant register */
         struct

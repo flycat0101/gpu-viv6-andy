@@ -4216,6 +4216,20 @@ VSC_GetUniformIndexingRange(
     return VSC_ERR_NONE;
 }
 
+static gctBOOL
+VSC_CheckRealUseArraySize(
+    IN OUT VIR_Shader       *pShader,
+    IN VIR_Symbol           *pUniformSym
+    )
+{
+    if (VIR_Symbol_GetUniformKind(pUniformSym) == VIR_UNIFORM_VIRTUAL_FOR_UBO)
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
 static void
 VSC_CheckOpndUniformUsage(
     IN OUT VIR_Shader       *pShader,
@@ -4250,11 +4264,14 @@ VSC_CheckOpndUniformUsage(
 
             if (VIR_Type_GetKind(symType) == VIR_TY_ARRAY)
             {
-                if ((VIR_Inst_GetOpcode(inst) == VIR_OP_LDARR &&
-                     opnd == VIR_Inst_GetSource(inst, 0)) ||
-                     VIR_Operand_GetRelAddrMode(opnd) != VIR_INDEXED_NONE)
+                if ((VIR_Inst_GetOpcode(inst) == VIR_OP_LDARR && opnd == VIR_Inst_GetSource(inst, 0))
+                    ||
+                    VIR_Operand_GetRelAddrMode(opnd) != VIR_INDEXED_NONE
+                    ||
+                    !VSC_CheckRealUseArraySize(pShader, sym)
+                    )
                 {
-                    uniform->realUseArraySize = VIR_Type_GetArrayLength(symType);
+                    VIR_Uniform_SetRealUseArraySize(uniform, VIR_Type_GetArrayLength(symType));
                 }
                 else
                 {
@@ -4550,6 +4567,412 @@ VSC_ErrCode VSC_UF_CreateAUBOForCLShader(
     }
 
     pPassWorker->pResDestroyReq->s.bInvalidateCfg = trans;
+    return errCode;
+}
+
+/* Use the constant register to save the UBO. */
+DEF_QUERY_PASS_PROP(VSC_UF_UseConstRegForUBO)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_LL;
+    pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
+}
+
+DEF_SH_NECESSITY_CHECK(VSC_UF_UseConstRegForUBO)
+{
+    VIR_Shader*                 pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+
+    /* For Vulkan only. */
+    if (VIR_Shader_IsVulkan(pShader))
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
+/* AUBO pass for openCL Compute shader */
+VSC_ErrCode VSC_UF_UseConstRegForUBO(
+    IN VSC_SH_PASS_WORKER* pPassWorker
+    )
+{
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    VSC_MM*                     pMM = pPassWorker->basePassWorker.pMM;
+    VIR_Shader*                 pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_UBOIdList*              pUboList = VIR_Shader_GetUniformBlocks(pShader);
+    gctUINT                     uboCount = VIR_IdList_Count(pUboList);
+    VIR_UniformBlock*           pUbo = gcvNULL;
+    VIR_Symbol*                 pUboSym = gcvNULL;
+    VIR_Type*                   pUboSymType = gcvNULL;
+    VIR_Symbol*                 pBaseAddrSym = gcvNULL;
+    VIR_Type*                   pBaseAddrSymType = gcvNULL;
+    VIR_Uniform*                pBaseAddrUniform = gcvNULL;
+    VIR_SymId                   virtualUniformSymId = VIR_INVALID_ID;
+    VIR_Symbol*                 pVirtualUniformSym = gcvNULL;
+    VIR_Uniform*                pVirtualUniform = gcvNULL;
+    VSC_HASH_TABLE*             pWorkingBaseAddrSet = gcvNULL;
+    VSC_HASH_TABLE*             pWorkingInstAddSet = gcvNULL;
+    VIR_FuncIterator            funcIter;
+    VIR_FunctionNode*           pFuncNode = gcvNULL;
+    VIR_Function*               pFunc = gcvNULL;
+    VIR_Instruction*            pInst = gcvNULL;
+    VIR_Operand*                pOpnd = gcvNULL;
+    VIR_Symbol*                 pOpndSym = gcvNULL;
+    VSC_HASH_ITERATOR           hashIter;
+    VSC_DIRECT_HNODE_PAIR       nodePair;
+    gctUINT                     i, totalRegCount = 0, maxRegCount = 0;
+    gctBOOL                     bChanged = gcvFALSE;
+
+    maxRegCount = 32;
+
+    /* Find the matched UBO. */
+    for (i = 0; i < uboCount; i++)
+    {
+        pUboSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pUboList, i));
+        pUboSymType = VIR_Symbol_GetType(pUboSym);
+        pUbo = VIR_Symbol_GetUBO(pUboSym);
+
+        /* Skip the push constant. */
+        if (VIR_UBO_IsPushConst(pUbo))
+        {
+            continue;
+        }
+
+        pBaseAddrSym = VIR_Shader_GetSymFromId(pShader, VIR_UBO_GetBaseAddress(pUbo));
+
+        /* Skip if this UBO is not used. */
+        if (!isSymUniformUsedInShader(pBaseAddrSym)         &&
+            !isSymUniformUsedInTextureSize(pBaseAddrSym)    &&
+            !isSymUniformUsedInLTC(pBaseAddrSym))
+        {
+            continue;
+        }
+
+        /* Skip the UBO that contain any 8bit/16bit elements. */
+        if (VIR_Type_Contain8Bit16BitField(pShader, pUboSymType))
+        {
+            continue;
+        }
+
+        /* Check the hash table. */
+        if (pWorkingBaseAddrSet == gcvNULL)
+        {
+            pWorkingBaseAddrSet = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 8);
+        }
+
+        /* Insert the base address symbol. */
+        vscHTBL_DirectSet(pWorkingBaseAddrSet, (void *)pBaseAddrSym, gcvNULL);
+    }
+
+    /* Empty, just bail out. */
+    if (pWorkingBaseAddrSet == gcvNULL)
+    {
+        return errCode;
+    }
+
+    /* Iterate over functions to find the matched instruction. */
+    VIR_FuncIterator_Init(&funcIter, VIR_Shader_GetFunctions(pShader));
+    for (pFuncNode = VIR_FuncIterator_First(&funcIter);
+         pFuncNode != gcvNULL;
+         pFuncNode = VIR_FuncIterator_Next(&funcIter))
+    {
+        pFunc = pFuncNode->function;
+
+        for (pInst = VIR_Function_GetInstStart(pFunc);
+             pInst != gcvNULL;
+             pInst = VIR_Inst_GetNext(pInst))
+        {
+            gctBOOL             bInvalidCase = gcvFALSE;
+
+            /* Check LOAD only. */
+            if (!VIR_OPCODE_isGlobalMemLd(VIR_Inst_GetOpcode(pInst)))
+            {
+                continue;
+            }
+
+            /* Check if the source0 is a UBO base address. */
+            pOpnd = VIR_Inst_GetSource(pInst, 0);
+            if (!VIR_Operand_isSymbol(pOpnd))
+            {
+                continue;
+            }
+
+            pOpndSym = VIR_Operand_GetSymbol(pOpnd);
+            if (!vscHTBL_DirectTestAndGet(pWorkingBaseAddrSet, (void *)pOpndSym, gcvNULL))
+            {
+                continue;
+            }
+
+            /* Skip dynamic indexing of the base address. */
+            if (!VIR_Operand_GetIsConstIndexing(pOpnd) && VIR_Operand_GetRelAddrMode(pOpnd))
+            {
+                bInvalidCase = gcvTRUE;
+            }
+
+            /* Only check constant offset right now. */
+            pOpnd = VIR_Inst_GetSource(pInst, 1);
+            if (!(VIR_Operand_isConst(pOpnd) || VIR_Operand_isImm(pOpnd)))
+            {
+                bInvalidCase = gcvTRUE;
+            }
+
+            if (bInvalidCase)
+            {
+                /* Remove this base address from the hash table. */
+                vscHTBL_DirectRemove(pWorkingBaseAddrSet, (void *)pOpndSym);
+                continue;
+            }
+
+            /* Check the hash table. */
+            if (pWorkingInstAddSet == gcvNULL)
+            {
+                pWorkingInstAddSet = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 16);
+            }
+
+            /* Insert the matched instruction. */
+            vscHTBL_DirectSet(pWorkingInstAddSet, (void *)pInst, gcvNULL);
+        }
+    }
+
+    /* No matched instruction, just bail out. */
+    if (HTBL_GET_ITEM_COUNT(pWorkingBaseAddrSet) == 0 || pWorkingInstAddSet == gcvNULL)
+    {
+        /* Free the hash table if needed. */
+        if (pWorkingBaseAddrSet != gcvNULL)
+        {
+            vscHTBL_Destroy(pWorkingBaseAddrSet);
+            pWorkingBaseAddrSet = gcvNULL;
+        }
+        if (pWorkingInstAddSet != gcvNULL)
+        {
+            vscHTBL_Destroy(pWorkingInstAddSet);
+            pWorkingInstAddSet = gcvNULL;
+        }
+
+        return errCode;
+    }
+
+    /*
+    ** 1) Set the flag to those matched base address uniform.
+    ** 2) Create a virtual uniform.
+    */
+    vscHTBLIterator_Init(&hashIter, pWorkingBaseAddrSet);
+    for (nodePair = vscHTBLIterator_DirectFirst(&hashIter);
+         IS_VALID_DIRECT_HNODE_PAIR(&nodePair);
+         nodePair = vscHTBLIterator_DirectNext(&hashIter))
+    {
+        VIR_NameId              nameId;
+        gctCHAR                 name[128];
+        gctUINT                 offset = 0;
+        gctUINT                 uboSize = 0, regCount = 0;
+        VIR_TypeId              virtualUniformTypeId = VIR_TYPE_VOID;
+
+        pBaseAddrSym = (VIR_Symbol *)VSC_DIRECT_HNODE_PAIR_FIRST(&nodePair);
+        pBaseAddrUniform = VIR_Symbol_GetUniformPointer(pShader, pBaseAddrSym);
+        pBaseAddrSymType = VIR_Symbol_GetType(pBaseAddrSym);
+
+        pUboSym = VIR_Shader_GetSymFromId(pShader, pBaseAddrUniform->u.parentSSBOOrUBO);
+        pUbo = VIR_Symbol_GetUBO(pUboSym);
+
+        uboSize = VIR_UBO_GetBlockSize(pUbo);
+        regCount = (gctUINT)ceil((gctFLOAT)uboSize / 16.0);
+
+        while (VIR_Type_isArray(pBaseAddrSymType))
+        {
+            regCount *= VIR_Type_GetArrayLength(pBaseAddrSymType);
+
+            pBaseAddrSymType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(pBaseAddrSymType));
+        }
+
+        if (totalRegCount + regCount > maxRegCount)
+        {
+            continue;
+        }
+        totalRegCount += regCount;
+
+        /* Mark this base address. */
+        pBaseAddrUniform = VIR_Symbol_GetUniformPointer(pShader, pBaseAddrSym);
+        gcmASSERT(pBaseAddrUniform);
+        VIR_Uniform_SetFlag(pBaseAddrUniform, VIR_UNIFORMFLAG_USE_CONST_REG_FOR_UBO);
+
+        /* Add a name string. */
+        gcoOS_PrintStrSafe(name, sizeof(name), &offset, "#_virtualArray_%d", VIR_Symbol_GetIndex(pBaseAddrSym));
+        errCode = VIR_Shader_AddString(pShader,
+                                       name,
+                                       &nameId);
+        ON_ERROR(errCode, "Fail to add a string");
+
+        /* Add an array type. */
+        if (regCount > 1)
+        {
+            errCode = VIR_Shader_AddArrayType(pShader,
+                                              VIR_TYPE_UINT_X4,
+                                              regCount,
+                                              0,
+                                              &virtualUniformTypeId);
+            ON_ERROR(errCode, "Fail to add an array type.");
+        }
+        else
+        {
+            virtualUniformTypeId = VIR_TYPE_UINT_X4;
+        }
+
+        /* Add a virtual uniform. */
+        errCode = VIR_Shader_AddSymbol(pShader,
+                                       VIR_SYM_UNIFORM,
+                                       nameId,
+                                       VIR_Shader_GetTypeFromId(pShader, virtualUniformTypeId),
+                                       VIR_STORAGE_UNKNOWN,
+                                       &virtualUniformSymId);
+        ON_ERROR(errCode, "Fail to add a uniform. ");
+
+        pVirtualUniformSym = VIR_Shader_GetSymFromId(pShader, virtualUniformSymId);
+        VIR_Symbol_SetFlag(pVirtualUniformSym, VIR_SYMFLAG_COMPILER_GEN | VIR_SYMFLAG_STATICALLY_USED | VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
+        VIR_Symbol_SetUniformKind(pVirtualUniformSym, VIR_UNIFORM_VIRTUAL_FOR_UBO);
+        VIR_Symbol_SetAddrSpace(pVirtualUniformSym, VIR_AS_CONSTANT);
+
+        pVirtualUniform = VIR_Symbol_GetUniformPointer(pShader, pVirtualUniformSym);
+        pVirtualUniform->u1.baseAddrSymId = VIR_Symbol_GetIndex(pBaseAddrSym);
+
+        pBaseAddrUniform->u1.virtualUniformSymId = virtualUniformSymId;
+    }
+
+    /* Change those matched instructions to MOV. */
+    vscHTBLIterator_Init(&hashIter, pWorkingInstAddSet);
+    for (nodePair = vscHTBLIterator_DirectFirst(&hashIter);
+         IS_VALID_DIRECT_HNODE_PAIR(&nodePair);
+         nodePair = vscHTBLIterator_DirectNext(&hashIter))
+    {
+        gctUINT                 i, offset = 0, regOffset = 0, shiftChannel = 0;
+        VIR_Operand*            pDestOpnd = gcvNULL;
+        VIR_Swizzle             swizzle = VIR_SWIZZLE_XYZW, startSwizzle = VIR_SWIZZLE_X;
+        VIR_SymId               fieldSymId;
+        gctUINT                 uboSize = 0, regCount = 0;
+
+        pInst = (VIR_Instruction *)VSC_DIRECT_HNODE_PAIR_FIRST(&nodePair);
+        pFunc = VIR_Inst_GetFunction(pInst);
+        pDestOpnd = VIR_Inst_GetDest(pInst);
+
+        /* Check if the source0 is a UBO base address. */
+        pOpnd = VIR_Inst_GetSource(pInst, 0);
+        pOpndSym = VIR_Operand_GetSymbol(pOpnd);
+        if (!vscHTBL_DirectTestAndGet(pWorkingBaseAddrSet, (void *)pOpndSym, gcvNULL))
+        {
+            continue;
+        }
+
+        /* Get the base address uniform. */
+        pBaseAddrSym = pOpndSym;
+        pBaseAddrUniform = VIR_Symbol_GetUniformPointer(pShader, pBaseAddrSym);
+
+        /* Check if the base address uniform is marked. */
+        if (!VIR_Uniform_IsUseConstRegForUbo(pBaseAddrUniform))
+        {
+            continue;
+        }
+
+        /* Get the UBO. */
+        pUboSym = VIR_Shader_GetSymFromId(pShader, pBaseAddrUniform->u.parentSSBOOrUBO);
+        pUboSymType = VIR_Symbol_GetType(pUboSym);
+        pUbo = VIR_Symbol_GetUBO(pUboSym);
+
+        uboSize = VIR_UBO_GetBlockSize(pUbo);
+        regCount = (gctUINT)ceil((gctFLOAT)uboSize / 16.0);
+
+        /* Get the virtual uniform. */
+        virtualUniformSymId = pBaseAddrUniform->u1.virtualUniformSymId;
+
+        /* Get the offset. */
+        pOpnd = VIR_Inst_GetSource(pInst, 1);
+        if (VIR_Operand_isImm(pOpnd))
+        {
+            offset = VIR_Operand_GetImmediateUint(pOpnd);
+        }
+        else if (VIR_Operand_isConst(pOpnd))
+        {
+            VIR_Const*          pConst = VIR_Shader_GetConstFromId(pShader, VIR_Operand_GetConstId(pOpnd));
+
+            offset = pConst->value.vecVal.u32Value[VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(pOpnd), 0)];
+        }
+        else
+        {
+            gcmASSERT(gcvFALSE);
+        }
+
+        gcmASSERT(regOffset % 4 == 0);
+
+        /* Get the regOffset. */
+        regOffset = offset / 16;
+
+        pOpnd = VIR_Inst_GetSource(pInst, 0);
+        if (VIR_Operand_GetIsConstIndexing(pOpnd))
+        {
+            regOffset += (VIR_Operand_GetConstIndexingImmed(pOpnd) * regCount);
+        }
+
+        /* Get the channel shift. */
+        shiftChannel = (offset % 16) / 4;
+
+        /* Generate the swizzle. */
+        startSwizzle = (VIR_Swizzle)shiftChannel;
+        for (i = 0; i < 4; i++)
+        {
+            if (startSwizzle + i < VIR_SWIZZLE_W)
+            {
+                VIR_Swizzle_SetChannel(swizzle, i, startSwizzle + i);
+            }
+            else
+            {
+                VIR_Swizzle_SetChannel(swizzle, i, VIR_SWIZZLE_W);
+            }
+        }
+
+        /* Change LOAD to MOV. */
+        VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
+        VIR_Inst_SetSrcNum(pInst, 1);
+
+        /* Update source0. */
+        pOpnd = VIR_Inst_GetSource(pInst, 0);
+        VIR_Operand_SetSymbol(pOpnd, pFunc, virtualUniformSymId);
+        VIR_Operand_SetRelIndexingImmed(pOpnd, regOffset);
+        VIR_Operand_SetTypeId(pOpnd, VIR_Operand_GetTypeId(pDestOpnd));
+        VIR_Operand_SetSwizzle(pOpnd, swizzle);
+
+        /* Set the precision. */
+        VIR_Operand_SetFlag(pOpnd, VIR_OPNDFLAG_USE_OPND_PRECISION);
+        fieldSymId = VIR_Type_FindFieldSymIdByOffset(pShader, pUboSymType, offset);
+        if (fieldSymId == VIR_INVALID_ID)
+        {
+            /* Someting is wrong here. */
+            gcmASSERT(gcvFALSE);
+            VIR_Operand_SetPrecision(pOpnd, VIR_PRECISION_HIGH);
+        }
+        else
+        {
+            VIR_Operand_SetPrecision(pOpnd, VIR_Symbol_GetPrecision(VIR_Shader_GetSymFromId(pShader, fieldSymId)));
+        }
+
+        bChanged = gcvTRUE;
+    }
+
+    /* Dump the shader if needed. */
+    if (bChanged &&
+        VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    {
+        VIR_Shader_Dump(gcvNULL, "After use constant register for the UBO.", pShader, gcvTRUE);
+    }
+
+OnError:
+    /* Free the hash table if needed. */
+    if (pWorkingBaseAddrSet != gcvNULL)
+    {
+        vscHTBL_Destroy(pWorkingBaseAddrSet);
+        pWorkingBaseAddrSet = gcvNULL;
+    }
+    if (pWorkingInstAddSet != gcvNULL)
+    {
+        vscHTBL_Destroy(pWorkingInstAddSet);
+        pWorkingInstAddSet = gcvNULL;
+    }
     return errCode;
 }
 

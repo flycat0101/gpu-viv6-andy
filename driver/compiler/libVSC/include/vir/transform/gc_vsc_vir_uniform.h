@@ -280,6 +280,14 @@ VSC_UF_CreateAUBOForCLShader(
 DECLARE_QUERY_PASS_PROP(VSC_UF_CreateAUBOForCLShader);
 DEF_SH_NECESSITY_CHECK(VSC_UF_CreateAUBOForCLShader);
 
+/* Use the constant register to save the UBO. */
+VSC_ErrCode
+VSC_UF_UseConstRegForUBO(
+    IN VSC_SH_PASS_WORKER* pPassWorker
+    );
+DECLARE_QUERY_PASS_PROP(VSC_UF_UseConstRegForUBO);
+DEF_SH_NECESSITY_CHECK(VSC_UF_UseConstRegForUBO);
+
 END_EXTERN_C()
 
 #endif
