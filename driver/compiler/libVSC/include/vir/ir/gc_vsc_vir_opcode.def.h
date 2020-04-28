@@ -60,6 +60,10 @@
      **/
     /* move data */
     VIR_OPINFO(MOV, 1, HasDest|Componentwise|Expr|EPFromS0, 1, AL),
+
+    /* move a highp source to a mediump dest. */
+    VIR_OPINFO(MOV_DUAL16, 1, HasDest|Componentwise|Expr|EPFromS0, 1, AL),
+
     /* set call parameter:
     ** It must immediately precede a VIR_OP_CALL instruction.
     ** The dest holds the function label.

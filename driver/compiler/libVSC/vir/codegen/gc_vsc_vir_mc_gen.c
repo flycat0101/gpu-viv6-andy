@@ -176,6 +176,7 @@ _VSC_MC_GEN_GenOpcode(
         *BaseOpcode = 0x00;
         break;
     case VIR_OP_MOV:
+    case VIR_OP_MOV_DUAL16:
         *BaseOpcode = 0x09;
         break;
     case VIR_OP_CMOV:
@@ -1330,6 +1331,7 @@ _VSC_MC_GEN_GenInstType(
     case VIR_OP_BITFIND_LSB:
     case VIR_OP_BITFIND_MSB:
     case VIR_OP_MOV:
+    case VIR_OP_MOV_DUAL16:
         gcmASSERT(VIR_OPCODE_useSrc0AsInstType(opcode));
         return _VSC_MC_GEN_GetInstType(Gen, Inst, VIR_Inst_GetSource(Inst, 0));
     case VIR_OP_CMOV:
@@ -2135,11 +2137,12 @@ _VSC_MC_GEN_GenImmTypeAndValue(
 static gctUINT
 _VSC_MC_GEN_GenSrcType(
     IN VSC_MCGen  *Gen,
+    IN VIR_Operand*pOpnd,
     IN VIR_Symbol *Symbol
     )
 {
     VIR_SymbolKind kind      = VIR_Symbol_GetKind(Symbol);
-    VIR_Precision  precision = VIR_Symbol_GetPrecision(Symbol);
+    VIR_Precision  precision = VIR_Operand_GetPrecision(pOpnd);
 
     switch(kind)
     {
@@ -2499,7 +2502,7 @@ _VSC_MC_GEN_GenSource(
             gctUINT      swizzle    = VIR_Symbol_isSampler(sym) && VIR_OPCODE_isTexLd(opCode)
                                        ? VIR_SWIZZLE_XYZW : _VSC_MC_GEN_GenOpndSwizzle(Gen, Inst, Opnd);
             gctUINT      indexed    = _VSC_MC_GEN_GenIndexed(Gen, Opnd);
-            gctUINT      srcKind    = _VSC_MC_GEN_GenSrcType(Gen, sym);
+            gctUINT      srcKind    = _VSC_MC_GEN_GenSrcType(Gen, Opnd, sym);
 
             Src->regType            = srcKind;
             Src->u.reg.regNo        = index;
@@ -2523,7 +2526,7 @@ _VSC_MC_GEN_GenSource(
     case VIR_OPND_SYMBOL:
         {
             VIR_Symbol  *sym        = VIR_Operand_GetSymbol(Opnd);
-            gctUINT      srcKind    = _VSC_MC_GEN_GenSrcType(Gen, sym);
+            gctUINT      srcKind    = _VSC_MC_GEN_GenSrcType(Gen, Opnd, sym);
             gctUINT      newSrcKind = srcKind;
             gctUINT      index      = _VSC_MC_GEN_GenRegisterNo(Gen, Inst, sym, Opnd) +
                 (VIR_Operand_GetMatrixConstIndex(Opnd) +
