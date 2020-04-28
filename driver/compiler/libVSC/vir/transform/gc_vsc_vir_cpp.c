@@ -379,6 +379,40 @@ static gctBOOL _VSC_CPP_NeedToFindNearestDefInst(
     return gcvTRUE;
 }
 
+static gctBOOL _VSC_CPP_IsSrcAbsOrNegOnly(
+    IN     VIR_Operand              *srcOpnd,
+    IN OUT gctBOOL                  *isAbs,
+    IN OUT gctBOOL                  *isNeg
+    )
+{
+    gctBOOL                         bHasOtherModifier = gcvFALSE;
+    gctBOOL                         bIsAbs = gcvFALSE, bIsNeg = gcvFALSE;
+
+    if (VIR_Operand_GetModifier(srcOpnd) & (~(VIR_MOD_NEG | VIR_MOD_ABS)))
+    {
+        bHasOtherModifier = gcvTRUE;
+    }
+    if (VIR_Operand_GetModifier(srcOpnd) & VIR_MOD_NEG)
+    {
+        bIsNeg = gcvTRUE;
+    }
+    if (VIR_Operand_GetModifier(srcOpnd) & VIR_MOD_ABS)
+    {
+        bIsAbs = gcvTRUE;
+    }
+
+    if (isNeg)
+    {
+        *isNeg = bIsNeg;
+    }
+    if (isAbs)
+    {
+        *isAbs = bIsAbs;
+    }
+
+    return bHasOtherModifier;
+}
+
 static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
     IN OUT VSC_CPP_CopyPropagation  *cpp,
     IN     VIR_Instruction          *inst,
@@ -388,26 +422,27 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
     IN     gctUINT                  srcNum
     )
 {
-    VSC_ErrCode     errCode  = VSC_ERR_NONE;
-    VIR_Shader      *shader = VSC_CPP_GetShader(cpp);
-    VIR_Function    *func = VIR_Shader_GetCurrentFunction(shader);
-
-    VSC_OPTN_CPPOptions *options = VSC_CPP_GetOptions(cpp);
-
-    VIR_OpCode      instOpcode = VIR_Inst_GetOpcode(inst);
-    VIR_Operand     *instDst = VIR_Inst_GetDest(inst);
-    VIR_Instruction *defInst = gcvNULL;
-
-    gctBOOL         srcOpndIsRelIndexing = (VIR_Operand_GetRelAddrMode(srcOpnd) != VIR_INDEXED_NONE);
-    gctBOOL         bCopyFromOutputParam = (VSC_CPP_GetFlag(cpp) & VSC_CPP_COPY_FROM_OUTPUT_PARAM);
-    gctBOOL         bHasUniqueDefInst = gcvFALSE;
-    gctBOOL         bUseUniqueNearestDef = gcvFALSE;
+    VSC_ErrCode                     errCode  = VSC_ERR_NONE;
+    VIR_Shader                      *shader = VSC_CPP_GetShader(cpp);
+    VIR_Function                    *func = VIR_Shader_GetCurrentFunction(shader);
+    VSC_OPTN_CPPOptions             *options = VSC_CPP_GetOptions(cpp);
+    VIR_OpCode                      instOpcode = VIR_Inst_GetOpcode(inst);
+    VIR_Operand                     *instDst = VIR_Inst_GetDest(inst);
+    VIR_Instruction                 *defInst = gcvNULL;
+    gctBOOL                         srcOpndIsRelIndexing = (VIR_Operand_GetRelAddrMode(srcOpnd) != VIR_INDEXED_NONE);
+    gctBOOL                         bCopyFromOutputParam = (VSC_CPP_GetFlag(cpp) & VSC_CPP_COPY_FROM_OUTPUT_PARAM);
+    gctBOOL                         bHasUniqueDefInst = gcvFALSE;
+    gctBOOL                         bUseUniqueNearestDef = gcvFALSE;
+    gctBOOL                         bHandleModifier = (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetOPTS(options), VSC_OPTN_CPPOptions_HANDLE_MODIFIER));
+    gctBOOL                         bIsUsageSrcNeg = gcvFALSE, bIsUsageSrcAbs = gcvFALSE;
+    gctBOOL                         bIsMovSrcNeg = gcvFALSE, bIsMovSrcAbs = gcvFALSE;
+    gctBOOL                         bSetNeg = gcvFALSE, bSetAbs = gcvFALSE;
+    VIR_ModifierOrder               modOrder = VIR_MODORDER_NONE;
 
     do
     {
-        VIR_Enable          srcEnable = VIR_Swizzle_2_Enable(
-                                            VIR_Operand_GetSwizzle(srcOpnd));
-        VIR_OperandInfo     srcInfo;
+        VIR_Enable                  srcEnable = VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(srcOpnd));
+        VIR_OperandInfo             srcInfo;
 
         VIR_Operand_GetOperandInfo(inst, srcOpnd, &srcInfo);
         if (srcInfo.isImmVal || srcInfo.isVecConst)
@@ -422,10 +457,21 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
             continue;
         }
 
-        if (VIR_Operand_GetModifier(srcOpnd) ||
-            VIR_Operand_GetRoundMode(srcOpnd))
+        /* Skip any rounding mode right now. */
+        if (VIR_Operand_GetRoundMode(srcOpnd))
         {
              continue;
+        }
+
+        /* Check if we neend to handle the modifier. */
+        if (bHandleModifier)
+        {
+            /* Get the modifier information. */
+            _VSC_CPP_IsSrcAbsOrNegOnly(srcOpnd, &bIsUsageSrcAbs, &bIsUsageSrcNeg);
+        }
+        else if (VIR_Operand_GetModifier(srcOpnd) != VIR_MOD_NONE)
+        {
+            continue;
         }
 
         /* cannot copy to temp256 pair, otherwise it will break the assumption that
@@ -827,6 +873,55 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                     }
                 }
 
+                if (VIR_Operand_GetModifier(movDst) || VIR_Operand_GetRoundMode(movDst) ||
+                    VIR_Operand_GetRoundMode(movSrc))
+                {
+                    if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                    {
+                        VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                        VIR_LOG(dumper, "[FW] ==> bail out because of modifier");
+                        VIR_LOG_FLUSH(dumper);
+                    }
+                    break;
+                }
+
+                /* Check if we neend to handle the modifier. */
+                if (bHandleModifier)
+                {
+                    /* Check the source's modifier, so far we can only support NEG and ABS. */
+                    if (_VSC_CPP_IsSrcAbsOrNegOnly(movSrc, &bIsMovSrcAbs, &bIsMovSrcNeg))
+                    {
+                        break;
+                    }
+
+                    /* Usage source ABS: we can ignore the modifier of the MOV source, just use the modifier of usage source. */
+                    if (bIsUsageSrcAbs)
+                    {
+                        bSetAbs = gcvTRUE;
+                        bSetNeg = bIsUsageSrcNeg;
+                    }
+                    /* Usage source Neg: Use the ABS of the MOV source, and inverse the NEG of the MOV source. */
+                    else if (bIsUsageSrcNeg)
+                    {
+                        bSetAbs = bIsMovSrcAbs;
+                        bSetNeg = !bIsMovSrcNeg;
+                    }
+                    /* Usage none: just use the modifier of the MOV source. */
+                    else
+                    {
+                        bSetAbs = bIsMovSrcAbs;
+                        bSetNeg = bIsMovSrcNeg;
+                    }
+                    if (bSetNeg && bSetAbs)
+                    {
+                        modOrder = VIR_MODORDER_ABS_NEG;
+                    }
+                }
+                else if (VIR_Operand_GetModifier(movSrc) != VIR_MOD_NONE)
+                {
+                    continue;
+                }
+
                 /*
                 ** If any usage instruction of this MOV has more than one DEF instruction, which means we can't remove this MOV,
                 ** we don't generate this new copy because it may increase the live range of SOURCE0.
@@ -903,23 +998,6 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                     {
                         VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
                         VIR_LOG(dumper, "[FW] ==> bail out because LDARR index has to be temp ");
-                        VIR_LOG_FLUSH(dumper);
-                    }
-                    break;
-                }
-
-                /* we could move between different precison  */
-                /* instruction has modifier */
-                /* VIV:TODO: relax */
-                if (VIR_Operand_GetModifier(movDst) ||
-                    VIR_Operand_GetRoundMode(movDst) ||
-                    VIR_Operand_GetModifier(movSrc) ||
-                    VIR_Operand_GetRoundMode(movSrc))
-                {
-                    if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
-                    {
-                        VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                        VIR_LOG(dumper, "[FW] ==> bail out because of modifier");
                         VIR_LOG_FLUSH(dumper);
                     }
                     break;
@@ -1108,6 +1186,30 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                     VIR_Operand_SetSwizzle(newSrc, newSwizzle);
                     VIR_Operand_SetLShift(newSrc, VIR_Operand_GetLShift(srcOpnd));
 
+                    /* Set the modifier if needed. */
+                    if (bHandleModifier)
+                    {
+                        VIR_Operand_SetModifier(newSrc, VIR_Operand_GetModifier(srcOpnd));
+                        if (bSetAbs)
+                        {
+                            VIR_Operand_SetOneModifier(newSrc, VIR_MOD_ABS);
+                        }
+                        else
+                        {
+                            VIR_Operand_ClrOneModifier(newSrc, VIR_MOD_ABS);
+                        }
+                        if (bSetNeg)
+                        {
+                            VIR_Operand_SetOneModifier(newSrc, VIR_MOD_NEG);
+                        }
+                        else
+                        {
+                            VIR_Operand_ClrOneModifier(newSrc, VIR_MOD_NEG);
+                        }
+                        VIR_Operand_SetModOrder(newSrc, modOrder);
+                    }
+
+                    /* Set the type id. */
                     if (!_VSC_CPP_CopySrcTypeFromMov(cpp, inst, defInst, newSrc))
                     {
                         VIR_Operand_SetTypeId(newSrc, ty);
@@ -2415,9 +2517,7 @@ VSC_ErrCode VSC_CPP_PerformOnShader(
     return errcode;
 }
 
-
 /* simple local copy propagation */
-
 typedef struct VIR_SCPP
 {
     VIR_Shader              *shader;

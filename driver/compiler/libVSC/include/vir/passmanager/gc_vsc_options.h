@@ -915,13 +915,14 @@ typedef struct _VSC_OPTN_CPPOPTIONS
 #define VSC_OPTN_CPPOptions_GetTrace(option)                VSC_OPTN_GetTrace(&(option)->optnBase)
 #define VSC_OPTN_CPPOptions_SetTrace(option, t)             VSC_OPTN_SetTrace(&(option)->optnBase, (t))
 
-#define VSC_OPTN_CPPOptions_FORWARD_OPT                     0x1
-#define VSC_OPTN_CPPOptions_BACKWARD_OPT                    0x2
+#define VSC_OPTN_CPPOptions_FORWARD_OPT                     0x0001
+#define VSC_OPTN_CPPOptions_BACKWARD_OPT                    0x0002
+#define VSC_OPTN_CPPOptions_HANDLE_MODIFIER                 0x0004
 
-#define VSC_OPTN_CPPOptions_TRACE_INPUT                     0x1
-#define VSC_OPTN_CPPOptions_TRACE_OUTPUT                    0x2
-#define VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT               0x4
-#define VSC_OPTN_CPPOptions_TRACE_BACKWARD_OPT              0x8
+#define VSC_OPTN_CPPOptions_TRACE_INPUT                     0x0001
+#define VSC_OPTN_CPPOptions_TRACE_OUTPUT                    0x0002
+#define VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT               0x0004
+#define VSC_OPTN_CPPOptions_TRACE_BACKWARD_OPT              0x0008
 
 void VSC_OPTN_CPPOptions_SetDefault(
     IN OUT VSC_OPTN_CPPOptions* options,

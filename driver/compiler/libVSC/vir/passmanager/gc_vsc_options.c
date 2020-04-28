@@ -2035,6 +2035,8 @@ void VSC_OPTN_CPPOptions_SetDefault(
     )
 {
     gctUINT i;
+    gctUINT option = VSC_OPTN_CPPOptions_FORWARD_OPT        |
+                     VSC_OPTN_CPPOptions_BACKWARD_OPT;
 
     for(i = 0; i < VSC_OPTN_CPP_COUNT; i++)
     {
@@ -2047,7 +2049,7 @@ void VSC_OPTN_CPPOptions_SetDefault(
             VSC_OPTN_CPPOptions_SetSwitchOn(options + i, gcvFALSE);
         }
         VSC_OPTN_CPPOptions_SetPassId(options + i, i);
-        VSC_OPTN_CPPOptions_SetOPTS(options + i, 0xff);
+        VSC_OPTN_CPPOptions_SetOPTS(options + i, option);
         VSC_OPTN_CPPOptions_SetTrace(options + i, 0);
     }
 }

@@ -823,6 +823,8 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 
 #define VIR_Operand_SetRoundMode(Opnd, Round)   do { (Opnd)->header._roundMode = (gctUINT)(Round); } while (0)
 #define VIR_Operand_SetModifier(Opnd, Val)      do { (Opnd)->header._modifier = (gctUINT)(Val); } while (0)
+#define VIR_Operand_SetOneModifier(Opnd, Val)   do { (Opnd)->header._modifier |= (gctUINT)(Val); } while (0)
+#define VIR_Operand_ClrOneModifier(Opnd, Val)   do { (Opnd)->header._modifier &= (gctUINT)(~Val); } while (0)
 #define VIR_Operand_SetTexModifierFlag(Opnd, F) do { ((VIR_Operand_Header_TM *)&((Opnd)->header))->_texmodifiers |= (F); } while (0)
 #define VIR_Operand_ClrTexModifierFlag(Opnd, F) do { ((VIR_Operand_Header_TM *)&((Opnd)->header))->_texmodifiers &= ~(F); } while (0)
 #define VIR_Operand_SetTypeId(Opnd, TypeId)     do { (Opnd)->u.n._opndTypeId = (TypeId); } while (0)
@@ -2428,13 +2430,15 @@ typedef enum _VIR_ROUNDMODE
 
 typedef enum _VIR_MODIFIER
 {
-    /* destination modifiers */
     VIR_MOD_NONE            = 0,
+
+    /* destination modifiers */
     VIR_MOD_SAT_0_TO_1      = 1, /* Satruate the value between [0.0, 1.0] */
     VIR_MOD_SAT_0_TO_INF    = 2, /* Satruate the value between [0.0, +inf) */
     VIR_MOD_SAT_NINF_TO_1   = 3, /* Satruate the value between (-inf, 1.0] */
     VIR_MOD_SAT_TO_MAX_UINT = 4, /* Based on integer bit count, saturate to max uint */
-    /* source modifiers */
+
+    /* source modifiers flags */
     VIR_MOD_NEG             = 0x01, /* source negate modifier */
     VIR_MOD_ABS             = 0x02, /* source absolute modfier, reuse it for conj modifier in complex instruction */
     VIR_MOD_X3              = 0x04, /* source X3 modfier */
