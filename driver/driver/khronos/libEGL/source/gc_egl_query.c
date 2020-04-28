@@ -345,6 +345,10 @@ eglQueryContext(
             }
             break;
 
+        case EGL_PROTECTED_CONTENT_EXT:
+            *value = context->protectedContent;
+            break;
+
         default:
             veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
