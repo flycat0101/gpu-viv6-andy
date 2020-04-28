@@ -272,6 +272,7 @@ typedef struct _gcsHARDWARE_CONFIG
     gctUINT32                   pixelPipes;
     gctUINT32                   resolvePipes;
     gctUINT32                   coreCount;
+    gctUINT32                   hwCoreCount;
     gctUINT32                   clusterCount;
     gctINT32                    clusterMaxID;
     gctINT32                    clusterMinID;

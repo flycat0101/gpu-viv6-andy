@@ -6584,7 +6584,7 @@ gco2D_ProfileEngine(
     )
 {
 #if (VIVANTE_PROFILER && gcdENABLE_2D)
-    gcsHAL_INTERFACE iface;
+    gcsHAL_PROFILER_INTERFACE iface;
     gceSTATUS status;
 
     gcmHEADER_ARG("Engine=0x%x Profile=0x%x", Engine, Profile);
@@ -6600,7 +6600,7 @@ gco2D_ProfileEngine(
     /* Call the kernel. */
     status = gcoOS_DeviceControl(
         gcvNULL,
-        IOCTL_GCHAL_INTERFACE,
+        IOCTL_GCHAL_PROFILER_INTERFACE,
         &iface, gcmSIZEOF(iface),
         &iface, gcmSIZEOF(iface)
         );

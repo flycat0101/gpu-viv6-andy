@@ -1992,7 +1992,7 @@ int drv_msg(resmgr_context_t *ctp,
     if ((drvArgs->iomsg.i.type != _IO_MSG)
     || (drvArgs->iomsg.i.mgrid != _IOMGR_VIVANTE)
     || (drvArgs->iomsg.i.subtype != IOCTL_GCHAL_INTERFACE
-        && drvArgs->iomsg.i.subtype != IOCTL_GCHAL_KERNEL_INTERFACE
+        && drvArgs->iomsg.i.subtype != IOCTL_GCHAL_PROFILER_INTERFACE
         && drvArgs->iomsg.i.subtype != IOCTL_GCHAL_TERMINATE))
     {
         /* Unknown command. Fail the I/O. */
