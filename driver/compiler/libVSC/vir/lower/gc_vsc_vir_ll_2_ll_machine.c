@@ -493,6 +493,36 @@ static VIR_Pattern _convertPattern[] = {
     { VIR_PATN_FLAG_NONE }
 };
 
+/*
+JMPC.le            #spv_52, mp  v_normal+v_layerDepth.mp.w, mp  temp(273).mp.x
+MOV                hp temp(265).hp.x, 0.000000[0]
+JMP                #spv_50
+LABEL              #spv_52:
+MUL                hp temp(265).hp.x, mp  temp(261).mp.w, vec2 mp  temp(262).mp.x
+LABEL              #spv_50:
+-->
+MUL                hp temp(265).hp.x, mp  temp(261).mp.w, vec2 mp  temp(262).mp.x
+CMOV.gt            hp temp(265).hp.x, mp  v_normal+v_layerDepth.mp.w, mp  temp(273).mp.x, 0.000000[0]
+*/
+static VIR_PatternMatchInst _jmpcPatInst0[] = {
+    { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { VIR_Lower_jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 4, 5, 0, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 6, 0, 0, 0 }, { VIR_Lower_jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 7, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_MUL, VIR_PATTERN_ANYCOND, 0, { 4, 8, 9, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 10, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _jmpcRepInst0[] = {
+    { VIR_OP_MUL, 0, 0, { 4, 8, 9, }, { 0 } },
+    { VIR_OP_CMOV, -1, 0, { 4, 2, 3, 5 }, { VIR_Lower_ReverseCondOp } },
+};
+
+static VIR_Pattern _jmpcPostPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_jmpc, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
 static VIR_Pattern*
 _GetLowerPatternPhaseMachinePre(
     IN VIR_PatternContext      *Context,
@@ -533,6 +563,8 @@ _GetLowerPatternPhaseMachinePost(
         return _divPostPattern;
     case VIR_OP_MOD:
         return _modPostPattern;
+    case VIR_OP_JMPC:
+        return _jmpcPostPattern;
     default:
         break;
     }
