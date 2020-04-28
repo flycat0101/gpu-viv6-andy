@@ -728,6 +728,38 @@ VIR_Lower_MatchDual16Req(
     IN VIR_Operand        *SrcOpnd
     );
 
+/* JMP check functions. */
+gctBOOL
+VIR_Lower_label_only_one_jmp(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
+VIR_Lower_jmp_2_succ(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN gctUINT            seq
+    );
+
+gctBOOL
+VIR_Lower_jmp_2_succ2(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
+VIR_Lower_jmp_2_succ3(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
+VIR_Lower_jmp_2_succ4(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
 END_EXTERN_C()
 #endif
 

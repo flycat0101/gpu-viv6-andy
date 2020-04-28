@@ -1568,3 +1568,84 @@ VIR_Lower_MatchDual16Req(
     return gcvTRUE;
 }
 
+/* JMP check functions. */
+gctBOOL
+VIR_Lower_label_only_one_jmp(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_Operand* inst_dest;
+    VIR_Label* label;
+
+    gcmASSERT(Inst->_opcode == VIR_OP_LABEL);
+
+    inst_dest = VIR_Inst_GetDest(Inst);
+    label = VIR_Operand_GetLabel(inst_dest);
+    return VIR_Link_Count(label->referenced) == 1;
+}
+
+gctBOOL
+VIR_Lower_jmp_2_succ(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN gctUINT            seq
+    )
+{
+    VIR_Instruction* succ;
+    VIR_Operand* inst_dest, *succ_dest;
+    VIR_Label* inst_label, *succ_label;
+    gctUINT i;
+    gcmASSERT(Inst->_opcode == VIR_OP_JMP
+        || Inst->_opcode == VIR_OP_JMPC
+        || Inst->_opcode == VIR_OP_JMP_ANY);
+
+    succ = Inst;
+    for(i = 0; i < seq; ++i)
+    {
+        succ = VIR_Inst_GetNext(succ);
+        if(succ == gcvNULL)
+        {
+            return gcvFALSE;
+        }
+    }
+
+    succ_dest = VIR_Inst_GetDest(succ);
+    if(!succ_dest || (VIR_Operand_GetOpKind(succ_dest) != VIR_OPND_LABEL))
+    {
+        return gcvFALSE;
+    }
+    succ_label = VIR_Operand_GetLabel(succ_dest);
+    inst_dest = VIR_Inst_GetDest(Inst);
+    gcmASSERT((VIR_Operand_GetOpKind(inst_dest) == VIR_OPND_LABEL));
+    inst_label = VIR_Operand_GetLabel(inst_dest);
+    return inst_label == succ_label;
+}
+
+gctBOOL
+VIR_Lower_jmp_2_succ2(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return VIR_Lower_jmp_2_succ(Context, Inst, 2);
+}
+
+gctBOOL
+VIR_Lower_jmp_2_succ3(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return VIR_Lower_jmp_2_succ(Context, Inst, 3);
+}
+
+gctBOOL
+VIR_Lower_jmp_2_succ4(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+     return VIR_Lower_jmp_2_succ(Context, Inst, 4);
+}
+

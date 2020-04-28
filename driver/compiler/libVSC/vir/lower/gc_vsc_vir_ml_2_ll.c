@@ -79,7 +79,7 @@ VIR_Lower_MiddleLevel_To_LowLevel_Pre(
 
     if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(shader), VIR_Shader_GetId(shader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
-        VIR_Shader_Dump(gcvNULL, "After Lowered to LowLevel.", shader, gcvTRUE);
+        VIR_Shader_Dump(gcvNULL, "After Lowered to LowLevel pre.", shader, gcvTRUE);
     }
 
     return errCode;
@@ -135,7 +135,7 @@ VIR_Lower_MiddleLevel_To_LowLevel_Post(
 
     if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(shader), VIR_Shader_GetId(shader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
-        VIR_Shader_Dump(gcvNULL, "After Lowered to LowLevel.", shader, gcvTRUE);
+        VIR_Shader_Dump(gcvNULL, "After Lowered to LowLevel post.", shader, gcvTRUE);
     }
 
     return errCode;

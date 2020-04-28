@@ -3397,42 +3397,6 @@ value_types_32(
 }
 
 static gctBOOL
-jmp_2_succ(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN gctUINT            seq
-    )
-{
-    VIR_Instruction* succ;
-    VIR_Operand* inst_dest, *succ_dest;
-    VIR_Label* inst_label, *succ_label;
-    gctUINT i;
-    gcmASSERT(Inst->_opcode == VIR_OP_JMP
-        || Inst->_opcode == VIR_OP_JMPC
-        || Inst->_opcode == VIR_OP_JMP_ANY);
-
-    succ = Inst;
-    for(i = 0; i < seq; ++i)
-    {
-        succ = VIR_Inst_GetNext(succ);
-        if(succ == gcvNULL)
-        {
-            return gcvFALSE;
-        }
-    }
-
-    succ_dest = VIR_Inst_GetDest(succ);
-    if(!succ_dest || (VIR_Operand_GetOpKind(succ_dest) != VIR_OPND_LABEL))
-    {
-        return gcvFALSE;
-    }
-    succ_label = VIR_Operand_GetLabel(succ_dest);
-    inst_dest = VIR_Inst_GetDest(Inst);
-    gcmASSERT((VIR_Operand_GetOpKind(inst_dest) == VIR_OPND_LABEL));
-    inst_label = VIR_Operand_GetLabel(inst_dest);
-    return inst_label == succ_label;
-}
-static gctBOOL
 all_source_single_value(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
@@ -3534,33 +3498,6 @@ supportCONV(
 }
 
 static gctBOOL
-jmp_2_succ2(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst
-    )
-{
-    return jmp_2_succ(Context, Inst, 2);
-}
-
-static gctBOOL
-jmp_2_succ3(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst
-    )
-{
-    return jmp_2_succ(Context, Inst, 3);
-}
-
-static gctBOOL
-jmp_2_succ4(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst
-    )
-{
-     return jmp_2_succ(Context, Inst, 4);
-}
-
-static gctBOOL
 jmp_2_succ2_resCondOp_float(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
@@ -3575,7 +3512,7 @@ jmp_2_succ2_resCondOp_float(
     gcmASSERT(ty0 < VIR_TYPE_PRIMITIVETYPE_COUNT &&
         ty1 < VIR_TYPE_PRIMITIVETYPE_COUNT);
     /* Texkill only supports float. */
-    return jmp_2_succ(Context, Inst, 2) &&
+    return VIR_Lower_jmp_2_succ2(Context, Inst) &&
            VIR_ConditionOp_Reversable(VIR_Inst_GetConditionOp(Inst)) &&
            (VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISFLOAT) &&
            (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISFLOAT);
@@ -3600,7 +3537,7 @@ jmp_2_succ2_resCondOp_singleChannel(
         ty1 < VIR_TYPE_PRIMITIVETYPE_COUNT);
     return (VIR_Swizzle_Channel_Count(swizzle0) == 1 || VIR_Operand_isImm(VIR_Inst_GetSource(Inst, 0))) &&
            (VIR_Swizzle_Channel_Count(swizzle1) == 1 || VIR_Operand_isImm(VIR_Inst_GetSource(Inst, 1))) &&
-           jmp_2_succ(Context, Inst, 2) &&
+           VIR_Lower_jmp_2_succ2(Context, Inst) &&
            VIR_ConditionOp_Reversable(VIR_Inst_GetConditionOp(Inst)) &&
            !VIR_TypeId_isFloat(ty0) &&
            !VIR_TypeId_isFloat(ty1);
@@ -3615,7 +3552,7 @@ supportCMP_single_value_jmp_2_succ3(
     gcmASSERT(Inst->_opcode == VIR_OP_JMPC || Inst->_opcode == VIR_OP_JMP_ANY);
     return supportCMP(Context, Inst) &&
            all_source_single_value(Context, Inst) &&
-           jmp_2_succ(Context, Inst, 3);
+           VIR_Lower_jmp_2_succ3(Context, Inst);
 }
 
 static gctBOOL
@@ -3712,22 +3649,6 @@ canBeMergedToSelect1(
     )
 {
     return canBeMergedToSelect(Context, Inst, 1);
-}
-
-static gctBOOL
-label_only_one_jmp(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst
-    )
-{
-    VIR_Operand* inst_dest;
-    VIR_Label* label;
-
-    gcmASSERT(Inst->_opcode == VIR_OP_LABEL);
-
-    inst_dest = VIR_Inst_GetDest(Inst);
-    label = VIR_Operand_GetLabel(inst_dest);
-    return VIR_Link_Count(label->referenced) == 1;
 }
 
 static gctBOOL
@@ -8188,7 +8109,7 @@ supportCMP_single_value_jmp_2_succ2_resCondOp(
     gcmASSERT(Inst->_opcode == VIR_OP_JMPC || Inst->_opcode == VIR_OP_JMP_ANY);
     return supportCMP(Context, Inst) &&
            all_source_single_value(Context, Inst) &&
-           jmp_2_succ(Context, Inst, 2) &&
+           VIR_Lower_jmp_2_succ2(Context, Inst) &&
            VIR_ConditionOp_Reversable(VIR_Inst_GetConditionOp(Inst));
 }
 
@@ -8209,7 +8130,7 @@ notDual16Req(
 static VIR_PatternMatchInst _jmpcPatInst0[] = {
     { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { VIR_Lower_HasHalti4, supportCMP_single_value_jmp_2_succ2_resCondOp }, VIR_PATN_MATCH_FLAG_AND },
     { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 4, 5, 0, 0 }, { notDual16Req }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 6, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 6, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _jmpcRepInst0[] = {
@@ -8217,12 +8138,12 @@ static VIR_PatternReplaceInst _jmpcRepInst0[] = {
 };
 
 static VIR_PatternMatchInst _jmpcPatInst1[] = {
-    { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { all_source_float, all_source_single_value, jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { all_source_float, all_source_single_value, VIR_Lower_jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_AND },
     { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 4, 5, 0, 0 }, { _isSrc0FloatOne }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 6, 0, 0, 0 }, { jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 7, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 6, 0, 0, 0 }, { VIR_Lower_jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 7, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 4, 8, 0, 0 }, { _isSrc0Zero }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 9, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 9, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _jmpcRepInst1[] = {
@@ -8230,12 +8151,12 @@ static VIR_PatternReplaceInst _jmpcRepInst1[] = {
 };
 
 static VIR_PatternMatchInst _jmpcPatInst2[] = {
-    { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { all_source_float, all_source_single_value, jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { all_source_float, all_source_single_value, VIR_Lower_jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_AND },
     { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 4, 5, 0, 0 }, { _isSrc0Zero }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 6, 0, 0, 0 }, { jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 7, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 6, 0, 0, 0 }, { VIR_Lower_jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 7, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 4, 8, 0, 0 }, { _isSrc0FloatOne }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 9, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 9, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _jmpcRepInst2[] = {
@@ -8243,12 +8164,12 @@ static VIR_PatternReplaceInst _jmpcRepInst2[] = {
 };
 
 static VIR_PatternMatchInst _jmpcPatInst3[] = {
-    { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isCLShader, all_source_integer, all_source_single_value, jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isCLShader, all_source_integer, all_source_single_value, VIR_Lower_jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_AND },
     { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 4, 5, 0, 0 }, { _isSrc0IntOne }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 6, 0, 0, 0 }, { jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 7, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 6, 0, 0, 0 }, { VIR_Lower_jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 7, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 4, 8, 0, 0 }, { _isSrc0Zero }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 9, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 9, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _jmpcRepInst3[] = {
@@ -8256,12 +8177,12 @@ static VIR_PatternReplaceInst _jmpcRepInst3[] = {
 };
 
 static VIR_PatternMatchInst _jmpcPatInst4[] = {
-    { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isCLShader, all_source_integer, all_source_single_value, jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isCLShader, all_source_integer, all_source_single_value, VIR_Lower_jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_AND },
     { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 4, 5, 0, 0 }, { _isSrc0Zero }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 6, 0, 0, 0 }, { jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 7, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 6, 0, 0, 0 }, { VIR_Lower_jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 7, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 4, 8, 0, 0 }, { _isSrc0IntOne }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 9, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 9, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _jmpcRepInst4[] = {
@@ -8271,10 +8192,10 @@ static VIR_PatternReplaceInst _jmpcRepInst4[] = {
 static VIR_PatternMatchInst _jmpcPatInst5[] = {
     { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { supportCMP_single_value_jmp_2_succ3, _isSrc0Zero }, VIR_PATN_MATCH_FLAG_AND },
     { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 4, 5, 0, 0 }, { canBeMergedToSelect1, _dstSrcSamePrecsion}, VIR_PATN_MATCH_FLAG_AND },
-    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 6, 0, 0, 0 }, { jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 7, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 6, 0, 0, 0 }, { VIR_Lower_jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 7, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 4, 8, 0, 0 }, { _dstSrcSamePrecsion }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 9, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 9, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _jmpcRepInst5[] = {
@@ -8284,10 +8205,10 @@ static VIR_PatternReplaceInst _jmpcRepInst5[] = {
 static VIR_PatternMatchInst _jmpcPatInst6[] = {
     { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { supportCMP_single_value_jmp_2_succ3, _isSrc1Zero }, VIR_PATN_MATCH_FLAG_AND },
     { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 4, 5, 0, 0 }, { canBeMergedToSelect0, _dstSrcSamePrecsion }, VIR_PATN_MATCH_FLAG_AND },
-    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 6, 0, 0, 0 }, { jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 7, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 6, 0, 0, 0 }, { VIR_Lower_jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 7, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 4, 8, 0, 0 }, { _dstSrcSamePrecsion }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 9, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 9, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _jmpcRepInst6[] = {
@@ -8297,10 +8218,10 @@ static VIR_PatternReplaceInst _jmpcRepInst6[] = {
 static VIR_PatternMatchInst _jmpcPatInst7[] = {
     { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { supportCMP_single_value_jmp_2_succ3, VIR_Lower_enableFullNewLinker }, VIR_PATN_MATCH_FLAG_AND },
     { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 4, 5, 0, 0 }, { dest_type_less_than_prev_jmp_src0 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 6, 0, 0, 0 }, { jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 7, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 6, 0, 0, 0 }, { VIR_Lower_jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 7, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 4, 8, 0, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 9, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 9, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 /* CMP, if dest.type is not float,
@@ -8316,10 +8237,10 @@ static VIR_PatternReplaceInst _jmpcRepInst7[] = {
 static VIR_PatternMatchInst _jmpcPatInst8[] = {
     { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { supportCMP_single_value_jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 4, 5, 0, 0 }, { dest_type_less_than_prev_jmp_src0 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 6, 0, 0, 0 }, { jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 7, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 6, 0, 0, 0 }, { VIR_Lower_jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 7, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 4, 8, 0, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 9, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 9, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _jmpcRepInst8[] = {
@@ -8331,7 +8252,7 @@ static VIR_PatternReplaceInst _jmpcRepInst8[] = {
 static VIR_PatternMatchInst _jmpcPatInst9[] = {
     { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { jmp_2_succ2_resCondOp_float }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_KILL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { no_source }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 4, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 4, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _jmpcRepInst9[] = {
@@ -8350,14 +8271,14 @@ static VIR_PatternReplaceInst _jmpcRepInst9[] = {
    CMP.ne           hp temp(4268).hp.x, bool hp  temp(4272).hp.x, bool false, 1.000000[3f800000]
 */
 static VIR_PatternMatchInst _jmpcPatInst10[] = {
-    { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { all_source_single_value, jmp_2_succ2 }, VIR_PATN_MATCH_FLAG_AND },
-    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 4, 0, 0, 0 }, { jmp_2_succ4 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 5, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { all_source_single_value, VIR_Lower_jmp_2_succ2 }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 4, 0, 0, 0 }, { VIR_Lower_jmp_2_succ4 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 5, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 6, 7, 0, 0 }, { _isSrc0FloatOne }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 8, 0, 0, 0 }, { jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 9, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 8, 0, 0, 0 }, { VIR_Lower_jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 9, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 6, 10, 0, 0 }, { _isSrc0FloatZero }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 11, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 11, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _jmpcRepInst10[] = {
@@ -8365,14 +8286,14 @@ static VIR_PatternReplaceInst _jmpcRepInst10[] = {
 };
 
 static VIR_PatternMatchInst _jmpcPatInst11[] = {
-    { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { all_source_not_float, all_source_single_value, jmp_2_succ2 }, VIR_PATN_MATCH_FLAG_AND },
-    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 4, 0, 0, 0 }, { jmp_2_succ4 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 5, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { all_source_not_float, all_source_single_value, VIR_Lower_jmp_2_succ2 }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 4, 0, 0, 0 }, { VIR_Lower_jmp_2_succ4 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 5, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 6, 7, 0, 0 }, { _isSrc0IntOne }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 8, 0, 0, 0 }, { jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 9, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 8, 0, 0, 0 }, { VIR_Lower_jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 9, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 6, 10, 0, 0 }, { _isSrc0Zero }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 11, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 11, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _jmpcRepInst11[] = {
@@ -8382,7 +8303,7 @@ static VIR_PatternReplaceInst _jmpcRepInst11[] = {
 static VIR_PatternMatchInst _jmpcPatInst12[] = {
     { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { jmp_2_succ2_resCondOp_singleChannel }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 4, 0, 0, 0 }, { no_source }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 5, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 5, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _jmpcRepInst12[] = {
@@ -18419,8 +18340,6 @@ VIR_Lower_MiddleLevel_To_LowLevel_Expand(
     )
 {
     VSC_ErrCode errCode  = VSC_ERR_NONE;
-
-
 
     VIR_PatternContext_Initialize(&Context->header, VscContext, Shader, Context->pMM, VIR_PATN_CONTEXT_FLAG_NONE,
                                   _GetLowerPatternPhaseExpand, _CmpInstuction, 512);
