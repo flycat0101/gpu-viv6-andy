@@ -2544,17 +2544,6 @@ _ConvShaderUniformIdx2Vir(
 
             virUniform->sym = symId;
             VIR_Uniform_SetBlockIndex(virUniform, BlockIndex);
-            if(BlockIndex != -1)
-            {
-                /* In recompilation, uniform already in DUBO but not so in IR. Need to move it to DUBO again */
-                VIR_UBOIdList* uboList = VIR_Shader_GetUniformBlocks(VirShader);
-                VIR_Symbol* uboSym = VIR_Shader_GetSymFromId(VirShader, VIR_IdList_GetId(uboList, BlockIndex));
-
-                if(isSymUBODUBO(uboSym))
-                {
-                    VIR_Symbol_AddFlag(sym, VIR_SYMUNIFORMFLAG_MOVING_TO_DUBO);
-                }
-            }
             if (VIR_Shader_IsCL(VirShader) && Shader->currentKernelFunction &&
                 uniform->index < Shader->currentKernelFunction->uniformArgumentCount)
             {
@@ -7470,6 +7459,9 @@ gcSHADER_Conv2VIR(
         uniformBlock = Shader->uniformBlocks[i];
         if (uniformBlock == gcvNULL) continue;
 
+        /* Default UBO needs to be added after all the use def uniforms */
+        if (gcoOS_StrCmp(uniformBlock->name, "#DefaultUBO") == gcvSTATUS_OK) continue;
+
         if (GetUBPrevSibling(uniformBlock) == -1)
         {
             VIR_TypeId uniformBlockTypeId[1] = {VIR_TYPE_UNKNOWN};
@@ -7675,6 +7667,65 @@ gcSHADER_Conv2VIR(
                     break;
                 }
             }
+        }
+    }
+
+    /* default UBO  */
+    for (i = 0; i < Shader->uniformBlockCount; i++)
+    {
+        gcsUNIFORM_BLOCK uniformBlock;
+        VIR_UniformBlock *virUniformBlock;
+        VIR_Symbol *virUniformSym = gcvNULL;
+        VIR_Uniform *virUniform = gcvNULL;
+        VIR_Id      virUniformID;
+        gctUINT     k;
+
+        uniformBlock = Shader->uniformBlocks[i];
+        if (uniformBlock == gcvNULL) continue;
+        if (gcoOS_StrCmp(uniformBlock->name, "#DefaultUBO") != gcvSTATUS_OK) continue;
+
+        if (GetUBPrevSibling(uniformBlock) == -1)
+        {
+            VIR_TypeId uniformBlockTypeId[1] = {VIR_TYPE_UNKNOWN};
+
+            virErrCode =_ConvUniformBlock2Vir(Shader,
+                                              uniformBlock,
+                                              VirShader,
+                                              uniformBlockTypeId,
+                                              &virUniformBlock);
+            ON_ERROR2STATUS(virErrCode, "Failed to _ConvUniformBlock2Vir");
+            virUniformIdArr[GetUBIndex(uniformBlock)] = virUniformBlock->baseAddr;
+
+            while (GetUBNextSibling(uniformBlock) != -1)
+            {
+                gcmONERROR(gcSHADER_GetUniformBlock(Shader,
+                                                  GetUBNextSibling(uniformBlock),
+                                                  &uniformBlock));
+
+                virErrCode =_ConvUniformBlock2Vir(Shader,
+                                                  uniformBlock,
+                                                  VirShader,
+                                                  uniformBlockTypeId,
+                                                  &virUniformBlock);
+                ON_ERROR2STATUS(virErrCode, "Failed to _ConvUniformBlock2Vir");
+                virUniformBlock->baseAddr = virUniformIdArr[GetUBIndex(uniformBlock)];
+            }
+        }
+
+        if (virErrCode != VSC_ERR_NONE)
+        {
+           status = gcvSTATUS_INVALID_ARGUMENT;
+           goto OnError;
+        }
+
+        /* In recompilation, uniform already in DUBO but not so in IR. Need to move it to DUBO again */
+        for (k = 0; k < VIR_IdList_Count(&VirShader->uniforms); k ++)
+        {
+            virUniformID  = VIR_IdList_GetId(&VirShader->uniforms, k);
+            virUniformSym = VIR_Shader_GetSymFromId(VirShader, virUniformID);
+            virUniform = virUniformSym->u2.uniform;
+            if (VIR_Uniform_GetBlockIndex(virUniform) == GetUBBlockIndex(uniformBlock))
+                VIR_Symbol_AddFlag(virUniformSym, VIR_SYMUNIFORMFLAG_MOVING_TO_DUBO);
         }
     }
 
