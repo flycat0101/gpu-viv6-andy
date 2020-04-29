@@ -2790,6 +2790,47 @@ OnError:
 }
 
 static GLvoid
+gcChipUpdateBaseAddrUniformForDefaultUBO(
+    IN     __GLcontext *gc,
+    IN OUT __GLprogramObject *progObj,
+    IN     gcSHADER Shader
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    __GLchipSLProgram *program = (__GLchipSLProgram *)progObj->privateData;
+    __GLchipSLUniformBlock *ubSlot = gcvNULL;
+    __GLSLStage stageIdx = __GLSL_STAGE_LAST;
+    gcUNIFORM newBaseAddrUniform = gcvNULL;
+    GLint i;
+
+    gcmHEADER_ARG("gc=0x%x progObj=0x%x Shader=0x%x", gc, progObj, Shader);
+
+    stageIdx = gcChipGetShaderStage(Shader);
+    for (i = 0; i < program->defaultUbCount; i++)
+    {
+        ubSlot = &program->uniformBlocks[i];
+
+        if (ubSlot == gcvNULL || ubSlot->halUniform[stageIdx] == gcvNULL)
+        {
+            continue;
+        }
+
+        gcmONERROR(gcSHADER_GetUniform(Shader,
+                                       GetUniformIndex(ubSlot->halUniform[stageIdx]),
+                                       &newBaseAddrUniform));
+
+        ubSlot->halUniform[stageIdx] = newBaseAddrUniform;
+
+        gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(program->curPgInstance->programState.hints->hwConstRegBases,
+                                                          newBaseAddrUniform,
+                                                          &ubSlot->stateAddress[stageIdx]));
+    }
+
+OnError:
+    gcmFOOTER_NO();
+}
+
+static GLvoid
 gcChipProcessStorageBlocks(
     IN     __GLcontext *gc,
     IN OUT __GLprogramObject *progObj,
@@ -3865,6 +3906,7 @@ gcChipProgramBindingRecompiledInfo(
         if (pBinaries[stage])
         {
             gcChipUpdateBaseAddrUniformForStorageBlocks(gc, programObject, pBinaries[stage]);
+            gcChipUpdateBaseAddrUniformForDefaultUBO(gc, programObject, pBinaries[stage]);
         }
     }
 
