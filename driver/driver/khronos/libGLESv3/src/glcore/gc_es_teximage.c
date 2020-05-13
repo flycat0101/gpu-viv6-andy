@@ -3171,6 +3171,8 @@ GLvoid GL_APIENTRY __gles_CompressedTexImage2D(__GLcontext *gc,
 
     __glSetTexImageDirtyBit(gc, tex, __GL_TEX_IMAGE_CONTENT_CHANGED_BIT | mipHintDirty);
 
+    __gles_GenerateMipmap(gc, target);
+
     tex->seqNumber++;
 
 OnExit:
@@ -3431,6 +3433,36 @@ GLvoid GL_APIENTRY __gles_GenerateMipmap(__GLcontext *gc, GLenum target)
     case GL_RGB:
     case GL_RGB565:
         break;
+
+    case GL_COMPRESSED_RGBA_ASTC_4x4:
+    case GL_COMPRESSED_RGBA_ASTC_5x4:
+    case GL_COMPRESSED_RGBA_ASTC_5x5:
+    case GL_COMPRESSED_RGBA_ASTC_6x5:
+    case GL_COMPRESSED_RGBA_ASTC_8x5:
+    case GL_COMPRESSED_RGBA_ASTC_8x6:
+    case GL_COMPRESSED_RGBA_ASTC_8x8:
+    case GL_COMPRESSED_RGBA_ASTC_6x6:
+    case GL_COMPRESSED_RGBA_ASTC_10x5:
+    case GL_COMPRESSED_RGBA_ASTC_10x6:
+    case GL_COMPRESSED_RGBA_ASTC_10x8:
+    case GL_COMPRESSED_RGBA_ASTC_10x10:
+    case GL_COMPRESSED_RGBA_ASTC_12x10:
+    case GL_COMPRESSED_RGBA_ASTC_12x12:
+        if (baseMipmap->width >= 1080 && baseMipmap->height >= 1080)
+            break;
+
+        if (!baseMipmap->formatInfo->filterable ||
+            !baseMipmap->formatInfo->renderable ||
+            /* Only color-renderable format are allowed. */
+            baseMipmap->formatInfo->baseFormat == GL_DEPTH_COMPONENT ||
+            baseMipmap->formatInfo->baseFormat == GL_DEPTH_STENCIL ||
+            baseMipmap->formatInfo->baseFormat == GL_STENCIL
+            )
+        {
+            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+        }
+        break;
+
     default:
         if (!baseMipmap->formatInfo->filterable ||
             !baseMipmap->formatInfo->renderable ||

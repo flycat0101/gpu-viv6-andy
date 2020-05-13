@@ -805,6 +805,17 @@ gcChipResidentTextureLevel(
             patchCase = __GL_CHIP_FMT_PATCH_D32F;
         }
         else if ((((mipmap->requestedFormat >= GL_COMPRESSED_RGBA_ASTC_4x4_KHR) &&
+            (mipmap->requestedFormat <= GL_COMPRESSED_RGBA_ASTC_12x12_KHR)
+            ) ||
+            ((mipmap->requestedFormat >= GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR) &&
+            (mipmap->requestedFormat <= GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR)
+            )
+            ) &&
+            (mipmap->width >= 1080 && mipmap->height >= 1080))
+        {
+            patchCase = __GL_CHIP_FMT_PATCH_ASTC;
+        }
+        else if ((((mipmap->requestedFormat >= GL_COMPRESSED_RGBA_ASTC_4x4_KHR) &&
                    (mipmap->requestedFormat <= GL_COMPRESSED_RGBA_ASTC_12x12_KHR)
                   ) ||
                   ((mipmap->requestedFormat >= GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR) &&
