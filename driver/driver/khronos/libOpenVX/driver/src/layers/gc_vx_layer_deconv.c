@@ -1170,7 +1170,8 @@ VX_PRIVATE_API vx_status vxoNNDeConvolution_GetPad(vx_int32 in, vx_int32 out, vx
 
                 *upsample_output = *decov_output * stride;
 
-                *upsample_pad = *kernel_resuffle_pad_head;
+                *upsample_pad = (pad_head > *kernel_resuffle_pad_head) ? *kernel_resuffle_pad_head : (pad_head - *kernel_resuffle_pad_head);
+
             }
             else if ((out > in * stride))
             {
@@ -1319,6 +1320,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
         nntp_support = nntp_support && isPadSizeSupport(vxGetContext((vx_reference)inputs), kernel_reshuffle_width);
 
         if (bias && biasFormat == VX_TYPE_UINT8) /*NNCTS has biasformat uint8, while NN doesn't suuport this bias format*/
+            nntp_support = vx_false_e;
+
+        if (weights != VX_NULL && TENSOR_DATA_LIFETIME(weights) == VX_TENSOR_LIFE_TIME_DYNAMIC)
             nntp_support = vx_false_e;
 
         if (!nntp_support)
