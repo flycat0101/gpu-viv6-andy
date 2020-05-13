@@ -12667,6 +12667,14 @@ gcoHARDWARE_UploadTexture(
         gcmONERROR(gcoHARDWARE_Commit(gcvNULL));
         gcmONERROR(gcoHARDWARE_Stall(gcvNULL));
     }
+    else
+    {
+        if (TexSurf->type == gcvSURF_RENDER_TARGET)
+        {
+            gcmONERROR(gcoHARDWARE_Commit(gcvNULL));
+            gcmONERROR(gcoHARDWARE_Stall(gcvNULL));
+        }
+    }
 
     if (TexSurf->superTiled && ((SourceFormat & gcvSURF_FORMAT_OCL) == 0))
     {
