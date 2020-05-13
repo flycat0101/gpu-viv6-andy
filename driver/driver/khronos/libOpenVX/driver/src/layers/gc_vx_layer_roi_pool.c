@@ -52,7 +52,7 @@ vx_status vxnneExecuteSWROIPooling(struct _vxnne_operation_s *operation)
     vx_int32 height         = TENSOR_VIEW_SIZE_INDEX(input_data, 1);
     vx_int32 width          = TENSOR_VIEW_SIZE_INDEX(input_data, 0);
 
-    vx_int32 stride_w       = TENSOR_VIEW_SIZE_INDEX(input_roi, 2); /* 5 */
+    vx_int32 stride_w       = TENSOR_DIM_NUM(input_roi) > 2 ? TENSOR_VIEW_SIZE_INDEX(input_roi, 2) : TENSOR_VIEW_SIZE_INDEX(input_roi, 0); /* 5 */
 
     vx_type_e in_data_format    = (vx_type_e)TENSOR_DATA_TYPE(input_data);
     vx_type_e in_roi_format     = (vx_type_e)TENSOR_DATA_TYPE(input_roi);
@@ -134,6 +134,15 @@ vx_status vxnneExecuteSWROIPooling(struct _vxnne_operation_s *operation)
                     else
                     {
                         /* find the max value in the current pooling region */
+                        if (out_format == VX_TYPE_INT8)
+                        {
+                            output_data_v = -128.0f;
+                        }
+                        else if (out_format == VX_TYPE_INT16)
+                        {
+                            output_data_v = -32768.0f;
+                        }
+
                         for(h = hstart; h < hend; h++)
                         {
                             for(w = wstart; w < wend; w++)
@@ -263,13 +272,31 @@ VX_PRIVATE_API vx_bool vxoROIPoolLayer_SH_EVIS_Support_Ext(vx_node node, const v
 
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
 
-    vx_bool    shExe_flag0  = (vx_bool)(width == 20 && height == 16 && roi_stride == 5 && pool_width == 6 && pool_height == 6 && inputFormat == VX_TYPE_FLOAT16 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16);
-    vx_bool    shExe_flag1  = (vx_bool)(width == 51 && height == 39 && roi_stride == 5 && pool_width == 6 && pool_height == 6 && inputFormat == VX_TYPE_FLOAT16 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16);
-    vx_bool    shExe_flag2  = (vx_bool)(width == 51 && height == 39 && roi_stride == 5 && pool_width == 6 && pool_height == 6 && inputFormat == VX_TYPE_INT8 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8);
-    vx_bool    shExe_flag3  = (vx_bool)(width == 20 && height == 16 && roi_stride == 5 && pool_width == 6 && pool_height == 6 && inputFormat == VX_TYPE_INT8 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8);
-    vx_bool    shExe_flag4  = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16) /*||
-                                                (inputFormat == VX_TYPE_INT16 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT16)||
-                                                (inputFormat == VX_TYPE_UINT8 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_UINT8)*/);
+    vx_bool    shExe_flag0  = vx_false_e;
+    vx_bool    shExe_flag1  = vx_false_e;
+    vx_bool    shExe_flag2  = vx_false_e;
+    vx_bool    shExe_flag3  = vx_false_e;
+    vx_bool    shExe_flag4  = vx_false_e;
+
+    if(evis)
+    {
+        shExe_flag0  = (vx_bool)(width == 20 && height == 16 && roi_stride == 5 && pool_width == 6 && pool_height == 6 && inputFormat == VX_TYPE_FLOAT16 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16);
+        shExe_flag1  = (vx_bool)(width == 51 && height == 39 && roi_stride == 5 && pool_width == 6 && pool_height == 6 && inputFormat == VX_TYPE_FLOAT16 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16);
+        shExe_flag2  = (vx_bool)(width == 51 && height == 39 && roi_stride == 5 && pool_width == 6 && pool_height == 6 && inputFormat == VX_TYPE_INT8 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8);
+        shExe_flag3  = (vx_bool)(width == 20 && height == 16 && roi_stride == 5 && pool_width == 6 && pool_height == 6 && inputFormat == VX_TYPE_INT8 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8);
+        shExe_flag4  = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)   ||
+                                (inputFormat == VX_TYPE_INT16 && (roisFormat == VX_TYPE_FLOAT16 || roisFormat == VX_TYPE_INT16) && outputFormat == VX_TYPE_INT16) ||
+                                (inputFormat == VX_TYPE_UINT8 && (roisFormat == VX_TYPE_FLOAT16 || roisFormat == VX_TYPE_UINT8) && outputFormat == VX_TYPE_UINT8) ||
+                                (inputFormat == VX_TYPE_INT8  && (roisFormat == VX_TYPE_FLOAT16 || roisFormat == VX_TYPE_INT8)  && outputFormat == VX_TYPE_INT8));
+    }
+    else
+    {
+        shExe_flag4  = (vx_bool)(((inputFormat == VX_TYPE_FLOAT16   || inputFormat == VX_TYPE_FLOAT32)
+                                && (roisFormat == VX_TYPE_FLOAT16   || roisFormat == VX_TYPE_FLOAT32)
+                                && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_FLOAT32))
+                                ||
+                                (inputFormat == VX_TYPE_UINT8 && (roisFormat == VX_TYPE_FLOAT16 || roisFormat == VX_TYPE_FLOAT32) && outputFormat == VX_TYPE_UINT8));
+    }
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
@@ -310,7 +337,7 @@ VX_PRIVATE_API vx_bool vxoROIPoolLayer_SH_EVIS_Support(vx_node node, const vx_re
     return support;
 }
 
-VX_PRIVATE_API vx_status vxoROIPoolLayer_SH_EVIS_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+VX_PRIVATE_API vx_status vxoROIPoolLayer_SH_EVIS_Initialize_Ext(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis)
 {
     vx_status status = VX_SUCCESS;
 
@@ -346,8 +373,6 @@ VX_PRIVATE_API vx_status vxoROIPoolLayer_SH_EVIS_Initialize(vxnne_layer ops_laye
 
     vxnne_shader_executable shaderExecutable = VX_NULL;
     vx_bool enable_relu = relu ? relu->value->b : vx_false_e;
-
-    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
     if (shExe_flag0 || shExe_flag1 || shExe_flag2 || shExe_flag3)
     {
@@ -491,8 +516,16 @@ VX_PRIVATE_API vx_status vxoROIPoolLayer_SH_EVIS_Initialize(vxnne_layer ops_laye
     }
     else if (shExe_flag4)
     {
-        shaderExecutable = vxnneROIPoolShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_ROIPOOL, &ops_layer->node->kernelAttributes.borderMode, input_data, input_rois, pool_width, pool_height, spatial_scale, enable_relu, outputs);
-
+        if(evis)
+        {
+            shaderExecutable = vxnneROIPoolShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_ROIPOOL, &ops_layer->node->kernelAttributes.borderMode,
+            input_data, input_rois, pool_width, pool_height, spatial_scale, enable_relu, outputs);
+        }
+        else
+        {
+            shaderExecutable = vxnneGPUROIPoolShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_ROIPOOL, &ops_layer->node->kernelAttributes.borderMode,
+            input_data, input_rois, pool_width, pool_height, spatial_scale, enable_relu, outputs);
+        }
         if (!shaderExecutable)
         {
             status = VX_FAILURE;
@@ -513,6 +546,48 @@ VX_PRIVATE_API vx_status vxoROIPoolLayer_SH_EVIS_Initialize(vxnne_layer ops_laye
                  &roipoolLayer->tensorROIPoolSH.base,
                  0));
     }
+
+
+OnError:
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoROIPoolLayer_SH_EVIS_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoROIPoolLayer_SH_EVIS_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_true_e));
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+OnError:
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoROIPoolLayer_SH_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && vxoROIPoolLayer_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_false_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoROIPoolLayer_SH_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoROIPoolLayer_SH_EVIS_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_false_e));
 
     vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
 
@@ -772,7 +847,7 @@ VX_PRIVATE_API vx_status vxnneROIPoolLayer_Initializer(vx_node    node, char* na
         { "ROIPool NN", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
         { "ROIPool TP", vxoROIPoolLayer_TP_Support, vxoROIPoolLayer_TP_Initialize, VX_NULL },
         { "ROIPool SH EVIS", vxoROIPoolLayer_SH_EVIS_Support, vxoROIPoolLayer_SH_EVIS_Initialize, VX_NULL },
-        { "ROIPool SH F32", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "ROIPool SH F32", vxoROIPoolLayer_SH_Support, vxoROIPoolLayer_SH_Initialize, VX_NULL },
         { "ROIPool SW", vxoNNCommon_Support, vxoROIPoolLayer_SW_Initialize, VX_NULL },
     };
 
@@ -1032,15 +1107,33 @@ VX_PRIVATE_API vx_status vxnneROIPoolLayer_Initializer(
         }
         else
         {
-            vx_bool    shExe_flag0  = (vx_bool)(width == 20 && height == 16 && roi_stride == 5 && pool_width == 6 && pool_height == 6 && inputFormat == VX_TYPE_FLOAT16 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16);
-            vx_bool    shExe_flag1  = (vx_bool)(width == 51 && height == 39 && roi_stride == 5 && pool_width == 6 && pool_height == 6 && inputFormat == VX_TYPE_FLOAT16 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16);
-            vx_bool    shExe_flag2  = (vx_bool)(width == 51 && height == 39 && roi_stride == 5 && pool_width == 6 && pool_height == 6 && inputFormat == VX_TYPE_INT8 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8);
-            vx_bool    shExe_flag3  = (vx_bool)(width == 20 && height == 16 && roi_stride == 5 && pool_width == 6 && pool_height == 6 && inputFormat == VX_TYPE_INT8 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8);
-            vx_bool    shExe_flag4  = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16) /*||
-                                                (inputFormat == VX_TYPE_INT16 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT16)||
-                                                (inputFormat == VX_TYPE_UINT8 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_UINT8)*/);
+            vx_bool    shExe_flag0  = vx_false_e;
+            vx_bool    shExe_flag1  = vx_false_e;
+            vx_bool    shExe_flag2  = vx_false_e;
+            vx_bool    shExe_flag3  = vx_false_e;
+            vx_bool    shExe_flag4  = vx_false_e;
 
-            shExe_flag =  shExe_flag2 || shExe_flag3 || shExe_flag4;
+            if(context->evisNoInst.supportEVIS)
+            {
+                shExe_flag0  = (vx_bool)(width == 20 && height == 16 && roi_stride == 5 && pool_width == 6 && pool_height == 6 && inputFormat == VX_TYPE_FLOAT16 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16);
+                shExe_flag1  = (vx_bool)(width == 51 && height == 39 && roi_stride == 5 && pool_width == 6 && pool_height == 6 && inputFormat == VX_TYPE_FLOAT16 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16);
+                shExe_flag2  = (vx_bool)(width == 51 && height == 39 && roi_stride == 5 && pool_width == 6 && pool_height == 6 && inputFormat == VX_TYPE_INT8 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8);
+                shExe_flag3  = (vx_bool)(width == 20 && height == 16 && roi_stride == 5 && pool_width == 6 && pool_height == 6 && inputFormat == VX_TYPE_INT8 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8);
+                shExe_flag4  = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)   ||
+                                        (inputFormat == VX_TYPE_INT16 && (roisFormat == VX_TYPE_FLOAT16 || roisFormat == VX_TYPE_INT16) && outputFormat == VX_TYPE_INT16) ||
+                                        (inputFormat == VX_TYPE_UINT8 && (roisFormat == VX_TYPE_FLOAT16 || roisFormat == VX_TYPE_UINT8) && outputFormat == VX_TYPE_UINT8) ||
+                                        (inputFormat == VX_TYPE_INT8  && (roisFormat == VX_TYPE_FLOAT16 || roisFormat == VX_TYPE_INT8)  && outputFormat == VX_TYPE_INT8));
+                shExe_flag =  shExe_flag2 || shExe_flag3 || shExe_flag4;
+            }
+            else
+            {
+                shExe_flag4  = (vx_bool)(((inputFormat == VX_TYPE_FLOAT16   || inputFormat == VX_TYPE_FLOAT32)
+                                        && (roisFormat == VX_TYPE_FLOAT16   || roisFormat == VX_TYPE_FLOAT32)
+                                        && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_FLOAT32))
+                                        ||
+                                        (inputFormat == VX_TYPE_UINT8 && (roisFormat == VX_TYPE_FLOAT16 || roisFormat == VX_TYPE_FLOAT32) && outputFormat == VX_TYPE_UINT8));
+                shExe_flag = shExe_flag4;
+            }
 
             if (shExe_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
             {
@@ -1197,7 +1290,14 @@ VX_PRIVATE_API vx_status vxnneROIPoolLayer_Initializer(
                 }
                 else if (shExe_flag4)
                 {
-                    shaderExecutable = vxnneROIPoolShaderExecutable(node->base.context, VXNNE_KERNEL_ROIPOOL, &node->kernelAttributes.borderMode, input_data, input_rois, pool_width, pool_height, spatial_scale, enable_relu, outputs);
+                    if(context->evisNoInst.supportEVIS)
+                    {
+                        shaderExecutable = vxnneROIPoolShaderExecutable(node->base.context, VXNNE_KERNEL_ROIPOOL, &node->kernelAttributes.borderMode, input_data, input_rois, pool_width, pool_height, spatial_scale, enable_relu, outputs);
+                    }
+                    else
+                    {
+                        shaderExecutable = vxnneGPUROIPoolShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_ROIPOOL, &node->kernelAttributes.borderMode, input_data, input_rois, pool_width, pool_height, spatial_scale, enable_relu, outputs);
+                    }
 
                     if (!shaderExecutable)
                     {
@@ -1360,6 +1460,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNROIPoolReluLayer_Deinitializer(vx_node
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;

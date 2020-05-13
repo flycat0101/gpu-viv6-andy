@@ -12364,6 +12364,14 @@ vxnne_shader_executable vxnneGPUROIPoolShaderExecutable(
     }
 
     borderMode->mode   = VX_BORDER_REPLICATE;
+    if (rois_dims <= 2)
+    {
+        rois_dims     = 4;
+        rois_depth    = TENSOR_VIEW_SIZE_INDEX(input_rois, 0);
+        rois_batch    = TENSOR_VIEW_SIZE_INDEX(input_rois, 1);
+        rois_sizes[0] = rois_depth;
+        rois_sizes[1] = rois_batch;
+    }
     input_rois_rs      = vxoTensor_ReshapeTensor(input_rois, rois_sizes, rois_dims);
     output_rs          = vxoTensor_ReshapeTensor(output, dst_sizes, dst_dims);
     pool_width_s       = vxCreateScalar(context, VX_TYPE_INT32, &pool_width);
