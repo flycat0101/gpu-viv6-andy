@@ -23638,6 +23638,35 @@ gcoHARDWARE_FlushProtectMode(
 }
 
 gceSTATUS
+gcoHARDWARE_QueryHostInterface1(
+    IN gcoHARDWARE Hardware,
+    OUT gctBOOL *hasHI1)
+{
+    gceSTATUS status;
+    gcmHEADER_ARG("Hardware=0x%x", Hardware);
+
+    gcmGETHARDWARE(Hardware);
+    gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
+    if (hasHI1 != NULL)
+    {
+        if (Hardware->config->hwCoreCount == 1 && Hardware->config->clusterCount == 1 && Hardware->config->shaderCoreCount >= 4)
+        {
+            *hasHI1 = gcvTRUE;
+        }
+        else
+        {
+            *hasHI1 = gcvFALSE;
+        }
+    }
+    status = gcvSTATUS_OK;
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+
+gceSTATUS
 gcoHARDWARE_SetProbeCmd(
     IN gcoHARDWARE Hardware,
     IN gceProbeCmd Cmd,
@@ -23728,10 +23757,7 @@ gcoHARDWARE_SetProbeCmd(
     /* Reserve space in the command buffer. */
     gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, Memory);
 
-    if (Hardware->config->hwCoreCount == 1 && Hardware->config->clusterCount == 1 && Hardware->config->shaderCoreCount >= 4)
-    {
-        hostInterface1 = gcvTRUE;
-    }
+    gcmONERROR(gcoHARDWARE_QueryHostInterface1(Hardware, &hostInterface1));
 
     if (ProbeAddress != ~0U)
     {

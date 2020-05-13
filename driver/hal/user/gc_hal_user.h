@@ -5328,6 +5328,10 @@ gcoHARDWARE_DrawBlit(
     gscSURF_BLITDRAW_BLIT *args
     );
 
+gceSTATUS
+gcoHARDWARE_QueryHostInterface1(
+    IN gcoHARDWARE Hardware,
+    OUT gctBOOL *hasHI1);
 
 /******************************************************************************
 **********************gcsTXDescNode *******************************************

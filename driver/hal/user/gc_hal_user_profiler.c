@@ -168,6 +168,10 @@ _RecordCounters(
     gctUINT32 offset = 0;
     gctUINT32 clusterIDWidth = 0;
 
+    gctBOOL hostInterface1 = gcvFALSE;
+    gcoHARDWARE_QueryHostInterface1(gcvNULL, &hostInterface1);
+
+
     gcoHARDWARE_QueryCluster(gcvNULL, gcvNULL, gcvNULL, gcvNULL, &clusterIDWidth);
 
     memory = (gctUINT32_PTR)Logical;
@@ -312,13 +316,26 @@ _RecordCounters(
     offset += MODULE_HOST_INTERFACE0_COUNTER_NUM;
 
     /* module HI1 */
-    gcmGET_COUNTER(Counters->counters_part2.hi1_total_read_8B_count, 0);
-    gcmGET_COUNTER(Counters->counters_part2.hi1_total_write_8B_count, 1);
-    gcmGET_COUNTER(Counters->counters_part2.hi1_total_write_request_count, 2);
-    gcmGET_COUNTER(Counters->counters_part2.hi1_total_read_request_count, 3);
-    gcmGET_COUNTER(Counters->counters_part2.hi1_axi_cycles_read_request_stalled, 4);
-    gcmGET_COUNTER(Counters->counters_part2.hi1_axi_cycles_write_request_stalled, 5);
-    gcmGET_COUNTER(Counters->counters_part2.hi1_axi_cycles_write_data_stalled, 6);
+    if (hostInterface1)
+    {
+        gcmGET_COUNTER(Counters->counters_part2.hi1_total_read_8B_count, 0);
+        gcmGET_COUNTER(Counters->counters_part2.hi1_total_write_8B_count, 1);
+        gcmGET_COUNTER(Counters->counters_part2.hi1_total_write_request_count, 2);
+        gcmGET_COUNTER(Counters->counters_part2.hi1_total_read_request_count, 3);
+        gcmGET_COUNTER(Counters->counters_part2.hi1_axi_cycles_read_request_stalled, 4);
+        gcmGET_COUNTER(Counters->counters_part2.hi1_axi_cycles_write_request_stalled, 5);
+        gcmGET_COUNTER(Counters->counters_part2.hi1_axi_cycles_write_data_stalled, 6);
+    }
+    else
+    {
+        Counters->counters_part2.hi1_total_read_8B_count = 0;
+        Counters->counters_part2.hi1_total_write_8B_count = 0;
+        Counters->counters_part2.hi1_total_write_request_count = 0;
+        Counters->counters_part2.hi1_total_read_request_count = 0;
+        Counters->counters_part2.hi1_axi_cycles_read_request_stalled = 0;
+        Counters->counters_part2.hi1_axi_cycles_write_request_stalled = 0;
+        Counters->counters_part2.hi1_axi_cycles_write_data_stalled = 0;
+    }
     offset += MODULE_HOST_INTERFACE1_COUNTER_NUM;
 
     /* module L2 */
@@ -625,8 +642,8 @@ _WriteCounters(
                     counters->counters_part2.hi_total_write_8B_count = counters->counters_part2.hi0_total_write_8B_count + counters->counters_part2.hi1_total_write_8B_count;
                 }
 
-                counters->counters_part2.hi_total_readOCB_16B_count = 0xdeaddead;
-                counters->counters_part2.hi_total_writeOCB_16B_count = 0xdeaddead;
+                counters->counters_part2.hi_total_readOCB_16B_count = 0;
+                counters->counters_part2.hi_total_writeOCB_16B_count = 0;
             }
             /*non probe mode */
             else if (Profiler->axiBus128bits)
@@ -725,6 +742,7 @@ _WriteCounters(
 
                 gcmPRINT("GPUTOTALCYCLES: %u\n", gcmGETCOUNTER(counters_part2.hi_total_cycle_count));
                 gcmPRINT("GPUIDLECYCLES: %u\n", gcmGETCOUNTER(counters_part2.hi_total_idle_cycle_count));
+                gcmPRINT("GPUCYCLES: %d\n", gcmGETCOUNTER(counters_part2.hi_total_cycle_count) - gcmGETCOUNTER(counters_part2.hi_total_idle_cycle_count));
             }
             else
             {
@@ -1134,6 +1152,12 @@ gcoPROFILER_Destroy(
             counterBuffer->prev->next =
             Profiler->counterBuf = counterBuffer->next;
             counterBuffer->next->prev = counterBuffer->prev;
+        }
+
+        if (Profiler->probeMode)
+        {
+            gcmONERROR(gcoBUFOBJ_Free(counterBuffer->couterBufobj));
+            gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, counterBuffer->couterBufobj));
         }
 
         gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, counterBuffer->counters));
