@@ -1281,6 +1281,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
     vx_bool   shader_support     = vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER);
     vx_bool   evis_support       = shader_support ? node->base.context->evisNoInst.supportEVIS : vx_false_e;
     vx_uint32 overflow_policys   = VX_CONVERT_POLICY_SATURATE;
+    vx_bool    is_share_bias     = bias ? (1 == TENSOR_DIM_NUM(bias)) : vx_true_e;
 
     if (overflow_policy && overflow_policy->value->u32 == VX_CONVERT_POLICY_WRAP)
         overflow_policys = VX_CONVERT_POLICY_WRAP;
@@ -1334,6 +1335,14 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
         }
     }
 
+    if (bias && (2 == TENSOR_DIM_NUM(bias)))
+    {
+        if (1 == TENSOR_VIEW_SIZE_INDEX(bias, 1))
+        {
+            is_share_bias = vx_true_e;
+        }
+    }
+
     if (deconvolution_mode == gcoNNE_DECONV_MODE_SHADER1)
     {
         if (evis_support)
@@ -1361,6 +1370,37 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
             }
             support_type    = (vx_bool)(convsize < IMG_MAX_WIDTH && support_type );
         }
+
+        if (!support_type)
+        {
+            evis_support = vx_false_e;
+        }
+
+        if (!evis_support)
+        {
+            if (bias)
+            {
+                support_type    = (vx_bool)
+                    ((inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && biasFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+                    || (inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16)
+                    || (inputFormat == VX_TYPE_FLOAT32 && weightFormat == VX_TYPE_FLOAT32 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
+                    || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_UINT8));
+                support_type    = (vx_bool)(support_type && is_share_bias);
+            }
+            else
+            {
+                support_type    = (vx_bool)
+                    ((inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+                    || (inputFormat == VX_TYPE_FLOAT32 && weightFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
+                    || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8));
+            }
+
+            if (outputFormat == VX_TYPE_UINT8)
+            {
+                support_type = (vx_bool)(support_type && (VX_CONVERT_POLICY_SATURATE == overflow_policys));
+            }
+        }
+
         if (!support_type)
         {
             vxError("shader1 not support this format, goto cpu path temporarily\n");
@@ -1461,18 +1501,21 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
                 overflow_flag = overflow_policy->value->u32;
             }
 
-            if (inputFormat == VX_TYPE_INT8 || inputFormat == VX_TYPE_UINT8)
+            if (evis_support)
             {
-                if ((stride_w * (in_w - 1) + 1) < 16)
+                if (inputFormat == VX_TYPE_INT8 || inputFormat == VX_TYPE_UINT8)
                 {
-                    is_small_input = vx_true_e;
+                    if ((stride_w * (in_w - 1) + 1) < 16)
+                    {
+                        is_small_input = vx_true_e;
+                    }
                 }
-            }
-            else
-            {
-                if ((stride_w * (in_w - 1) + 1) < 8)
+                else
                 {
-                    is_small_input = vx_true_e;
+                    if ((stride_w * (in_w - 1) + 1) < 8)
+                    {
+                        is_small_input = vx_true_e;
+                    }
                 }
             }
 
@@ -1512,8 +1555,17 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
                     goto exit;
                 }
 
-                shaderExecutable = vxnneTensorExpandShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOREXPAND, &node->kernelAttributes.borderMode,
-                                   inputs, stride_w, stride_h, tensorexpand);
+                if (evis_support)
+                {
+                    shaderExecutable = vxnneTensorExpandShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOREXPAND, &node->kernelAttributes.borderMode,
+                                       inputs, stride_w, stride_h, tensorexpand);
+                }
+                else
+                {
+                    shaderExecutable = vxnneGPUTensorExpandShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOREXPAND, &node->kernelAttributes.borderMode,
+                                       inputs, stride_w, stride_h, tensorexpand);
+                }
+
                 if (!shaderExecutable)
                 {
                     status = VX_FAILURE;
@@ -1544,7 +1596,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
                 tensor2RowIn = inputs;
             }
 
-            if (enable_2dTensor)
+            if (enable_2dTensor && evis_support)
             {
                 sizes[0] = kernel_x * kernel_y * inputDepth;
                 sizes[1] = out_w * out_h;
@@ -1582,8 +1634,18 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
                 status = VX_ERROR_NO_MEMORY;
                 goto exit;
             }
-            shaderExecutable = vxnneTensor2RowShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR2ROW, &node->kernelAttributes.borderMode,
-                               tensor2RowIn, kernel_x, kernel_y, dilation_x, dilation_y, strideX2, strideY2, start_pad_x, start_pad_y, out_w, out_h, tensor2Row);
+
+            if (evis_support)
+            {
+                shaderExecutable = vxnneTensor2RowShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR2ROW, &node->kernelAttributes.borderMode,
+                                   tensor2RowIn, kernel_x, kernel_y, dilation_x, dilation_y, strideX2, strideY2, start_pad_x, start_pad_y, out_w, out_h, tensor2Row);
+            }
+            else
+            {
+                shaderExecutable = vxnneGPUTensor2RowShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR2ROW,
+                    &node->kernelAttributes.borderMode, tensor2RowIn, kernel_x, kernel_y, dilation_x, dilation_y,
+                    strideX2, strideY2, start_pad_x, start_pad_y, out_w, out_h, tensor2Row);
+            }
             if (!shaderExecutable)
             {
                 status = VX_FAILURE;
@@ -1603,16 +1665,32 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
 
             vxnneOperation_AddReference(&deconvolutionLayer->deconvolutionTensor2Row_sh_operation.base, (vx_reference)tensor2RowIn, VXNNE_OPERATION_REFENRENCE_INPUT);
             vxnneOperation_AddReference(&deconvolutionLayer->deconvolutionTensor2Row_sh_operation.base, (vx_reference)tensor2Row, VXNNE_OPERATION_REFENRENCE_OUTPUT);
-
-            if (bias)
+            if (evis_support)
             {
-                shaderExecutable = vxnneGemmShaderExecutable(node->base.context, VXNNE_KERNEL_GEMM, &node->kernelAttributes.borderMode,
-                tensor2Row, weights, bias, VX_NN_ACTIVATION_NONE, enable_2dTensor, is_share_bias, enable_adjust_biases, overflow_flag, outputs);
+                if (bias)
+                {
+                    shaderExecutable = vxnneGemmShaderExecutable(node->base.context, VXNNE_KERNEL_GEMM, &node->kernelAttributes.borderMode,
+                    tensor2Row, weights, bias, VX_NN_ACTIVATION_NONE, enable_2dTensor, is_share_bias, enable_adjust_biases, overflow_flag, outputs);
+                }
+                else
+                {
+                    shaderExecutable = vxnneGemm_noBiasShaderExecutable(node->base.context, VXNNE_KERNEL_GEMM_NOBIAS, &node->kernelAttributes.borderMode,
+                    tensor2Row, weights, VX_NN_ACTIVATION_NONE, enable_2dTensor, overflow_flag, outputs);
+                }
             }
             else
             {
-                shaderExecutable = vxnneGemm_noBiasShaderExecutable(node->base.context, VXNNE_KERNEL_GEMM_NOBIAS, &node->kernelAttributes.borderMode,
-                tensor2Row, weights, VX_NN_ACTIVATION_NONE, enable_2dTensor, overflow_flag, outputs);
+                if (bias)
+                {
+                    shaderExecutable = vxnneGPUGemmShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_GEMM,
+                        &node->kernelAttributes.borderMode, vx_false_e, enable_adjust_biases,
+                        tensor2Row, weights, bias, outputs);
+                }
+                else
+                {
+                    shaderExecutable = vxnneGPUGemm_noBiasShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_GEMM_NOBIAS,
+                        &node->kernelAttributes.borderMode, tensor2Row, weights, outputs);
+                }
             }
 
             if (!shaderExecutable)

@@ -3832,6 +3832,15 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
     vx_int32                outputHeight,
     vx_tensor               output);
 
+vxnne_shader_executable vxnneGPUTensorExpandShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_int32                upsample_x,
+    vx_int32                upsample_y,
+    vx_tensor               output);
+
 vxnne_shader_executable vxnneGPUGemm_noBiasShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
@@ -3845,6 +3854,7 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
     vx_bool                 enable_reorgWeights,
+    vx_bool                 enable_adjust_biases,
     vx_tensor               input,
     vx_tensor               weight,
     vx_tensor               bias,

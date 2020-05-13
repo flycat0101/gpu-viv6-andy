@@ -2870,7 +2870,8 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
             {
                 outputs_rs = outputs;
                 shaderExecutable = vxnneGPUGemmShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_GEMM,
-                    &ops_layer->node->kernelAttributes.borderMode, enable_packed_weights, input_rs, weights_new_rs, newBiases, outputs_rs);
+                    &ops_layer->node->kernelAttributes.borderMode, enable_packed_weights, enable_adjust_biases,
+                    input_rs, weights_new_rs, newBiases, outputs_rs);
             }
         }
         else
