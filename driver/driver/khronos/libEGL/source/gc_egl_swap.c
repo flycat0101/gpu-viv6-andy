@@ -2278,7 +2278,7 @@ _eglSwapBuffersRegion(
     EGLint width, height;
 
     gcmHEADER_ARG("Dpy=0x%p Draw=0x%p SwapRegion=0x%p",
-                  Dpy, Draw, (void *)SwapRegion);
+                  Dpy, Draw, (void*)SwapRegion);
 
     /* Get thread data. */
     thread = veglGetThreadData();
@@ -2627,7 +2627,7 @@ EGLAPI EGLBoolean EGLAPIENTRY
 eglSwapBuffersWithDamageKHR(
     EGLDisplay Dpy,
     EGLSurface Surface,
-    EGLint *Rects,
+    const EGLint *Rects,
     EGLint NumRects
     )
 {
@@ -2636,14 +2636,14 @@ eglSwapBuffersWithDamageKHR(
     {
         NumRects,
         0,
-        Rects,
+        (EGLint*)Rects,
     };
 
     gcmHEADER_ARG("Dpy=0x%p Surface=0x%p rects=0x%p n_rects=%d",
-                  Dpy, Surface, (void *)Rects, NumRects);
+                  Dpy, Surface, (void*)Rects, NumRects);
     gcmDUMP_API("${EGL eglSwapBuffersWithDamageKHR 0x%p 0x%p 0x%p 0x%X}",
-                Dpy, Surface, (void *)Rects, NumRects);
-    VEGL_TRACE_API(SwapBuffersWithDamageKHR)(Dpy, Surface, Rects, NumRects);
+                Dpy, Surface, (void*)Rects, NumRects);
+    VEGL_TRACE_API(SwapBuffersWithDamageKHR)(Dpy, Surface, (EGLint*)Rects, NumRects);
 
     result = veglSwapBuffers(Dpy, Surface, gcvNULL, &region);
 
@@ -2655,7 +2655,7 @@ EGLAPI EGLBoolean EGLAPIENTRY
 eglSwapBuffersWithDamageEXT(
     EGLDisplay Dpy,
     EGLSurface Surface,
-    EGLint *Rects,
+    const EGLint *Rects,
     EGLint NumRects
     )
 {
@@ -2664,14 +2664,14 @@ eglSwapBuffersWithDamageEXT(
     {
         NumRects,
         0,
-        Rects,
+        (EGLint*)Rects,
     };
 
     gcmHEADER_ARG("Dpy=0x%p Surface=0x%p rects=0x%p n_rects=%d",
-                  Dpy, Surface, (void *)Rects, NumRects);
+                  Dpy, Surface, (void*)Rects, NumRects);
     gcmDUMP_API("${EGL eglSwapBuffersWithDamageEXT 0x%p 0x%p 0x%p 0x%X}",
-                Dpy, Surface, (void *)Rects, NumRects);
-    VEGL_TRACE_API(SwapBuffersWithDamageEXT)(Dpy, Surface, Rects, NumRects);
+                Dpy, Surface, (void*)Rects, NumRects);
+    VEGL_TRACE_API(SwapBuffersWithDamageEXT)(Dpy, Surface, (EGLint*)Rects, NumRects);
 
     result = veglSwapBuffers(Dpy, Surface, gcvNULL, &region);
 
@@ -2999,7 +2999,7 @@ eglCopyBuffers(
         /* Flush the API. */
         _Flush(thread);
 
-        if (!platform->connectPixmap(dpy, (void *) target, &info, &pixmapSurface))
+        if (!platform->connectPixmap(dpy, (void*)target, &info, &pixmapSurface))
         {
             veglSetEGLerror(thread, EGL_BAD_NATIVE_PIXMAP);
             result = EGL_FALSE;
@@ -3045,7 +3045,7 @@ eglCopyBuffers(
         }
 
         /* Wait native operations to write pixmap. */
-        platform->syncToPixmap((void *) target, info);
+        platform->syncToPixmap((void*)target, info);
 
         /* Success. */
         result = EGL_TRUE;
@@ -3054,7 +3054,7 @@ eglCopyBuffers(
 
     if (info != gcvNULL)
     {
-        platform->disconnectPixmap(dpy, (void *) target, info);
+        platform->disconnectPixmap(dpy, (void*)target, info);
         info = gcvNULL;
     }
 
