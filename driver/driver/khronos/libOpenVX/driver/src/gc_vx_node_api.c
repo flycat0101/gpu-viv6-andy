@@ -3849,9 +3849,9 @@ VX_API_ENTRY vx_node VX_API_CALL vxDeconvolutionLayer(
 
     vxmCHECK_PRECISION(biases, VX_TENSOR_PRECISION_HIGH);
 
-    vxmCHECK_LIFETIME(weights, VX_TENSOR_LIFE_TIME_STATIC);
+    //vxmCHECK_LIFETIME(weights, VX_TENSOR_LIFE_TIME_STATIC);
 
-    vxmCHECK_LIFETIME(biases, VX_TENSOR_LIFE_TIME_STATIC);
+    //vxmCHECK_LIFETIME(biases, VX_TENSOR_LIFE_TIME_STATIC);
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_DECONVOLUTION_LAYER, parameters, vxmLENGTH_OF(parameters));
 

@@ -1601,6 +1601,13 @@ VX_PRIVATE_API vx_status vxoNNReorgLayer2_SW_Initialize(vxnne_layer ops_layer, c
     vx_uint32 op_index = 0;
     vxnne_reorg_layer  reorg_layer = (vxnne_reorg_layer)ops_layer;
 
+    if (axis_s)
+    {
+        if (axis_s->value->e == 3 && type == VX_REORG_SHUFFLE_CHANNEL)
+        {
+            batch_count = 1;
+        }
+    }
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
     vxmONERROR(_InitializeReorg2OperationSW(reorg_layer,
@@ -1813,6 +1820,14 @@ VX_PRIVATE_API vx_status vxoNNReorgLayer2_TP_Initialize(vxnne_layer ops_layer, c
 
     vx_uint32 op_index = 0;
     vxnne_reorg_layer  reorg_layer = (vxnne_reorg_layer)ops_layer;
+
+    if (axis_s)
+    {
+        if (axis_s->value->e == 3 && type == VX_REORG_SHUFFLE_CHANNEL)
+        {
+            batch_count = 1;
+        }
+    }
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 

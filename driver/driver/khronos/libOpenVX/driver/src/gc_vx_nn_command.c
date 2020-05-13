@@ -1041,7 +1041,10 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
         {
             vxmASSERT(value != VX_NULL);
             size = inputZSize * value->u32[2];
-            slice = !mult || size < core ? 1 : core;;
+            if (value->u32[4] == 3 || value->u32[4] == 2)
+                slice = 1;
+            else
+                slice = !mult || size < core ? 1 : core;
             break;
         }
 
