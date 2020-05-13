@@ -876,7 +876,7 @@ void vscDIDumpLineTable(VSC_DIContext * context)
     if (context == gcvNULL || context->lineTable.map == gcvNULL)
         return;
 
-    gcmPRINT("--------------line table----------------");
+    gcmPRINT("|--------------line table----------------|");
 
     for (i = 0; i < context->lineTable.count; i++)
     {
@@ -888,16 +888,16 @@ void vscDIDumpLineTable(VSC_DIContext * context)
 
         gcmPRINT("|   source(%d,%d,%d)         pc(%d,%d)      |", file, line, col, start, end);
     }
-    gcmPRINT("---------------------------------------------");
+    gcmPRINT("|---------------------------------------------|");
 }
 
 void vscDIDumpDIETree(VSC_DIContext * context, gctUINT16 id, gctUINT tag)
 {
-    if (context)
+    if (context && gcmOPT_DUMP_CODEGEN())
     {
-        gcmPRINT("------------------------------------------DIE TREE id = %d---------------------------------------", id);
+        gcmPRINT("|------------------------------------------DIE TREE id = %d---------------------------------------|", id);
         _DIDumpDIETree(context,id, 0, tag);
-        gcmPRINT("-------------------------------------------------------------------------------------------------");
+        gcmPRINT("|-------------------------------------------------------------------------------------------------|");
     }
 #if vsdTEST_API
     {
@@ -998,7 +998,7 @@ void vscDIDumpDIE(VSC_DIContext * context, gctUINT16 id, gctUINT shift, gctUINT 
         ".xxw", ".yxw", ".zxw", ".wxw", ".xyw", ".yyw", ".zyw", ".wyw", ".xzw", ".yzw", ".zzw", ".wzw", ".xw", ".yw", ".zw", ".w",
     };
 
-    if (context)
+    if (context && gcmOPT_DUMP_CODEGEN())
     {
         die = VSC_DI_DIE_PTR(id);
         if (die != gcvNULL)
