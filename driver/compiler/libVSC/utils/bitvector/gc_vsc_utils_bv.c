@@ -170,6 +170,11 @@ void vscBV_Finalize(VSC_BIT_VECTOR* pBV)
     pBV->numOfUINT = 0;
 }
 
+void vscBV_Reset(VSC_BIT_VECTOR* pBV)
+{
+    memset(pBV->pBits, CLR_VALUE, pBV->numOfUINT*sizeof(gctUINT));
+}
+
 void vscBV_Destroy(VSC_BIT_VECTOR* pBV)
 {
     if (pBV)
