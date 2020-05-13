@@ -3171,7 +3171,10 @@ GLvoid GL_APIENTRY __gles_CompressedTexImage2D(__GLcontext *gc,
 
     __glSetTexImageDirtyBit(gc, tex, __GL_TEX_IMAGE_CONTENT_CHANGED_BIT | mipHintDirty);
 
-    __gles_GenerateMipmap(gc, target);
+    if (mipmap->requestedFormat >= GL_COMPRESSED_RGBA_ASTC_4x4 &&
+        mipmap->requestedFormat <= GL_COMPRESSED_RGBA_ASTC_12x12 &&
+        mipmap->width >= 1080 && mipmap->height >= 1080)
+        __gles_GenerateMipmap(gc, target);
 
     tex->seqNumber++;
 
