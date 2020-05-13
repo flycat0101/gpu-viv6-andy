@@ -424,11 +424,21 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
                 SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_PAD_Y_B_INDEX], u32)
             };
 
+            vx_int32 stride_x = 1, stride_y = 1;
+            if(node->paramTable[PARAM_POOLING_POOL_STRIDE_X_INDEX] != NULL && node->paramTable[PARAM_POOLING_POOL_STRIDE_Y_INDEX] != NULL)
+            {
+                stride_x = SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_STRIDE_X_INDEX], u32);
+                stride_y = SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_STRIDE_Y_INDEX], u32);
+            }
+            else
+            {
+                vxWarning("stride paramters is not passed, it will be computed");
+                stride_x = (vx_int32)roundRTNE((vx_float32)(input_w + pad[0] + pad[1] - kernelx)/(output_w == 1? 1: output_w -1));
+                stride_y = (vx_int32)roundRTNE((vx_float32)(input_h + pad[2] + pad[3]- kernely)/(output_h == 1? 1: output_h-1));
+                stride_x = stride_x == 0 ? 1: stride_x;
+                stride_y = stride_y == 0 ? 1: stride_y;
+            }
 
-            vx_int32 stride_x = (vx_int32)roundRTNE((vx_float32)(input_w + pad[0] + pad[1] - kernelx)/(output_w == 1? 1: output_w -1));
-            vx_int32 stride_y = (vx_int32)roundRTNE((vx_float32)(input_h + pad[2] + pad[3]- kernely)/(output_h == 1? 1: output_h-1));
-            stride_x = stride_x == 0 ? 1: stride_x;
-            stride_y = stride_y == 0 ? 1: stride_y;
             if(poolType == VX_NN_POOLING_MAX)
             {
                 vx_uint32 poolx = SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_SIZE_X_INDEX], u32);
@@ -456,12 +466,26 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
                         nodeOpType = OP_POOLING;
                 }
             }
-            else if(poolType == VX_NN_POOLING_AVG)
+            else if(poolType == VX_NN_POOLING_AVG || poolType == VX_NN_POOLING_AVG_ANDROID)
             {
                 /*TODO: whether to convert VX_NN_POOLING_AVG_ANDROID to CONV*/
                 vx_enum roundMode = SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_ROUND_MODE_INDEX], u32);
                 if(TENSOR_DATA_TYPE(input) != TENSOR_DATA_TYPE(output))
+                {
+                    if(TENSOR_DATA_TYPE(output) != VX_TYPE_BFLOAT16 &&
+                        (TENSOR_DATA_TYPE(input) != VX_TYPE_FLOAT32 || TENSOR_DATA_TYPE(input) != VX_TYPE_BFLOAT16))
                     break;
+                }
+                /*hw only support i8 or i16 for dfp */
+                if((!(TENSOR_DATA_TYPE(input) == VX_TYPE_INT8 || TENSOR_DATA_TYPE(input) == VX_TYPE_INT16)) &&
+                     TENSOR_QUANT_TYPE(input) == VX_QUANT_DYNAMIC_FIXED_POINT )
+                    break;
+
+
+                if((poolType == VX_NN_POOLING_AVG_ANDROID) &&
+                    (pad[0] + pad[1] + pad[2] + pad[3] != 0) )
+                    break;
+
                 if(roundMode == VX_NN_DS_SIZE_ROUNDING_FLOOR)
                 {
                     nodeOpType = OP_AVG_POOL;

@@ -28,10 +28,11 @@ __kernel void roiPooling_FP32 (
     int2   inputSize = (int2)(input_width, input_height);
 
     rect_coord_f = read_imagef(rois, coord_roi);
-    rect_coord_f = rect_coord_f * spatial_scale + 0.5f;
-    rect_coord = convert_int4_rtz(rect_coord_f);
+    rect_coord_f = rect_coord_f * spatial_scale;
+    rect_coord = convert_int4_rte(rect_coord_f);
 
     roiWH = rect_coord.zw - rect_coord.xy + 1;
+    roiWH = roiWH > 1 ? roiWH : 1;
     roi_size_scale = convert_float2(roiWH) * q_PoolWH;
     pwh.xy = 0;
 
@@ -51,6 +52,8 @@ __kernel void roiPooling_FP32 (
 
             pwh.xz += 1;
             int4 coord_out = (int4)(ph * pool_width + pw, depth, idx, 0);
+            end.xy  = end.xy > 0 ? end.xy : 0;
+            start.xy = start.xy > 0 ?  start.xy : 0;
             end.xy = min(end.xy, inputSize.xy);
             start.xy = min(start.xy, inputSize.xy);
             if(end.y <= start.y || end.x <= start.x)
@@ -119,10 +122,11 @@ __kernel void roiPooling_Quant8 (
     int2   inputSize = (int2)(input_width, input_height);
 
     rect_coord_f = read_imagef(rois, coord_roi);
-    rect_coord_f = rect_coord_f.xyzw * spatial_scale + 0.5f;
-    rect_coord = convert_int4_rtz(rect_coord_f);
+    rect_coord_f = rect_coord_f.xyzw * spatial_scale;
+    rect_coord = convert_int4_rte(rect_coord_f);
 
     roiWH = rect_coord.zw - rect_coord.xy + 1;
+    roiWH = roiWH > 1 ? roiWH : 1;
     roi_size_scale = convert_float2(roiWH) * q_PoolWH;
     pwh.xy = 0;
 
@@ -142,6 +146,8 @@ __kernel void roiPooling_Quant8 (
 
             pwh.xz += 1;
             int4 coord_out = (int4)(ph * pool_width + pw, depth, idx, 0);
+            end.xy  = end.xy > 0 ? end.xy : 0;
+            start.xy = start.xy > 0 ?  start.xy : 0;
             end.xy = min(end.xy, inputSize.xy);
             start.xy = min(start.xy, inputSize.xy);
             if(end.y <= start.y || end.x <= start.x)
