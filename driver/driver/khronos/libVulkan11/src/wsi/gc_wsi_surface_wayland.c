@@ -179,6 +179,7 @@ struct __vkWaylandImageBufferRec
     __vkImageBufferState            state;
 
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
+    int client_fence_fd;
     int release_fence_fd;
     struct zwp_linux_buffer_release_v1 *buffer_release;
 #endif
@@ -806,6 +807,8 @@ static VkResult __CreateImageBuffer(
 #ifndef gcdUSE_ZWP_SYNCHRONIZATION
         wl_buffer_add_listener(imageBuffer->wl_buf, &buffer_listener, imageBuffer);
 #else
+        imageBuffer->client_fence_fd = -1;
+
         if(!sc->use_explicit_sync)
             wl_buffer_add_listener(imageBuffer->wl_buf, &buffer_listener, imageBuffer);
 
@@ -896,6 +899,12 @@ static void __DestroyImageBuffer(
     }
 
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
+    if (imageBuffer->client_fence_fd >= 0)
+    {
+        close(imageBuffer->client_fence_fd);
+        imageBuffer->client_fence_fd = -1;
+    }
+
     if (imageBuffer->buffer_release)
     {
         zwp_linux_buffer_release_v1_destroy(imageBuffer->buffer_release);
@@ -1017,6 +1026,52 @@ static VkResult __GetSwapchainImages(
 }
 
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
+static gceSTATUS __CreateNativeFence(VkQueue queue, int *fenceFd)
+{
+    gceSTATUS status;
+    gctSIGNAL signal = gcvNULL;
+    gcsHAL_INTERFACE iface;
+
+    do
+    {
+        /* Create sync point. */
+        status = gcoOS_CreateSignal(gcvNULL, gcvTRUE, &signal);
+
+        if (gcmIS_ERROR(status))
+        {
+            gcoHAL_Commit(gcvNULL, gcvTRUE);
+            break;
+        }
+
+        /* Create native fence. */
+        status = gcoOS_CreateNativeFence(gcvNULL, signal, fenceFd);
+
+        if (gcmIS_ERROR(status))
+        {
+            *fenceFd = -1;
+            __vk_QueueWaitIdle(queue);
+            break;
+        }
+
+        /* Submit the sync point. */
+        iface.command            = gcvHAL_SIGNAL;
+        iface.engine             = gcvENGINE_RENDER;
+        iface.u.Signal.signal    = gcmPTR_TO_UINT64(signal);
+        iface.u.Signal.auxSignal = 0;
+        iface.u.Signal.process   = gcmPTR2INT32(gcoOS_GetCurrentProcessID());
+        iface.u.Signal.fromWhere = gcvKERNEL_PIXEL;
+        __vk_QueueAppendEvent((__vkDevQueue *)queue, &iface);
+        __vk_QueueCommitEvents((__vkDevQueue *)queue, VK_FALSE);
+        /* Now destroy the sync point. */
+        gcoOS_DestroySignal(gcvNULL, signal);
+
+        return 0;
+    }
+    while (VK_FALSE);
+
+    return status;
+}
+
 static void __WaitNativeFence(int fenceFd)
 {
     gceSTATUS status;
@@ -1174,10 +1229,11 @@ OnError:
 
 static VkResult __CommitPresentCommand(
     VkQueue queue,
-    __vkWaylandSwapchainKHR *sc
+    __vkWaylandSwapchainKHR *sc,
+    int *fence_fd
     )
 {
-    VkResult result;
+    VkResult result = VK_SUCCESS;
     __vkCommandBuffer *cmd;
     __vkStateBuffer *stateBuffer;
     uint32_t stateBufCount;
@@ -1199,7 +1255,18 @@ static VkResult __CommitPresentCommand(
 
     __VK_ONERROR(__vk_CommitStateBuffers(queue, pCommits, 0, 1));
 
-    __vk_QueueWaitIdle(queue);
+    /* Create fence sync. */
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+    if (sc->use_explicit_sync)
+    {
+        result = gcmNO_ERROR(__CreateNativeFence(queue,fence_fd)) ? VK_SUCCESS : VK_INCOMPLETE;
+    }
+    else
+#endif
+    {
+        __vk_QueueWaitIdle(queue);
+        *fence_fd = -1;
+    }
 
 OnError:
     return result;
@@ -1233,13 +1300,14 @@ static VkResult __QueuePresentSwapchainImage(
 {
     VkResult result = VK_SUCCESS;
     __vkDevContext *devCtx = (__vkDevContext *)sc->device;
+    int fence_fd = -1;
 
     /* Generate queue commands. */
     if (sc->renderMode == __VK_WSI_INDIRECT_RENDERING)
     {
         __VK_ONERROR(__GenPresentCommand(devCtx, sc, imageBuffer));
     }
-     __VK_ONERROR(__CommitPresentCommand(queue, sc));
+     __VK_ONERROR(__CommitPresentCommand(queue, sc, &fence_fd));
 
     /*
      * This is to block read & dispatch events in other threads, so that the
@@ -1254,6 +1322,19 @@ static VkResult __QueuePresentSwapchainImage(
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
     if (sc->use_explicit_sync)
     {
+        if(imageBuffer->client_fence_fd > 0)
+        {
+            __WaitNativeFence(imageBuffer->client_fence_fd);
+            close(imageBuffer->client_fence_fd);
+        }
+
+        if(fence_fd > 0)
+        {
+            imageBuffer->client_fence_fd = fence_fd;
+            zwp_linux_surface_synchronization_v1_set_acquire_fence(
+                sc->surface_sync, imageBuffer->client_fence_fd);
+        }
+
         imageBuffer->buffer_release =
             zwp_linux_surface_synchronization_v1_get_release(sc->surface_sync);
         wl_proxy_set_queue((struct wl_proxy *)imageBuffer->buffer_release, sc->wl_queue);
