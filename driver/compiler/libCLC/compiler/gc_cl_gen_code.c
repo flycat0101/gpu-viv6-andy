@@ -7365,7 +7365,7 @@ clPackROperand(
 {
     gceSTATUS status;
     clsLOPERAND lOperand[1];
-    clsROPERAND rOperands[3];
+    clsROPERAND rOperands[3], *fromROperand, rOperand;
     clsROPERAND constantZero[1];
     gctUINT32 swizzleMaskValue[2];
     gctUINT32 packedSwizzleValue[2];
@@ -7379,22 +7379,38 @@ clPackROperand(
     if(clmIsElementTypePacked(From->dataType.elementType)) {
         gcmASSERT(From->dataType.elementType == To->dataType.elementType &&
                   vectorSize == clmGEN_CODE_vectorSize_GET(To->dataType));
-        status = clGenAssignCode(Compiler,
-                                 LineNo,
-                                 StringNo,
-                                 lOperand,
-                                 From);
-        if (gcmIS_ERROR(status)) return status;
-        return gcvSTATUS_OK;
+        return clGenAssignCode(Compiler,
+                               LineNo,
+                               StringNo,
+                               lOperand,
+                               From);
+    }
+    fromROperand = From;
+    if(fromROperand->isReg &&
+       !clIsDefaultComponentSelection(&fromROperand->u.reg.componentSelection)) {
+         gceSTATUS status;
+         clsIOPERAND intermIOperand[1];
+         clsLOPERAND intermLOperand[1];
+
+         clsIOPERAND_New(Compiler, intermIOperand, fromROperand->dataType);
+         clsLOPERAND_InitializeUsingIOperand(intermLOperand, intermIOperand);
+         status = clGenAssignCode(Compiler,
+                                  LineNo,
+                                  StringNo,
+                                  intermLOperand,
+                                  fromROperand);
+         if (gcmIS_ERROR(status)) return status;
+         fromROperand = &rOperand;
+         clsROPERAND_InitializeUsingIOperand(fromROperand, intermIOperand);
     }
     clsROPERAND_InitializeIntOrIVecConstant(constantZero,
                                             clmGenCodeDataType(T_UINT),
                                             (gctUINT)0);
     dataType = clConvToPackedType(Compiler,
-                                  From->dataType);
+                                  fromROperand->dataType);
     gcmASSERT(dataType.elementType == To->dataType.elementType &&
               vectorSize == clmGEN_CODE_vectorSize_GET(To->dataType));
-    switch(From->dataType.elementType) {
+    switch(fromROperand->dataType.elementType) {
     case clvTYPE_USHORT:
     case clvTYPE_SHORT:
     case clvTYPE_HALF:
@@ -7415,20 +7431,13 @@ clPackROperand(
             swizzleMaskValue[1] = 0xFF00;
         }
 
-        status = clGenAssignCode(Compiler,
-                                 LineNo,
-                                 StringNo,
-                                 lOperand,
-                                 constantZero);
-        if (gcmIS_ERROR(status)) return status;
-
         for(i = 0, j = 0; i < vectorSize; i += 4, j++) {
             clsROPERAND_InitializeTempRegWithComponentSelection(&rOperands[0],
                                                                 clvQUALIFIER_NONE,
                                                                 regDataType,
                                                                 regDataType,
-                                                                From->u.reg.regIndex + j,
-                                                                clGetDefaultComponentSelection(Compiler, dataType));
+                                                                fromROperand->u.reg.regIndex + j,
+                                                                clGetDefaultComponentSelection(Compiler, regDataType));
             clsROPERAND_InitializeIntOrIVecConstant(&rOperands[1],
                                                     clmGenCodeDataType(T_UINT),
                                                     packedSwizzleValue[j & 1]);
@@ -7479,21 +7488,14 @@ clPackROperand(
             break;
         }
 
-        status = clGenAssignCode(Compiler,
-                                 LineNo,
-                                 StringNo,
-                                 lOperand,
-                                 constantZero);
-        if (gcmIS_ERROR(status)) return status;
-
         clsLOPERAND_InitializeUsingIOperand(lOperand, To);
         for(i = 0, j = 0; i < vectorSize; i += 4, j++) {
             clsROPERAND_InitializeTempRegWithComponentSelection(&rOperands[0],
                                                                 clvQUALIFIER_NONE,
                                                                 regDataType,
                                                                 regDataType,
-                                                                From->u.reg.regIndex + j,
-                                                                clGetDefaultComponentSelection(Compiler, dataType));
+                                                                fromROperand->u.reg.regIndex + j,
+                                                                clGetDefaultComponentSelection(Compiler, regDataType));
 
             if(swizzleValue.u32_v4[0]) {
                 clsROPERAND_InitializeIntOrIVecConstant(&rOperands[1],
