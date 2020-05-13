@@ -77,6 +77,12 @@ typedef HDC     EGLNativeDisplayType;
 typedef HBITMAP EGLNativePixmapType;
 typedef HWND    EGLNativeWindowType;
 
+#elif defined(__EMSCRIPTEN__)
+
+typedef int EGLNativeDisplayType;
+typedef int EGLNativePixmapType;
+typedef int EGLNativeWindowType;
+
 #elif defined(__WINSCW__) || defined(__SYMBIAN32__)  /* Symbian */
 
 typedef int   EGLNativeDisplayType;
@@ -160,6 +166,12 @@ typedef void *EGLNativeWindowType;
 #elif defined(__HAIKU__)
 
 #include <kernel/image.h>
+
+typedef void              *EGLNativeDisplayType;
+typedef khronos_uintptr_t  EGLNativePixmapType;
+typedef khronos_uintptr_t  EGLNativeWindowType;
+
+#elif defined(__Fuchsia__)
 
 typedef void              *EGLNativeDisplayType;
 typedef khronos_uintptr_t  EGLNativePixmapType;
