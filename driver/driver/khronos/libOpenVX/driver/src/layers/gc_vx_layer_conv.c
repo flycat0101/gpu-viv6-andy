@@ -1272,6 +1272,7 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
     kernelXSize = TENSOR_VIEW_SIZE_INDEX(weights, 0);
     kernelYSize = TENSOR_VIEW_SIZE_INDEX(weights, 1);
 
+
     if (biases && (2 == TENSOR_DIM_NUM(biases)))
     {
         if (1 == TENSOR_VIEW_SIZE_INDEX(biases, 1))
@@ -1324,9 +1325,9 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
 #if DUMP_ONE_PIXEL_CPU_CONV
         vx_int32 my_count;
 #endif
-        dataSrc    = (vx_uint8_ptr)inputBaseLogical + k * inputWidth * inputHeight * inputDepth * vxnneGetTypeSize(inputFormat);
+        dataSrc    = (vx_uint8_ptr)inputBaseLogical + k * TENSOR_STRIDE_INDEX(inputs, 3);
         dataWeight = (vx_uint8_ptr)weightsBaseLogical;
-        dataDst    = (vx_uint8_ptr)outputBaseLogical + k * outputWidth * outputHeight * outputDepth * vxnneGetTypeSize(outputFormat);
+        dataDst    = (vx_uint8_ptr)outputBaseLogical + k * TENSOR_STRIDE_INDEX(outputs, 3);
 
         for (p = 0; p < outputDepth; p ++)
         {
@@ -1370,7 +1371,11 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
                     else
                         wStart = gcmMAX(wStart, 0);
 
-                    indexOut = j * (outputWidth) + i;
+                    //indexOut = j * (outputWidth) + i;
+
+                    indexOut =(p * TENSOR_STRIDE_INDEX(outputs, 2) +
+                               j * TENSOR_STRIDE_INDEX(outputs, 1) +
+                               i * TENSOR_STRIDE_INDEX(outputs, 0) ) / TENSOR_DATA_SIZE(outputs);
 #if DUMP_ONE_PIXEL_CPU_CONV
                     if(my_count == dump_index)
                     {
@@ -1417,7 +1422,6 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
                             }
                         }
                     }
-
                     if(is_share_bias)
                         indexBias = p;
                     else
@@ -1453,7 +1457,7 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
                     }
 #else
 
-                    if (biasFormat == VX_TYPE_INT64 || biasFormat== VX_TYPE_FLOAT32 || biasFormat == VX_TYPE_INT32 || biasFormat == VX_TYPE_FLOAT16)
+                    if (biasFormat == VX_TYPE_INT64 || biasFormat== VX_TYPE_FLOAT32 || biasFormat == VX_TYPE_INT32 || biasFormat == VX_TYPE_FLOAT16 || biasFormat == VX_TYPE_UINT8)
                     {
                         if (dataBias != VX_NULL)
                         {
@@ -1477,7 +1481,7 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
 
                     if (relu)
                         sum = vxnneActivation(relu->value->e, 0, 0, sum);
-                    if (overflow == VX_CONVERT_POLICY_WRAP && biasFormat == VX_TYPE_UINT8)
+                    if (overflow == VX_CONVERT_POLICY_WRAP && (dataBias == VX_NULL || biasFormat == VX_TYPE_UINT8))
                     {
                         sum = (vx_float32)vxnneWarp(sum, outputFormat);
                     }
@@ -1487,7 +1491,7 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
             }
 
             dataWeight += kernelXSize * kernelYSize * inputDepth * vxnneGetTypeSize(weightFormat);
-            dataDst += outputWidth * outputHeight * vxnneGetTypeSize(outputFormat);
+            //dataDst += outputWidth * outputHeight * vxnneGetTypeSize(outputFormat);
         }
     }
 
