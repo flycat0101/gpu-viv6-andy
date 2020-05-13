@@ -312,7 +312,7 @@ vx_status vxoNNFullyConnectedLayerInitializer(
         vxnneIsTPSupportFormat(context, inputs, weights_biases, outputs) &&
         weights_biases->use_tp_fc &&
         WB_IS_NN_FC_BATCH_MODE(weights_biases) == vx_false_e &&
-        aligned64)
+        aligned64 && (VX_CONVERT_POLICY_SATURATE == overflow_policy))
     {
         vx_op_param conv = VX_NULL;
         vx_uint32 kzgroup = weights_biases->weights_sizes[2] % weights_biases->slice_array[0].kz_count == 0 ?
