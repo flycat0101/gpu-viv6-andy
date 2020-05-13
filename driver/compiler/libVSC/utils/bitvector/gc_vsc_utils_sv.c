@@ -103,6 +103,16 @@ void vscSV_Finalize(VSC_STATE_VECTOR* pSV)
     pSV->stateCount = 0;
 }
 
+void vscSV_Reset(VSC_STATE_VECTOR* pSV)
+{
+    gctINT bvIdx;
+
+    for (bvIdx = 0; bvIdx < pSV->bvCount; bvIdx ++)
+    {
+        vscBV_Reset(&pSV->pBVs[bvIdx]);
+    }
+}
+
 void vscSV_Destroy(VSC_STATE_VECTOR* pSV)
 {
     if (pSV)
