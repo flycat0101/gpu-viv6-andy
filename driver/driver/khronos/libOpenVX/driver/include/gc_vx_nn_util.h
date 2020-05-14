@@ -489,6 +489,12 @@ vx_bool vx_nn_kernel_optimize_element_shape
     vx_int32* out_shape_x, vx_int32* out_rank_x
     );
 
+vx_bool IsTPSupport_CheckOutPixel
+    (
+    vx_context context,
+    vx_tensor inputs,
+    vx_tensor outputs);
+
 #endif
 vx_status patchNodeParamLocation(vx_node node);
 
