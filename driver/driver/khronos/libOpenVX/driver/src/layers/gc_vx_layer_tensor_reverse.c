@@ -464,6 +464,8 @@ VX_PRIVATE_API vx_bool vxoNNTensorReverse_TP_Support(vx_node node, const vx_refe
     support = support && vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_REVERSE);
     support = support && vxnneIsTPSupportFormat(context, input, VX_NULL, output);
 
+    support = support && IsTPSupport_CheckOutPixel(node->base.context, input, output);
+
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
     return support;

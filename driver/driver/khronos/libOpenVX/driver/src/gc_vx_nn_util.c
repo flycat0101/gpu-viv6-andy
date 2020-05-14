@@ -5292,7 +5292,7 @@ vx_status vxo_insertHandle(vxnne_execution_layer   executionLayer)
                     if(op->inputs[j]->type == VX_TYPE_TENSOR)
                     {
                         vx_tensor tensor = (vx_tensor)op->inputs[j];
-
+                        vx_uint32 kk = 0;
                         if((!vxoTensor_IsVirtualTensor(tensor)) && tensor->tensorBuffer->memory.wrapFlag == gcvALLOC_FLAG_USERMEMORY)
                         {
                             if(executionLayer->swapHandle[n] == VX_NULL)
@@ -5300,6 +5300,11 @@ vx_status vxo_insertHandle(vxnne_execution_layer   executionLayer)
                                 executionLayer->swapHandle[n] = (vx_swapHandel *) vxAllocate(sizeof(vx_swapHandel));
                             }
                             executionLayer->swapHandle[n]->ref = (vx_reference)op->inputs[j];
+                            for (kk = 0; kk < op->layer->node->kernel->signature.paramCount; kk++)
+                            {
+                                if (op->layer->node->paramTable[kk] && ((vx_tensor)op->layer->node->paramTable[kk])->tensorBuffer == tensor->tensorBuffer)
+                                    executionLayer->swapHandle[n]->ref = (vx_reference)op->layer->node->paramTable[kk];
+                            }
                         }
                         else
                             continue;
@@ -5448,7 +5453,7 @@ vx_status vxo_updateSwapHandle(vx_graph graph)
                     vx_node node = graph->nodeTable[executionLayer->swapHandle[j]->u.nodeTable[0]];
                     for (paramIndex = 0; paramIndex < node->numParameters; ++paramIndex)
                     {
-                        if (node->paramTable[paramIndex] != VX_NULL && (node->paramTable[paramIndex]->type == VX_TYPE_TENSOR) && (((vx_tensor)executionLayer->swapHandle[j]->ref)->tensorBuffer == ((vx_tensor)node->paramTable[paramIndex])->tensorBuffer))
+                        if (node->paramTable[paramIndex] != VX_NULL && (node->paramTable[paramIndex]->type == VX_TYPE_TENSOR) && ((executionLayer->swapHandle[j]->ref) == (node->paramTable[paramIndex])))
                          {
                             if (graph->commandBuffer && node->patchLocation[paramIndex][0] != 0xFFFFFFFF)
                             {
@@ -5944,4 +5949,16 @@ vx_bool vx_nn_kernel_optimize_element_shape
     return ret;
 } /* vx_nn_kernel_optimize_element_shape() */
 
+vx_bool IsTPSupport_CheckOutPixel(vx_context context, vx_tensor inputs, vx_tensor outputs)
+{
+    vx_bool support = vx_true_e;
+    vx_uint32 outputsWidth   = TENSOR_VIEW_SIZE_INDEX(outputs, 0);
+    vx_uint32 outputsHeight  = TENSOR_VIEW_SIZE_INDEX(outputs, 1);
+    vx_uint32 outputsDepth   = TENSOR_VIEW_SIZE_INDEX(outputs, 2);
+    vx_uint32 outputsBatch   = TENSOR_VIEW_SIZE_INDEX(outputs, 3);
+
+    support = support && ((outputsWidth * outputsHeight * outputsDepth * outputsBatch) > 1);
+
+    return support;
+}
 
