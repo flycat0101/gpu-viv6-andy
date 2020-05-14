@@ -46,7 +46,6 @@ static struct EGL_CONFIG_DEPTH eglConfigDepth[] =
     { 24, 0 },  /* D24X8 */
     { 24, 8 },  /* D24S8 */
     {  0, 8 },  /* S8 || X24S8*/
-    { 32, 0 },  /* D32   */
 };
 
 static struct eglExtension extensions[] =
