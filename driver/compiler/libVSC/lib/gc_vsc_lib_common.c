@@ -3030,10 +3030,10 @@ static gceSTATUS _ProcessExLockLibFile(gctFILE filp, gctUINT32 bufferSize)
 
     gcmVERIFY_ARGUMENT(filp != gcvNULL);
 
-    status = gcoOS_LockFile(gcvNULL, filp, gcvFALSE/* exclusive lock */, gcvFALSE /* non blocking */);
+    status = gcoOS_LockFile(gcvNULL, filp, gcvFALSE /* exclusive lock */, gcvFALSE /* non blocking */);
     if (!gcmIS_SUCCESS(status))
     {
-        gcoOS_Print("_ProcessExLockLibFile:Failed to exlock libfile ");
+        gcoOS_Print("_ProcessExLockLibFile: Failed to exlock libfile ");
     }
     return status;
 }
@@ -3044,10 +3044,10 @@ static gceSTATUS _ProcessShLockLibFile(gctFILE filp, gctUINT32 bufferSize)
 
     gcmVERIFY_ARGUMENT(filp != gcvNULL);
 
-    status = gcoOS_LockFile(gcvNULL, filp, gcvTRUE/* shared lock */, gcvFALSE /* non blocking */);
+    status = gcoOS_LockFile(gcvNULL, filp, gcvTRUE /* shared lock */, gcvTRUE /* blocking */);
     if (!gcmIS_SUCCESS(status))
     {
-        gcoOS_Print("_ProcessShLockLibFile:Failed to lock libfile ");
+        gcoOS_Print("_ProcessShLockLibFile: Failed to lock libfile ");
     }
 
     return status;
@@ -3381,6 +3381,7 @@ gcSHADER_ReadBufferFromFile(
     gctSIZE_T bufferSize = 0;
     gcoOS os = gcvNULL;
     gctSTRING buffer = gcvNULL;
+    gctBOOL locked = gcvFALSE;
 
     gcmONERROR(_ThreadLockLibFile());
 
@@ -3396,6 +3397,18 @@ gcSHADER_ReadBufferFromFile(
     }
     else
     {
+        status = _ProcessShLockLibFile(filp, fileSize);
+        if (gcmIS_SUCCESS(status))
+        {
+            locked = gcvTRUE;
+        }
+        else
+        {
+            gcoOS_Close(os, filp);
+            gcmVERIFY_OK(_ThreadUnLockLibFile());
+            return status;
+        }
+
         gcmONERROR(gcoOS_Seek(os, filp, 0,gcvFILE_SEEK_END));
         gcmONERROR(gcoOS_GetPos(os, filp, &fileSize));
 
@@ -3415,8 +3428,6 @@ gcSHADER_ReadBufferFromFile(
             {
                 *buf = buffer;
                 gcmONERROR(gcoOS_Seek(gcvNULL, filp, 0, gcvFILE_SEEK_SET));/*file pos to 0;*/
-
-                gcmONERROR(_ProcessShLockLibFile(filp, fileSize));
                 status = gcoOS_Read(os, filp ,fileSize, buffer, &bufferSize);
                 *bufSize = bufferSize;
                 if (gcmIS_SUCCESS(status) && (fileSize == bufferSize))
@@ -3431,11 +3442,12 @@ gcSHADER_ReadBufferFromFile(
                     gcoOS_Print("ERROR: Failed to read library shader file %s",ShaderName);
                     status = gcvSTATUS_INVALID_DATA;
                 }
-                gcmONERROR(_ProcessUnLockLibFile(filp, fileSize));
             }
         }
     }
 OnError:
+    if (locked)
+        gcmONERROR(_ProcessUnLockLibFile(filp, fileSize));
     if (filp != gcvNULL)
     {
         gcoOS_Close(os, filp);
