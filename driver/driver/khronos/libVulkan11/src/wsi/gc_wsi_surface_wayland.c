@@ -129,6 +129,7 @@ struct __vkWaylandSwapchainKHRRec
     struct wl_viv *                 wl_viv;
     struct wl_compositor *          wl_compositor;
     struct wl_region *              opaque_region;
+    struct wl_callback *            frame_callback;
 
     /* It's an old swapchain, replaced by new one. */
     VkBool32                        expired;
@@ -175,7 +176,6 @@ struct __vkWaylandImageBufferRec
     int32_t                         imageBufferFd;
 
     struct wl_buffer *              wl_buf;
-    struct wl_callback *            frame_callback;
     __vkImageBufferState            state;
 
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
@@ -418,6 +418,7 @@ static VkResult waylandGetPhysicalDeviceSurfacePresentModes(
 {
     static VkPresentModeKHR presentModes[] =
     {
+        VK_PRESENT_MODE_MAILBOX_KHR,
         VK_PRESENT_MODE_FIFO_KHR,
     };
 
@@ -814,7 +815,6 @@ static VkResult __CreateImageBuffer(
 
         imageBuffer->release_fence_fd = -1;
 #endif
-        imageBuffer->frame_callback = NULL;
         imageBuffer->state = __VK_IMAGE_STATE_FREE;
     }
 
@@ -864,7 +864,7 @@ static void __DestroyImageBuffer(
         int ret = 0;
         VkIcdSurfaceWayland *surf = sc->surface;
 
-        while (imageBuffer->frame_callback && ret != -1)
+        while (sc->frame_callback && ret != -1)
             ret = dispatch_queue(surf->display, sc->wl_queue, 5);
     }
 
@@ -1275,9 +1275,9 @@ OnError:
 static void
 frame_callback_handle_done(void *data, struct wl_callback *callback, uint32_t time)
 {
-    __vkWaylandImageBuffer *imageBuffer= data;
+    __vkWaylandSwapchainKHR *sc= data;
 
-    imageBuffer->frame_callback = NULL;
+    sc->frame_callback = NULL;
     wl_callback_destroy(callback);
 }
 
@@ -1301,6 +1301,7 @@ static VkResult __QueuePresentSwapchainImage(
     VkResult result = VK_SUCCESS;
     __vkDevContext *devCtx = (__vkDevContext *)sc->device;
     int fence_fd = -1;
+    int ret = 0;
 
     /* Generate queue commands. */
     if (sc->renderMode == __VK_WSI_INDIRECT_RENDERING)
@@ -1308,13 +1309,6 @@ static VkResult __QueuePresentSwapchainImage(
         __VK_ONERROR(__GenPresentCommand(devCtx, sc, imageBuffer));
     }
      __VK_ONERROR(__CommitPresentCommand(queue, sc, &fence_fd));
-
-    /*
-     * This is to block read & dispatch events in other threads, so that the
-     * callback is with correct queue and listener when 'done' event.
-     */
-    while (wl_display_prepare_read_queue(surf->display, sc->wl_queue) == -1)
-        wl_display_dispatch_queue_pending(surf->display, sc->wl_queue);
 
     if (sc->opaque_region)
         wl_surface_set_opaque_region(surf->surface, sc->opaque_region);
@@ -1343,11 +1337,31 @@ static VkResult __QueuePresentSwapchainImage(
     }
 #endif
 
-    imageBuffer->frame_callback = wl_surface_frame(surf->surface);
-    wl_proxy_set_queue((struct wl_proxy *)imageBuffer->frame_callback, sc->wl_queue);
-    wl_callback_add_listener(imageBuffer->frame_callback, &frame_callback_listener, imageBuffer);
+    while (sc->frame_callback && ret != -1)
+    {
+        ret = dispatch_queue(surf->display, sc->wl_queue, 5);
+    }
+    if (ret == -1)
+    {
+        /* fatal error, can not recover. */
+        goto OnError;
+    }
 
-    wl_display_cancel_read(surf->display);
+    if(sc->presentMode != VK_PRESENT_MODE_MAILBOX_KHR)
+    {
+        /*
+         * This is to block read & dispatch events in other threads, so that the
+         * callback is with correct queue and listener when 'done' event.
+         */
+        while (wl_display_prepare_read_queue(surf->display, sc->wl_queue) == -1)
+            wl_display_dispatch_queue_pending(surf->display, sc->wl_queue);
+
+        sc->frame_callback = wl_surface_frame(surf->surface);
+        wl_proxy_set_queue((struct wl_proxy *)sc->frame_callback, sc->wl_queue);
+        wl_callback_add_listener(sc->frame_callback, &frame_callback_listener, sc);
+
+        wl_display_cancel_read(surf->display);
+    }
 
     imageBuffer->state = __VK_IMAGE_STATE_QUEUED;
 
@@ -1355,10 +1369,22 @@ static VkResult __QueuePresentSwapchainImage(
     wl_surface_damage(surf->surface, 0, 0, sc->imageExtent.width, sc->imageExtent.height);
     wl_surface_commit(surf->surface);
 
+    if(sc->frame_callback == NULL)
+    {
+        /*
+         * This is to block read & dispatch events in other threads, so that the
+         * callback is with correct queue and listener when 'done' event.
+         */
+        while (wl_display_prepare_read_queue(surf->display, sc->wl_queue) == -1)
+             wl_display_dispatch_queue_pending(surf->display, sc->wl_queue);
+
+        sc->frame_callback = wl_display_sync(surf->display);
+        wl_proxy_set_queue((struct wl_proxy *)sc->frame_callback, sc->wl_queue);
+        wl_callback_add_listener(sc->frame_callback, &frame_callback_listener, sc);
+        wl_display_cancel_read(surf->display);
+    }
     /* flush events. */
     wl_display_flush(surf->display);
-
-    return result;
 
 OnError:
     return result;
@@ -1519,6 +1545,7 @@ static VkResult waylandCreateSwapchain(
     sc->compositeAlpha      = pCreateInfo->compositeAlpha;
     sc->presentMode         = pCreateInfo->presentMode;
     sc->clipped             = pCreateInfo->clipped;
+    sc->frame_callback      = NULL;
 
     VIV_EXTENT = pCreateInfo->imageExtent;
 
