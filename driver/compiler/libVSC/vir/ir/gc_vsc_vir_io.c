@@ -3106,7 +3106,8 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader, gctUINT message
         return errCode;
     }
     ON_ERROR0(VIR_IO_readUint(buf, &chipRevision));
-    if (chipRevision != gcGetHWCaps()->chipRevision)
+    /* Relax the chipRevision check here: skip the 8bits LSB. */
+    if ((chipRevision & 0xFFF0) != (gcGetHWCaps()->chipRevision & 0xFFF0))
     {
         errCode = VSC_ERR_VERSION_MISMATCH;
         if (needToPrint)
