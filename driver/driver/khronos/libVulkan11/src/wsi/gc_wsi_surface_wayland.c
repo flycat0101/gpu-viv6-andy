@@ -37,6 +37,9 @@
 #include "linux-explicit-synchronization-unstable-v1-client-protocol.h"
 #endif
 
+#define GC_WL_MAX_SWAP_INTERVAL     1
+#define GC_WL_MIN_SWAP_INTERVAL     0
+
 typedef struct __vkWaylandSwapchainKHRRec   __vkWaylandSwapchainKHR;
 typedef struct __vkWaylandImageBufferRec    __vkWaylandImageBuffer;
 static VkExtent2D VIV_EXTENT = (VkExtent2D){-1, -1};
@@ -145,6 +148,7 @@ struct __vkWaylandSwapchainKHRRec
     VkSurfaceTransformFlagBitsKHR   preTransform;
     VkPresentModeKHR                presentMode;
     VkBool32                        clipped;
+    int32_t                         swapInterval;
 
     int32_t                         enableTileStatus;
     __VkDirectRenderMode            renderMode;
@@ -1347,7 +1351,7 @@ static VkResult __QueuePresentSwapchainImage(
         goto OnError;
     }
 
-    if(sc->presentMode != VK_PRESENT_MODE_MAILBOX_KHR)
+    if (sc->swapInterval > 0)
     {
         /*
          * This is to block read & dispatch events in other threads, so that the
@@ -1473,10 +1477,11 @@ static VkResult waylandCreateSwapchain(
     )
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
-    __vkWaylandSwapchainKHR *sc = NULL;
-    uint32_t i;
-    VkResult result = VK_SUCCESS;
     VkIcdSurfaceWayland *surf = __VK_NON_DISPATCHABLE_HANDLE_CAST(VkIcdSurfaceWayland *, pCreateInfo->surface);
+    __vkWaylandSwapchainKHR *sc = NULL;
+    VkResult result = VK_SUCCESS;
+    char *envswapint;
+    uint32_t i;
 
     switch (pCreateInfo->imageFormat)
     {
@@ -1546,6 +1551,7 @@ static VkResult waylandCreateSwapchain(
     sc->presentMode         = pCreateInfo->presentMode;
     sc->clipped             = pCreateInfo->clipped;
     sc->frame_callback      = NULL;
+    sc->swapInterval        = 1;
 
     VIV_EXTENT = pCreateInfo->imageExtent;
 
@@ -1561,6 +1567,18 @@ static VkResult waylandCreateSwapchain(
     wl_registry_add_listener(sc->wl_registry, &registry_listener, sc);
 
     roundtrip_queue(surf->display, sc->wl_queue);
+
+    if (sc->presentMode == VK_PRESENT_MODE_MAILBOX_KHR)
+    {
+        sc->swapInterval = 0;
+    }
+
+    envswapint = getenv("WL_EGL_SWAP_INTERVAL");
+    if (envswapint)
+    {
+        int32_t interval = atoi(envswapint);
+        sc->swapInterval = gcmCLAMP(interval, GC_WL_MIN_SWAP_INTERVAL, GC_WL_MAX_SWAP_INTERVAL);
+    }
 
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
     if(sc->use_explicit_sync == 1)
