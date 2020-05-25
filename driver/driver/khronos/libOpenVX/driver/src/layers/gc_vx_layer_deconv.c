@@ -1491,6 +1491,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
             vx_bool    is_small_input     = vx_false_e;
             vx_bool    is_expand_tensor   = vx_false_e;
 
+            vxmCHECK_LIFETIME(weights, VX_TENSOR_LIFE_TIME_STATIC);
+            vxmCHECK_LIFETIME(bias, VX_TENSOR_LIFE_TIME_STATIC);
+
             enable_2dTensor = (vx_bool)(size < IMG_MAX_WIDTH);
             if (bias && (2 == TENSOR_DIM_NUM(bias)))
             {
