@@ -81,7 +81,7 @@ __kernel void roiPooling_generic_int8 (
                     char vec0;
                     VXC_ReadImage2DArray(vec0, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 0, 0,VXC_RM_TowardZero, 0));
                     w ++;
-                    output_data = max(output_data, vec0);
+                    output_data = output_data > vec0 ? output_data : vec0;
                 } while (w < end.x);
                 h ++;
             } while (h < end.y);
@@ -90,7 +90,7 @@ __kernel void roiPooling_generic_int8 (
             output_data = convert_char_rte(temp);
             char minData;
             _viv_asm(COPY, minData, minVal, 4);
-            output_data = max(minData, output_data);
+            output_data = minData > output_data ? minData : output_data;
             VXC_WriteImage2DArray(output, coord_out, output_data, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
         }
         pwh.yw += 1;
@@ -166,7 +166,7 @@ __kernel void roiPooling_generic_int8_int8 (
                     char vec0;
                     VXC_ReadImage2DArray(vec0, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 0, 0,VXC_RM_TowardZero, 0));
                     w ++;
-                    output_data = max(output_data, vec0);
+                    output_data = output_data > vec0 ? output_data : vec0;
                 } while (w < end.x);
                 h ++;
             } while (h < end.y);
@@ -175,7 +175,7 @@ __kernel void roiPooling_generic_int8_int8 (
             output_data = convert_char_rte(temp);
             char minData;
             _viv_asm(COPY, minData, minVal, 4);
-            output_data = max(minData, output_data);
+            output_data = minData > output_data ? minData : output_data;
             VXC_WriteImage2DArray(output, coord_out, output_data, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
         }
         pwh.yw += 1;
@@ -424,7 +424,7 @@ __kernel void roiPooling_generic_fp16 (
                     vxc_ushort8 vec0;
                     VXC_ReadImage2DArray(vec0, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 0, 0,VXC_RM_TowardZero, 0));
                     w ++;
-                    output_data = max(output_data, vec0);
+                    output_data = output_data > vec0 ? output_data : vec0;
                 } while (w < end.x);
                 h ++;
             } while (h < end.y);
@@ -508,8 +508,7 @@ __kernel void roiPooling_generic_uint8 (
                     unsigned char vec0;
                     VXC_ReadImage2DArray(vec0, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 0, 0,VXC_RM_TowardZero, 0));
                     w ++;
-
-                    output_data = max(output_data, vec0);
+                    output_data = output_data > vec0 ? output_data : vec0;
                 } while (w < end.x);
                 h ++;
             } while (h < end.y);
@@ -521,7 +520,7 @@ __kernel void roiPooling_generic_uint8 (
 
             unsigned char minData;
             _viv_asm(COPY, minData, minVal, 4);
-            output_data = max(minData, output_data);
+            output_data = minData > output_data ? minData : output_data;
             VXC_WriteImage2DArray(output, coord_out, output_data, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
         }
         pwh.yw += 1;
@@ -598,8 +597,7 @@ __kernel void roiPooling_generic_uint8_uint8 (
                     unsigned char vec0;
                     VXC_ReadImage2DArray(vec0, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 0, 0,VXC_RM_TowardZero, 0));
                     w ++;
-
-                    output_data = max(output_data, vec0);
+                    output_data = output_data > vec0 ? output_data : vec0;
                 } while (w < end.x);
                 h ++;
             } while (h < end.y);
@@ -611,7 +609,7 @@ __kernel void roiPooling_generic_uint8_uint8 (
 
             unsigned char minData;
             _viv_asm(COPY, minData, minVal, 4);
-            output_data = max(minData, output_data);
+            output_data = minData > output_data ? minData : output_data;
             VXC_WriteImage2DArray(output, coord_out, output_data, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
         }
         pwh.yw += 1;
