@@ -819,9 +819,11 @@ VX_PRIVATE_API vx_status vxoNNTensorStrideSlice_TP_Initialize(vxnne_layer ops_la
     vx_tensor output                = (vx_tensor)parameters[7];
 
     vx_uint32 batch                 = TENSOR_VIEW_DIM_NUM(input) > 3 ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
-
+    vx_uint32 batch_o               = TENSOR_VIEW_DIM_NUM(output) > 3 ? TENSOR_VIEW_SIZE_INDEX(output, 3) : 1;
     vx_op_param_s conv = { 0 };
 
+    if (batch !=  batch_o)
+        batch = 1;
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
     conv.pad_x_left = 0;
@@ -874,6 +876,7 @@ VX_PRIVATE_API vx_status vxoNNTensorStrideSlice_TP_Initialize(vxnne_layer ops_la
     conv.tp_value->u32[5] = TENSOR_VIEW_SIZE_INDEX(stride_dims, 0) > 1 ? (vx_uint32)VX_GET_DATA_FROM_TENSOR(stride_dims, 1) : 1; /* stride y*/
     conv.tp_value->u32[6] = TENSOR_VIEW_SIZE_INDEX(begin_dims, 0) > 2 ? (vx_uint32)VX_GET_DATA_FROM_TENSOR(begin_dims, 2) : 0;
     conv.tp_value->u32[7] = TENSOR_VIEW_SIZE_INDEX(end_dims, 0) > 2 ? (vx_uint32)VX_GET_DATA_FROM_TENSOR(end_dims, 2) : 0;
+    conv.tp_value->u32[8] = TENSOR_VIEW_SIZE_INDEX(stride_dims, 0) > 2 ? (vx_uint32)VX_GET_DATA_FROM_TENSOR(stride_dims, 2) : 1;
 
     memcpy(&tensor_stride_slice_layer->tensor_stride_slice_tp_operation.base.parameter, &conv, sizeof(vx_op_param_s));
 
