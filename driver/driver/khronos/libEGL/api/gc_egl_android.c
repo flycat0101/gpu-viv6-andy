@@ -817,15 +817,53 @@ _SetBufferCount(
     else
     {
         int rel;
-        int bufferCount;
+        int bufferCount = 0;
+#if (gcdANDROID_NATIVE_FENCE_SYNC < 2)
         int minUndequeued;
         android_native_buffer_t *buffer;
         android_native_buffer_t *buffer2;
+#endif
 
         /* Set default value to 0. */
         Info->bufferCount = 0;
 
+#if (gcdANDROID_NATIVE_FENCE_SYNC >= 2)
+        /*
+         * Does not need to set buffer count if native fence is enabled.
+         * Because it will NEVER dequeue multiple buffers when native fence
+         * sync is enabled.
+         * reserve set buffercount to some special case to maintain performance
+         */
+        {
+            gctUINT i;
+            gcePATCH_ID patchId = gcvPATCH_INVALID;
 
+            gcoHAL_GetPatchID(gcvNULL, &patchId);
+
+            for (i = 0; i < gcmCOUNTOF(bufferCountList); i++)
+            {
+                if (patchId == bufferCountList[i].patchId)
+                {
+                    /* Get per app buffer count. */
+                    bufferCount = bufferCountList[i].bufferCount;
+                    break;
+                }
+            }
+
+            if (bufferCount > 0)
+            {
+                /* Store buffer count set for the window. */
+                Info->bufferCount = bufferCount;
+                /* Set native buffer count. */
+                LOGV("%s: Surface: set bufferCount to %d", __func__, bufferCount);
+                rel = native_window_set_buffer_count(win, bufferCount);
+                if (rel!= 0)
+                {
+                    LOGV("%s: Surface: set bufferCount to %d failed", __func__, bufferCount);
+                }
+            }
+        }
+#else
         /* Query minUndequeued buffer count. */
         win->query(win, NATIVE_WINDOW_MIN_UNDEQUEUED_BUFFERS, &minUndequeued);
 
@@ -907,13 +945,8 @@ _SetBufferCount(
 
             /* Set native buffer count. */
             LOGV("%s: Surface: set bufferCount to %d", __func__, bufferCount);
-            if(native_window_set_buffer_count(win, bufferCount) != 0)
+            if (native_window_set_buffer_count(win, bufferCount) != 0)
             {
-#if (gcdANDROID_NATIVE_FENCE_SYNC >= 2)
-                LOGV("%s: win=%p set bufferCount to %d failed, return", __func__, win, bufferCount);
-                /* Set buffer count to 0. */
-                Info->bufferCount = 0;
-#else
                 /* From libgui: BufferQueueProducer::setMaxDequeuedBufferCount
                  * if failed to dequeue second buffer and failed to set buffer count
                  * it might because this is a single mode buffer,
@@ -924,7 +957,6 @@ _SetBufferCount(
                  * sync is enabled.
                  */
                 Info->bufferCount = -2;
-#endif
                 return;
             }
 
@@ -946,8 +978,8 @@ _SetBufferCount(
             /* Set buffer count to 0. */
             Info->bufferCount = 0;
         }
+#endif
     }
-
     LOGV("%s: win=%p bufferCount=%d", __func__, win, Info->bufferCount);
 #endif
 }
