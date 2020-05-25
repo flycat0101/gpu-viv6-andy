@@ -160,6 +160,8 @@
         forward_glTexDirectVIVMap;
         forward_glTexDirectTiledMapVIV;
 
+        _EGL_VERSION;
+
     local:
         *;
 };
