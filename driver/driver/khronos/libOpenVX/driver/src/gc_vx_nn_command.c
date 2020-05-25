@@ -3917,8 +3917,8 @@ void _fill_TP_TENSOR_STRIDED_SLICE_Command(
     vx_uint32 i;
     vx_int32 begin_dims[3] = { parameter->tp_value->u32[0], parameter->tp_value->u32[1], parameter->tp_value->u32[6]};
     vx_int32 end_dims[3] = { parameter->tp_value->u32[2], parameter->tp_value->u32[3], parameter->tp_value->u32[7]};
-    vx_int32 stride_dims[2] = { parameter->tp_value->u32[4], parameter->tp_value->u32[5] };
-    vx_int32 x_start, x_end, y_start, y_end;
+    vx_int32 stride_dims[3] = { parameter->tp_value->u32[4], parameter->tp_value->u32[5], parameter->tp_value->u32[8]};
+    vx_int32 x_start, x_end, y_start, y_end, inZsizeT;
     DEFINE_TP_GENERAL_PARAMETER();
 
     x_start = gcmMAX(0, begin_dims[0]);
@@ -3939,16 +3939,24 @@ void _fill_TP_TENSOR_STRIDED_SLICE_Command(
     {
         info_array[i].vx_tp_general_cmd_split_info.inImageXSize = inXSize;
         info_array[i].vx_tp_general_cmd_split_info.inImageYSize = inYSize;
-        if (end_dims[2] - begin_dims[2] != 0)
+        inZsizeT = end_dims[2] - begin_dims[2];
+        if (inZsizeT != 0)
         {
-            info_array[i].vx_tp_general_cmd_split_info.inImageZSize = end_dims[2] - begin_dims[2];
+            if (stride_dims[2] > 1)
+            {
+                info_array[i].vx_tp_general_cmd_split_info.inImageZSize = inZsizeT % stride_dims[2] ? (inZsizeT / stride_dims[2] + 1) : inZsizeT / stride_dims[2];
+            }
+            else
+            {
+                info_array[i].vx_tp_general_cmd_split_info.inImageZSize = inZsizeT;
+            }
         }
         else
         {
             info_array[i].vx_tp_general_cmd_split_info.inImageZSize = split_sizes[i];
         }
         info_array[i].vx_tp_general_cmd_split_info.inImageStride = inYStride / inputElemSize;
-        info_array[i].vx_tp_general_cmd_split_info.inImageSlice = inZStride / inputElemSize;
+        info_array[i].vx_tp_general_cmd_split_info.inImageSlice = inZsizeT ? inZStride / inputElemSize * stride_dims[2] : inZStride / inputElemSize;
         info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = x_start;
         info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = y_start;
 
@@ -3956,6 +3964,7 @@ void _fill_TP_TENSOR_STRIDED_SLICE_Command(
         info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = y_end;
         info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
         info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inZStride * split_offsets[i] + begin_dims[2] * inZStride;
+        /*
         if (stride_dims[0] == 1)
         {
             info_array[i].vx_tp_general_cmd_split_info.inTileXSize = info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd -
@@ -3974,6 +3983,9 @@ void _fill_TP_TENSOR_STRIDED_SLICE_Command(
         {
             info_array[i].vx_tp_general_cmd_split_info.inTileYSize = 1;
         }
+        */
+        info_array[i].vx_tp_general_cmd_split_info.inTileXSize = 1;
+        info_array[i].vx_tp_general_cmd_split_info.inTileYSize = 1;
         info_array[i].vx_tp_general_cmd_split_info.inTileXInc = stride_dims[0];
         info_array[i].vx_tp_general_cmd_split_info.inTileYInc = stride_dims[1];
         info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + inZStride * split_offsets[i];
@@ -3988,8 +4000,8 @@ void _fill_TP_TENSOR_STRIDED_SLICE_Command(
         info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = outYStride / outputElemSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = outYSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = 1;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = outZStride / outputElemSize;;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = outZSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = 0;
         info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = 1;
         info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = outZStride / outputElemSize;
