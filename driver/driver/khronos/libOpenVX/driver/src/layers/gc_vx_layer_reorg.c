@@ -1803,7 +1803,7 @@ VX_PRIVATE_API vx_status vxoNNReorgLayer2_TP_Initialize(vxnne_layer ops_layer, c
     vx_scalar num_group_s = (vx_scalar)parameters[5];
     vx_scalar axis_s = (vx_scalar)parameters[6];
     vx_enum type = type_s->value->e;
-    vx_uint32 batch_count = (type == VX_REORG_BATCH_TO_SPACE_ND || type == VX_REORG_SPACE_TO_BATCH_ND) ? 1 : TENSOR_SIZE_INDEX(inputs, 3);
+    vx_uint32 batch_count = (type == VX_REORG_BATCH_TO_SPACE_ND || type == VX_REORG_SPACE_TO_BATCH_ND || type == VX_REORG_SHUFFLE_CHANNEL) ? 1 : TENSOR_SIZE_INDEX(inputs, 3);
 
     vx_uint32 op_index = 0;
     vxnne_reorg_layer  reorg_layer = (vxnne_reorg_layer)ops_layer;
