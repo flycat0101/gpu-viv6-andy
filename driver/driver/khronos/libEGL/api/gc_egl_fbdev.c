@@ -148,6 +148,8 @@ destroyDisplays(
 
         if (display->file >= 0)
         {
+            pthread_cond_broadcast(&display->cond);
+
             ioctl(display->file, FBIOPUT_VSCREENINFO, &display->orgVarInfo);
 
             close(display->file);
@@ -1252,6 +1254,8 @@ fbdev_DestroyDisplay(
 
         if (display->file >= 0)
         {
+            pthread_cond_broadcast(&display->cond);
+
             ioctl(display->file, FBIOPUT_VSCREENINFO, &(display->orgVarInfo));
 
             close(display->file);
