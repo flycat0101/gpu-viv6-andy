@@ -3883,8 +3883,10 @@ gcSHADER_LoadHeader(
     }
 
     /* Word 4: chipRevision */
+    /* Relax the chipRevision check here: skip the 8bits LSB. */
     chipRevision = (gctUINT32 *) (chipModel + 1);
-    if(*chipRevision != gcGetHWCaps()->chipRevision) {
+    if ((*chipRevision & 0xFFF0) != (gcGetHWCaps()->chipRevision & 0xFFF0))
+    {
         gcoOS_Print("gcSHADER_LoadHeader: shader binary file's chipRevision 0x%x doesn't match current chipRevision 0x%x.",
                  *chipRevision, gcGetHWCaps()->chipRevision);
         gcmFOOTER_ARG("status=%d", gcvSTATUS_VERSION_MISMATCH);
