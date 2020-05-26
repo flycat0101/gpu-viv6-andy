@@ -96,6 +96,14 @@ typedef struct __vkHwFenceDataRec
 }
 __vkHwFenceData;
 
+
+typedef struct __vkSemaphoreNodeRec
+{
+    __vkSemaphore *sphPointer;
+    struct __vkSemaphoreNodeRec *sphNext;
+}
+__vkSemaphoreNode;
+
 struct __vkDevContextRec
 {
     /*
@@ -124,9 +132,9 @@ struct __vkDevContextRec
     uint32_t fenceCount;
     VkBuffer fenceBuffer;
 
-    /*record the signal related with Native fence*/
-    void *fdSignal[8];
-    uint32_t fdCount;
+    /*record the semaphore that will export fd*/
+    __vkSemaphoreNode *sphList;
+    __vkSemaphoreNode *currentSph;
 
     /* All VK objects created through vkCreate*() API with this devContext. */
     __vkObjectList vkObject[__VK_DEV_OBJECT_COUNT];

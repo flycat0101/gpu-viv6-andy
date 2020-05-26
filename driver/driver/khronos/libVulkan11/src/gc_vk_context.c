@@ -409,6 +409,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDevice(
 
     devCtx->lastFenceIndex = (uint32_t)-1;
     devCtx->fenceCount = 0;
+    devCtx->sphList = VK_NULL_HANDLE;
+    devCtx->currentSph = VK_NULL_HANDLE;
     __VK_ONERROR(gcoOS_CreateMutex(gcvNULL, &devCtx->fenceMutex));
 
     /* Lock the phyDev->mutex */
@@ -548,6 +550,27 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyDevice(
 
                 __vk_DestroyBuffer((VkDevice)(uintptr_t)devCtx, devCtx->fenceBuffer, gcvNULL);
             }
+#if defined(LINUX) || defined(ANDROID)
+            if (devCtx->sphList)
+            {
+                __vkSemaphoreNode * tmpNode = devCtx->sphList;
+                 while (tmpNode)
+                 {
+                     __vkSemaphoreNode *node = tmpNode;
+
+                     tmpNode = tmpNode->sphNext;
+
+                     if (node->sphPointer->fenceFd >= 0)
+                     {
+                         close(node->sphPointer->fenceFd);
+                     }
+
+                     gcoOS_DestroySignal(gcvNULL, node->sphPointer->sphSignal);
+                     __vk_DestroyObject(devCtx, __VK_OBJECT_SEMAPHORE, (__vkObject *)node->sphPointer);
+                     __VK_FREE(node);
+                 }
+            }
+#endif
 
             __VK_ASSERT(devCtx->fenceMutex);
             gcoOS_DeleteMutex(gcvNULL, devCtx->fenceMutex);

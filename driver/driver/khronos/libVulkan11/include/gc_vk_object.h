@@ -120,7 +120,9 @@ typedef struct __vkSemaphoreRec
     /*support semaphore_fd extension*/
     int fenceFd;
 
-    int32_t signalIndex;
+    void *sphSignal;
+
+    VkBool32 payloadImported;
 
 } __vkSemaphore;
 

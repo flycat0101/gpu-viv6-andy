@@ -407,7 +407,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateSemaphore(
     }
 
     result = __vk_AllocateHwFence(device, &sph->fenceIndex);
-    sph->signalIndex = -1;
+    sph->fenceFd = -1;
+    sph->sphSignal = VK_NULL_HANDLE;
 
     if (result == VK_SUCCESS)
     {
@@ -435,10 +436,35 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateSemaphore(
         if (sph->handleType == VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT ||
             sph->handleType == VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT)
         {
+            __vkSemaphoreNode *sphNode;
+
+            __VK_SET_ALLOCATIONCB(&devCtx->memCb);
+
             /*use the fenceFd to represent semaphore's fd*/
-            __VK_ONERROR(gcoOS_CreateSignal(gcvNULL, VK_TRUE, &devCtx->fdSignal[devCtx->fdCount]));
-            __VK_ONERROR(gcoOS_CreateNativeFence(gcvNULL, devCtx->fdSignal[devCtx->fdCount], &sph->fenceFd));
-            sph->signalIndex = devCtx->fdCount++;
+            __VK_ONERROR(gcoOS_CreateSignal(gcvNULL, VK_TRUE, &sph->sphSignal));
+            __VK_ONERROR(gcoOS_CreateNativeFence(gcvNULL, sph->sphSignal, &sph->fenceFd));
+
+            sphNode = (__vkSemaphoreNode *)__VK_ALLOC(sizeof(__vkSemaphoreNode), 8, VK_SYSTEM_ALLOCATION_SCOPE_DEVICE);
+            if (!sphNode)
+            {
+                return VK_ERROR_OUT_OF_HOST_MEMORY;
+            }
+            __VK_MEMZERO(sphNode, sizeof(__vkSemaphoreNode));
+
+            sphNode->sphPointer = sph;
+            sphNode->sphNext = VK_NULL_HANDLE;
+
+            if (devCtx->currentSph == VK_NULL_HANDLE)
+            {
+                __VK_ASSERT(devCtx->sphList == VK_NULL_HANDLE);
+                devCtx->currentSph = sphNode;
+                devCtx->sphList    = sphNode;
+            }
+            else
+            {
+                devCtx->currentSph->sphNext = sphNode;
+                devCtx->currentSph = sphNode;
+            }
         }
 #endif
     }
@@ -459,20 +485,18 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroySemaphore(
     {
         __vkSemaphore *sph = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSemaphore *, semaphore);
 
-#if defined(LINUX) || defined(ANDROID)
-        if (sph->fenceFd)
-        {
-            close(sph->fenceFd);
-        }
-
-        if (sph->signalIndex >= 0)
-        {
-            gcoOS_DestroySignal(gcvNULL, devCtx->fdSignal[sph->signalIndex]);
-        }
-#endif
         __vk_FreeHwFence(device, sph->fenceIndex);
 
-        __vk_DestroyObject(devCtx, __VK_OBJECT_SEMAPHORE, (__vkObject *)sph);
+        if (!sph->sphSignal)
+        {
+#if defined(LINUX) || defined(ANDROID)
+            if (sph->fenceFd >= 0)
+            {
+                close(sph->fenceFd);
+            }
+#endif
+            __vk_DestroyObject(devCtx, __VK_OBJECT_SEMAPHORE, (__vkObject *)sph);
+        }
     }
 }
 
@@ -574,18 +598,30 @@ VkResult VKAPI_CALL __vk_GetSemaphoreFdKHR(
     int* pFd
     )
 {
-    __vkSemaphore *sph = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSemaphore *, pGetFdInfo->semaphore);
     VkResult result = VK_SUCCESS;
 
-    if (sph->fenceFd != VK_NULL_HANDLE)
+#if defined(LINUX) || defined(ANDROID)
+    __vkSemaphore *sph = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSemaphore *, pGetFdInfo->semaphore);
+
+    if (sph->fenceFd >= 0)
     {
-        *pFd = sph->fenceFd;
+        int tempFd;
+        tempFd = dup(sph->fenceFd);
+
+        if (tempFd < 0)
+        {
+            result = VK_INCOMPLETE;
+        }
+
+        *pFd = tempFd;
+
         return result;
     }
     else
     {
         result = VK_INCOMPLETE;
     }
+#endif
 
    return result;
 
@@ -601,7 +637,7 @@ VkResult VKAPI_CALL __vk_ImportSemaphoreFdKHR(
 
     sph->fenceFd = pImportSemaphoreFdInfo->fd;
     sph->handleType = pImportSemaphoreFdInfo->handleType;
-    sph->signalIndex = -1;
+    sph->payloadImported = VK_TRUE;
 
     return result;
 }
