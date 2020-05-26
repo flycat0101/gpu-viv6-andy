@@ -2738,6 +2738,13 @@ static VSC_ErrCode _LinkUniformAmongShaderStages(VSC_PROGRAM_LINKER_HELPER* pPgL
     gctUINT      stageIdx, stageIdx1;
     VIR_Shader*  pCurStage;
     VIR_Shader*  pTempStage;
+    gctBOOL      bNeedLinkageValidate = gcvTRUE;
+
+    /* We don't need to do the linkage validation for a vulkan program because spec doesn't require this. */
+    if (pPgLinkHelper->pgPassMnger.pPgmLinkerParam->cfg.ctx.clientAPI == gcvAPI_OPENVK)
+    {
+        bNeedLinkageValidate = gcvFALSE;
+    }
 
     for (stageIdx = 0; stageIdx < VSC_MAX_GFX_SHADER_STAGE_COUNT; stageIdx ++)
     {
@@ -2748,6 +2755,12 @@ static VSC_ErrCode _LinkUniformAmongShaderStages(VSC_PROGRAM_LINKER_HELPER* pPgL
             errCode = _CheckUniformAliasedLocation(&pPgLinkHelper->baseHelper,
                                                    pCurStage);
             ON_ERROR(errCode, "Link Uniforms between two shader stages");
+
+            /* Skip the linkage validation. */
+            if (!bNeedLinkageValidate)
+            {
+                continue;
+            }
 
             for (stageIdx1 = 0; stageIdx1 < stageIdx; stageIdx1 ++)
             {
