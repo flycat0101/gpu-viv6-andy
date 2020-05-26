@@ -26,6 +26,9 @@
 
 #include <hardware/hardware.h>
 #include <hardware/gralloc.h>
+#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 29)
+#include <hardware/gralloc1.h>
+#endif
 #include <graphics_ext.h>
 
 /* from libdrm. */
@@ -334,6 +337,9 @@ gralloc_vivante_alloc_bo(struct gralloc_vivante_t *drv, buffer_handle_t handle)
             /* also zero memory for GPU linear buffers */
             || ((gralloc_handle_usage(handle) & GRALLOC_USAGE_HW_TEXTURE) &&
             (gralloc_handle_usage(handle) & GRALLOC_USAGE_HW_RENDER) &&
+            tiling == DRM_VIV_GEM_TILING_LINEAR)
+            /* clear some virtual display related buffers to avoid blur issue*/
+            || ((gralloc_handle_usage(handle) & GRALLOC1_PRODUCER_USAGE_CPU_READ_OFTEN) &&
             tiling == DRM_VIV_GEM_TILING_LINEAR)
 #endif
             ) {
