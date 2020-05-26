@@ -608,9 +608,10 @@ VkResult __vk_InsertSemaphoreWaits(
             __VK_ONERROR(gcoOS_WaitSignal(gcvNULL, sph->winHandle, gcvINFINITE));
         }
 #if defined(LINUX) || defined(ANDROID)
-        else if (sph->fenceFd)
+        else if (sph->fenceFd >= 0 && sph->payloadImported)
         {
             __VK_ONERROR(gcoOS_WaitNativeFence(gcvNULL, sph->fenceFd, gcvINFINITE));
+            sph->payloadImported = VK_FALSE;
         }
 #endif
         else
@@ -689,25 +690,14 @@ VkResult __vk_InsertSemaphoreSignals(
             __VK_ONERROR(__vk_QueueCommitEvents(devQueue, VK_FALSE));
         }
 #if defined(LINUX) || defined(ANDROID)
-        uint32_t j = 0;
-        if (sph->fenceFd)
+        if (sph->fenceFd >= 0)
         {
-            if (sph->signalIndex >= 0)
+            if (sph->sphSignal)
             {
-                iface.u.Signal.signal = gcmPTR_TO_UINT64(devQueue->pDevContext->fdSignal[sph->signalIndex]);
+                iface.u.Signal.signal = gcmPTR_TO_UINT64(sph->sphSignal);
 
                 __VK_ONERROR(__vk_QueueAppendEvent(devQueue, &iface));
                 __VK_ONERROR(__vk_QueueCommitEvents(devQueue, VK_FALSE));
-            }
-            else if (sph->signalIndex == -1)
-            {
-                for (j = 0; j < devQueue->pDevContext->fdCount; j++)
-                {
-                    iface.u.Signal.signal = gcmPTR_TO_UINT64(devQueue->pDevContext->fdSignal[j]);
-
-                    __VK_ONERROR(__vk_QueueAppendEvent(devQueue, &iface));
-                    __VK_ONERROR(__vk_QueueCommitEvents(devQueue, VK_FALSE));
-                }
             }
         }
 #endif
@@ -720,10 +710,13 @@ OnError:
     return result;
 }
 
-VkResult __vk_CommitSubmitFence(VkQueue queue, VkFence fence)
+VkResult __vk_CommitSubmitFence(
+    VkQueue queue,
+    VkFence fence
+    )
 {
     __vkDevQueue *devQueue = (__vkDevQueue *)queue;
-   __vkFence *fce = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFence *, fence);
+    __vkFence *fce = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFence *, fence);
     VkResult result = VK_SUCCESS;
 
     /* Event to signal when any device submit operation completes */

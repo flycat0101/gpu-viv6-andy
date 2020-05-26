@@ -2240,11 +2240,13 @@ VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceExternalSemaphoreProperties(
     switch (handleType)
     {
     case VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT:
+    case VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT:
+        pExternalSemaphoreProperties->externalSemaphoreFeatures = 0x0;
+        break;
     case VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT:
     case VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT:
-    case VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT:
     case VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT:
-        pExternalSemaphoreProperties->externalSemaphoreFeatures = 0x17;
+        pExternalSemaphoreProperties->externalSemaphoreFeatures = 0x3;
         break;
     default:
         __VK_ASSERT(!"invalid external semaphore handle types");
