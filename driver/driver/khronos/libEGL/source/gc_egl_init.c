@@ -451,29 +451,7 @@ _FillIn(
         if (patchId == gcvPATCH_GTFES30)
         {
             gctSTRING env;
-            static gctBOOL printed = gcvFALSE;
             gcoOS_GetEnv(gcvNULL, "VIV_EGL_ALL_CONFIG", &env);
-            if (!env)
-            {
-                if (!printed)
-                {
-                    gcmPRINT("EGL: enable default configs for conformance test");
-                    printed = gcvTRUE;
-                }
-                /* Only enable RGBA8888/D24S8 and RGB565/D0S0 for ES2/ES3 context to reduce ES CTS running time */
-                /* Enable RGBA8888/D24S8 and RGB565/D0S0 for GL context to make GL and ES go the same path */
-                if (!((Color->formatFlags & VEGL_8888) == VEGL_8888 && config->depthSize == 24 && config->stencilSize == 8) &&
-                    !((Color->formatFlags & VEGL_565) == VEGL_565 && config->depthSize == 0 && config->stencilSize == 0))
-                {
-                    config->renderableType &= ~(EGL_OPENGL_ES2_BIT | EGL_OPENGL_ES3_BIT_KHR | EGL_OPENGL_BIT);
-                    config->conformant     &= ~(EGL_OPENGL_ES2_BIT | EGL_OPENGL_ES3_BIT_KHR | EGL_OPENGL_BIT);
-                }
-                else if (!printed)
-                {
-                    gcmPRINT("EGL: enable all configs for conformance test");
-                    printed = gcvTRUE;
-                }
-            }
             gcoOS_GetEnv(gcvNULL, "VIV_EGL_OPENGL_CTS", &env);
             if (!env)
             {
