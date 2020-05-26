@@ -59,7 +59,8 @@ endif
 
 ifeq ($(EGL_API_WL),1)
   INCLUDE += -I$(AQROOT)/driver/wayland \
-             -I$(WAYLAND_DIR)/include
+             -I$(WAYLAND_DIR)/include \
+             -I$(ROOTFS)/usr/include/libdrm
 else
   ifeq ($(EGL_API_DRI),1)
     INCLUDE += -I$(X11_ARM_DIR)/include \
