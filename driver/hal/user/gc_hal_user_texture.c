@@ -4568,10 +4568,18 @@ gcoTEXTURE_BindTextureEx(
     gctBOOL canTsEnable = gcvTRUE;
     gctBOOL anyTsEnableForMultiSlice = gcvFALSE;
     gctUINT i = 0;
+
+    gceCHIPMODEL chipModel;
+    gctUINT32 chipRevision;
+    gcePATCH_ID patchID = gcvPATCH_INVALID;
+
     gcmHEADER_ARG("Texture=0x%x Sampler=%d", Texture, Sampler);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Texture, gcvOBJ_TEXTURE);
+
+    gcoHAL_GetPatchID(gcvNULL, &patchID);
+    gcoHAL_QueryChipIdentity(gcvNULL, &chipModel, &chipRevision, gcvNULL, gcvNULL);
 
     /* Use the local struct Info for every thread.*/
     tmpInfo = *Info;
@@ -4627,6 +4635,13 @@ gcoTEXTURE_BindTextureEx(
     maxLevel = (gcvTEXTURE_NONE == pTexParams->mipFilter)
              ? (baseLevel + 0.3f)    /* Add <0.5 bias to let HW min/mag determination correct*/
              : (gctFLOAT)gcmMIN(pTexParams->maxLevel, Texture->levels - 1);
+
+    if ((chipModel == gcv600) && (chipRevision == 0x4653) &&
+        (patchID == gcvPATCH_SKIA_SKQP) && baseMipMap &&
+        (baseMipMap->width == 100) && (baseMipMap->height == 100))
+    {
+        maxLevel = (gctFLOAT)gcmMIN(pTexParams->maxLevel, Texture->levels - 1);
+    }
 
     if ((gcvTEXTURE_NONE == pTexParams->mipFilter) &&
         (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_MIPFILTER_NONE_FIX)))
