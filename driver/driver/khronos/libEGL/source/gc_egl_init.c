@@ -459,6 +459,7 @@ _FillIn(
                 config->conformant     &= ~EGL_OPENGL_BIT;
             }
             gcoOS_GetEnv(gcvNULL, "VIV_EGL_ALL_CONFIG", &allconfig);
+            allconfig = "1";
             if (!allconfig || openglcts)
             {
                 /* Only enable RGBA8888/D24S8 and RGB565/D0S0 for ES and GL CTS to reduce CTS running time */
