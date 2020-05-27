@@ -450,14 +450,24 @@ _FillIn(
         gcoHAL_GetPatchID(gcvNULL, &patchId);
         if (patchId == gcvPATCH_GTFES30)
         {
-            gctSTRING env;
-            gcoOS_GetEnv(gcvNULL, "VIV_EGL_ALL_CONFIG", &env);
-            gcoOS_GetEnv(gcvNULL, "VIV_EGL_OPENGL_CTS", &env);
-            if (!env)
+            gctSTRING openglcts, allconfig;
+            gcoOS_GetEnv(gcvNULL, "VIV_EGL_OPENGL_CTS", &openglcts);
+            if (!openglcts)
             {
                 /* Clear EGL_OPENGL_BIT if CTS run is not OpenGL CTS */
                 config->renderableType &= ~EGL_OPENGL_BIT;
                 config->conformant     &= ~EGL_OPENGL_BIT;
+            }
+            gcoOS_GetEnv(gcvNULL, "VIV_EGL_ALL_CONFIG", &allconfig);
+            if (!allconfig || openglcts)
+            {
+                /* Only enable RGBA8888/D24S8 and RGB565/D0S0 for ES and GL CTS to reduce CTS running time */
+                if (!((Color->formatFlags & VEGL_8888) == VEGL_8888 && config->depthSize == 24 && config->stencilSize == 8) &&
+                    !((Color->formatFlags & VEGL_565) == VEGL_565 && config->depthSize == 0 && config->stencilSize == 0))
+                {
+                    config->renderableType &= ~(EGL_OPENGL_ES2_BIT | EGL_OPENGL_ES3_BIT_KHR | EGL_OPENGL_BIT);
+                    config->conformant     &= ~(EGL_OPENGL_ES2_BIT | EGL_OPENGL_ES3_BIT_KHR | EGL_OPENGL_BIT);
+                }
             }
         }
     }
