@@ -33,9 +33,9 @@ else
 ifeq ($(gcdSTATIC_LINK), 1)
   TARGET_MODULE     := $(OBJ_DIR)/libGL.a
 else
-  TARGET_MODULE     := $(OBJ_DIR)/libGL.so.1.2
-  TARGET_SONAME     := libGL.so.1.2
-  TARGET_LINKS      :=
+  TARGET_MODULE     := $(OBJ_DIR)/libGL.so.1.2.0
+  TARGET_SONAME     := libGL.so.1
+  TARGET_LINKS      := libGL.so.1 libGL.so
 endif
 endif
 
@@ -205,8 +205,9 @@ install: all
 	@-cp $(TARGET_MODULE) $(INSTALL_DIR)
 	@mkdir -p $(SDK_DIR)/include/GL
 	@-cp -f $(AQROOT)/sdk/inc/GL/*.h $(SDK_DIR)/include/GL
-	-cd $(OBJ_DIR); ln -sf $(TARGET_SONAME) libGL.so; ln -sf $(TARGET_SONAME) libGL.so.1
-	cd $(SDK_DIR)/drivers; rm -f libGL.so libGL.so.1; ln -s $(TARGET_SONAME) libGL.so; ln -s $(TARGET_SONAME) libGL.so.1
+	@for lib in $(TARGET_LINKS); do \
+	    ln -sf $(notdir $(TARGET_MODULE)) $(INSTALL_DIR)/$$lib; \
+	done
 endif
 
 ################################################################################
