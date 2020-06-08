@@ -37,7 +37,7 @@ ifeq ($(STATIC),1)
     TARGET_NAME = libOpenCL.a
 else
     ifeq ($(BUILD_OPENCL_ICD),1)
-        TARGET_NAME     = libVivanteOpenCL.so
+        TARGET_NAME    := libVivanteOpenCL.so
     else
         TARGET_NAME    := libOpenCL.so.1.2
         TARGET_SONAME  := libOpenCL.so.1
