@@ -37,9 +37,11 @@ ifeq ($(STATIC),1)
     TARGET_NAME = libOpenCL.a
 else
     ifeq ($(BUILD_OPENCL_ICD),1)
-        TARGET_NAME = libVivanteOpenCL.so
+        TARGET_NAME     = libVivanteOpenCL.so
     else
-        TARGET_NAME = libOpenCL.so
+        TARGET_NAME    := libOpenCL.so.1.2
+        TARGET_SONAME  := libOpenCL.so.1
+        TARGET_LINKS   := libOpenCL.so.1 libOpenCL.so
     endif
 endif
 
@@ -96,9 +98,9 @@ LIBS += -L $(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR)
 endif
 LIBS += -L $(AQROOT)/compiler/libVSC/$(OBJ_DIR)
 ifeq ($(ENABLE_CL_GL),1)
-LIBS += -l GAL -lVSC -l GLESv2 -lm -lEGL -lCLC
+LIBS += -lGAL -lVSC -lCLC -lEGL -lGLESv2 -lm
 else
-LIBS += -l GAL -lVSC -lm -lCLC
+LIBS += -lGAL -lVSC -lCLC -lm
 endif
 
 ################################################################################
@@ -126,7 +128,11 @@ extra_install:
 	@mkdir -p $(SDK_DIR)/include/CL
 	@-cp -f $(AQROOT)/sdk/inc/CL/*.h $(SDK_DIR)/include/CL
 	@-cp -f $(AQROOT)/sdk/inc/CL/*.hpp $(SDK_DIR)/include/CL
-
+ifneq ($(BUILD_OPENCL_ICD),1)
+	@for lib in $(TARGET_LINKS); do \
+	    ln -sf $(notdir $(TARGET_NAME)) $(INSTALL_DIR)/$$lib; \
+	done
+endif
 ################################################################################
 # Dependencies.
 
