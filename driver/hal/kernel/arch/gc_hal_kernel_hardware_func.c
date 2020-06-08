@@ -4285,11 +4285,7 @@ _FuncInit_FlopReset(
 
     Execution->funcCmd = (gcsFUNCTION_COMMAND_PTR)pointer;
 
-#if !gcdCAPTURE_ONLY_MODE
     pool = gcvPOOL_DEFAULT;
-#else
-    pool = gcvPOOL_VIRTUAL;
-#endif
 
 #if gcdENABLE_CACHEABLE_COMMAND_BUFFER
     allocFlag = gcvALLOC_FLAG_CACHEABLE;
