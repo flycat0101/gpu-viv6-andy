@@ -1775,6 +1775,7 @@ VX_PRIVATE_API vx_bool vxoNNReorgLayer2_TP_Support(vx_node node, const vx_refere
     vx_tensor inputs = (vx_tensor)parameters[0];
     vx_scalar type_s = (vx_scalar)parameters[2];
     vx_tensor outputs = (vx_tensor)parameters[4];
+    vx_tensor pad = (vx_tensor)parameters[3];
     vx_enum type = type_s->value->e;
     vx_tp_cmd_type_e tp_cmd_type = TP_NONE;
 
@@ -1784,6 +1785,16 @@ VX_PRIVATE_API vx_bool vxoNNReorgLayer2_TP_Support(vx_node node, const vx_refere
 
     support = support && (vxnneIsTPSupportFormat(node->base.context, inputs, VX_NULL, outputs) &&
         !vxmIS_ERROR(_GetTPReorgCmdType(type, &tp_cmd_type)));
+
+    if (type == VX_REORG_BATCH_TO_SPACE_ND)
+    {
+        const vx_int32 left = (vx_int32)VX_GET_DATA_FROM_TENSOR(pad, 0);
+        const vx_int32 right = (vx_int32)VX_GET_DATA_FROM_TENSOR(pad, 1);
+
+        const vx_int32 top = (vx_int32)VX_GET_DATA_FROM_TENSOR(pad, 2);
+        const vx_int32 bottom = (vx_int32)VX_GET_DATA_FROM_TENSOR(pad, 3);
+        support = support && (left == 0) && (right == 0) && (top == 0) && (bottom == 0);
+    }
 
     support = support && IsTPSupport_CheckOutPixel(node->base.context, inputs, outputs);
 
