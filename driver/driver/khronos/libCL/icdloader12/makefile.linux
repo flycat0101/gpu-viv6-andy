@@ -12,7 +12,7 @@
 
 
 #
-# ICD Loader for OpenCL 1.1.
+# ICD Loader for OpenCL 1.2.
 #
 
 #############################################################################
@@ -36,16 +36,17 @@ endif
 ifeq ($(STATIC), 1)
     TARGET_NAME = libOpenCL.a
 else
-    TARGET_NAME = libOpenCL.so
+    TARGET_NAME    := libOpenCL.so.1.2
+    TARGET_SONAME  := libOpenCL.so.1
+    TARGET_LINKS   := libOpenCL.so.1 libOpenCL.so
 endif
 
 #############################################################################
 # Objects.
 
-OBJECTS			=	$(OBJ_DIR)/icd.o \
-					$(OBJ_DIR)/icd_dispatch.o \
-					$(OBJ_DIR)/icd_linux.o
-
+OBJECTS = $(OBJ_DIR)/icd.o \
+          $(OBJ_DIR)/icd_dispatch.o \
+          $(OBJ_DIR)/icd_linux.o
 
 ################################################################################
 # Add extra flags for object files.
@@ -77,7 +78,7 @@ LIBS += -ldl
 # Define the macros used in common makefile.
 
 # installation directory
-INSTALL_DIR	:= $(SDK_DIR)/drivers
+INSTALL_DIR := $(SDK_DIR)/drivers
 
 ################################################################################
 # Include the common makefile.
@@ -92,6 +93,9 @@ install: extra_install
 .PHONY: extra_install
 extra_install:
 	@mkdir -p $(SDK_DIR)/drivers
+	@for lib in $(TARGET_LINKS); do \
+	    ln -sf $(notdir $(TARGET_NAME)) $(INSTALL_DIR)/$$lib; \
+	done
 
 ################################################################################
 # Dependencies.

@@ -27,15 +27,15 @@ endif
 ifeq ($(gcdSTATIC_LINK),1)
   TARGET_MODULE     := $(OBJ_DIR)/libvulkan.a
 else
-  TARGET_MODULE     := $(OBJ_DIR)/libvulkan.so
+  TARGET_MODULE     := $(OBJ_DIR)/libvulkan.so.1.1.6
   TARGET_SONAME     := libvulkan.so.1
-  TARGET_LINKS      := libvulkan.so.1
+  TARGET_LINKS      := libvulkan.so.1 libvulkan.so
 endif
 
 ################################################################################
 # Installation directory.
 
-INSTALL_DIR         := $(SDK_DIR)/drivers
+INSTALL_DIR := $(SDK_DIR)/drivers
 
 
 OBJECTS := \
