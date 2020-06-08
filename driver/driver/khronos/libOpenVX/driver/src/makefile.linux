@@ -35,7 +35,9 @@ STATIC=1
 TARGET_NAME = libOpenVX.a
 else
 DYNAMIC = 1
-TARGET_NAME = libOpenVX.so
+TARGET_NAME := libOpenVX.so.${OPENVX_MAJOR_VERSION}.${OPENVX_SUB_VERSION}
+TARGET_SONAME := libOpenVX.so.${OPENVX_MAJOR_VERSION}
+TARGET_LINKS  := libOpenVX.so.${OPENVX_MAJOR_VERSION} libOpenVX.so
 endif
 
 #############################################################################
@@ -215,4 +217,9 @@ ifeq ($(USE_VXC_BINARY),0)
 	@-cp -rvf $(AQROOT)/driver/khronos/libOpenVX/libkernel/libovx12/ovx12_vxcKernels $(SDK_DIR)
 	@mkdir -p $(SDK_DIR)/nngpu_kernels
 	@-cp -rvf $(AQROOT)/driver/khronos/libOpenVX/libkernel/libnngpu/nngpu_kernels $(SDK_DIR)
+endif
+ifeq ($(gcdSTATIC_LINK), 0)
+	@for lib in $(TARGET_LINKS); do \
+	    ln -sf $(notdir $(TARGET_NAME)) $(INSTALL_DIR)/$$lib; \
+	done
 endif
