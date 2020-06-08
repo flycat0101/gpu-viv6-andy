@@ -12,7 +12,7 @@
 
 
 #
-# Driver part of OpenCL 1.1.
+# Driver part of OpenCL 1.2.
 #
 
 #############################################################################
@@ -46,21 +46,21 @@ endif
 #############################################################################
 # Objects.
 
-OBJECTS			=	$(OBJ_DIR)/gc_cl.o \
-                    $(OBJ_DIR)/gc_cl_log.o \
-					$(OBJ_DIR)/gc_cl_command.o \
-					$(OBJ_DIR)/gc_cl_context.o \
-					$(OBJ_DIR)/gc_cl_device.o \
-					$(OBJ_DIR)/gc_cl_enqueue.o \
-					$(OBJ_DIR)/gc_cl_event.o \
-					$(OBJ_DIR)/gc_cl_extension.o \
-					$(OBJ_DIR)/gc_cl_icd.o \
-					$(OBJ_DIR)/gc_cl_kernel.o \
-					$(OBJ_DIR)/gc_cl_mem.o \
-					$(OBJ_DIR)/gc_cl_platform.o \
-					$(OBJ_DIR)/gc_cl_program.o \
-					$(OBJ_DIR)/gc_cl_profiler.o \
-					$(OBJ_DIR)/gc_cl_sampler.o
+OBJECTS = $(OBJ_DIR)/gc_cl.o \
+          $(OBJ_DIR)/gc_cl_log.o \
+          $(OBJ_DIR)/gc_cl_command.o \
+          $(OBJ_DIR)/gc_cl_context.o \
+          $(OBJ_DIR)/gc_cl_device.o \
+          $(OBJ_DIR)/gc_cl_enqueue.o \
+          $(OBJ_DIR)/gc_cl_event.o \
+          $(OBJ_DIR)/gc_cl_extension.o \
+          $(OBJ_DIR)/gc_cl_icd.o \
+          $(OBJ_DIR)/gc_cl_kernel.o \
+          $(OBJ_DIR)/gc_cl_mem.o \
+          $(OBJ_DIR)/gc_cl_platform.o \
+          $(OBJ_DIR)/gc_cl_program.o \
+          $(OBJ_DIR)/gc_cl_profiler.o \
+          $(OBJ_DIR)/gc_cl_sampler.o
 
 ifeq ($(ENABLE_CL_GL),1)
     OBJECTS += $(OBJ_DIR)/gc_cl_gl.o
@@ -108,7 +108,7 @@ endif
 # Define the macros used in common makefile.
 
 # installation directory
-INSTALL_DIR	:= $(SDK_DIR)/drivers
+INSTALL_DIR := $(SDK_DIR)/drivers
 
 ################################################################################
 # Include the common makefile.
