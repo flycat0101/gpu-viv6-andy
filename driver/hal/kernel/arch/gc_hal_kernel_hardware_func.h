@@ -18,9 +18,9 @@
 extern "C" {
 #endif
 
-#define gcdFLOP_RESET           0
+#define gcdFLOP_RESET           1
 #define gcdFLOP_RESET_PPU       1
-#define gcdFLOP_RESET_NN        0
+#define gcdFLOP_RESET_NN        1
 #define gcdFLOP_RESET_TP        0
 
 /*

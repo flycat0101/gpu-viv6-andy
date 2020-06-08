@@ -4205,7 +4205,9 @@ _FuncValidate_FlopReset(
 {
     gceSTATUS status = gcvSTATUS_OK;
 
+#ifndef EMULATOR
     gckHARDWARE hardware = (gckHARDWARE)Execution->hardware;
+#endif
 
 #ifdef EMULATOR
     Execution->valid = gcvFALSE;
