@@ -35,7 +35,7 @@ ifeq ($(gcdSTATIC_LINK), 1)
 else
   TARGET_MODULE     := $(OBJ_DIR)/libGL.so.1.2.0
   TARGET_SONAME     := libGL.so.1
-  TARGET_LINKS      := libGL.so.1 libGL.so
+  TARGET_LINKS      := libGL.so.1 libGL.so libGL.so.1.2
 endif
 endif
 
