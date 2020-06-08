@@ -24,6 +24,7 @@ typedef struct VIR_SIMP_SIMPLIFICATION
     VIR_Function* currFunc;
     VIR_BASIC_BLOCK* currBB;
     VSC_OPTN_SIMPOptions* options;
+    gctBOOL bChanged;
     VIR_Dumper* dumper;
 } VSC_SIMP_Simplification;
 
@@ -35,6 +36,8 @@ typedef struct VIR_SIMP_SIMPLIFICATION
 #define VSC_SIMP_Simplification_SetCurrBB(simp, b)          ((simp)->currBB = (b))
 #define VSC_SIMP_Simplification_GetOptions(simp)            ((simp)->options)
 #define VSC_SIMP_Simplification_SetOptions(simp, o)         ((simp)->options = (o))
+#define VSC_SIMP_Simplification_GetChanged(simp)            ((simp)->bChanged)
+#define VSC_SIMP_Simplification_SetChanged(simp, o)         ((simp)->bChanged = (o))
 #define VSC_SIMP_Simplification_GetDumper(simp)             ((simp)->dumper)
 #define VSC_SIMP_Simplification_SetDumper(simp, d)          ((simp)->dumper = (d))
 
