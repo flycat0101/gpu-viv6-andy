@@ -301,7 +301,7 @@ _BitValue(
             gctUINT32 data_m = (*msb & ~((1 << length_m) - 1));
 
             data_l |= (Value << *Offset);
-            data_m |= (Value >> length_m);
+            data_m |= (Value >> (32 - *Offset));
 
             *lsb = data_l;
 
@@ -345,7 +345,7 @@ _GetVIPCoreInfo(
     /* Choose one supported format. */
     if (database->NNCoreCount_INT8 > 0)
     {
-        dataType = 0x2;
+        dataType = 0x0;
         coreCount = database->NNCoreCount_INT8;
     }
     else if (database->NNCoreCount_INT16 > 0)
@@ -466,6 +466,7 @@ _GetNNDataSize(
     switch (DataType)
     {
     case 0x2:
+    case 0x0:
         *DataSize = 1;
         break;
 
@@ -4238,6 +4239,13 @@ _ProgramNNKernel(
                         DataType == 0x7;
         gctBOOL fp16 = DataType == 0x1;
         gctUINT32 index = 0;
+
+        if (Hardware->identity.customerID == 0x9f)
+        {
+            rlt[0][0] = 3;
+            rlt[0][1] = 1;
+            rlt[0][3] = 1;
+        }
 
         gcmkONERROR(_GetMapIndex(DataType, &index));
 
