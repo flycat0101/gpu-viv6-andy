@@ -6818,7 +6818,33 @@ gcLINKTREE_Link(
                     if (!gcSHADER_IsHaltiCompiler(VertexTree->shader) &&
                         gcmOUTPUT_isInvariant(output) != gcmATTRIBUTE_isInvariant(attribute))
                     {
-                        return gcvSTATUS_VARYING_TYPE_MISMATCH;
+                        if (attribute->nameLength == gcSL_POINT_COORD)
+                        {
+                            if (gcmATTRIBUTE_isInvariant(attribute))
+                            {
+                                /* gl_PointCoord can only be declared invariant if and only if gl_PointSize is declared invariant */
+                                gctUINT l;
+                                gcOUTPUT output_pointSize = gcvNULL;
+                                for (l = 0; l < VertexTree->outputCount; ++l)
+                                {
+                                    if (VertexTree->shader->outputs[l]->nameLength == gcSL_POINT_SIZE)
+                                    {
+                                        output_pointSize = VertexTree->shader->outputs[l];
+                                        break;
+                                    }
+                                }
+                                if (!output_pointSize || !gcmOUTPUT_isInvariant(output_pointSize))
+                                    return gcvSTATUS_VARYING_TYPE_MISMATCH;
+                            }
+                        }
+                        else if (attribute->nameLength == gcSL_POSITION)
+                        {
+                            /* gl_FragCoord can only be declared invariant if and only if gl_Position is declared invariant */
+                            if (gcmATTRIBUTE_isInvariant(attribute) && !gcmOUTPUT_isInvariant(output))
+                                return gcvSTATUS_VARYING_TYPE_MISMATCH;
+                        }
+                        else
+                            return gcvSTATUS_VARYING_TYPE_MISMATCH;
                     }
 
                     /* Check the type name if needed. */
