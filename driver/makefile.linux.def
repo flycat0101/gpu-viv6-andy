@@ -112,6 +112,11 @@ ifeq ($(gcdSTATIC_LINK),1)
   GL_3_APPENDIX     ?= _es3
 endif
 
+ifeq ($(USE_OPENVX),1)
+   OPENVX_MAJOR_VERSION ?= 1
+   OPENVX_SUB_VERSION ?= 2
+endif
+
 ifneq ($(LINUX_OABI),1)
   ABI               ?= aapcs-linux
 endif
@@ -438,6 +443,10 @@ ifeq ($(USE_LOADTIME_OPT),1)
   CFLAGS            += -DGC_ENABLE_LOADTIME_OPT=1
 else
   CFLAGS            += -DGC_ENABLE_LOADTIME_OPT=0
+endif
+
+ifeq ($(USE_OPENVX),1)
+  CFLAGS            += -DVX_VERSION=VX_VERSION_${OPENVX_MAJOR_VERSION}_${OPENVX_SUB_VERSION}
 endif
 
 ifeq ($(USE_VXC_BINARY),1)
