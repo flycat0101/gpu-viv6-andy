@@ -4250,7 +4250,7 @@ _FuncInit_FlopReset(
 #endif
 
 #if gcdFLOP_RESET_NN
-    if (gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_NN_ENGINE))
+    if (gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_NN_ENGINE) && (hardware->identity.customerID == 0x9f))
     {
         doNN = gcvTRUE;
         Execution->funcCmdCount++;
@@ -4258,7 +4258,7 @@ _FuncInit_FlopReset(
 #endif
 
 #if gcdFLOP_RESET_TP
-    if (gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_TP_ENGINE))
+    if (gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_TP_ENGINE) && (hardware->identity.customerID == 0x9f))
     {
         doTP = gcvTRUE;
         Execution->funcCmdCount++;
