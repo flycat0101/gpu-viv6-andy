@@ -2836,10 +2836,10 @@ void _fill_TP_REORG_BATCH2SPACE_Command(
         info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + outXSize * outYSize * split_offsets[i] * outputElemSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = blockWidth;
         info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = inXSize;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = outXSize * outZSize * blockHeight;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = outXSize * blockHeight;
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = inYSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = outXSize * blockHeight;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = outXSize * outYSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = inZSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0;
         info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = outXSize * outYSize * outZSize;
