@@ -4214,9 +4214,10 @@ _FuncValidate_FlopReset(
 #else
     Execution->valid = gcvFALSE;
 
-    if (!gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_EVIS2_FLOP_RESET_FIX) ||
+    if (hardware->type == gcvHARDWARE_VIP &&
+        (!gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_EVIS2_FLOP_RESET_FIX) ||
         !gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_USC_EVICT_CTRL_FIFO_FLOP_RESET_FIX) ||
-        !gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_USC_ASYNC_CP_RTN_FLOP_RESET_FIX))
+        !gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_USC_ASYNC_CP_RTN_FLOP_RESET_FIX)))
     {
         Execution->valid = gcvTRUE;
     }
