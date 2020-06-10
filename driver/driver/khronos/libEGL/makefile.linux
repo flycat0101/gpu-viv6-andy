@@ -29,6 +29,9 @@ else
   TARGET_MODULE    := $(OBJ_DIR)/libEGL.so.1.5
   TARGET_SONAME    := libEGL.so.1
   TARGET_LINKS     := libEGL.so.1 libEGL.so
+ifeq ($(EGL_API_WL),1)
+  TARGET_LINKS     += libwayland-egl.so.1.0.0 libwayland-egl.so.1 libwayland-egl.so
+endif
 endif
 
 ################################################################################

@@ -639,6 +639,39 @@ OnError:
     return status;
 }
 
+static int
+Is_8DXBoard()
+{
+    char *p;
+    int ret = 0;
+    char* name = "i.MX8DX";
+    char* path = "/sys/devices/soc0/machine";
+    char buffer[64]={0};
+
+    FILE *fp = NULL;
+
+    fp = fopen(path, "r");
+
+    if(fp < 0)
+    {
+        return ret;
+    }
+
+    while(fgets(buffer, 64, fp) != NULL)
+    {
+        p = strstr(buffer, name);
+        if(p)
+        {
+            ret = 1;
+            break;
+        }
+        memset(buffer, 0, sizeof(buffer));
+    }
+    fclose(fp);
+
+    return ret;
+}
+
 static uint64_t
 gbm_viv_select_modifier(
     const uint64_t *modifiers,
@@ -673,6 +706,11 @@ gbm_viv_select_modifier(
     }
     p = getenv("GBM_SET_FORMAT_MOD_LINEAR");
     if (p && p[0] == '1')
+    {
+        return DRM_FORMAT_MOD_LINEAR;
+    }
+
+    if(Is_8DXBoard())
     {
         return DRM_FORMAT_MOD_LINEAR;
     }
