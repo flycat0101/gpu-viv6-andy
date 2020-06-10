@@ -362,7 +362,16 @@ vx_float32 Uint8toFp32(vx_uint8 val, vx_int32 zeroPoint, vx_float32 scale)
 {
     vx_float32 result = 0.0f;
 
-    result = (val - (vx_uint8)zeroPoint) * scale;
+    result = ((vx_int32)val - zeroPoint) * scale;
+
+    return result;
+}
+
+vx_float32 int8toFp32(vx_int8 val, vx_int32 zeroPoint, vx_float32 scale)
+{
+    vx_float32 result = 0.0f;
+
+    result = ((vx_int32)val - zeroPoint) * scale;
 
     return result;
 }
@@ -390,7 +399,7 @@ vx_uint8 Fp32toUint8(vx_float32 val, vx_int32 zeroPoint, vx_float32 scale, vx_in
     vx_uint8 result = 0;
     vx_int32 data;
 
-    data = (vx_int32) vxnneRound((val / scale + (vx_uint8)zeroPoint), roundMode);
+    data = (vx_int32) vxnneRound((val / scale + zeroPoint), roundMode);
 
     if (data > 255)
         data = 255;
@@ -402,6 +411,43 @@ vx_uint8 Fp32toUint8(vx_float32 val, vx_int32 zeroPoint, vx_float32 scale, vx_in
 
     return result;
 }
+
+vx_int8 Fp32toInt8_asym(vx_float32 val, vx_int32 zeroPoint, vx_float32 scale, vx_int32 roundMode)
+{
+    vx_int8 result = 0;
+    vx_int32 data;
+
+    data = (vx_int32) vxnneRound((val / scale + zeroPoint), roundMode);
+
+    if (data > 127)
+        data = 127;
+
+    if (data < -128)
+        data = -128;
+
+    result = (vx_int8)(data);
+
+    return result;
+}
+
+vx_uint8 Fp32toAInt8(vx_float32 val, vx_int32 zeroPoint, vx_float32 scale, vx_int32 roundMode)
+{
+    vx_int8 result = 0;
+    vx_int32 data;
+
+    data = (vx_int32) vxnneRound((val / scale + zeroPoint), roundMode);
+
+    if (data > 127)
+        data = 127;
+
+    if (data < -128)
+        data = -128;
+
+    result = (vx_int8)(data);
+
+    return result;
+}
+
 
 vx_int16 Fp32toInt16(vx_float32 val, vx_int8 fixedPointPos, vx_int32 roundMode)
 {

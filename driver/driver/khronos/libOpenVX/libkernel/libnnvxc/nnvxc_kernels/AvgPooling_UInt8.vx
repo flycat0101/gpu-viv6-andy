@@ -32,8 +32,8 @@ __kernel void vxcPooling_AvgUInt8toUInt8K6S1(
     VXC_ReadImage2DArray(img_val2, input,  coord_in, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
     VXC_ReadImage2DArray(img_val3, input,  coord_in, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
 
-    char inputZP;
-    _viv_asm(COPY, inputZP, input_ZP, 4);
+    vxc_short8 inputZP;
+    inputZP = (short)input_ZP;
     VXC_DP8x4(h0, img_val0, inputZP, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniAcc6DataSubZPLo_8x4);
     VXC_DP8x4(h0, img_val0, inputZP, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0), uniAcc6DataSubZPHi_8x4);
     VXC_ReadImage2DArray(img_val0, input,  coord_in, VXC_5BITOFFSET_XY(0, 4), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
@@ -97,8 +97,8 @@ __kernel void vxcPooling_AvgUInt8toUInt8K7S1(
     VXC_ReadImage2DArray(img_val2, input,  coord_in, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
     VXC_ReadImage2DArray(img_val3, input,  coord_in, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
 
-    char inputZP;
-    _viv_asm(COPY, inputZP, input_ZP, 4);
+    vxc_short8 inputZP;
+    inputZP = (short)input_ZP;
     VXC_DP8x4(h0, img_val0, inputZP, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniAcc7DataSubZPLo_8x4);
     VXC_DP8x4(h0, img_val0, inputZP, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0), uniAcc7DataSubZPHi_8x4);
     VXC_DP8x4(h1, img_val1, inputZP, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniAcc7DataSubZPLo_8x4);
@@ -193,8 +193,8 @@ __kernel void vxcPooling_generic_uint8
                 vxc_uchar16 vec;
                 VXC_ReadImage2DArray(vec, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
                 coord_in.x += 8;
-                vxc_uchar16 inputZP;
-                _viv_asm(COPY, inputZP, input_ZP, 4);
+                vxc_short8 inputZP;
+                inputZP = (short)input_ZP;
                 VXC_DP16x1(sum0, vec, inputZP, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0), uniAcc8BinUInt8_16x1);
                 sum += sum0;
             }
@@ -212,14 +212,14 @@ __kernel void vxcPooling_generic_uint8
             {
                 VXC_ReadImage2DArray(vec, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
                 coord_in.x += 8;
-                vxc_uchar16 inputZP;
-                _viv_asm(COPY, inputZP, input_ZP, 4);
+                vxc_short8 inputZP;
+                inputZP = (short)input_ZP;
                 VXC_DP16x1(sum0, vec, inputZP, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0), uniAcc8BinUInt8_16x1);
                 sum += sum0;
             }
             VXC_ReadImage2DArray(vec, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 6, 0, VXC_RM_TowardZero, 0));
-            vxc_uchar16 inputZP;
-            _viv_asm(COPY, inputZP, input_ZP, 4);
+            vxc_short8 inputZP;
+            inputZP = (short)input_ZP;
             VXC_DP16x1(sum0, vec, inputZP, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0), uniAccNBinUInt8_16x1);
             sum += sum0;
 
@@ -330,8 +330,8 @@ __kernel void vxcPooling_AvgUInt8toUInt8K3S1_Fast (
     VXC_ReadImage2DArray(lineC, input,  coord_in, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 9, 0, VXC_RM_TowardZero, 0));
     VXC_ReadImage2DArray(lineD, input,  coord_in, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(0, 9, 0, VXC_RM_TowardZero, 0));
 
-    vxc_uchar16 inputZP;
-    _viv_asm(COPY, inputZP, input_ZP, 16);
+    vxc_short8 inputZP;
+    inputZP = (short)input_ZP;
     VXC_DP4x8(sumA, lineA, inputZP, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uni8BAdd_SubNZP_k3s1_4x8);
     VXC_DP4x8(sumB, lineB, inputZP, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uni8BAdd_SubNZP_k3s1_4x8);
     VXC_DP4x8(sumC, lineC, inputZP, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uni8BAdd_SubNZP_k3s1_4x8);
@@ -390,8 +390,8 @@ __kernel void vxcPooling_AvgUInt8toUInt8K3S1 (
     VXC_ReadImage2DArray(lineC, input,  coord_in, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 9, 0, VXC_RM_TowardZero, 0));
     VXC_ReadImage2DArray(lineD, input,  coord_in, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(0, 9, 0, VXC_RM_TowardZero, 0));
 
-    vxc_uchar16 inputZP;
-    _viv_asm(COPY, inputZP, input_ZP, 16);
+    vxc_short8 inputZP;
+    inputZP = (short)input_ZP;
     VXC_DP4x8(sumA, lineA, inputZP, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uni8BAdd_SubNZP_k3s1_4x8);
     VXC_DP4x8(sumB, lineB, inputZP, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uni8BAdd_SubNZP_k3s1_4x8);
     VXC_DP4x8(sumC, lineC, inputZP, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uni8BAdd_SubNZP_k3s1_4x8);

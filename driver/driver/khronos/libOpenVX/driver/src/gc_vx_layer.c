@@ -8913,19 +8913,21 @@ vxnne_shader_executable vxnneGetAvgPooling_UInt8ShaderExecutable(
             0x76543210, 0x00000000, // ABin
             0xaaaaaaaa, // BSelt
             0x00000000, 0x00000000, // BBin
-            0x00004400, // AccumType, ConstantType, and PostShift
+            0x00000700, // AccumType, ConstantType, and PostShift
             0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001 // Constant
         };
 
-        vx_uint32 uniUInt8Config[8] = {0x00000000, 0x00020001, 0x000a0005 ,0x002a0015, 0x00aa0055, 0x02aa0155, 0x0aaa0555, 0x2aaa1555};
-
+        vx_uint32 uniUInt8Config1[8] = {0x00000000, 0x00020001, 0x000a0005 ,0x002a0015, 0x00aa0055, 0x02aa0155, 0x0aaa0555, 0x2aaa1555};
+        vx_uint32 uniUInt8Config2[8] = {0x00000000, 0x00010000, 0x00050000 ,0x00150000, 0x00550000, 0x01550000, 0x05550000, 0x15550000};
+        vx_uint32 uniUInt8Config3[8] = {0x00000000, 0x00000000, 0x00000010 ,0x00000210, 0x00003210, 0x00043210, 0x00543210, 0x06543210};
+        vx_uint32 uniUInt8Config4[8] = {0x00000000, 0x00020002, 0x000a000a ,0x002a002a, 0x00aa00aa, 0x02aa02aa, 0x0aaa0aaa, 0x2aaa2aaa};
         vx_uint32 uniAccNBinUInt8_16x1[16] = {
             0xaaaa5555, // TCfg
             0x55550000, // ASelt
             0x76543210, 0x00000000, // ABin
             0xaaaaaaaa, // BSelt
             0x00000000, 0x00000000, // BBin
-            0x00004400, // AccumType, ConstantType, and PostShift
+            0x00000700, // AccumType, ConstantType, and PostShift
             0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001 // Constant
         };
 
@@ -8934,8 +8936,10 @@ vxnne_shader_executable vxnneGetAvgPooling_UInt8ShaderExecutable(
         minData = (vx_uint32)minVal;
         maxData = (vx_uint32)maxVal;
 
-        uniAccNBinUInt8_16x1[0] = uniUInt8Config[x_len_remain];
-
+        uniAccNBinUInt8_16x1[0] = uniUInt8Config1[x_len_remain];
+        uniAccNBinUInt8_16x1[1] = uniUInt8Config2[x_len_remain];
+        uniAccNBinUInt8_16x1[2] = uniUInt8Config3[x_len_remain];
+        uniAccNBinUInt8_16x1[4] = uniUInt8Config4[x_len_remain];
         execution_parameters.globalWorkScale[0]  = 1;
         execution_parameters.globalWorkScale[1]  = 1;
         execution_parameters.globalWorkScale[2]  = 1;
