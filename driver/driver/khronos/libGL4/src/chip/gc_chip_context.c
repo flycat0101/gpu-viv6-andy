@@ -503,11 +503,8 @@ gcChipInitExtension(
     __glExtension[__GL_EXTID_OES_vertex_array_object].bEnabled = enableOESExtension;
     __glExtension[__GL_EXTID_OES_required_internalformat].bEnabled = enableOESExtension;
     __glExtension[__GL_EXTID_OES_surfaceless_context].bEnabled = enableOESExtension;
-
-#if defined(ANDROID) || defined(__QNXNTO__)
     __glExtension[__GL_EXTID_OES_EGL_image_external].bEnabled = enableOESExtension;
     __glExtension[__GL_EXTID_OES_EGL_image_external_essl3].bEnabled = enableOESExtension;
-#endif
 
     if (chipCtx->chipFeature.hwFeature.hasTxBorderClamp)
     {
