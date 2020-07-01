@@ -271,87 +271,96 @@ static gctINT _CalcHashValue(VSC_HASH_TABLE* pHT, void* pHashKey)
 gctBOOL vscHTBL_TestAndGet(VSC_HASH_TABLE* pHT, void* pHashKey, VSC_HASH_NODE** ppNode)
 {
     gctINT              hashVal;
-    VSC_HASH_NODE_LIST* pList;
-    VSC_HASH_NODE*      pHashNode;
+    VSC_HASH_NODE_LIST* pList = gcvNULL;
+    VSC_HASH_NODE*      pHashNode = gcvNULL;
     gctINT              searchTimes = 0;
+    gctBOOL             bEmptyTable = (HTBL_GET_ITEM_COUNT(pHT) == 0);
 
-    /* Get hash value */
-    hashVal = _CalcHashValue(pHT, pHashKey);
-
-    /* Find in corresponding list */
-    pList = &(pHT->pTable[hashVal]);
-    for (pHashNode = HNLST_GET_FIRST_HASH_NODE(pList);
-         pHashNode != NULL;
-         pHashNode = HND_GET_NEXT_HASH_NODE(pHashNode))
+    if (!bEmptyTable)
     {
-        if (pHT->searchTime != gcvNULL)
+        /* Get hash value */
+        hashVal = _CalcHashValue(pHT, pHashKey);
+
+        /* Find in corresponding list */
+        pList = &(pHT->pTable[hashVal]);
+        for (pHashNode = HNLST_GET_FIRST_HASH_NODE(pList);
+             pHashNode != NULL;
+             pHashNode = HND_GET_NEXT_HASH_NODE(pHashNode))
         {
-            searchTimes ++;
-            pHT->searchTime->searchTotal ++;
-        }
-        if (pHT->pfnKeyCmp(vscHND_GetHashKey(pHashNode), pHashKey))
-        {
-            /* Yes, found it */
-            if (ppNode)
+            if (pHT->searchTime != gcvNULL)
             {
-                *ppNode = pHashNode;
-                if (pHT->searchTime != gcvNULL)
+                searchTimes ++;
+                pHT->searchTime->searchTotal ++;
+            }
+            if (pHT->pfnKeyCmp(vscHND_GetHashKey(pHashNode), pHashKey))
+            {
+                /* Yes, found it */
+                if (ppNode)
                 {
-                    pHT->searchTime->searchSucceed ++;
-                    if (searchTimes < HTBL_MAX_SEARCH_TIMES(pHT))
+                    *ppNode = pHashNode;
+                    if (pHT->searchTime != gcvNULL)
                     {
-                        pHT->searchTime->searchTimesArray[searchTimes] ++ ;
-                        if (pHT->searchTime->searchTimesArray[searchTimes] > pHT->searchTime->searchMostCount)
+                        pHT->searchTime->searchSucceed ++;
+                        if (searchTimes < HTBL_MAX_SEARCH_TIMES(pHT))
                         {
-                            pHT->searchTime->searchMostCount = pHT->searchTime->searchTimesArray[searchTimes];
-                            pHT->searchTime->searchMostTimes = searchTimes;
+                            pHT->searchTime->searchTimesArray[searchTimes] ++ ;
+                            if (pHT->searchTime->searchTimesArray[searchTimes] > pHT->searchTime->searchMostCount)
+                            {
+                                pHT->searchTime->searchMostCount = pHT->searchTime->searchTimesArray[searchTimes];
+                                pHT->searchTime->searchMostTimes = searchTimes;
+                            }
                         }
-                    }
-                    else
-                    {
-                        pHT->searchTime->searchTimesArray[HTBL_MAX_SEARCH_TIMES(pHT)] ++ ;
-                        if (pHT->searchTime->searchTimesArray[HTBL_MAX_SEARCH_TIMES(pHT)] > pHT->searchTime->searchMostCount)
+                        else
                         {
-                            pHT->searchTime->searchMostCount = pHT->searchTime->searchTimesArray[HTBL_MAX_SEARCH_TIMES(pHT)];
-                            pHT->searchTime->searchMostTimes = searchTimes;
+                            pHT->searchTime->searchTimesArray[HTBL_MAX_SEARCH_TIMES(pHT)] ++ ;
+                            if (pHT->searchTime->searchTimesArray[HTBL_MAX_SEARCH_TIMES(pHT)] > pHT->searchTime->searchMostCount)
+                            {
+                                pHT->searchTime->searchMostCount = pHT->searchTime->searchTimesArray[HTBL_MAX_SEARCH_TIMES(pHT)];
+                                pHT->searchTime->searchMostTimes = searchTimes;
+                            }
                         }
                     }
                 }
-            }
 
-            return gcvTRUE;
+                return gcvTRUE;
+            }
         }
     }
 
     /* Not found */
     if (ppNode)
     {
-        if (pHT->searchTime != gcvNULL)
+        /* Record the search time. */
+        if (!bEmptyTable)
         {
-            if (HNLST_GET_FIRST_HASH_NODE(pList) != NULL)
+            if (pHT->searchTime != gcvNULL)
             {
-                pHT->searchTime->searchFailed ++;
-            }
-
-            if (searchTimes < HTBL_MAX_SEARCH_TIMES(pHT))
-            {
-                pHT->searchTime->searchTimesArray[searchTimes] ++ ;
-                if((searchTimes > 0) && (pHT->searchTime->searchTimesArray[searchTimes] >= pHT->searchTime->searchMostCount))
+                if (HNLST_GET_FIRST_HASH_NODE(pList) != NULL)
                 {
-                    pHT->searchTime->searchMostCount = pHT->searchTime->searchTimesArray[searchTimes];
-                    pHT->searchTime->searchMostTimes = searchTimes;
+                    pHT->searchTime->searchFailed ++;
                 }
-            }
-            else
-            {
-                pHT->searchTime->searchTimesArray[HTBL_MAX_SEARCH_TIMES(pHT)] ++ ;
-                if ((searchTimes > 0) && (pHT->searchTime->searchTimesArray[HTBL_MAX_SEARCH_TIMES(pHT)] >= pHT->searchTime->searchMostCount))
+
+                if (searchTimes < HTBL_MAX_SEARCH_TIMES(pHT))
                 {
-                    pHT->searchTime->searchMostCount = pHT->searchTime->searchTimesArray[HTBL_MAX_SEARCH_TIMES(pHT)];
-                    pHT->searchTime->searchMostTimes = searchTimes;
+                    pHT->searchTime->searchTimesArray[searchTimes] ++ ;
+                    if((searchTimes > 0) && (pHT->searchTime->searchTimesArray[searchTimes] >= pHT->searchTime->searchMostCount))
+                    {
+                        pHT->searchTime->searchMostCount = pHT->searchTime->searchTimesArray[searchTimes];
+                        pHT->searchTime->searchMostTimes = searchTimes;
+                    }
+                }
+                else
+                {
+                    pHT->searchTime->searchTimesArray[HTBL_MAX_SEARCH_TIMES(pHT)] ++ ;
+                    if ((searchTimes > 0) && (pHT->searchTime->searchTimesArray[HTBL_MAX_SEARCH_TIMES(pHT)] >= pHT->searchTime->searchMostCount))
+                    {
+                        pHT->searchTime->searchMostCount = pHT->searchTime->searchTimesArray[HTBL_MAX_SEARCH_TIMES(pHT)];
+                        pHT->searchTime->searchMostTimes = searchTimes;
+                    }
                 }
             }
         }
+
         *ppNode = NULL;
     }
 
@@ -395,7 +404,7 @@ VSC_HASH_NODE* vscHTBL_Get(VSC_HASH_TABLE* pHT, void* pHashKey)
 VSC_HASH_NODE* vscHTBL_Set(VSC_HASH_TABLE* pHT, void* pHashKey, VSC_HASH_NODE* pNode)
 {
     gctINT              hashVal;
-    VSC_HASH_NODE_LIST* pList;
+    VSC_HASH_NODE_LIST* pList = gcvNULL;
     VSC_HASH_NODE*      pHashNode = gcvNULL;
 
     gcmASSERT(pHashKey == vscHND_GetHashKey(pNode));
@@ -419,24 +428,28 @@ VSC_HASH_NODE* vscHTBL_Set(VSC_HASH_TABLE* pHT, void* pHashKey, VSC_HASH_NODE* p
 VSC_HASH_NODE* vscHTBL_Remove(VSC_HASH_TABLE* pHT, void* pHashKey)
 {
     gctINT              hashVal;
-    VSC_HASH_NODE_LIST* pList;
-    VSC_HASH_NODE*      pHashNode;
+    VSC_HASH_NODE_LIST* pList = gcvNULL;
+    VSC_HASH_NODE*      pHashNode = gcvNULL;
+    gctBOOL             bEmptyTable = (HTBL_GET_ITEM_COUNT(pHT) == 0);
 
-    /* Get hash value */
-    hashVal = _CalcHashValue(pHT, pHashKey);
-
-    /* Find in corresponding list */
-    pList = &(pHT->pTable[hashVal]);
-    for (pHashNode = HNLST_GET_FIRST_HASH_NODE(pList);
-         pHashNode != NULL;
-         pHashNode = HND_GET_NEXT_HASH_NODE(pHashNode))
+    if (!bEmptyTable)
     {
-        if (pHT->pfnKeyCmp(vscHND_GetHashKey(pHashNode), pHashKey))
+        /* Get hash value */
+        hashVal = _CalcHashValue(pHT, pHashKey);
+
+        /* Find in corresponding list */
+        pList = &(pHT->pTable[hashVal]);
+        for (pHashNode = HNLST_GET_FIRST_HASH_NODE(pList);
+             pHashNode != NULL;
+             pHashNode = HND_GET_NEXT_HASH_NODE(pHashNode))
         {
-            /* Yes, found it, so remove it from list */
-            HNLST_REMOVE_HASH_NODE(pList, pHashNode);
-            pHT->itemCount --;
-            return pHashNode;
+            if (pHT->pfnKeyCmp(vscHND_GetHashKey(pHashNode), pHashKey))
+            {
+                /* Yes, found it, so remove it from list */
+                HNLST_REMOVE_HASH_NODE(pList, pHashNode);
+                pHT->itemCount --;
+                return pHashNode;
+            }
         }
     }
 

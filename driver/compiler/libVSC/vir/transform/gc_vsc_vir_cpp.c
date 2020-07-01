@@ -65,15 +65,46 @@ static void VSC_CPP_Init(
     VSC_CPP_SetMM(cpp, pMM);
     VSC_CPP_SetHWCFG(cpp, pHwCfg);
     VSC_CPP_SetInvalidCfg(cpp, gcvFALSE);
+
+    memset(&cpp->checkRedefinedResInfo, 0, sizeof(VSC_CHECK_REDEFINED_RES));
+    cpp->checkRedefinedResInfo.pMM = pMM;
 }
 
 static void VSC_CPP_Final(
     IN OUT VSC_CPP_CopyPropagation  *cpp
     )
 {
+    VSC_CHECK_REDEFINED_RES checkRedefinedResInfo = cpp->checkRedefinedResInfo;
+
     VSC_CPP_SetShader(cpp, gcvNULL);
     VSC_CPP_SetOptions(cpp, gcvNULL);
     VSC_CPP_SetDumper(cpp, gcvNULL);
+
+    /* Free the resource for the redefined instruction. */
+    if (checkRedefinedResInfo.pInstHashTable != gcvNULL)
+    {
+        vscHTBL_Destroy(checkRedefinedResInfo.pInstHashTable);
+    }
+
+    if (checkRedefinedResInfo.pBBHashTable != gcvNULL)
+    {
+        vscHTBL_Destroy(checkRedefinedResInfo.pBBHashTable);
+    }
+
+    if (checkRedefinedResInfo.pBBFlowMask != gcvNULL)
+    {
+        vscBV_Destroy(checkRedefinedResInfo.pBBFlowMask);
+    }
+
+    if (checkRedefinedResInfo.pBBCheckStatusMask != gcvNULL)
+    {
+        vscBV_Destroy(checkRedefinedResInfo.pBBCheckStatusMask);
+    }
+
+    if (checkRedefinedResInfo.pBBCheckValueMask != gcvNULL)
+    {
+        vscBV_Destroy(checkRedefinedResInfo.pBBCheckValueMask);
+    }
 }
 
 /*
@@ -1083,7 +1114,7 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                                   VIR_Symbol_isImage(VIR_Operand_GetSymbol(movSrc)) ||
                                   VIR_Symbol_isImageT(VIR_Operand_GetSymbol(movSrc)))
                                 &&
-                                vscVIR_RedefineBetweenInsts(VSC_CPP_GetMM(cpp), VSC_CPP_GetDUInfo(cpp),
+                                vscVIR_RedefineBetweenInsts(&cpp->checkRedefinedResInfo, VSC_CPP_GetDUInfo(cpp),
                                     defInst, inst, movSrc, &redefInst))
                             {
                                 if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))

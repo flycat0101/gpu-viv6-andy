@@ -326,6 +326,11 @@ gceSTATUS vscFinalizePEP(PROGRAM_EXECUTABLE_PROFILE* pPEP)
                                     pUtbHwMapping->u.s.ppExtraSamplerArray = gcvNULL;
                                 }
                             }
+
+                            if (pUtbHwMapping->u.s.hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR)
+                            {
+                                gcmOS_SAFE_FREE(gcvNULL, pUtbHwMapping->u.s.hwLoc.pHwDirectAddrBase);
+                            }
                         }
 
                         if (pPEP->u.vk.pResourceSets[i].uniformTexBufTable.pUtbEntries[j].pResOpBits)

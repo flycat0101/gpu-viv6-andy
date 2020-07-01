@@ -5115,7 +5115,7 @@ static gctBOOL _vscVIR_DefBBInBetween(
 
 static gctBOOL
 _IsRedefineBetweenInsts(
-    IN VSC_MM                   *pMM,
+    IN VSC_CHECK_REDEFINED_RES  *pResInfo,
     IN VIR_DEF_USAGE_INFO       *duInfo,
     IN VIR_Instruction          *startInst,
     IN VIR_Instruction          *endInst,
@@ -5125,9 +5125,11 @@ _IsRedefineBetweenInsts(
     OUT VIR_Instruction         **redefInst
     )
 {
+    VSC_MM          *pMM = pResInfo->pMM;
     gctBOOL         retValue = gcvFALSE;
     VIR_Instruction *pDefInst = gcvNULL;
-    VSC_HASH_TABLE  *visitSet = gcvNULL;
+    VSC_HASH_TABLE  *pInstHashTable = pResInfo->pInstHashTable;
+    VSC_HASH_TABLE  *pBBHashTable = pResInfo->pBBHashTable;
 
     VIR_OperandInfo srcInfo;
     VIR_Enable      enableMask = VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(srcOpndOfStartInst));
@@ -5146,7 +5148,19 @@ _IsRedefineBetweenInsts(
     firstRegNo = srcInfo.u1.virRegInfo.virReg;
     regNoRange = srcInfo.u1.virRegInfo.virRegCount;
 
-    visitSet = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 512);
+    /* Get instruction hash table. */
+    if (pInstHashTable == gcvNULL)
+    {
+        pInstHashTable = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 512);
+        pResInfo->pInstHashTable = pInstHashTable;
+    }
+
+    /* Get the BB hash table. */
+    if (pBBHashTable == gcvNULL)
+    {
+        pBBHashTable = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 512);
+        pResInfo->pBBHashTable = pBBHashTable;
+    }
 
     /* find all defs of the same firstRegNo*/
     for (regNo = firstRegNo; regNo < firstRegNo + regNoRange; regNo ++)
@@ -5188,6 +5202,15 @@ _IsRedefineBetweenInsts(
                         continue;
                     }
                 }
+
+                /* If this DEF instruction is checked before, just skip it. */
+                if (vscHTBL_DirectTestAndGet(pInstHashTable, (void*)pDefInst, gcvNULL))
+                {
+                    defIdx = pDef->nextDefIdxOfSameRegNo;
+                    continue;
+                }
+
+                vscHTBL_DirectSet(pInstHashTable, (void*)pDefInst, gcvNULL);
 
                 /* Get a refined match. */
                 if (pDefInst == endInst || pDefInst == startInst)
@@ -5248,10 +5271,10 @@ _IsRedefineBetweenInsts(
                     }
                 }
 
-                vscHTBL_Reset(visitSet);
+                vscHTBL_Reset(pBBHashTable);
                 /* If any of the instructions in the workSet, that is between
                     endInst and startInst, return gcvTURE.*/
-                if (_vscVIR_DefInstInBetween(startInst, endInst, pDef->defKey.pDefInst, visitSet))
+                if (_vscVIR_DefInstInBetween(startInst, endInst, pDef->defKey.pDefInst, pBBHashTable))
                 {
                     retValue = gcvTRUE;
                     *redefInst = pDefInst;
@@ -5268,31 +5291,57 @@ _IsRedefineBetweenInsts(
                         VIR_BB* pReDefBB = VIR_Inst_GetBasicBlock(pDefInst);
                         gctBOOL meetReDefBB = gcvFALSE;
                         gctUINT bbCount;
-                        VSC_BIT_VECTOR bbFlowMask;
-                        VSC_BIT_VECTOR bbCheckStatusMask;
-                        VSC_BIT_VECTOR bbCheckValueMask;
+                        VSC_BIT_VECTOR* pBBFlowMask = pResInfo->pBBFlowMask;
+                        VSC_BIT_VECTOR* pBBCheckStatusMask = pResInfo->pBBCheckStatusMask;
+                        VSC_BIT_VECTOR* pBBCheckValueMask = pResInfo->pBBCheckValueMask;
 
                         bbCount = CG_GET_HIST_GLOBAL_BB_COUNT(VIR_Function_GetFuncBlock(VIR_Inst_GetFunction(startInst))->pOwnerCG);
-                        vscBV_Initialize(&bbFlowMask, pMM, bbCount);
-                        vscBV_Initialize(&bbCheckStatusMask, pMM, bbCount);
-                        vscBV_Initialize(&bbCheckValueMask, pMM, bbCount);
+
+                        /* Create or resize the BB flow mask. */
+                        if (pBBFlowMask == gcvNULL)
+                        {
+                            pBBFlowMask = vscBV_Create(pMM, bbCount);
+                            pResInfo->pBBFlowMask = pBBFlowMask;
+                        }
+                        else
+                        {
+                            vscBV_Resize(pBBFlowMask, bbCount, gcvFALSE);
+                        }
+
+                        /* Create or resize the BB check status mask. */
+                        if (pBBCheckStatusMask == gcvNULL)
+                        {
+                            pBBCheckStatusMask = vscBV_Create(pMM, bbCount);
+                            pResInfo->pBBCheckStatusMask = pBBCheckStatusMask;
+                        }
+                        else
+                        {
+                            vscBV_Resize(pBBCheckStatusMask, bbCount, gcvFALSE);
+                        }
+
+                        /* Create or resize the BB check value mask. */
+                        if (pBBCheckValueMask == gcvNULL)
+                        {
+                            pBBCheckValueMask = vscBV_Create(pMM, bbCount);
+                            pResInfo->pBBCheckValueMask = pBBCheckValueMask;
+                        }
+                        else
+                        {
+                            vscBV_Resize(pBBCheckValueMask, bbCount, gcvFALSE);
+                        }
 
                         if (_vscVIR_DefBBInBetween(pStartBB,
                                                    pEndBB,
                                                    pReDefBB,
-                                                   &bbFlowMask,
-                                                   &bbCheckStatusMask,
-                                                   &bbCheckValueMask,
+                                                   pBBFlowMask,
+                                                   pBBCheckStatusMask,
+                                                   pBBCheckValueMask,
                                                    &meetReDefBB))
                         {
                             retValue = gcvTRUE;
                             *redefInst = pDefInst;
                             break;
                         }
-
-                        vscBV_Finalize(&bbFlowMask);
-                        vscBV_Finalize(&bbCheckStatusMask);
-                        vscBV_Finalize(&bbCheckValueMask);
                     }
                 }
 
@@ -5307,7 +5356,8 @@ _IsRedefineBetweenInsts(
         }
     }
 
-    vscHTBL_Destroy(visitSet);
+    vscHTBL_Reset(pInstHashTable);
+    vscHTBL_Reset(pBBHashTable);
 
     return retValue;
 }
@@ -5354,7 +5404,7 @@ _IsRedefineBetweenInsts(
 
 */
 gctBOOL vscVIR_RedefineBetweenInsts(
-    IN VSC_MM                   *pMM,
+    IN VSC_CHECK_REDEFINED_RES  *pResInfo,
     IN VIR_DEF_USAGE_INFO       *duInfo,
     IN VIR_Instruction          *startInst,
     IN VIR_Instruction          *endInst,
@@ -5382,7 +5432,7 @@ gctBOOL vscVIR_RedefineBetweenInsts(
     */
     if (bIsStartEndInSameBB)
     {
-        retValue = _IsRedefineBetweenInsts(pMM, duInfo, startInst, endInst, srcOpndOfStartInst, gcvTRUE, gcvFALSE, redefInst);
+        retValue = _IsRedefineBetweenInsts(pResInfo, duInfo, startInst, endInst, srcOpndOfStartInst, gcvTRUE, gcvFALSE, redefInst);
 
         if (retValue)
         {
@@ -5395,7 +5445,7 @@ gctBOOL vscVIR_RedefineBetweenInsts(
     }
     else
     {
-        retValue = _IsRedefineBetweenInsts(pMM, duInfo, startInst, endInst, srcOpndOfStartInst, gcvFALSE, gcvFALSE, redefInst);
+        retValue = _IsRedefineBetweenInsts(pResInfo, duInfo, startInst, endInst, srcOpndOfStartInst, gcvFALSE, gcvFALSE, redefInst);
         return retValue;
     }
 }
