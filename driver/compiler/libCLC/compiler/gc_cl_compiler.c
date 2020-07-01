@@ -4715,7 +4715,7 @@ IN gctUINT mask
         {
             die->u.variable.type.array.length[i] = Variable->decl.array.length[i];
         }
-        if (clmDECL_IsPointerType(&(Variable->decl)))
+        if (clmDECL_IsPointerType(&(Variable->decl)) || clmDECL_IsPointerArray(&(Variable->decl)))
             die->u.variable.type.isPointer = gcvTRUE;
     }
 }

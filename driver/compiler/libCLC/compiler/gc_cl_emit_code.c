@@ -3778,7 +3778,10 @@ IN gctSIZE_T Length,
 IN clsARRAY *Array,
 IN gctBOOL   IsArray,
 IN gctREG_INDEX TempRegIndex,
-OUT gcVARIABLE *Variable
+OUT gcVARIABLE *Variable,
+IN gctINT16 parent,
+IN gctINT16 prevSibling,
+OUT gctINT16* ThisVarIndex
 )
 {
     gceSTATUS status;
@@ -3842,9 +3845,11 @@ OUT gcVARIABLE *Variable
                                     gcSHADER_VAR_CATEGORY_NORMAL,
                                     gcSHADER_PRECISION_DEFAULT,
                                     0,
-                                    -1,
-                                    -1,
+                                    parent,
+                                    prevSibling,
                                     (gctINT16*)&varIndex);
+    if(ThisVarIndex != gcvNULL)
+        *ThisVarIndex = varIndex;
     if (gcmIS_ERROR(status)) {
         cloCOMPILER_Report(Compiler,
                            LineNo,
@@ -3876,6 +3881,72 @@ OUT gcVARIABLE *Variable
                       clvDUMP_CODE_EMITTER,
                       "</VARIABLE>"));
     return gcvSTATUS_OK;
+}
+
+gceSTATUS
+clNewStructIntermediateElementSymbol(
+IN cloCOMPILER Compiler,
+IN gctCONST_STRING Name,
+IN clsGEN_CODE_DATA_TYPE DataType,
+IN gctSIZE_T Length,
+IN clsARRAY *Array,
+IN gctBOOL   IsArray,
+IN gctREG_INDEX TempRegIndex,
+IN gcSHADER_VAR_CATEGORY varCategory,
+IN gctUINT16 numStructureElement,
+IN gctINT16 parent,
+IN gctINT16 prevSibling,
+OUT gctINT16* ThisVarIndex
+)
+{
+    gceSTATUS status;
+    gcsTYPE_SIZE typeSize;
+    gcSHADER_TYPE type;
+    clsARRAY     array;
+    gcSHADER     binary;
+    gctUINT16     varIndex;
+    gctINT       length;
+
+    typeSize = clConvToShaderDataType(Compiler, DataType);
+    type = typeSize.type;
+    length = Length * typeSize.length;
+
+    gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
+    if (IsArray)
+    {
+        if(Array) {
+            array = *Array;
+            if(typeSize.length > 1) {
+                array.length[Array->numDim] = typeSize.length;
+                array.numDim = Array->numDim + 1;
+            }
+        }
+        else {
+            array.numDim = 1;
+            array.length[0] = length;
+        }
+    }
+    else
+    {
+        array.numDim = -1;
+        array.length[0] = length;
+    }
+
+    status = gcSHADER_AddVariableEx(binary,
+                                    Name,
+                                    type,
+                                    array.numDim,
+                                    (gctINT *)array.length,
+                                    TempRegIndex,
+                                    varCategory,
+                                    gcSHADER_PRECISION_DEFAULT,
+                                    numStructureElement,
+                                    parent,
+                                    prevSibling,
+                                    (gctINT16*)&varIndex);
+    if(ThisVarIndex != gcvNULL)
+        *ThisVarIndex = varIndex;
+    return status;
 }
 
 gceSTATUS
