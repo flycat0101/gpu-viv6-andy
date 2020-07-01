@@ -745,8 +745,8 @@ static VSC_ErrCode _CompileShaderAtMedLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
     /* Call (schedule) passes of ML by ourselves */
     CALL_SH_PASS(vscVIR_CheckVariableUsage, 0, &checkVarUsage);
 
-    /* Fix the texld offset */
-    CALL_SH_PASS(vscVIR_FixTexldOffset, 0, gcvNULL);
+    /* Fix texld and imageLoad coordinate with offset */
+    CALL_SH_PASS(vscVIR_FixCoordWithOffset, 0, gcvNULL);
 
     /* Convert atom* instruction to extcall atom* if
      * pHwCfg->hwFeatureFlags.supportUSC && !pHwCfg->hwFeatureFlags.hasUSCAtomicFix2

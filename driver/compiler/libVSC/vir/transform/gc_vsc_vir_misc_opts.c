@@ -9464,12 +9464,130 @@ OnError:
     return errCode;
 }
 
-DEF_QUERY_PASS_PROP(vscVIR_FixTexldOffset)
+static VSC_ErrCode
+_CalculateImageOffsetCoord(
+    IN      VIR_Shader       *pShader,
+    IN      VSC_HW_CONFIG    *HwCfg,
+    IN      VIR_Function     *pFunc,
+    IN      VIR_Instruction  *pInst
+    )
+{
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    VIR_Operand                 *pOperand = VIR_Inst_GetSource(pInst, 1);
+    VIR_ParmPassing             *opndParm = VIR_Operand_GetParameters(pOperand);
+    VIR_Operand                 *pCoordOpnd = opndParm->args[1];
+    VIR_Operand                 *pTexldOperand = opndParm->args[2];
+    VIR_Operand                 *pOffsetOpnd = VIR_Operand_GetTexldOffset(pTexldOperand);
+    VIR_TypeId                  coordTypeId = VIR_Operand_GetTypeId(pCoordOpnd);
+    VIR_TypeId                  offsetTypeId = VIR_Operand_GetTypeId(pOffsetOpnd);
+    VIR_SymId                   newCoordSymId = VIR_INVALID_ID;
+    VIR_VirRegId                tempRegId = VIR_INVALID_ID;
+    VIR_Instruction             *inst = gcvNULL;
+    VIR_Operand                 *operand = gcvNULL;
+
+    /* Move the coord into a new reg. */
+    tempRegId = VIR_Shader_NewVirRegId(pShader, 1);
+    errCode = VIR_Shader_AddSymbol(pShader,
+        VIR_SYM_VIRREG,
+        tempRegId,
+        VIR_Shader_GetTypeFromId(pShader, coordTypeId),
+        VIR_STORAGE_UNKNOWN,
+        &newCoordSymId);
+    CHECK_ERROR(errCode, "VIR_Shader_AddSymbol failed.");
+
+    /* Calculate the new coordinate value with offset. */
+    /* ADD: newCoord, coord, offset */
+    errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_ADD,
+        offsetTypeId,
+        pInst,
+        gcvTRUE,
+        &inst);
+    ON_ERROR(errCode, "Add instruction.");
+
+    operand = VIR_Inst_GetDest(inst);
+    VIR_Operand_SetTempRegister(operand,
+        pFunc,
+        newCoordSymId,
+        offsetTypeId);
+    VIR_Operand_SetEnable(operand, VIR_TypeId_Conv2Enable(offsetTypeId));
+
+    operand = VIR_Inst_GetSource(inst, 0);
+    VIR_Operand_Copy(operand, pCoordOpnd);
+
+    operand = VIR_Inst_GetSource(inst, 1);
+    VIR_Operand_Copy(operand, pOffsetOpnd);
+
+    /* Update the coord operand. */
+    VIR_Operand_SetSymbol(pCoordOpnd, pFunc, newCoordSymId);
+    VIR_Operand_SetSwizzle(pCoordOpnd, VIR_TypeId_Conv2Swizzle(coordTypeId));
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
+_CalculateImageCoordWithOffset(
+    IN      VIR_Shader       *pShader,
+    IN      VSC_HW_CONFIG    *HwCfg,
+    IN      VIR_Function     *pFunc,
+    IN      VIR_Instruction  *pInst
+)
+{
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    VIR_Operand                *pParamSrc = VIR_Inst_GetSource(pInst, 1);
+    VIR_Operand                *pOffsetOpnd = gcvNULL;
+    VIR_ParmPassing            *opndParm = gcvNULL;
+    VIR_Operand                *pImgFetchModifier;
+
+    opndParm = VIR_Operand_GetParameters(pParamSrc);
+
+    /* Skip non-param operand. */
+    if (pParamSrc == gcvNULL)
+    {
+        return errCode;
+    }
+
+    /* Skip non-offset param. */
+    if (opndParm->argNum > 2)
+    {
+        pImgFetchModifier = opndParm->args[2];
+        if (!VIR_Operand_hasOffsetFlag(pImgFetchModifier))
+        {
+            return errCode;
+        }
+    }
+    else
+    {
+        return errCode;
+    }
+
+    /* Get the offset operand. */
+    pOffsetOpnd = VIR_Operand_GetTexldOffset(pImgFetchModifier);
+
+    /* Check if we need to calculate the offset. */
+    if (_NeedToCalculateOffset(pShader, pFunc, pOffsetOpnd))
+    {
+        errCode = _CalculateImageOffsetCoord(pShader,
+            HwCfg,
+            pFunc,
+            pInst);
+        ON_ERROR(errCode, "Calculate offset coord");
+    }
+
+    /* Clean up the offset param. */
+    VIR_Operand_ClrTexModifierFlag(pImgFetchModifier, VIR_TMFLAG_OFFSET);
+    VIR_Operand_SetTexldModifier(pImgFetchModifier, VIR_TEXLDMODIFIER_OFFSET, gcvNULL);
+
+OnError:
+    return errCode;
+}
+
+DEF_QUERY_PASS_PROP(vscVIR_FixCoordWithOffset)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_ML;
 }
 
-DEF_SH_NECESSITY_CHECK(vscVIR_FixTexldOffset)
+DEF_SH_NECESSITY_CHECK(vscVIR_FixCoordWithOffset)
 {
     VSC_HW_CONFIG              *pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
 
@@ -9482,7 +9600,7 @@ DEF_SH_NECESSITY_CHECK(vscVIR_FixTexldOffset)
     return gcvTRUE;
 }
 
-VSC_ErrCode vscVIR_FixTexldOffset(VSC_SH_PASS_WORKER* pPassWorker)
+VSC_ErrCode vscVIR_FixCoordWithOffset(VSC_SH_PASS_WORKER* pPassWorker)
 {
     VSC_ErrCode                 errCode = VSC_ERR_NONE;
     VIR_Shader                 *pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
@@ -9506,6 +9624,16 @@ VSC_ErrCode vscVIR_FixTexldOffset(VSC_SH_PASS_WORKER* pPassWorker)
             if (VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(inst)))
             {
                 _CalculateCoordWithOffset(pShader, pHwCfg, func, inst);
+            }
+            /* For ImageFetch operand with image source, calculate new coordinate with offset before link intrinsic function.*/
+            if (inst->_opcode == VIR_OP_INTRINSIC)
+            {
+                VIR_IntrinsicsKind      intrinsicsKind;
+                intrinsicsKind = VIR_Operand_GetIntrinsicKind(VIR_Inst_GetSource(inst, 0));
+                if (VIR_Intrinsics_isImageFetch(intrinsicsKind))
+                {
+                    _CalculateImageCoordWithOffset(pShader, pHwCfg, func, inst);
+                }
             }
         }
     }
