@@ -13543,8 +13543,9 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
         }
     }
 
-    /* We don't update the DU when insert LOAD_S/STORE_S, so we need to invalid the DU. */
-    if (pShader->hasRegisterSpill)
+    /* We don't update the DU when insert LOAD_S/STORE_S, so we need to invalid the DU.
+     * DU information of fragment shader is used after postcg pass, invalid DU here */
+    if (pShader->hasRegisterSpill || VIR_Shader_IsFS(pShader))
     {
         pPassWorker->pResDestroyReq->s.bInvalidateDu = gcvTRUE;
         pPassWorker->pResDestroyReq->s.bInvalidateRdFlow= gcvTRUE;
