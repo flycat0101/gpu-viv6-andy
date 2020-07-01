@@ -2898,6 +2898,23 @@ _FillInFeatureTable(
     Features[gcvFEATURE_TP_NN_PROBE] = database->TP_NN_PROBE;
     Features[gcvFEATURE_VIP_DEC400] = database->VIP_DEC400;
     Features[gcFEATURE_BIT_TP_FC_FLOAT_LAST_PIXEL_NEGATIVE_0_FIX] = database->TP_FC_FLOAT_LAST_PIXEL_NEGATIVE_0_FIX;
+
+    /* AIGPU */
+    Features[gcvFEATURE_AI_GPU] = database->AI_GPU;
+
+    if (Features[gcvFEATURE_AI_GPU])
+    {
+        Hardware->config->disableVIP = ((((gctUINT32) (Hardware->config->chipMinorFeatures6)) >> (0 ?
+ 5:5) & ((gctUINT32) ((((1 ?
+ 5:5) - (0 ?
+ 5:5) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:5) - (0 ?
+ 5:5) + 1)))))) == (0x1 & ((gctUINT32) ((((1 ?
+ 5:5) - (0 ?
+ 5:5) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1)))))));
+    }
+
     /*these chip don't have maxpointSize limit, so need fix */
     if (((chipModel == gcv880) && (chipRevision == 0x5106))
      || ((chipModel == gcv2000) && (chipRevision == 0x5108))
@@ -3302,6 +3319,8 @@ static gceSTATUS
     config->chipMinorFeatures4     = iface.u.QueryChipIdentity.chipMinorFeatures4;
     config->chipMinorFeatures5     = iface.u.QueryChipIdentity.chipMinorFeatures5;
     config->chipMinorFeatures6     = iface.u.QueryChipIdentity.chipMinorFeatures6;
+
+    config->disableVIP = gcvFALSE;
 
     iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_QUERY_CHIP_OPTION;
