@@ -483,7 +483,7 @@ G2dSolid(PixmapPtr pPixmap, int x1, int y1, int x2, int y2) {
     pVivPixDst = pBlt->mDstSurfInfo.mPriv;
     pDstSurf = (GenericSurfacePtr)pVivPixDst->mVidMemInfo;
 
-    TRACE_EXA("%s (%d,%d,%d,%d) w:%d h:%d format:%d clrcolor:%x planemask:%x hwMask:%x",
+    TRACE_EXA("%s (%d,%d,%d,%d) w:%d h:%d format:%d clrcolor:%x planemask:%lx hwMask:%x",
                 __FUNCTION__,x1,y1,x2,y2,x2-x1,y2-y1,
                 pBlt->mDstSurfInfo.mFormat.mG2dFmt,
                 pBlt->mColorARGB32,pBlt->mPlaneMask,pBlt->hwMask);
@@ -1160,7 +1160,7 @@ static Bool G2dDoneByVSurf(PixmapPtr pDst, int x, int y, int w,
 
     pDstSurf = (GenericSurfacePtr)pVivPixDst->mVidMemInfo;
 
-    if(!GetDefaultG2dFormat(pDst->drawable.bitsPerPixel, &pBlt->mDstSurfInfo.mFormat));
+    if(!GetDefaultG2dFormat(pDst->drawable.bitsPerPixel, &pBlt->mDstSurfInfo.mFormat))
     {
         TRACE_EXA("%s fail dst bpp:%d",__FUNCTION__,pDst->drawable.bitsPerPixel);
         return FALSE;
