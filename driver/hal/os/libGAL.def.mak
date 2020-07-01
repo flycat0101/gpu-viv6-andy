@@ -284,6 +284,7 @@ EXPORTS
     gcoHAL_SetBltNP2Texture
     gcoHAL_Get3DEngine
     gcoHAL_SetCompilerFuncTable
+	gcoHAL_SetFscaleValue
 !ENDIF
     gcoHAL_SetHardwareType
     gcoHAL_GetBaseAddr

@@ -438,6 +438,8 @@ gcoHAL_GetProductName(
 
 gceSTATUS
 gcoHAL_SetFscaleValue(
+    IN gcoHAL Hal,
+    IN gctUINT CoreIndex,
     IN gctUINT FscaleValue,
     IN gctUINT ShaderFscaleValue
     );
