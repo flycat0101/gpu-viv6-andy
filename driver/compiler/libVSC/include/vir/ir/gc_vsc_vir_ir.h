@@ -1050,14 +1050,18 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Shader_IsTCS(S)       (VIR_Shader_GetKind(S) == VIR_SHADER_TESSELLATION_CONTROL)
 #define VIR_Shader_IsTES(S)       (VIR_Shader_GetKind(S) == VIR_SHADER_TESSELLATION_EVALUATION)
 #define VIR_Shader_IsGS(S)        (VIR_Shader_GetKind(S) == VIR_SHADER_GEOMETRY)
+#define VIR_Shader_IsGraphics(S)  (VIR_Shader_IsGPipe(S) || VIR_Shader_IsFS(S))
 
-#define VIR_Shader_IsGraphics(S)     (VIR_Shader_IsGPipe(S) || VIR_Shader_IsFS(S))
-#define VIR_Shader_IsDesktopGL(S)    ((S)->clientApiVersion == gcvAPI_OPENGL)
-#define VIR_Shader_IsOpenVG(S)       ((S)->clientApiVersion == gcvAPI_OPENVG || (((S)->compilerVersion[0] & 0xffff) == _SHADER_VG_TYPE))
-#define VIR_Shader_IsVulkan(S)       ((S)->clientApiVersion == gcvAPI_OPENVK)
+/* Client driver. */
+#define VIR_Shader_IsDesktopGL(S)       ((S)->clientApiVersion == gcvAPI_OPENGL)
+#define VIR_Shader_IsOpenVG(S)          ((S)->clientApiVersion == gcvAPI_OPENVG || (((S)->compilerVersion[0] & 0xffff) == _SHADER_VG_TYPE))
+#define VIR_Shader_IsVulkan(S)          ((S)->clientApiVersion == gcvAPI_OPENVK)
+#define VIR_Shader_IsOpenCL(S)          ((S)->clientApiVersion == gcvAPI_OPENCL)
 
-#define VIR_Shader_IsCL(S)           (VIR_Shader_GetKind(S) == VIR_SHADER_COMPUTE && ((S->compilerVersion[0] & 0xFFFF) == _cldLanguageType))
-#define VIR_Shader_IsGlCompute(S)    (VIR_Shader_GetKind(S) == VIR_SHADER_COMPUTE && ((S->compilerVersion[0] & 0xFFFF) != _cldLanguageType))
+#define VIR_Shader_IsCL(S)              (VIR_Shader_GetKind(S) == VIR_SHADER_COMPUTE && ((S->compilerVersion[0] & 0xFFFF) == _cldLanguageType))
+#define VIR_Shader_IsCLFromLanguage(S)  (VIR_Shader_IsCL(S) && VIR_Shader_IsOpenCL(S))
+#define VIR_Shader_IsCLFromSPIRV(S)     (VIR_Shader_IsCL(S) && VIR_Shader_IsVulkan(S))
+#define VIR_Shader_IsGlCompute(S)       (VIR_Shader_GetKind(S) == VIR_SHADER_COMPUTE && ((S->compilerVersion[0] & 0xFFFF) != _cldLanguageType))
 
 #define VIR_GetOperandFromId(Func, Id)              ((VIR_Operand *)VIR_GetEntryFromId(&((Func)->operandTable), (Id)))
 #define VIR_GetFuncSymFromId(Func, SymId)           (VIR_GetSymFromId(&(Func)->symTable, (SymId)))

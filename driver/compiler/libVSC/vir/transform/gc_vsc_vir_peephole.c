@@ -6060,7 +6060,7 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
         if ((localMemorySize <= ph->hwCfg->maxLocalMemSizeInByte) &&
             (localMemorySize > 0))
         {
-            gcmASSERT(VIR_Shader_IsCL(pShader) || VIR_Shader_IsGlCompute(pShader));
+            gcmASSERT(VIR_Shader_IsCLFromLanguage(pShader) || VIR_Shader_IsGlCompute(pShader));
 
             inst = BB_GET_START_INST(bb);
             while (inst != VIR_Inst_GetNext(BB_GET_END_INST(bb)))
