@@ -12100,11 +12100,15 @@ VIR_Function_ChangeInstToNop(
     {
         VIR_Operand* dest = VIR_Inst_GetDest(Inst);
         VIR_Label* label = VIR_Operand_GetLabel(dest);
-        VIR_Link* link = VIR_Link_RemoveLink(VIR_Label_GetReferenceAddr(label), (gctUINTPTR_T)Inst);
 
-        if(link)
+        if (label)
         {
-            VIR_Function_FreeLink(Function, link);
+            VIR_Link* link = VIR_Link_RemoveLink(VIR_Label_GetReferenceAddr(label), (gctUINTPTR_T)Inst);
+
+            if (link)
+            {
+                VIR_Function_FreeLink(Function, link);
+            }
         }
     }
 

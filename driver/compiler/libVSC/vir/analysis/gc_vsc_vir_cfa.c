@@ -714,13 +714,15 @@ static void _RemoveBasicBlockFromCFG(
 
         if (bDeleteInst)
         {
+            VIR_OpCode  opCode = VIR_Inst_GetOpcode(pInst);
+
             /*
             ** If this instruction is a CALL, we need to remove it from:
             ** 1) The call site array of the callee function.
             ** 2) The mixed call site array of the caller function.
             **
             */
-            if (VIR_Inst_GetOpcode(pInst) == VIR_OP_CALL)
+            if (opCode == VIR_OP_CALL)
             {
                 VIR_Function*               pCalleeFunc = VIR_Inst_GetCallee(pInst);
                 VIR_FUNC_BLOCK*             pCalleeFuncBlk = VIR_Function_GetFuncBlock(pCalleeFunc);
@@ -755,6 +757,22 @@ static void _RemoveBasicBlockFromCFG(
                     vscSRARR_RemoveElementByContent(&pCallerFuncBlk->mixedCallSiteArray, (void*)&pInst);
                 }
             }
+            /* We need to make sure that no references or change all references to NOPs. */
+            else if (opCode == VIR_OP_LABEL)
+            {
+                VIR_Label*          pLabel = VIR_Inst_GetJmpLabel(pInst);
+                VIR_Instruction*    pJmpInst = gcvNULL;
+                VIR_Link*           pLink = VIR_Label_GetReference(pLabel);
+
+                while (pLink)
+                {
+                    pJmpInst = (VIR_Instruction*)VIR_Link_GetReference(pLink);
+                    pLink = pLink->next;
+
+                    VIR_Function_ChangeInstToNop(pCFG->pOwnerFuncBlk->pVIRFunc, pJmpInst);
+                }
+            }
+
             VIR_Function_DeleteInstruction(pCFG->pOwnerFuncBlk->pVIRFunc, pInst);
         }
         else
