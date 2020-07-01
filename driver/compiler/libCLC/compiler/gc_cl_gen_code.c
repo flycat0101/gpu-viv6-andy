@@ -53,9 +53,9 @@
     (SuperSource)->numSources = 1; \
    } while (gcvFALSE)
 
-#define _clmConvROperandToSpecialVectorSuperSourceConstant(Compiler, ROperand, SuperSource, Status) \
+#define _clmConvROperandToSpecialVectorSuperSourceConstant(Compiler, ROperand, LineNo, StringNo, SuperSource, Status) \
    do { \
-    Status =_ConvROperandToSpecialVectorSourceConstant(Compiler, ROperand, 0, 0, (SuperSource)->sources); \
+    Status =_ConvROperandToSpecialVectorSourceConstant(Compiler, ROperand, LineNo, StringNo, (SuperSource)->sources); \
     (SuperSource)->numSources = 1; \
    } while (gcvFALSE)
 
@@ -10055,6 +10055,8 @@ _ConvNormalROperandToSuperSource(
     {
         _clmConvROperandToSpecialVectorSuperSourceConstant(Compiler,
                                                            ROperand,
+                                                           LineNo,
+                                                           StringNo,
                                                            SuperSource,
                                                            status);
         if(gcmIS_ERROR(status)) return status;
@@ -10131,8 +10133,10 @@ OUT gcsSUPER_SOURCE * SuperSource
     {
         _clmConvROperandToSpecialVectorSuperSourceConstant(Compiler,
                                                            ROperand,
+                                                           LineNo,
+                                                           StringNo,
                                                            SuperSource,
-                                                       status);
+                                                           status);
         if (gcmIS_ERROR(status)) return status;
     }
     else

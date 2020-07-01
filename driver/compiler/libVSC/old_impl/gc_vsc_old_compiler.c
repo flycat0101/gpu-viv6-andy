@@ -3907,7 +3907,13 @@ gcSHADER_LoadHeader(
 
     /* Verify the signature. */
     signature = (gceOBJECT_TYPE *) Buffer;
-    if (*signature != gcvOBJ_SHADER) {
+    if (*signature == gcmCC('R','D','H','S')) {
+        /* Endian mismatch. */
+        gcoOS_Print("gcSHADER_LoadHeader: Memory endian type does not match!");
+        gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+        return gcvSTATUS_INVALID_DATA;
+    }
+    else if (*signature != gcvOBJ_SHADER) {
         /* Signature mismatch. */
         gcoOS_Print("gcSHADER_LoadHeader: Signature does not match with 'SHDR'");
         gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
@@ -39128,7 +39134,13 @@ _gcLoadProgramHeader(
 
     /* Verify the signature. */
     signature = (gctUINT32 *) Buffer;
-    if (*signature != gcmCC('P', 'R', 'G', 'M')) {
+    if (*signature == gcmCC('M', 'G', 'R', 'P')) {
+        /* Endian mismatch. */
+        gcoOS_Print("_gcLoadProgramHeader: Memory endian type does not match!");
+        gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+        return gcvSTATUS_INVALID_DATA;
+    }
+    else if (*signature != gcmCC('P', 'R', 'G', 'M')) {
         /* Signature mismatch. */
         gcoOS_Print("_gcLoadProgramHeader: Signature does not match with 'PRGM'");
         gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
