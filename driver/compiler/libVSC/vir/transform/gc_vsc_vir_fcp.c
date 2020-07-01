@@ -1787,6 +1787,7 @@ VSC_ErrCode vscVIR_PostMCCleanup(
         {
             VIR_OpCode opCode = VIR_Inst_GetOpcode(inst);
 
+
             /* disable this when RA enabled for now, since DU and RA has not supported indexed opnd yet */
             if (!bRAEnabled)
             {
