@@ -423,6 +423,16 @@ if ((database->SMALLBATCH && phyDev->phyDevConfig.options.smallBatch)){    vsCon
     pVscHwCfg->hwFeatureFlags.hasAtomTimingFix       = !(pVscHwCfg->chipModel == 0x3000 && pVscHwCfg->chipRevision == 0x5450);
     pVscHwCfg->hwFeatureFlags.FEDrawDirect           = database->FE_DRAW_DIRECT;
 
+    /* Only those chips with VX2 really have this issue, other chips don't have this issue. */
+    if (database->EVIS_VX2)
+    {
+        pVscHwCfg->hwFeatureFlags.hasFloatingMadFix  = database->SH_VX2_FLOATING_MAD_FIX;
+    }
+    else
+    {
+        pVscHwCfg->hwFeatureFlags.hasFloatingMadFix  = gcvTRUE;
+    }
+
     return;
 }
 

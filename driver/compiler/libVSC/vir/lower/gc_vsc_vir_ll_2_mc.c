@@ -387,26 +387,35 @@ static VIR_Pattern _ctzPattern[] = {
 };
 
 static VIR_PatternMatchInst _madPatInst0[] = {
-    { VIR_OP_MAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { VIR_Lower_IsIntOpcode, VIR_Lower_IsDstInt16, VIR_Lower_HasNoHalti4 }, VIR_PATN_MATCH_FLAG_AND },
-
+    { VIR_OP_MAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { VIR_Lower_IsFloatOpcode, VIR_Lower_HasNoFloatingMadFix }, VIR_PATN_MATCH_FLAG_AND },
 };
 
 static VIR_PatternReplaceInst _madRepInst0[] = {
+    { VIR_OP_MUL, 0, 0, { -1, 2, 3, 0 }, { 0 } },
+    { VIR_OP_ADD, 0, 0, { 1, -1, 4, 0 }, { 0 } }
+};
+
+static VIR_PatternMatchInst _madPatInst1[] = {
+    { VIR_OP_MAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { VIR_Lower_IsIntOpcode, VIR_Lower_IsDstInt16, VIR_Lower_HasNoHalti4 }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _madRepInst1[] = {
     { VIR_OP_IMADLO0, 0, 0, { 1, 2, 3, 4 }, { 0 } },
     { VIR_OP_IMADLO1, 0, 0, { 1, 2, 3, 4 }, { 0 } }
 };
 
-static VIR_PatternMatchInst _madPatInst1[] = {
+static VIR_PatternMatchInst _madPatInst2[] = {
     { VIR_OP_MAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { VIR_Lower_IsIntOpcode }, VIR_PATN_MATCH_FLAG_AND },
 };
 
-static VIR_PatternReplaceInst _madRepInst1[] = {
+static VIR_PatternReplaceInst _madRepInst2[] = {
     { VIR_OP_IMADLO0, 0, 0, { 1, 2, 3, 4 }, { 0 } },
 };
 
 static VIR_Pattern _madPattern[] = {
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_mad, 0) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_mad, 1) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_mad, 2) },
     { VIR_PATN_FLAG_NONE }
 };
 
