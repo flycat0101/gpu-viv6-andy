@@ -2017,6 +2017,13 @@ gcSHADER_InitBuiltinLibrary(
         gcLibTextureGatherCommon_Func_1,
     };
 
+    gctSTRING   BuiltinLib_GL_Common[] =
+    {
+        gcLibLDEXP_GL_Func,
+        gcLibFREXP_GL_Func,
+        gcLibPackUnpack_GL_Func,
+    };
+
     gctSTRING   BuiltinLib_Reflect[] =
     {
         gcLibREFLECT_Func_float,
@@ -2837,6 +2844,25 @@ gcSHADER_InitBuiltinLibrary(
             gcoOS_StrCatSafe(*sloBuiltinSource,
                 __BUILTIN_SHADER_LENGTH__, BuiltinLib_Common[i]);
         }
+        if (VIR_Shader_IsDesktopGL(Shader))
+        {
+            stringNum = sizeof(BuiltinLib_GL_Common) / sizeof(gctSTRING);
+            for (i = 0; i < stringNum; i++)
+            {
+                gcoOS_StrCatSafe(*sloBuiltinSource,
+                    __BUILTIN_SHADER_LENGTH__, BuiltinLib_GL_Common[i]);
+            }
+            if (fmaSupported)
+            {
+                gcoOS_StrCatSafe(*sloBuiltinSource,
+                    __BUILTIN_SHADER_LENGTH__, gcLibFMA_GL_Func_fmaSupported);
+            }
+            else
+            {
+                gcoOS_StrCatSafe(*sloBuiltinSource,
+                    __BUILTIN_SHADER_LENGTH__, gcLibFMA_GL_Func_fmaNotSupported);
+            }
+        }
 
         if (fmaSupported)
         {
@@ -3042,6 +3068,8 @@ gcSHADER_InitBuiltinLibrary(
                 gcoOS_StrCatSafe(*sloBuiltinSource,
                     __BUILTIN_SHADER_LENGTH__, TextureSize_gl[i]);
             }
+            gcoOS_StrCatSafe(*sloBuiltinSource,
+                __BUILTIN_SHADER_LENGTH__, gcGLLibNoise_Funcs_Str);
         }
     }
     else if (LibType == gcLIB_BLEND_EQUATION)

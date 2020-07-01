@@ -1645,6 +1645,23 @@ _GetArgumentVariable(
 }
 
 gceSTATUS
+slFuncCheckForNoiseIntrinsic(
+    IN sloCOMPILER Compiler,
+    IN struct _slsNAME * FuncName,
+    IN struct _sloIR_POLYNARY_EXPR * PolynaryExpr
+    )
+{
+    gceSTATUS    status = gcvSTATUS_OK;
+
+    if(sloCOMPILER_IsOGLVersion(Compiler) &&
+       sloCOMPILER_GetLanguageVersion(Compiler) >= _SHADER_GL44_VERSION)
+    {
+        slsFUNC_SET_FLAG(&(FuncName->u.funcInfo), slvFUNC_SKIP_AS_INTRINSIC);
+    }
+    return status;
+}
+
+gceSTATUS
 slFuncCheckForAtrigAsIntrinsic(
     IN sloCOMPILER Compiler,
     IN struct _slsNAME * FuncName,
@@ -8549,6 +8566,46 @@ _EvaluateSin(
     return gcvSTATUS_OK;
 }
 
+
+gceSTATUS
+_GenNoiseCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    )
+{
+    gceSTATUS   status;
+    slsROPERAND constantZero[1];
+    slsLOPERAND lOperand[1];
+
+    gcmHEADER();
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    slmVERIFY_IR_OBJECT(PolynaryExpr, slvIR_POLYNARY_EXPR);
+    gcmASSERT(OperandCount == 1);
+    gcmASSERT(OperandsParameters);
+    gcmASSERT(IOperand);
+
+    slsROPERAND_InitializeFloatOrVecOrMatConstant(constantZero,
+                                                  gcSHADER_FLOAT_X1,
+                                                  gcSHADER_PRECISION_HIGH,
+                                                  0.0);
+    slsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
+    status = slGenAssignCode(Compiler,
+                             PolynaryExpr->exprBase.base.lineNo,
+                             PolynaryExpr->exprBase.base.stringNo,
+                             lOperand,
+                             constantZero);
+
+    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
 
 gceSTATUS
 _GenSinCode(

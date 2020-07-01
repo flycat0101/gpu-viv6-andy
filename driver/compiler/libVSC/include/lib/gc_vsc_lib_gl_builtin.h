@@ -104,11 +104,14 @@ extern gctSTRING gcLibUaddCarry_Func_hati4;
 extern gctSTRING gcLibUaddCarry_Func_VK_hati4;
 extern gctSTRING gcLibLDEXP_Func;
 extern gctSTRING gcLibFREXP_Func;
+extern gctSTRING gcLibLDEXP_GL_Func;
+extern gctSTRING gcLibFREXP_GL_Func;
 extern gctSTRING gcLibFREXPSTRUCT_Func;
 extern gctSTRING gcLibUsubBorrow_Func;
 extern gctSTRING gcLibUsubBorrow_Func_VK;
 extern gctSTRING gcLibPack_Func;
 extern gctSTRING gcLibUnpack_Func;
+extern gctSTRING gcLibPackUnpack_GL_Func;
 extern gctSTRING gcLibUmulExtended_Func;
 extern gctSTRING gcLibImulExtended_Func;
 extern gctSTRING gcLibUmulExtended_Func_VK;
@@ -116,6 +119,8 @@ extern gctSTRING gcLibImulExtended_Func_VK;
 extern gctSTRING gcLibMODF_Func;
 extern gctSTRING gcLibFMA_Func_fmaNotSupported;
 extern gctSTRING gcLibFMA_Func_fmaSupported;
+extern gctSTRING gcLibFMA_GL_Func_fmaNotSupported;
+extern gctSTRING gcLibFMA_GL_Func_fmaSupported;
 extern gctSTRING gcLibREFLECT_Func_float;
 extern gctSTRING gcLibREFLECT_Func_vec2;
 extern gctSTRING gcLibREFLECT_Func_vec3;
@@ -822,5 +827,7 @@ extern gctSTRING gcGLLib_AtomcmpxchgPatch_Func_core1_Str;
 extern gctSTRING gcGLLib_AtomcmpxchgPatch_Func_core2_Str;
 extern gctSTRING gcGLLib_AtomcmpxchgPatch_Func_core4_Str;
 extern gctSTRING gcGLLib_AtomcmpxchgPatch_Func_core8_Str;
+/* GL noise functions */
+extern gctSTRING gcGLLibNoise_Funcs_Str;
 #endif /* __gc_vsc_gl_builtin_lib_h_ */
 
