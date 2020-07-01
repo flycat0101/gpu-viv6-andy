@@ -15707,7 +15707,8 @@ IN OUT clsGEN_CODE_PARAMETERS *RightParameters
           }
        }
        else {
-          if(leftElementType > rightElementType) { /* convert right */
+          if(leftElementType > rightElementType &&
+             gcIsScalarDataType(RightParameters->dataTypes[i].def)) { /* convert right */
              gcmASSERT(gcIsScalarDataType(RightParameters->dataTypes[i].def));
 
              status = _ImplicitConvertOperand(Compiler,
@@ -15729,7 +15730,8 @@ IN OUT clsGEN_CODE_PARAMETERS *RightParameters
                  exprCloned = gcvTRUE;
              }
          }
-         else if(LeftParameters->needROperand) { /* convert left */
+         else if(gcIsScalarDataType(LeftParameters->dataTypes[i].def) &&
+                 LeftParameters->needROperand) { /* convert left */
              status = _ImplicitConvertOperand(Compiler,
                                               operand1->base.lineNo,
                                               operand1->base.stringNo,
