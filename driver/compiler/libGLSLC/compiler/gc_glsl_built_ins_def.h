@@ -167,6 +167,16 @@ _GenTexture3DProjCode(
     );
 
 gceSTATUS
+_GenTexture1DCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    );
+
+gceSTATUS
 _GenTexture1DArrayCode(
     IN sloCOMPILER Compiler,
     IN sloCODE_GENERATOR CodeGenerator,
@@ -2520,6 +2530,8 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION1_TEXTURE_ARRAY, "shadow2DArray", gcvNULL, _GenShadow2DArrayCode,   T_VEC4,     2, {T_SAMPLER2DARRAYSHADOW,   T_VEC4}, {0}, {0}},
 
     /* HALTI Texture array Lookup Functions */
+    {slvEXTENSION1_HALTI,     "texture", gcvNULL, _GenTexture1DCode,          T_VEC4,     2, {T_SAMPLER1D,        T_FLOAT}, {0}, {0}},
+    {slvEXTENSION1_HALTI,     "texture", gcvNULL, _GenTexture1DArrayCode,     T_VEC4,     2, {T_SAMPLER1DARRAY,    T_VEC2}, {0}, {0}},
     {slvEXTENSION1_HALTI,     "texture", gcvNULL, _GenTextureCode,            T_VEC4,     2, {T_SAMPLER2D,    T_VEC2}, {0}, {0}},
     {slvEXTENSION1_HALTI,     "texture", gcvNULL, _GenTextureCode,            T_VEC4,     2, {T_SAMPLER3D,    T_VEC3}, {0}, {0}},
     {slvEXTENSION1_HALTI,     "texture", gcvNULL, _GenTextureCode,            T_VEC4,     2, {T_SAMPLERCUBE,  T_VEC3}, {0}, {0}},
