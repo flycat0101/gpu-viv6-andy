@@ -3047,7 +3047,6 @@ sloCOMPILER_DuplicateFieldSpaceForDataType(
                                            slvNAME_SPACE_TYPE_STRUCT,
                                            &currentNameSpace));
     /* Duplicate field list. */
-    extension.extension1 = slvEXTENSION1_NONE;
     FOR_EACH_DLINK_NODE(&DataType->fieldSpace->names, slsNAME, orgFieldName)
     {
         sleSHADER_TYPE shaderType = Compiler->shaderType;
