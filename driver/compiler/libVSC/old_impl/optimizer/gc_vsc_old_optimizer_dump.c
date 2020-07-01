@@ -99,6 +99,9 @@ GetCategoryName_(
     case gcSHADER_VAR_CATEGORY_BLOCK_ADDRESS:
         return "block_addr";
 
+    case gcSHADER_VAR_CATEGORY_CLIP_DISTANCE_ENABLE:
+        return "clip_distance_enable";
+
     default:
         gcmASSERT(0);
         return "Invalid";

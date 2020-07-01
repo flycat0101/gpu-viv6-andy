@@ -227,7 +227,8 @@ VIR_GetIntrinsicLib(
     IN VSC_MM                   *pMM,
     IN gctBOOL                  forOCL,
     IN gctBOOL                  forGraphics,
-    IN gctBOOL                  DumpShader,
+    IN gctBOOL                  forDesktopGL,
+    IN gctBOOL                   DumpShader,
     OUT VIR_Shader              **pOutLib
     );
 
