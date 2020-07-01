@@ -1687,6 +1687,39 @@ uint64_t getAndroidHardwareBufferUsageFromVkUsage(const VkImageCreateFlags vk_cr
     return usage;
 }
 
+#if (ANDROID_SDK_VERSION >= 26)
+uint64_t getAndroidHardwareBufferGrallocUsage(__vkFormatInfo *formatInfo, VkImageTiling tiling)
+{
+    /* Default hw render usage. */
+    uint64_t usage = GRALLOC_USAGE_HW_RENDER |GRALLOC_USAGE_HW_TEXTURE;
+    VkBool32 supportTiled = VK_FALSE;
+
+#ifdef DRM_GRALLOC
+    if ((formatInfo->residentImgFormat >= VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK &&
+         formatInfo->residentImgFormat <= VK_FORMAT_ASTC_12x12_SRGB_BLOCK))
+    {
+        /* Invalid residentImgFormat args. */
+        return 0;
+    }
+    else if (tiling == VK_IMAGE_TILING_OPTIMAL)
+    {
+        supportTiled = VK_TRUE;
+    }
+    else
+    {
+        supportTiled = VK_FALSE;
+    }
+
+    usage |= (supportTiled ? GRALLOC_USAGE_TILED_VIV : 0);
+#else
+    usage |= (supportTiled ? GRALLOC_USAGE_RENDER_TARGET_NO_TS_VIV : 0);
+
+#endif
+
+    return usage;
+}
+#endif
+
 VKAPI_ATTR VkResult VKAPI_CALL __vk_GetAndroidHardwareBufferPropertiesANDROID(VkDevice device, const struct AHardwareBuffer* buffer, VkAndroidHardwareBufferPropertiesANDROID* pProperties)
 {
     VkAndroidHardwareBufferFormatPropertiesANDROID *ahbFormatProps = VK_NULL_HANDLE;
