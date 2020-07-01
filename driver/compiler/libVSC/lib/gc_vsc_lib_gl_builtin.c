@@ -3632,7 +3632,7 @@ gctSTRING gcLibTextureSize_Func_5 =
 
 /* For the 2D array sampler. */
 gctSTRING gcLibTextureSize_Func_6 =
-"ivec3 _viv_textureSize_float_Array(sampler2DArray sampler, mediump ivec3 levelBaseSize, mediump ivec2 lodMinAndMax, int lod)\n"
+"ivec3 _viv_textureSize_float_2DArray(sampler2DArray sampler, mediump ivec3 levelBaseSize, mediump ivec2 lodMinAndMax, int lod)\n"
 "{\n"
 "    ivec3 result;\n"
 "    lod = clamp(lod, lodMinAndMax.x, lodMinAndMax.y);\n"
@@ -3684,7 +3684,7 @@ gctSTRING gcLibTextureSize_Func_10 =
 
 /* For the 2D array sampler. */
 gctSTRING gcLibTextureSize_Func_11 =
-"ivec3 _viv_textureSize_int_Array(isampler2DArray sampler, mediump ivec3 levelBaseSize, mediump ivec2 lodMinAndMax, int lod)\n"
+"ivec3 _viv_textureSize_int_2DArray(isampler2DArray sampler, mediump ivec3 levelBaseSize, mediump ivec2 lodMinAndMax, int lod)\n"
 "{\n"
 "    ivec3 result;\n"
 "    lod = clamp(lod, lodMinAndMax.x, lodMinAndMax.y);\n"
@@ -3725,7 +3725,7 @@ gctSTRING gcLibTextureSize_Func_14 =
 
 /* For the 2D array sampler. */
 gctSTRING gcLibTextureSize_Func_15 =
-"ivec3 _viv_textureSize_uint_Array(usampler2DArray sampler, mediump ivec3 levelBaseSize, mediump ivec2 lodMinAndMax, int lod)\n"
+"ivec3 _viv_textureSize_uint_2DArray(usampler2DArray sampler, mediump ivec3 levelBaseSize, mediump ivec2 lodMinAndMax, int lod)\n"
 "{\n"
 "    ivec3 result;\n"
 "    lod = clamp(lod, lodMinAndMax.x, lodMinAndMax.y);\n"
@@ -3736,7 +3736,7 @@ gctSTRING gcLibTextureSize_Func_15 =
 
 /* For the 2D MS sampler. */
 gctSTRING gcLibTextureSize_Func_16 =
-"ivec2 _viv_textureSize_float_MS(sampler2DMS sampler, mediump ivec3 levelBaseSize, mediump ivec2 lodMinAndMax)\n"
+"ivec2 _viv_textureSize_float_2DMS(sampler2DMS sampler, mediump ivec3 levelBaseSize, mediump ivec2 lodMinAndMax)\n"
 "{\n"
 "    ivec2 result;\n"
 "    int lod = 0;\n"
@@ -3745,7 +3745,7 @@ gctSTRING gcLibTextureSize_Func_16 =
 "}\n";
 
 gctSTRING gcLibTextureSize_Func_17 =
-"ivec2 _viv_textureSize_int_MS(isampler2DMS sampler, mediump ivec3 levelBaseSize, mediump ivec2 lodMinAndMax)\n"
+"ivec2 _viv_textureSize_int_2DMS(isampler2DMS sampler, mediump ivec3 levelBaseSize, mediump ivec2 lodMinAndMax)\n"
 "{\n"
 "    ivec2 result;\n"
 "    int lod = 0;\n"
@@ -3754,7 +3754,7 @@ gctSTRING gcLibTextureSize_Func_17 =
 "}\n";
 
 gctSTRING gcLibTextureSize_Func_18 =
-"ivec2 _viv_textureSize_uint_MS(usampler2DMS sampler, mediump ivec3 levelBaseSize, mediump ivec2 lodMinAndMax)\n"
+"ivec2 _viv_textureSize_uint_2DMS(usampler2DMS sampler, mediump ivec3 levelBaseSize, mediump ivec2 lodMinAndMax)\n"
 "{\n"
 "    ivec2 result;\n"
 "    int lod = 0;\n"
@@ -3857,6 +3857,86 @@ gctSTRING gcLibTextureSize_Func_29 =
 "    int result;\n"
 "    lod = clamp(lod, lodMinAndMax.x, lodMinAndMax.y);\n"
 "    result = levelBaseSize.x >> lod;\n"
+"    return max(result, 1);\n"
+"}\n";
+
+gctSTRING gcLibTextureSize_Func_30 =
+"ivec2 _viv_textureSize_float_2DRect(sampler2D sampler, mediump ivec3 levelBaseSize, mediump ivec2 lodMinAndMax)\n"
+"{\n"
+"    return max(levelBaseSize.xy, 1);\n"
+"}\n";
+
+gctSTRING gcLibTextureSize_Func_31 =
+"ivec2 _viv_textureSize_int_2DRect(isampler2D sampler, mediump ivec3 levelBaseSize, mediump ivec2 lodMinAndMax)\n"
+"{\n"
+"    return max(levelBaseSize.xy, 1);\n"
+"}\n";
+
+gctSTRING gcLibTextureSize_Func_32 =
+"ivec2 _viv_textureSize_uint_2DRect(usampler2D sampler, mediump ivec3 levelBaseSize, mediump ivec2 lodMinAndMax)\n"
+"{\n"
+"    return max(levelBaseSize.xy, 1);\n"
+"}\n";
+
+/* For the 1D array sampler. */
+gctSTRING gcLibTextureSize_Func_33 =
+"ivec2 _viv_textureSize_float_1DArray(sampler2DArray sampler, mediump ivec3 levelBaseSize, mediump ivec2 lodMinAndMax, int lod)\n"
+"{\n"
+"    ivec2 result;\n"
+"    lod = clamp(lod, lodMinAndMax.x, lodMinAndMax.y);\n"
+"    result.x = levelBaseSize.x >> lod;\n"
+"    result.x = max(result.x, 1);\n"
+"    result.y = levelBaseSize.z;\n"
+"    return result.xy;\n"
+"}\n";
+
+gctSTRING gcLibTextureSize_Func_34 =
+"ivec2 _viv_textureSize_int_1DArray(isampler2DArray sampler, mediump ivec3 levelBaseSize, mediump ivec2 lodMinAndMax, int lod)\n"
+"{\n"
+"    ivec2 result;\n"
+"    lod = clamp(lod, lodMinAndMax.x, lodMinAndMax.y);\n"
+"    result.x = levelBaseSize.x >> lod;\n"
+"    result.x = max(result.x, 1);\n"
+"    result.y = levelBaseSize.z;\n"
+"    return result.xy;\n"
+"}\n";
+
+gctSTRING gcLibTextureSize_Func_35 =
+"ivec2 _viv_textureSize_uint_1DArray(usampler2DArray sampler, mediump ivec3 levelBaseSize, mediump ivec2 lodMinAndMax, int lod)\n"
+"{\n"
+"    ivec2 result;\n"
+"    lod = clamp(lod, lodMinAndMax.x, lodMinAndMax.y);\n"
+"    result.x = levelBaseSize.x >> lod;\n"
+"    result.x = max(result.x, 1);\n"
+"    result.y = levelBaseSize.z;\n"
+"    return result.xy;\n"
+"}\n";
+
+/* For the 2D MS sampler. */
+gctSTRING gcLibTextureSize_Func_36 =
+"ivec2 _viv_textureSize_float_2DMSArray(sampler2DMSArray sampler, mediump ivec3 levelBaseSize, mediump ivec2 lodMinAndMax)\n"
+"{\n"
+"    ivec2 result;\n"
+"    int lod = 0;\n"
+"    result.xy = levelBaseSize.xy >> lod;\n"
+"    return max(result, 1);\n"
+"}\n";
+
+gctSTRING gcLibTextureSize_Func_37 =
+"ivec2 _viv_textureSize_int_2DMSArray(isampler2DMSArray sampler, mediump ivec3 levelBaseSize, mediump ivec2 lodMinAndMax)\n"
+"{\n"
+"    ivec2 result;\n"
+"    int lod = 0;\n"
+"    result.xy = levelBaseSize.xy >> lod;\n"
+"    return max(result, 1);\n"
+"}\n";
+
+gctSTRING gcLibTextureSize_Func_38 =
+"ivec2 _viv_textureSize_uint_2DMSArray(usampler2DMSArray sampler, mediump ivec3 levelBaseSize, mediump ivec2 lodMinAndMax)\n"
+"{\n"
+"    ivec2 result;\n"
+"    int lod = 0;\n"
+"    result.xy = levelBaseSize.xy >> lod;\n"
 "    return max(result, 1);\n"
 "}\n";
 
