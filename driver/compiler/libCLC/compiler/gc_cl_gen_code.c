@@ -5474,7 +5474,7 @@ IN clsNAME * FuncName
                                              FuncName);
         }
 
-        FuncName->u.funcInfo.mangledName = FuncName->symbol = symbol;
+        FuncName->u.funcInfo.mangledName = symbol;
     }
     else if(!FuncName->isBuiltin &&
             cloCOMPILER_IsExternSymbolsAllowed(Compiler)) {
