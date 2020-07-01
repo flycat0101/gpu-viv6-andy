@@ -5658,6 +5658,21 @@ VIR_Shader_IsGL40(
     IN VIR_Shader * Shader
     );
 
+gctBOOL
+VIR_Shader_IsGL43(
+    IN VIR_Shader * Shader
+    );
+
+gctBOOL
+VIR_Shader_IsGL44(
+    IN VIR_Shader * Shader
+    );
+
+gctBOOL
+VIR_Shader_IsGL45(
+    IN VIR_Shader * Shader
+    );
+
 VSC_ErrCode
 VIR_Shader_AddFunction(
     IN  VIR_Shader *    Shader,
@@ -6473,6 +6488,26 @@ VIR_Shader_SupportImgLdSt(
     IN VIR_Shader*      pShader,
     IN VSC_HW_CONFIG*   pHwCfg,
     IN gctBOOL          bForGraphics
+    );
+
+gctBOOL
+VIR_Shader_SupportAliasedAttribute(
+    IN VIR_Shader*      pShader
+    );
+
+gctBOOL
+VIR_Shader_SupportIoCommponentMapping(
+    IN VIR_Shader*      pShader
+    );
+
+/* Bubble sort the symbol ID list, by default using the location to compare. */
+typedef gctBOOL (*SortCompartFunc)(VIR_Symbol *, VIR_Symbol *);
+void
+VIR_Shader_BubbleSortSymIdList(
+    IN VIR_Shader*      pShader,
+    IN VIR_IdList*      pIdList,
+    IN SortCompartFunc  pFunc,
+    IN gctUINT          length
     );
 
 /* setters */

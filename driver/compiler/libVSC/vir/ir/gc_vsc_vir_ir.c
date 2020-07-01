@@ -2423,6 +2423,46 @@ VIR_Shader_IsGL40(
     return bMatch;
 }
 
+
+gctBOOL
+VIR_Shader_IsGL43(
+    IN VIR_Shader * Shader
+    )
+{
+    gctBOOL bMatch;
+
+    bMatch = ((Shader->compilerVersion[0] & 0xFFFF) == _SHADER_OGL_LANGUAGE_TYPE &&
+              (Shader->compilerVersion[1] == _SHADER_GL43_VERSION));
+
+    return bMatch;
+}
+
+gctBOOL
+VIR_Shader_IsGL44(
+    IN VIR_Shader * Shader
+    )
+{
+    gctBOOL bMatch;
+
+    bMatch = ((Shader->compilerVersion[0] & 0xFFFF) == _SHADER_OGL_LANGUAGE_TYPE &&
+              (Shader->compilerVersion[1] == _SHADER_GL44_VERSION));
+
+    return bMatch;
+}
+
+gctBOOL
+VIR_Shader_IsGL45(
+    IN VIR_Shader * Shader
+    )
+{
+    gctBOOL bMatch;
+
+    bMatch = ((Shader->compilerVersion[0] & 0xFFFF) == _SHADER_OGL_LANGUAGE_TYPE &&
+              (Shader->compilerVersion[1] == _SHADER_GL45_VERSION));
+
+    return bMatch;
+}
+
 VSC_BT_FREE_ENTRY* VIR_Operand_GetFreeEntry(VIR_Operand * pOperand)
 {
     /* set the operand kind to free entry kind */
@@ -9851,6 +9891,78 @@ VIR_Shader_SupportImgLdSt(
     }
 
     return bSupportImgLdSt;
+}
+
+gctBOOL
+VIR_Shader_SupportAliasedAttribute(
+    IN VIR_Shader*      pShader
+    )
+{
+    /* The attribute aliasing is only allowed in OpenGLES2.0/OpenGL vertex shaders. */
+    if ((VIR_Shader_IsDesktopGL(pShader) || VIR_Shader_IsES20Compiler(pShader))
+        &&
+        VIR_Shader_IsVS(pShader))
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
+gctBOOL
+VIR_Shader_SupportIoCommponentMapping(
+    IN VIR_Shader*      pShader
+    )
+{
+    if (VIR_Shader_IsVulkan(pShader) ||
+        VIR_Shader_IsGL44(pShader) || VIR_Shader_IsGL45(pShader))
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
+/* Bubble sort the symbol ID list, by default using the location to compare. */
+void
+VIR_Shader_BubbleSortSymIdList(
+    IN VIR_Shader*      pShader,
+    IN VIR_IdList*      pIdList,
+    IN SortCompartFunc  pFunc,
+    IN gctUINT          length
+    )
+{
+    gctUINT             i, j;
+    VIR_Id              temp;
+    VIR_Symbol*         pSym1;
+    VIR_Symbol*         pSym2;
+
+    for (j = 0; j < length - 1; j++)
+    {
+        for (i = 0; i < length - 1 - j; i++)
+        {
+            gctBOOL bSwap = gcvFALSE;
+
+            pSym1 = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pIdList, i));
+            pSym2 = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pIdList, i + 1));
+
+            if (pFunc != gcvNULL)
+            {
+                bSwap = (pFunc)(pSym1, pSym2);
+            }
+            else
+            {
+                bSwap = VIR_Symbol_GetLocation(pSym1) > VIR_Symbol_GetLocation(pSym2);
+            }
+
+            if (bSwap)
+            {
+                temp = VIR_IdList_GetId(pIdList, i);
+                VIR_IdList_SetId(pIdList, (gctUINT)i, VIR_IdList_GetId(pIdList, i + 1));
+                VIR_IdList_SetId(pIdList, (gctUINT)(i + 1), temp);
+            }
+        }
+    }
 }
 
 /* setters */

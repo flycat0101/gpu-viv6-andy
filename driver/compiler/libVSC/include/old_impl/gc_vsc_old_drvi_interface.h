@@ -2396,10 +2396,29 @@ gcSHADER_IsHaltiCompiler(
 **        because detecting by clientApiVersion does not work in some cases.
 **
 */
-
 gctBOOL
 gcSHADER_IsOGLCompiler(
     IN gcSHADER Shader
+    );
+
+gctBOOL
+gcSHADER_IsGL43(
+    IN gcSHADER Shader
+    );
+
+gctBOOL
+gcSHADER_IsGL44(
+    IN gcSHADER Shader
+    );
+
+gctBOOL
+gcSHADER_IsGL45(
+    IN gcSHADER Shader
+    );
+
+gctBOOL
+gcSHADER_SupportAliasedAttribute(
+    IN gcSHADER      pShader
     );
 
 /*******************************************************************************
