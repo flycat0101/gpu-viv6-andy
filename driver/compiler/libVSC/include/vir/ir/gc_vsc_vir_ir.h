@@ -3600,6 +3600,8 @@ VIR_Shader_GetBuiltInTypes(
                                              VIR_TypeId_isUnSignedInteger(Id)   || \
                                              VIR_TypeId_isBoolean(Id))
 #define VIR_TypeId_isFloat(Id)              ((VIR_GetTypeFlag(Id) & VIR_TYFLAG_ISFLOAT) != 0)
+#define VIR_TypeId_isFloat16(Id)            (VIR_TypeId_isPrimitive(Id) && (VIR_GetTypeComponentType(Id) == VIR_TYPE_FLOAT16))
+#define VIR_TypeId_isFloat32(Id)            (VIR_TypeId_isPrimitive(Id) && (VIR_GetTypeComponentType(Id) == VIR_TYPE_FLOAT32))
 #define VIR_TypeId_isPacked(Id)             ((VIR_GetTypeFlag(Id) & VIR_TYFLAG_PACKED) != 0)
 
 #if VIR_POINTER_64BIT

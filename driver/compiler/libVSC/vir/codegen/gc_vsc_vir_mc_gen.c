@@ -1300,7 +1300,8 @@ _IsDestTypeFP16(
     gcmASSERT(dest);
 
     typeId = VIR_Operand_GetTypeId(dest);
-    return VIR_Shader_GetBuiltInTypes(typeId)->componentType == VIR_TYPE_FLOAT16;
+
+    return VIR_TypeId_isFloat16(typeId);
 }
 
 static gctUINT

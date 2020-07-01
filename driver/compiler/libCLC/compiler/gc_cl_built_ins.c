@@ -2054,6 +2054,9 @@ IN clsNAME *KernelFunc
                                    gcvNULL,
                                    gcvFALSE,
                                    cldLocalMemoryAddressRegIndex,
+                                   gcvNULL,
+                                   -1,
+                                   -1,
                                    gcvNULL));
       }
 

@@ -755,7 +755,7 @@ static gctBOOL _IsIoConstInterpolate(VIR_Shader* pShader,
         pSymType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(pSymType));
     }
 
-    if (VIR_GetTypeComponentType(VIR_Type_GetIndex(pSymType)) == VIR_TYPE_FLOAT16)
+    if (VIR_TypeId_isFloat16(VIR_Type_GetIndex(pSymType)))
     {
         WARNING_REPORT(VSC_ERR_NOT_SUPPORTED, "HW can't support smooth for FP16!!!");
         return gcvTRUE;

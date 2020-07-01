@@ -21,7 +21,7 @@
 
 #define vsdTEST_API 0
 
-#define VSC_DI_DIE_PTR(id) ((((id) >= 0) && ((id) <= context->dieTable.usedCount)) ? (&context->dieTable.die[(id)]) : gcvNULL)
+#define VSC_DI_DIE_PTR(id) (((id) == VSC_DI_INVALIDE_DIE ? gcvNULL : (&context->dieTable.die[(id)])))
 #define VSC_DI_HW_LOC_PTR(id) (((id) == VSC_DI_INVALID_HW_LOC ? gcvNULL : (&context->locTable.loc[id])))
 #define VSC_DI_SW_LOC_PTR(id) (((id) == VSC_DI_INVALID_SW_LOC ? gcvNULL : (&context->swLocTable.loc[id])))
 
@@ -2258,7 +2258,12 @@ gctUINT vscDIGetDieOffset(
                         size =  ((VIR_GetTypeSize(die->u.type.type) - 1) / VIR_GetTypeAlignment(die->u.type.type) + 1)
                                 * VIR_GetTypeAlignment(die->u.type.type);
                     }
-                    else/*need more judge to judge struct or union*/
+                    else if(die->tag != VSC_DI_TAG_TYPE)
+                    {
+                        childDie = VSC_DI_DIE_PTR(die->u.type.type);
+                        size = childDie->size;
+                    }
+                    else /*may need more judge to some type*/
                         size = die->size;
                     offset += size * vscGetArrayRelativeAddr(arrDesc, arrlength, arrNum);
                 }
@@ -2413,7 +2418,7 @@ void vscDIGetVariableInfo(
     gctUINT pointerDepth = 0;
     gctUINT structDepth = 0;
     gctUINT dotIndex[10];
-    gctINT dimNum[10];
+    gctINT  dimNum[10];
     gctUINT useRegNum = 0;
 
     vscDIGetIdStrInfo(parentIdStr,
@@ -2658,6 +2663,8 @@ void vscDIGetVariableInfo(
             {
                 if((gctINT)dimDepth +1 < Vdie->u.type.array.numDim)
                     *hwLocCount = 0;
+                else if(!vscDIGetDieisPrimitiveType(Vdie))
+                    *hwLocCount = 0;
                 else
                     *hwLocCount = 1;
             }
@@ -2684,6 +2691,18 @@ void vscDIGetVariableInfo(
             else if(isVectorChild)
             {
                 *childrenCount = VIR_GetTypeLogicalComponents(Vdie->u.variable.type.type);
+            }
+            else if(!vscDIGetDieisPrimitiveType(Vdie))
+            {
+                VSC_DIE * tempDie;
+                *childrenCount = 0;
+                tempDie = VSC_DI_DIE_PTR(die->u.type.type);
+                tempDie = VSC_DI_DIE_PTR(tempDie->child);
+                while(tempDie != gcvNULL)
+                {
+                    *childrenCount +=1;
+                    tempDie = VSC_DI_DIE_PTR(tempDie->sib);
+                }
             }
             else
                 *childrenCount = 0;
