@@ -11219,6 +11219,7 @@ _UpdateSubGroup(
     if (bMeetSubGroupId)
     {
         pPassWorker->pResDestroyReq->s.bInvalidateDu = gcvTRUE;
+        pPassWorker->pResDestroyReq->s.bInvalidateRdFlow= gcvTRUE;
     }
 
     if (pChanged)

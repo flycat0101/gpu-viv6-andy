@@ -1868,6 +1868,7 @@ VSC_ErrCode vscVIR_PostMCCleanup(
     if (bInvalidDu)
     {
         pPassWorker->pResDestroyReq->s.bInvalidateDu = gcvTRUE;
+        pPassWorker->pResDestroyReq->s.bInvalidateRdFlow= gcvTRUE;
     }
     if (bInvalidCfg)
     {

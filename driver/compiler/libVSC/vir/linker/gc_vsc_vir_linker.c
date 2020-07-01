@@ -7511,6 +7511,7 @@ VIR_LinkExternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker)
         pPassWorker->pResDestroyReq->s.bInvalidateCg = gcvTRUE;
         pPassWorker->pResDestroyReq->s.bInvalidateCfg = gcvTRUE;
         pPassWorker->pResDestroyReq->s.bInvalidateDu = gcvTRUE;
+        pPassWorker->pResDestroyReq->s.bInvalidateRdFlow= gcvTRUE;
 
         if (pPassData)
         {
@@ -7689,6 +7690,7 @@ OnError:
         pPassWorker->pResDestroyReq->s.bInvalidateCg = gcvTRUE;
         pPassWorker->pResDestroyReq->s.bInvalidateCfg = gcvTRUE;
         pPassWorker->pResDestroyReq->s.bInvalidateDu = gcvTRUE;
+        pPassWorker->pResDestroyReq->s.bInvalidateRdFlow= gcvTRUE;
     }
 
     return errCode;

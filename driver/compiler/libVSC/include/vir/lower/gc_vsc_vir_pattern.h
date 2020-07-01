@@ -143,10 +143,12 @@ typedef enum _VIR_PATN_FLAG
 
     /**
      * Expand RCP, RSQ, EXP, LOG, SQRT, DIV, IDIV, IMOD, SIN, COS.
-     * These instructions only can be computed one component everytime.
-     * We need expand them now or later at ll.
+     * For these instructions, 1~4 components(dest write mask) can be enabled, however all components have the same result because
+     * all source components use the same value(normally use the value of x channel).
+     * So if there are different source swizzles, we need to expand them.
+     * This flag must be always used with VIR_PATN_FLAG_EXPAND_COMPONENT_INLINE.
      */
-    VIR_PATN_FLAG_EXPAND_MODE_COMPONENT_O2O         = 0x10,
+    VIR_PATN_FLAG_EXPAND_MODE_SAME_COMPONENT_VALUE  = 0x10,
 
     /* Expand DP3, DP4. Reserved. */
     VIR_PATN_FLAG_EXPAND_MODE_COMPONENT_O2N         = 0x20,
@@ -162,7 +164,7 @@ typedef enum _VIR_PATN_FLAG
     VIR_PATN_FLAG_EXPAND_COMP_INLINE_NOT_BY_DST     = 0x100,
 
     VIR_PATN_FLAG_EXPAND_COMP_O2O_SRC_ONLY_INLINE   =  VIR_PATN_FLAG_EXPAND_COMPONENT_INLINE |
-                                                       VIR_PATN_FLAG_EXPAND_MODE_COMPONENT_O2O |
+                                                       VIR_PATN_FLAG_EXPAND_MODE_SAME_COMPONENT_VALUE |
                                                        VIR_PATN_FLAG_EXPAND_COMP_INLINE_NOT_BY_DST,
 
     /*

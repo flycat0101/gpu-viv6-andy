@@ -13480,7 +13480,7 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
     if (pShader->hasRegisterSpill)
     {
         pPassWorker->pResDestroyReq->s.bInvalidateDu = gcvTRUE;
-        pPassWorker->pResDestroyReq->s.bInvalidateCfg= gcvTRUE;
+        pPassWorker->pResDestroyReq->s.bInvalidateRdFlow= gcvTRUE;
     }
 
     if ((gcmOPT_EnableDebug() || gcmOPT_DisableOPTforDebugger()) && ra.DIContext)
