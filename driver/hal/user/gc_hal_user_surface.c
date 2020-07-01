@@ -5037,38 +5037,19 @@ _ComputeClear(
             gcmASSERT(LayerIndex == 0);
             clearValueType = (gceVALUE_TYPE) (ClearArgs->color.valueType | gcvVALUE_FLAG_UNSIGNED_DENORM);
 
-            if (gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_PE_A8B8G8R8))
-            {
-                 Surface->clearValue[0]
-                    /* Convert red to 8-bit. */
-                    = (_ConvertValue(clearValueType,
-                                     ClearArgs->color.r, 8) << 16)
-                  /* Convert green to 8-bit. */
-                    | (_ConvertValue(clearValueType,
-                                     ClearArgs->color.g, 8) << 8)
-                    /* Convert blue to 8-bit. */
-                    |  _ConvertValue(clearValueType,
-                                    ClearArgs->color.b, 8)
-                        /* Convert alpha to 8-bit. */
-                    | (_ConvertValue(clearValueType,
-                                     ClearArgs->color.a, 8) << 24);
-            }
-            else
-            {
-                Surface->clearValue[0]
-                    /* Convert red to 8-bit. */
-                    = (_ConvertValue(clearValueType,
-                                     ClearArgs->color.b, 8) << 16)
-                  /* Convert green to 8-bit. */
-                    | (_ConvertValue(clearValueType,
-                                     ClearArgs->color.g, 8) << 8)
-                    /* Convert blue to 8-bit. */
-                    |  _ConvertValue(clearValueType,
-                                    ClearArgs->color.r, 8)
-                        /* Convert alpha to 8-bit. */
-                    | (_ConvertValue(clearValueType,
-                                     ClearArgs->color.a, 8) << 24);
-            }
+            Surface->clearValue[0]
+                /* Convert red to 8-bit. */
+                = (_ConvertValue(clearValueType,
+                                 ClearArgs->color.b, 8) << 16)
+              /* Convert green to 8-bit. */
+                | (_ConvertValue(clearValueType,
+                                 ClearArgs->color.g, 8) << 8)
+                /* Convert blue to 8-bit. */
+                |  _ConvertValue(clearValueType,
+                                ClearArgs->color.r, 8)
+                    /* Convert alpha to 8-bit. */
+                | (_ConvertValue(clearValueType,
+                                 ClearArgs->color.a, 8) << 24);
 
             Surface->clearValueUpper[0] = Surface->clearValue[0];
             Surface->clearBitMask[LayerIndex] = clearBitMask32;
