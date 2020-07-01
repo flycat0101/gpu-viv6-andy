@@ -4435,6 +4435,7 @@ OUT gctUINT *NumRegNeeded
     case clvQUALIFIER_UNIFORM:
         if(isUniformForAddressSpace) {
            gctSTRING symbol;
+           gctBOOL needFree = gcvFALSE;
 
            switch(addrSpaceQualifier) {
            case clvQUALIFIER_GLOBAL:
@@ -4485,6 +4486,7 @@ OUT gctUINT *NumRegNeeded
                                              &pointer);
                if (gcmIS_ERROR(status))  return status;
                symbol = pointer;
+               needFree = gcvTRUE;
 
                if(length) {
                    gcmVERIFY_OK(gcoOS_PrintStrSafe(symbol,
@@ -4537,6 +4539,10 @@ OUT gctUINT *NumRegNeeded
                                            storageQualifier,
                                            variable);
            if (gcmIS_ERROR(status)) return status;
+           if (needFree == gcvTRUE)
+           {
+               gcmVERIFY_OK(cloCOMPILER_Free(Compiler, symbol));
+           }
         }
         else {
             clsGEN_CODE_DATA_TYPE format;

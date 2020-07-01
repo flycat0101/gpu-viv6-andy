@@ -4257,7 +4257,7 @@ gcOpt_CopyOutShader(
                 /* Free any variables. */
                 if (kernelFunction->localVariables != gcvNULL)
                 {
-                    for (j = 0; j < Shader->kernelFunctions[j]->localVariableCount; j++)
+                    for (j = 0; j < kernelFunction->localVariableCount; j++)
                     {
                         /* Free the gcVARIABLE structure. */
                         gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction->localVariables[j]));
@@ -4336,6 +4336,21 @@ gcOpt_CopyOutShader(
                         /* Free argument array. */
                         gcmVERIFY_OK(gcmOS_SAFE_FREE(os, shaderFunction->arguments));
                     }
+
+                    /* Free any variables. */
+                    if (shaderFunction->localVariables != gcvNULL)
+                    {
+                        gctUINT m;
+                        for (m = 0; m < shaderFunction->localVariableCount; m++)
+                        {
+                            /* Free the gcVARIABLE structure. */
+                            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, shaderFunction->localVariables[m]));
+                        }
+
+                        /* Free the array of gcVARIABLE pointers. */
+                        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, shaderFunction->localVariables));
+                        shaderFunction->localVariableCount = 0;
+                    }
                     gcmVERIFY_OK(gcmOS_SAFE_FREE(os, shaderFunction));
                     Shader->functions[j] = gcvNULL;
 
@@ -4382,6 +4397,65 @@ gcOpt_CopyOutShader(
                             /* Free argument array. */
                             gcmVERIFY_OK(gcmOS_SAFE_FREE(os, kernelFunction->arguments));
                         }
+
+                        /* Free any uniforms. */
+                        if (kernelFunction->uniformArguments != gcvNULL)
+                        {
+                            gctUINT m;
+                            for (m = 0; m < kernelFunction->uniformArgumentCount; m++)
+                            {
+                                /* Free the gcUNIFORM structure. */
+                                gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction->uniformArguments[m]));
+                            }
+
+                            /* Free the array of gcUNIFORM pointers. */
+                            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction->uniformArguments));
+                            kernelFunction->uniformArgumentArrayCount = 0;
+                            kernelFunction->uniformArgumentCount = 0;
+                        }
+
+                        /* Free any variables. */
+                        if (kernelFunction->localVariables != gcvNULL)
+                        {
+                            gctUINT m;
+                            for (m = 0; m < kernelFunction->localVariableCount; m++)
+                            {
+                                /* Free the gcVARIABLE structure. */
+                                gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction->localVariables[m]));
+                            }
+
+                            /* Free the array of gcVARIABLE pointers. */
+                            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction->localVariables));
+                            kernelFunction->localVariableCount = 0;
+                        }
+
+                        /* Free any image samplers. */
+                        if (kernelFunction->imageSamplers != gcvNULL)
+                        {
+                             /* Free the array of gcsIMAGE_SAMPLER pointers. */
+                            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction->imageSamplers));
+                            kernelFunction->imageSamplerArrayCount = 0;
+                            kernelFunction->imageSamplerCount = 0;
+                        }
+
+                        /* Free any properties. */
+                        if (kernelFunction->properties != gcvNULL)
+                        {
+                            /* Free the gcKERNEL_FUNCTION_PROPERTY structure. */
+                            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction->properties));
+                            kernelFunction->propertyArrayCount = 0;
+                            kernelFunction->propertyCount = 0;
+                        }
+
+                        /* Free any property values. */
+                        if (kernelFunction->propertyValues != gcvNULL)
+                        {
+                            /* Free the gctUINT array. */
+                            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction->propertyValues));
+                            kernelFunction->propertyValueArrayCount = 0;
+                            kernelFunction->propertyValueCount = 0;
+                        }
+
                         gcmVERIFY_OK(gcmOS_SAFE_FREE(os, kernelFunction));
                         Shader->kernelFunctions[k] = gcvNULL;
                     }
@@ -4431,6 +4505,22 @@ gcOpt_CopyOutShader(
                 /* Free argument array. */
                 gcmVERIFY_OK(gcmOS_SAFE_FREE(os, shaderFunction->arguments));
             }
+
+            /* Free any variables. */
+            if (shaderFunction->localVariables != gcvNULL)
+            {
+                gctUINT m;
+                for (m = 0; m < shaderFunction->localVariableCount; m++)
+                {
+                    /* Free the gcVARIABLE structure. */
+                    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, shaderFunction->localVariables[m]));
+                }
+
+                /* Free the array of gcVARIABLE pointers. */
+                gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, shaderFunction->localVariables));
+                shaderFunction->localVariableCount = 0;
+            }
+
             gcmVERIFY_OK(gcmOS_SAFE_FREE(os, shaderFunction));
             Shader->functions[j] = gcvNULL;
 
@@ -4458,6 +4548,65 @@ gcOpt_CopyOutShader(
                     /* Free argument array. */
                     gcmVERIFY_OK(gcmOS_SAFE_FREE(os, kernelFunction->arguments));
                 }
+
+                /* Free any uniforms. */
+                if (kernelFunction->uniformArguments != gcvNULL)
+                {
+                    gctUINT m;
+                    for (m = 0; m < kernelFunction->uniformArgumentCount; m++)
+                    {
+                        /* Free the gcUNIFORM structure. */
+                        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction->uniformArguments[m]));
+                    }
+
+                    /* Free the array of gcUNIFORM pointers. */
+                    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction->uniformArguments));
+                    kernelFunction->uniformArgumentArrayCount = 0;
+                    kernelFunction->uniformArgumentCount = 0;
+                }
+
+                /* Free any variables. */
+                if (kernelFunction->localVariables != gcvNULL)
+                {
+                    gctUINT m;
+                    for (m = 0; m < kernelFunction->localVariableCount; m++)
+                    {
+                        /* Free the gcVARIABLE structure. */
+                        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction->localVariables[m]));
+                    }
+
+                    /* Free the array of gcVARIABLE pointers. */
+                    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction->localVariables));
+                    kernelFunction->localVariableCount = 0;
+                }
+
+                /* Free any image samplers. */
+                if (kernelFunction->imageSamplers != gcvNULL)
+                {
+                     /* Free the array of gcsIMAGE_SAMPLER pointers. */
+                    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction->imageSamplers));
+                    kernelFunction->imageSamplerArrayCount = 0;
+                    kernelFunction->imageSamplerCount = 0;
+                }
+
+                /* Free any properties. */
+                if (kernelFunction->properties != gcvNULL)
+                {
+                    /* Free the gcKERNEL_FUNCTION_PROPERTY structure. */
+                    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction->properties));
+                    kernelFunction->propertyArrayCount = 0;
+                    kernelFunction->propertyCount = 0;
+                }
+
+                /* Free any property values. */
+                if (kernelFunction->propertyValues != gcvNULL)
+                {
+                    /* Free the gctUINT array. */
+                    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction->propertyValues));
+                    kernelFunction->propertyValueArrayCount = 0;
+                    kernelFunction->propertyValueCount = 0;
+                }
+
                 gcmVERIFY_OK(gcmOS_SAFE_FREE(os, kernelFunction));
             }
             Shader->kernelFunctions[k] = gcvNULL;
