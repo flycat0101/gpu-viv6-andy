@@ -769,6 +769,12 @@ static gctBOOL _IsFakeSGV(VIR_Shader* pUpperShader, VIR_Shader* pLowerShader,
         (attrBuiltinName == VIR_NAME_CULL_DISTANCE || attrBuiltinName == VIR_NAME_IN_CULL_DISTANCE)
         )
     {
+        /* All OGL that before GL4.00 need ClipDistance/CullDistance have the same size for all stages. */
+        if (VIR_Shader_IsDesktopGL(pLowerShader) && !VIR_Shader_IsGL40(pLowerShader))
+        {
+            return gcvTRUE;
+        }
+
         if (pUpperShader->shaderKind != VIR_SHADER_VERTEX)
         {
             return gcvTRUE;
@@ -839,6 +845,12 @@ static gctBOOL _IsFakeSIV(VIR_Shader* pUpperShader, VIR_Shader* pLowerShader,
         (outputBuiltinName == VIR_NAME_CULL_DISTANCE || outputBuiltinName == VIR_NAME_IN_CULL_DISTANCE)
         )
     {
+        /* All OGL that before GL4.00 need ClipDistance/CullDistance have the same size for all stages. */
+        if (VIR_Shader_IsDesktopGL(pLowerShader) && !VIR_Shader_IsGL40(pLowerShader))
+        {
+            return gcvTRUE;
+        }
+
         if (pLowerShader->shaderKind != VIR_SHADER_FRAGMENT)
         {
             return gcvTRUE;
