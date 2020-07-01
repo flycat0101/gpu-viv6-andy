@@ -2804,6 +2804,7 @@ typedef enum _VIR_UNIFORMKIND
     VIR_UNIFORM_GLOBAL_WORK_SCALE,
     VIR_UNIFORM_VIEW_INDEX,
     VIR_UNIFORM_THREAD_ID_MEM_ADDR,
+    VIR_UNIFORM_CLIP_DISTANCE_ENABLE,
     VIR_UNIFORM_YCBCR_PLANE,
     VIR_UNIFORM_VIRTUAL_FOR_UBO,
     /* should not larger than 2^6, since it is using storageClass,
@@ -7807,6 +7808,11 @@ VIR_Uniform *
 VIR_Shader_GetTempRegSpillAddrUniform(
     IN VIR_Shader *pShader,
     IN gctBOOL     bNeedBoundsCheck
+    );
+
+VIR_Uniform *
+VIR_Shader_GetClipDistanceEnableUniform(
+    IN VIR_Shader *  Shader
     );
 
 gctUINT
