@@ -1420,12 +1420,13 @@ static void _VIR_RA_LS_Init(
 
     pRA->samplePosRegister = VIR_INVALID_ID;
 
-    pRA->currentMaxRegCount = VIR_RA_LS_REG_MAX;
+    pRA->currentMaxGRCount = VIR_RA_LS_REG_MAX;
 
     pRA->DIContext = gcvNULL;
     VIR_RA_LS_SetExtendLSEndPoint(pRA, gcvFALSE);
     VIR_RA_LS_SetInstIdChanged(pRA, gcvFALSE);
     VIR_RA_LS_SetEnableDebug(pRA, gcvFALSE);
+    VIR_RA_LS_SetDisableDual16AndRecolor(pRA, gcvFALSE);
 }
 
 static VSC_ErrCode
@@ -3707,18 +3708,27 @@ void _VIR_RA_LS_SetMaxAllocReg(
 
 gctUINT
 _VIR_RA_LS_GetMaxReg(
-    VIR_RA_LS   *pRA,
-    gctUINT     hwType,
-    gctUINT     reservedDataReg)
+    VIR_RA_LS           *pRA,
+    VIR_RA_HWReg_Type   hwType,
+    gctUINT             reservedDataReg)
 {
     VIR_Shader          *pShader = VIR_RA_LS_GetShader(pRA);
     VIR_RA_ColorPool    *pCP = VIR_RA_LS_GetColorPool(pRA);
     VSC_HW_CONFIG       *hwConfig = VIR_RA_LS_GetHwCfg(pRA);
     gctUINT             maxReg = pCP->colorMap[hwType].maxReg;
 
-    if (pRA->currentMaxRegCount != VIR_RA_LS_REG_MAX)
+    gcmASSERT(hwType == VIR_RA_HWREG_GR || hwType == VIR_RA_HWREG_A0 || hwType == VIR_RA_HWREG_B0);
+
+    /* Now only the count of the general registers are floating, the other kinds of registers are all fixed. */
+    if (hwType != VIR_RA_HWREG_GR)
     {
-        maxReg = pRA->currentMaxRegCount;
+        return maxReg;
+    }
+
+    /* Check if we need to adjust the maximum number. */
+    if (pRA->currentMaxGRCount != VIR_RA_LS_REG_MAX)
+    {
+        maxReg = pRA->currentMaxGRCount;
     }
     else
     {
@@ -3738,8 +3748,7 @@ _VIR_RA_LS_GetMaxReg(
 
         /* we need to reserve 3 more registers (baseRegister/movaRegister) +
            data registers for spilling */
-        if (reservedDataReg > 0 &&
-            hwType == VIR_RA_HWREG_GR)
+        if (reservedDataReg > 0)
         {
             if (maxReg > reservedDataReg + 1 + pRA->movaRegCount)
             {
@@ -3751,10 +3760,7 @@ _VIR_RA_LS_GetMaxReg(
             }
         }
 
-        if (hwType == VIR_RA_HWREG_GR)
-        {
-            pRA->currentMaxRegCount = maxReg;
-        }
+        pRA->currentMaxGRCount = maxReg;
     }
 
     return maxReg;
@@ -6743,7 +6749,7 @@ _VIR_RA_LS_computeWeight(
 }
 
 /* ===========================================================================
-   _VIR_RA_LS_AssignColors
+   _VIR_RA_LS_AssignColorsForGeneralReg
    assign color to the webs in the function
    ===========================================================================
 */
@@ -6814,6 +6820,7 @@ void  _VIR_RA_LS_Reserve_AttrColor(
     for (webIdx = 0; webIdx < VIR_RA_LS_GetNumWeb(pRA); webIdx++)
     {
         pLR = _VIR_RA_LS_Web2LR(pRA, webIdx);
+
         if (pLR->liveFunc == pFunc &&
             pLR->colorFunc == VIR_RA_LS_ATTRIBUTE_FUNC)
         {
@@ -7215,7 +7222,7 @@ VSC_ErrCode  _VIR_RA_LS_AssignColorLR(
     return retValue;
 }
 
-VSC_ErrCode _VIR_RA_LS_AssignColors(
+VSC_ErrCode _VIR_RA_LS_AssignColorsForGeneralReg(
     VIR_RA_LS       *pRA,
     VIR_Function    *pFunc,
     gctUINT         reservedDataReg)
@@ -11246,6 +11253,11 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
     switch(opcode)
     {
     case VIR_OP_MOVA:
+        /*
+        ** If the dest operand of a MOVA is invalid(optimize this in _VIR_RA_LS_AssignColorForA0B0Inst),
+        ** then we don't need to write the source operand.
+        */
+        if (VIR_Operand_GetHwRegId(VIR_Inst_GetDest(pInst)) != VIR_INVALID_HWREG)
         {
             _VIR_RA_LS_RewriteColor_Src(pRA, pInst, pInst->src[0], pInst, pInst->src[0]);
         }
@@ -11743,16 +11755,18 @@ _VIR_RA_LS_ClearUsedColorFromActiveLR(
     return gcvFALSE;
 }
 
-VSC_ErrCode _VIR_RA_LS_AssignColorA0Inst(
+VSC_ErrCode _VIR_RA_LS_AssignColorForA0B0Inst(
     VIR_RA_LS           *pRA,
     VIR_Function        *pFunc,
-    VIR_Instruction     *pInst)
+    VIR_Instruction     *pInst
+    )
 {
     VSC_ErrCode         retValue  = VSC_ERR_NONE;
     VIR_Shader          *pShader = VIR_RA_LS_GetShader(pRA);
     VIR_OpCode          opcode    = VIR_Inst_GetOpcode(pInst);
     gctUINT             defIdx = VIR_INVALID_DEF_INDEX;
     VIR_RA_LS_Liverange *pMovaLR;
+    VIR_RA_LS_Liverange *pBaseLR;
     VIR_RA_HWReg_Color  curColor;
     VIR_Operand         *pOpnd = gcvNULL;
     gctUINT             webIdx = VIR_INVALID_WEB_INDEX;
@@ -11760,11 +11774,112 @@ VSC_ErrCode _VIR_RA_LS_AssignColorA0Inst(
     VSC_OPTN_RAOptions  *pOption = VIR_RA_LS_GetOptions(pRA);
     VIR_DEF_USAGE_INFO  *pDuInfo = VIR_RA_LS_GetLvInfo(pRA)->pDuInfo;
     gctBOOL             bClearUsedColor = gcvFALSE;
+    gctBOOL             bRegisterSpill = pShader->hasRegisterSpill;
+    gctBOOL             bTryToDisableDual16AndRecolor = gcvFALSE;
+    gctBOOL             bUnderDual16 = gcvFALSE;
 
     curColor = InvalidColor;
 
+    if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetOPTS(pOption), VSC_OPTN_RAOptions_DISABLE_DUAL16_FOR_A0B0))
+    {
+        bTryToDisableDual16AndRecolor = gcvTRUE;
+    }
+
     if (opcode == VIR_OP_MOVA)
     {
+        /*
+        ** When all usage operands of this MOVA are spilled, we don't need to assign A0/B0 for the DEST of this MOVA
+        ** because in that case we generate a extra MAD to calcuate the offset of the base operand and
+        ** use LOAD/STORE to access the usage operands, not the temp register directly.
+        */
+        if (bRegisterSpill)
+        {
+            VIR_OperandInfo         instDstInfo;
+            VIR_Enable              enable = VIR_Inst_GetEnable(pInst);
+            gctUINT8                channel;
+            VIR_GENERAL_DU_ITERATOR instDUIter;
+            VIR_USAGE*              pInstUsage = gcvNULL;
+            VIR_OpCode              usageInstOpcode;
+            VIR_Instruction*        pUsageInst = gcvNULL;
+            gctBOOL                 bAllUsageSpilled = gcvTRUE;
+
+            VIR_Operand_GetOperandInfo(pInst, VIR_Inst_GetDest(pInst), &instDstInfo);
+
+            for (channel = 0; channel < VIR_CHANNEL_COUNT; ++channel)
+            {
+                if (bAllUsageSpilled == gcvFALSE)
+                {
+                    break;
+                }
+
+                if (!(enable & (1 << channel)))
+                {
+                    continue;
+                }
+
+                /* Get all usage instructions. */
+                vscVIR_InitGeneralDuIterator(&instDUIter,
+                                             pRA->pLvInfo->pDuInfo,
+                                             pInst,
+                                             instDstInfo.u1.virRegInfo.virReg,
+                                             channel,
+                                             gcvFALSE);
+                for (pInstUsage = vscVIR_GeneralDuIterator_First(&instDUIter);
+                     pInstUsage != gcvNULL;
+                     pInstUsage = vscVIR_GeneralDuIterator_Next(&instDUIter))
+                {
+                    pUsageInst = pInstUsage->usageKey.pUsageInst;
+
+                    if (VIR_IS_OUTPUT_USAGE_INST(pUsageInst))
+                    {
+                        continue;
+                    }
+
+                    /* Get the base operand LR. */
+                    usageInstOpcode = VIR_Inst_GetOpcode(pUsageInst);
+                    if (usageInstOpcode == VIR_OP_LDARR)
+                    {
+                        webIdx = _VIR_RA_LS_SrcOpnd2WebIdx(pRA, pUsageInst, VIR_Inst_GetSource(pUsageInst, 0));
+                        if (webIdx == VIR_INVALID_WEB_INDEX)
+                        {
+                            bAllUsageSpilled = gcvFALSE;
+                            break;
+                        }
+                        pBaseLR = _VIR_RA_LS_Web2ColorLR(pRA, webIdx);
+                    }
+                    else if (usageInstOpcode == VIR_OP_STARR)
+                    {
+                        defIdx = _VIR_RA_LS_InstFirstDefIdx(pRA, pUsageInst);
+                        if (defIdx == VIR_INVALID_DEF_INDEX)
+                        {
+                            bAllUsageSpilled = gcvFALSE;
+                            break;
+                        }
+                        pBaseLR = _VIR_RA_LS_Def2ColorLR(pRA, defIdx);
+                    }
+                    else
+                    {
+                        /* Invalid case here. */
+                        gcmASSERT(gcvFALSE);
+                        bAllUsageSpilled = gcvFALSE;
+                        break;
+                    }
+
+                    if (pBaseLR == gcvNULL || !isLRSpilled(pBaseLR))
+                    {
+                        bAllUsageSpilled = gcvFALSE;
+                        break;
+                    }
+                }
+            }
+
+            if (bAllUsageSpilled)
+            {
+                _VIR_RA_LS_ExpireActiveLRs(pRA, VIR_Inst_GetId(pInst));
+                return retValue;
+            }
+        }
+
         defIdx = _VIR_RA_LS_InstFirstDefIdx(pRA, pInst);
         pMovaLR = _VIR_RA_LS_Def2ColorLR(pRA, defIdx);
         webIdx = pMovaLR->webIdx;
@@ -11782,10 +11897,23 @@ VSC_ErrCode _VIR_RA_LS_AssignColorA0Inst(
             else
             {
                 curColor = _VIR_RA_LS_FindNewColor(pRA, webIdx, VIR_Shader_isDual16Mode(pShader), 0, -1, gcvNULL);
+                bUnderDual16 = VIR_Shader_isDual16Mode(pShader);
             }
 
+            /*
+            ** Here are two solutions when failing to find a new color:
+            **  1) Disable dual16 if it is possible and re-color.
+            **  2) Clear the used color from the active LRs, then try to find the new color again.
+            */
             if (_VIR_RA_LS_IsInvalidColor(curColor))
             {
+                /* Disable dual16 if it is possible and re-color. */
+                if (bTryToDisableDual16AndRecolor && bUnderDual16)
+                {
+                    VIR_RA_LS_SetDisableDual16AndRecolor(pRA, gcvTRUE);
+                    return retValue;
+                }
+
                 /* Clear the used color from the active LRs, then try to find the new color again. */
                 bClearUsedColor = _VIR_RA_LS_ClearUsedColorFromActiveLR(pRA, webIdx);
 
@@ -11816,7 +11944,7 @@ VSC_ErrCode _VIR_RA_LS_AssignColorA0Inst(
                 }
                 else
                 {
-                    retValue = VSC_RA_ERR_OUT_OF_REG_FAIL;
+                    retValue = VSC_RA_ERR_OUT_OF_A0B0_REG_FAIL;
                     return retValue;
                 }
             }
@@ -11838,30 +11966,66 @@ VSC_ErrCode _VIR_RA_LS_AssignColorA0Inst(
     }
     else if (opcode == VIR_OP_LDARR || opcode == VIR_OP_STARR)
     {
-        VIR_Instruction *pNewInst = gcvNULL, *pDefInst = gcvNULL;
-        VIR_Operand     *pNewOpnd = gcvNULL;
+        VIR_Instruction         *pNewInst = gcvNULL, *pDefInst = gcvNULL;
+        VIR_Operand             *pNewOpnd = gcvNULL;
         VIR_GENERAL_UD_ITERATOR udIter;
-        VIR_DEF     *pDef = gcvNULL;
-        VIR_RA_LS_Liverange *pMovaSrc0;
-        VIR_Swizzle         src_swizzle = VIR_SWIZZLE_INVALID;
+        VIR_DEF                 *pDef = gcvNULL;
+        VIR_RA_LS_Liverange     *pMovaSrc0;
+        VIR_Swizzle             src_swizzle = VIR_SWIZZLE_INVALID;
         gctUINT                 indexSymId;
         VIR_Symbol              *indexSym;
         VIR_Type                *pOpndType = gcvNULL;
         VIR_OperandInfo         operandInfo;
 
+        pBaseLR = gcvNULL;
+
         if (opcode == VIR_OP_LDARR)
         {
             pOpnd = VIR_Inst_GetSource(pInst, 1);
+
+            /* When register spill is enable, try to get the base LR. */
+            if (bRegisterSpill)
+            {
+                webIdx = _VIR_RA_LS_SrcOpnd2WebIdx(pRA, pInst, VIR_Inst_GetSource(pInst, 0));
+                if (webIdx != VIR_INVALID_WEB_INDEX)
+                {
+                    pBaseLR = _VIR_RA_LS_Web2ColorLR(pRA, webIdx);
+                }
+                else
+                {
+                    pBaseLR = gcvNULL;
+                }
+            }
         }
         else
         {
             pOpnd = VIR_Inst_GetSource(pInst, 0);
+
+            /* When register spill is enable, try to get the base LR. */
+            if (bRegisterSpill)
+            {
+                defIdx = _VIR_RA_LS_InstFirstDefIdx(pRA, pInst);
+                if (defIdx != VIR_INVALID_DEF_INDEX)
+                {
+                    pBaseLR = _VIR_RA_LS_Def2ColorLR(pRA, defIdx);
+                }
+                else
+                {
+                    pBaseLR = gcvNULL;
+                }
+            }
         }
+
         webIdx = _VIR_RA_LS_SrcOpnd2WebIdx(pRA, pInst, pOpnd);
         /* assume LDARR/STARR dst, base, immediate is already simplified*/
         gcmASSERT(webIdx != VIR_INVALID_WEB_INDEX);
+
         pMovaLR = _VIR_RA_LS_Web2ColorLR(pRA, webIdx);
-        if (_VIR_RA_LS_IsInvalidColor(_VIR_RA_GetLRColor(pMovaLR)))
+
+        /* If the base operand is spilled, then it loads the data from the memory, and it doesn't need a A0/B0 register. */
+        if ((pBaseLR == gcvNULL || !isLRSpilled(pBaseLR))
+            &&
+            _VIR_RA_LS_IsInvalidColor(_VIR_RA_GetLRColor(pMovaLR)))
         {
             curColor = _VIR_RA_LS_FindNewColor(pRA, webIdx, VIR_Shader_isDual16Mode(pShader), 0, -1, gcvNULL);
 
@@ -11877,7 +12041,7 @@ VSC_ErrCode _VIR_RA_LS_AssignColorA0Inst(
 
                 if(_VIR_RA_LS_IsInvalidColor(curColor))
                 {
-                    retValue = VSC_RA_ERR_OUT_OF_REG_FAIL;
+                    retValue = VSC_RA_ERR_OUT_OF_A0B0_REG_FAIL;
                     return retValue;
                 }
             }
@@ -12019,60 +12183,66 @@ VSC_ErrCode _VIR_RA_LS_AssignColorA0Inst(
 }
 
 VSC_ErrCode
-_VIR_RA_LS_AssignColorA0(
+_VIR_RA_LS_AssignColorForA0B0(
     VIR_RA_LS       *pRA,
-    VIR_Function    *pFunc)
+    VIR_Function    *pFunc
+    )
 {
     VSC_ErrCode         retValue  = VSC_ERR_NONE;
     VIR_Instruction     *pInst;
     VIR_InstIterator    instIter;
-    VIR_Dumper              *pDumper = VIR_RA_LS_GetDumper(pRA);
-    VSC_OPTN_RAOptions      *pOption = VIR_RA_LS_GetOptions(pRA);
+    VIR_Dumper          *pDumper = VIR_RA_LS_GetDumper(pRA);
+    VSC_OPTN_RAOptions  *pOption = VIR_RA_LS_GetOptions(pRA);
 
     if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption),
         VSC_OPTN_RAOptions_TRACE_ASSIGN_COLOR))
     {
-        VIR_LOG(pDumper, "============== Assign color for A0 registers ==============\n");
+        VIR_LOG(pDumper, "============== Assign color for A0/B0 registers ==============\n");
         VIR_LOG_FLUSH(pDumper);
     }
 
     VIR_Shader_SetCurrentFunction(VIR_RA_LS_GetShader(pRA), pFunc);
 
     VIR_InstIterator_Init(&instIter, &pFunc->instList);
-    pInst = (VIR_Instruction *)VIR_InstIterator_First(&instIter);
-
-    for (; pInst != gcvNULL;
-        pInst = (VIR_Instruction *)VIR_InstIterator_Next(&instIter))
+    for (pInst = (VIR_Instruction *)VIR_InstIterator_First(&instIter);
+         pInst != gcvNULL;
+         pInst = (VIR_Instruction *)VIR_InstIterator_Next(&instIter))
     {
-        retValue = _VIR_RA_LS_AssignColorA0Inst(pRA, pFunc, pInst);
-        CHECK_ERROR(retValue, "_VIR_RA_LS_AssignColorA0Inst");
+        retValue = _VIR_RA_LS_AssignColorForA0B0Inst(pRA, pFunc, pInst);
+        CHECK_ERROR(retValue, "Fail to assign A0/B0 color instruction.");
+
+        /* No need to check the left instructions when we need to re-color. */
+        if (VIR_RA_LS_GetDisableDual16AndRecolor(pRA))
+        {
+            return retValue;
+        }
     }
 
     return retValue;
 }
 
 /* ===========================================================================
-   VIR_RA_LS_PerformOnFunction
+   VIR_RA_LS_PerformOnFunction_Pre
    linear scan register allocation on function
+   we can't insert any new instruction in this function!!!!!!
    ===========================================================================
 */
-static VSC_ErrCode _VIR_RA_LS_PerformOnFunction(
+static VSC_ErrCode _VIR_RA_LS_PerformOnFunction_Pre(
     VIR_RA_LS       *pRA,
     gctUINT         reservedDataReg)
 {
-    VSC_ErrCode retValue  = VSC_ERR_NONE;
-
+    VSC_ErrCode             retValue  = VSC_ERR_NONE;
     VIR_Shader              *pShader = VIR_RA_LS_GetShader(pRA);
     VIR_Function            *pFunc = VIR_Shader_GetCurrentFunction(pShader);
     VIR_Dumper              *pDumper = VIR_RA_LS_GetDumper(pRA);
     VSC_OPTN_RAOptions      *pOption = VIR_RA_LS_GetOptions(pRA);
     VIR_LIVENESS_INFO       *pLvInfo = VIR_RA_LS_GetLvInfo(pRA);
-    VIR_CONTROL_FLOW_GRAPH* pCfg = VIR_Function_GetCFG(pFunc);
+    VIR_CONTROL_FLOW_GRAPH  *pCfg = VIR_Function_GetCFG(pFunc);
 
     if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption),
         VSC_OPTN_RAOptions_TRACE))
     {
-        VIR_LOG(pDumper, "\nProcessing function:\t[%s]\n",
+        VIR_LOG(pDumper, "\nPre Processing function:\t[%s]\n",
             VIR_Shader_GetSymNameString(pShader, VIR_Function_GetSymbol(pFunc)));
         VIR_LOG_FLUSH(pDumper);
     }
@@ -12089,10 +12259,6 @@ static VSC_ErrCode _VIR_RA_LS_PerformOnFunction(
         VIR_LOG_FLUSH(pDumper);
     }
 
-    /* assign color for A0 and support A0 spill*/
-    retValue = _VIR_RA_LS_AssignColorA0(pRA, pFunc);
-    CHECK_ERROR(retValue, "_VIR_RA_LS_AssignColorA0");
-
     /* sort live ranges in LRTable for pFunc */
     retValue = _VIR_RA_LS_SortLRTable(pRA, pFunc);
     CHECK_ERROR(retValue, "_VIR_RA_LS_SortLRTable");
@@ -12100,7 +12266,47 @@ static VSC_ErrCode _VIR_RA_LS_PerformOnFunction(
     /* compute weight for each LR */
     _VIR_RA_LS_computeWeight(pRA, pFunc);
 
-    retValue = _VIR_RA_LS_AssignColors(pRA, pFunc, reservedDataReg);
+    /* Assign the colors for the generate registers. */
+    retValue = _VIR_RA_LS_AssignColorsForGeneralReg(pRA, pFunc, reservedDataReg);
+    CHECK_ERROR(retValue, "Fail to assign colors for the generate registers.");
+
+    return retValue;
+}
+
+/* ===========================================================================
+   VIR_RA_LS_PerformOnFunction_Post
+   post linear scan register allocation on function
+   we can insert any new instruction in this function.
+   ===========================================================================
+*/
+static VSC_ErrCode _VIR_RA_LS_PerformOnFunction_Post(
+    VIR_RA_LS       *pRA,
+    gctUINT         reservedDataReg
+    )
+{
+    VSC_ErrCode             retValue  = VSC_ERR_NONE;
+    VIR_Shader              *pShader = VIR_RA_LS_GetShader(pRA);
+    VIR_Function            *pFunc = VIR_Shader_GetCurrentFunction(pShader);
+    VIR_Dumper              *pDumper = VIR_RA_LS_GetDumper(pRA);
+    VSC_OPTN_RAOptions      *pOption = VIR_RA_LS_GetOptions(pRA);
+
+    if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption),
+        VSC_OPTN_RAOptions_TRACE))
+    {
+        VIR_LOG(pDumper, "\nPost Processing function:\t[%s]\n",
+            VIR_Shader_GetSymNameString(pShader, VIR_Function_GetSymbol(pFunc)));
+        VIR_LOG_FLUSH(pDumper);
+    }
+
+    /* I: Assign colors for A0/B0. */
+    retValue = _VIR_RA_LS_AssignColorForA0B0(pRA, pFunc);
+    CHECK_ERROR(retValue, "Fail to assign colors for the A0/B0 registers.");
+
+    /* No need to check the left instructions when we need to re-color. */
+    if (VIR_RA_LS_GetDisableDual16AndRecolor(pRA))
+    {
+        return retValue;
+    }
 
     return retValue;
 }
@@ -12931,8 +13137,9 @@ _VIR_RA_ClearColorPool(
         VIR_Shader_SetDual16Mode(pShader, gcvFALSE);
     }
 
-    (pRA)->currentMaxRegCount = VIR_RA_LS_REG_MAX;
+    (pRA)->currentMaxGRCount = VIR_RA_LS_REG_MAX;
     _VIR_RA_FlaseDepReg_ClearAll(pRA);
+    VIR_RA_LS_SetDisableDual16AndRecolor(pRA, gcvFALSE);
 }
 
 DEF_QUERY_PASS_PROP(VIR_RA_LS_PerformTempRegAlloc)
@@ -13068,12 +13275,12 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
                 gctBOOL     reColor = gcvFALSE;
                 gctBOOL     bSpillReg = gcvFALSE;
 
-                /* build the live range and assign color to */
+                /* I: build the live range and assign color for the general registers. */
                 for (funcIdx = 0; funcIdx < countOfFuncBlk; funcIdx ++)
                 {
                     pFunc = ppFuncBlkRPO[funcIdx]->pVIRFunc;
                     VIR_Shader_SetCurrentFunction(pShader, pFunc);
-                    retValue = _VIR_RA_LS_PerformOnFunction(&ra, reservedDataReg);
+                    retValue = _VIR_RA_LS_PerformOnFunction_Pre(&ra, reservedDataReg);
 
                     if (retValue == VSC_RA_ERR_OUT_OF_REG_SPILL ||
                         retValue == VSC_RA_ERR_OUT_OF_REG_FAIL)
@@ -13145,6 +13352,7 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
                     ON_ERROR(retValue, "_VIR_RA_LS_PerformOnFunction");
                 }
 
+                /* II: check if we need to re-color. */
                 if (!reColor)
                 {
                     if (pShader->hasRegisterSpill)
@@ -13175,19 +13383,48 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
                         else
                         {
                             colorSucceed = gcvTRUE;
-                            break;
                         }
                     }
                     else
                     {
                         colorSucceed = gcvTRUE;
+                    }
+                }
+
+                /* III: do the post perform on functions. */
+                if (colorSucceed)
+                {
+                    /*
+                    ** All general LRs are assigned successfully, now we can do some post works,
+                    ** including assign colors for the A0/B0 registers.
+                    */
+                    for (funcIdx = 0; funcIdx < countOfFuncBlk; funcIdx ++)
+                    {
+                        pFunc = ppFuncBlkRPO[funcIdx]->pVIRFunc;
+                        VIR_Shader_SetCurrentFunction(pShader, pFunc);
+                        retValue = _VIR_RA_LS_PerformOnFunction_Post(&ra, reservedDataReg);
+                        CHECK_ERROR(retValue, "Fail to post perform on the functions.");
+
+                        if (VIR_RA_LS_GetDisableDual16AndRecolor(&ra))
+                        {
+                            gcmASSERT(VIR_Shader_isDual16Mode(pShader));
+                            VIR_Shader_SetDual16Mode(pShader, gcvFALSE);
+                            reColor = gcvTRUE;
+                            colorSucceed = gcvFALSE;
+                            VIR_RA_LS_SetDisableDual16AndRecolor(&ra, gcvFALSE);
+                            break;
+                        }
+                    }
+
+                    if (colorSucceed)
+                    {
                         break;
                     }
                 }
 
+                /* IV: We need to clear the color pool if we need to re-color. */
                 if (reColor)
                 {
-                    /* clear color pool */
                     _VIR_RA_ClearColorPool(&ra, bSpillReg, reservedDataReg, gcvFALSE);
                 }
             }
