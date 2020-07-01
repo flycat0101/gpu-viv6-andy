@@ -458,6 +458,7 @@ conv2VirsVirBuiltinMap _virBuiltinMap[] =
     { "gl_BoundingBox", {0, VIR_STORAGE_PERPATCH_INOUT, 0,}},
     { "gl_LastFragData", {0, VIR_STORAGE_INPUT, 0,}},
     { "#cluster_id", {0, 0, 0, VIR_STORAGE_INPUT,}},
+    { "gl_ClipDistance", {0, 0, 0, VIR_STORAGE_OUTPUT,}},
 };
 
 #define _gcdBuiltinMapCount (sizeof(_virBuiltinMap)/sizeof(conv2VirsVirBuiltinMap))
@@ -1466,6 +1467,7 @@ _ConvBuiltinNameKindToVirNameId(
     Case(gcSL_BOUNDING_BOX, VIR_NAME_BOUNDING_BOX);
     Case(gcSL_LAST_FRAG_DATA, VIR_NAME_LAST_FRAG_DATA);
     Case(gcSL_CLUSTER_ID, VIR_NAME_CLUSTER_ID);
+    Case(gcSL_CLIP_DISTANCE, VIR_NAME_CLIP_DISTANCE);
     default:
         if((gctINT) Kind < 0) {
             gcmASSERT(0);

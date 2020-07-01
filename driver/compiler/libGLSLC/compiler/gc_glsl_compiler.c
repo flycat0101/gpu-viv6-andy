@@ -18,6 +18,158 @@
 #include "gc_glsl_ast_walk.h"
 #include "gc_glsl_emit_code.h"
 
+/*******************************Redeclared built-in variables*******************************/
+typedef gctBOOL
+(*sltREDECLARED_CHECK_FUNC_PTR)(
+    IN sloCOMPILER,
+    IN slsNAME*,
+    IN slsDATA_TYPE*
+    );
+
+typedef gceSTATUS
+(*sltREDECLARED_UPDATE_FUNC_PTR)(
+    IN sloCOMPILER,
+    IN slsNAME*,
+    IN slsDATA_TYPE*
+    );
+
+/*******************************Redeclared built-in functions*******************************/
+gctBOOL
+_CheckRedeclaredForInterpolation(
+    IN sloCOMPILER Compiler,
+    IN slsNAME* Name,
+    IN slsDATA_TYPE* NewDataType
+    )
+{
+    /* Everything in data type must be the same expect for the ineterpolation qualifier. */
+    if (!slsDATA_TYPE_IsEqual(Name->dataType, NewDataType))
+    {
+        return gcvFALSE;
+    }
+
+    if (Name->dataType->qualifiers.auxiliary != NewDataType->qualifiers.auxiliary
+        ||
+        Name->dataType->qualifiers.precision != NewDataType->qualifiers.precision
+        ||
+        Name->dataType->qualifiers.storage != NewDataType->qualifiers.storage
+        ||
+        Name->dataType->qualifiers.memoryAccess != NewDataType->qualifiers.memoryAccess
+        ||
+        Name->dataType->qualifiers.flags != NewDataType->qualifiers.flags)
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
+gceSTATUS
+_UpdateRedeclaredForInterpolation(
+    IN sloCOMPILER Compiler,
+    IN slsNAME* Name,
+    IN slsDATA_TYPE* NewDataType
+    )
+{
+    Name->dataType->qualifiers.interpolation = NewDataType->qualifiers.interpolation;
+    return gcvSTATUS_OK;
+}
+
+gctBOOL
+_CheckRedeclaredForClipDistance(
+    IN sloCOMPILER Compiler,
+    IN slsNAME* Name,
+    IN slsDATA_TYPE* NewDataType
+    )
+{
+    slsDATA_TYPE* DataType1 = Name->dataType;
+
+    /* Everything in data type must be the same expect for the array size. */
+    if (!((DataType1->elementType == NewDataType->elementType)
+         &&
+         (slmDATA_TYPE_vectorSize_NOCHECK_GET(DataType1) == slmDATA_TYPE_vectorSize_NOCHECK_GET(NewDataType))
+         &&
+         (slmDATA_TYPE_matrixRowCount_GET(DataType1) == slmDATA_TYPE_matrixRowCount_GET(NewDataType))
+         &&
+         (slmDATA_TYPE_matrixColumnCount_GET(DataType1) == slmDATA_TYPE_matrixColumnCount_GET(NewDataType))
+         &&
+         (DataType1->arrayLengthCount == NewDataType->arrayLengthCount)
+         &&
+         (DataType1->orgFieldSpace == NewDataType->orgFieldSpace)))
+    {
+        return gcvFALSE;
+    }
+
+    if (DataType1->qualifiers.interpolation != NewDataType->qualifiers.interpolation
+        ||
+        DataType1->qualifiers.auxiliary != NewDataType->qualifiers.auxiliary
+        ||
+        DataType1->qualifiers.precision != NewDataType->qualifiers.precision
+        ||
+        DataType1->qualifiers.storage != NewDataType->qualifiers.storage
+        ||
+        DataType1->qualifiers.memoryAccess != NewDataType->qualifiers.memoryAccess
+        ||
+        DataType1->qualifiers.flags != NewDataType->qualifiers.flags)
+    {
+        return gcvFALSE;
+    }
+
+    /* The array length can be larger than the MaxClipDistance. */
+    if (NewDataType->arrayLength > (gctINT)GetGLMaxClipDistances())
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
+gceSTATUS
+_UpdateRedeclaredForClipDistance(
+    IN sloCOMPILER Compiler,
+    IN slsNAME* Name,
+    IN slsDATA_TYPE* NewDataType
+    )
+{
+    Name->dataType->arrayLength = NewDataType->arrayLength;
+    Name->dataType->arrayLengthList[0] = NewDataType->arrayLengthList[0];
+    return gcvSTATUS_OK;
+}
+
+/* Reclared built-in Variables */
+typedef struct _slsREDECLARED_VARIABLE
+{
+    sloEXTENSION                    extension;
+    gctSTRING                       variableName;
+    sltREDECLARED_CHECK_FUNC_PTR    checkFunc;
+    sltREDECLARED_UPDATE_FUNC_PTR   updateFunc;
+} slsREDECLARED_VARIABLE;
+
+static slsREDECLARED_VARIABLE VSRedeclaredVariables[] =
+{
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_FrontColor",            _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_BackColor",             _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_FrontSecondaryColor",   _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_BackSecondaryColor",    _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_ClipDistance",          _CheckRedeclaredForClipDistance,         _UpdateRedeclaredForClipDistance },
+};
+static gctUINT VSRedeclaredVariableCount = sizeof(VSRedeclaredVariables) / sizeof(slsREDECLARED_VARIABLE);
+
+static slsREDECLARED_VARIABLE GSRedeclaredVariables[] =
+{
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_FrontColor",            _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_BackColor",             _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_FrontSecondaryColor",   _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_BackSecondaryColor",    _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+};
+static gctUINT GSRedeclaredVariableCount = sizeof(GSRedeclaredVariables) / sizeof(slsREDECLARED_VARIABLE);
+
+static slsREDECLARED_VARIABLE FSRedeclaredVariables[] =
+{
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_Color",                 _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_SecondaryColor",        _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+};
+static gctUINT FSRedeclaredVariableCount = sizeof(FSRedeclaredVariables) / sizeof(slsREDECLARED_VARIABLE);
+
 sloCOMPILER gcCompiler[__GC_COMPILER_NUMBER__] = {gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL};
 
 sloCOMPILER *
@@ -3033,28 +3185,67 @@ sloCOMPILER_CreateName(
     if (!Compiler->context.loadingBuiltIns &&
         !Compiler->context.redeclareBuiltInVar)
     {
+        /* Some built-in variables can be redeclared, do some checking here. */
         length = gcoOS_StrLen(Symbol, gcvNULL);
         if (length >= 3 &&
             Symbol[0] == 'g' && Symbol[1] == 'l' && Symbol[2] == '_')
         {
-            sleSHADER_TYPE shaderType;
-            shaderType = Compiler->shaderType;
-           /* The following predeclared variables can be redeclared with an interpolation qualifier:
-              Vertex and geometry languages: gl_FrontColor / gl_BackColor / gl_FrontSecondaryColor / gl_BackSecondaryColor
-              Fragment language: gl_Color / gl_SecondaryColor */
-            if (sloCOMPILER_IsOGLVersion(Compiler) &&
-               (((shaderType == slvSHADER_TYPE_VERTEX || shaderType == slvSHADER_TYPE_GS ) &&
-                 (gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_FrontColor")) ||
-                  gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_BackColor")) ||
-                  gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_FrontSecondaryColor")) ||
-                  gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_BackSecondaryColor")))) ||
-                 (shaderType == slvSHADER_TYPE_FRAGMENT &&
-                 (gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_Color")) ||
-                  gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_SecondaryColor"))))))
+            sleSHADER_TYPE              shaderType = Compiler->shaderType;
+            slsREDECLARED_VARIABLE*     pRedeclaredVariableList = gcvNULL;
+            slsREDECLARED_VARIABLE      redeclaredVariable = { 0 };
+            slsNAME*                    pBuiltinName = gcvNULL;
+            gctUINT                     redeclaredVariableCount = 0, i = 0;
+            gctBOOL                     bMatch = gcvTRUE;
+
+            if (shaderType == slvSHADER_TYPE_VERTEX)
             {
-                isBuiltIn = gcvTRUE;
+                pRedeclaredVariableList = VSRedeclaredVariables;
+                redeclaredVariableCount = VSRedeclaredVariableCount;
             }
-            else
+            else if (shaderType == slvSHADER_TYPE_GS)
+            {
+                pRedeclaredVariableList = GSRedeclaredVariables;
+                redeclaredVariableCount = GSRedeclaredVariableCount;
+            }
+            else if (shaderType == slvSHADER_TYPE_FRAGMENT)
+            {
+                pRedeclaredVariableList = FSRedeclaredVariables;
+                redeclaredVariableCount = FSRedeclaredVariableCount;
+            }
+
+            for (i = 0; i < redeclaredVariableCount; i++)
+            {
+                redeclaredVariable = pRedeclaredVariableList[i];
+
+                if (!sloCOMPILER_ExtensionEnabled(Compiler, &redeclaredVariable.extension))
+                {
+                    continue;
+                }
+
+                if (!gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, redeclaredVariable.variableName)))
+                {
+                    continue;
+                }
+
+                gcmONERROR(slsNAME_SPACE_SearchBuiltinVariable(Compiler,
+                                                               Compiler->context.builtinSpace,
+                                                               Symbol,
+                                                               Extension,
+                                                               &pBuiltinName));
+
+                if (redeclaredVariable.checkFunc == gcvNULL)
+                {
+                    bMatch = gcvTRUE;
+                }
+                else
+                {
+                    bMatch = redeclaredVariable.checkFunc(Compiler, pBuiltinName, DataType);
+                }
+
+                break;
+            }
+
+            if (!bMatch)
             {
                 gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                 LineNo,
@@ -3063,10 +3254,22 @@ sloCOMPILER_CreateName(
                                                 "The identifier: '%s' starting with 'gl_' is reserved",
                                                 Symbol));
 
-                status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
                 gcmFOOTER();
-                return status;
+                return gcvSTATUS_COMPILER_FE_PARSER_ERROR;
             }
+
+            if (redeclaredVariable.updateFunc)
+            {
+                gcmONERROR(redeclaredVariable.updateFunc(Compiler, pBuiltinName, DataType));
+            }
+
+            if (Name)
+            {
+                *Name = pBuiltinName;
+            }
+
+            gcmFOOTER();
+            return gcvSTATUS_OK;
         }
     }
 
@@ -3082,6 +3285,7 @@ sloCOMPILER_CreateName(
                                       CheckExistedName,
                                       Name);
 
+OnError:
     gcmFOOTER();
     return status;
 }

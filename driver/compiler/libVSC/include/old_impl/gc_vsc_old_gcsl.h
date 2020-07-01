@@ -1497,7 +1497,8 @@ typedef enum _gceBuiltinNameKind
     gcSL_BOUNDING_BOX           = -38, /* gl_BoundingBox */
     gcSL_LAST_FRAG_DATA         = -39, /* gl_LastFragData */
     gcSL_CLUSTER_ID             = -40, /* cluster id */
-    gcSL_BUILTINNAME_COUNT      = 41
+    gcSL_CLIP_DISTANCE          = -41, /* gl_ClipDistance */
+    gcSL_BUILTINNAME_COUNT      = 42
 } gceBuiltinNameKind;
 
 /* Special code generation indices. */
