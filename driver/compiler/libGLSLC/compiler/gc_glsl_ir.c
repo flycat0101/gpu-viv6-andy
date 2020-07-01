@@ -2723,7 +2723,7 @@ slsNAME_SPACE_Search(
 {
     slsNAME *       name;
     gceSTATUS       status = gcvSTATUS_OK;
-    sloEXTENSION    extension = {{0}};
+    sloEXTENSION    extension = {0};
     gcmHEADER_ARG("Compiler=0x%x NameSpace=0x%x Symbol=0x%x Recursive=%d Name=0x%x",
                    Compiler, NameSpace, Symbol, Recursive, Name);
 
@@ -2859,7 +2859,7 @@ slsNAME_SPACE_CheckNewFuncName(
     slsNAME *       name;
     gctBOOL         areAllParamQualifiersEqual;
     gceSTATUS       status = gcvSTATUS_OK;
-    sloEXTENSION    extension = {{0}};
+    sloEXTENSION    extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x NameSpace=0x%x FuncName=0x%x FirstFuncName=0x%x",
                    Compiler, NameSpace, FuncName, FirstFuncName);
@@ -3256,7 +3256,7 @@ _IsCorrespondingFuncName(
         sloIR_EXPR_SetToBeTheSameDataType(argument);
         if (!slsDATA_TYPE_IsEqual(effectiveType, argument->toBeDataType))
         {
-            sloEXTENSION extension = {{0}};
+            sloEXTENSION extension = {0};
             extension.extension1 = slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS;
             /* For now we cannot handle double-precision floating point constants, so treat them as single-precision ones */
             if (sloIR_OBJECT_GetType(&argument->base) == slvIR_CONSTANT
@@ -3328,7 +3328,7 @@ slsNAME_SPACE_BindFuncName(
     gctPOINTER      nameCandidates[1024];
     gctINT          nameCandidateDistances[1024];
     gctINT          currentCandidateIndex = 0;
-    sloEXTENSION    extension = {{0}};
+    sloEXTENSION    extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x NameSpace=0x%x PolynaryExpr=0x%x",
                    Compiler, NameSpace, PolynaryExpr);
