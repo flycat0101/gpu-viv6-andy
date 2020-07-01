@@ -117,7 +117,27 @@ _GenTexture2DRectCode(
     );
 
 gceSTATUS
+_GenTexture1DProjCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    );
+
+gceSTATUS
 _GenTexture2DProjCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    );
+
+gceSTATUS
+_GenTexture2DRectProjCode(
     IN sloCOMPILER Compiler,
     IN sloCODE_GENERATOR CodeGenerator,
     IN sloIR_POLYNARY_EXPR PolynaryExpr,
@@ -1809,16 +1829,22 @@ static slsBUILT_IN_FUNCTION FSBuiltInFunctions[] =
 
     {{slvEXTENSION1_SUPPORT_OGL},  "texture", gcvNULL, _GenTextureCode,         T_VEC4,     3, {T_SAMPLER2DSHADOW,      T_VEC3,   T_FLOAT},  {0}, {0}},
 
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProj", gcvNULL, _GenTextureProjCode,        T_VEC4,     3, {T_SAMPLER1D,    T_VEC2, T_FLOAT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProj", gcvNULL, _GenTextureProjCode,        T_VEC4,     3, {T_SAMPLER1D,    T_VEC4, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProj", gcvNULL, _GenTextureProjCode,        T_VEC4,     3, {T_SAMPLER2D,    T_VEC3, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProj", gcvNULL, _GenTextureProjCode,        T_VEC4,     3, {T_SAMPLER2D,    T_VEC4, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProj", gcvNULL, _GenTextureProjCode,        T_VEC4,     3, {T_SAMPLER3D,    T_VEC4, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProj", gcvNULL, _GenTextureProjCode,        T_FLOAT,    3, {T_SAMPLER2DSHADOW, T_VEC4, T_FLOAT}, {0}, {0}},
-    {{slvEXTENSION1_HALTI},     "textureProj", gcvNULL, _GenTextureCode,            T_FLOAT,    3, {T_SAMPLER1DSHADOW, T_VEC4, T_FLOAT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProj", gcvNULL, _GenTextureProjCode,            T_FLOAT,    3, {T_SAMPLER1DSHADOW, T_VEC4, T_FLOAT}, {0}, {0}},
 
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProj", gcvNULL, _GenTextureProjCode,        T_IVEC4,    3, {T_ISAMPLER1D,    T_VEC2, T_FLOAT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProj", gcvNULL, _GenTextureProjCode,        T_IVEC4,    3, {T_ISAMPLER1D,    T_VEC4, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProj", gcvNULL, _GenTextureProjCode,        T_IVEC4,    3, {T_ISAMPLER2D,    T_VEC3, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProj", gcvNULL, _GenTextureProjCode,        T_IVEC4,    3, {T_ISAMPLER2D,    T_VEC4, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProj", gcvNULL, _GenTextureProjCode,        T_IVEC4,    3, {T_ISAMPLER3D,    T_VEC4, T_FLOAT}, {0}, {0}},
 
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProj", gcvNULL, _GenTextureProjCode,        T_UVEC4,    3, {T_USAMPLER1D,    T_VEC2, T_FLOAT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProj", gcvNULL, _GenTextureProjCode,        T_UVEC4,    3, {T_USAMPLER1D,    T_VEC4, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProj", gcvNULL, _GenTextureProjCode,        T_UVEC4,    3, {T_USAMPLER2D,    T_VEC3, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProj", gcvNULL, _GenTextureProjCode,        T_UVEC4,    3, {T_USAMPLER2D,    T_VEC4, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProj", gcvNULL, _GenTextureProjCode,        T_UVEC4,    3, {T_USAMPLER3D,    T_VEC4, T_FLOAT}, {0}, {0}},
@@ -1828,26 +1854,38 @@ static slsBUILT_IN_FUNCTION FSBuiltInFunctions[] =
     {{slvEXTENSION1_HALTI},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_FLOAT,    4, {T_SAMPLER1DSHADOW,   T_VEC3, T_INT,   T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_FLOAT,    4, {T_SAMPLER2DSHADOW,   T_VEC3, T_IVEC2, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_VEC4,     4, {T_SAMPLER2DARRAY,    T_VEC3, T_IVEC2, T_FLOAT}, {0}, {0}},
+    {{slvEXTENSION1_HALTI},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_FLOAT,    4, {T_SAMPLER1DARRAYSHADOW, T_VEC3, T_INT, T_FLOAT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_VEC4,     4, {T_SAMPLER1D,    T_FLOAT, T_INT, T_FLOAT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_VEC4,     4, {T_SAMPLER1DARRAY,    T_VEC2, T_INT, T_FLOAT}, {0}, {0}},
 
     {{slvEXTENSION1_HALTI},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_IVEC4,    4, {T_ISAMPLER2D,    T_VEC2, T_IVEC2, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_IVEC4,    4, {T_ISAMPLER3D,    T_VEC3, T_IVEC3, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_IVEC4,    4, {T_ISAMPLER2DARRAY,    T_VEC3, T_IVEC2, T_FLOAT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_IVEC4,    4, {T_ISAMPLER1D,    T_FLOAT, T_INT, T_FLOAT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_IVEC4,    4, {T_ISAMPLER1DARRAY,    T_VEC2, T_INT, T_FLOAT}, {0}, {0}},
 
     {{slvEXTENSION1_HALTI},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_UVEC4,    4, {T_USAMPLER2D,    T_VEC2, T_IVEC2, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_UVEC4,    4, {T_USAMPLER3D,    T_VEC3, T_IVEC3, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_UVEC4,    4, {T_USAMPLER2DARRAY,    T_VEC3, T_IVEC2, T_FLOAT}, {0}, {0}},
-    {{slvEXTENSION1_HALTI},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_FLOAT,    4, {T_SAMPLER1DARRAYSHADOW, T_VEC3, T_INT, T_FLOAT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_UVEC4,    4, {T_USAMPLER1D,    T_FLOAT, T_INT, T_FLOAT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_UVEC4,    4, {T_USAMPLER1DARRAY,    T_VEC2, T_INT, T_FLOAT}, {0}, {0}},
 
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,        T_VEC4,     4, {T_SAMPLER1D,    T_VEC2, T_INT, T_FLOAT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,        T_VEC4,     4, {T_SAMPLER1D,    T_VEC4, T_INT, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,        T_VEC4,     4, {T_SAMPLER2D,    T_VEC3, T_IVEC2, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,        T_VEC4,     4, {T_SAMPLER2D,    T_VEC4, T_IVEC2, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,        T_VEC4,     4, {T_SAMPLER3D,    T_VEC4, T_IVEC3, T_FLOAT}, {0}, {0}},
-    {{slvEXTENSION1_HALTI},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,        T_FLOAT,    4, {T_SAMPLER2DSHADOW, T_VEC4, T_IVEC2, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,        T_FLOAT,    4, {T_SAMPLER1DSHADOW, T_VEC4, T_INT,   T_FLOAT}, {0}, {0}},
+    {{slvEXTENSION1_HALTI},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,        T_FLOAT,    4, {T_SAMPLER2DSHADOW, T_VEC4, T_IVEC2, T_FLOAT}, {0}, {0}},
 
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,        T_IVEC4,     4, {T_ISAMPLER1D,    T_VEC2, T_INT, T_FLOAT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,        T_IVEC4,     4, {T_ISAMPLER1D,    T_VEC4, T_INT, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,        T_IVEC4,    4, {T_ISAMPLER2D,    T_VEC3, T_IVEC2, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,        T_IVEC4,    4, {T_ISAMPLER2D,    T_VEC4, T_IVEC2, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,        T_IVEC4,    4, {T_ISAMPLER3D,    T_VEC4, T_IVEC3, T_FLOAT}, {0}, {0}},
 
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,        T_UVEC4,     4, {T_USAMPLER1D,    T_VEC2, T_INT, T_FLOAT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,        T_UVEC4,     4, {T_USAMPLER1D,    T_VEC4, T_INT, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,        T_UVEC4,    4, {T_USAMPLER2D,    T_VEC3, T_IVEC2, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,        T_UVEC4,    4, {T_USAMPLER2D,    T_VEC4, T_IVEC2, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,        T_UVEC4,    4, {T_USAMPLER3D,    T_VEC4, T_IVEC3, T_FLOAT}, {0}, {0}},
@@ -2625,47 +2663,80 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {{slvEXTENSION1_HALTI},     "textureProj", gcvNULL, _GenTextureProjCode,        T_VEC4,     2, {T_SAMPLER3D,    T_VEC4}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProj", gcvNULL, _GenTextureProjCode,        T_FLOAT,    2, {T_SAMPLER2DSHADOW,   T_VEC4}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProj", gcvNULL, _GenTextureProjCode,        T_FLOAT,    2, {T_SAMPLER2DRECTSHADOW,   T_VEC4}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProj", gcvNULL, _GenTextureProjCode,        T_VEC4,     2, {T_SAMPLER1D,    T_VEC2}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProj", gcvNULL, _GenTextureProjCode,        T_VEC4,     2, {T_SAMPLER1D,    T_VEC4}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProj", gcvNULL, _GenTextureProjCode,        T_VEC4,     2, {T_SAMPLER2DRECT,    T_VEC3}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProj", gcvNULL, _GenTextureProjCode,        T_VEC4,     2, {T_SAMPLER2DRECT,    T_VEC4}, {0}, {0}},
 
     {{slvEXTENSION1_HALTI},     "textureProj", gcvNULL, _GenTextureProjCode,        T_IVEC4,    2, {T_ISAMPLER2D,    T_VEC3}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProj", gcvNULL, _GenTextureProjCode,        T_IVEC4,    2, {T_ISAMPLER2D,    T_VEC4}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProj", gcvNULL, _GenTextureProjCode,        T_IVEC4,    2, {T_ISAMPLER3D,    T_VEC4}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProj", gcvNULL, _GenTextureProjCode,        T_IVEC4,    2, {T_ISAMPLER1D,    T_VEC2}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProj", gcvNULL, _GenTextureProjCode,        T_IVEC4,    2, {T_ISAMPLER1D,    T_VEC4}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProj", gcvNULL, _GenTextureProjCode,        T_IVEC4,    2, {T_ISAMPLER2DRECT,    T_VEC3}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProj", gcvNULL, _GenTextureProjCode,        T_IVEC4,    2, {T_ISAMPLER2DRECT,    T_VEC4}, {0}, {0}},
 
     {{slvEXTENSION1_HALTI},     "textureProj", gcvNULL, _GenTextureProjCode,        T_UVEC4,    2, {T_USAMPLER2D,    T_VEC3}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProj", gcvNULL, _GenTextureProjCode,        T_UVEC4,    2, {T_USAMPLER2D,    T_VEC4}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProj", gcvNULL, _GenTextureProjCode,        T_UVEC4,    2, {T_USAMPLER3D,    T_VEC4}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProj", gcvNULL, _GenTextureProjCode,        T_UVEC4,    2, {T_USAMPLER1D,    T_VEC2}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProj", gcvNULL, _GenTextureProjCode,        T_UVEC4,    2, {T_USAMPLER1D,    T_VEC4}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProj", gcvNULL, _GenTextureProjCode,        T_UVEC4,    2, {T_ISAMPLER2DRECT,    T_VEC3}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProj", gcvNULL, _GenTextureProjCode,        T_UVEC4,    2, {T_ISAMPLER2DRECT,    T_VEC4}, {0}, {0}},
 
-    {{slvEXTENSION1_HALTI},      "textureProj",  gcvNULL, _GenTextureCode,         T_FLOAT,    2, {T_SAMPLER1DSHADOW,    T_VEC4}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},      "textureProj",  gcvNULL, _GenTextureProjCode,         T_FLOAT,    2, {T_SAMPLER1DSHADOW,    T_VEC4}, {0}, {0}},
 
     {{slvEXTENSION1_HALTI},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_VEC4,     3, {T_SAMPLER2D,    T_VEC2, T_IVEC2}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_VEC4,     3, {T_SAMPLER3D,    T_VEC3, T_IVEC3}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_FLOAT,    3, {T_SAMPLER2DSHADOW,   T_VEC3, T_IVEC2}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_FLOAT,    3, {T_SAMPLER2DRECTSHADOW,   T_VEC3, T_IVEC2}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_VEC4,     3, {T_SAMPLER2DARRAY,    T_VEC3, T_IVEC2}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_VEC4,     3, {T_SAMPLER1D,    T_FLOAT, T_INT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_VEC4,     3, {T_SAMPLER2DRECT,    T_VEC2, T_IVEC2}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_VEC4,     3, {T_SAMPLER1DARRAY,    T_VEC2, T_INT}, {0}, {0}},
 
     {{slvEXTENSION1_HALTI},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_IVEC4,    3, {T_ISAMPLER2D,    T_VEC2, T_IVEC2}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_IVEC4,    3, {T_ISAMPLER3D,    T_VEC3, T_IVEC3}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_IVEC4,    3, {T_ISAMPLER2DARRAY,    T_VEC3, T_IVEC2}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_IVEC4,    3, {T_ISAMPLER1D,    T_FLOAT, T_INT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_IVEC4,    3, {T_ISAMPLER2DRECT,    T_VEC2, T_IVEC2}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_IVEC4,    3, {T_ISAMPLER1DARRAY,    T_VEC2, T_INT}, {0}, {0}},
 
     {{slvEXTENSION1_HALTI},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_UVEC4,    3, {T_USAMPLER2D,    T_VEC2, T_IVEC2}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_UVEC4,    3, {T_USAMPLER3D,    T_VEC3, T_IVEC3}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_UVEC4,    3, {T_USAMPLER2DARRAY,    T_VEC3, T_IVEC2}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_UVEC4,    3, {T_USAMPLER1D,    T_FLOAT, T_INT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_UVEC4,    3, {T_USAMPLER2DRECT,    T_VEC2, T_IVEC2}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_UVEC4,    3, {T_USAMPLER1DARRAY,    T_VEC2, T_INT}, {0}, {0}},
 
     {{slvEXTENSION1_HALTI},     "textureOffset",  gcvNULL, _GenTextureOffsetCode,     T_FLOAT,    3, {T_SAMPLER1DSHADOW,    T_VEC3, T_INT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureOffset",  gcvNULL, _GenTextureOffsetCode,     T_FLOAT,    3, {T_SAMPLER1DARRAYSHADOW, T_VEC3, T_INT}, {0}, {0}},
 
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_VEC4,     3, {T_SAMPLER1D,    T_VEC3, T_INT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_VEC4,     3, {T_SAMPLER1D,    T_VEC4, T_INT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_VEC4,     3, {T_SAMPLER2D,    T_VEC3, T_IVEC2}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_VEC4,     3, {T_SAMPLER2D,    T_VEC4, T_IVEC2}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_VEC4,     3, {T_SAMPLER3D,    T_VEC4, T_IVEC3}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_FLOAT,    3, {T_SAMPLER2DSHADOW, T_VEC4, T_IVEC2}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_FLOAT,    3, {T_SAMPLER2DRECTSHADOW, T_VEC4, T_IVEC2}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_VEC4,     3, {T_SAMPLER2DRECT,    T_VEC3, T_IVEC2}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_VEC4,     3, {T_SAMPLER2DRECT,    T_VEC4, T_IVEC2}, {0}, {0}},
 
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_IVEC4,     3, {T_ISAMPLER1D,    T_VEC3, T_INT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_IVEC4,     3, {T_ISAMPLER1D,    T_VEC4, T_INT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_IVEC4,    3, {T_ISAMPLER2D,    T_VEC3, T_IVEC2}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_IVEC4,    3, {T_ISAMPLER2D,    T_VEC4, T_IVEC2}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_IVEC4,    3, {T_ISAMPLER3D,    T_VEC4, T_IVEC3}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_IVEC4,     3, {T_ISAMPLER2DRECT,    T_VEC3, T_IVEC2}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_IVEC4,     3, {T_ISAMPLER2DRECT,    T_VEC4, T_IVEC2}, {0}, {0}},
 
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_UVEC4,     3, {T_USAMPLER1D,    T_VEC3, T_INT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_UVEC4,     3, {T_USAMPLER1D,    T_VEC4, T_INT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_UVEC4,    3, {T_USAMPLER2D,    T_VEC3, T_IVEC2}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_UVEC4,    3, {T_USAMPLER2D,    T_VEC4, T_IVEC2}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_UVEC4,    3, {T_USAMPLER3D,    T_VEC4, T_IVEC3}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_UVEC4,     3, {T_USAMPLER2DRECT,    T_VEC3, T_IVEC2}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_UVEC4,     3, {T_USAMPLER2DRECT,    T_VEC4, T_IVEC2}, {0}, {0}},
 
     {{slvEXTENSION1_HALTI},     "textureProjOffset",  gcvNULL, _GenTextureProjOffsetCode, T_FLOAT,    3, {T_SAMPLER1DSHADOW,    T_VEC4, T_INT}, {0}, {0}},
 
