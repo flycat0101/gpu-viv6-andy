@@ -1016,6 +1016,10 @@ static gctBOOL _NeedToCollectThisIO(VIR_Shader* pShader,
     gctBOOL needToCollect = gcvTRUE;
 
     /* Some IO are compile-generated faked IO, we don't need to collect them. */
+    if (VIR_Symbol_GetName(pSymbol) == VIR_NAME_CLUSTER_ID) {
+        /* #cluster_id is not counted to input count */
+        return gcvFALSE;
+    }
 
     return needToCollect;
 }
