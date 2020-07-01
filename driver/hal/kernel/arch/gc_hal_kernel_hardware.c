@@ -307,6 +307,11 @@ _IdentifyHardwareByDatabase(
                   Hardware->identity.customerID);
         gcmkONERROR(gcvSTATUS_NOT_FOUND);
     }
+    else if (database->chipVersion != Hardware->identity.chipRevision)
+    {
+        gcmkPRINT("[galcore]: Warning: chipRevision mismatch, database chipRevision=0x%x register read chipRevision=0x%x\n",
+                  database->chipVersion, Hardware->identity.chipRevision);
+    }
 
 
     Identity->pixelPipes                    = database->NumPixelPipes;
