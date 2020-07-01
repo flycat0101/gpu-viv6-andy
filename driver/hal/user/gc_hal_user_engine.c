@@ -5548,18 +5548,19 @@ gco3D_GetQuery(
     IN gcsSURF_NODE_PTR Node,
     IN gctUINT32    Size,
     IN gctPOINTER   Locked,
+    IN gctUINT32    IndexedId,
     OUT gctINT32 * Index)
 {
     gceSTATUS status = gcvSTATUS_OK;
 
-    gcmHEADER_ARG("Engine=0x%x Type=%d Index=%d", Engine, Type, Index);
+    gcmHEADER_ARG("Engine=0x%x Type=%d IndexedId=%d Index=%d", Engine, Type, IndexedId, Index);
 
     gcmVERIFY_OBJECT(Engine, gcvOBJ_3D);
 
     /* Invalidate CPU cache for it was written by GPU. */
     gcmONERROR(gcoSURF_NODE_Cache(Node, Locked, Size, gcvCACHE_INVALIDATE));
 
-    gcmONERROR(gcoHARDWARE_GetQueryIndex(Engine->hardware, Type, Index));
+    gcmONERROR(gcoHARDWARE_GetQueryIndex(Engine->hardware, Type, IndexedId, Index));
 
 OnError:
     /* Return the status. */
@@ -7095,6 +7096,7 @@ gco3D_GetQuery(
     IN gcsSURF_NODE_PTR Node,
     IN gctUINT32    Size,
     IN gctPOINTER   Locked,
+    IN gctUINT32    IndexedId,
     OUT gctINT32 * Index
     )
 {

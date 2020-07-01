@@ -7251,7 +7251,7 @@ gcoHARDWARE_DrawOnOneCore(
         }
     }
 
-    if (Hardware->QUERYStates->queryStatus[gcvQUERY_OCCLUSION] == gcvQUERY_Enabled)
+    if (Hardware->QUERYStates->queryStatus[gcvQUERY_OCCLUSION][0] == gcvQUERY_Enabled)
     {
         status = gcvSTATUS_TRUE;
     }

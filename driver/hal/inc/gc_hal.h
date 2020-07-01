@@ -127,6 +127,8 @@ typedef struct _gckHARDWARE *       gckHARDWARE;
 #define gcdMAX_3DGPU_COUNT             8
 
 #define gcdMAX_MAJOR_CORE_COUNT        8
+
+#define gcdMAX_VERTEX_STREAM_COUNT     4
 /*******************************************************************************
 **
 **  gcmVERIFY_OBJECT

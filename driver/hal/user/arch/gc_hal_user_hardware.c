@@ -6686,21 +6686,29 @@ gcoHARDWARE_ConstructEx(
 
     hardware->robust = Robust && hardware->features[gcvFEATURE_ROBUSTNESS];
 
-    hardware->QUERYStates->queryStatus[gcvQUERY_OCCLUSION] = gcvQUERY_Disabled;
+    hardware->QUERYStates->queryStatus[gcvQUERY_OCCLUSION][0] = gcvQUERY_Disabled;
 #if gcdENABLE_APPCTXT_BLITDRAW
-    hardware->QUERYStates->queryCmd[gcvQUERY_OCCLUSION] = gcvQUERYCMD_INVALID;
+    hardware->QUERYStates->queryCmd[gcvQUERY_OCCLUSION][0] = gcvQUERYCMD_INVALID;
 #endif
 
     if (hardware->features[gcvFEATURE_HW_TFB])
     {
+        gctUINT i;
+
         hardware->XFBStates->status =
         hardware->XFBStates->statusInCmd = gcvXFB_Disabled;
 
-        hardware->QUERYStates->queryStatus[gcvQUERY_XFB_WRITTEN] =
-        hardware->QUERYStates->queryStatus[gcvQUERY_PRIM_GENERATED] = gcvQUERY_Disabled;
+        for (i = 0; i < gcvMAX_QUERY_SIZE; i++)
+        {
+            hardware->QUERYStates->queryStatus[gcvQUERY_XFB_WRITTEN][i] =
+            hardware->QUERYStates->queryStatus[gcvQUERY_PRIM_GENERATED][i] = gcvQUERY_Disabled;
 #if gcdENABLE_APPCTXT_BLITDRAW
-        hardware->QUERYStates->queryCmd[gcvQUERY_PRIM_GENERATED] =
-        hardware->QUERYStates->queryCmd[gcvQUERY_XFB_WRITTEN] = gcvQUERYCMD_INVALID;
+            hardware->QUERYStates->queryCmd[gcvQUERY_PRIM_GENERATED][i] =
+            hardware->QUERYStates->queryCmd[gcvQUERY_XFB_WRITTEN][i] = gcvQUERYCMD_INVALID;
+#endif
+        }
+
+#if gcdENABLE_APPCTXT_BLITDRAW
         hardware->XFBStates->cmd = gcvXFBCMD_INVALID;
 #endif
     }
@@ -34170,21 +34178,26 @@ static gceSTATUS _InitDefaultState(
     /*Set a invalid value when init*/
     *(gctUINT32 *)&(Hardware->PEStates->alphaStates.floatReference) = 0xFFFFFFFF;
 
-    Hardware->QUERYStates->queryStatus[gcvQUERY_OCCLUSION] =
-    Hardware->QUERYStates->statusInCmd[gcvQUERY_OCCLUSION] = gcvQUERY_Disabled;
-    Hardware->QUERYStates->queryCmd[gcvQUERY_OCCLUSION] = gcvQUERYCMD_INVALID;
+    Hardware->QUERYStates->queryStatus[gcvQUERY_OCCLUSION][0] =
+    Hardware->QUERYStates->statusInCmd[gcvQUERY_OCCLUSION][0] = gcvQUERY_Disabled;
+    Hardware->QUERYStates->queryCmd[gcvQUERY_OCCLUSION][0] = gcvQUERYCMD_INVALID;
 
     if (Hardware->features[gcvFEATURE_HW_TFB])
     {
+        gctUINT i;
+
         Hardware->XFBStates->status =
         Hardware->XFBStates->statusInCmd = gcvXFB_Disabled;
 
-        Hardware->QUERYStates->queryStatus[gcvQUERY_XFB_WRITTEN] =
-        Hardware->QUERYStates->statusInCmd[gcvQUERY_XFB_WRITTEN] = gcvQUERY_Disabled;
-        Hardware->QUERYStates->queryStatus[gcvQUERY_PRIM_GENERATED] =
-        Hardware->QUERYStates->statusInCmd[gcvQUERY_PRIM_GENERATED] = gcvQUERY_Disabled;
-        Hardware->QUERYStates->queryCmd[gcvQUERY_PRIM_GENERATED] =
-        Hardware->QUERYStates->queryCmd[gcvQUERY_XFB_WRITTEN] = gcvQUERYCMD_INVALID;
+        for (i = 0; i < gcvMAX_QUERY_SIZE; i++)
+        {
+            Hardware->QUERYStates->queryStatus[gcvQUERY_XFB_WRITTEN][i] =
+            Hardware->QUERYStates->statusInCmd[gcvQUERY_XFB_WRITTEN][i] = gcvQUERY_Disabled;
+            Hardware->QUERYStates->queryStatus[gcvQUERY_PRIM_GENERATED][i] =
+            Hardware->QUERYStates->statusInCmd[gcvQUERY_PRIM_GENERATED][i] = gcvQUERY_Disabled;
+            Hardware->QUERYStates->queryCmd[gcvQUERY_PRIM_GENERATED][i] =
+            Hardware->QUERYStates->queryCmd[gcvQUERY_XFB_WRITTEN][i] = gcvQUERYCMD_INVALID;
+        }
         Hardware->XFBStates->cmd = gcvXFBCMD_INVALID;
     }
 #endif

@@ -522,14 +522,21 @@ static VSC_ErrCode _ProgramStreamOut(SHADER_HW_INFO* pShHwInfo,
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     SHADER_IO_REG_MAPPING*     pSoOutputRegMapping;
     SHADER_IO_REG_LINKAGE*     pSoOutputLinkage;
-    gctUINT                    state, ioIdx, channelIdx, regIdx = 0;
+    gctUINT                    state, ioIdx, channelIdx, descriptorAddrOffset = 0, descriptorCountPerStream = 0;
     gctUINT                    soOutputArray[MAX_SHADER_STREAM_OUT_BUFFER_NUM][MAX_SHADER_IO_NUM];
-    gctUINT                    soHwStartChannel, soHwChannelCount, soStreamIdx, soOutputIdx;
+    gctUINT                    soHwStartChannel, soHwChannelCount, soStreamIdx, soOutputIdx, activeStreamIdx;
     gctBOOL                    bFinishSoCompCalc;
+    SHADER_TYPE                shType = (SHADER_TYPE)DECODE_SHADER_TYPE(pShHwInfo->pSEP->shVersionType);
+    gctBOOL                    bHasStreamOut = gcvFALSE;
 
-    gcmASSERT(DECODE_SHADER_TYPE(pShHwInfo->pSEP->shVersionType) == SHADER_TYPE_VERTEX   ||
-              DECODE_SHADER_TYPE(pShHwInfo->pSEP->shVersionType) == SHADER_TYPE_GEOMETRY ||
-              DECODE_SHADER_TYPE(pShHwInfo->pSEP->shVersionType) == SHADER_TYPE_DOMAIN);
+    gcmASSERT(shType == SHADER_TYPE_VERTEX   ||
+              shType == SHADER_TYPE_GEOMETRY ||
+              shType == SHADER_TYPE_DOMAIN);
+
+    if (shType == SHADER_TYPE_GEOMETRY && pShHwInfo->pSEP->exeHints.nativeHints.prvStates.gs.bHasStreamOut)
+    {
+        bHasStreamOut = gcvTRUE;
+    }
 
     for (soStreamIdx = 0; soStreamIdx < MAX_SHADER_STREAM_OUT_BUFFER_NUM; soStreamIdx ++)
     {
@@ -563,6 +570,19 @@ static VSC_ErrCode _ProgramStreamOut(SHADER_HW_INFO* pShHwInfo,
 
     for (soStreamIdx = 0; soStreamIdx < MAX_SHADER_STREAM_OUT_BUFFER_NUM; soStreamIdx ++)
     {
+        /* If this shader have no multi-stream, then we always use stream 0. */
+        if (bHasStreamOut)
+        {
+            /* Each stream has 128 descirptors, so the descriptorAddrOffset starts with StreamIndex * 128. */
+            descriptorAddrOffset = soStreamIdx * 128;
+            descriptorCountPerStream = 0;
+            activeStreamIdx = soStreamIdx;
+        }
+        else
+        {
+            activeStreamIdx = 0;
+        }
+
         for (soOutputIdx = 0; soOutputIdx < MAX_SHADER_IO_NUM; soOutputIdx ++)
         {
             ioIdx = soOutputArray[soStreamIdx][soOutputIdx];
@@ -671,14 +691,18 @@ static VSC_ErrCode _ProgramStreamOut(SHADER_HW_INFO* pShHwInfo,
  21:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ? 21:20)));
 
-                VSC_LOAD_HW_STATE(0x7200 + regIdx, state);
-                regIdx ++;
+                VSC_LOAD_HW_STATE(0x7200 + descriptorAddrOffset, state);
+                descriptorAddrOffset++;
+                descriptorCountPerStream++;
             }
         }
-    }
 
-    /* Tell HW how many TFBDescriptor we have programed */
-    VSC_LOAD_HW_STATE(0x7040, regIdx);
+        /* Tell HW how many TFBDescriptor we have programed */
+        if (bHasStreamOut || soStreamIdx == MAX_SHADER_STREAM_OUT_BUFFER_NUM - 1)
+        {
+            VSC_LOAD_HW_STATE(0x7040 + activeStreamIdx, descriptorCountPerStream);
+        }
+    }
 
 OnError:
     return errCode;
