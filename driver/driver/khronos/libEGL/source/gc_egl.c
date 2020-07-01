@@ -1459,6 +1459,9 @@ EGLBoolean veglInitTracerDispatchTable()
                     gcoOS_Print("Failed to initialize veglTracerDispatchTable: %s!\n", veglTraceFuncNames[i]);
                     ((void *(*))(&veglTracerDispatchTable))[i] = gcvNULL;
                     ret = EGL_FALSE;
+
+                    gcoOS_FreeLibrary(gcvNULL, trlib);
+                    break;
                 }
             }
         }
