@@ -1142,7 +1142,7 @@ static VSC_ErrCode _DoMLPostCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
 
         if (libShLevel == VIR_SHLEVEL_Post_Medium)
         {
-            VSC_EXTERNAL_LINK_PASS_DATA externalLinkPassData = { gcvFALSE, gcvFALSE };
+            VSC_EXTERNAL_LINK_PASS_DATA externalLinkPassData = { gcvFALSE };
             VSC_CPP_PASS_DATA           cppPassData = { VSC_CPP_NONE, gcvTRUE };
 
             /* If this is from recompiler, we need to do these processes before linking external lib functions. */
@@ -1159,8 +1159,6 @@ static VSC_ErrCode _DoMLPostCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
 
                 CALL_SH_PASS(vscVIR_ConvertVirtualInstructions, 0, gcvNULL);
                 CALL_SH_PASS(VSC_CPP_PerformOnShader, 0, &cppPassData);
-
-                externalLinkPassData.bNeedToInvalidCFG = gcvTRUE;
             }
 
             CALL_SH_PASS(VIR_LinkExternalLibFunc, 3, &externalLinkPassData);
