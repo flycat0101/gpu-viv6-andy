@@ -620,6 +620,7 @@ _LoadBuiltInConstants(
         {"gl_MaxGeometryAtomicCounters",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_EXT_GEOMETRY_SHADER}},
         {"gl_MaxGeometryAtomicCounterBuffers",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_EXT_GEOMETRY_SHADER}},
         /* Desktop GL constants */
+        {"gl_MaxLights",                           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {0}},
         {"gl_MaxClipDistances",                    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{8}}, {0}},
         {"gl_MaxClipPlanes",                       T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {0}},
         {"gl_MaxFragmentUniformComponents",        T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {0}},
@@ -745,6 +746,7 @@ _LoadBuiltInConstants(
     constantInfos[gcBIConst_MaxGSAtomicCounterBuffers].value[0].intValue = GetGLMaxGSAtomicCounterBuffers();
     if (apiVersion == gcvAPI_OPENGL)
     {
+        constantInfos[gcBIConst_MaxLights].value[0].intValue = GetGLMaxLights();
         constantInfos[gcBIConst_MaxClipDistances].value[0].intValue = GetGLMaxClipDistances();
         constantInfos[gcBIConst_MaxClipPlanes].value[0].intValue = GetGLMaxClipPlanes();
         constantInfos[gcBIConst_MaxFragmentUniformComponents].value[0].intValue = GetGLMaxFragmentUniformComponents();
@@ -774,9 +776,9 @@ _LoadBuiltInConstants(
     return status;
 }
 
-/* Built-In Uniform State */
+/* Built-In Uniform State of DepthRange */
 static gceSTATUS
-_LoadBuiltInUniformState(
+_loadBuiltInOfDepthRange(
     IN sloCOMPILER Compiler,
     IN slsBASIC_BUILT_IN_TYPE_INFO * BasicBuiltInTypeInfos
     )
@@ -898,6 +900,193 @@ _LoadBuiltInUniformState(
     while (gcvFALSE);
 
     gcmFOOTER();
+    return status;
+}
+
+/* Built-In Uniform State of LightSource */
+static gceSTATUS
+_loadBuiltInOfLightSource(
+    IN sloCOMPILER Compiler,
+    IN slsBASIC_BUILT_IN_TYPE_INFO * BasicBuiltInTypeInfos
+    )
+{
+    gceSTATUS               status = gcvSTATUS_OK;
+    gctUINT                 i;
+    slsNAME_SPACE *         fieldNameSpace;
+    slsDATA_TYPE *          fieldDataType[12];
+    const gctCONST_STRING   fields[12] = {"ambient", "diffuse", "specular", "position", "halfVector", "spotDirection", "spotExponent", "spotCutoff",
+                                          "spotCosCutoff", "constantAttenuation", "linearAttenuation", "quadraticAttenuation"};
+    const gctINT            dataType[12] = {T_VEC4, T_VEC4, T_VEC4, T_VEC4, T_VEC4, T_VEC3, T_VEC4, T_FLOAT, T_FLOAT, T_FLOAT, T_FLOAT, T_FLOAT};
+    sltPOOL_STRING          fieldSymbol;
+    slsDATA_TYPE *          structDataType, *variableDataType, *arrayDataType;
+    sltPOOL_STRING          structSymbol;
+    sltPOOL_STRING          variableSymbol;
+    sloEXTENSION            extension = {0};
+
+    gcmHEADER_ARG("Compiler=0x%x BasicBuiltInTypeInfos=0x%x",
+                  Compiler, BasicBuiltInTypeInfos);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    gcmVERIFY_ARGUMENT(BasicBuiltInTypeInfos);
+
+    extension.extension1 = slvEXTENSION1_NONE;
+    do
+    {
+        /* Create the struct field for :
+           ambient, diffuse, specular, position, halfVector, spotDirection, spotExponent, spotCutoff
+           spotCosCutoff, constantAttenuation, linearAttenuation, quadraticAttenuation
+           */
+        status = sloCOMPILER_CreateNameSpace(Compiler,
+                                             gcvNULL,
+                                             slvNAME_SPACE_TYPE_STRUCT,
+                                             &fieldNameSpace);
+
+        if (gcmIS_ERROR(status)) break;
+
+        for (i = 0; i < 12; i++)
+        {
+            status = sloCOMPILER_CreateDataType(Compiler,
+                                    dataType[i],
+                                    gcvNULL,
+                                    &fieldDataType[i]);
+            fieldDataType[i]->qualifiers.precision = slvPRECISION_QUALIFIER_HIGH;
+
+            status = sloCOMPILER_AllocatePoolString(Compiler,
+                                                    fields[i],
+                                                    &fieldSymbol);
+            if (gcmIS_ERROR(status)) break;
+
+            status = sloCOMPILER_CreateName(Compiler,
+                                            0,
+                                            0,
+                                            slvFIELD_NAME,
+                                            fieldDataType[i],
+                                            fieldSymbol,
+                                            extension,
+                                            gcvFALSE,
+                                            gcvNULL);
+
+            if (gcmIS_ERROR(status)) break;
+        }
+
+        if (gcmIS_ERROR(status)) break;
+
+        sloCOMPILER_PopCurrentNameSpace(Compiler, gcvNULL);
+
+        /* Create the struct type: gl_LightSourceParameters */
+        status = sloCOMPILER_CreateDataType(Compiler,
+                                            T_STRUCT,
+                                            fieldNameSpace,
+                                            &structDataType);
+        if (gcmIS_ERROR(status)) break;
+
+        structDataType->qualifiers.storage = slvSTORAGE_QUALIFIER_UNIFORM;
+
+        status = sloCOMPILER_AllocatePoolString(Compiler,
+                                                "#LightSourceParameters",
+                                                &structSymbol);
+
+        if (gcmIS_ERROR(status)) break;
+
+        slsNAME_SPACE_SetSpaceName(fieldNameSpace, structSymbol);
+
+        status = sloCOMPILER_CreateName(Compiler,
+                                        0,
+                                        0,
+                                        slvSTRUCT_NAME,
+                                        structDataType,
+                                        structSymbol,
+                                        extension,
+                                        gcvFALSE,
+                                        gcvNULL);
+        if (gcmIS_ERROR(status)) break;
+
+        /* Create the array variable: gl_LightSource */
+        slsDATA_TYPE_Clone(Compiler,
+                           structDataType->qualifiers.storage,
+                           structDataType->qualifiers.precision,
+                           structDataType,
+                           &variableDataType);
+        if (gcmIS_ERROR(status)) break;
+
+        sloCOMPILER_CreateArrayDataType(Compiler,
+                                        variableDataType,
+                                        8,
+                                        &arrayDataType);
+        if (gcmIS_ERROR(status)) break;
+
+        sloCOMPILER_AllocatePoolString(Compiler,
+                                       "gl_LightSource",
+                                       &variableSymbol);
+        if (gcmIS_ERROR(status)) break;
+
+        sloCOMPILER_CreateName(Compiler,
+                               0,
+                               0,
+                               slvVARIABLE_NAME,
+                               arrayDataType,
+                               variableSymbol,
+                               extension,
+                               gcvFALSE,
+                               gcvNULL);
+        if (gcmIS_ERROR(status)) break;
+
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+    }
+    while (gcvFALSE);
+
+    gcmFOOTER();
+    return status;
+}
+
+gctBOOL
+_IsGLShaderHaveBuiltinUniform(
+    IN sloCOMPILER Compiler
+    )
+{
+    gctBOOL isHave = gcvFALSE;
+
+    if (sloCOMPILER_IsOGLVersion(Compiler))
+    {
+        if(sloCOMPILER_IsOGL11Version(Compiler) || sloCOMPILER_IsOGL12Version(Compiler))
+            isHave = gcvTRUE;
+        else if(sloCOMPILER_IsOGL13Version(Compiler))
+            isHave = gcvFALSE;
+        else if(sloCOMPILER_IsOGL14Version(Compiler) /* TODO: && extension GL_ARB_compatibility is enable */ )
+            isHave = gcvTRUE;
+        else if((sloCOMPILER_IsOGL15Version(Compiler) || sloCOMPILER_IsOGL33VersionOrAbove(Compiler, gcvTRUE)) &&
+                 slsCOMPILER_HasCompatibilityProfile(slvCOMPILER_IS_COMPATIBILITY_PROFILE))
+            isHave = gcvTRUE;
+    }
+    return isHave;
+}
+
+/* Built-In Uniform State */
+static gceSTATUS
+_LoadBuiltInUniformState(
+    IN sloCOMPILER Compiler,
+    IN slsBASIC_BUILT_IN_TYPE_INFO * BasicBuiltInTypeInfos
+    )
+{
+    gceSTATUS               status;
+
+    status = _loadBuiltInOfDepthRange(Compiler, BasicBuiltInTypeInfos);
+    if (gcmIS_ERROR(status))
+    {
+        gcoOS_Print("Error: Load Built-In Uniform State of DepthRangeParameters is failed!\n");
+        return status;
+    }
+    if (_IsGLShaderHaveBuiltinUniform(Compiler))
+    {
+        status = _loadBuiltInOfLightSource(Compiler, BasicBuiltInTypeInfos);
+    }
+    if (gcmIS_ERROR(status))
+    {
+        gcoOS_Print("Error: Load Built-In Uniform State of LightSourceParameters is failed!\n");
+        return status;
+    }
     return status;
 }
 
@@ -1155,6 +1344,106 @@ OnError:
 }
 
 static gceSTATUS
+_LoadBuiltInVariablesForUniformArray(
+    IN sloCOMPILER Compiler,
+    IN slsBUILT_IN_VARIABLE  Variable
+    )
+{
+    gceSTATUS                       status = gcvSTATUS_OK;
+    slsNAME_SPACE *                 nameSpace;
+    gctUINT                         i;
+    slsNAME *                       structName, *instanceName;
+    slsBUILT_IN_VARIABLE *          fieldVar = Variable.fieldVariables;
+    sltPOOL_STRING                  symbol;
+    slsDATA_TYPE *                  structDataType, *instanceDataType, *fieldDataType;
+    sloEXTENSION                    extension = {0};
+
+    extension.extension1 = slvEXTENSION1_NONE;
+    gcmONERROR(sloCOMPILER_CreateNameSpace(Compiler,
+                                        gcvNULL,
+                                        slvNAME_SPACE_TYPE_STRUCT,
+                                        &nameSpace));
+
+    /* Create the filed name. */
+    for (i = 0; i < Variable.fieldCount; i++)
+    {
+        gcmONERROR(sloCOMPILER_AllocatePoolString(Compiler,
+                                                  fieldVar[i].symbol,
+                                                  &symbol));
+
+        gcmONERROR(sloCOMPILER_CreateDataType(Compiler,
+                                              fieldVar[i].type,
+                                              gcvNULL,
+                                              &fieldDataType));
+
+        gcmONERROR(sloCOMPILER_CreateName(Compiler,
+                                          0,
+                                          0,
+                                          slvFIELD_NAME,
+                                          fieldDataType,
+                                          symbol,
+                                          extension,
+                                          gcvFALSE,
+                                          gcvNULL));
+    }
+
+    sloCOMPILER_PopCurrentNameSpace(Compiler, &nameSpace);
+
+    /* Create the struct name. */
+    gcmONERROR(sloCOMPILER_CreateDataType(Compiler,
+                                          T_STRUCT,
+                                          nameSpace,
+                                          &structDataType));
+    structDataType->qualifiers.storage = Variable.qualifier;
+
+    gcmONERROR(sloCOMPILER_AllocatePoolString(Compiler,
+                                              Variable.blockSymbol,
+                                              &symbol));
+
+    gcmONERROR(sloCOMPILER_CreateName(Compiler,
+                                      0,
+                                      0,
+                                      slvSTRUCT_NAME,
+                                      structDataType,
+                                      symbol,
+                                      extension,
+                                      gcvFALSE,
+                                      &structName));
+
+    /* Create the variable name. */
+    if (Variable.symbol != gcvNULL)
+    {
+        gcmONERROR(slsDATA_TYPE_Clone(Compiler,
+                                      Variable.qualifier,
+                                      structName->dataType->qualifiers.precision,
+                                      structName->dataType,
+                                      &instanceDataType));
+
+        gcmONERROR(sloCOMPILER_CreateArrayDataType(Compiler,
+                                                   instanceDataType,
+                                                   Variable.arrayLength,
+                                                   &instanceDataType));
+
+        gcmONERROR(sloCOMPILER_AllocatePoolString(Compiler,
+                                                  Variable.symbol,
+                                                  &symbol));
+
+        gcmONERROR(sloCOMPILER_CreateName(Compiler,
+                                          0,
+                                          0,
+                                          slvVARIABLE_NAME,
+                                          instanceDataType,
+                                          symbol,
+                                          extension,
+                                          gcvFALSE,
+                                          &instanceName));
+    }
+
+OnError:
+    return status;
+}
+
+static gceSTATUS
 _LoadBuiltInVariables(
     IN sloCOMPILER Compiler,
     IN slsBASIC_BUILT_IN_TYPE_INFO * BasicBuiltInTypeInfos,
@@ -1202,6 +1491,16 @@ _LoadBuiltInVariables(
 
         if (BuiltInVariables[i].arrayLength == -1)
         {
+            continue;
+        }
+
+        if (BuiltInVariables[i].qualifier == slvSTORAGE_QUALIFIER_UNIFORM &&
+            BuiltInVariables[i].arrayLength > 0)
+        {
+            status = _LoadBuiltInVariablesForUniformArray(Compiler,
+                                                          BuiltInVariables[i]);
+
+            if (gcmIS_ERROR(status)) break;
             continue;
         }
 
@@ -2104,8 +2403,43 @@ slGetBuiltInVariableImplSymbol(
     gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_COMPILER, "*ImplQualifier=%u", gcmOPT_VALUE(ImplQualifier));
 
     shaderType = Compiler->shaderType;
+    /* gl_LightSource is defined as :
+            struct gl_LightSourceParameters {
+            vec4 ambient; // Acli
+            vec4 diffuse; // Dcli
+            vec4 specular; // Scli
+            vec4 position; // Ppli
+            vec4 halfVector; // Derived: Hi
+            vec3 spotDirection; // Sdli
+            float spotExponent; // Srli
+            float spotCutoff; // Crli
+            // (range: [0.0,90.0], 180.0)
+            float spotCosCutoff; // Derived: cos(Crli)
+            // (range: [1.0,0.0],-1.0)
+            float constantAttenuation; // K0
+            float linearAttenuation; // K1
+            float quadraticAttenuation;// K2
+            };
+            uniform gl_LightSourceParameters gl_LightSource[gl_MaxLights];
 
-    if(shaderType == slvSHADER_TYPE_VERTEX)
+        If we defined gl_LightSource[n].XXXX as BuiltInVariable, we need to add too many variable.
+        So, in this function, we use "#" instead of "gl_" to change variable string name as below:
+            gl_LightSource[0].ambient ===> #LightSource[0].ambient
+            gl_LightSource[0].diffuse ===> #LightSource[0].diffuse
+        PS: gl_LightSource only used in VS and FS.
+    */
+
+    if((shaderType == slvSHADER_TYPE_VERTEX || shaderType == slvSHADER_TYPE_FRAGMENT) &&
+        gcmIS_SUCCESS(gcoOS_StrNCmp(Symbol, "gl_LightSource[", 15)))
+    {
+        gctSTRING subString;
+        gctCHAR   string[1024] = "#";
+        gcoOS_StrFindReverse(Symbol, '_', &subString);
+        gcoOS_StrCatSafe(string, 1024, (subString + 1));
+        *ImplSymbol = string;
+        *ImplQualifier  = slvSTORAGE_QUALIFIER_UNIFORM;
+    }
+    else if(shaderType == slvSHADER_TYPE_VERTEX)
     {
         for (i = 0; i < VSBuiltInVariableCount; i++)
         {

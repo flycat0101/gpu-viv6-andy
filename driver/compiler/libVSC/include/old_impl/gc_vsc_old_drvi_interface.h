@@ -2055,6 +2055,7 @@ typedef struct _gcsGLSLCaps
 
     /* Desktop GL limits */
     gctUINT maxClipDistances;
+    gctUINT maxLights;
     gctUINT maxClipPlanes;
     gctUINT maxFragmentUniformComponents;
     gctUINT maxTextureCoords;
@@ -2214,6 +2215,7 @@ extern gceSTATUS gcInitGLSLCaps(
 
 /* Desktop GL constants */
 #define GetGLMaxClipDistances()               (gcGetGLSLCaps()->maxClipDistances)
+#define GetGLMaxLights()                      (gcGetGLSLCaps()->maxLights)
 #define GetGLMaxClipPlanes()                  (gcGetGLSLCaps()->maxClipPlanes)
 #define GetGLMaxFragmentUniformComponents()   (gcGetGLSLCaps()->maxFragmentUniformComponents)
 #define GetGLMaxTextureCoords()               (gcGetGLSLCaps()->maxTextureCoords)
