@@ -437,7 +437,7 @@ typedef struct
     gctUINT             valueCount;
     sluCONSTANT_VALUE   value[sldMAX_VECTOR_COMPONENT];
     /* Only add this constant when extension is enabled. */
-    gctUINT             extension;
+    sloEXTENSION        extension;
 } BuiltinConstInfo;
 
 /* Built-In Constant */
@@ -468,7 +468,7 @@ _AddBuiltInConstants(
         slsBASIC_BUILT_IN_TYPE_INFO *basicBuiltInTypeInfo;
         sloEXTENSION extension = {0};
 
-        extension.extension1 = ConstantInfos[i].extension;
+        extension = ConstantInfos[i].extension;
         /* If this variable is not enabled in this shader, then we don't need to load it. */
         if (!sloCOMPILER_ExtensionEnabled(Compiler, &extension))
         {
@@ -557,80 +557,80 @@ _LoadBuiltInConstants(
     gceAPI              apiVersion;
     static BuiltinConstInfo    constantInfos[] =
     {
-        {"gl_MaxVertexAttribs",                    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
-        {"gl_MaxVertexUniformVectors",             T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
-        {"gl_MaxVertexOutputVectors",              T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
-        {"gl_MaxFragmentInputVectors",             T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
-        {"gl_MaxVertexTextureImageUnits",          T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
-        {"gl_MaxCombinedTextureImageUnits",        T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
-        {"gl_MaxTextureImageUnits",                T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
-        {"gl_MaxFragmentUniformVectors",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
-        {"gl_MaxDrawBuffers",                      T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
-        {"gl_MaxSamples",                          T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_SAMPLE_VARIABLES},
-        {"gl_MinProgramTexelOffset",               T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_HALTI},
-        {"gl_MaxProgramTexelOffset",               T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_HALTI},
-        {"gl_MaxImageUnits",                       T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
-        {"gl_MaxVertexImageUniforms",              T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
-        {"gl_MaxFragmentImageUniforms",            T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
-        {"gl_MaxComputeImageUniforms",             T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
-        {"gl_MaxCombinedImageUniforms",            T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
-        {"gl_MaxCombinedShaderOutputResources",    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
-        {"gl_MaxComputeWorkGroupCount",            T_IVEC3, slvPRECISION_QUALIFIER_HIGH, 3, {{0}}, slvEXTENSION1_ES_31},
-        {"gl_MaxComputeWorkGroupSize",             T_IVEC3, slvPRECISION_QUALIFIER_HIGH, 3, {{0}}, slvEXTENSION1_ES_31},
-        {"gl_MaxComputeUniformComponents",         T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
-        {"gl_MaxComputeTextureImageUnits",         T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
-        {"gl_MaxComputeAtomicCounters",            T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
-        {"gl_MaxComputeAtomicCounterBuffers",      T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
-        {"gl_MaxVertexAtomicCounters",             T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
-        {"gl_MaxFragmentAtomicCounters",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
-        {"gl_MaxCombinedAtomicCounters",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
-        {"gl_MaxAtomicCounterBindings",            T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
-        {"gl_MaxVertexAtomicCounterBuffers",       T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
-        {"gl_MaxFragmentAtomicCounterBuffers",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
-        {"gl_MaxCombinedAtomicCounterBuffers",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
-        {"gl_MaxAtomicCounterBufferSize",          T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
-        {"gl_MaxVaryingVectors",                   T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0},
+        {"gl_MaxVertexAttribs",                    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {0}},
+        {"gl_MaxVertexUniformVectors",             T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {0}},
+        {"gl_MaxVertexOutputVectors",              T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {0}},
+        {"gl_MaxFragmentInputVectors",             T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {0}},
+        {"gl_MaxVertexTextureImageUnits",          T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {0}},
+        {"gl_MaxCombinedTextureImageUnits",        T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {0}},
+        {"gl_MaxTextureImageUnits",                T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {0}},
+        {"gl_MaxFragmentUniformVectors",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {0}},
+        {"gl_MaxDrawBuffers",                      T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {0}},
+        {"gl_MaxSamples",                          T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_SAMPLE_VARIABLES}},
+        {"gl_MinProgramTexelOffset",               T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_HALTI}},
+        {"gl_MaxProgramTexelOffset",               T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_HALTI}},
+        {"gl_MaxImageUnits",                       T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_ES_31}},
+        {"gl_MaxVertexImageUniforms",              T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_ES_31}},
+        {"gl_MaxFragmentImageUniforms",            T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_ES_31}},
+        {"gl_MaxComputeImageUniforms",             T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_ES_31}},
+        {"gl_MaxCombinedImageUniforms",            T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_ES_31}},
+        {"gl_MaxCombinedShaderOutputResources",    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_ES_31}},
+        {"gl_MaxComputeWorkGroupCount",            T_IVEC3, slvPRECISION_QUALIFIER_HIGH, 3, {{0}}, {slvEXTENSION1_ES_31}},
+        {"gl_MaxComputeWorkGroupSize",             T_IVEC3, slvPRECISION_QUALIFIER_HIGH, 3, {{0}}, {slvEXTENSION1_ES_31}},
+        {"gl_MaxComputeUniformComponents",         T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_ES_31}},
+        {"gl_MaxComputeTextureImageUnits",         T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_ES_31}},
+        {"gl_MaxComputeAtomicCounters",            T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_ES_31}},
+        {"gl_MaxComputeAtomicCounterBuffers",      T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_ES_31}},
+        {"gl_MaxVertexAtomicCounters",             T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_ES_31}},
+        {"gl_MaxFragmentAtomicCounters",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_ES_31}},
+        {"gl_MaxCombinedAtomicCounters",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_ES_31}},
+        {"gl_MaxAtomicCounterBindings",            T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_ES_31}},
+        {"gl_MaxVertexAtomicCounterBuffers",       T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_ES_31}},
+        {"gl_MaxFragmentAtomicCounterBuffers",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_ES_31}},
+        {"gl_MaxCombinedAtomicCounterBuffers",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_ES_31}},
+        {"gl_MaxAtomicCounterBufferSize",          T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_ES_31}},
+        {"gl_MaxVaryingVectors",                   T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {0}},
         /* TS EXT constants */
-        {"gl_MaxTessControlInputComponents",       T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
-        {"gl_MaxTessControlOutputComponents",      T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
-        {"gl_MaxTessControlTextureImageUnits",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
-        {"gl_MaxTessControlImageUniforms",         T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
-        {"gl_MaxTessControlUniformComponents",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
-        {"gl_MaxTessControlTotalOutputComponents", T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
-        {"gl_MaxTessControlAtomicCounters",        T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
-        {"gl_MaxTessControlAtomicCounterBuffers",  T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
-        {"gl_MaxTessEvaluationInputComponents",    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
-        {"gl_MaxTessEvaluationOutputComponents",   T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
-        {"gl_MaxTessEvaluationTextureImageUnits",  T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
-        {"gl_MaxTessEvaluationImageUniforms",      T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
-        {"gl_MaxTessEvaluationUniformComponents",  T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
-        {"gl_MaxTessEvaluationAtomicCounters",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
-        {"gl_MaxTessEvaluationAtomicCounterBuffers", T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
-        {"gl_MaxTessPatchComponents",              T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
-        {"gl_MaxPatchVertices",                    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
-        {"gl_MaxTessGenLevel",                     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
+        {"gl_MaxTessControlInputComponents",       T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_TESSELLATION_SHADER}},
+        {"gl_MaxTessControlOutputComponents",      T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_TESSELLATION_SHADER}},
+        {"gl_MaxTessControlTextureImageUnits",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_TESSELLATION_SHADER}},
+        {"gl_MaxTessControlImageUniforms",         T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_TESSELLATION_SHADER}},
+        {"gl_MaxTessControlUniformComponents",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_TESSELLATION_SHADER}},
+        {"gl_MaxTessControlTotalOutputComponents", T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_TESSELLATION_SHADER}},
+        {"gl_MaxTessControlAtomicCounters",        T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_TESSELLATION_SHADER}},
+        {"gl_MaxTessControlAtomicCounterBuffers",  T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_TESSELLATION_SHADER}},
+        {"gl_MaxTessEvaluationInputComponents",    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_TESSELLATION_SHADER}},
+        {"gl_MaxTessEvaluationOutputComponents",   T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_TESSELLATION_SHADER}},
+        {"gl_MaxTessEvaluationTextureImageUnits",  T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_TESSELLATION_SHADER}},
+        {"gl_MaxTessEvaluationImageUniforms",      T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_TESSELLATION_SHADER}},
+        {"gl_MaxTessEvaluationUniformComponents",  T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_TESSELLATION_SHADER}},
+        {"gl_MaxTessEvaluationAtomicCounters",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_TESSELLATION_SHADER}},
+        {"gl_MaxTessEvaluationAtomicCounterBuffers", T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_TESSELLATION_SHADER}},
+        {"gl_MaxTessPatchComponents",              T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_TESSELLATION_SHADER}},
+        {"gl_MaxPatchVertices",                    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_TESSELLATION_SHADER}},
+        {"gl_MaxTessGenLevel",                     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_TESSELLATION_SHADER}},
         /* GS EXT constants */
-        {"gl_MaxGeometryInputComponents",          T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_EXT_GEOMETRY_SHADER},
-        {"gl_MaxGeometryOutputComponents",         T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_EXT_GEOMETRY_SHADER},
-        {"gl_MaxGeometryImageUniforms",            T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_EXT_GEOMETRY_SHADER},
-        {"gl_MaxGeometryTextureImageUnits",        T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_EXT_GEOMETRY_SHADER},
-        {"gl_MaxGeometryOutputVertices",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_EXT_GEOMETRY_SHADER},
-        {"gl_MaxGeometryTotalOutputComponents",    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_EXT_GEOMETRY_SHADER},
-        {"gl_MaxGeometryUniformComponents",        T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_EXT_GEOMETRY_SHADER},
-        {"gl_MaxGeometryAtomicCounters",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_EXT_GEOMETRY_SHADER},
-        {"gl_MaxGeometryAtomicCounterBuffers",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_EXT_GEOMETRY_SHADER},
+        {"gl_MaxGeometryInputComponents",          T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_EXT_GEOMETRY_SHADER}},
+        {"gl_MaxGeometryOutputComponents",         T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_EXT_GEOMETRY_SHADER}},
+        {"gl_MaxGeometryImageUniforms",            T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_EXT_GEOMETRY_SHADER}},
+        {"gl_MaxGeometryTextureImageUnits",        T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_EXT_GEOMETRY_SHADER}},
+        {"gl_MaxGeometryOutputVertices",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_EXT_GEOMETRY_SHADER}},
+        {"gl_MaxGeometryTotalOutputComponents",    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_EXT_GEOMETRY_SHADER}},
+        {"gl_MaxGeometryUniformComponents",        T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_EXT_GEOMETRY_SHADER}},
+        {"gl_MaxGeometryAtomicCounters",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_EXT_GEOMETRY_SHADER}},
+        {"gl_MaxGeometryAtomicCounterBuffers",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_EXT_GEOMETRY_SHADER}},
         /* Desktop GL constants */
-        {"gl_MaxClipDistances",                    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{8}}, 0 },
-        {"gl_MaxClipPlanes",                       T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
-        {"gl_MaxFragmentUniformComponents",        T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
-        {"gl_MaxTextureCoords",                    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
-        {"gl_MaxTextureUnits",                     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
-        {"gl_MaxVaryingComponents",                T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
-        {"gl_MaxVaryingFloats",                    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
-        {"gl_MaxVertexUniformComponents",          T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
-        {"gl_MaxFragmentInputComponents",          T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
-        {"gl_MaxVertexOutputComponents",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
-        {"gl_MaxGeometryVaryingComponents",        T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_EXT_GEOMETRY_SHADER},
+        {"gl_MaxClipDistances",                    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{8}}, {0}},
+        {"gl_MaxClipPlanes",                       T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {0}},
+        {"gl_MaxFragmentUniformComponents",        T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {0}},
+        {"gl_MaxTextureCoords",                    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {0}},
+        {"gl_MaxTextureUnits",                     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {0}},
+        {"gl_MaxVaryingComponents",                T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {0}},
+        {"gl_MaxVaryingFloats",                    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {0}},
+        {"gl_MaxVertexUniformComponents",          T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {0}},
+        {"gl_MaxFragmentInputComponents",          T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {0}},
+        {"gl_MaxVertexOutputComponents",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {0}},
+        {"gl_MaxGeometryVaryingComponents",        T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, {slvEXTENSION1_EXT_GEOMETRY_SHADER}},
 
     };
 
@@ -799,7 +799,6 @@ _LoadBuiltInUniformState(
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     gcmVERIFY_ARGUMENT(BasicBuiltInTypeInfos);
 
-    extension.extension1 = slvEXTENSION1_NONE;
     do
     {
         /* Create the struct field: near, far, diff */
@@ -991,8 +990,6 @@ _LoadBuiltInVariablesForIOBlock(
     gctBOOL                         addMember;
     slsINTERFACE_BLOCK_MEMBER *     blockMember;
     sloEXTENSION                    extension = {0};
-
-    extension.extension1 = slvEXTENSION1_NONE;
 
     gcmONERROR(sloCOMPILER_CreateAuxGlobalNameSpace(Compiler,
                                                     gcvNULL,
@@ -1186,7 +1183,7 @@ _LoadBuiltInVariables(
     for (i = 0; i < BuiltInVariableCount; i++)
     {
         /* If this variable is not enabled in this shader, then we don't need to load it. */
-        extension.extension1 = BuiltInVariables[i].extension;
+        extension = BuiltInVariables[i].extension;
         if (!sloCOMPILER_ExtensionEnabled(Compiler, &extension))
         {
             continue;
@@ -1528,7 +1525,7 @@ _LoadBuiltInFunctions(
 
         if (gcmIS_ERROR(status)) break;
 
-        extension.extension1 = BuiltInFunctions[i].extension;
+        extension = BuiltInFunctions[i].extension;
         status = sloCOMPILER_CreateName(Compiler,
                                         0,
                                         0,
@@ -1691,7 +1688,7 @@ _LoadIntrinsicBuiltInFunctions(
         if (gcmIS_ERROR(status)) break;
 
         /* Create function name */
-        extension.extension1 = IntrinsicFunctions[i].extension;
+        extension= IntrinsicFunctions[i].extension;
         status = sloCOMPILER_CreateName(Compiler,
                                         0,
                                         0,
@@ -17948,12 +17945,11 @@ slGetBuiltinFunctionExtension(
     sloEXTENSION extension = {0};
     gctUINT i;
 
-    extension.extension1 = slvEXTENSION1_NONE;
     for (i = 0; i < builtinFunctionExtensionCount; i++)
     {
         if (gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, builtinFunctionExtensionTable[i].symbol)))
         {
-            extension.extension1 = builtinFunctionExtensionTable[i].extension;
+            extension = builtinFunctionExtensionTable[i].extension;
             break;
         }
     }
