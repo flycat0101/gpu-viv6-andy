@@ -4613,7 +4613,7 @@ IN gctUINT mask
             prevSwLoc->next = loc;
         }
 
-        if (gcmOPT_EnableDebugDumpALL())
+        if (gcmOPT_EnableDebugDumpALL() && gcmOPT_DUMP_CODEGEN())
         {
             gcmPRINT("set swLoc[%d] reg[%d,%d]", swLoc->id, regIndex, regIndex + num -1);
             vscDIDumpDIE(Compiler->context.debugInfo, die->id, 0, (1 << VSC_DI_TAG_VARIABE)|(1 << VSC_DI_TAG_PARAMETER));

@@ -1885,15 +1885,17 @@ static void _GetTypeStr(
     if (die->u.variable.type.isPointer)
         gcoOS_StrCatSafe(typeStr, strLength, " *");
 
-    if (die->u.variable.type.array.numDim > 0)
+    if (die->u.variable.type.array.numDim > 0 && dimDepth < (gctUINT)(die->u.variable.type.array.numDim))
     {
+        char tempStr[100]={0};
         gctUINT offset = 0;
         gctINT i = dimDepth;
         for (; i < die->u.variable.type.array.numDim; i++)
         {
-            offset = 0;
-            gcoOS_PrintStrSafe(typeStr, strLength, &offset, "%s%s[%d]", typeStr, (unsigned int)i == dimDepth ? " " : "", die->u.variable.type.array.length[i]);
+            gcoOS_PrintStrSafe(tempStr, 100, &offset, "[%d]", die->u.variable.type.array.length[i]);
         }
+        gcoOS_StrCatSafe(typeStr, strLength, " ");
+        gcoOS_StrCatSafe(typeStr, strLength, tempStr);
     }
 }
 
@@ -2384,14 +2386,17 @@ void vscDIGetVariableInfo(
 
         if (varName)
         {
+            char tempStr[20]={0};
             gcoOS_StrCopySafe(varName, nameLength, _GetNameStr(context, Vdie->name));
             for (index = 0; index < dimDepth; index++)
             {
                 offset = 0;
-                gcoOS_PrintStrSafe(varName, nameLength, &offset, "%s[%d]", varName, dimNum[index]);
+                gcoOS_PrintStrSafe(tempStr, 20, &offset, "[%d]", dimNum[index]);
+                gcoOS_StrCatSafe(varName, nameLength, tempStr);
             }
             offset = 0;
-            gcoOS_PrintStrSafe(varName, nameLength, &offset, "%s[%d]", varName, idx);
+            gcoOS_PrintStrSafe(tempStr, 20, &offset, "[%d]", idx);
+            gcoOS_StrCatSafe(varName, nameLength, tempStr);
         }
 
          _GetTypeStr(context, Vdie, typeStr, nameLength, dimDepth + 1);
@@ -2494,6 +2499,17 @@ void vscDIGetVariableInfo(
             for(index = 0; tempstr[index]!=0; index++)
                 varName[index + 1] = tempstr[index];
             varName[index + 1] = 0;
+
+            if(Vdie->u.variable.type.array.numDim > 0 && (gctINT)dimDepth == Vdie->u.variable.type.array.numDim)
+            {
+                char tempStr[50]={0};
+                offset = 0;
+                for (index = 0; index < dimDepth; index++)
+                {
+                    gcoOS_PrintStrSafe(tempStr, 50, &offset, "[%d]", dimNum[index]);
+                }
+                gcoOS_StrCatSafe(varName, nameLength, tempStr);
+            }
         }
 
         if(typeStr)
