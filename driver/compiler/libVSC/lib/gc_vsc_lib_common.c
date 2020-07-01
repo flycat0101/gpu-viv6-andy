@@ -1966,6 +1966,12 @@ gcSHADER_InitBuiltinLibrary(
         gcLibTextureSize_Func_16,
         gcLibTextureSize_Func_17,
         gcLibTextureSize_Func_18,
+        gcLibTextureSize_Func_33,
+        gcLibTextureSize_Func_34,
+        gcLibTextureSize_Func_35,
+        gcLibTextureSize_Func_36,
+        gcLibTextureSize_Func_37,
+        gcLibTextureSize_Func_38,
 
         gcLibTextureCommon_Func,
         gcLibTextureGatherCommon_Func_1,
@@ -2610,6 +2616,9 @@ gcSHADER_InitBuiltinLibrary(
     gctSTRING TextureSize_gl[] =
     {
         gcLibTextureSize_Func_29,
+        gcLibTextureSize_Func_30,
+        gcLibTextureSize_Func_31,
+        gcLibTextureSize_Func_32,
     };
 
     if (isSupportImgAddr && !isSupportImgInst &&
