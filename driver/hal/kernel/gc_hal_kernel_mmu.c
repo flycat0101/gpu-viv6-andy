@@ -3160,7 +3160,7 @@ gckMMU_SetupSRAM(
                 {
                     if (Device->showSRAMMapInfo)
                     {
-                        gcmkPRINT("Galcore Info: MMU mapped core%d SRAM base=0x%llx size=0x%x",
+                            gcmkPRINT("Galcore Info: MMU mapped external shared SRAM[%d] GPU view base=0x%llx GPU virtual address=0x%x size=0x%x",
                             i,
                             reservedBase,
                             reservedSize

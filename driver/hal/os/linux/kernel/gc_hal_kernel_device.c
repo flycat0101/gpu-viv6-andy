@@ -1616,6 +1616,79 @@ OnError:
     return status;
 }
 
+static gceSTATUS
+_SetupExternalSRAMVidMem(
+    IN gckGALDEVICE Device
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gckGALDEVICE device = Device;
+    gctINT32 i, j = 0;
+
+    gcmkHEADER_ARG("Device=%p", Device);
+
+    /* Setup external SRAM memory region. */
+    for (i = 0; i < gcvSRAM_EXT_COUNT; i++)
+    {
+        if (!device->extSRAMSizes[i])
+        {
+            /* Keep this path for internal test, read from feature database. */
+            device->extSRAMSizes[i] = device->device->extSRAMSizes[i];
+        }
+
+        if (device->extSRAMSizes[i] > 0)
+        {
+            /* create the external SRAM memory heap */
+            status = gckVIDMEM_Construct(
+                device->os,
+                device->extSRAMBases[i],
+                device->extSRAMSizes[i],
+                64,
+                0,
+                &device->extSRAMVidMem[i]
+                );
+
+            if (gcmIS_ERROR(status))
+            {
+                /* Error, disable external SRAM heap. */
+                device->extSRAMSizes[i] = 0;
+            }
+            else
+            {
+                char sRAMName[40];
+                snprintf(sRAMName, gcmSIZEOF(sRAMName) - 1, "Galcore external sram%d", i);
+
+#if gcdCAPTURE_ONLY_MODE
+                device->args.sRAMRequested = gcvTRUE;
+#endif
+                /* Map external SRAM memory. */
+                gcmkONERROR(gckOS_RequestReservedMemory(
+                        device->os,
+                        device->extSRAMBases[i], device->extSRAMSizes[i],
+                        sRAMName,
+                        device->args.sRAMRequested,
+                        &device->extSRAMPhysical[i]
+                        ));
+
+                device->extSRAMVidMem[i]->physical = device->extSRAMPhysical[i];
+                device->device->extSRAMPhysical[i] = device->extSRAMPhysical[i];
+
+                for (j = 0; j < gcdMAX_GPU_COUNT; j++)
+                {
+                    if (device->irqLines[j] != -1 && device->kernels[j])
+                    {
+                        device->kernels[j]->hardware->options.extSRAMGPUPhysNames[i] = gckKERNEL_AllocateNameFromPointer(device->kernels[j], device->extSRAMPhysical[i]);
+                    }
+                }
+            }
+        }
+    }
+
+OnError:
+    gcmkFOOTER();
+    return status;
+}
+
 /******************************************************************************\
 ******************************* Interrupt Handler ******************************
 \******************************************************************************/
@@ -1866,7 +1939,7 @@ gckGALDEVICE_Construct(
 {
     gckKERNEL kernel = gcvNULL;
     gckGALDEVICE device;
-    gctINT32 i, j;
+    gctINT32 i;
     gceHARDWARE_TYPE type;
     gceSTATUS status = gcvSTATUS_OK;
 
@@ -1994,6 +2067,11 @@ gckGALDEVICE_Construct(
     device->externalBase = Args->externalBase;
     device->externalSize = Args->externalSize;
 
+#if gcdEXTERNAL_SRAM_DEFAULT_POOL
+    /* Setup external SRAM video memory pool. */
+    gcmkONERROR(_SetupExternalSRAMVidMem(device));
+#endif
+
     /* Add core for all available major cores. */
     for (i = gcvCORE_MAJOR; i <= gcvCORE_3D_MAX; i++)
     {
@@ -2108,59 +2186,10 @@ gckGALDEVICE_Construct(
         device->kernels[gcvCORE_VG] = gcvNULL;
     }
 
-    /* Setup external SRAM memory region. */
-    for (i = 0; i < gcvSRAM_EXT_COUNT; i++)
-    {
-        if (!device->extSRAMSizes[i])
-        {
-            /* Keep this path for internal test, read from feature database. */
-            device->extSRAMSizes[i] = device->device->extSRAMSizes[i];
-        }
-
-        if (device->extSRAMSizes[i] > 0)
-        {
-            /* create the external SRAM memory heap */
-            status = gckVIDMEM_Construct(
-                device->os,
-                device->extSRAMBases[i],
-                device->extSRAMSizes[i],
-                64,
-                0,
-                &device->extSRAMVidMem[i]
-                );
-
-            if (gcmIS_ERROR(status))
-            {
-                /* Error, disable external SRAM heap. */
-                device->extSRAMSizes[i] = 0;
-            }
-            else
-            {
-                char sRAMName[20];
-                snprintf(sRAMName, gcmSIZEOF(sRAMName) - 1, "Galcore external sram%d", i);
-
-                /* Map external SRAM memory. */
-                gcmkONERROR(gckOS_RequestReservedMemory(
-                        device->os,
-                        device->extSRAMBases[i], device->extSRAMSizes[i],
-                        sRAMName,
-                        device->args.sRAMRequested,
-                        &device->extSRAMPhysical[i]
-                        ));
-
-                device->extSRAMVidMem[i]->physical = device->extSRAMPhysical[i];
-                device->device->extSRAMPhysical[i] = device->extSRAMPhysical[i];
-
-                for (j = 0; j < gcdMAX_GPU_COUNT; j++)
-                {
-                    if (device->irqLines[j] != -1 && device->kernels[j])
-                    {
-                        device->kernels[j]->hardware->options.extSRAMGPUPhysNames[i] = gckKERNEL_AllocateNameFromPointer(device->kernels[j], device->extSRAMPhysical[i]);
-                    }
-                }
-            }
-        }
-    }
+#if !gcdEXTERNAL_SRAM_DEFAULT_POOL
+    /* Setup external SRAM video memory pool. */
+    gcmkONERROR(_SetupExternalSRAMVidMem(device));
+#endif
 
     /* Initialize the kernel thread semaphores. */
     for (i = 0; i < gcdMAX_GPU_COUNT; i++)
@@ -2338,6 +2367,22 @@ gckGALDEVICE_Destroy(
             }
         }
 
+        if (Device->device)
+        {
+            gcmkVERIFY_OK(gckDEVICE_Destroy(Device->os, Device->device));
+
+            for (i = 0; i < gcdMAX_GPU_COUNT; i++)
+            {
+                if (globalTA[i])
+                {
+                    gcTA_Destroy(globalTA[i]);
+                    globalTA[i] = gcvNULL;
+                }
+            }
+
+            Device->device = gcvNULL;
+        }
+
         for (i = 0; i < gcdMAX_GPU_COUNT; i++)
         {
             if (Device->kernels[i] != gcvNULL)
@@ -2397,22 +2442,6 @@ gckGALDEVICE_Destroy(
             /* destroy the external heap */
             gcmkVERIFY_OK(gckVIDMEM_Destroy(Device->externalVidMem));
             Device->externalVidMem = gcvNULL;
-        }
-
-        if (Device->device)
-        {
-            gcmkVERIFY_OK(gckDEVICE_Destroy(Device->os, Device->device));
-
-            for (i = 0; i < gcdMAX_GPU_COUNT; i++)
-            {
-                if (globalTA[i])
-                {
-                    gcTA_Destroy(globalTA[i]);
-                    globalTA[i] = gcvNULL;
-                }
-            }
-
-            Device->device = gcvNULL;
         }
 
         /*
