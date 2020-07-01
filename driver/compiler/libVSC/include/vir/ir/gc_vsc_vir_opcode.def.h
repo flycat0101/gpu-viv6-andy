@@ -1389,8 +1389,8 @@
     VIR_OPINFO(EMIT, 3,HasDest, 0, LM),
     VIR_OPINFO(RESTART, 2,HasDest, 0, LM), /* cut */
     /* Specified Stream. */
-    VIR_OPINFO(EMIT_STREAM0, 1, NoDest, 0, AL),
-    VIR_OPINFO(RESTART_STREAM0, 1, NoDest, 0, AL), /* cut */
+    VIR_OPINFO(EMIT_STREAM, 1, NoDest, 0, NM),
+    VIR_OPINFO(RESTART_STREAM, 1, NoDest, 0, NM), /* cut */
 
     VIR_OPINFO(ALLOCA, 1, HasDest, 1, NU), /* allocate memory in stack */
 
