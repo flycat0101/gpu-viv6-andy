@@ -3979,31 +3979,31 @@ sloCOMPILER_SetLanguageVersion(
        /* TODO: need to review the keyword table and built-ins and refine the extensions for each GLSL version*/
        case 100:
        case 110:
-          Compiler->langVersion = _SHADER_GL20_VERSION;
+          Compiler->langVersion = _SHADER_GL11_VERSION;
           Compiler->context.extensions.extension1 &= ~slvEXTENSION1_ES_30_AND_ABOVE;
           Compiler->context.extensions.extension1 |= slvEXTENSION1_NON_HALTI;
           break;
 
        case 120:
-          Compiler->langVersion = _SHADER_GL21_VERSION;
+          Compiler->langVersion = _SHADER_GL12_VERSION;
           Compiler->context.extensions.extension1 &= ~slvEXTENSION1_ES_30_AND_ABOVE;
           Compiler->context.extensions.extension1 |= slvEXTENSION1_NON_HALTI;
           break;
 
        case 130:
-          Compiler->langVersion = _SHADER_GL30_VERSION;
+          Compiler->langVersion = _SHADER_GL13_VERSION;
           Compiler->context.extensions.extension1 |= (slvEXTENSION1_HALTI | slvEXTENSION1_NON_HALTI | slvEXTENSION1_ES_31
                                           |slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS);
           break;
 
        case 140:
-          Compiler->langVersion = _SHADER_GL31_VERSION;
+          Compiler->langVersion = _SHADER_GL14_VERSION;
           Compiler->context.extensions.extension1 |= (slvEXTENSION1_HALTI | slvEXTENSION1_NON_HALTI | slvEXTENSION1_ES_31
                                           |slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS);
           break;
 
        case 150:
-          Compiler->langVersion = _SHADER_GL32_VERSION;
+          Compiler->langVersion = _SHADER_GL15_VERSION;
           Compiler->context.extensions.extension1 |= (slvEXTENSION1_HALTI | slvEXTENSION1_NON_HALTI | slvEXTENSION1_ES_31
                                           |slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS | slvEXTENSION1_EXT_GEOMETRY_SHADER );
           break;
@@ -4168,35 +4168,43 @@ sloCOMPILER_IsOGLVersion(
 }
 
 gctBOOL
-sloCOMPILER_IsOGL40Version(
+sloCOMPILER_IsOGL11Version(
     IN sloCOMPILER Compiler
     )
 {
-    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL40_VERSION;
+    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL11_VERSION;
 }
 
 gctBOOL
-sloCOMPILER_IsOGL30Version(
+sloCOMPILER_IsOGL12Version(
     IN sloCOMPILER Compiler
     )
 {
-    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL30_VERSION;
+    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL12_VERSION;
 }
 
 gctBOOL
-sloCOMPILER_IsOGL31Version(
+sloCOMPILER_IsOGL13Version(
     IN sloCOMPILER Compiler
     )
 {
-    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL31_VERSION;
+    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL13_VERSION;
 }
 
 gctBOOL
-sloCOMPILER_IsOGL32Version(
+sloCOMPILER_IsOGL14Version(
     IN sloCOMPILER Compiler
     )
 {
-    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL32_VERSION;
+    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL14_VERSION;
+}
+
+gctBOOL
+sloCOMPILER_IsOGL15Version(
+    IN sloCOMPILER Compiler
+    )
+{
+    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL15_VERSION;
 }
 
 gctBOOL
@@ -4208,11 +4216,11 @@ sloCOMPILER_IsOGL33Version(
 }
 
 gctBOOL
-sloCOMPILER_IsOGL20Version(
+sloCOMPILER_IsOGL40Version(
     IN sloCOMPILER Compiler
     )
 {
-    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL20_VERSION;
+    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL40_VERSION;
 }
 
 gctLABEL

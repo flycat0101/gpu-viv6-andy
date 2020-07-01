@@ -223,32 +223,37 @@ sloCOMPILER_IsOGLVersion(
 );
 
 gctBOOL
+sloCOMPILER_IsOGL11Version(
+    IN sloCOMPILER Compiler
+);
+
+gctBOOL
+sloCOMPILER_IsOGL12Version(
+    IN sloCOMPILER Compiler
+);
+
+gctBOOL
+sloCOMPILER_IsOGL13Version(
+    IN sloCOMPILER Compiler
+);
+
+gctBOOL
+sloCOMPILER_IsOGL14Version(
+    IN sloCOMPILER Compiler
+);
+
+gctBOOL
+sloCOMPILER_IsOGL15Version(
+    IN sloCOMPILER Compiler
+);
+
+gctBOOL
 sloCOMPILER_IsOGL40Version(
     IN sloCOMPILER Compiler
 );
 
 gctBOOL
-sloCOMPILER_IsOGL30Version(
-    IN sloCOMPILER Compiler
-);
-
-gctBOOL
-sloCOMPILER_IsOGL31Version(
-    IN sloCOMPILER Compiler
-);
-
-gctBOOL
-sloCOMPILER_IsOGL32Version(
-    IN sloCOMPILER Compiler
-);
-
-gctBOOL
 sloCOMPILER_IsOGL33Version(
-    IN sloCOMPILER Compiler
-);
-
-gctBOOL
-sloCOMPILER_IsOGL20Version(
     IN sloCOMPILER Compiler
 );
 
