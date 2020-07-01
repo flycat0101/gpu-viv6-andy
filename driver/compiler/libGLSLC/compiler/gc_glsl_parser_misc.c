@@ -5951,7 +5951,7 @@ slParseNormalBinaryExpr(
             return gcvNULL;
         }
 
-        if (!sloCOMPILER_IsHaltiVersion(Compiler) &&
+        if ((!sloCOMPILER_IsHaltiVersion(Compiler) || sloCOMPILER_IsOGLVersion(Compiler)) &&
             sloIR_OBJECT_GetType(&LeftOperand->base) == slvIR_CONSTANT)
         {
             gcmVERIFY_OK(sloIR_OBJECT_Destroy(Compiler, &LeftOperand->base));
@@ -8319,6 +8319,25 @@ _CheckErrorForArray(
 
     if (sloCOMPILER_IsHaltiVersion(Compiler))
     {
+       /* GLSL1.1/1.3/1.4 does not allow attributes as arrays */
+       if ((sloCOMPILER_IsOGL11Version(Compiler) ||
+           sloCOMPILER_IsOGL13Version(Compiler) ||
+           sloCOMPILER_IsOGL14Version(Compiler)) &&
+           DataType->qualifiers.storage == slvSTORAGE_QUALIFIER_ATTRIBUTE)
+       {
+           gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                           Identifier->lineNo,
+                                           Identifier->stringNo,
+                                           slvREPORT_ERROR,
+                                           "cannot declare the array: '%s' with the '%s' qualifier",
+                                           Identifier->u.identifier,
+                                           slGetStorageQualifierName(Compiler, DataType->qualifiers.storage)));
+
+           status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+           gcmFOOTER();
+           return status;
+       }
+
        if (DataType->qualifiers.storage == slvSTORAGE_QUALIFIER_IN)
        {
            sleSHADER_TYPE shaderType;
@@ -12939,7 +12958,9 @@ slParseFullySpecifiedType(
         break;
 
     case slvSTORAGE_QUALIFIER_ATTRIBUTE:
-        if (!sloCOMPILER_IsOGLVersion(Compiler) && !slsDATA_TYPE_IsFloatOrVecOrMat(DataType))
+        /* GLES and GLSL11 requires that attribute cannot be integer related types */
+        if (!(sloCOMPILER_IsOGLVersion(Compiler) && !sloCOMPILER_IsOGL11Version(Compiler))
+            && !slsDATA_TYPE_IsFloatOrVecOrMat(DataType))
         {
             gcmVERIFY_OK(sloCOMPILER_Report(
                                             Compiler,
