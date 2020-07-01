@@ -2887,6 +2887,54 @@ gckHARDWARE_InitializeHardware(
                                   data));
     }
 
+    /* AHBDEC400 */
+    if (gckHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_DEC400EX_COMPRESSION))
+    {
+        data = 0x0201018A;
+        data = ((((gctUINT32) (data)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 1:1) - (0 ?
+ 1:1) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 1:1) - (0 ?
+ 1:1) + 1))))))) << (0 ?
+ 1:1))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 1:1) - (0 ?
+ 1:1) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1)));
+        gcmkONERROR(gckOS_WriteRegisterEx(
+            Hardware->os,
+            Hardware->core,
+            0x00800,
+            data));
+
+        data = 0x003FC810;
+        data = ((((gctUINT32) (data)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 6:0) - (0 ?
+ 6:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 6:0) - (0 ?
+ 6:0) + 1))))))) << (0 ?
+ 6:0))) | (((gctUINT32) ((gctUINT32) (4) & ((gctUINT32) ((((1 ?
+ 6:0) - (0 ?
+ 6:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ? 6:0)));
+        data = ((((gctUINT32) (data)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 13:7) - (0 ?
+ 13:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 13:7) - (0 ?
+ 13:7) + 1))))))) << (0 ?
+ 13:7))) | (((gctUINT32) ((gctUINT32) (2) & ((gctUINT32) ((((1 ?
+ 13:7) - (0 ?
+ 13:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 13:7) - (0 ? 13:7) + 1))))))) << (0 ? 13:7)));
+        gcmkONERROR(gckOS_WriteRegisterEx(
+            Hardware->os,
+            Hardware->core,
+            0x00808,
+            data));
+    }
+
     gcmkONERROR(
         gckHARDWARE_SetMMU(Hardware,
                            Hardware->kernel->mmu));
