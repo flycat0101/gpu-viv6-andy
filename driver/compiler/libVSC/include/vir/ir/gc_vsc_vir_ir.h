@@ -547,6 +547,24 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
      (Opcode) == VIR_OP_IMADLO0         ||      \
      (Opcode) == VIR_OP_IMADLO1)
 
+/* opcode with SkipHelper flag by default
+ * load need extra check instructionflag hasSkHp and use VIR_Inst_HasSkHp() */
+#define VIR_OPCODE_NeedSkHpFlag(Opcode) \
+     ((VIR_OPCODE_isAtom(Opcode))         ||  \
+        (Opcode == VIR_OP_IMG_LOAD)       || \
+        (Opcode == VIR_OP_VX_IMG_LOAD)    || \
+        (Opcode == VIR_OP_IMG_LOAD_3D)    || \
+        (Opcode == VIR_OP_VX_IMG_LOAD_3D) || \
+        (Opcode == VIR_OP_IMG_ADDR)       || \
+        (Opcode == VIR_OP_IMG_ADDR_3D)    || \
+        /* store_s should not skip helper */ \
+        (VIR_OPCODE_isLocalMemSt(Opcode))   || \
+        (VIR_OPCODE_isGlobalMemSt(Opcode))  || \
+        (Opcode == VIR_OP_IMG_STORE)      || \
+        (Opcode == VIR_OP_VX_IMG_STORE)   || \
+        (Opcode == VIR_OP_IMG_STORE_3D)   || \
+        (Opcode == VIR_OP_VX_IMG_STORE_3D))
+
 #define VIR_OPCODE_isNonUniform(Opcode)         \
     ((Opcode) == VIR_OP_NONUNIFORM_ELECT)
 
@@ -632,6 +650,9 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
 #define VIR_Inst_IsLoopInvariant(Inst)  ((Inst)->_isLoopInvariant)
 #define VIR_Inst_IsEndOfBB(Inst)        ((Inst)->_endOfBB != 0)
 #define VIR_Inst_IsUSCUnallocate(Inst)  ((Inst)->_USCUnallocate != 0)
+
+/* Flags check. */
+#define VIR_Inst_IsSkipHelper(Inst)     ((VIR_Inst_GetFlags(Inst) & VIR_INSTFLAG_SKIP_HELPER) != 0)
 
 #define VIR_Inst_GetSrcLocLine(Inst)    ((Inst)->sourceLoc.lineNo)
 #define VIR_Inst_GetSrcLocCol(Inst)     ((Inst)->sourceLoc.colNo)
@@ -4130,6 +4151,7 @@ typedef enum _VIR_INSTFLAG
     VIR_INSTFLAG_FULL_DEF           = 0x02,
     VIR_INSTFLAG_FORCE_GEN          = 0x04,
     VIR_INSTFLAG_DEAD_INST          = 0x08,
+    VIR_INSTFLAG_SKIP_HELPER        = 0x10,
 }
 VIR_InstFlag;
 
