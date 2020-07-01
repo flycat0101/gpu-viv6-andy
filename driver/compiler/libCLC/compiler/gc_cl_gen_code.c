@@ -249,6 +249,8 @@ static gctBOOL _IsOpcodeComponentWise[] =
     /* clvOPCODE_FLOAT_TO_INT */ gcvTRUE,
     /* clvOPCODE_FLOAT_TO_UINT */ gcvTRUE,
     /* clvOPCODE_FLOAT_TO_BOOL */ gcvTRUE,
+    /* clvOPCODE_FLOAT_TO_HALF */ gcvTRUE,
+    /* clvOPCODE_HALF_TO_FLOAT */ gcvTRUE,
     /* clvOPCODE_INT_TO_INT */ gcvTRUE,
     /* clvOPCODE_INT_TO_UINT */ gcvTRUE,
     /* clvOPCODE_INT_TO_BOOL */ gcvTRUE,
@@ -1150,6 +1152,13 @@ IN OUT clsROPERAND * ROperand
                    }
                 }
              }
+             else if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX))
+             {
+                 if(clmIsElementTypeHalf(elementType)) {
+                    opcode = clvOPCODE_HALF_TO_FLOAT;
+                 }
+                 else opcode = clvOPCODE_FLOAT_TO_HALF;
+             }
           }
           else if(clmIsElementTypeBoolean(newElementType)) {
              if(clmIsElementTypeFloating(elementType)) {
@@ -1512,6 +1521,8 @@ clGetOpcodeName(
     case clvOPCODE_FLOAT_TO_INT:     return "float_to_int";
     case clvOPCODE_FLOAT_TO_UINT:    return "float_to_uint";
     case clvOPCODE_FLOAT_TO_BOOL:    return "float_to_bool";
+    case clvOPCODE_FLOAT_TO_HALF:    return "float_to_half";
+    case clvOPCODE_HALF_TO_FLOAT:    return "half_to_float";
     case clvOPCODE_INT_TO_UINT:      return "int_to_uint";
     case clvOPCODE_INT_TO_INT:       return "int_to_int";
     case clvOPCODE_INT_TO_BOOL:      return "int_to_bool";
@@ -8036,6 +8047,7 @@ _GenSignExtendCode(
     gcsSOURCE source[1];
     gcsTARGET target[1];
     clsGEN_CODE_DATA_TYPE dataType;
+    clsGEN_CODE_DATA_TYPE sourceType;
 
     clsROPERAND_InitializeUsingLOperand(rOperand, LOperand);
 
@@ -8054,13 +8066,19 @@ _GenSignExtendCode(
     }
     clsIOPERAND_Initialize(Compiler, iOperand, dataType, rOperand->u.reg.regIndex);
     gcsTARGET_InitializeUsingIOperand(Compiler, target, iOperand);
+    sourceType = rOperand->dataType;
+    /* When half type, force to short */
+    if(clmIsElementTypeHalf(rOperand->dataType.elementType)) {
+        sourceType = clmGenCodeDataType(T_SHORT);
+    }
+
     return clEmitConvCode(Compiler,
                           LineNo,
                           StringNo,
                           clvOPCODE_CONV,
                           target,
                           source,
-                          rOperand->dataType);
+                          sourceType);
 }
 
 static gceSTATUS
@@ -13872,9 +13890,11 @@ clGenGenericCode1(
     switch (Opcode)
     {
     case clvOPCODE_ASSIGN:
-     case clvOPCODE_FLOAT_TO_INT:
-     case clvOPCODE_FLOAT_TO_UINT:
+    case clvOPCODE_FLOAT_TO_INT:
+    case clvOPCODE_FLOAT_TO_UINT:
     case clvOPCODE_FLOAT_TO_BOOL:
+    case clvOPCODE_FLOAT_TO_HALF:
+    case clvOPCODE_HALF_TO_FLOAT:
     case clvOPCODE_INT_TO_INT:
     case clvOPCODE_INT_TO_BOOL:
     case clvOPCODE_INT_TO_FLOAT:
