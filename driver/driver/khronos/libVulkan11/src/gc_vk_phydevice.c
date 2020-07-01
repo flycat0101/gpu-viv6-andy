@@ -293,6 +293,8 @@ if ((database->SMALLBATCH && phyDev->phyDevConfig.options.smallBatch)){    vsCon
                     ((database->L1CacheSize * s_uscCacheRatio[phyDev->phyDevConfig.options.uscAttribCacheRatio]));
             }
             attribBufSizeInKbyte -= fragmentSizeInKbyte;
+
+            localStorageSizeInKbyte = attribBufSizeInKbyte;
         }
     }
     else
