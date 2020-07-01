@@ -14,6 +14,7 @@
 /*
 **/
 
+#if !REMOVE_CL_LIBS
 #define read_image_ARGS_INT_COORD_1d \
 "    (\n" \
 "    uint image, \n" \
@@ -11509,6 +11510,8 @@ extern gctSTRING gcLibCL_ReadImage_With_TEXLD_Funcs;
     SINGLE_IMAGE_WR_##DIMENSION \
     "}\n"
 
+#endif
+
 extern gctSTRING gcLibCL_WriteImage_With_IMGST_Funcs;
 extern const gctCONST_STRING gcLibCL_ReadImage_VIR_Common_Func_Str;
 extern gctSTRING gcLib_AtomicPatch_Common_Func_core1_Str;
@@ -11521,6 +11524,7 @@ extern gctSTRING gcCLLib_AtomcmpxchgPatch_Func_core4_Str;
 extern gctSTRING gcCLLib_AtomcmpxchgPatch_Func_core8_Str;
 extern gctSTRING gcCLLibGetLocalID;
 
+#if !REMOVE_CL_LIBS
 /* macro switch */
 #define FIX_LEN_COORD   0
 #define PARAM_FIX       1
@@ -13147,5 +13151,5 @@ VIR_WRITE_IMAGE_IMGLD(type, 3d) \
 extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_IMGLD_int[3];
 extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_IMGLD_uint[3];
 extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_IMGLD_float[3];
-
+#endif
 

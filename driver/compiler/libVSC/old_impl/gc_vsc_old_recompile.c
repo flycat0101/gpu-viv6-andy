@@ -27,7 +27,11 @@
 #if gcdENABLE_3D
 
 #define __COMPILE_TEX_FORMAT_CONVERT_LIBRARY__  1
+#if !REMOVE_CL_LIBS
 #define __COMPILE_CL_PATCH_LIBRARY__            1
+#else
+#define __COMPILE_CL_PATCH_LIBRARY__            0
+#endif
 
 #if __COMPILE_TEX_FORMAT_CONVERT_LIBRARY__
 #include "lib/gc_vsc_lib_gl_patch.h"
@@ -61,6 +65,7 @@ extern gctCLCompiler gcCLCompiler;
 #if _SUPPORT_LONG_ULONG_DATA_TYPE
 #define CL_LIB_COUNT    5
 #define LONG_ULONG_LIB_INDEX 4
+#if __COMPILE_CL_PATCH_LIBRARY__
 #define CL_LONG_ULONG_FUNCS \
             { \
                 gcLibCLLong_Func, \
@@ -88,7 +93,7 @@ extern gctCLCompiler gcCLCompiler;
                 "", \
                 "", \
             }
-
+#endif
 #else
 #define CL_LIB_COUNT    4
 #define LONG_ULONG_LIB_INDEX 3
@@ -5139,9 +5144,13 @@ gcLoadCLPatchLibrary(
     gceSTATUS   status          = gcvSTATUS_OK;
     gctSTRING   gcCLPatchSource[CL_LIB_COUNT] = {gcvNULL};
     gctSTRING   log = gcvNULL;
-    gctINT      i, j;
+    gctINT      i;
     gctBOOL     locked = gcvFALSE;
+
+#if __COMPILE_CL_PATCH_LIBRARY__
+    gctINT      j;
     gctSTRING   options = gcvNULL;
+#endif
 
     gcmONERROR(gcLockLoadLibrary());
     locked = gcvTRUE;
@@ -5358,6 +5367,7 @@ _LoadCLPatchLongULongLibrary(
     IN gcSHADER  Shader
     )
 {
+#if __COMPILE_CL_PATCH_LIBRARY__
     gceSTATUS   status = gcvSTATUS_OK;
     gctSTRING   patchSource = gcvNULL;
     gctSTRING   log = gcvNULL;
@@ -5470,6 +5480,9 @@ OnError:
 
     /* Return the status. */
     return status;
+#else
+    return gcvSTATUS_NOT_SUPPORTED;
+#endif
 }
 
 gceSTATUS

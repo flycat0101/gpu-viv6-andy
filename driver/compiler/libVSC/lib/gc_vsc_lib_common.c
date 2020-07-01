@@ -20,7 +20,7 @@
 #include "lib/gc_vsc_lib_cl_patch.h"
 
 /* libCL strings */
-
+#if !REMOVE_CL_LIBS
 gctSTRING gcLibCLImage_ReadFunc_1D =
     READFUNC(1d, )
 ;
@@ -1648,6 +1648,8 @@ const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_IMGLD_uint[3] = \
     VIR_IMAGE_IMGLD_group(uint);
 const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_IMGLD_float[3] = \
     VIR_IMAGE_IMGLD_group(float);
+
+#endif
 
 static gctBOOL isAppConformance(gcePATCH_ID patchId)
 {

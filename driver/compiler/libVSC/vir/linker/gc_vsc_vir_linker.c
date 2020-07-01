@@ -1088,6 +1088,7 @@ _CreateCLIntrinsicLib(
     OUT VIR_Shader              **pOutLib
     )
 {
+#if !REMOVE_CL_LIBS
     VSC_ErrCode errCode = VSC_ERR_NONE;
     gceSTATUS   status  = gcvSTATUS_OK;
     gctSTRING   builtinSource = gcvNULL;
@@ -1576,6 +1577,9 @@ OnError:
         errCode = vscERR_CastGcStatus2ErrCode(status);
     }
     return errCode;
+#else
+    return VSC_ERR_NOT_SUPPORTED;
+#endif
 }
 
 /* Free the vir intrinsic library. */
