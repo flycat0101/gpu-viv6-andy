@@ -6865,7 +6865,7 @@ _ConvCode2VirInstruction(
                     gctUINT virRegComponents;
                     gctBOOL treatHalfAsFloat = _gcmTreatHalfAsFloat(VirShader);
 
-                    if(opcode == gcSL_STORE || opcode == gcSL_STORE1 || opcode == gcSL_LOAD)
+                    if(opcode == gcSL_STORE || opcode == gcSL_STORE1 || opcode == gcSL_LOAD || opcode == gcSL_CONV)
                     {
                        treatHalfAsFloat = gcvFALSE;
                     }
