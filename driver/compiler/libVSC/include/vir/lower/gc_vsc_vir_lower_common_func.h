@@ -786,6 +786,14 @@ VIR_Lower_jmp_2_succ4(
     IN VIR_Instruction    *Inst
     );
 
+
+gctBOOL
+VIR_Lower_SkipOperand(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
 END_EXTERN_C()
 #endif
 
