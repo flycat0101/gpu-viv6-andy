@@ -2987,36 +2987,47 @@ _ConvertCoordForSampler1D(
     slsROPERAND         rZero[1];
     sluCONSTANT_VALUE   cZero[1];
     gctUINT8            componentCount;
-    gctBOOL             bIsSampler1DArray = gcvFALSE;
+    gctBOOL             bIsSampler1DArray = gcvFALSE, bIs1DArrayShadow = gcvFALSE, bIs1DShadow = gcvFALSE;
 
     /*
     ** 1) For 1D, change the coord from "int p" to "ivec2(p, 0)".
     ** 2) For 1DArray, change the coord from "ivec2 p" to "ivec3(p.x, 0, p.y)".
+    ** 3) For 1DShadow, change the coord from "vec3 p" to "vec3(p.x, 0, p.z)".
+    ** 4) For 1DArrayShadow, change the coord from "vec3 p" to "vec4(p.x, 0, p.y, p.z)".
     */
     if (slsDATA_TYPE_IsSampler1D(samplerOperand->dataType))
     {
         componentCount = 2;
     }
-    else
+    else if (slsDATA_TYPE_IsSampler1DArray(samplerOperand->dataType))
     {
-        gcmASSERT(slsDATA_TYPE_IsSampler1DArray(samplerOperand->dataType));
         componentCount = 3;
         bIsSampler1DArray = gcvTRUE;
     }
-
-    /* Get the component data type. */
-    if (!bIsSampler1DArray)
+    else if ((samplerOperand->dataType)->elementType == slvTYPE_SAMPLER1DSHADOW)
     {
-        coordElementType = OperandsParameters[1].rOperands[0].dataType;
+        componentCount = 3;
+        bIs1DShadow = gcvTRUE;
     }
     else
     {
+        gcmASSERT((samplerOperand->dataType)->elementType == slvTYPE_SAMPLER1DARRAYSHADOW);
+        componentCount = 4;
+        bIs1DArrayShadow = gcvTRUE;
+    }
+
+    /* Get the component data type. */
+    if (bIsSampler1DArray || bIs1DArrayShadow || bIs1DShadow)
+    {
         coordElementType = gcGetComponentDataType(OperandsParameters[1].rOperands[0].dataType);
+    }
+    else
+    {
+        coordElementType = OperandsParameters[1].rOperands[0].dataType;
     }
     /* Generate the new coord data type. */
     newCoordType = gcConvScalarToVectorDataType(coordElementType, componentCount);
 
-    /* Change the coordinate from "p" to "ivec2(p, 0)" or "ivec3(p.x, 0, p.y). */
     slsIOPERAND_New(Compiler,
                     iOperand,
                     newCoordType,
@@ -3029,17 +3040,17 @@ _ConvertCoordForSampler1D(
                                   ComponentSelection_X,
                                   intermLOperand);
 
-    if (!bIsSampler1DArray)
-    {
-        intermROperand[0] = OperandsParameters[1].rOperands[0];
-    }
-    else
+    if (bIsSampler1DArray || bIs1DArrayShadow || bIs1DShadow)
     {
         status = sloIR_ROperandComponentSelect(Compiler,
                                                &OperandsParameters[1].rOperands[0],
                                                ComponentSelection_X,
                                                intermROperand);
         if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+    }
+    else
+    {
+        intermROperand[0] = OperandsParameters[1].rOperands[0];
     }
 
     status = slGenAssignCode(Compiler,
@@ -3092,6 +3103,78 @@ _ConvertCoordForSampler1D(
                                  intermLOperand,
                                  intermROperand);
         if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+    }
+
+    /* Check if it is a sampler1DShadow. */
+    if (bIs1DShadow)
+    {
+        /* newCoord.z = p.z */
+        slsLOPERAND_InitializeUsingIOperand(intermLOperand, iOperand);
+        sloIR_LOperandComponentSelect(Compiler,
+                                      intermLOperand,
+                                      ComponentSelection_Z,
+                                      intermLOperand);
+
+        status = sloIR_ROperandComponentSelect(Compiler,
+                                               &OperandsParameters[1].rOperands[0],
+                                               ComponentSelection_Z,
+                                               intermROperand);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        status = slGenAssignCode(Compiler,
+                                 PolynaryExpr->exprBase.base.lineNo,
+                                 PolynaryExpr->exprBase.base.stringNo,
+                                 intermLOperand,
+                                 intermROperand);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+    }
+
+    /* Check if it is a sampler1DArrayShadow. */
+    if (bIs1DArrayShadow)
+    {
+        status = _GenAccessLayerCode(Compiler,
+                                     PolynaryExpr->exprBase.base.lineNo,
+                                     PolynaryExpr->exprBase.base.stringNo,
+                                     &OperandsParameters[1].rOperands[0],
+                                     ComponentSelection_Y,
+                                     layerOperand);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        /* newCoord.z = p.y */
+        slsLOPERAND_InitializeUsingIOperand(intermLOperand, iOperand);
+        sloIR_LOperandComponentSelect(Compiler,
+                                      intermLOperand,
+                                      ComponentSelection_Z,
+                                      intermLOperand);
+
+        slsROPERAND_InitializeUsingIOperand(intermROperand, layerOperand);
+        status = slGenAssignCode(Compiler,
+                                 PolynaryExpr->exprBase.base.lineNo,
+                                 PolynaryExpr->exprBase.base.stringNo,
+                                 intermLOperand,
+                                 intermROperand);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        /* newCoord.w = p.z */
+        slsLOPERAND_InitializeUsingIOperand(intermLOperand, iOperand);
+        sloIR_LOperandComponentSelect(Compiler,
+                                      intermLOperand,
+                                      ComponentSelection_W,
+                                      intermLOperand);
+
+        status = sloIR_ROperandComponentSelect(Compiler,
+                                               &OperandsParameters[1].rOperands[0],
+                                               ComponentSelection_Z,
+                                               intermROperand);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        status = slGenAssignCode(Compiler,
+                                 PolynaryExpr->exprBase.base.lineNo,
+                                 PolynaryExpr->exprBase.base.stringNo,
+                                 intermLOperand,
+                                 &intermROperand[0]);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
     }
 
     if (NewCoordIOperand)
@@ -3954,9 +4037,6 @@ _GenShadow1DArrayCode(
     )
 {
     gceSTATUS   status;
-    slsROPERAND intermROperand[1];
-    slsLOPERAND intermLOperand[1];
-    slsIOPERAND layerOperand[1];
     slsIOPERAND iOperand[1];
     slsROPERAND rOperand[1];
 
@@ -3969,35 +4049,12 @@ _GenShadow1DArrayCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
-    status = _GenAccessLayerCode(Compiler,
-                                 PolynaryExpr->exprBase.base.lineNo,
-                                 PolynaryExpr->exprBase.base.stringNo,
-                                 &OperandsParameters[1].rOperands[0],
-                                 ComponentSelection_Y,
-                                 layerOperand);
-    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-
-    slsIOPERAND_New(Compiler, iOperand, OperandsParameters[1].rOperands[0].dataType,
-                                        OperandsParameters[1].rOperands[0].u.reg.precision);
-    slsLOPERAND_InitializeUsingIOperand(intermLOperand, iOperand);
-    status = slGenAssignCode(Compiler,
-                             PolynaryExpr->exprBase.base.lineNo,
-                             PolynaryExpr->exprBase.base.stringNo,
-                             intermLOperand,
-                             &OperandsParameters[1].rOperands[0]);
-    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-
-    sloIR_LOperandComponentSelect(Compiler,
-                                  intermLOperand,
-                                  ComponentSelection_Y,
-                                  intermLOperand);
-
-    slsROPERAND_InitializeUsingIOperand(intermROperand, layerOperand);
-    status = slGenAssignCode(Compiler,
-                             PolynaryExpr->exprBase.base.lineNo,
-                             PolynaryExpr->exprBase.base.stringNo,
-                             intermLOperand,
-                             intermROperand);
+    /* Change the coordinate from 1D to 2D. */
+    status = _ConvertCoordForSampler1D(Compiler,
+                                       CodeGenerator,
+                                       PolynaryExpr,
+                                       OperandsParameters,
+                                       iOperand);
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
     if (OperandCount == 3)
@@ -4250,6 +4307,15 @@ _GenTextureCode(
 
     switch(expr->dataType->elementType)
     {
+    case slvTYPE_SAMPLER1D:
+    case slvTYPE_ISAMPLER1D:
+    case slvTYPE_USAMPLER1D:
+    case slvTYPE_SAMPLER1DARRAY:
+    case slvTYPE_ISAMPLER1DARRAY:
+    case slvTYPE_USAMPLER1DARRAY:
+        genCode = _GenTexture1DCode;
+        break;
+
     case slvTYPE_SAMPLER2D:
     case slvTYPE_ISAMPLER2D:
     case slvTYPE_USAMPLER2D:
@@ -4275,16 +4341,13 @@ _GenTextureCode(
         genCode = _GenTextureCubeCode;
         break;
 
-    case slvTYPE_SAMPLER1DARRAY:
-        genCode = _GenTexture1DArrayCode;
-        break;
-
     case slvTYPE_SAMPLER2DARRAY:
     case slvTYPE_ISAMPLER2DARRAY:
     case slvTYPE_USAMPLER2DARRAY:
         genCode = _GenTexture2DArrayCode;
         break;
 
+    case slvTYPE_SAMPLER1DSHADOW:
     case slvTYPE_SAMPLER1DARRAYSHADOW:
         genCode = _GenShadow1DArrayCode;
         break;
@@ -4296,7 +4359,8 @@ _GenTextureCode(
     case slvTYPE_SAMPLER2DSHADOW:
     case slvTYPE_SAMPLERCUBESHADOW:
     case slvTYPE_SAMPLERCUBEARRAYSHADOW:
-    case slvTYPE_SAMPLER1DSHADOW:
+        genCode = _GenTextureShadowCode;
+        break;
     case slvTYPE_SAMPLER2DRECTSHADOW:
         genCode = _GenTextureShadowCode;
         break;
