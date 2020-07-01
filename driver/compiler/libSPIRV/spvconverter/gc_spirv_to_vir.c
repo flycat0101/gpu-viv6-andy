@@ -4296,7 +4296,7 @@ static gctBOOL __SpvIsResultMemoryAddress(gcSPV spv, VIR_Shader * virShader)
         (typeStorageClass == SpvStorageClassStorageBuffer || typeStorageClass == SpvStorageClassWorkgroup))
     {
         /*
-        ** According to spec, a variable pointer that results from one of thos following instructions:
+        ** According to spec, a variable pointer that results from one of those following instructions:
         **  OpSelect, OpPhi, OpFunctionCall, OpPtrAccessChain, OpCopyObject, OpLoad, OpConstantNull.
         ** And we still need to check OpFunction/OpFunctionParameter/OpVariable.
         */
@@ -6784,35 +6784,50 @@ VSC_ErrCode __SpvEmitAccessChain(gcSPV spv, VIR_Shader * virShader)
         baseTypeId = VIR_Symbol_GetTypeId(baseSymbol);
     }
 
-    /* If this is a OpPtrAccessChain, we need to construct an array type based on the array stride from OpDecorate. */
+    /*
+    ** For a OpPtrAccessChain/OpInBoundsAccessChain, according to SPIR-V spec 1.5.2:
+    ** If this is from OpPtrAccessChain/OpInBoundsAccessChain, we need to construct an array type:
+    ** For objects in the Uniform, StorageBuffer, or PushConstant storage classes, the element’s address or location is
+    ** calculated using a stride, which will be the Base-type’s Array Stride when the Base type is decorated with ArrayStride.
+    ** For all other objects, the implementation will calculate the element’s address or location.
+    ** So we need to construct an array type for it.
+    */
     if (virBaseTypeInfo.bIsPtrAccessChain)
     {
+        gctINT                  arrayStride = 0;
+        SpvId                   baseSpvPointerTypeId = SPV_ID_SYM_SPV_POINTER_TYPE(spv->operands[0]);
+        SpvId                   baseSpvTypeId = SPV_ID_SYM_SPV_TYPE(spv->operands[0]);
+        SpvStorageClass         baseStorageClass = SPV_ID_TYPE_POINTER_STORAGE_CLASS(baseSpvPointerTypeId);
         SpvCovDecorator*        pDec = spv->decorationList;
-        SpvId                   baseSpvTypeId = SPV_ID_SYM_SPV_POINTER_TYPE(spv->operands[0]);
 
-        /* Find the decoration by target and member index. */
-        SPV_GET_DECORATOR(pDec, baseSpvTypeId, -1);
+        if (baseStorageClass == SpvStorageClassUniform      ||
+            baseStorageClass == SpvStorageClassPushConstant ||
+            baseStorageClass == SpvStorageClassStorageBuffer)
+        {
+            /* Get the array stride from the decoration. */
+            SPV_GET_DECORATOR(pDec, baseSpvPointerTypeId, -1);
 
-        /* Get the array stride, and according to spec:
-        ** Each OpPtrAccessChain must have a Base whose type is decorated with ArrayStride.
-        */
-        if (pDec == gcvNULL || pDec->decorationData.arrayStride == -1)
-        {
-            /*
-            ** According to spec:
-            ** Each OpPtrAccessChain must have a base whose type is decorated with ArrayStride.
-            */
-            gcmASSERT(gcvFALSE);
+            if (pDec == gcvNULL || pDec->decorationData.arrayStride == -1)
+            {
+                gcmASSERT(gcvFALSE);
+            }
+            else
+            {
+                arrayStride = pDec->decorationData.arrayStride;
+            }
         }
-        else
+        else if (virBaseTypeInfo.bIsBaseVarMemory)
         {
-            /* Construct the array type. */
-            VIR_Shader_AddArrayType(virShader,
-                                    baseTypeId,
-                                    (gctUINT)-1,
-                                    pDec->decorationData.arrayStride,
-                                    &baseTypeId);
+            while (SPV_ID_TYPE_IS_POINTER(baseSpvTypeId))
+            {
+                baseSpvTypeId = SPV_ID_TYPE_POINTER_OBJECT_SPV_TYPE(baseSpvTypeId);
+            };
+
+            arrayStride = VIR_Type_GetTypeByteSize(virShader, SPV_ID_TYPE_VIR_TYPE(baseSpvTypeId));
         }
+
+        /* Construct the array type. */
+        VIR_Shader_AddArrayType(virShader, baseTypeId, (gctUINT)-1, arrayStride, &baseTypeId);
     }
     gcmASSERT(baseTypeId != VIR_TYPE_UNKNOWN);
 
@@ -11104,7 +11119,6 @@ VSC_ErrCode __SpvEmitBarrier(gcSPV spv, VIR_Shader * virShader)
     SpvId                       memoryScopeId;
     VIR_Const*                  pMemoryScopeConst = gcvNULL;
     VIR_Type*                   pMemoryScopeType = gcvNULL;
-    VIR_MEMORY_SCOPE_TYPE       memoryScope = VIR_MEMORY_SCOPE_TYPE_WORKGROUP;
     SpvId                       memorySemanticId;
     VIR_Const*                  pMemorySemanticConst = gcvNULL;
     VIR_Type*                   pMemorySemanticType = gcvNULL;
@@ -11134,13 +11148,6 @@ VSC_ErrCode __SpvEmitBarrier(gcSPV spv, VIR_Shader * virShader)
 
     pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
     VIR_Operand_SetImmediateInt(pNewOpnd, pMemoryScopeConst->value.scalarVal.iValue);
-
-    memoryScope = (VIR_MEMORY_SCOPE_TYPE)pMemoryScopeConst->value.scalarVal.iValue;
-    /* So far we can't support DEVICE barrier. */
-    if (memoryScope == VIR_MEMORY_SCOPE_TYPE_CROSS_DEVICE || memoryScope == VIR_MEMORY_SCOPE_TYPE_DEVICE)
-    {
-        gcmASSERT(gcvFALSE);
-    }
 
     /* Src1 -- Memory semantic. */
     memorySemanticId = spv->operands[1];
@@ -11712,10 +11719,12 @@ VSC_ErrCode __SpvEmitDecorator(gcSPV spv, VIR_Shader * virShader)
 
 static void __SpvSetClientVersion(
     IN gcSPV spv,
+    IN gctBOOL isGraphics,
     IN VIR_Shader *virShader
     )
 {
     gctUINT shaderKindValue = 0;
+    gctUINT srcLanguageVersion = isGraphics ? 450 : 110;
 
     /* Create VIR_SHADER */
     switch (virShader->shaderKind)
@@ -11736,43 +11745,34 @@ static void __SpvSetClientVersion(
         shaderKindValue = 2 /*gcSHADER_TYPE_FRAGMENT*/;
         break;
     case VIR_SHADER_COMPUTE:
-        shaderKindValue = (spv->srcLanguage == SpvSourceLanguageOpenCL_C) ? 4 /*gcSHADER_TYPE_CL*/ : 3 /*gcSHADER_TYPE_COMPUTE*/;
+        shaderKindValue = (!isGraphics) ? 4 /*gcSHADER_TYPE_CL*/ : 3 /*gcSHADER_TYPE_COMPUTE*/;
         break;
     default:
         gcmASSERT(0);
     }
 
-    /*
-    ** SrcLanguage is saved in Opsource, which is belong to debug information and not required.
-    ** So there is not OpSource in this binary, get the srcLanguage from OpMemoryModel.
-    */
-    if (spv->srcLanguage == SpvSourceLanguageUnknown)
-    {
-        if (spv->srcMemoryMode == SpvMemoryModelGLSL450)
-        {
-            spv->srcLanguage = SpvSourceLanguageGLSL;
-            spv->srcLanguageVersion = 450;
-        }
-        else if (spv->srcMemoryMode == SpvMemoryModelOpenCL)
-        {
-            spv->srcLanguage = SpvSourceLanguageOpenCL_C;
-            /* Assume it is OCL 1.1. */
-            spv->srcLanguageVersion = 110;
-        }
-    }
-
-    if (spv->srcLanguage == SpvSourceLanguageESSL ||
-        spv->srcLanguage == SpvSourceLanguageGLSL)
+    if (isGraphics)
     {
         virShader->compilerVersion[0] = _SHADER_GL_LANGUAGE_TYPE | (shaderKindValue << 16);
     }
-    else if (spv->srcLanguage == SpvSourceLanguageOpenCL_C)
+    else
     {
         virShader->compilerVersion[0] = _cldLanguageType | (shaderKindValue << 16);
     }
-    virShader->compilerVersion[1] = VIR_Shader_DecodeLangVersionToCompilerVersion(virShader, gcvFALSE, spv->srcLanguageVersion);
+    virShader->compilerVersion[1] = VIR_Shader_DecodeLangVersionToCompilerVersion(virShader, gcvFALSE, srcLanguageVersion);
 
-    spv->setClientVersion = gcvTRUE;
+    /* update default value of workgroupsizefixed when compilerVersion is determined */
+    if (VIR_Shader_GetKind(virShader) == VIR_SHADER_COMPUTE)
+    {
+        if (VIR_Shader_IsGlCompute(virShader))
+        {
+            VIR_Shader_SetWorkGroupSizeFixed(virShader, gcvTRUE);
+        }
+        else
+        {
+            VIR_Shader_SetWorkGroupSizeFixed(virShader, gcvFALSE);
+        }
+    }
 }
 
 static void __SpvSetWorkgroupSize(
@@ -12125,8 +12125,6 @@ static VSC_ErrCode __SpvDecodeInstruction(gcSPV spv, VIR_Shader * virShader)
         {
             SPV_NEXT_WORD;
         }
-
-        __SpvSetClientVersion(spv, virShader);
         break;
 
     case SpvOpSourceExtension:
@@ -12159,11 +12157,6 @@ static VSC_ErrCode __SpvDecodeInstruction(gcSPV spv, VIR_Shader * virShader)
         }
 
     default:
-        if (!spv->setClientVersion)
-        {
-            __SpvSetClientVersion(spv, virShader);
-        }
-
         spv->operandSize = 0;
 
         if (spv->numOperands > spv->maxOperandSize)
@@ -12426,6 +12419,8 @@ static gceSTATUS __SpvConstructAndInitializeVIRShader(
     spv->shaderStage = shaderStage;
 
     __SpvAddBuiltinVariable(spv, *virShader);
+
+    __SpvSetClientVersion(spv, (model != SpvExecutionModelKernel), *virShader);
 
     return gcvSTATUS_OK;
 }
@@ -12710,11 +12705,14 @@ static void __SpvIntegrateCalls(SpvMemPool * memPool, SpvFuncCallTable * funcTab
 }
 
 static gceSTATUS __SpvProcessFuncCall(
+    IN SpvMemPool * MemPoolForFuncTable,
     IN gcSPV spv,
     IN SpvFuncCallTable * funcTable)
 {
     SpvFuncCallInfo * curFuncInfo = gcvNULL;
     spv->word = SPV_INSTRUCTION_START;
+
+    gcmASSERT(MemPoolForFuncTable == funcTable->memPool);
 
     while (spv->word < spv->size)
     {
@@ -12764,12 +12762,12 @@ static gceSTATUS __SpvProcessFuncCall(
             if (!__SpvIsFuncCallInTable(funcTable, entryId))
             {
                 SpvFuncCallInfo * funcInfo = gcvNULL;
-                __SpvCreateFuncCallInfo(spv->spvMemPool, &funcInfo);
+                __SpvCreateFuncCallInfo(MemPoolForFuncTable, &funcInfo);
 
                 funcInfo->funcId = entryId;
                 funcInfo->isEntry = gcvTRUE;
 
-                __SpvAddNewFuncCallToTable(spv->spvMemPool, funcTable, funcInfo);
+                __SpvAddNewFuncCallToTable(MemPoolForFuncTable, funcTable, funcInfo);
             }
 
             __SpvDecodeLiteralString(spv, &entryPointNameLength, entryPointName, gcvTRUE);
@@ -12789,17 +12787,17 @@ static gceSTATUS __SpvProcessFuncCall(
             }
             else
             {
-                __SpvCreateFuncCallInfo(spv->spvMemPool, &curFuncInfo);
+                __SpvCreateFuncCallInfo(MemPoolForFuncTable, &curFuncInfo);
 
                 curFuncInfo->funcId = funcId;
 
-                __SpvAddNewFuncCallToTable(spv->spvMemPool, funcTable, curFuncInfo);
+                __SpvAddNewFuncCallToTable(MemPoolForFuncTable, funcTable, curFuncInfo);
             }
         }
         else if (spv->opCode == SpvOpFunctionCall && curFuncInfo)
         {
             gctUINT calleeId = SPV_NEXT_WORD;
-            __SpvAddNewFuncToCallInfo(spv->spvMemPool, curFuncInfo, calleeId);
+            __SpvAddNewFuncToCallInfo(MemPoolForFuncTable, curFuncInfo, calleeId);
         }
         else if (spv->opCode == SpvOpFunctionEnd)
         {
@@ -12809,7 +12807,7 @@ static gceSTATUS __SpvProcessFuncCall(
         SPV_NEXT_INST;
     }
 
-    __SpvIntegrateCalls(spv->spvMemPool, funcTable);
+    __SpvIntegrateCalls(MemPoolForFuncTable, funcTable);
 
     return gcvSTATUS_OK;
 }
@@ -13586,14 +13584,19 @@ gceSTATUS
 gcSPV_PreDecode(
     IN SpvDecodeInfo * info,
     INOUT gctPOINTER* FuncTable
-)
+    )
 {
     gceSTATUS               status = gcvSTATUS_OK;
     gcSPV                   Spv = gcvNULL;
     SpvMemPool             *spvMemPool = gcvNULL;
+    SpvMemPool             *memPoolForFuncTable = gcvNULL;
     SpvFuncCallTable       *funcTable = gcvNULL;
 
+    /* Initialize the memory pool for the spirv converter. */
     spvInitializeMemPool(SPV_MEMPOOL_PAGESIZE, &spvMemPool);
+
+    /* Initialize the memory pool for the function table only. */
+    spvInitializeMemPool(SPV_MEMPOOL_PAGESIZE, &memPoolForFuncTable);
 
     Spv = (gcSPV)gcSPV_CreateSPV(spvMemPool, info);
 
@@ -13610,11 +13613,11 @@ gcSPV_PreDecode(
     {
         status = gcvSTATUS_INVALID_DATA;
     }
-    else if (gcmIS_ERROR(__SpvCreateFuncCallTable(spvMemPool, &funcTable)))
+    else if (gcmIS_ERROR(__SpvCreateFuncCallTable(memPoolForFuncTable, &funcTable)))
     {
         status = gcvSTATUS_INVALID_DATA;
     }
-    else if (gcmIS_ERROR(__SpvProcessFuncCall(Spv, funcTable)))
+    else if (gcmIS_ERROR(__SpvProcessFuncCall(memPoolForFuncTable, Spv, funcTable)))
     {
         status = gcvSTATUS_INVALID_DATA;
     }
@@ -13634,12 +13637,14 @@ gcSPV_PreDecode(
     }
     vscBV_Finalize(&Spv->internalIdMask);
 
-    /* We will call "spvUninitializeMemPool" in gcSPV_PostDecode. */
+    /* Call gcSPV_PostDecode to free the memory pool for the function table only. */
+    spvUninitializeMemPool(spvMemPool);
     return status;
 
 OnError:
     /* Uninitialize, this will destroy Spv */
     spvUninitializeMemPool(spvMemPool);
+    spvUninitializeMemPool(memPoolForFuncTable);
     return status;
 }
 

@@ -661,9 +661,6 @@ struct _gcSPV
     gctUINT                     exeModeSize; /* total size */
     gctUINT                     exeModeCount; /* current indexing */
 
-    /* If client version is set. */
-    gctBOOL                     setClientVersion;
-
     /* variable used to analysis instructions */
     gctUINT                     shaderId;
     gctUINT                     nameId;
