@@ -12011,6 +12011,7 @@ gcSHADER_LoadEx(
     gctUINT32 * codeCount;
     gctUINT16 * count;
     gctUINT16 * privateMemorySize;
+    gctUINT16 * localMemorySize;
     gctUINT16 * constantMemorySize;
     gctUINT   * optimizationOption;
     gctUINT16 * maxKernelFunctionArgs;
@@ -12402,6 +12403,8 @@ gcSHADER_LoadEx(
             Shader->uniforms[i]         = uniform;
             uniform->object.type        = gcvOBJ_UNIFORM;
             uniform->index              = binaryUniform->index;
+            uniform->shaderKind         = binaryUniform->shaderKind;
+            uniform->swizzle            = binaryUniform->swizzle;
 
             if (shaderVersion <= gcdSL_SHADER_BINARY_BEFORE_OPENCL_IMAGE_SAMPLER_BY_TEXLD_FILE_VERSION)
             {
@@ -14623,8 +14626,21 @@ gcSHADER_LoadEx(
 
     Shader->privateMemorySize = *privateMemorySize;
 
+    /* Get the local memory size. */
+    localMemorySize = (gctUINT16 *) (privateMemorySize + 1);
+    bytes -= sizeof(gctUINT16);
+    if (bytes < sizeof(gctUINT16))
+    {
+        /* Invalid private memory size. */
+        gcmFATAL("gcSHADER_LoadEx: Invalid private memory size");
+        gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+        return gcvSTATUS_INVALID_DATA;
+    }
+
+    Shader->localMemorySize = *localMemorySize;
+
     /* Point to the constant memory size. */
-    constantMemorySize  = (gctUINT16 *) (privateMemorySize + 1);
+    constantMemorySize  = (gctUINT16 *) (localMemorySize + 1);
     bytes -= sizeof(gctUINT16);
 
     if (bytes < sizeof(gctUINT16))
@@ -15396,6 +15412,9 @@ gcSHADER_SaveEx(
     /* Private memory size. */
     bytes += sizeof(gctUINT16);
 
+    /* Local memory size. */
+    bytes += sizeof(gctUINT16);
+
     /* Constant memory size. */
     bytes += sizeof(gctUINT16);
 
@@ -15609,6 +15628,8 @@ gcSHADER_SaveEx(
         binary->nextSibling = uniform->nextSibling;
         binary->prevSibling = uniform->prevSibling;
         binary->parent = uniform->parent;
+        binary->shaderKind = uniform->shaderKind;
+        binary->swizzle   = uniform->swizzle;
 
         if (isUniformBasicType(uniform))
         {
@@ -16323,6 +16344,10 @@ gcSHADER_SaveEx(
 
     /* Private memory size. */
     *(gctUINT16 *) buffer = (gctUINT16) Shader->privateMemorySize;
+    buffer += sizeof(gctUINT16);
+
+    /* Local memory size. */
+    *(gctUINT16 *) buffer = (gctUINT16) Shader->localMemorySize;
     buffer += sizeof(gctUINT16);
 
     /* Constant memory size. */
