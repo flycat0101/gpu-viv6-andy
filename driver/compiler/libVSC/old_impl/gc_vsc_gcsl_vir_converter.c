@@ -7383,6 +7383,11 @@ gcSHADER_Conv2VIR(
         VIR_Shader_SetFlag(VirShader, VIR_SHFLAG_HAS_DEFINE_MAIN_FUNC);
     }
 
+    if(gcShaderIsCompatibilityProfile(Shader))
+    {
+        VIR_Shader_SetFlagExt1(VirShader, VIR_SHFLAG_EXT1_COMPATIBILITY_PROFILR);
+    }
+
      size = (Shader->codeCount + 1) * gcmSIZEOF(conv2VirsInstMap);
      gcmONERROR(gcoOS_Allocate(gcvNULL,
                             size,

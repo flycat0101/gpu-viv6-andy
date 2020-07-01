@@ -119,6 +119,7 @@ typedef enum _sleCOMPILER_FLAGS
     slvCOMPILER_HAS_UNSPECIFIED_LOCATION                        = 0x0002,
     slvCOMPILER_HAS_EARLY_FRAG_TEST                             = 0x0004,
     slvCOMPILER_HAS_PATCH_FOR_CENTROID_VARYING                  = 0x0008,
+    slvCOMPILER_IS_COMPATIBILITY_PROFILE                        = 0x0010,
 }
 sleCOMPILER_FLAGS;
 
@@ -134,6 +135,9 @@ sleCOMPILER_FLAGS;
 #define slsCOMPILER_HasPatchForCentroidVarying(f)               (((f) & slvCOMPILER_HAS_PATCH_FOR_CENTROID_VARYING) != 0)
 #define slsCOMPILER_SetPatchForCentroidVarying(f)               ((f) |= slvCOMPILER_HAS_PATCH_FOR_CENTROID_VARYING)
 #define slsCOMPILER_ClrPatchForCentroidVarying(f)               ((f) &= ~slvCOMPILER_HAS_PATCH_FOR_CENTROID_VARYING)
+#define slsCOMPILER_HasCompatibilityProfile(f)                  (((f) & slvCOMPILER_IS_COMPATIBILITY_PROFILE) != 0)
+#define slsCOMPILER_SetCompatibilityProfile(f)                  ((f) |= slvCOMPILER_IS_COMPATIBILITY_PROFILE)
+#define slsCOMPILER_ClrCompatibilityProfile(f)                  ((f) &= ~slvCOMPILER_IS_COMPATIBILITY_PROFILE)
 
 struct _sloCOMPILER;
 struct _sloIR_BASE;
@@ -279,6 +283,12 @@ sloCOMPILER_SetOutputInvariant(
 gctBOOL
 sloCOMPILER_GetOutputInvariant(
     IN sloCOMPILER Compiler
+    );
+
+gceSTATUS
+sloCOMPILER_SetVersionProfile(
+    IN sloCOMPILER Compiler,
+    IN gctBOOL IsDefault
     );
 
 gceSTATUS

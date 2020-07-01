@@ -1459,6 +1459,13 @@ sloCOMPILER_Compile(
         gcmERR_BREAK(gcSHADER_SetCompilerVersion(binary,
                                                  sloCOMPILER_GetVersion(Compiler, Compiler->shaderType)));
 
+        /* Set version profile for OGL shader.*/
+        if(sloCOMPILER_GetClientApiVersion(Compiler) == gcvAPI_OPENGL &&
+           slsCOMPILER_HasCompatibilityProfile(Compiler->context.compilerFlags))
+        {
+            gcShaderSetIsCompatibilityProfile(binary);
+        }
+
         /* Set earlyFragTest. */
         gcmERR_BREAK(gcSHADER_SetEarlyFragTest(binary,
                                                slsCOMPILER_HasEarlyFragText(Compiler->context.compilerFlags)));
@@ -4167,6 +4174,24 @@ sloCOMPILER_GetOutputInvariant(
 
    gcmFOOTER_NO();
    return Compiler->context.outputInvariant;
+}
+
+gceSTATUS
+sloCOMPILER_SetVersionProfile(
+    IN sloCOMPILER Compiler,
+    IN gctBOOL IsDefault
+    )
+{
+   gcmHEADER_ARG("Compiler=0x%x IsDefault=0x%x ",Compiler, IsDefault);
+   if (IsDefault)
+   {
+       slsCOMPILER_ClrCompatibilityProfile(Compiler->context.compilerFlags);
+   }
+   else
+   {
+       slsCOMPILER_SetCompatibilityProfile(Compiler->context.compilerFlags);
+   }
+   return gcvSTATUS_OK;
 }
 
 gceSTATUS

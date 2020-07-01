@@ -829,6 +829,12 @@ ppoPREPROCESSOR_Construct_InitKeyword(
                                        "GL_core_profile",
                                        &((*PP)->keyword->gl_core_profile)));
 
+    /* 60 gl_compatibility_profile */
+    gcmONERROR(
+        sloCOMPILER_AllocatePoolString((*PP)->compiler,
+                                       "GL_compatibility_profile",
+                                       &((*PP)->keyword->gl_compatibility_profile)));
+
     (*PP)->keyword->isVersionUndefined = gcvFALSE;
     gcmFOOTER_ARG("*PP=%d", *PP);
     return gcvSTATUS_OK;

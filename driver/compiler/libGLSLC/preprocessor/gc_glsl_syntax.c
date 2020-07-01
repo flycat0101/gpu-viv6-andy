@@ -1190,6 +1190,11 @@ ppoPREPROCESSOR_TextLine_Handle_FILE_LINE_VERSION(
         creat_str = "ppoPREPROCESSOR_TextLine : Creat a new token to substitute GL_core_profile";
         gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d", 1);
     }
+    else if(What == PP->keyword->gl_compatibility_profile)
+    {
+        creat_str = "ppoPREPROCESSOR_TextLine : Creat a new token to substitute GL_compatibility_profile";
+        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d", 1);
+    }
     else
     {
         gcmASSERT(0);
@@ -1328,7 +1333,8 @@ ppoPREPROCESSOR_TextLine(
                 ntoken->poolString == PP->keyword->_line_       ||
                 ntoken->poolString == PP->keyword->_version_    ||
                 ntoken->poolString == PP->keyword->gl_es        ||
-                ntoken->poolString == PP->keyword->gl_core_profile)
+                ntoken->poolString == PP->keyword->gl_core_profile||
+                ntoken->poolString == PP->keyword->gl_compatibility_profile)
             {
                 gcmONERROR(
                     ppoPREPROCESSOR_TextLine_Handle_FILE_LINE_VERSION(PP, ntoken->poolString)
@@ -1664,11 +1670,11 @@ gceSTATUS ppoPREPROCESSOR_Version(ppoPREPROCESSOR PP)
             /* TODO: Need to deal with the difference between the core and compatibility profile */
             if (gcmIS_SUCCESS(gcoOS_StrCmp(nextToken->poolString, "core")))
             {
-                /* TODO */
+                sloCOMPILER_SetVersionProfile(PP->compiler, gcvTRUE);
             }
             else if (gcmIS_SUCCESS(gcoOS_StrCmp(nextToken->poolString, "compatibility")))
             {
-                /* TODO */
+                sloCOMPILER_SetVersionProfile(PP->compiler, gcvFALSE);
             }
             else
             {
@@ -2410,7 +2416,8 @@ ppoPREPROCESSOR_Undef(ppoPREPROCESSOR PP)
 
     if (sloCOMPILER_GetClientApiVersion(PP->compiler) == gcvAPI_OPENGL)
     {
-        if (ntoken->poolString == PP->keyword->gl_core_profile)
+        if (ntoken->poolString == PP->keyword->gl_core_profile ||
+            ntoken->poolString == PP->keyword->gl_compatibility_profile)
         {
             ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,
                 "Error(%d,%d) : Can not #undef builtin marcro %s.",
@@ -2544,7 +2551,8 @@ ppoPREPROCESSOR_Define(ppoPREPROCESSOR PP)
         name == PP->keyword->_version_  ||
         name == PP->keyword->_file_     ||
         name == PP->keyword->gl_es      ||
-        name == PP->keyword->gl_core_profile)
+        name == PP->keyword->gl_core_profile||
+        name == PP->keyword->gl_compatibility_profile)
     {
         ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,
             "Error(%d,%d) : Can not #redefine a builtin marcro %s.",

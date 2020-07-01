@@ -463,6 +463,7 @@ struct _ppsKEYWORD
     gctSTRING               optimize;   /*57 optimize */
     gctSTRING               nul_str;    /*58 nulstr */
     gctSTRING               gl_core_profile;   /*59 GL_core_profile */
+    gctSTRING               gl_compatibility_profile; /*60 GL_compatibility_profile */
     gctBOOL                 isVersionUndefined;
 };
 

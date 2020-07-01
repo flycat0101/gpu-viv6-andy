@@ -328,6 +328,12 @@ gceSTATUS    ppoPREPROCESSOR_Eval_GetToken_FILE_LINE_VERSION_GL_ES(
 
         gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d", 1);
     }
+    else if(Token->poolString == PP->keyword->gl_compatibility_profile)
+    {
+        token_cons_str = "ppoPREPROCESSOR_TextLine : Creat a new token to substitute GL_compatibility_profile";
+
+        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d", 1);
+    }
     else
     {
         *IsMatch = gcvFALSE;
@@ -620,7 +626,8 @@ ppoPREPROCESSOR_Eval_Case_Unary_Op(
                 ||    id == PP->keyword->_line_
                 ||    id == PP->keyword->_version_
                 ||    (id == PP->keyword->gl_es && (sloCOMPILER_GetClientApiVersion(PP->compiler) != gcvAPI_OPENGL))
-                ||    id == PP->keyword->gl_core_profile)
+                ||    id == PP->keyword->gl_core_profile
+                ||    id == PP->keyword->gl_compatibility_profile)
             {
                 if (id == PP->keyword->_version_ && PP->keyword->isVersionUndefined)
                     *Result = 0;
