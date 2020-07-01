@@ -1400,14 +1400,15 @@ _ConvSingleTemp256Src(
     VIR_Shader*         pShader,
     VIR_Function*       pFunc,
     VIR_Instruction*    pInst,
-    gctUINT             srcIdx)
+    gctUINT             srcIdx,
+    VIR_VirRegId        destRegId,
+    VIR_SymId           destSymId
+    )
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
     VIR_Operand*        pOrigSrc = VIR_Inst_GetSource(pInst, srcIdx);
     VIR_Instruction*    pNewInst = gcvNULL;
     VIR_Operand*        pNewOpnd = gcvNULL;
-    VIR_VirRegId        destRegId = VIR_INVALID_ID;
-    VIR_SymId           destSymId = VIR_INVALID_ID;
     VIR_TypeId          typeId = VIR_Operand_GetTypeId(pOrigSrc);
     VIR_Enable          enable = VIR_TypeId_Conv2Enable(typeId);
 
@@ -1418,16 +1419,6 @@ _ConvSingleTemp256Src(
                                                 gcvTRUE,
                                                 &pNewInst);
     ON_ERROR(errCode, "Add MOV instruction failed.");
-
-    /* Add a new vreg. */
-    destRegId = VIR_Shader_NewVirRegId(pShader, 1);
-    errCode = VIR_Shader_AddSymbol(pShader,
-                                   VIR_SYM_VIRREG,
-                                   destRegId,
-                                   VIR_Shader_GetTypeFromId(pShader, typeId),
-                                   VIR_STORAGE_UNKNOWN,
-                                   &destSymId);
-    ON_ERROR(errCode, "Add vreg failed.");
 
     /* Set DEST. */
     pNewOpnd = VIR_Inst_GetDest(pNewInst);
@@ -1440,6 +1431,8 @@ _ConvSingleTemp256Src(
     /* Set SRC0. */
     pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
     VIR_Operand_Copy(pNewOpnd, pOrigSrc);
+    /* Clear the flag. */
+    VIR_Operand_ResetFlag(pNewOpnd, VIR_OPNDFLAG_TEMP256_HIGH | VIR_OPNDFLAG_TEMP256_LOW);
 
     /* Change the original source to the new virReg. */
     VIR_Operand_Copy(pOrigSrc, VIR_Inst_GetDest(pNewInst));
@@ -1465,6 +1458,7 @@ _ConvSingleTemp256Src(
                             enable,
                             VIR_HALF_CHANNEL_MASK_FULL,
                             gcvNULL);
+
 OnError:
     return errCode;
 }
@@ -1474,31 +1468,79 @@ _ConvTemp256Srcs(
     VIR_DEF_USAGE_INFO* pDuInfo,
     VIR_Shader*         pShader,
     VIR_Function*       pFunc,
-    VIR_Instruction*    pInst)
+    VIR_Instruction*    pInst
+    )
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
     gctBOOL             bIsSrc0Src1Temp256 = VIR_OPCODE_Src0Src1Temp256(VIR_Inst_GetOpcode(pInst));
     gctUINT             srcIdx;
     VIR_Operand*        pHigherOpnd = bIsSrc0Src1Temp256 ? VIR_Inst_GetSource(pInst, 0) : VIR_Inst_GetSource(pInst, 1);
     VIR_Operand*        pLowerOpnd = bIsSrc0Src1Temp256 ? VIR_Inst_GetSource(pInst, 1) : VIR_Inst_GetSource(pInst, 2);
-    VIR_OperandInfo     opndInfo;
+    VIR_OperandInfo     higherOpndInfo, lowerOpndInfo;
+    gctBOOL             bNeedToConv = gcvFALSE;
+    gctUINT             i;
+    VIR_VirRegId        destRegIds[2] = { VIR_INVALID_ID, VIR_INVALID_ID };
+    VIR_SymId           destSymIds[2] = { VIR_INVALID_ID, VIR_INVALID_ID };
+    VIR_TypeId          typeId;
 
-    /* Check higher operand. */
-    srcIdx = bIsSrc0Src1Temp256 ? 0 : 1;
-    VIR_Operand_GetOperandInfo(pInst, pHigherOpnd, &opndInfo);
-    if (!opndInfo.isVreg)
+    VIR_Operand_GetOperandInfo(pInst, pHigherOpnd, &higherOpndInfo);
+    VIR_Operand_GetOperandInfo(pInst, pLowerOpnd, &lowerOpndInfo);
+
+    /* Check if we need to convert the temp256 pair. */
+    if (!higherOpndInfo.isVreg || !lowerOpndInfo.isVreg)
     {
-        errCode = _ConvSingleTemp256Src(pDuInfo, pShader, pFunc, pInst, srcIdx);
-        ON_ERROR(errCode, "Convert single temp 256 source.");
+        bNeedToConv = gcvTRUE;
+    }
+    else if (higherOpndInfo.u1.virRegInfo.virReg + 1 != lowerOpndInfo.u1.virRegInfo.virReg)
+    {
+        bNeedToConv = gcvTRUE;
     }
 
-    /* Check lower operand. */
-    srcIdx = bIsSrc0Src1Temp256 ? 1 : 2;
-    VIR_Operand_GetOperandInfo(pInst, pLowerOpnd, &opndInfo);
-    if (!opndInfo.isVreg)
+    if (!bNeedToConv)
     {
-        errCode = _ConvSingleTemp256Src(pDuInfo, pShader, pFunc, pInst, srcIdx);
+        return errCode;
+    }
+
+    /* Create a new temp256 pair(two contiguous temp registers). */
+    typeId = VIR_Operand_GetTypeId(pHigherOpnd);
+    for (i = 0; i < 2; i++)
+    {
+        /* Add a new vreg. */
+        destRegIds[i] = VIR_Shader_NewVirRegId(pShader, 1);
+        errCode = VIR_Shader_AddSymbol(pShader,
+                                       VIR_SYM_VIRREG,
+                                       destRegIds[i],
+                                       VIR_Shader_GetTypeFromId(pShader, typeId),
+                                       VIR_STORAGE_UNKNOWN,
+                                       &destSymIds[i]);
+        ON_ERROR(errCode, "Add vreg failed.");
+    }
+
+    /*  Replace the corresponding sources. */
+    for (i = 0; i < 2; i++)
+    {
+        if (i == 0)
+        {
+            srcIdx = bIsSrc0Src1Temp256 ? 0 : 1;
+        }
+        else
+        {
+            srcIdx = bIsSrc0Src1Temp256 ? 1 : 2;
+        }
+
+        /* Replace the corresponding source. */
+        errCode = _ConvSingleTemp256Src(pDuInfo, pShader, pFunc, pInst, srcIdx, destRegIds[i], destSymIds[i]);
         ON_ERROR(errCode, "Convert single temp 256 source.");
+
+        /* Set the flag. */
+        if (i == 0)
+        {
+            VIR_Operand_SetFlag(VIR_Inst_GetSource(pInst, srcIdx), VIR_OPNDFLAG_TEMP256_HIGH);
+        }
+        else
+        {
+            VIR_Operand_SetFlag(VIR_Inst_GetSource(pInst, srcIdx), VIR_OPNDFLAG_TEMP256_LOW);
+        }
     }
 
 OnError:
@@ -1835,7 +1877,7 @@ VSC_ErrCode vscVIR_PostMCCleanup(
                 ON_ERROR(errCode, "Normalize swizzle for atomic instruction source2");
             }
 
-            /* For a temp 256 register pair, we need to make sure that both operands are temp registers. */
+            /* For a temp 256 register pair, we need to make sure that both operands are temp registers and contiguous. */
             if (VIR_OPCODE_SrcsTemp256(opCode))
             {
                 errCode = _ConvTemp256Srcs(pDuInfo, pShader, func, inst);

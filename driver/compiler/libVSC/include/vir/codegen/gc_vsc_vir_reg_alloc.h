@@ -327,6 +327,9 @@ typedef struct VIR_REG_ALLOC_LINEAR_SCAN
     /* Save the resource to check the redefined instruction. */
     VSC_CHECK_REDEFINED_RES     checkRedefinedResInfo;
 
+    /* Save the dead instructions which can be deleted in the end of RA. */
+    VSC_HASH_TABLE              *pDeadInstSet;
+
     gctBOOL                     bEnableDebug;
     VSC_DIContext               *DIContext;
 
@@ -369,6 +372,8 @@ typedef struct VIR_REG_ALLOC_LINEAR_SCAN
 #define VIR_RA_LS_SetDisableDual16AndRecolor(ra, h) ((ra)->bDisableDual16AndRecolor = (h))
 #define VIR_RA_LS_GetEnableDebug(ra)                ((ra)->bEnableDebug)
 #define VIR_RA_LS_SetEnableDebug(ra, h)             ((ra)->bEnableDebug = (h))
+#define VIR_RA_LS_GetDeadInstSet(ra)                ((ra)->pDeadInstSet)
+#define VIR_RA_LS_SetDeadInstSet(ra, h)             ((ra)->pDeadInstSet = (h))
 
 extern VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
     IN VSC_SH_PASS_WORKER* pPassWorker);

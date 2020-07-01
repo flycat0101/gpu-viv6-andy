@@ -127,7 +127,7 @@
     /* SpvOpExtInstImport = 11 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassExtension,
-        __SpvEmitExtInst,
+        gcvNULL,
         1,
         { OperandLiteralString, },
         { "'Name'", },
@@ -138,7 +138,7 @@
     /* SpvOpExtInst = 12 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassExtension,
-        __SpvEmitIntrinsicFunction,
+        __SpvEmitExtInst,
         3,
         { OperandId, OperandLiteralNumber, OperandVariableIds, },
         { "'Set'", "'Instruction'", "'Operand 1', +\n'Operand 2', +\n...", },

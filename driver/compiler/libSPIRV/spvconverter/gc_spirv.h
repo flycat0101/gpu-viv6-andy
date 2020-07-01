@@ -285,7 +285,7 @@ typedef struct _SpvCovDecorator
 }SpvCovDecorator;
 
 typedef enum{
-    SPV_ID_TYPE_UNKNOW = 0,
+    SPV_ID_TYPE_UNKNOWN = 0,
     SPV_ID_TYPE_SYMBOL,
     SPV_ID_TYPE_CONST,
     SPV_ID_TYPE_TYPE,
@@ -441,6 +441,12 @@ typedef struct
 
 typedef struct
 {
+    SpvDescriptorHeader     descriptorHeader;
+    VIR_INTRINSIC_SET       virIntrinsicSetKind;
+}SpvExtInstSetDescriptor;
+
+typedef struct
+{
     SpvOp opcode;
     SpvId resultId;
     SpvId resultTypeId;
@@ -474,12 +480,13 @@ typedef struct
     gctBOOL isMemAddrCalc;
 
     union{
-        SpvSymDescriptor sym;
-        SpvConstDescriptor cst;
-        SpvTypeDescriptor type;
-        SpvLabelDescriptor label;
-        SpvCondDescriptor cond;
-        SpvFuncDescriptor func;
+        SpvSymDescriptor            sym;
+        SpvConstDescriptor          cst;
+        SpvTypeDescriptor           type;
+        SpvLabelDescriptor          label;
+        SpvCondDescriptor           cond;
+        SpvFuncDescriptor           func;
+        SpvExtInstSetDescriptor     extInstSet;
     }u;
 
     SpvInterfaceFlag interfaceFlag;
@@ -646,7 +653,6 @@ struct _gcSPV
     gctUINT                     srcLanguageVersion;
     gctCHAR *                   srcLanguageExternsion;
     gctCHAR *                   srcExtension;
-    gctCHAR *                   srcExtInstImport;
     SpvAddressingModel          srcAddrMode;
     SpvMemoryModel              srcMemoryMode;
     gctUINT8                    shaderStage;
@@ -752,6 +758,22 @@ struct SpvInstructionParameters
     VIR_TypeId          virOpFormat;
     VIR_Modifier        modifier;
 };
+
+/* The builtin extended instruction-set. */
+typedef struct __SpvExtInstSet
+{
+    gctSTRING               extInstSetName;
+    gctUINT                 extInstSetNameLength;
+    VIR_INTRINSIC_SET       virIntrinsicSetKind;
+} SpvExtInstSet;
+
+static SpvExtInstSet extInstSets[] =
+{
+    { "GLSL.std.450",   12,     VIR_INTRINSIC_SET_GLSL},
+    { "OpenCL.std",     10,     VIR_INTRINSIC_SET_CL},
+};
+
+static gctUINT extInstSetCount = sizeof(extInstSets) / sizeof(SpvExtInstSet);
 
 gceSTATUS
 gcSPV_Conv2VIR(
