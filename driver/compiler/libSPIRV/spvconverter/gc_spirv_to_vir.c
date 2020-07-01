@@ -743,6 +743,14 @@ static void _SpvSetOperandPrecision(gcSPV spv, VIR_Operand* pOpnd)
     VIR_Operand_SetPrecision(pOpnd, opndPrecision);
 }
 
+/* All builtin extended instruction-sets we can support now. */
+static SpvExtInstSet extInstSets[] =
+{
+    { "GLSL.std.450",   12,     VIR_INTRINSIC_SET_GLSL},
+    { "OpenCL.std",     10,     VIR_INTRINSIC_SET_CL},
+};
+static gctUINT extInstSetCount = sizeof(extInstSets) / sizeof(SpvExtInstSet);
+
 static void __SpvSetExtInstImport(gcSPV spv)
 {
     gctSTRING       extenedInstSetName = gcvNULL;

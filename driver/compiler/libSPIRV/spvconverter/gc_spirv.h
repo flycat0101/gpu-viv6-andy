@@ -764,14 +764,6 @@ typedef struct __SpvExtInstSet
     VIR_INTRINSIC_SET       virIntrinsicSetKind;
 } SpvExtInstSet;
 
-static SpvExtInstSet extInstSets[] =
-{
-    { "GLSL.std.450",   12,     VIR_INTRINSIC_SET_GLSL},
-    { "OpenCL.std",     10,     VIR_INTRINSIC_SET_CL},
-};
-
-static gctUINT extInstSetCount = sizeof(extInstSets) / sizeof(SpvExtInstSet);
-
 gceSTATUS
 gcSPV_Conv2VIR(
     IN gcSPV Spv,

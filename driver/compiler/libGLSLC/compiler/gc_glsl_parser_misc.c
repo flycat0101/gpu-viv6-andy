@@ -7322,6 +7322,21 @@ OnError:
     return gcvSTATUS_OK;
 }
 
+/* the patchID should be same as the appId list in vscVIR_CheckDual16able */
+static gctBOOL
+_checkPerfBenchUseDual16(
+    gcePATCH_ID patchID)
+{
+    return (patchID == gcvPATCH_GLBM21 ||
+            patchID == gcvPATCH_GLBM25 ||
+            patchID == gcvPATCH_GLBM27 ||
+            patchID == gcvPATCH_GFXBENCH ||
+            patchID == gcvPATCH_MM07 ||
+            patchID == gcvPATCH_NENAMARK2 ||
+            patchID == gcvPATCH_LEANBACK ||
+            patchID == gcvPATCH_ANGRYBIRDS);
+}
+
 static gceSTATUS
 _CheckDataTypePrecision(
     IN sloCOMPILER Compiler,
@@ -7429,7 +7444,18 @@ _CheckDataTypePrecision(
 
         status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
     }
-
+    else if ((Compiler->shaderType == slvSHADER_TYPE_FRAGMENT) &&
+             (DataType->qualifiers.precision == slvPRECISION_QUALIFIER_HIGH) &&
+             (DataType->qualifiers.storage == 0) &&
+             (!slsDATA_TYPE_IsOpaque(DataType)))
+    {
+        gcePATCH_ID patchId = sloCOMPILER_GetPatchID(Compiler);
+        /* only apply this change for perfBench when dual16 is on */
+        if ((gcmOPT_DualFP16Mode() != DUAL16_FORCE_OFF) && _checkPerfBenchUseDual16(patchId))
+        {
+            DataType->qualifiers.precision = slvPRECISION_QUALIFIER_MEDIUM;
+        }
+    }
     gcmFOOTER();
     return status;
 }

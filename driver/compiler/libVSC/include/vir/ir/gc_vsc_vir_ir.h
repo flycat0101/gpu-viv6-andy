@@ -4223,7 +4223,7 @@ struct _VIR_INSTRUCTION
 
     /* Word 3. */
     gctUINT                 _condOp     : 5;
-    VIR_InstFlag            _instFlags  : 4;  /* VL concept, etc */
+    VIR_InstFlag            _instFlags  : 5;  /* VL concept, etc */
     gctUINT                 _srcOpndNum : 3;  /* number of source operands */
     gctUINT                 _threadMode : 3;
     gctUINT                 _parentUseBB: 1;  /* parent union uses BB */
@@ -4232,7 +4232,7 @@ struct _VIR_INSTRUCTION
     gctUINT                 _isLoopInvariant: 1;
     gctUINT                 _endOfBB    : 1;  /* End Of Basic Block Bit for non-control-flow inst */
     gctUINT                 _USCUnallocate: 1; /* USC Unallocate Bit for global memory load/store  */
-    gctUINT                 _reserved1  : 6;
+    gctUINT                 _reserved1  : 5;
 
     gctUINT                 _dual16ExpandSeq;
 
