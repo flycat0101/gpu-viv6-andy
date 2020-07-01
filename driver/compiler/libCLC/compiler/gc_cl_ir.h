@@ -417,10 +417,7 @@ typedef enum _cleELEMENT_TYPE
   (Decl)->array.numDim == 0  &&  \
   clmIsElementTypePacked((Decl)->dataType->elementType))
 
-#define clmDECL_IsSameVectorType(Decl1, Decl2) \
- ((Decl1)->dataType->elementType == (Decl2)->dataType->elementType \
-  && clmDATA_TYPE_vectorSize_GET((Decl1)->dataType) ==  \
-     clmDATA_TYPE_vectorSize_GET((Decl2)->dataType))
+#define clmDECL_IsSameVectorType(Decl1, Decl2) clDeclIsSameVectorType(Decl1, Decl2)
 
 #define clmDECL_IsSameMatrixType(Decl1, Decl2) \
  ((Decl1)->dataType->elementType == (Decl2)->dataType->elementType \
@@ -2559,6 +2556,12 @@ IN cloCOMPILER Compiler,
 IN slsSLINK_LIST *PtrDscr,
 IN clsDECL *Decl,
 IN gctBOOL PtrDominant
+);
+
+gctBOOL
+clDeclIsSameVectorType(
+IN clsDECL *Decl1,
+IN clsDECL *Decl2
 );
 
 /* Visitor */
