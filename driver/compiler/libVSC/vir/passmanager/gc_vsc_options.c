@@ -3083,6 +3083,91 @@ void VSC_OPTN_ATOMPatchOptions_SetDefault(
     VSC_OPTN_ATOMPatchOptions_SetSwitchOn(options, gcvTRUE);
 }
 
+void VSC_OPTN_CIEOptions_SetDefault(
+    IN OUT VSC_OPTN_CIEOptions* options,
+    IN gctUINT optLevel
+    )
+{
+    if (optLevel >= 2)
+    {
+        VSC_OPTN_CIEOptions_SetSwitchOn(options, gcvTRUE);
+    }
+    else
+    {
+        VSC_OPTN_CIEOptions_SetSwitchOn(options, gcvFALSE);
+    }
+    VSC_OPTN_CIEOptions_SetThreshold(options, 4);
+    VSC_OPTN_FCPOptions_SetTrace(options, 0);
+}
+
+void VSC_OPTN_CIEOptions_GetOptionFromString(
+    IN gctSTRING str,
+    IN OUT VSC_OPTN_CIEOptions* options
+    )
+{
+    while (str[0] == ':')
+    {
+        ++str;
+        if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "on", sizeof("on") - 1))
+        {
+            VSC_OPTN_CIEOptions_SetSwitchOn(options, gcvTRUE);
+            str += sizeof("on") - 1;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "off", sizeof("off") - 1))
+        {
+            VSC_OPTN_CIEOptions_SetSwitchOn(options, gcvFALSE);
+            str += sizeof("off") - 1;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "threshold:", sizeof("threshold:") - 1))
+        {
+            gctUINT32 val;
+            gctUINT32 len;
+            str += sizeof("threshold:") - 1;
+            len = _VSC_OPTN_GetSubOptionLength(str);
+            val = vscSTR_StrToUint32(str, len);
+            VSC_OPTN_CIEOptions_SetThreshold(options, val);
+            str += len;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "trace:", sizeof("trace:")-1))
+        {
+            gctUINT32 trace;
+            gctUINT32 len;
+
+            str += sizeof("trace:") -1;
+            len = _VSC_OPTN_GetSubOptionLength(str);
+            trace = vscSTR_StrToUint32(str, len);
+            VSC_OPTN_CIEOptions_SetTrace(options, trace);
+            str += len;
+        }
+    }
+}
+
+void VSC_OPTN_CIEOptions_Dump(
+    IN VSC_OPTN_CIEOptions* options,
+    IN struct _VIR_DUMPER* dumper
+    )
+{
+    VIR_LOG(dumper, "common intrinsic elimination options:\n");
+    VIR_LOG(dumper, "    on: %s\n", VSC_OPTN_CIEOptions_GetSwitchOn(options) ? "true" : "false");
+    VIR_LOG(dumper, "    threshold: 0x%x\n", VSC_OPTN_CIEOptions_GetThreshold(options));
+    VIR_LOG(dumper, "    trace: %x\n", VSC_OPTN_FCPOptions_GetTrace(options));
+    VIR_LOG_FLUSH(dumper);
+}
+
+void VSC_OPTN_CIEOptions_Usage(
+    IN struct _VIR_DUMPER* dumper
+    )
+{
+    gctSTRING usage =
+        "-CIE:\n"
+        "    on                  turn on common intrinsic elimination\n"
+        "    off                 turn off common intrinsic elimination\n"
+        "    threshold:          0x4    replace common instrinsic if candidates num >= 4 \n"
+        "    trace:              0x1    trace internal\n";
+
+    VIR_LOG(dumper, usage);
+    VIR_LOG_FLUSH(dumper);
+}
 
 static gctBOOL
 _IsTriageForShaderId(
@@ -3158,6 +3243,7 @@ void VSC_OPTN_Options_SetDefault(
     VSC_OPTN_DumpOptions_SetDefault(VSC_OPTN_Options_GetDumpOptions(options));
     VSC_OPTN_ILFLinkOptions_SetDefault(VSC_OPTN_Options_GetILFLinkOptions(options));
     VSC_OPTN_ATOMPatchOptions_SetDefault(VSC_OPTN_Options_GetATOMPatchOptions(options));
+    VSC_OPTN_CIEOptions_SetDefault(VSC_OPTN_Options_GetCIEOptions(options), optLevel);
     VSC_OPTN_Options_SetOptionsUsage(options, gcvFALSE);
 }
 
@@ -3221,6 +3307,8 @@ VSC_OPTN_BASE* VSC_OPTN_Options_GetOption(VSC_OPTN_Options* pOptions, VSC_PASS_O
         return &pOptions->unifiedUniform_options.optnBase;
     case VSC_PASS_OPTN_TYPE_ATOM_PATCH:
         return &pOptions->atompatch_options.optnBase;
+    case VSC_PASS_OPTN_TYPE_CIE:
+        return &pOptions->cie_options.optnBase;
     default:
         return gcvNULL;
     }
@@ -3493,6 +3581,14 @@ void VSC_OPTN_Options_GetOptionFromString(
         VSC_OPTN_ATOMPatchOptions_GetOptionFromString(pos, VSC_OPTN_Options_GetATOMPatchOptions(options));
     }
 
+    /* common intrinsic elimination : */
+    gcoOS_StrStr(str, "-CIE", &pos);
+    if (pos)
+    {
+        pos += sizeof("-CIE") - 1;
+        VSC_OPTN_CIEOptions_GetOptionFromString(pos, VSC_OPTN_Options_GetCIEOptions(options));
+    }
+
     /* print options usage*/
     gcoOS_StrStr(str, "-USAGE", &pos);
     if (pos)
@@ -3529,6 +3625,7 @@ void VSC_OPTN_Options_Dump(
     VSC_OPTN_FCPOptions_Dump(VSC_OPTN_Options_GetFCPOptions(options, 0), dumper);
     VSC_OPTN_DumpOptions_Dump(VSC_OPTN_Options_GetDumpOptions(options), dumper);
     VSC_OPTN_UnifiedUniformOptions_Dump(VSC_OPTN_Options_GetUnifiedUniformOptions(options), dumper);
+    VSC_OPTN_CIEOptions_Dump(VSC_OPTN_Options_GetCIEOptions(options), dumper);
     VIR_LOG(dumper, "options usage: %s\n", VSC_OPTN_Options_GetOptionsUsage(options) ? "true" : "false");
     VIR_LOG_FLUSH(dumper);
 }
@@ -3556,6 +3653,7 @@ void VSC_OPTN_Options_Usage(
     VSC_OPTN_RAOptions_Usage(dumper);
     VSC_OPTN_DUAL16Options_Usage(dumper);
     VSC_OPTN_FCPOptions_Usage(dumper);
+    VSC_OPTN_CIEOptions_Usage(dumper);
     VIR_LOG(dumper, "-DUMP_OPTIONS        dump options\n");
     VIR_LOG(dumper, "-USAGE               print options usage\n");
     VIR_LOG_FLUSH(dumper);

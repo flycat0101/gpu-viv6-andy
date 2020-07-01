@@ -6875,7 +6875,8 @@ VIR_Inst_IdenticalExpression(
     IN VIR_Instruction  *Inst1,
     IN VIR_Shader       *Shader,
     IN gctBOOL          bPrecisionMatters,
-    IN gctBOOL          bAllowCommutative
+    IN gctBOOL          bAllowCommutative,
+    IN gctBOOL          bAllowIntrinsic
     );
 
 VIR_TypeId
