@@ -523,6 +523,7 @@ static VSC_ErrCode _ProgramStreamOut(SHADER_HW_INFO* pShHwInfo,
     SHADER_IO_REG_MAPPING*     pSoOutputRegMapping;
     SHADER_IO_REG_LINKAGE*     pSoOutputLinkage;
     gctUINT                    state, ioIdx, channelIdx, descriptorAddrOffset = 0, descriptorCountPerStream = 0;
+    gctUINT                    descriptorCountForEachStream[MAX_SHADER_STREAM_OUT_BUFFER_NUM] = { 0 };
     gctUINT                    soOutputArray[MAX_SHADER_STREAM_OUT_BUFFER_NUM][MAX_SHADER_IO_NUM];
     gctUINT                    soHwStartChannel, soHwChannelCount, soStreamIdx, soOutputIdx, activeStreamIdx;
     gctBOOL                    bFinishSoCompCalc;
@@ -568,6 +569,7 @@ static VSC_ErrCode _ProgramStreamOut(SHADER_HW_INFO* pShHwInfo,
         }
     }
 
+    /* Collect the information for all streams and program all used descriptors. */
     for (soStreamIdx = 0; soStreamIdx < MAX_SHADER_STREAM_OUT_BUFFER_NUM; soStreamIdx ++)
     {
         /* If this shader have no multi-stream, then we always use stream 0. */
@@ -698,11 +700,11 @@ static VSC_ErrCode _ProgramStreamOut(SHADER_HW_INFO* pShHwInfo,
         }
 
         /* Tell HW how many TFBDescriptor we have programed */
-        if (bHasStreamOut || soStreamIdx == MAX_SHADER_STREAM_OUT_BUFFER_NUM - 1)
-        {
-            VSC_LOAD_HW_STATE(0x7040 + activeStreamIdx, descriptorCountPerStream);
-        }
+        descriptorCountForEachStream[activeStreamIdx] = descriptorCountPerStream;
     }
+
+    /* Program the descriptor count for all streams. */
+    VSC_LOAD_HW_STATES(0x7040, descriptorCountForEachStream, MAX_SHADER_STREAM_OUT_BUFFER_NUM);
 
 OnError:
     return errCode;
