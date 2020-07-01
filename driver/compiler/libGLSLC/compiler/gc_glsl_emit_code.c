@@ -574,7 +574,9 @@ static gctCONST_STRING OpName[] =
     "gcSL_CSUBCJ",                        /* 0x99 */
     "gcSL_CADD",                          /* 0x9A */
     "gcSL_GET_IMAGE_TYPE",                /* 0x9B */
-    "gcSL_CLAMPCOORD",                    /*  */
+    "gcSL_CLAMPCOORD",                    /* 0x9C */
+    "gcSL_EMIT_STREAM_VERTEX",            /* 0x9D For function "EmitStreamVertex" */
+    "gcSL_END_STREAM_PRIMITIVE",          /* 0x9E For function "EndStreamPrimitive" */
 };
 char _checkOpName_size[sizeof(OpName)/sizeof(OpName[0]) == gcSL_MAXOPCODE];
 
@@ -5612,6 +5614,8 @@ _ConvOpcode(
     case slvOPCODE_CLAMPCOORD:              return gcSL_CLAMPCOORD;
     case slvOPCODE_EMIT_VERTEX:             return gcSL_EMIT_VERTEX;
     case slvOPCODE_END_PRIMITIVE:           return gcSL_END_PRIMITIVE;
+    case slvOPCODE_EMIT_STREAM_VERTEX:      return gcSL_EMIT_STREAM_VERTEX;
+    case slvOPCODE_END_STREAM_PRIMITIVE:    return gcSL_END_STREAM_PRIMITIVE;
 
     case slvOPCODE_LOAD_L:                  return gcSL_LOAD_L;
     case slvOPCODE_STORE_L:                 return gcSL_STORE_L;

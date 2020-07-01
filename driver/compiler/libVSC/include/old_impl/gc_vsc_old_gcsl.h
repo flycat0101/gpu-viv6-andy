@@ -122,10 +122,13 @@ BEGIN_EXTERN_C()
 /* bump up version to 1.39 for saving ubo array index into the binary on 08/09/2019 */
 /* bump up version to 1.40 for saving local memory size, uniform's swizzle and shader kind into the binary on 11/07/2019 */
 
-/* current version */
-#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 40)
+/* bump up version to 1.41 for saving the stream number for gcOUTPUT on 11/07/2019 */
+#define gcdSL_SHADER_BINARY_BEFORE_SAVING_STREAM_NUMBER_FOR_OUTPUT gcmCC(0, 0, 1, 41)
 
-#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 40)
+/* current version */
+#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 41)
+
+#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 41)
 
 typedef union _gcsValue
 {
@@ -380,7 +383,9 @@ typedef enum _gcSL_OPCODE
     gcSL_CSUBCJ, /* 0x99 Complex number conjugate sub. */
     gcSL_CADD, /* 0x9A Complex number add. */
     gcSL_GET_IMAGE_TYPE, /* 0x9B get the image type: 0-1d, 1-1dbuffer, 2-1darray, 3-2d, 4-2darray, 5-3d */
-    gcSL_CLAMPCOORD, /* clamp image 2d cooridate to its width and height */
+    gcSL_CLAMPCOORD, /* 0x9C clamp image 2d cooridate to its width and height */
+    gcSL_EMIT_STREAM_VERTEX, /* 0x9D For function "EmitStreamVertex" */
+    gcSL_END_STREAM_PRIMITIVE, /* 0x9E For function "EndStreamPrimitive" */
     gcSL_MAXOPCODE
 }
 gcSL_OPCODE;
@@ -431,7 +436,9 @@ gcSL_OPCODE;
                                                  (Opcode) == gcSL_TEXU_LOD            ||  \
                                                  (Opcode) == gcSL_MEM_BARRIER         ||  \
                                                  (Opcode) == gcSL_EMIT_VERTEX         ||  \
-                                                 (Opcode) == gcSL_END_PRIMITIVE)
+                                                 (Opcode) == gcSL_END_PRIMITIVE       ||  \
+                                                 (Opcode) == gcSL_EMIT_STREAM_VERTEX  ||  \
+                                                 (Opcode) == gcSL_END_STREAM_PRIMITIVE)
 
 #define gcSL_isOpcodeUseTargetAsSource(Opcode)  ((Opcode) == gcSL_STORE               ||  \
                                                  (Opcode) == gcSL_IMAGE_WR            ||  \
@@ -3148,6 +3155,9 @@ struct _gcOUTPUT
     /* Flat output or smooth output. */
     gcSHADER_SHADERMODE             shaderMode;
 
+    /* The stream number, for GS only. The default value is 0. */
+    gctINT                          streamNumber;
+
     /* Location index. */
     gctINT                          location;
     gctINT                          output2RTIndex; /* user may specify location 1,3,
@@ -3190,6 +3200,8 @@ struct _gcOUTPUT
 #define GetOutputArrayIndex(o)              ((o)->arrayIndex)
 #define GetOutputTempIndex(o)               ((o)->tempIndex)
 #define GetOutputShaderMode(o)              ((o)->shaderMode)
+#define GetOutputStreamNumber(o)            ((o)->streamNumber)
+#define SetOutputStreamNumber(o, i)         (GetOutputStreamNumber(o) = (i))
 #define GetOutputLocation(o)                ((o)->location)
 #define GetOutput2RTIndex(o)                ((o)->output2RTIndex)
 #define GetOutputFieldIndex(o)              ((o)->fieldIndex)
@@ -3251,6 +3263,9 @@ typedef struct _gcBINARY_OUTPUT
 
     /* shader mode: flat/smooth/... */
     gctINT16                        shaderMode;
+
+    /* The stream number, for GS only. The default value is 0. */
+    gctINT16                        streamNumber;
 
     /* layout qualifier */
     char                            layoutQualifier[sizeof(gceLAYOUT_QUALIFIER)];

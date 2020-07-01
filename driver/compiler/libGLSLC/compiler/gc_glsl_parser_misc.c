@@ -7143,7 +7143,7 @@ _ParseUpdateHaltiQualifiers(
                 if (sloCOMPILER_IsOGLVersion(Compiler))
                 {
                     if (sloCOMPILER_IsOGL40Version(Compiler) ||
-                        sloCOMPILER_IsOGL33Version(Compiler) ||
+                        sloCOMPILER_IsOGL33VersionOrAbove(Compiler, gcvFALSE) ||
                         sloCOMPILER_IsOGL15Version(Compiler))
                     {
                         if (shaderType == slvSHADER_TYPE_FRAGMENT &&
@@ -7803,7 +7803,7 @@ _ParseArrayVariableDecl(
 
         if(shaderType == slvSHADER_TYPE_VERTEX &&
            !sloCOMPILER_IsOGL40Version(Compiler) &&
-           !sloCOMPILER_IsOGL33Version(Compiler) &&
+           !sloCOMPILER_IsOGL33VersionOrAbove(Compiler, gcvFALSE) &&
            !sloCOMPILER_IsOGL15Version(Compiler))
         {
            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
@@ -8018,7 +8018,7 @@ _ParseArrayVariableDeclWithInitializer(
 
         if(shaderType == slvSHADER_TYPE_VERTEX &&
            !sloCOMPILER_IsOGL40Version(Compiler) &&
-           !sloCOMPILER_IsOGL33Version(Compiler) &&
+           !sloCOMPILER_IsOGL33VersionOrAbove(Compiler, gcvFALSE) &&
            !sloCOMPILER_IsOGL15Version(Compiler))
         {
            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
@@ -8327,7 +8327,7 @@ _CheckErrorForArray(
 
            if(shaderType == slvSHADER_TYPE_VERTEX &&
               !sloCOMPILER_IsOGL40Version(Compiler) &&
-              !sloCOMPILER_IsOGL33Version(Compiler) &&
+              !sloCOMPILER_IsOGL33VersionOrAbove(Compiler, gcvFALSE) &&
               !sloCOMPILER_IsOGL15Version(Compiler))
            {
               gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
@@ -12838,6 +12838,21 @@ slParseFullySpecifiedType(
                slmDATA_TYPE_layoutBinding_SET(DataType, TypeQualifier->u.qualifiers.layout.binding);
            }
            slmDATA_TYPE_layoutId_SET(DataType, TypeQualifier->u.qualifiers.layout.id);
+
+           /* Use the stream layout if exist, otherwise use the global setting. */
+           if (TypeQualifier->u.qualifiers.layout.ext_id & slvLAYOUT_EXT_GS_STREAM)
+           {
+               DataType->qualifiers.layout.streamNumber = TypeQualifier->u.qualifiers.layout.streamNumber;
+               DataType->qualifiers.layout.ext_id |= slvLAYOUT_EXT_GS_STREAM;
+           }
+           else
+           {
+               slsLAYOUT_QUALIFIER outLayout[1];
+               sloCOMPILER_GetDefaultLayout(Compiler,
+                                            outLayout,
+                                            slvSTORAGE_QUALIFIER_OUT);
+               DataType->qualifiers.layout.streamNumber = outLayout->streamNumber;
+           }
        }
        else
        { /* no layout(especially, no location) specified */
@@ -13242,6 +13257,10 @@ slMergeTypeQualifiers(
                 if (ComingQualifier->u.qualifiers.layout.ext_id & slvLAYOUT_EXT_MAX_VERTICES)
                 {
                     Qualifiers->u.qualifiers.layout.maxGSVerticesNumber = ComingQualifier->u.qualifiers.layout.maxGSVerticesNumber;
+                }
+                if (ComingQualifier->u.qualifiers.layout.ext_id & slvLAYOUT_EXT_GS_STREAM)
+                {
+                    Qualifiers->u.qualifiers.layout.streamNumber = ComingQualifier->u.qualifiers.layout.streamNumber;
                 }
                 Qualifiers->u.qualifiers.layout.ext_id |= ComingQualifier->u.qualifiers.layout.ext_id;
             }
@@ -13766,6 +13785,9 @@ _ParseSearchLayoutId(
     else if (gcmIS_SUCCESS(gcoOS_StrCmp(LayoutId->u.identifier, "max_vertices"))) {
         layoutId2 = slvLAYOUT_EXT_MAX_VERTICES;
     }
+    else if (gcmIS_SUCCESS(gcoOS_StrCmp(LayoutId->u.identifier, "stream"))) {
+        layoutId2 = slvLAYOUT_EXT_GS_STREAM;
+    }
     if (LayoutId1)
     {
         *LayoutId1 = layoutId1;
@@ -13877,6 +13899,29 @@ slParseLayoutId(
            else if (layoutIdExt & slvLAYOUT_EXT_MAX_VERTICES)
            {
                layoutQualifier.u.qualifiers.layout.maxGSVerticesNumber = Value->u.constant.intValue;
+           }
+           else if (layoutIdExt & slvLAYOUT_EXT_GS_STREAM)
+           {
+               if (Value->u.constant.intValue <= 0)
+               {
+                   gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                                   LayoutId->lineNo,
+                                                   LayoutId->stringNo,
+                                                   slvREPORT_ERROR,
+                                                   "invalid stream number %d",
+                                                   Value->u.constant.intValue));
+                   break;
+               }
+               else if (!sloCOMPILER_IsOGL33VersionOrAbove(Compiler, gcvTRUE))
+               {
+                   gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                                   LayoutId->lineNo,
+                                                   LayoutId->stringNo,
+                                                   slvREPORT_ERROR,
+                                                   "Can't support layout \"stream\""));
+                   break;
+               }
+               layoutQualifier.u.qualifiers.layout.streamNumber = Value->u.constant.intValue;
            }
        }
 
@@ -14167,6 +14212,8 @@ slParseAddLayoutId(
                LayoutIdList->u.qualifiers.layout.maxGSVerticesNumber = LayoutId->u.qualifiers.layout.maxGSVerticesNumber;
            if (LayoutId->u.qualifiers.layout.ext_id & slvLAYOUT_EXT_INVOCATIONS)
                LayoutIdList->u.qualifiers.layout.gsInvocationTime = LayoutId->u.qualifiers.layout.gsInvocationTime;
+           if (LayoutId->u.qualifiers.layout.ext_id & slvLAYOUT_EXT_GS_STREAM)
+               LayoutIdList->u.qualifiers.layout.streamNumber = LayoutId->u.qualifiers.layout.streamNumber;
            LayoutIdList->u.qualifiers.layout.ext_id |= LayoutId->u.qualifiers.layout.ext_id;
        }
     } while (gcvFALSE);
@@ -15310,8 +15357,8 @@ slParseInterfaceBlockDeclEnd(
     dataType->qualifiers.layout = BlockType->u.qualifiers.layout;
     dataType->qualifiers.flags = BlockType->u.qualifiers.flags;
     status = sloCOMPILER_GetDefaultLayout(Compiler,
-                                            defaultLayout,
-                                            storageQualifier);
+                                          defaultLayout,
+                                          storageQualifier);
     if (gcmIS_ERROR(status)) {
         gcmFOOTER_ARG("<return>=%s", "<nil>");
         return gcvNULL;
@@ -15457,14 +15504,35 @@ slParseInterfaceBlockDeclEnd(
     lastField = slsDLINK_LIST_Last(&(prevNameSpace->names), slsNAME);
 
     /*
-    ** check it there is a embedded structure definition
-    ** and/or implicitly sized array
+    ** Check:
+    ** 1) If there is a embedded structure definition.
+    ** 2) If there is a implicitly sized array.
+    ** 3) If there is unmatched stream number.
+    ** ...
     */
     FOR_EACH_DLINK_NODE(&(prevNameSpace->names), slsNAME, field)
     {
         gctBOOL setLocation = gcvFALSE;
         gctINT location = 0;
         sleSHADER_TYPE shaderType = Compiler->shaderType;
+
+        /* A block member must match the stream associated with the containing block. */
+        if (field->dataType->qualifiers.layout.ext_id & slvLAYOUT_EXT_GS_STREAM
+            &&
+            field->dataType->qualifiers.layout.streamNumber != dataType->qualifiers.layout.streamNumber)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                            field->lineNo,
+                                            field->stringNo,
+                                            slvREPORT_ERROR,
+                                            "A block member \"%s\" must match the stream associated with the containing block.",
+                                            field->symbol));
+            hasError = gcvTRUE;
+        }
+        else
+        {
+            field->dataType->qualifiers.layout.streamNumber = dataType->qualifiers.layout.streamNumber;
+        }
 
         /* double input must have "flat" qualifier. */
         if (slmIsElementTypeDouble(field->dataType->elementType) &&

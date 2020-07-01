@@ -360,6 +360,8 @@ _CalculateInstCount(
     case VIR_OP_SELECT_MAP:
     case VIR_OP_EMIT0:
     case VIR_OP_RESTART0:
+    case VIR_OP_EMIT_STREAM0:
+    case VIR_OP_RESTART_STREAM0:
 
     case VIR_OP_PARM:       case VIR_OP_UNREACHABLE:
     case VIR_OP_INTRINSIC:  case VIR_OP_THREADEXIT:
