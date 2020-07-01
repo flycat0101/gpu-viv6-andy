@@ -3852,7 +3852,7 @@ gctSTRING gcLibTextureSize_Func_28 =
 "}\n";
 
 gctSTRING gcLibTextureSize_Func_29 =
-"int _viv_textureSize_float_1D(sampler1D sampler, mediump ivec3 levelBaseSize, mediump ivec2 lodMinAndMax, int lod)\n"
+"int _viv_textureSize_float_1D(sampler2D sampler, mediump ivec3 levelBaseSize, mediump ivec2 lodMinAndMax, int lod)\n"
 "{\n"
 "    int result;\n"
 "    lod = clamp(lod, lodMinAndMax.x, lodMinAndMax.y);\n"
