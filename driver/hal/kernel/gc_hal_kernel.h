@@ -1405,8 +1405,10 @@ typedef struct _gcsDEVICE
     gctUINT32                   sRAMBaseAddresses[gcvCORE_COUNT][gcvSRAM_INTER_COUNT];
     gctBOOL                     sRAMPhysFaked[gcvCORE_COUNT][gcvSRAM_INTER_COUNT];
 
-    /* Physical address of external SRAMs. */
+    /* CPU physical address of external SRAMs. */
     gctUINT64                   extSRAMBases[gcvSRAM_EXT_COUNT];
+    /* GPU physical address of external SRAMs. */
+    gctUINT64                   extSRAMGPUBases[gcvSRAM_EXT_COUNT];
     /* External SRAMs' size. */
     gctUINT32                   extSRAMSizes[gcvSRAM_EXT_COUNT];
     /* GPU/VIP virtual address of external SRAMs. */
