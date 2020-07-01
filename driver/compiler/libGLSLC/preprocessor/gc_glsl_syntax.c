@@ -1887,6 +1887,12 @@ gceSTATUS ppoPREPROCESSOR_SetExtensionWithSel(ppoPREPROCESSOR PP, gctUINT Sel, g
             tempExtension.extension1 = slvEXTENSION1_TESSELLATION_SHADER;
             gcmVERIFY_OK(sloCOMPILER_EnableExtension(PP->compiler, &tempExtension, enable));
         }
+        else if(extension.extension2 == slvEXTENSION2_GL_ARB_GPU_SHADER5)
+        {
+            sloEXTENSION tempExtension = {0};
+            tempExtension.extension1 = slvEXTENSION1_GPU_SHADER5;
+            gcmVERIFY_OK(sloCOMPILER_EnableExtension(PP->compiler, &tempExtension, enable));
+        }
     }
     else
     {

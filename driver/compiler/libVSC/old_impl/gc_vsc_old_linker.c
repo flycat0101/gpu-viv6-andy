@@ -17989,16 +17989,6 @@ _gcLinkFullGraphicsShaders(
 
                 if (Flags & gcvSHADER_OPTIMIZER)
                 {
-                    /* Recompute the vertex shader. */
-                    gcmONERROR(gcLINKTREE_ComputeSamplerPhysicalAddress(shaderTrees[i]));
-                    if (dumpCGV[i])
-                    {
-                        offset = 0;
-                        gcoOS_PrintStrSafe(headsup, sizeof(headsup), &offset,
-                                           "Recompute the %s shader", shaderName[i]);
-                        _DumpLinkTree(headsup, shaderTrees[i], gcvFALSE);
-                    }
-
                     /* Optimize the vertex shader by removing MOV instructions. */
                     gcmONERROR(gcLINKTREE_Optimize(shaderTrees[i]));
                     if (dumpCGV[i])
@@ -18006,6 +17996,16 @@ _gcLinkFullGraphicsShaders(
                         offset = 0;
                         gcoOS_PrintStrSafe(headsup, sizeof(headsup), &offset,
                                            "Optimized the %s shader", shaderName[i]);
+                        _DumpLinkTree(headsup, shaderTrees[i], gcvFALSE);
+                    }
+
+                    /* Recompute the vertex shader. */
+                    gcmONERROR(gcLINKTREE_ComputeSamplerPhysicalAddress(shaderTrees[i]));
+                    if (dumpCGV[i])
+                    {
+                        offset = 0;
+                        gcoOS_PrintStrSafe(headsup, sizeof(headsup), &offset,
+                                           "Recompute the %s shader", shaderName[i]);
                         _DumpLinkTree(headsup, shaderTrees[i], gcvFALSE);
                     }
 
