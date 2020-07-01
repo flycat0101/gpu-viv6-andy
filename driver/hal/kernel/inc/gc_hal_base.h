@@ -3717,9 +3717,8 @@ gcoOS_Print(
 #   define gcmkPRINT_VERSION()      _gcmPRINT_VERSION(gcmk)
 #   define _gcmPRINT_VERSION(prefix) \
         prefix##TRACE(gcvLEVEL_ERROR, \
-                      "Vivante HAL version %d.%d.%d build %d", \
-                      gcvVERSION_MAJOR, gcvVERSION_MINOR, \
-                      gcvVERSION_PATCH, gcvVERSION_BUILD)
+                      "Vivante HAL version %s", \
+                      gcvVERSION_STRING)
 #else
 #   define gcmPRINT_VERSION()       do { gcmSTACK_DUMP(); } while (gcvFALSE)
 #   define gcmkPRINT_VERSION()      do { } while (gcvFALSE)

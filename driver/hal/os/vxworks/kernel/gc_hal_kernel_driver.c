@@ -294,8 +294,8 @@ static int drv_init(void)
     memcpy(args.registerSizes, registerSizes, gcmSIZEOF(gctUINT) * gcvCORE_COUNT);
     memcpy(args.chipIDs, chipIDs, gcmSIZEOF(gctUINT) * gcvCORE_COUNT);
 
-    gcmkPRINT("Galcore version %d.%d.%d.%d\n",
-        gcvVERSION_MAJOR, gcvVERSION_MINOR, gcvVERSION_PATCH, gcvVERSION_BUILD);
+    gcmkPRINT("Galcore version %s\n", gcvVERSION_STRING);
+
     args.powerManagement = powerManagement;
     args.gpuProfiler = gpuProfiler;
 
