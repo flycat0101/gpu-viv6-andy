@@ -7637,6 +7637,12 @@ VIR_Operand_GetConstValForUniform(
     IN  gctUINT             arrayOffset
     );
 
+VIR_TypeId
+VIR_Operand_GetSymbolTypeId(
+    IN  VIR_Shader         *pShader,
+    IN  VIR_Operand        *pOpnd
+    );
+
 gctBOOL
 VIR_Const_isValueFit5Bits(
     VIR_Const *      pConstVal

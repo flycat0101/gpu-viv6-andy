@@ -5504,6 +5504,76 @@ static VSC_ErrCode _ValidateProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
     return VSC_ERR_NONE;
 }
 
+static void _DumpProgramResLayout(VIR_Dumper* pDumper,
+                                  VSC_OPTN_Options* pOptions,
+                                  VSC_PROGRAM_RESOURCE_LAYOUT* pPgResourceLayout)
+{
+    VSC_OPTN_DumpOptions*               pDumpOption = VSC_OPTN_Options_GetDumpOptions(pOptions);
+    VSC_PROGRAM_RESOURCE_SET*           pResSet = gcvNULL;
+    VSC_PROGRAM_RESOURCE_BINDING*       pResBinding = gcvNULL;
+    VSC_PROGRAM_PUSH_CONSTANT_RANGE*    pPushCnstRange = gcvNULL;
+    gctUINT                             i, j;
+
+    if (!VSC_UTILS_MASK(VSC_OPTN_DumpOptions_GetOPTS(pDumpOption), VSC_OPTN_DumpOptions_DUMP_CG))
+    {
+        return;
+    }
+
+    /* Reset the dumper offset. */
+    (*pDumper->baseDumper.pOffset) = 0;
+
+    VIR_LOG(pDumper, "%s\n%s\nProgram resource layout.\n%s\n", VSC_TRACE_BAR_LINE, VSC_TRACE_STAR_LINE, VSC_TRACE_STAR_LINE);
+
+    /* Dump the resource sets. */
+    if (pPgResourceLayout->resourceSetCount != 0)
+    {
+        VERIFY_OK(VIR_LOG(pDumper, "/* Resource Sets. */\n"));
+    }
+
+    for (i = 0; i < pPgResourceLayout->resourceSetCount; i++)
+    {
+        pResSet = &pPgResourceLayout->pResourceSets[i];
+
+        for (j = 0; j < pResSet->resourceBindingCount; j++)
+        {
+            pResBinding = &pResSet->pResouceBindings[j];
+
+            VERIFY_OK(
+                VIR_LOG(pDumper, "set %d, binding %d: type=%d, arraySize=%d, stageBits=0x%x\n",
+                        pResBinding->shResBinding.set,
+                        pResBinding->shResBinding.binding,
+                        pResBinding->shResBinding.type,
+                        pResBinding->shResBinding.arraySize,
+                        pResBinding->stageBits));
+
+        }
+    }
+    VERIFY_OK(VIR_LOG(pDumper, "\n"));
+
+    /* Dump the push constants. */
+    if (pPgResourceLayout->pushConstantRangeCount != 0)
+    {
+        VERIFY_OK(VIR_LOG(pDumper, "/* Push Constants */\n"));
+    }
+
+    for (i = 0; i < pPgResourceLayout->pushConstantRangeCount; i++)
+    {
+        pPushCnstRange = &pPgResourceLayout->pPushConstantRanges[i];
+
+        VERIFY_OK(
+            VIR_LOG(pDumper, "entry %d: offset=%d, size=%d, stageBits=0x%x\n",
+                    i,
+                    pPushCnstRange->shPushConstRange.offset,
+                    pPushCnstRange->shPushConstRange.size,
+                    pPushCnstRange->stageBits));
+    }
+    VERIFY_OK(VIR_LOG(pDumper, "\n"));
+
+    VIR_LOG(pDumper, "%s\n", VSC_TRACE_BAR_LINE);
+    /* Flush the dumper. */
+    VIR_LOG_FLUSH(pDumper);
+}
+
 static gctBOOL _InitializeShResLayout(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
                                       VSC_PROGRAM_RESOURCE_LAYOUT* pPgResourceLayout,
                                       gctUINT shStage,
@@ -5907,6 +5977,8 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
 
             if (pPgLinkParam->pPgResourceLayout)
             {
+                _DumpProgramResLayout(&dumper, &options, pPgLinkParam->pPgResourceLayout);
+
                 if (_InitializeShResLayout(&pgLinkHelper.baseHelper, pPgLinkParam->pPgResourceLayout,
                                            stageIdx, &shResLayoutArray[stageIdx]))
                 {
