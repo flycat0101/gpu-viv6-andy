@@ -87,9 +87,9 @@ VSC_ErrCode vscVIR_CheckVariableUsage(VSC_SH_PASS_WORKER* pPassWorker);
 DECLARE_QUERY_PASS_PROP(vscVIR_CheckVariableUsage);
 DECLARE_SH_NECESSITY_CHECK(vscVIR_CheckVariableUsage);
 
-VSC_ErrCode vscVIR_FixTexldOffset(VSC_SH_PASS_WORKER* pPassWorker);
-DECLARE_QUERY_PASS_PROP(vscVIR_FixTexldOffset);
-DECLARE_SH_NECESSITY_CHECK(vscVIR_FixTexldOffset);
+VSC_ErrCode vscVIR_FixCoordWithOffset(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_FixCoordWithOffset);
+DECLARE_SH_NECESSITY_CHECK(vscVIR_FixCoordWithOffset);
 
 VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker);
 DECLARE_QUERY_PASS_PROP(vscVIR_InitializeVariables);
