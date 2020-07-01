@@ -39,6 +39,11 @@ sloCOMPILER_EmptyMemoryPool(
     IN gctBOOL     IsGeneralMemoryPool
     );
 
+gctBOOL
+sloCOMPILER_NeedCheckOutputLocationExist(
+    IN sloCOMPILER Compiler
+    );
+
 gceSTATUS
 sloCOMPILER_SetUnspecifiedOutputLocationExist(
     IN sloCOMPILER Compiler

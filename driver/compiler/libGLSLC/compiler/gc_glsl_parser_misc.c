@@ -12720,17 +12720,19 @@ slParseFullySpecifiedType(
                    }
                 }
                 else
-                { /* no location specified */
+                {
+                    /* no location specified */
                     status = sloCOMPILER_SetUnspecifiedOutputLocationExist(Compiler);
-                    if(gcmIS_ERROR(status))
+
+                    if (gcmIS_ERROR(status) && sloCOMPILER_NeedCheckOutputLocationExist(Compiler))
                     {
-                       gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                                                       TypeQualifier->lineNo,
-                                                       TypeQualifier->stringNo,
-                                                       slvREPORT_ERROR,
-                                                       "fragment shader's output location has to be explicitly specified"));
-                       gcmFOOTER_ARG("<return>=%s", "<nil>");
-                       return gcvNULL;
+                        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                                        TypeQualifier->lineNo,
+                                                        TypeQualifier->stringNo,
+                                                        slvREPORT_ERROR,
+                                                        "fragment shader's output location has to be explicitly specified"));
+                        gcmFOOTER_ARG("<return>=%s", "<nil>");
+                        return gcvNULL;
                     }
                 }
              }
@@ -12815,7 +12817,7 @@ slParseFullySpecifiedType(
            {
                status = sloCOMPILER_SetUnspecifiedOutputLocationExist(Compiler);
 
-               if(gcmIS_ERROR(status))
+               if(gcmIS_ERROR(status) && sloCOMPILER_NeedCheckOutputLocationExist(Compiler))
                {
                   gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                   TypeQualifier->lineNo,
