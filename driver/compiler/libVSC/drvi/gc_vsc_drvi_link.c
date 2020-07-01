@@ -214,6 +214,12 @@ gceSTATUS vscFinalizePEP(PROGRAM_EXECUTABLE_PROFILE* pPEP)
                                     pCtsHwMapping->ppExtraSamplerArray = gcvNULL;
                                 }
 
+                                if (pCtsHwMapping->ppYcbcrPlanes)
+                                {
+                                    gcoOS_Free(gcvNULL, pCtsHwMapping->ppYcbcrPlanes);
+                                    pCtsHwMapping->ppYcbcrPlanes = gcvNULL;
+                                }
+
                                 if (pCtsHwMapping->samplerHwMappingList.arraySize)
                                 {
                                     gcoOS_Free(gcvNULL, pCtsHwMapping->samplerHwMappingList.pPctsHmEntryIdxArray);

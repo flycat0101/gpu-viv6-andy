@@ -8853,12 +8853,13 @@ static VkResult halti5_helper_setDescSetCombinedImageSampler(
 
                 /* program YCbCr reompile plane img desc */
                 {
+                    uint32_t offset = arrayIdx * 3;
                     uint32_t planeIdx = 0;
 
                     for (planeIdx = 0; planeIdx < 3; planeIdx++)
                     {
                         uint32_t imageInfo[4];
-                        SHADER_PRIV_UAV_ENTRY *privEntry = samplerEntry->hwMappings[stageIdx].pYcbcrPlanes[planeIdx];
+                        SHADER_PRIV_UAV_ENTRY *privEntry = samplerEntry->hwMappings[stageIdx].ppYcbcrPlanes[offset + planeIdx];
                         if (privEntry)
                         {
                             uint32_t hwConstRegNo = privEntry->pBuffer->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo;
@@ -8867,7 +8868,7 @@ static VkResult halti5_helper_setDescSetCombinedImageSampler(
 
                             __VK_MEMCOPY(imageInfo, chipImgv->imgDesc[planeIdx * __VK_MAX_PARTS].imageInfo, sizeof(imageInfo));
 
-                            __VK_ASSERT(planeIdx == privEntry->uavEntryIndex);
+                            __VK_ASSERT(offset + planeIdx == privEntry->commonPrivm.privmKindIndex);
 
                             /* for ycbcr conversion, always is clamp to edge */
                             imageInfo[3] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?

@@ -1347,12 +1347,12 @@ _vscEP_Buffer_SaveVkCombTexSampHwMapping(
         VSC_IO_writeUint(pIoBuf, 0);
     }
 
-    for (i = 0; i < __YCBCR_PLANE_COUNT__; i++)
+    for (i = 0; i < (__YCBCR_PLANE_COUNT__ * ArraySize); i++)
     {
-        if (pCombTsHwMapping->pYcbcrPlanes[i] != gcvNULL)
+        if (pCombTsHwMapping->ppYcbcrPlanes[i] != gcvNULL)
         {
             VSC_IO_writeUint(pIoBuf, 1);
-            VSC_IO_writeUint(pIoBuf, pCombTsHwMapping->pYcbcrPlanes[i]->uavEntryIndex);
+            VSC_IO_writeUint(pIoBuf, pCombTsHwMapping->ppYcbcrPlanes[i]->uavEntryIndex);
         }
         else
         {
@@ -4203,17 +4203,23 @@ _vscEP_Buffer_LoadVkCombTexSampHwMapping(
         pCombTsHwMapping->ppExtraSamplerArray = gcvNULL;
     }
 
-    for (i = 0; i < __YCBCR_PLANE_COUNT__; i++)
+    if (uVal != 0 && ArraySize != 0)
+    {
+        VSC_EP_ALLOC_MEM(pCombTsHwMapping->ppYcbcrPlanes,
+                         SHADER_PRIV_UAV_ENTRY*,
+                         sizeof(SHADER_PRIV_UAV_ENTRY*) * ArraySize);
+    }
+    for (i = 0; i < (__YCBCR_PLANE_COUNT__ * ArraySize); i++)
     {
         VSC_IO_readUint(pIoBuf, &uVal);
         if (uVal != 0)
         {
             VSC_IO_readUint(pIoBuf, &uVal);
-            pCombTsHwMapping->pYcbcrPlanes[i] = &pSep->staticPrivMapping.privUavMapping.pPrivUavEntries[uVal];
+            pCombTsHwMapping->ppYcbcrPlanes[i] = &pSep->staticPrivMapping.privUavMapping.pPrivUavEntries[uVal];
         }
         else
         {
-            pCombTsHwMapping->pYcbcrPlanes[i] = gcvNULL;
+            pCombTsHwMapping->ppYcbcrPlanes[i] = gcvNULL;
         }
     }
 

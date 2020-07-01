@@ -567,7 +567,7 @@ typedef struct PROG_VK_COMBINED_TEXTURE_SAMPLER_HW_MAPPING
     SHADER_PRIV_SAMPLER_ENTRY**                 ppExtraSamplerArray;
 
     /* For the ycbcr texture recompilation. */
-    SHADER_PRIV_UAV_ENTRY*                      pYcbcrPlanes[__YCBCR_PLANE_COUNT__];
+    SHADER_PRIV_UAV_ENTRY**                     ppYcbcrPlanes;
 
     /* For the case that HW natively supports separated texture, so texture part of API
        combined texture sampler will be directly mapped to HW separated texture */

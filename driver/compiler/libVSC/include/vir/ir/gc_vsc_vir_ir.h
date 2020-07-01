@@ -4464,9 +4464,11 @@ struct _VIR_UNIFORM
             VIR_SymId       texelBufferToImageSymId;
 
             /*
-            ** The plane image uniform for a ycbcr sampler.
+            ** Pointer to array of plane image uniform for a ycbcr sampler.
+            ** Size of the array is sampler array size * __YCBCR_PLANE_COUNT__
+            ** If sampler is not an array, the sampler array size is 1
             */
-            VIR_SymId       ycbcrPlaneSymId[__YCBCR_PLANE_COUNT__];
+            VIR_SymId       *pYcbcrPlaneSymId;
 
             /* The sampled image symbol ID. */
             VIR_SymId       sampledImageSymId;
