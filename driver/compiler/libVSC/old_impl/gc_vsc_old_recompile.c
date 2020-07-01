@@ -5373,6 +5373,7 @@ _LoadCLPatchLongULongLibrary(
     gctSTRING   log = gcvNULL;
     gctINT      i;
     gctBOOL     locked = gcvFALSE;
+    gctBOOL     libFileInitialized = gcvFALSE;
     gcSHADER    library;
     gctBOOL     rewriteFile = gcvFALSE;
 
@@ -5400,6 +5401,7 @@ _LoadCLPatchLongULongLibrary(
         if ((gcmOPT_LibShaderFile() == 1) || (gcmOPT_LibShaderFile() == 2))
         {
             gcmONERROR(gcInitializeLibFile());
+            libFileInitialized = gcvTRUE;
 
             if (gcmOPT_LibShaderFile() == 2)
             {
@@ -5412,7 +5414,6 @@ _LoadCLPatchLongULongLibrary(
                 {
                     gcoOS_Print("gcSHADER_ReadPatchLibFromFile Error:%d\n", status);
                 }
-                gcmONERROR(gcFinalizeLibFile());
             }
         }
 
@@ -5461,7 +5462,6 @@ _LoadCLPatchLongULongLibrary(
                 {
                     gcoOS_Print("gcSHADER_WriteBuiltinLibToFile Error:%d\n", status);
                 }
-                gcmONERROR(gcFinalizeLibFile());
             }
         }
     }
@@ -5476,6 +5476,11 @@ OnError:
     if (log)
     {
         gcmOS_SAFE_FREE(gcvNULL, log);
+    }
+
+    if(libFileInitialized)
+    {
+        gcmVERIFY_OK(gcFinalizeLibFile());
     }
 
     if (locked)
