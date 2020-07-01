@@ -3111,7 +3111,7 @@ int_value_type0_const_24(
 /* If dest data type rank higher than the src, set src to constant zero
    other nop the instruction */
 static gctBOOL
-_destTypeRankHigher_setSrcToZero_elseNop(
+_destUnsignedRankHigher_setSrcToZero_elseNop(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
     IN VIR_Operand        *Opnd
@@ -3121,36 +3121,38 @@ _destTypeRankHigher_setSrcToZero_elseNop(
     VIR_PrimitiveTypeId format, srcFormat;
     gctBOOL rankHigher = gcvFALSE;
 
-    format = VIR_GetTypeComponentType(VIR_Lower_GetBaseType(Context->shader, dest));
-    srcFormat = VIR_GetTypeComponentType(VIR_Lower_GetBaseType(Context->shader, Opnd));
-    switch(format) {
-    case VIR_TYPE_INT8:
-    case VIR_TYPE_UINT8:
-    case VIR_TYPE_BOOLEAN:
-        break;
+    if(VIR_TypeId_isUnSignedInteger(VIR_Operand_GetTypeId(dest))) {
+        format = VIR_GetTypeComponentType(VIR_Lower_GetBaseType(Context->shader, dest));
+        srcFormat = VIR_GetTypeComponentType(VIR_Lower_GetBaseType(Context->shader, Opnd));
+        switch(format) {
+        case VIR_TYPE_INT8:
+        case VIR_TYPE_UINT8:
+        case VIR_TYPE_BOOLEAN:
+            break;
 
-    case VIR_TYPE_INT16:
-    case VIR_TYPE_UINT16:
-    case VIR_TYPE_FLOAT16:
-        if(srcFormat == VIR_TYPE_INT8 ||
-           srcFormat == VIR_TYPE_UINT8 ||
-           srcFormat == VIR_TYPE_BOOLEAN) {
-            rankHigher = gcvTRUE;
+        case VIR_TYPE_INT16:
+        case VIR_TYPE_UINT16:
+        case VIR_TYPE_FLOAT16:
+            if(srcFormat == VIR_TYPE_INT8 ||
+               srcFormat == VIR_TYPE_UINT8 ||
+               srcFormat == VIR_TYPE_BOOLEAN) {
+                rankHigher = gcvTRUE;
+            }
+            break;
+
+        case VIR_TYPE_INT32:
+        case VIR_TYPE_UINT32:
+        case VIR_TYPE_FLOAT32:
+            if(srcFormat != VIR_TYPE_INT32 ||
+               srcFormat != VIR_TYPE_UINT32 ||
+               srcFormat != VIR_TYPE_FLOAT32) {
+                rankHigher = gcvTRUE;
+            }
+            break;
+
+        default:
+           break;
         }
-        break;
-
-    case VIR_TYPE_INT32:
-    case VIR_TYPE_UINT32:
-    case VIR_TYPE_FLOAT32:
-        if(srcFormat != VIR_TYPE_INT32 &&
-           srcFormat != VIR_TYPE_UINT32 &&
-           srcFormat != VIR_TYPE_FLOAT32) {
-            rankHigher = gcvTRUE;
-        }
-        break;
-
-    default:
-       break;
     }
 
     if(rankHigher) {
@@ -3164,6 +3166,61 @@ _destTypeRankHigher_setSrcToZero_elseNop(
                                  imm0);
         components = VIR_GetTypeComponents(VIR_Operand_GetTypeId(dest));
         VIR_Operand_SetTypeId(dest, VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_UINT32, components, 1));
+    }
+    else
+    {
+        VIR_Inst_SetOpcode(Inst, VIR_OP_NOP);
+        VIR_Inst_SetConditionOp(Inst, VIR_COP_ALWAYS);
+        VIR_Inst_SetSrcNum(Inst, 0);
+        VIR_Inst_SetDest(Inst, gcvNULL);
+    }
+    return gcvTRUE;
+}
+
+/* If dest data type is signed rank higher than the src, set src to shift count
+   other nop the instruction */
+static gctBOOL
+_destSignedRankHigher_setSrcToShiftCount_elseNop(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand *dest = VIR_Inst_GetDest(Inst);
+    VIR_PrimitiveTypeId format, srcFormat;
+    gctUINT shiftCount = 0;
+
+    if(VIR_TypeId_isSignedInteger(VIR_Operand_GetTypeId(dest))) {
+        format = VIR_GetTypeComponentType(VIR_Lower_GetBaseType(Context->shader, dest));
+        srcFormat = VIR_GetTypeComponentType(VIR_Lower_GetBaseType(Context->shader, Opnd));
+        switch(format) {
+        case VIR_TYPE_INT16:
+            if(srcFormat == VIR_TYPE_INT8) {
+                shiftCount = 8;
+            }
+            break;
+
+        case VIR_TYPE_INT32:
+            if(srcFormat == VIR_TYPE_INT8) {
+                shiftCount = 24;
+            }
+            else if(srcFormat == VIR_TYPE_INT16) {
+                shiftCount = 16;
+            }
+            break;
+
+        default:
+           break;
+        }
+    }
+
+    if(shiftCount) {
+        VIR_ScalarConstVal imm0;
+
+        imm0.uValue = shiftCount;
+        VIR_Operand_SetImmediate(Opnd,
+                                 VIR_TYPE_UINT32,
+                                 imm0);
     }
     else
     {
@@ -7840,8 +7897,10 @@ static VIR_PatternMatchInst _convPatInst14[] = {
 };
 
 static VIR_PatternReplaceInst _convRepInst14[] = {
-    { VIR_OP_MOV, 0, 0, { 1, 2, 0, 0 }, { _reset_sat_rounding, _destTypeRankHigher_setSrcToZero_elseNop } },
+    { VIR_OP_MOV, 0, 0, { 1, 2, 0, 0 }, { _reset_sat_rounding, _destUnsignedRankHigher_setSrcToZero_elseNop } },
     { VIR_OP_SWIZZLE, 0, 0, { 1, 2, 2, 2 }, { _reset_sat_rounding, _equatePackedTypeForDestOrSrc, _setConvPackedSwizzle, _setConvPackedMaskValue } },
+    { VIR_OP_LSHIFT, 0, 0, { -1, 1, 2, 0 }, { 0, 0, _destSignedRankHigher_setSrcToShiftCount_elseNop } },
+    { VIR_OP_RSHIFT, 0, 0, { 1, -1, 2, 0 }, { 0, VIR_Lower_SkipOperand, _destSignedRankHigher_setSrcToShiftCount_elseNop } },
 };
 
 static VIR_PatternMatchInst _convPatInst15[] = {

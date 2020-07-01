@@ -12,6 +12,7 @@
 
 
 #include "vir/lower/gc_vsc_vir_pattern.h"
+#include "vir/lower/gc_vsc_vir_lower_common_func.h"
 
 #define VIR_DEBUG_PATTERN 0
 
@@ -821,6 +822,10 @@ _Pattern_ReplaceNormal(
                     gcmASSERT(Context->tmpRegSymbol[regNo] != gcvNULL);
                     opnd = _Pattern_GetTempOperandByPattern(replacedPtnInst, ptnOpnd, insertedInst);
                 }
+                if(!opnd && replacedPtnInst->function[j] == VIR_Lower_SkipOperand )
+                {
+                    continue;
+                }
             }
             else
             {
@@ -1344,7 +1349,7 @@ VIR_Pattern_Transform(
         func = funcNode->function;
 
         errCode = _Pattern_TransformByFunction(Context, func);
-        if (errCode != VSC_ERR_NONE)        break;
+        if (errCode != VSC_ERR_NONE) break;
     }
     return errCode;
 }

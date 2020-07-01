@@ -1660,6 +1660,16 @@ VIR_Lower_MatchDual16Req(
     return gcvTRUE;
 }
 
+gctBOOL
+VIR_Lower_SkipOperand(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    return gcvTRUE;
+}
+
 /* JMP check functions. */
 gctBOOL
 VIR_Lower_label_only_one_jmp(
