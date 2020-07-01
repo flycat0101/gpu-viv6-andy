@@ -466,7 +466,7 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
     gctBOOL                         bUseUniqueNearestDef = gcvFALSE;
     gctBOOL                         bHandleModifier = (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetOPTS(options), VSC_OPTN_CPPOptions_HANDLE_MODIFIER));
     gctBOOL                         bIsUsageSrcNeg = gcvFALSE, bIsUsageSrcAbs = gcvFALSE;
-    gctBOOL                         bIsMovSrcNeg = gcvFALSE, bIsMovSrcAbs = gcvFALSE;
+    gctBOOL                         bMovSrcNegAbsOnly = gcvFALSE, bIsMovSrcNeg = gcvFALSE, bIsMovSrcAbs = gcvFALSE;
     gctBOOL                         bSetNeg = gcvFALSE, bSetAbs = gcvFALSE;
 
     do
@@ -620,6 +620,28 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
 
             VIR_Operand_GetOperandInfo(defInst, movSrc, &movSrcInfo);
 
+            /* Get the ABS/NEG status. */
+            bMovSrcNegAbsOnly = _VSC_CPP_IsSrcAbsOrNegOnly(movSrc, &bIsMovSrcAbs, &bIsMovSrcNeg);
+
+            /* Usage source ABS: we can ignore the modifier of the MOV source, just use the modifier of usage source. */
+            if (bIsUsageSrcAbs)
+            {
+                bSetAbs = gcvTRUE;
+                bSetNeg = bIsUsageSrcNeg;
+            }
+            /* Usage source Neg: Use the ABS of the MOV source, and inverse the NEG of the MOV source. */
+            else if (bIsUsageSrcNeg)
+            {
+                bSetAbs = bIsMovSrcAbs;
+                bSetNeg = !bIsMovSrcNeg;
+            }
+            /* Usage none: just use the modifier of the MOV source. */
+            else
+            {
+                bSetAbs = bIsMovSrcAbs;
+                bSetNeg = bIsMovSrcNeg;
+            }
+
             if (movSrcInfo.isOutputParm && VIR_Shader_GetLevel(cpp->shader) < VIR_SHLEVEL_Pre_Low)
             {
                 /* do not copy output parameter to its use before Lowlevel, so the inliner
@@ -686,6 +708,7 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                         break;
                     }
                 }
+
                 /* update the DU, remove the usage of srcOpnd */
                 vscVIR_DeleteUsage(VSC_CPP_GetDUInfo(cpp),
                                    defInst,
@@ -700,8 +723,35 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
 
                 /* duplicate movSrc */
                 VIR_Function_DupOperand(func, movSrc, &newSrc);
+
+                /* Use the component type for a immediate. */
+                if (VIR_Operand_isImm(newSrc))
+                {
+                    VIR_Operand_SetTypeId(newSrc, VIR_GetTypeComponentType(VIR_Operand_GetTypeId(srcOpnd)));
+                }
+                else
+                {
+                    VIR_Operand_SetTypeId(newSrc, VIR_Operand_GetTypeId(srcOpnd));
+                }
+
                 VIR_Operand_SetLShift(newSrc, VIR_Operand_GetLShift(srcOpnd));
-                VIR_Operand_SetTypeId(newSrc, VIR_Operand_GetTypeId(srcOpnd));
+                VIR_Operand_SetModifier(newSrc, VIR_Operand_GetModifier(srcOpnd));
+
+                /* Update the modifier. */
+                if (bSetAbs)
+                {
+                    VIR_Operand_SetOneModifier(newSrc, VIR_MOD_ABS);
+                }
+                else
+                {
+                    VIR_Operand_ClrOneModifier(newSrc, VIR_MOD_ABS);
+                }
+
+                VIR_Operand_ClrOneModifier(newSrc, VIR_MOD_NEG);
+                if (bSetNeg)
+                {
+                    VIR_Operand_NegateOperand(shader, newSrc);
+                }
 
                 /* we need to map swizzle for a vector constant. */
                 if (movSrcInfo.isVecConst)
@@ -872,6 +922,37 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                     break;
                 }
 
+                /* if UsageSrc or movSrc has modifier, check the type and opcode
+                 */
+                if (bHandleModifier)
+                {
+                    /* Check the source's modifier, so far we can only support NEG and ABS. */
+                    if (bMovSrcNegAbsOnly)
+                    {
+                        if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                        {
+                            VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                            VIR_LOG(dumper, "[FW] ==> bail out because of Neg/Abs Modifier Only");
+                            VIR_LOG_FLUSH(dumper);
+                        }
+                        break;
+                    }
+
+                    if (bIsUsageSrcNeg || bIsUsageSrcAbs || bIsMovSrcAbs || bIsMovSrcNeg)
+                    {
+                        if (ty0 != ty1)
+                        {
+                            if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                            {
+                                VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                                VIR_LOG(dumper, "[FW] ==> bail out because of movSrc and UsageSrc not same type");
+                                VIR_LOG_FLUSH(dumper);
+                            }
+                            break;
+                        }
+                    }
+                }
+
                 if (VIR_Operand_GetOpKind(movDst) != VIR_OPND_SYMBOL || VIR_Operand_GetOpKind(movSrc) != VIR_OPND_SYMBOL)
                 {
                     if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
@@ -914,34 +995,7 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                 }
 
                 /* Check if we neend to handle the modifier. */
-                if (bHandleModifier)
-                {
-                    /* Check the source's modifier, so far we can only support NEG and ABS. */
-                    if (_VSC_CPP_IsSrcAbsOrNegOnly(movSrc, &bIsMovSrcAbs, &bIsMovSrcNeg))
-                    {
-                        break;
-                    }
-
-                    /* Usage source ABS: we can ignore the modifier of the MOV source, just use the modifier of usage source. */
-                    if (bIsUsageSrcAbs)
-                    {
-                        bSetAbs = gcvTRUE;
-                        bSetNeg = bIsUsageSrcNeg;
-                    }
-                    /* Usage source Neg: Use the ABS of the MOV source, and inverse the NEG of the MOV source. */
-                    else if (bIsUsageSrcNeg)
-                    {
-                        bSetAbs = bIsMovSrcAbs;
-                        bSetNeg = !bIsMovSrcNeg;
-                    }
-                    /* Usage none: just use the modifier of the MOV source. */
-                    else
-                    {
-                        bSetAbs = bIsMovSrcAbs;
-                        bSetNeg = bIsMovSrcNeg;
-                    }
-                }
-                else if (VIR_Operand_GetModifier(movSrc) != VIR_MOD_NONE)
+                if (!bHandleModifier && VIR_Operand_GetModifier(movSrc) != VIR_MOD_NONE)
                 {
                     continue;
                 }
@@ -1222,13 +1276,11 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                         {
                             VIR_Operand_ClrOneModifier(newSrc, VIR_MOD_ABS);
                         }
+
+                        VIR_Operand_ClrOneModifier(newSrc, VIR_MOD_NEG);
                         if (bSetNeg)
                         {
-                            VIR_Operand_SetOneModifier(newSrc, VIR_MOD_NEG);
-                        }
-                        else
-                        {
-                            VIR_Operand_ClrOneModifier(newSrc, VIR_MOD_NEG);
+                            VIR_Operand_NegateOperand(shader, newSrc);
                         }
                     }
 
