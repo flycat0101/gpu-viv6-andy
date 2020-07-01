@@ -1841,6 +1841,8 @@ _SetHardwareOptions(
         options->secureMode = gcvSECURE_IN_NORMAL;
     }
 
+    options->hasShader = database->NumShaderCores;
+
     return;
 }
 
