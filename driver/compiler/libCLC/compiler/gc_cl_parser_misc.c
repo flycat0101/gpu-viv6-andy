@@ -5444,7 +5444,7 @@ IN cloIR_EXPR Operand
   else {
       if((decl->dataType->type == T_HALF ||
          Operand->decl.dataType->type == T_HALF) &&
-         !clmDECL_IsPointerType(decl) &&
+         !(clmDECL_IsPointerType(decl) || clmDECL_IsPointerType(&Operand->decl)) &&
          !cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX | clvEXTENSION_CL_KHR_FP16)) {
            gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                                            Operand->base.lineNo,
