@@ -470,6 +470,12 @@ VIR_Lower_HasNoHalti4(
     );
 
 gctBOOL
+VIR_Lower_HasNoFloatingMadFix(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
 VIR_Lower_SetImm0xFFFF(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,

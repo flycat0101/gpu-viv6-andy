@@ -909,20 +909,23 @@ _VSC_CPF_AndFlow(
 {
     gctUINT i;
     gctBOOL changed = gcvFALSE;
+    VSC_CPF_LATTICE dstLattice, srcLattice;
 
     for (i = 0; i < pCPF->flowSize; i ++)
     {
-        if (_VSC_CPF_DF_GetLattice(dstFlow, i) == VSC_CPF_NOT_CONSTANT)
+        dstLattice = _VSC_CPF_DF_GetLattice(dstFlow, i);
+        if (dstLattice == VSC_CPF_NOT_CONSTANT)
         {
             continue;
         }
-        else if (_VSC_CPF_DF_GetLattice(srcFlow, i) == VSC_CPF_NOT_CONSTANT)
+
+        srcLattice = _VSC_CPF_DF_GetLattice(srcFlow, i);
+        if (srcLattice == VSC_CPF_NOT_CONSTANT)
         {
             _VSC_CPF_DF_SetLatticeNotConst(dstFlow, i);
             changed = gcvTRUE;
         }
-        else if (_VSC_CPF_DF_GetLattice(dstFlow, i) == VSC_CPF_CONSTANT &&
-                 _VSC_CPF_DF_GetLattice(srcFlow, i) == VSC_CPF_CONSTANT)
+        else if (dstLattice == VSC_CPF_CONSTANT && srcLattice == VSC_CPF_CONSTANT)
         {
             /* this is "AND" all predecessors' (src) OUT to get IN (dst),
                thus src is not isIN, dst is isIN */
@@ -936,14 +939,14 @@ _VSC_CPF_AndFlow(
                 changed = gcvTRUE;
             }
         }
-        else if (_VSC_CPF_DF_GetLattice(srcFlow, i) == VSC_CPF_UNDEFINE)
+        else if (srcLattice == VSC_CPF_UNDEFINE)
         {
             continue;
         }
-        else if (_VSC_CPF_DF_GetLattice(dstFlow, i) == VSC_CPF_UNDEFINE)
+        else if (dstLattice == VSC_CPF_UNDEFINE)
         {
             VSC_CPF_Const   *srcConstVal = _VSC_CPF_GetConstVal(pCPF, srcBBId, i, gcvFALSE);
-            gcmASSERT(_VSC_CPF_DF_GetLattice(srcFlow, i) == VSC_CPF_CONSTANT);
+            gcmASSERT(srcLattice == VSC_CPF_CONSTANT);
             gcmASSERT(srcConstVal != gcvNULL);
             _VSC_CPF_SetConst(pCPF, dstFlow, dstBBId, i, gcvTRUE, srcConstVal->value, srcConstVal->type);
             changed = gcvTRUE;

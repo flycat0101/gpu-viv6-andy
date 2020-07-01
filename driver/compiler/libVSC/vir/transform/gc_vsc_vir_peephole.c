@@ -3248,6 +3248,7 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
     VSC_HASH_TABLE* def_inst_set1 = gcvNULL;
     gctBOOL invalid_case = gcvFALSE;
     gctBOOL is_mulsat = VIR_Inst_GetOpcode(mul) == VIR_OP_MULSAT;
+    gctBOOL bIsFloatInst = gcvFALSE;
 
     if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MAD))
     {
@@ -3268,6 +3269,17 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
             VIR_LOG_FLUSH(dumper);
         }
         if(generated != gcvNULL)
+        {
+            *generated = gcvFALSE;
+        }
+        return errCode;
+    }
+
+    /* Skip if this chip can't support the floating MAD. */
+    bIsFloatInst = VIR_TypeId_isFloat(VIR_Operand_GetTypeId(mul_dest));
+    if (!VSC_PH_Peephole_GetHwCfg(ph)->hwFeatureFlags.hasFloatingMadFix && bIsFloatInst)
+    {
+        if (generated != gcvNULL)
         {
             *generated = gcvFALSE;
         }

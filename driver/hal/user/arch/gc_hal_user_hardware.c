@@ -2912,6 +2912,8 @@ _FillInFeatureTable(
         Features[gcvFEATURE_MAX_POINTSIZE_CLAMP] = gcvTRUE;
     }
 
+    Features[gcvFEATURE_SH_VX2_FLOATING_MAD_FIX] = database->SH_VX2_FLOATING_MAD_FIX;
+
 #if gcdENABLE_2D
     Fill2DFeaturesByDatabase(Hardware, Features);
 #endif
