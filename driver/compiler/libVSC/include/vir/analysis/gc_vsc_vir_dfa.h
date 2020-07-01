@@ -299,9 +299,10 @@ VSC_ErrCode vscVIR_DoBackwardIterativeMsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_MS_DFA
 #define VIR_IS_IMPLICIT_DEF_INST(pDefInst)     ((pDefInst) == VIR_HW_SPECIAL_DEF_INST ||           \
                                                 (pDefInst) == VIR_INPUT_DEF_INST)
 
-#define VIR_IS_OUTPUT_USAGE_INST(pUsageInst)   ((pUsageInst) == VIR_OUTPUT_USAGE_INST           || \
-                                                VIR_Inst_GetOpcode((pUsageInst)) == VIR_OP_EMIT0 || \
-                                                VIR_Inst_GetOpcode((pUsageInst)) == VIR_OP_EMIT)
+#define VIR_IS_OUTPUT_USAGE_INST(pUsageInst)   ((pUsageInst) == VIR_OUTPUT_USAGE_INST               || \
+                                                VIR_Inst_GetOpcode((pUsageInst)) == VIR_OP_EMIT0    || \
+                                                VIR_Inst_GetOpcode((pUsageInst)) == VIR_OP_EMIT     || \
+                                                VIR_Inst_GetOpcode((pUsageInst)) == VIR_OP_EMIT_STREAM)
 
 #define VIR_IS_IMPLICIT_USAGE_INST(pUsageInst) ((pUsageInst) == VIR_OUTPUT_USAGE_INST)
 #define VIR_IS_SPECIAL_INST(pDefInst)          ((pDefInst) == VIR_ANY_DEF_INST        || \
@@ -496,11 +497,6 @@ typedef struct _VIR_USAGE
 #define IS_VALID_USAGE(pUsage)                                              \
     ((pUsage)->usageKey.pUsageInst != gcvNULL &&                            \
      (pUsage)->usageKey.pOperand != VIR_INVALID_USAGE_OPERAND)
-
-#define IS_OUTPUT_USAGE(pUsage)                                             \
-    ((pUsage)->usageKey.pUsageInst == VIR_OUTPUT_USAGE_INST              || \
-     VIR_Inst_GetOpcode((pUsage)->usageKey.pUsageInst) == VIR_OP_EMIT0    || \
-     VIR_Inst_GetOpcode((pUsage)->usageKey.pUsageInst) == VIR_OP_EMIT)
 
 typedef enum _VIR_WEB_TYPE
 {

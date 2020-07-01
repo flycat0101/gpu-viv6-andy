@@ -13902,7 +13902,7 @@ slParseLayoutId(
            }
            else if (layoutIdExt & slvLAYOUT_EXT_GS_STREAM)
            {
-               if (Value->u.constant.intValue <= 0)
+               if (Value->u.constant.intValue < 0)
                {
                    gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                    LayoutId->lineNo,

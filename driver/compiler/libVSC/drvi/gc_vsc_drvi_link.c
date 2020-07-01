@@ -9279,7 +9279,7 @@ static VSC_ErrCode _AnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
                                      _AnalyzeHwUSCSizeForGs(baseMaxThreadCount[VSC_GFX_SHADER_STAGE_GS],
                                                             realUSCThreshold[VSC_GFX_SHADER_STAGE_GS],
                                                             maxHwTGThreadCount,
-                                                            gcvFALSE,
+                                                            pSEP->exeHints.nativeHints.prvStates.gs.bHasStreamOut,
                                                             pSEP->exeHints.derivedHints.prvStates.gs.bHasPrimRestartOp,
                                                             i,
                                                             gcvTRUE,

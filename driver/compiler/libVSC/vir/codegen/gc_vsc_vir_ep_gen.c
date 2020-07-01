@@ -2539,6 +2539,8 @@ static void _CollectExeHints(VSC_SHADER_COMPILER_PARAM* pCompilerParam, VSC_SEP_
                                        &pOutSEP->exeHints.nativeHints.prvStates.gs.inputPrim,
                                        &pOutSEP->exeHints.nativeHints.prvStates.gs.inputVtxCount,
                                        &pOutSEP->exeHints.nativeHints.prvStates.gs.outputPrim);
+
+        pOutSEP->exeHints.nativeHints.prvStates.gs.bHasStreamOut = VIR_Shader_GS_HasStreamOut(pShader);
     }
 
     if (pShader->shaderKind == VIR_SHADER_COMPUTE)
