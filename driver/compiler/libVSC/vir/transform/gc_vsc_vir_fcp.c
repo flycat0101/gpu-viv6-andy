@@ -1558,8 +1558,6 @@ _ProcessModOrder(
     VIR_Operand*        pOpnd = gcvNULL;
     VIR_TypeId          opndTypeId = VIR_TYPE_UNKNOWN;
     VIR_OperandKind     opndKind;
-    VIR_ModifierOrder   modOrder = VIR_MODORDER_NONE;
-    VIR_ModifierOrder   hwModOrder = VIR_MODORDER_ABS_NEG;
     gctBOOL             bHasAbs = gcvFALSE, bHasNeg = gcvFALSE;
     gctUINT             i;
 
@@ -1578,7 +1576,6 @@ _ProcessModOrder(
 
         opndTypeId = VIR_Operand_GetTypeId(pOpnd);
         opndKind = (VIR_OperandKind)VIR_Operand_GetOpKind(pOpnd);
-        modOrder = (VIR_ModifierOrder)VIR_Operand_GetModOrder(pOpnd);
         bHasAbs = VIR_Operand_GetModifier(pOpnd) & VIR_MOD_ABS;
         bHasNeg = VIR_Operand_GetModifier(pOpnd) & VIR_MOD_NEG;
 
@@ -1592,28 +1589,12 @@ _ProcessModOrder(
 
             if (bHasAbs && bHasNeg)
             {
-                if (modOrder == VIR_MODORDER_ABS_NEG)
-                {
-                    VIR_ScalarConstVal_GetAbs(opndTypeId,
-                                              &VIR_Operand_GetScalarImmediate(pOpnd),
-                                              &VIR_Operand_GetScalarImmediate(pOpnd));
-                    VIR_ScalarConstVal_GetNeg(opndTypeId,
-                                              &VIR_Operand_GetScalarImmediate(pOpnd),
-                                              &VIR_Operand_GetScalarImmediate(pOpnd));
-                }
-                else if (modOrder == VIR_MODORDER_NEG_ABS)
-                {
-                    VIR_ScalarConstVal_GetNeg(opndTypeId,
-                                              &VIR_Operand_GetScalarImmediate(pOpnd),
-                                              &VIR_Operand_GetScalarImmediate(pOpnd));
-                    VIR_ScalarConstVal_GetAbs(opndTypeId,
-                                              &VIR_Operand_GetScalarImmediate(pOpnd),
-                                              &VIR_Operand_GetScalarImmediate(pOpnd));
-                }
-                else
-                {
-                    gcmASSERT(gcvFALSE);
-                }
+                VIR_ScalarConstVal_GetAbs(opndTypeId,
+                                          &VIR_Operand_GetScalarImmediate(pOpnd),
+                                          &VIR_Operand_GetScalarImmediate(pOpnd));
+                VIR_ScalarConstVal_GetNeg(opndTypeId,
+                                          &VIR_Operand_GetScalarImmediate(pOpnd),
+                                          &VIR_Operand_GetScalarImmediate(pOpnd));
             }
             else if (bHasAbs)
             {
@@ -1629,7 +1610,6 @@ _ProcessModOrder(
                                           &VIR_Operand_GetScalarImmediate(pOpnd));
             }
 
-            VIR_Operand_SetModOrder(pOpnd, VIR_MODORDER_NONE);
             if (bHasAbs)
             {
                 VIR_Operand_SetModifier(pOpnd, VIR_MOD_ABS ^ VIR_Operand_GetModifier(pOpnd));
@@ -1639,137 +1619,8 @@ _ProcessModOrder(
                 VIR_Operand_SetModifier(pOpnd, VIR_MOD_NEG ^ VIR_Operand_GetModifier(pOpnd));
             }
         }
-        else if (opndKind == VIR_OPND_SYMBOL)
-        {
-            VIR_Instruction*    pNewInst = gcvNULL;
-            VIR_Operand*        pNewOpnd = gcvNULL;
-            VIR_VirRegId        regId;                     /* newly created temp reg id */
-            VIR_SymId           regSymId;
-            VIR_TypeId          regTypeId;
-            VIR_Enable          newEnable;
-            VIR_Swizzle         newSwizzle;
-            VIR_OperandInfo     srcOpndInfo;
-
-            /* Skip only one modifer. */
-            if (!bHasAbs || !bHasNeg)
-            {
-                continue;
-            }
-
-            /* Skip the modifier order that HW can accept. */
-            if (modOrder == hwModOrder)
-            {
-                continue;
-            }
-
-            VIR_Operand_GetOperandInfo(pInst, pOpnd, &srcOpndInfo);
-
-            /* Add a new vreg. */
-            regId = VIR_Shader_NewVirRegId(pShader, 1);
-            regTypeId = VIR_Operand_GetTypeId(pOpnd);
-            newEnable = VIR_TypeId_Conv2Enable(regTypeId);
-            newSwizzle = VIR_TypeId_Conv2Swizzle(regTypeId);
-            errCode = VIR_Shader_AddSymbol(pShader,
-                                           VIR_SYM_VIRREG,
-                                           regId,
-                                           VIR_Shader_GetTypeFromId(pShader, regTypeId),
-                                           VIR_STORAGE_UNKNOWN,
-                                           &regSymId);
-            ON_ERROR(errCode, "Fail to add symbol.");
-
-            if (modOrder == VIR_MODORDER_ABS_NEG || modOrder == VIR_MODORDER_NEG_ABS)
-            {
-                /* Insert a MOV, newReg, src.abs/src.neg */
-                errCode = VIR_Function_AddInstructionBefore(pFunc,
-                                                            VIR_OP_MOV,
-                                                            regTypeId,
-                                                            pInst,
-                                                            gcvTRUE,
-                                                            &pNewInst);
-                pNewOpnd = VIR_Inst_GetDest(pNewInst);
-                VIR_Operand_SetSymbol(pNewOpnd, pFunc, regSymId);
-                VIR_Operand_SetEnable(pNewOpnd, newEnable);
-
-                pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
-                VIR_Operand_Copy(pNewOpnd, pOpnd);
-                if (modOrder == VIR_MODORDER_ABS_NEG)
-                {
-                    VIR_Operand_SetModifier(pNewOpnd, VIR_MOD_NEG ^ VIR_Operand_GetModifier(pNewOpnd));
-                }
-                else
-                {
-                    VIR_Operand_SetModifier(pNewOpnd, VIR_MOD_ABS ^ VIR_Operand_GetModifier(pNewOpnd));
-                }
-
-                /* Add def. */
-                vscVIR_AddNewDef(pDuInfo,
-                                 pNewInst,
-                                 regId,
-                                 1,
-                                 newEnable,
-                                 VIR_HALF_CHANNEL_MASK_FULL,
-                                 gcvNULL,
-                                 gcvNULL);
-                /* Add usage. */
-                vscVIR_AddNewUsageToDef(pDuInfo,
-                                        VIR_ANY_DEF_INST,
-                                        pNewInst,
-                                        pNewOpnd,
-                                        gcvFALSE,
-                                        regId,
-                                        1,
-                                        newEnable,
-                                        VIR_HALF_CHANNEL_MASK_FULL,
-                                        gcvNULL);
-                if (srcOpndInfo.isVreg)
-                {
-                    /* Delete the old usage. */
-                    vscVIR_DeleteUsage(pDuInfo,
-                                       VIR_ANY_DEF_INST,
-                                       pInst,
-                                       pOpnd,
-                                       gcvFALSE,
-                                       srcOpndInfo.u1.virRegInfo.virReg,
-                                       1,
-                                       VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pOpnd)),
-                                       VIR_HALF_CHANNEL_MASK_FULL,
-                                       gcvNULL);
-                }
-
-                /* Change the original operand from src.abs.neg to newReg.neg/newReg.abs */
-                VIR_Operand_SetSymbol(pOpnd, pFunc, regSymId);
-                VIR_Operand_SetSwizzle(pOpnd, newSwizzle);
-                if (modOrder == VIR_MODORDER_ABS_NEG)
-                {
-                    VIR_Operand_SetModifier(pOpnd, VIR_MOD_ABS ^ VIR_Operand_GetModifier(pOpnd));
-                }
-                else
-                {
-                    VIR_Operand_SetModifier(pOpnd, VIR_MOD_NEG ^ VIR_Operand_GetModifier(pOpnd));
-                }
-
-                /* Add usage. */
-                vscVIR_AddNewUsageToDef(pDuInfo,
-                                        pNewInst,
-                                        pInst,
-                                        pOpnd,
-                                        gcvFALSE,
-                                        regId,
-                                        1,
-                                        newEnable,
-                                        VIR_HALF_CHANNEL_MASK_FULL,
-                                        gcvNULL);
-            }
-            else
-            {
-                gcmASSERT(gcvFALSE);
-            }
-
-            VIR_Operand_SetModOrder(pOpnd, VIR_MODORDER_NONE);
-        }
     }
 
-OnError:
     return errCode;
 }
 
