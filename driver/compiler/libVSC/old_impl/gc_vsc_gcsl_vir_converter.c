@@ -1290,6 +1290,11 @@ _ConvUniformKind2Vir(
         {
             virUniformKind = VIR_UNIFORM_NUM_GROUPS;
         }
+        else if (Uniform->nameLength == 22 &&
+                 gcmIS_SUCCESS(gcoOS_StrNCmp(Uniform->name, "#num_groups_single_gpu", 22)))
+        {
+            virUniformKind = VIR_UNIFORM_NUM_GROUPS_FOR_SINGLE_GPU;
+        }
         else if (Uniform->nameLength == 17 &&
                  gcmIS_SUCCESS(gcoOS_StrCmp(Uniform->name, "$ConstBorderValue")))
         {
