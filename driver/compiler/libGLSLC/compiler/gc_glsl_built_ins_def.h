@@ -1795,9 +1795,19 @@ static slsBUILT_IN_FUNCTION FSBuiltInFunctions[] =
     {{slvEXTENSION1_HALTI},     "texture", gcvNULL, _GenTextureCode,            T_UVEC4,    3, {T_USAMPLERCUBEARRAY,  T_VEC4,     T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "texture", gcvNULL, _GenTextureCode,            T_UVEC4,    3, {T_USAMPLER2DARRAY,    T_VEC3,     T_FLOAT}, {0}, {0}},
 
+    /* OGL texture functions with more sampler types */
+    {{slvEXTENSION1_SUPPORT_OGL},  "texture", gcvNULL, _GenTextureCode,         T_VEC4,     3, {T_SAMPLER1D,            T_FLOAT,  T_FLOAT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},  "texture", gcvNULL, _GenTextureCode,         T_IVEC4,    3, {T_ISAMPLER1D,           T_FLOAT,  T_FLOAT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},  "texture", gcvNULL, _GenTextureCode,         T_UVEC4,    3, {T_USAMPLER1D,           T_FLOAT,  T_FLOAT}, {0}, {0}},
+
+    {{slvEXTENSION1_SUPPORT_OGL},  "texture", gcvNULL, _GenTextureCode,         T_VEC4,     3, {T_SAMPLER1DARRAY,       T_VEC2,   T_FLOAT},  {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},  "texture", gcvNULL, _GenTextureCode,         T_IVEC4,    3, {T_ISAMPLER1DARRAY,      T_VEC2,   T_FLOAT},  {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},  "texture", gcvNULL, _GenTextureCode,         T_UVEC4,    3, {T_USAMPLER1DARRAY,      T_VEC2,   T_FLOAT},  {0}, {0}},
+
     {{slvEXTENSION1_SUPPORT_OGL},  "texture", gcvNULL, _GenTextureCode,         T_FLOAT,    3, {T_SAMPLER1DSHADOW,      T_VEC3,  T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_SUPPORT_OGL},  "texture", gcvNULL, _GenTextureCode,         T_FLOAT,    3, {T_SAMPLER1DARRAYSHADOW, T_VEC3,  T_FLOAT}, {0}, {0}},
-    {{slvEXTENSION1_SUPPORT_OGL},  "texture", gcvNULL, _GenTextureCode,         T_VEC4,     3, {T_SAMPLER2DSHADOW,   T_VEC3,  T_FLOAT}, {0}, {0}},
+
+    {{slvEXTENSION1_SUPPORT_OGL},  "texture", gcvNULL, _GenTextureCode,         T_VEC4,     3, {T_SAMPLER2DSHADOW,      T_VEC3,   T_FLOAT},  {0}, {0}},
 
     {{slvEXTENSION1_HALTI},     "textureProj", gcvNULL, _GenTextureProjCode,        T_VEC4,     3, {T_SAMPLER2D,    T_VEC3, T_FLOAT}, {0}, {0}},
     {{slvEXTENSION1_HALTI},     "textureProj", gcvNULL, _GenTextureProjCode,        T_VEC4,     3, {T_SAMPLER2D,    T_VEC4, T_FLOAT}, {0}, {0}},
@@ -2592,15 +2602,15 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {{slvEXTENSION1_HALTI},     "texture", gcvNULL, _GenTextureCode,            T_UVEC4,    2, {T_USAMPLER2DARRAY,    T_VEC3}, {0}, {0}},
 
     /* OGL texture functions with more sampler types */
-    {{slvEXTENSION1_SUPPORT_OGL},     "texture", gcvNULL, _GenTexture1DCode,          T_VEC4,     2, {T_SAMPLER1D,            T_FLOAT}, {0}, {0}},
-    {{slvEXTENSION1_SUPPORT_OGL},     "texture", gcvNULL, _GenTexture1DCode,          T_IVEC4,    2, {T_ISAMPLER1D,           T_FLOAT}, {0}, {0}},
-    {{slvEXTENSION1_SUPPORT_OGL},     "texture", gcvNULL, _GenTexture1DCode,          T_UVEC4,    2, {T_USAMPLER1D,           T_FLOAT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "texture", gcvNULL, _GenTextureCode,          T_VEC4,     2, {T_SAMPLER1D,            T_FLOAT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "texture", gcvNULL, _GenTextureCode,          T_IVEC4,    2, {T_ISAMPLER1D,           T_FLOAT}, {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "texture", gcvNULL, _GenTextureCode,          T_UVEC4,    2, {T_USAMPLER1D,           T_FLOAT}, {0}, {0}},
 
     {{slvEXTENSION1_SUPPORT_OGL},     "texture", gcvNULL, _GenTextureCode,            T_FLOAT,    2, {T_SAMPLER1DSHADOW,      T_VEC3},  {0}, {0}},
 
-    {{slvEXTENSION1_SUPPORT_OGL},     "texture", gcvNULL, _GenTexture1DArrayCode,     T_VEC4,     2, {T_SAMPLER1DARRAY,       T_VEC2},  {0}, {0}},
-    {{slvEXTENSION1_SUPPORT_OGL},     "texture", gcvNULL, _GenTexture1DArrayCode,     T_IVEC4,    2, {T_ISAMPLER1DARRAY,      T_VEC2},  {0}, {0}},
-    {{slvEXTENSION1_SUPPORT_OGL},     "texture", gcvNULL, _GenTexture1DArrayCode,     T_UVEC4,    2, {T_USAMPLER1DARRAY,      T_VEC2},  {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "texture", gcvNULL, _GenTextureCode,     T_VEC4,     2, {T_SAMPLER1DARRAY,       T_VEC2},  {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "texture", gcvNULL, _GenTextureCode,     T_IVEC4,    2, {T_ISAMPLER1DARRAY,      T_VEC2},  {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "texture", gcvNULL, _GenTextureCode,     T_UVEC4,    2, {T_USAMPLER1DARRAY,      T_VEC2},  {0}, {0}},
 
     {{slvEXTENSION1_SUPPORT_OGL},     "texture", gcvNULL, _GenTextureCode,            T_FLOAT,    2, {T_SAMPLER1DARRAYSHADOW, T_VEC3},  {0}, {0}},
 
@@ -3191,6 +3201,12 @@ static slsINTRINSIC_BUILTIN_FUNCTION CommonIntrinsicBuiltInFunctions[] =
     {{slvEXTENSION1_HALTI},    "textureSize", gcvNULL, gcvNULL,            T_IVEC2,_HP,     1, {T_USAMPLER2DMSARRAY},                       {_IN},   {ANY},        gceINTRIN_create_size_for_sampler, "_viv_textureSize_uint_2DMSArray", {0}, {0}},
 
 
+    {{slvEXTENSION1_SUPPORT_OGL},    "textureSize", gcvNULL, gcvNULL,      T_INT, _HP,      2, {T_SAMPLER1D,       T_INT},                   {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_1D", {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},    "textureSize", gcvNULL, gcvNULL,      T_INT, _HP,      2, {T_ISAMPLER1D,      T_INT},                   {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_1D", {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},    "textureSize", gcvNULL, gcvNULL,      T_INT, _HP,      2, {T_USAMPLER1D,      T_INT},                   {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_1D", {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},    "textureSize", gcvNULL, gcvNULL,      T_INT, _HP,      2, {T_SAMPLER1DSHADOW, T_INT},                   {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_1D", {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},    "textureSize", gcvNULL, gcvNULL,      T_IVEC2, _HP,    2, {T_SAMPLER1DARRAYSHADOW, T_INT},              {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_1D", {0}, {0}},
+
     {{slvEXTENSION1_SUPPORT_OGL},    "textureSize", gcvNULL, gcvNULL,      T_IVEC3,_HP,     2, {T_SAMPLER1DARRAY,    T_INT},                {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_1DArray", {0}, {0}},
     {{slvEXTENSION1_SUPPORT_OGL},    "textureSize", gcvNULL, gcvNULL,      T_IVEC3,_HP,     2, {T_ISAMPLER1DARRAY,   T_INT},                {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_int_1DArray", {0}, {0}},
     {{slvEXTENSION1_SUPPORT_OGL},    "textureSize", gcvNULL, gcvNULL,      T_IVEC3,_HP,     2, {T_USAMPLER1DARRAY,   T_INT},                {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_uint_1DArray", {0}, {0}},
@@ -3208,16 +3224,6 @@ static slsINTRINSIC_BUILTIN_FUNCTION CommonIntrinsicBuiltInFunctions[] =
     {{slvEXTENSION1_EXT_TEXTURE_BUFFER},   "textureSize", gcvNULL, gcvNULL,            T_INT, _HP,    1, {T_ISAMPLERBUFFER},                   {_IN}, {ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_int_buffer", {0}, {0}},
     {{slvEXTENSION1_EXT_TEXTURE_BUFFER},   "textureSize", gcvNULL, gcvNULL,            T_INT, _HP,    1, {T_USAMPLERBUFFER},                   {_IN}, {ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_uint_buffer", {0}, {0}},
 
-    {{slvEXTENSION1_HALTI},    "textureSize", gcvNULL, gcvNULL,            T_INT, _HP,     2, {T_SAMPLER1D,       T_INT},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_1D", {0}, {0}},
-    {{slvEXTENSION1_HALTI},    "textureSize", gcvNULL, gcvNULL,            T_INT, _HP,     2, {T_ISAMPLER1D,      T_INT},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_1D", {0}, {0}},
-    {{slvEXTENSION1_HALTI},    "textureSize", gcvNULL, gcvNULL,            T_INT, _HP,     2, {T_USAMPLER1D,      T_INT},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_1D", {0}, {0}},
-    {{slvEXTENSION1_HALTI},    "textureSize", gcvNULL, gcvNULL,            T_INT, _HP,     2, {T_SAMPLER1DSHADOW, T_INT},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_1D", {0}, {0}},
-    {{slvEXTENSION1_HALTI},    "textureSize", gcvNULL, gcvNULL,            T_IVEC2, _HP,   2, {T_SAMPLER1DARRAYSHADOW, T_INT},                 {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_1D", {0}, {0}},
-
-    {{slvEXTENSION1_HALTI},    "textureSize", gcvNULL, gcvNULL,            T_IVEC2,_HP,     2, {T_SAMPLER2DRECT,  T_INT},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_2D", {0}, {0}},
-    {{slvEXTENSION1_HALTI},    "textureSize", gcvNULL, gcvNULL,            T_IVEC2,_HP,     2, {T_ISAMPLER2DRECT, T_INT},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_2D", {0}, {0}},
-    {{slvEXTENSION1_HALTI},    "textureSize", gcvNULL, gcvNULL,            T_IVEC2,_HP,     2, {T_USAMPLER2DRECT, T_INT},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_2D", {0}, {0}},
-    {{slvEXTENSION1_HALTI},    "textureSize", gcvNULL, gcvNULL,            T_IVEC2,_HP,     2, {T_SAMPLER2DRECTSHADOW, T_INT},                {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_2D", {0}, {0}},
     {{slvEXTENSION1_EGL_IMAGE_EXTERNAL_ESSL3},     "textureSize", gcvNULL,  gcvNULL,    T_IVEC2,_HP,2, {T_SAMPLEREXTERNALOES,    T_INT},      {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_2D", {0}, {0}},
 
     /* texture gather functions. */
