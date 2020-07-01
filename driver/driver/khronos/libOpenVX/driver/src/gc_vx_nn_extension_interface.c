@@ -1627,12 +1627,15 @@ OnError:
 vx_status vxnneShaderExecutable_Destroy(vxnne_shader_executable shaderExecutable)
 {
     vx_uint32 i;
+    vx_reference* params = VX_NULL;
+
+    params = shaderExecutable->params ? shaderExecutable->params : shaderExecutable->param;
 
     for (i = 0; i < shaderExecutable->paramNum; i++)
     {
-        if (shaderExecutable->param[i] != VX_NULL)
+        if (params[i] != VX_NULL)
         {
-            vxoReference_Release(&shaderExecutable->param[i], shaderExecutable->param[i]->type, VX_REF_INTERNAL);
+            vxoReference_Release(&params[i], params[i]->type, VX_REF_INTERNAL);
         }
     }
 
