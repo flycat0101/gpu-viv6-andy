@@ -1465,24 +1465,12 @@ _VSC_MC_GEN_GenSkipHelperFlag(
 {
     VIR_OpCode  opcode      = VIR_Inst_GetOpcode(Inst);
 
-    if (VIR_OPCODE_isAtom(opcode)      ||
+    if (VIR_OPCODE_NeedSkHpFlag(opcode)      ||
         /*
         ** LOAD instruction may be used for coordinate computation,
         ** which should not be skipped for helper.
         */
-        (opcode == VIR_OP_IMG_LOAD)       ||
-        (opcode == VIR_OP_VX_IMG_LOAD)    ||
-        (opcode == VIR_OP_IMG_LOAD_3D)    ||
-        (opcode == VIR_OP_VX_IMG_LOAD_3D) ||
-        (opcode == VIR_OP_IMG_ADDR)       ||
-        (opcode == VIR_OP_IMG_ADDR_3D)    ||
-        /* store_s should not skip helper */
-        VIR_OPCODE_isLocalMemSt(opcode)   ||
-        VIR_OPCODE_isGlobalMemSt(opcode)  ||
-        (opcode == VIR_OP_IMG_STORE)      ||
-        (opcode == VIR_OP_VX_IMG_STORE)   ||
-        (opcode == VIR_OP_IMG_STORE_3D)   ||
-        (opcode == VIR_OP_VX_IMG_STORE_3D))
+        (opcode == VIR_OP_LOAD && VIR_Inst_IsSkipHelper(Inst)))
     {
         return gcvTRUE;
     }
