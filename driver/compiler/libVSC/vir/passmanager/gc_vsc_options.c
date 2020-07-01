@@ -2698,6 +2698,11 @@ void VSC_OPTN_DUAL16Options_SetDefault(
     VSC_OPTN_DUAL16Options_SetPercentage(options, (gctFLOAT)0.67);
     VSC_OPTN_DUAL16Options_SetHalfDepPercentage(options, (gctFLOAT)0.33);
     VSC_OPTN_DUAL16Options_SetTrace(options, 0);
+    VSC_OPTN_DUAL16Options_SetSkipOpcode(options, -1);
+    VSC_OPTN_DUAL16Options_SetBeforeInst(options, gcvMAXUINT32);
+    VSC_OPTN_DUAL16Options_SetAfterInst(options, gcvMAXUINT32);
+    VSC_OPTN_DUAL16Options_SetAfterShader(options, gcvMAXUINT32);
+    VSC_OPTN_DUAL16Options_SetBeforeShader(options, gcvMAXUINT32);
 }
 
 void VSC_OPTN_DUAL16Options_GetOptionFromString(
@@ -2728,6 +2733,56 @@ void VSC_OPTN_DUAL16Options_GetOptionFromString(
             len = _VSC_OPTN_GetSubOptionLength(str);
             percentage = vscSTR_StrToUint32(str, len);
             VSC_OPTN_DUAL16Options_SetHalfDepPercentage(options, (gctFLOAT)((gctFLOAT)percentage / 100.0));
+            str += len;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "bs:", sizeof("bs:")-1))
+        {
+            gctUINT32 beforeshader;
+            gctUINT32 len;
+            str += sizeof("bs:") -1;
+            len = _VSC_OPTN_GetSubOptionLength(str);
+            beforeshader = vscSTR_StrToUint32(str, len);
+            VSC_OPTN_DUAL16Options_SetBeforeShader(options, beforeshader);
+            str += len;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "as:", sizeof("as:")-1))
+        {
+            gctUINT32 aftershader;
+            gctUINT32 len;
+            str += sizeof("as:") -1;
+            len = _VSC_OPTN_GetSubOptionLength(str);
+            aftershader = vscSTR_StrToUint32(str, len);
+            VSC_OPTN_DUAL16Options_SetAfterShader(options, aftershader);
+            str += len;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "skipopcode:", sizeof("skipopcode:")-1))
+        {
+            gctUINT32 skipopcode;
+            gctUINT32 len;
+            str += sizeof("skipopcode:") -1;
+            len = _VSC_OPTN_GetSubOptionLength(str);
+            skipopcode = vscSTR_StrToUint32(str, len);
+            VSC_OPTN_DUAL16Options_SetSkipOpcode(options, skipopcode);
+            str += len;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "bl:", sizeof("bl:")-1))
+        {
+            gctUINT32 beforeline;
+            gctUINT32 len;
+            str += sizeof("bl:") -1;
+            len = _VSC_OPTN_GetSubOptionLength(str);
+            beforeline = vscSTR_StrToUint32(str, len);
+            VSC_OPTN_DUAL16Options_SetBeforeInst(options, beforeline);
+            str += len;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str,"al:", sizeof("al:")-1))
+        {
+            gctUINT32 afterline;
+            gctUINT32 len;
+            str += sizeof("al:") -1;
+            len = _VSC_OPTN_GetSubOptionLength(str);
+            afterline = vscSTR_StrToUint32(str, len);
+            VSC_OPTN_DUAL16Options_SetAfterInst(options, afterline);
             str += len;
         }
         else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "trace:", sizeof("trace:")-1))
