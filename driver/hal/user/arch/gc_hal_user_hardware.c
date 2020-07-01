@@ -4296,6 +4296,12 @@ _DetectProcess(
 
         {
             gcvPATCH_OCLCTS,
+            "\x9d\x8d\x8a\x8b\x9a\xa0\x99\x90\x8d\x9c\x9a",
+            gcvFALSE
+        },
+
+        {
+            gcvPATCH_OCLCTS,
             "\x8b\x9a\x8c\x8b\xa0\x96\x91\x8b\x9a\x98\x9a\x8d\xa0\x90\x8f\x8c",
             gcvFALSE
         },
