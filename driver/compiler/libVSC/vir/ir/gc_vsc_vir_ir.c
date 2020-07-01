@@ -12802,7 +12802,10 @@ VIR_Inst_GetExpectedResultPrecision(
     VIR_OpCode opcode = VIR_Inst_GetOpcode(Inst);
 
     VIR_Shader *pShader = VIR_Inst_GetShader(Inst);
-    if (VIR_Shader_IsVulkan(pShader) || VIR_Shader_IsDesktopGL(pShader))
+    /*
+    ** Skip those shaders that don't care about the precision.
+    */
+    if (!VIR_Shader_NeedUpdatePrecision(pShader))
     {
         return result;
     }
@@ -20131,6 +20134,41 @@ VIR_Shader_NeedPutImmValue2Uniform(
         }
         return gcvFALSE;
     }
+}
+
+gctBOOL
+VIR_Shader_NeedToCheckDual16(
+    IN  VIR_Shader*         pShader,
+    IN  VSC_HW_CONFIG*      pHwCfg,
+    IN  VSC_COMPILER_CONFIG*pCompilerConfig
+    )
+{
+    /* only fragment shader or ocl with VC_OPTION=DUAL16:num>0 can be dual16 shader,
+    ** and exclude OpenVG shader due to precision issue
+    */
+    if (!pHwCfg->hwFeatureFlags.supportDual16   ||
+        !VIR_Shader_IsFS(pShader)               ||
+        (!VIR_Shader_IsFS(pShader) &&
+         !(VIR_Shader_IsCLFromLanguage(pShader) && gcGetDualFP16Mode(pHwCfg->hwFeatureFlags.hasHalti2)))    ||
+        VIR_Shader_IsDesktopGL(pShader)                            ||
+        VIR_Shader_IsOpenVG(pShader)                               ||
+        VIR_Shader_HasOutputArrayHighp(pShader)                    || /* currently, we disable dual16 if the output array is highp */
+        !VirSHADER_DoDual16(VIR_Shader_GetId(pShader))             ||
+        gcmOPT_DisableOPTforDebugger()                               /* we disable dual16 for debugging mode */
+        )
+    {
+        return gcvFALSE;
+    }
+
+    if (VIR_Shader_IsVulkan(pShader))
+    {
+        if ((pCompilerConfig->cFlags & VSC_COMPILER_FLAG_ENABLE_DUAL16_FOR_VK) == 0)
+        {
+            return gcvFALSE;
+        }
+    }
+
+    return gcvTRUE;
 }
 
 /* Those functions are used in the PASS only. */

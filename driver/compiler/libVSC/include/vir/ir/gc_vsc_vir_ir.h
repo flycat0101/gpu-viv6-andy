@@ -4882,6 +4882,7 @@ typedef enum _VIR_SHADERFLAGS_EXT1
     VIR_SHFLAG_EXT1_IMAGE_FORMAT_MISMATCH       = 0x00000100, /* Whether any image format/sampled type mismatch. */
     VIR_SHFLAG_EXT1_USE_EVIS_INST               = 0x00000200, /* Whether use EVIS instruction. */
     VIR_SHFLAG_EXT1_COMPATIBILITY_PROFILR       = 0x00000400, /* Whether the shader version is compatibility profile. */
+    VIR_SHFLAG_EXT1_ENABLE_PRECISION_UPDATE     = 0x00008000, /* Whether shader need update precision */
 } VIR_ShaderFlagsExt1;
 
 /* Get the flags. */
@@ -4946,6 +4947,7 @@ typedef enum _VIR_SHADERFLAGS_EXT1
 #define VIR_Shader_HasImageFormatMismatch(Shader)   (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_IMAGE_FORMAT_MISMATCH) != 0)
 #define VIR_Shader_UseEvisInst(Shader)              (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_USE_EVIS_INST) != 0)
 #define VIR_Shader_IsCompatibilityProfile(Shader)   (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_COMPATIBILITY_PROFILR) != 0)
+#define VIR_Shader_NeedUpdatePrecision(Shader)      (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_ENABLE_PRECISION_UPDATE) != 0)
 
 typedef struct _VIR_LIBRARYLIST VIR_LibraryList;
 
@@ -7912,6 +7914,13 @@ VIR_Shader_NeedPutImmValue2Uniform(
     IN  gctBOOL             bPackedChanged,
     IN  gctUINT32           immValue,
     IN  VIR_TypeId          valueTypeId
+    );
+
+gctBOOL
+VIR_Shader_NeedToCheckDual16(
+    IN  VIR_Shader*         pShader,
+    IN  VSC_HW_CONFIG*      pHwCfg,
+    IN  VSC_COMPILER_CONFIG*pCompilerConfig
     );
 
 void
