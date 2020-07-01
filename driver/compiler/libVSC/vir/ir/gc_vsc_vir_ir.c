@@ -15747,6 +15747,27 @@ VIR_Operand_GetConstValForUniform(
     return constId;
 }
 
+VIR_TypeId
+VIR_Operand_GetSymbolTypeId(
+    IN  VIR_Shader         *pShader,
+    IN  VIR_Operand        *pOpnd
+    )
+{
+    if (VIR_Operand_isSymbol(pOpnd) || VIR_Operand_isVirReg(pOpnd))
+    {
+        return VIR_Symbol_GetTypeId(VIR_Operand_GetSymbol(pOpnd));
+    }
+    else if (VIR_Operand_isConst(pOpnd))
+    {
+        VIR_ConstId         constId = VIR_Operand_GetConstId(pOpnd);
+        VIR_Const          *pConstVal = VIR_Shader_GetConstFromId(pShader, constId);
+
+        return pConstVal->type;
+    }
+
+    return VIR_Operand_GetTypeId(pOpnd);
+}
+
 /* return true if the Opnd is fit into 5 bit offset and be changed to
 * encoded 5bit offsets */
 gctBOOL

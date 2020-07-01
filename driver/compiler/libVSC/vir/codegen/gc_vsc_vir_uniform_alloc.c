@@ -1757,6 +1757,7 @@ static void _VIR_CG_FindPushConstUniform(
 {
     VIR_Uniform     *pushConstUniform = gcvNULL;
     gctUINT         i;
+    gctUINT         rangeStart = pConstRange->offset, rangeEnd = pConstRange->offset + pConstRange->size;
 
     for (i = 0; i < (gctINT) VIR_IdList_Count(&pShader->uniforms); ++i)
     {
@@ -1782,11 +1783,10 @@ static void _VIR_CG_FindPushConstUniform(
             pUboSym = VIR_Shader_GetSymFromId(pShader, uniform->u.parentSSBOOrUBO);
             pUbo = VIR_Symbol_GetUBO(pUboSym);
 
-            if (VIR_Symbol_GetLayoutOffset(sym) == pConstRange->offset)
+            if (VIR_Symbol_GetLayoutOffset(sym) == rangeStart)
             {
-                if (VIR_UBO_GetBlockSize(pUbo) != (pConstRange->size + pConstRange->offset))
+                if (VIR_UBO_GetBlockSize(pUbo) > rangeEnd)
                 {
-                    gcmASSERT(gcvFALSE);
                 }
 
                 pushConstUniform = uniform;
@@ -1802,9 +1802,18 @@ static void _VIR_CG_FindPushConstUniform(
         }
         else
         {
-            if (VIR_Symbol_GetLayoutOffset(sym) >= pConstRange->offset &&
-                VIR_Symbol_GetLayoutOffset(sym) + VIR_Type_GetTypeByteSize(pShader, symType) <= pConstRange->offset + pConstRange->size)
+            /* Check if the offset is within the constant range. */
+            if (VIR_Symbol_GetLayoutOffset(sym) >= rangeStart && VIR_Symbol_GetLayoutOffset(sym) < rangeEnd)
             {
+                /*
+                ** For the last element of a push constant block, it is possible that
+                ** the range size is smaller than the element size if only part of this element is used in the shader,
+                ** for this case we also need to allocate the constant register for this element.
+                */
+                if (VIR_Symbol_GetLayoutOffset(sym) + VIR_Type_GetTypeByteSize(pShader, symType) > rangeEnd)
+                {
+                }
+
                 pushConstUniform = VIR_Symbol_GetUniform(sym);
                 _VIR_CG_UniformListQueue(pMM, pushConstList, pushConstUniform);
                 /* the alignment of struct is the largest base alignment */
