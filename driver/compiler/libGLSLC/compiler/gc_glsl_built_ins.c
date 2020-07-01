@@ -437,7 +437,7 @@ typedef struct
     gctUINT             valueCount;
     sluCONSTANT_VALUE   value[sldMAX_VECTOR_COMPONENT];
     /* Only add this constant when extension is enabled. */
-    sleEXTENSION        extension;
+    gctUINT             extension;
 } BuiltinConstInfo;
 
 /* Built-In Constant */
@@ -466,9 +466,11 @@ _AddBuiltInConstants(
     {
         gctUINT j;
         slsBASIC_BUILT_IN_TYPE_INFO *basicBuiltInTypeInfo;
+        sloEXTENSION extension = {{0}};
 
+        extension.extension1 = ConstantInfos[i].extension;
         /* If this variable is not enabled in this shader, then we don't need to load it. */
-        if (!sloCOMPILER_ExtensionEnabled(Compiler, ConstantInfos[i].extension))
+        if (!sloCOMPILER_ExtensionEnabled(Compiler, &extension))
         {
             continue;
         }
@@ -530,7 +532,7 @@ _AddBuiltInConstants(
                                         slvVARIABLE_NAME,
                                         dataType,
                                         variableSymbol,
-                                        ConstantInfos[i].extension,
+                                        extension,
                                         gcvFALSE,
                                         &variableName);
 
@@ -564,59 +566,59 @@ _LoadBuiltInConstants(
         {"gl_MaxTextureImageUnits",                T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
         {"gl_MaxFragmentUniformVectors",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
         {"gl_MaxDrawBuffers",                      T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
-        {"gl_MaxSamples",                          T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_SAMPLE_VARIABLES},
-        {"gl_MinProgramTexelOffset",               T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_HALTI},
-        {"gl_MaxProgramTexelOffset",               T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_HALTI},
-        {"gl_MaxImageUnits",                       T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_ES_31},
-        {"gl_MaxVertexImageUniforms",              T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_ES_31},
-        {"gl_MaxFragmentImageUniforms",            T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_ES_31},
-        {"gl_MaxComputeImageUniforms",             T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_ES_31},
-        {"gl_MaxCombinedImageUniforms",            T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_ES_31},
-        {"gl_MaxCombinedShaderOutputResources",    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_ES_31},
-        {"gl_MaxComputeWorkGroupCount",            T_IVEC3, slvPRECISION_QUALIFIER_HIGH, 3, {{0}}, slvEXTENSION_ES_31},
-        {"gl_MaxComputeWorkGroupSize",             T_IVEC3, slvPRECISION_QUALIFIER_HIGH, 3, {{0}}, slvEXTENSION_ES_31},
-        {"gl_MaxComputeUniformComponents",         T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_ES_31},
-        {"gl_MaxComputeTextureImageUnits",         T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_ES_31},
-        {"gl_MaxComputeAtomicCounters",            T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_ES_31},
-        {"gl_MaxComputeAtomicCounterBuffers",      T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_ES_31},
-        {"gl_MaxVertexAtomicCounters",             T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_ES_31},
-        {"gl_MaxFragmentAtomicCounters",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_ES_31},
-        {"gl_MaxCombinedAtomicCounters",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_ES_31},
-        {"gl_MaxAtomicCounterBindings",            T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_ES_31},
-        {"gl_MaxVertexAtomicCounterBuffers",       T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_ES_31},
-        {"gl_MaxFragmentAtomicCounterBuffers",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_ES_31},
-        {"gl_MaxCombinedAtomicCounterBuffers",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_ES_31},
-        {"gl_MaxAtomicCounterBufferSize",          T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_ES_31},
+        {"gl_MaxSamples",                          T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_SAMPLE_VARIABLES},
+        {"gl_MinProgramTexelOffset",               T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_HALTI},
+        {"gl_MaxProgramTexelOffset",               T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_HALTI},
+        {"gl_MaxImageUnits",                       T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
+        {"gl_MaxVertexImageUniforms",              T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
+        {"gl_MaxFragmentImageUniforms",            T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
+        {"gl_MaxComputeImageUniforms",             T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
+        {"gl_MaxCombinedImageUniforms",            T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
+        {"gl_MaxCombinedShaderOutputResources",    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
+        {"gl_MaxComputeWorkGroupCount",            T_IVEC3, slvPRECISION_QUALIFIER_HIGH, 3, {{0}}, slvEXTENSION1_ES_31},
+        {"gl_MaxComputeWorkGroupSize",             T_IVEC3, slvPRECISION_QUALIFIER_HIGH, 3, {{0}}, slvEXTENSION1_ES_31},
+        {"gl_MaxComputeUniformComponents",         T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
+        {"gl_MaxComputeTextureImageUnits",         T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
+        {"gl_MaxComputeAtomicCounters",            T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
+        {"gl_MaxComputeAtomicCounterBuffers",      T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
+        {"gl_MaxVertexAtomicCounters",             T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
+        {"gl_MaxFragmentAtomicCounters",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
+        {"gl_MaxCombinedAtomicCounters",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
+        {"gl_MaxAtomicCounterBindings",            T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
+        {"gl_MaxVertexAtomicCounterBuffers",       T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
+        {"gl_MaxFragmentAtomicCounterBuffers",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
+        {"gl_MaxCombinedAtomicCounterBuffers",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
+        {"gl_MaxAtomicCounterBufferSize",          T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_ES_31},
         {"gl_MaxVaryingVectors",                   T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0},
         /* TS EXT constants */
-        {"gl_MaxTessControlInputComponents",       T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
-        {"gl_MaxTessControlOutputComponents",      T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
-        {"gl_MaxTessControlTextureImageUnits",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
-        {"gl_MaxTessControlImageUniforms",         T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
-        {"gl_MaxTessControlUniformComponents",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
-        {"gl_MaxTessControlTotalOutputComponents", T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
-        {"gl_MaxTessControlAtomicCounters",        T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
-        {"gl_MaxTessControlAtomicCounterBuffers",  T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
-        {"gl_MaxTessEvaluationInputComponents",    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
-        {"gl_MaxTessEvaluationOutputComponents",   T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
-        {"gl_MaxTessEvaluationTextureImageUnits",  T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
-        {"gl_MaxTessEvaluationImageUniforms",      T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
-        {"gl_MaxTessEvaluationUniformComponents",  T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
-        {"gl_MaxTessEvaluationAtomicCounters",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
-        {"gl_MaxTessEvaluationAtomicCounterBuffers", T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
-        {"gl_MaxTessPatchComponents",              T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
-        {"gl_MaxPatchVertices",                    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
-        {"gl_MaxTessGenLevel",                     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
+        {"gl_MaxTessControlInputComponents",       T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
+        {"gl_MaxTessControlOutputComponents",      T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
+        {"gl_MaxTessControlTextureImageUnits",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
+        {"gl_MaxTessControlImageUniforms",         T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
+        {"gl_MaxTessControlUniformComponents",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
+        {"gl_MaxTessControlTotalOutputComponents", T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
+        {"gl_MaxTessControlAtomicCounters",        T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
+        {"gl_MaxTessControlAtomicCounterBuffers",  T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
+        {"gl_MaxTessEvaluationInputComponents",    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
+        {"gl_MaxTessEvaluationOutputComponents",   T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
+        {"gl_MaxTessEvaluationTextureImageUnits",  T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
+        {"gl_MaxTessEvaluationImageUniforms",      T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
+        {"gl_MaxTessEvaluationUniformComponents",  T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
+        {"gl_MaxTessEvaluationAtomicCounters",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
+        {"gl_MaxTessEvaluationAtomicCounterBuffers", T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
+        {"gl_MaxTessPatchComponents",              T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
+        {"gl_MaxPatchVertices",                    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
+        {"gl_MaxTessGenLevel",                     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_TESSELLATION_SHADER},
         /* GS EXT constants */
-        {"gl_MaxGeometryInputComponents",          T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_EXT_GEOMETRY_SHADER},
-        {"gl_MaxGeometryOutputComponents",         T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_EXT_GEOMETRY_SHADER},
-        {"gl_MaxGeometryImageUniforms",            T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_EXT_GEOMETRY_SHADER},
-        {"gl_MaxGeometryTextureImageUnits",        T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_EXT_GEOMETRY_SHADER},
-        {"gl_MaxGeometryOutputVertices",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_EXT_GEOMETRY_SHADER},
-        {"gl_MaxGeometryTotalOutputComponents",    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_EXT_GEOMETRY_SHADER},
-        {"gl_MaxGeometryUniformComponents",        T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_EXT_GEOMETRY_SHADER},
-        {"gl_MaxGeometryAtomicCounters",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_EXT_GEOMETRY_SHADER},
-        {"gl_MaxGeometryAtomicCounterBuffers",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_EXT_GEOMETRY_SHADER},
+        {"gl_MaxGeometryInputComponents",          T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_EXT_GEOMETRY_SHADER},
+        {"gl_MaxGeometryOutputComponents",         T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_EXT_GEOMETRY_SHADER},
+        {"gl_MaxGeometryImageUniforms",            T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_EXT_GEOMETRY_SHADER},
+        {"gl_MaxGeometryTextureImageUnits",        T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_EXT_GEOMETRY_SHADER},
+        {"gl_MaxGeometryOutputVertices",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_EXT_GEOMETRY_SHADER},
+        {"gl_MaxGeometryTotalOutputComponents",    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_EXT_GEOMETRY_SHADER},
+        {"gl_MaxGeometryUniformComponents",        T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_EXT_GEOMETRY_SHADER},
+        {"gl_MaxGeometryAtomicCounters",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_EXT_GEOMETRY_SHADER},
+        {"gl_MaxGeometryAtomicCounterBuffers",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_EXT_GEOMETRY_SHADER},
         /* Desktop GL constants */
         {"gl_MaxClipDistances",                    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
         {"gl_MaxClipPlanes",                       T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
@@ -628,7 +630,7 @@ _LoadBuiltInConstants(
         {"gl_MaxVertexUniformComponents",          T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
         {"gl_MaxFragmentInputComponents",          T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
         {"gl_MaxVertexOutputComponents",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
-        {"gl_MaxGeometryVaryingComponents",        T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_EXT_GEOMETRY_SHADER},
+        {"gl_MaxGeometryVaryingComponents",        T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_EXT_GEOMETRY_SHADER},
 
     };
 
@@ -788,6 +790,7 @@ _LoadBuiltInUniformState(
     slsDATA_TYPE *          structDataType;
     sltPOOL_STRING          structSymbol;
     sltPOOL_STRING          variableSymbol;
+    sloEXTENSION            extension = {{0}};
 
     gcmHEADER_ARG("Compiler=0x%x BasicBuiltInTypeInfos=0x%x",
                   Compiler, BasicBuiltInTypeInfos);
@@ -796,6 +799,7 @@ _LoadBuiltInUniformState(
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     gcmVERIFY_ARGUMENT(BasicBuiltInTypeInfos);
 
+    extension.extension1 = slvEXTENSION1_NONE;
     do
     {
         /* Create the struct field: near, far, diff */
@@ -814,7 +818,6 @@ _LoadBuiltInUniformState(
         if (gcmIS_ERROR(status)) break;
 
         fieldDataType->qualifiers.precision = slvPRECISION_QUALIFIER_HIGH;
-
         for (i = 0; i < 3; i++)
         {
             status = sloCOMPILER_AllocatePoolString(Compiler,
@@ -829,7 +832,7 @@ _LoadBuiltInUniformState(
                                             slvFIELD_NAME,
                                             fieldDataType,
                                             fieldSymbol,
-                                            slvEXTENSION_NONE,
+                                            extension,
                                             gcvFALSE,
                                             gcvNULL);
 
@@ -865,7 +868,7 @@ _LoadBuiltInUniformState(
                                         slvSTRUCT_NAME,
                                         structDataType,
                                         structSymbol,
-                                        slvEXTENSION_NONE,
+                                        extension,
                                         gcvFALSE,
                                         gcvNULL);
 
@@ -884,7 +887,7 @@ _LoadBuiltInUniformState(
                                         slvVARIABLE_NAME,
                                         structDataType,
                                         variableSymbol,
-                                        slvEXTENSION_NONE,
+                                        extension,
                                         gcvFALSE,
                                         gcvNULL);
 
@@ -973,6 +976,9 @@ _LoadBuiltInVariablesForIOBlock(
     sltSTORAGE_QUALIFIER            qualifier;
     gctBOOL                         addMember;
     slsINTERFACE_BLOCK_MEMBER *     blockMember;
+    sloEXTENSION                    extension = {{0}};
+
+    extension.extension1 = slvEXTENSION1_NONE;
 
     gcmONERROR(sloCOMPILER_CreateAuxGlobalNameSpace(Compiler,
                                                     gcvNULL,
@@ -997,7 +1003,7 @@ _LoadBuiltInVariablesForIOBlock(
                                           slvFIELD_NAME,
                                           fieldDataType,
                                           symbol,
-                                          slvEXTENSION_NONE,
+                                          extension,
                                           gcvFALSE,
                                           &field));
 
@@ -1054,7 +1060,7 @@ _LoadBuiltInVariablesForIOBlock(
                                       slvINTERFACE_BLOCK_NAME,
                                       blockDataType,
                                       symbol,
-                                      slvEXTENSION_NONE,
+                                      extension,
                                       gcvFALSE,
                                       &blockName));
 
@@ -1082,7 +1088,7 @@ _LoadBuiltInVariablesForIOBlock(
                                           slvVARIABLE_NAME,
                                           instanceDataType,
                                           symbol,
-                                          slvEXTENSION_NONE,
+                                          extension,
                                           gcvFALSE,
                                           &instanceName));
 
@@ -1150,6 +1156,7 @@ _LoadBuiltInVariables(
     slsBASIC_BUILT_IN_TYPE_INFO *   basicBuiltInTypeInfo;
     slsDATA_TYPE *                  dataType;
     sltPOOL_STRING                  symbolInPool;
+    sloEXTENSION                    extension = {{0}};
 
     gcmHEADER_ARG("Compiler=0x%x BasicBuiltInTypeInfos=0x%x "
                   "BuiltInVariableCount=%u BuiltInVariables=0x%x",
@@ -1165,7 +1172,8 @@ _LoadBuiltInVariables(
     for (i = 0; i < BuiltInVariableCount; i++)
     {
         /* If this variable is not enabled in this shader, then we don't need to load it. */
-        if (!sloCOMPILER_ExtensionEnabled(Compiler, BuiltInVariables[i].extension))
+        extension.extension1 = BuiltInVariables[i].extension;
+        if (!sloCOMPILER_ExtensionEnabled(Compiler, &extension))
         {
             continue;
         }
@@ -1252,7 +1260,7 @@ _LoadBuiltInVariables(
                                         slvVARIABLE_NAME,
                                         dataType,
                                         symbolInPool,
-                                        BuiltInVariables[i].extension,
+                                        extension,
                                         gcvFALSE,
                                         gcvNULL);
 
@@ -1333,9 +1341,11 @@ slFuncCheckForAtrigAsIntrinsic(
     IN struct _sloIR_POLYNARY_EXPR * PolynaryExpr
     )
 {
-    gceSTATUS status = gcvSTATUS_OK;
+    gceSTATUS    status = gcvSTATUS_OK;
+    sloEXTENSION extension = {{0}};
+    extension.extension1 = slvEXTENSION1_HALTI5_WITH_FMA_SUPPORT;
 
-    if(sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_HALTI5_WITH_FMA_SUPPORT))
+    if(sloCOMPILER_ExtensionEnabled(Compiler, &extension))
     {
         slsFUNC_SET_FLAG(&(FuncName->u.funcInfo), slvFUNC_SKIP_AS_INTRINSIC);
     }
@@ -1472,6 +1482,7 @@ _LoadBuiltInFunctions(
     slsNAME *                       funcName = gcvNULL;
     slsNAME *                       paramName = gcvNULL;
     gctBOOL                         hasMemAccess;
+    sloEXTENSION                    extension = {{0}};
 
     gcmHEADER_ARG("Compiler=0x%x BasicBuiltInTypeInfos=0x%x "
                   "BuiltInFunctionCount=%u BuiltInFunctions=0x%x",
@@ -1503,13 +1514,14 @@ _LoadBuiltInFunctions(
 
         if (gcmIS_ERROR(status)) break;
 
+        extension.extension1 = BuiltInFunctions[i].extension;
         status = sloCOMPILER_CreateName(Compiler,
                                         0,
                                         0,
                                         slvFUNC_NAME,
                                         basicBuiltInTypeInfo->anypDataType,
                                         symbolInPool,
-                                        BuiltInFunctions[i].extension,
+                                        extension,
                                         gcvFALSE,
                                         &funcName);
 
@@ -1569,13 +1581,14 @@ _LoadBuiltInFunctions(
 
             if (dataType == gcvNULL) break;
 
+            extension.extension1 = slvEXTENSION1_NONE;
             status = sloCOMPILER_CreateName(Compiler,
                                             0,
                                             0,
                                             slvPARAMETER_NAME,
                                             dataType,
                                             "",
-                                            slvEXTENSION_NONE,
+                                            extension,
                                             gcvFALSE,
                                             &paramName);
 
@@ -1611,6 +1624,7 @@ _LoadIntrinsicBuiltInFunctions(
     slsNAME *                       paramName = gcvNULL;
     slsDATA_TYPE *                  dataType;
     gctBOOL                         hasMemAccess = gcvFALSE;
+    sloEXTENSION                    extension = {{0}};
 
     gcmHEADER();
 
@@ -1663,13 +1677,14 @@ _LoadIntrinsicBuiltInFunctions(
         if (gcmIS_ERROR(status)) break;
 
         /* Create function name */
+        extension.extension1 = IntrinsicFunctions[i].extension;
         status = sloCOMPILER_CreateName(Compiler,
                                         0,
                                         0,
                                         slvFUNC_NAME,
                                         dataType,
                                         symbolInPool,
-                                        IntrinsicFunctions[i].extension,
+                                        extension,
                                         gcvFALSE,
                                         &funcName);
 
@@ -1776,13 +1791,14 @@ _LoadIntrinsicBuiltInFunctions(
             }
 
             /* Create parameter name */
+            extension.extension1 = slvEXTENSION1_NONE;
             status = sloCOMPILER_CreateName(Compiler,
                                             0,
                                             0,
                                             slvPARAMETER_NAME,
                                             param_data_type_1,
                                             "",
-                                            slvEXTENSION_NONE,
+                                            extension,
                                             gcvFALSE,
                                             &paramName);
 
@@ -17698,19 +17714,20 @@ slGenBuiltInFunctionCode(
     return status;
 }
 
-sleEXTENSION
+sloEXTENSION
 slGetBuiltinFunctionExtension(
     IN gctSTRING Symbol
 )
 {
-    sleEXTENSION extension = slvEXTENSION_NONE;
+    sloEXTENSION extension = {{0}};
     gctUINT i;
 
+    extension.extension1 = slvEXTENSION1_NONE;
     for (i = 0; i < builtinFunctionExtensionCount; i++)
     {
         if (gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, builtinFunctionExtensionTable[i].symbol)))
         {
-            extension = builtinFunctionExtensionTable[i].extension;
+            extension.extension1 = builtinFunctionExtensionTable[i].extension;
             break;
         }
     }

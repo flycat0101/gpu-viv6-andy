@@ -16823,9 +16823,9 @@ _CreateSharedVariableStorageBlock(
     gctPOINTER pointer;
     slsSHARED_VARIABLE *sharedVariable;
     slsSLINK_LIST *sharedVariableList;
+    sloEXTENSION extension = {{0}};
 
     gcmHEADER_ARG("Compiler=0x%x Block=0x%x", Compiler, Block);
-
 
     status = sloCOMPILER_GetSharedVariableList(Compiler,
                                                &sharedVariableList);
@@ -16862,13 +16862,14 @@ _CreateSharedVariableStorageBlock(
                                             &symbolInPool);
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
+    extension.extension1 = slvEXTENSION1_NONE;
     status = sloCOMPILER_CreateName(Compiler,
                                     0,
                                     0,
                                     slvINTERFACE_BLOCK_NAME,
                                     dataType,
                                     symbolInPool,
-                                    slvEXTENSION_NONE,
+                                    extension,
                                     gcvTRUE,
                                     &blockName);
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
@@ -27673,6 +27674,8 @@ sloIR_POLYNARY_EXPR_GenConstructMatrixCode(
 
     if (Parameters->needROperand)
     {
+        sloEXTENSION extension = {{0}};
+        extension.extension1 = slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS;
         /* Allocate the register(s) */
         status = slsGEN_CODE_PARAMETERS_AllocateOperands(
                                                         Compiler,
@@ -27691,7 +27694,7 @@ sloIR_POLYNARY_EXPR_GenConstructMatrixCode(
         slsROPERAND_InitializeUsingIOperand(&Parameters->rOperands[0], &iOperand);
 
         /* when enabling implicit conversion, mat type needs to changed to dmat in some case */
-        if (sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS) &&
+        if (sloCOMPILER_ExtensionEnabled(Compiler, &extension) &&
             gcGetDataTypeComponentCount(operandsParameters[0].rOperands[0].dataType)
             == gcGetDataTypeComponentCount(Parameters->dataTypes[0]))
         {

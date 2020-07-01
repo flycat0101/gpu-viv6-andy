@@ -1219,7 +1219,7 @@ typedef struct _slsNAME
     slsDATA_TYPE *                          dataType;
     sltPOOL_STRING                          symbol;
     gctBOOL                                 isBuiltIn;
-    sleEXTENSION                            extension;
+    sloEXTENSION                            extension;
     /* Whether this variable is a per-vertex array, TC/GS only. */
     gctBOOL                                 isPerVertexArray;
     /* Whether this variable is a per-vertex variable, but not declare as an array, TC/GS only. */
@@ -1527,7 +1527,7 @@ slsNAME_SPACE_CreateName(
     IN slsDATA_TYPE * DataType,
     IN sltPOOL_STRING Symbol,
     IN gctBOOL IsBuiltIn,
-    IN sleEXTENSION Extension,
+    IN sloEXTENSION extension,
     IN gctBOOL CheckExistedName,
     OUT slsNAME ** Name
     );
@@ -1547,7 +1547,7 @@ sloCOMPILER_CreateName(
     IN sleNAME_TYPE Type,
     IN slsDATA_TYPE * DataType,
     IN sltPOOL_STRING Symbol,
-    IN sleEXTENSION Extension,
+    IN sloEXTENSION extension,
     IN gctBOOL CheckExistedName,
     OUT slsNAME ** Name
     );

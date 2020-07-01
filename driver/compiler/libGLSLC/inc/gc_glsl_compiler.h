@@ -497,88 +497,101 @@ sloCOMPILER_AllocatePoolString(
     );
 
 /* Extensions */
-typedef enum _sleEXTENSION
+typedef enum _sleEXTENSION1
 {
-    slvEXTENSION_NONE                                       = 0x00000000,
+    slvEXTENSION1_NONE                                       = 0x00000000,
 
-    slvEXTENSION_STANDARD_DERIVATIVES                       = 0x00000001,
-    slvEXTENSION_TEXTURE_3D                                 = 0x00000002,
-    slvEXTENSION_TEXTURE_ARRAY                              = 0x00000004,
-    slvEXTENSION_FRAG_DEPTH                                 = 0x00000008,
-    slvEXTENSION_EGL_IMAGE_EXTERNAL                         = 0x00000010,
-    slvEXTENSION_HALTI                                      = 0x00000020,
-    slvEXTENSION_NON_HALTI                                  = 0x00000040,
-    slvEXTENSION_SHADOW_SAMPLER                             = 0x00000080,
-    slvEXTENSION_BLEND_EQUATION_ADVANCED                    = 0x00000100,
-    slvEXTENSION_ES_31                                      = 0x00000200,
-    slvEXTENSION_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY       = 0x00000400,
-    slvEXTENSION_VASM                                       = 0x00000800,
-    slvEXTENSION_IMAGE_ATOMIC                               = 0x00001000,
-    slvEXTENSION_TEXTURE_CUBE_MAP_ARRAY                     = 0x00002000,
-    slvEXTENSION_IO_BLOCKS                                  = 0x00004000,
-    slvEXTENSION_GPU_SHADER5                                = 0x00008000,
-    slvEXTENSION_TESSELLATION_SHADER                        = 0x00010000 | slvEXTENSION_IO_BLOCKS | slvEXTENSION_GPU_SHADER5,
-    slvEXTENSION_TESSELLATION_POINT_SIZE                    = 0x00020000 | slvEXTENSION_IO_BLOCKS,
-    slvEXTENSION_SAMPLE_VARIABLES                           = 0x00040000,
-    slvEXTENSION_SHADER_MULTISAMPLE_INTERPOLATION           = 0x00080000,
-    slvEXTENSION_EXT_GEOMETRY_SHADER                        = 0x00100000 | slvEXTENSION_IO_BLOCKS,
-    slvEXTENSION_EXT_GEOMETRY_POINT_SIZE                    = 0x00200000 | slvEXTENSION_IO_BLOCKS,
-    slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS            = 0x00400000,
-    slvEXTENSION_EXT_TEXTURE_BUFFER                         = 0x00800000,
-    slvEXTENSION_EXT_PRIMITIVE_BOUNDING_BOX                 = 0x01000000,
+    slvEXTENSION1_STANDARD_DERIVATIVES                       = 0x00000001,
+    slvEXTENSION1_TEXTURE_3D                                 = 0x00000002,
+    slvEXTENSION1_TEXTURE_ARRAY                              = 0x00000004,
+    slvEXTENSION1_FRAG_DEPTH                                 = 0x00000008,
+    slvEXTENSION1_EGL_IMAGE_EXTERNAL                         = 0x00000010,
+    slvEXTENSION1_HALTI                                      = 0x00000020,
+    slvEXTENSION1_NON_HALTI                                  = 0x00000040,
+    slvEXTENSION1_SHADOW_SAMPLER                             = 0x00000080,
+    slvEXTENSION1_BLEND_EQUATION_ADVANCED                    = 0x00000100,
+    slvEXTENSION1_ES_31                                      = 0x00000200,
+    slvEXTENSION1_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY       = 0x00000400,
+    slvEXTENSION1_VASM                                       = 0x00000800,
+    slvEXTENSION1_IMAGE_ATOMIC                               = 0x00001000,
+    slvEXTENSION1_TEXTURE_CUBE_MAP_ARRAY                     = 0x00002000,
+    slvEXTENSION1_IO_BLOCKS                                  = 0x00004000,
+    slvEXTENSION1_GPU_SHADER5                                = 0x00008000,
+    slvEXTENSION1_TESSELLATION_SHADER                        = 0x00010000 | slvEXTENSION1_IO_BLOCKS | slvEXTENSION1_GPU_SHADER5,
+    slvEXTENSION1_TESSELLATION_POINT_SIZE                    = 0x00020000 | slvEXTENSION1_IO_BLOCKS,
+    slvEXTENSION1_SAMPLE_VARIABLES                           = 0x00040000,
+    slvEXTENSION1_SHADER_MULTISAMPLE_INTERPOLATION           = 0x00080000,
+    slvEXTENSION1_EXT_GEOMETRY_SHADER                        = 0x00100000 | slvEXTENSION1_IO_BLOCKS,
+    slvEXTENSION1_EXT_GEOMETRY_POINT_SIZE                    = 0x00200000 | slvEXTENSION1_IO_BLOCKS,
+    slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS            = 0x00400000,
+    slvEXTENSION1_EXT_TEXTURE_BUFFER                         = 0x00800000,
+    slvEXTENSION1_EXT_PRIMITIVE_BOUNDING_BOX                 = 0x01000000,
 
-    slvEXTENSION_ES_32                                      = 0x02000000 | slvEXTENSION_TEXTURE_CUBE_MAP_ARRAY
-                                                                         | slvEXTENSION_EXT_GEOMETRY_SHADER
-                                                                         | slvEXTENSION_TESSELLATION_SHADER
-                                                                         | slvEXTENSION_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY
-                                                                         | slvEXTENSION_SHADOW_SAMPLER
-                                                                         | slvEXTENSION_GPU_SHADER5
-                                                                         | slvEXTENSION_EXT_TEXTURE_BUFFER
-                                                                         | slvEXTENSION_SAMPLE_VARIABLES
-                                                                         | slvEXTENSION_SHADER_MULTISAMPLE_INTERPOLATION
-                                                                         | slvEXTENSION_EXT_PRIMITIVE_BOUNDING_BOX
-                                                                         | slvEXTENSION_BLEND_EQUATION_ADVANCED
-                                                                         | slvEXTENSION_IMAGE_ATOMIC,
+    slvEXTENSION1_ES_32                                      = 0x02000000 | slvEXTENSION1_TEXTURE_CUBE_MAP_ARRAY
+                                                                         | slvEXTENSION1_EXT_GEOMETRY_SHADER
+                                                                         | slvEXTENSION1_TESSELLATION_SHADER
+                                                                         | slvEXTENSION1_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY
+                                                                         | slvEXTENSION1_SHADOW_SAMPLER
+                                                                         | slvEXTENSION1_GPU_SHADER5
+                                                                         | slvEXTENSION1_EXT_TEXTURE_BUFFER
+                                                                         | slvEXTENSION1_SAMPLE_VARIABLES
+                                                                         | slvEXTENSION1_SHADER_MULTISAMPLE_INTERPOLATION
+                                                                         | slvEXTENSION1_EXT_PRIMITIVE_BOUNDING_BOX
+                                                                         | slvEXTENSION1_BLEND_EQUATION_ADVANCED
+                                                                         | slvEXTENSION1_IMAGE_ATOMIC,
 
-    slvEXTENSION_SHADER_FRAMEBUFFER_FETCH                   = 0x04000000,
-    slvEXTENSION_DOUBLE_DATA_TYPE                           = 0x08000000,
+    slvEXTENSION1_SHADER_FRAMEBUFFER_FETCH                   = 0x04000000,
+    slvEXTENSION1_DOUBLE_DATA_TYPE                           = 0x08000000,
 
-    slvEXTENSION_SUPPORT_OGL                                = 0x10000000,
-    slvEXTENSION_INTEGER_MIX                                = 0x20000000,
-    slvEXTENSION_EGL_IMAGE_EXTERNAL_ESSL3                   = 0x40000000,
-    slvEXTENSION_HALTI5_WITH_FMA_SUPPORT                    = 0x80000000,
+    slvEXTENSION1_SUPPORT_OGL                                = 0x10000000,
+    slvEXTENSION1_INTEGER_MIX                                = 0x20000000,
+    slvEXTENSION1_EGL_IMAGE_EXTERNAL_ESSL3                   = 0x40000000,
+    slvEXTENSION1_HALTI5_WITH_FMA_SUPPORT                    = 0x80000000,
 
-    slvEXTENSION_ANDROID_EXTENSION_PACK_ES31A               = slvEXTENSION_BLEND_EQUATION_ADVANCED              |
-                                                              slvEXTENSION_SAMPLE_VARIABLES                     |
-                                                              slvEXTENSION_IMAGE_ATOMIC                         |
-                                                              slvEXTENSION_SHADER_MULTISAMPLE_INTERPOLATION     |
-                                                              slvEXTENSION_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY |
-                                                              slvEXTENSION_EXT_GEOMETRY_SHADER                  |
-                                                              slvEXTENSION_EXT_GEOMETRY_POINT_SIZE              |
-                                                              slvEXTENSION_GPU_SHADER5                          |
-                                                              slvEXTENSION_EXT_PRIMITIVE_BOUNDING_BOX           |
-                                                              slvEXTENSION_IO_BLOCKS                            |
-                                                              slvEXTENSION_TESSELLATION_SHADER                  |
-                                                              slvEXTENSION_TESSELLATION_POINT_SIZE              |
-                                                              slvEXTENSION_EXT_TEXTURE_BUFFER                   |
-                                                              slvEXTENSION_TEXTURE_CUBE_MAP_ARRAY,
+    slvEXTENSION1_ANDROID_EXTENSION_PACK_ES31A               = slvEXTENSION1_BLEND_EQUATION_ADVANCED              |
+                                                              slvEXTENSION1_SAMPLE_VARIABLES                     |
+                                                              slvEXTENSION1_IMAGE_ATOMIC                         |
+                                                              slvEXTENSION1_SHADER_MULTISAMPLE_INTERPOLATION     |
+                                                              slvEXTENSION1_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY |
+                                                              slvEXTENSION1_EXT_GEOMETRY_SHADER                  |
+                                                              slvEXTENSION1_EXT_GEOMETRY_POINT_SIZE              |
+                                                              slvEXTENSION1_GPU_SHADER5                          |
+                                                              slvEXTENSION1_EXT_PRIMITIVE_BOUNDING_BOX           |
+                                                              slvEXTENSION1_IO_BLOCKS                            |
+                                                              slvEXTENSION1_TESSELLATION_SHADER                  |
+                                                              slvEXTENSION1_TESSELLATION_POINT_SIZE              |
+                                                              slvEXTENSION1_EXT_TEXTURE_BUFFER                   |
+                                                              slvEXTENSION1_TEXTURE_CUBE_MAP_ARRAY,
 
-    slvEXTENSION_ES_30_AND_ABOVE                            = slvEXTENSION_HALTI |
-                                                              slvEXTENSION_ES_31 |
-                                                              slvEXTENSION_ES_32,
+    slvEXTENSION1_ES_30_AND_ABOVE                            = slvEXTENSION1_HALTI |
+                                                              slvEXTENSION1_ES_31 |
+                                                              slvEXTENSION1_ES_32,
 
-    slvEXTENSION_ALL                                        = slvEXTENSION_STANDARD_DERIVATIVES |
-                                                              slvEXTENSION_TEXTURE_3D |
-                                                              slvEXTENSION_TEXTURE_ARRAY |
-                                                              slvEXTENSION_FRAG_DEPTH |
-                                                              slvEXTENSION_EGL_IMAGE_EXTERNAL |
-                                                              slvEXTENSION_EGL_IMAGE_EXTERNAL_ESSL3 |
-                                                              slvEXTENSION_SHADOW_SAMPLER |
-                                                              slvEXTENSION_BLEND_EQUATION_ADVANCED |
-                                                              slvEXTENSION_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY |
-                                                              slvEXTENSION_IMAGE_ATOMIC
+    slvEXTENSION1_ALL                                        = slvEXTENSION1_STANDARD_DERIVATIVES |
+                                                              slvEXTENSION1_TEXTURE_3D |
+                                                              slvEXTENSION1_TEXTURE_ARRAY |
+                                                              slvEXTENSION1_FRAG_DEPTH |
+                                                              slvEXTENSION1_EGL_IMAGE_EXTERNAL |
+                                                              slvEXTENSION1_EGL_IMAGE_EXTERNAL_ESSL3 |
+                                                              slvEXTENSION1_SHADOW_SAMPLER |
+                                                              slvEXTENSION1_BLEND_EQUATION_ADVANCED |
+                                                              slvEXTENSION1_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY |
+                                                              slvEXTENSION1_IMAGE_ATOMIC
 }
-sleEXTENSION;
+sleEXTENSION1;
+
+typedef enum _sleEXTENSION2
+{
+    slvEXTENSION2_NONE                                      = 0x00000000,
+}
+sleEXTENSION2;
+
+typedef struct _sloEXTENSION
+{
+    sleEXTENSION1   extension1;
+    sleEXTENSION2   extension2;
+}
+sloEXTENSION;
 
 typedef gctUINT32                sltEXTENSIONS;
 
@@ -586,7 +599,7 @@ typedef gctUINT32                sltEXTENSIONS;
 gceSTATUS
 sloCOMPILER_EnableExtension(
     IN sloCOMPILER Compiler,
-    IN sleEXTENSION Extension,
+    IN sloEXTENSION* extension,
     IN gctBOOL Enable
     );
 

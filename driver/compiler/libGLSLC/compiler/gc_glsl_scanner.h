@@ -187,7 +187,7 @@ slScanOperator(
 gctINT
 slScanSpecialOperator(
     IN sloCOMPILER Compiler,
-    IN sleEXTENSION Extention,
+    IN gctUINT Extention,
     IN gctUINT LineNo,
     IN gctUINT StringNo,
     IN gctSTRING Text,
