@@ -5231,6 +5231,7 @@ gckDEVICE_Construct(
     /* Initialize external SRAM. */
     for (i = 0; i < gcvSRAM_EXT_COUNT; i++)
     {
+        device->extSRAMGPUBases[i] = gcvINVALID_PHYSICAL_ADDRESS;
         device->extSRAMBases[i] = gcvINVALID_PHYSICAL_ADDRESS;
         device->extSRAMSizes[i] = 0;
     }
