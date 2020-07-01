@@ -561,8 +561,11 @@ ppoPREPROCESSOR_Eval_Case_Basic_Level(
         if((!PP->skipOPError) ||
            (PP->skipOPError && Token->type != ppvTokenType_ID))
         {
+            /* The undefined symbol is evalated as 0 in desktop GLSL.
+               But when the expression is evalated in #line, the undefined symbol cannot be treated as 0 */
             if (Token->type == ppvTokenType_ID &&
-                sloCOMPILER_GetClientApiVersion(PP->compiler) == gcvAPI_OPENGL)
+                sloCOMPILER_GetClientApiVersion(PP->compiler) == gcvAPI_OPENGL &&
+                !MeetStringNum)
             {
                 *Result = 0;
                 return gcvSTATUS_OK;

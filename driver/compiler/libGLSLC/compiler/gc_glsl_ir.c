@@ -2183,7 +2183,9 @@ slsNAME_Construct(
         if (gcmIS_ERROR(status)) break;
 
         if (!Compiler->context.loadingBuiltIns &&
-            DataType && sloCOMPILER_IsOGLVersion(Compiler) && DataType->qualifiers.storage == slvSTORAGE_QUALIFIER_UNIFORM)
+            DataType &&
+            (sloCOMPILER_IsOGLVersion(Compiler) && !sloCOMPILER_IsOGL11Version(Compiler))
+            && DataType->qualifiers.storage == slvSTORAGE_QUALIFIER_UNIFORM)
         {
             if (DataType->elementType != slvTYPE_STRUCT)
             {
@@ -2932,7 +2934,7 @@ slsNAME_SPACE_CheckNewFuncName(
                 */
                 if (name->symbol == FuncName->symbol)
                 {
-                    if (sloCOMPILER_IsHaltiVersion(Compiler))
+                    if (sloCOMPILER_IsHaltiVersion(Compiler) && sloCOMPILER_GetClientApiVersion(Compiler) != gcvAPI_OPENGL)
                     {
                         gcmVERIFY_OK(sloCOMPILER_Report(
                                                         Compiler,
