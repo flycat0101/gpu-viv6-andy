@@ -4112,6 +4112,12 @@ OUT gctUINT *NumRegNeeded
                 {
                     Symbol = Name->symbol;
                 }
+                if(!cldHandleHighPrecisionInFrontEnd &&
+                    clmIsElementTypeHighPrecision(Name->decl.dataType->elementType))
+                {
+                    /* need to reserve double the number of registers */
+                    numRegNeeded <<= 1;
+                }
                 cloCOMPILER_SetStructDIELogicalReg(Compiler, Decl, Name, ParentName->die, Symbol, tempRegIndex,
                     numRegNeeded, (gctUINT)_ConvComponentSelectionToEnable(&fieldComponentSelection));
 
