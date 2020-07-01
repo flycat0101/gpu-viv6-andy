@@ -37,6 +37,32 @@ static clsINTRINSIC_BUILTIN_FUNCTION IntrinsicBuiltinFunctions[] =
 {
     /* Intrinsic builtin functions */
 
+#if IMPL_TRIG_OR_POW_FUNCS_AS_INTRINSICS
+    {clvEXTENSION_NONE,  "sin",              gceINTRIN_source, "_viv_sin_float",      T_FLOAT,  1, {T_FLOAT},    {0}, {0}, 1},
+    {clvEXTENSION_NONE,  "sin",              gceINTRIN_source, "_viv_sin_float2",     T_FLOAT2, 1, {T_FLOAT2},  {0}, {0}, 1},
+    {clvEXTENSION_NONE,  "sin",              gceINTRIN_source, "_viv_sin_float3",     T_FLOAT3, 1, {T_FLOAT3},  {0}, {0}, 1},
+    {clvEXTENSION_NONE,  "sin",              gceINTRIN_source, "_viv_sin_float4",     T_FLOAT4, 1, {T_FLOAT4},  {0}, {0}, 1},
+    {clvEXTENSION_NONE,  "sin",              gceINTRIN_source, "_viv_sin_float8",     T_FLOAT8, 1, {T_FLOAT8},  {0}, {0}, 1},
+    {clvEXTENSION_NONE,  "sin",              gceINTRIN_source, "_viv_sin_float16",    T_FLOAT16, 1, {T_FLOAT16},  {0}, {0}, 1},
+    {clvEXTENSION_NONE,  "cos",              gceINTRIN_source, "_viv_cos_float",      T_FLOAT,  1, {T_FLOAT},    {0}, {0}, 1},
+    {clvEXTENSION_NONE,  "cos",              gceINTRIN_source, "_viv_cos_float2",     T_FLOAT2, 1, {T_FLOAT2},  {0}, {0}, 1},
+    {clvEXTENSION_NONE,  "cos",              gceINTRIN_source, "_viv_cos_float3",     T_FLOAT3, 1, {T_FLOAT3},  {0}, {0}, 1},
+    {clvEXTENSION_NONE,  "cos",              gceINTRIN_source, "_viv_cos_float4",     T_FLOAT4, 1, {T_FLOAT4},  {0}, {0}, 1},
+    {clvEXTENSION_NONE,  "cos",              gceINTRIN_source, "_viv_cos_float8",     T_FLOAT8, 1, {T_FLOAT8},  {0}, {0}, 1},
+    {clvEXTENSION_NONE,  "cos",              gceINTRIN_source, "_viv_cos_float16",    T_FLOAT16, 1, {T_FLOAT16},  {0}, {0}, 1},
+    {clvEXTENSION_NONE,  "tan",              gceINTRIN_source, "_viv_tan_float",      T_FLOAT,  1, {T_FLOAT},    {0}, {0}, 1},
+    {clvEXTENSION_NONE,  "tan",              gceINTRIN_source, "_viv_tan_float2",     T_FLOAT2, 1, {T_FLOAT2},  {0}, {0}, 1},
+    {clvEXTENSION_NONE,  "tan",              gceINTRIN_source, "_viv_tan_float3",     T_FLOAT3, 1, {T_FLOAT3},  {0}, {0}, 1},
+    {clvEXTENSION_NONE,  "tan",              gceINTRIN_source, "_viv_tan_float4",     T_FLOAT4, 1, {T_FLOAT4},  {0}, {0}, 1},
+    {clvEXTENSION_NONE,  "tan",              gceINTRIN_source, "_viv_tan_float8",     T_FLOAT8, 1, {T_FLOAT8},  {0}, {0}, 1},
+    {clvEXTENSION_NONE,  "tan",              gceINTRIN_source, "_viv_tan_float16",    T_FLOAT16, 1, {T_FLOAT16},  {0}, {0}, 1},
+    {clvEXTENSION_NONE,  "pow",              gceINTRIN_source, "_viv_pow_float",      T_FLOAT,  2, {T_FLOAT, T_FLOAT},    {0}, {0}, 1},
+    {clvEXTENSION_NONE,  "pow",              gceINTRIN_source, "_viv_pow_float2",     T_FLOAT2, 2, {T_FLOAT2, T_FLOAT2},  {0}, {0}, 1},
+    {clvEXTENSION_NONE,  "pow",              gceINTRIN_source, "_viv_pow_float3",     T_FLOAT3, 2, {T_FLOAT3, T_FLOAT3},  {0}, {0}, 1},
+    {clvEXTENSION_NONE,  "pow",              gceINTRIN_source, "_viv_pow_float4",     T_FLOAT4, 2, {T_FLOAT4, T_FLOAT4},  {0}, {0}, 1},
+    {clvEXTENSION_NONE,  "pow",              gceINTRIN_source, "_viv_pow_float8",     T_FLOAT8, 2, {T_FLOAT8, T_FLOAT8},  {0}, {0}, 1},
+    {clvEXTENSION_NONE,  "pow",              gceINTRIN_source, "_viv_pow_float16",    T_FLOAT16, 2, {T_FLOAT16, T_FLOAT16},  {0}, {0}, 1},
+#endif
     {clvEXTENSION_NONE,  "asin",              gceINTRIN_source, "_viv_asin_float",      T_FLOAT,  1, {T_FLOAT},    {0}, {0}, 1},
     {clvEXTENSION_NONE,  "asin",              gceINTRIN_source, "_viv_asin_float2",     T_FLOAT2, 1, {T_FLOAT2},  {0}, {0}, 1},
     {clvEXTENSION_NONE,  "asin",              gceINTRIN_source, "_viv_asin_float3",     T_FLOAT3, 1, {T_FLOAT3},  {0}, {0}, 1},

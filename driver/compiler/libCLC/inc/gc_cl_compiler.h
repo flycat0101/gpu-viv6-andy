@@ -499,6 +499,11 @@ cloCOMPILER_SetGcslDriverImage(
 IN cloCOMPILER Compiler
 );
 
+gceSTATUS
+cloCOMPILER_SetFastRelaxedMath(
+IN cloCOMPILER Compiler
+);
+
 gctBOOL
 cloCOMPILER_IsLoadingBuiltin(
     IN cloCOMPILER Compiler

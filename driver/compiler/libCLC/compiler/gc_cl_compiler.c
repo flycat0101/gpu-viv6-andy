@@ -114,6 +114,7 @@ struct _cloCOMPILER
         gctUINT          imageArrayMaxLevel;
         gctBOOL          basicTypePacked;
         gctBOOL          gcslDriverImage;
+        gctBOOL          fastRelaxedMath;
         gctBOOL          longUlongPatch;
         VSC_DIContext *  debugInfo;
         gctBOOL          mainFile;
@@ -2057,6 +2058,30 @@ IN cloCOMPILER Compiler
 
     Compiler->context.gcslDriverImage = gcvTRUE;
     return gcvSTATUS_OK;
+}
+
+gctBOOL
+cloCOMPILER_IsFastRelaxedMath(
+IN cloCOMPILER Compiler
+)
+{
+    /* Verify the arguments. */
+    clmASSERT_OBJECT(Compiler, clvOBJ_COMPILER);
+    return Compiler->context.fastRelaxedMath;
+}
+
+/* Set image in gcsl driver mode */
+gceSTATUS
+cloCOMPILER_SetFastRelaxedMath(
+IN cloCOMPILER Compiler
+)
+{
+    /* Verify the arguments. */
+    clmASSERT_OBJECT(Compiler, clvOBJ_COMPILER);
+
+    Compiler->context.fastRelaxedMath = gcvTRUE;
+    return cloCOMPILER_SetFpConfig(Compiler,
+                                   cldFpFAST_RELAXED_MATH);
 }
 
 gctBOOL

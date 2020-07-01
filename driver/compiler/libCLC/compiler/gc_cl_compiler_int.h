@@ -224,6 +224,11 @@ IN cloCOMPILER Compiler
 );
 
 gctBOOL
+cloCOMPILER_IsFastRelaxedMath(
+IN cloCOMPILER Compiler
+);
+
+gctBOOL
 cloCOMPILER_ExtensionEnabled(
     IN cloCOMPILER Compiler,
     IN cleEXTENSION Extension
