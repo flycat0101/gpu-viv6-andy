@@ -7059,8 +7059,8 @@ _ParseUpdateHaltiQualifiers(
             */
             if (slsDATA_TYPE_IsStruct(DataType))
             {
-                if (sloCOMPILER_IsOGL30Version(Compiler) ||
-                    sloCOMPILER_IsOGL31Version(Compiler))
+                if (sloCOMPILER_IsOGL13Version(Compiler) ||
+                    sloCOMPILER_IsOGL14Version(Compiler))
                 {
                     gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                     Identifier->lineNo,
@@ -7107,7 +7107,7 @@ _ParseUpdateHaltiQualifiers(
                 {
                     if (sloCOMPILER_IsOGL40Version(Compiler) ||
                         sloCOMPILER_IsOGL33Version(Compiler) ||
-                        sloCOMPILER_IsOGL32Version(Compiler))
+                        sloCOMPILER_IsOGL15Version(Compiler))
                     {
                         if (shaderType == slvSHADER_TYPE_FRAGMENT &&
                             DataType->qualifiers.interpolation != slvINTERPOLATION_QUALIFIER_FLAT &&
@@ -7767,7 +7767,7 @@ _ParseArrayVariableDecl(
         if(shaderType == slvSHADER_TYPE_VERTEX &&
            !sloCOMPILER_IsOGL40Version(Compiler) &&
            !sloCOMPILER_IsOGL33Version(Compiler) &&
-           !sloCOMPILER_IsOGL32Version(Compiler))
+           !sloCOMPILER_IsOGL15Version(Compiler))
         {
            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                            Identifier->lineNo,
@@ -7982,7 +7982,7 @@ _ParseArrayVariableDeclWithInitializer(
         if(shaderType == slvSHADER_TYPE_VERTEX &&
            !sloCOMPILER_IsOGL40Version(Compiler) &&
            !sloCOMPILER_IsOGL33Version(Compiler) &&
-           !sloCOMPILER_IsOGL32Version(Compiler))
+           !sloCOMPILER_IsOGL15Version(Compiler))
         {
            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                            Identifier->lineNo,
@@ -8291,7 +8291,7 @@ _CheckErrorForArray(
            if(shaderType == slvSHADER_TYPE_VERTEX &&
               !sloCOMPILER_IsOGL40Version(Compiler) &&
               !sloCOMPILER_IsOGL33Version(Compiler) &&
-              !sloCOMPILER_IsOGL32Version(Compiler))
+              !sloCOMPILER_IsOGL15Version(Compiler))
            {
               gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                               Identifier->lineNo,
@@ -13501,9 +13501,10 @@ _ParseSearchLayoutId(
     /* Match layoutId1. */
     extension.extension2 = slvEXTENSION2_GL_ARB_EXPLICIT_ATTRIB_LOCATION;
     if (gcmIS_SUCCESS(gcoOS_StrCmp(LayoutId->u.identifier, "location"))) {
-        if (sloCOMPILER_GetLanguageVersion(Compiler) > _SHADER_GL32_VERSION ||
-            (sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL32_VERSION &&
-             sloCOMPILER_ExtensionEnabled(Compiler, &extension)))
+        if ((!sloCOMPILER_IsOGLVersion(Compiler)) ||
+            ((sloCOMPILER_GetLanguageVersion(Compiler) > _SHADER_GL15_VERSION ||
+            (sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL15_VERSION &&
+             sloCOMPILER_ExtensionEnabled(Compiler, &extension)))))
         {
             layoutId1 = slvLAYOUT_LOCATION;
         }
