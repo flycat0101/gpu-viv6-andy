@@ -741,9 +741,17 @@ _VSC_CPF_DataFlow_Dump(
 
         if (constVal != gcvNULL)
         {
-            if (VIR_TypeId_isFloat(constVal->type))
+            if (VIR_TypeId_isFloat32(constVal->type))
             {
                 gctFLOAT f = *(gctFLOAT*)&(constVal->value);
+                VIR_LOG(pDumper, "\ttemp[%d].%s(%f)",
+                    regNo,
+                    _VSC_CPF_GetChannelName(channel),
+                    f);
+            }
+            else if (VIR_TypeId_isFloat16(constVal->type))
+            {
+                gctFLOAT f = gcoMATH_UIntAsFloat(gcoMATH_Float16ToFloat((gctUINT16)(constVal->value)));
                 VIR_LOG(pDumper, "\ttemp[%d].%s(%f)",
                     regNo,
                     _VSC_CPF_GetChannelName(channel),
@@ -1670,8 +1678,9 @@ _VSC_CPF_PropagateConst(
     /* immediate case */
     if (dstEnableCount == 1 || opndSwizzleCount == 1)
     {
-        gctFLOAT floatValue;
+        gctFLOAT float32Value;
         gctUINT  intValue;
+        gctUINT  float16Value; /*use uint for float16 type */
 
         for (channel = 0; channel < VIR_CHANNEL_NUM; channel++ )
         {
@@ -1681,22 +1690,35 @@ _VSC_CPF_PropagateConst(
             }
         }
 
-        if (VIR_TypeId_isFloat(pConst[channel].type))
+        if (VIR_TypeId_isFloat32(pConst[channel].type))
         {
-            floatValue = gcoMATH_UIntAsFloat(pConst[channel].value);
-            intValue = (gctUINT)floatValue;
+
+            float32Value = gcoMATH_UIntAsFloat(pConst[channel].value);
+            intValue = pConst[channel].value;
+            float16Value = intValue;
+        }
+        else if (VIR_TypeId_isFloat16(pConst[channel].type))
+        {
+            intValue = pConst[channel].value;
+            float32Value = gcoMATH_UIntAsFloat(gcoMATH_Float16ToFloat((gctUINT16)(intValue)));
+            float16Value = intValue;
         }
         else
         {
             intValue = pConst[channel].value;
-            floatValue = (gctFLOAT) intValue;
+            float32Value = gcoMATH_UIntAsFloat(pConst[channel].value);
+            float16Value = intValue;
         }
 
         /* Change the operand type to the scalar type. */
         VIR_Operand_SetTypeId(pOpnd, srcType);
-        if (VIR_TypeId_isFloat(srcType))
+        if (VIR_TypeId_isFloat32(srcType))
         {
-            VIR_Operand_SetImmFloat(pOpnd, floatValue);
+            VIR_Operand_SetImmFloat(pOpnd, float32Value);
+        }
+        else if (VIR_TypeId_isFloat16(srcType))
+        {
+            VIR_Operand_SetImmUint(pOpnd, float16Value);
         }
         else if (_VSC_CPF_isTypeINT(srcType))
         {
@@ -2478,9 +2500,13 @@ _VSC_CPF_PerformOnInst(
             }
 
             /* constant could be float32 type */
-            if (VIR_TypeId_isFloat(vecVal[1].type))
+            if (VIR_TypeId_isFloat32(vecVal[1].type))
             {
                 opndOffset = (gctUINT) *(gctFLOAT*) &(vecVal[1].value);
+            }
+            else if (VIR_TypeId_isFloat16(vecVal[1].type))
+            {
+                opndOffset = gcoMATH_Float16ToFloat((gctUINT16)(vecVal[1].value));
             }
             else
             {

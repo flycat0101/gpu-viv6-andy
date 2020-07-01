@@ -14049,6 +14049,9 @@ IN clsATTRIBUTE *Attr
                            Identifier->lineNo,
                            Identifier->stringNo,
                            gcvNULL, field, Attr);
+    if(fieldDecl->array.numDim > 0)
+        cloCOMPILER_SetDIEArrayWithArray(Compiler, field->die, &(fieldDecl->array));
+
     return fieldDecl;
 }
 

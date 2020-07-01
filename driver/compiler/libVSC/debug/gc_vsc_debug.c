@@ -567,6 +567,7 @@ void vscDISetHwLocToSWLoc(VSC_DIContext * context, VSC_DI_SW_LOC * swLoc, VSC_DI
     gctUINT     i, j, k;
     gctUINT16   id;
     gctBOOL     found = gcvFALSE, breakFlag = gcvFALSE;
+    gctBOOL     splitRAswloc = gcvFALSE;
 
     if (!swLoc || !hwLoc)
         return;
@@ -633,7 +634,9 @@ void vscDISetHwLocToSWLoc(VSC_DIContext * context, VSC_DI_SW_LOC * swLoc, VSC_DI
                     {
                         found = gcvTRUE;
                     }
-                    else
+                    else if(sl->u.reg.start <= swLoc->u.reg.end &&
+                            sl->u.reg.end >= swLoc->u.reg.start &&
+                            swLoc->u.reg.start == swLoc->u.reg.end)
                     {
                         /* split the sw loc here */
                         /* create a sw loc and add to next */
@@ -658,6 +661,14 @@ void vscDISetHwLocToSWLoc(VSC_DIContext * context, VSC_DI_SW_LOC * swLoc, VSC_DI
 
                         found = gcvTRUE;
                     }
+                    else if(sl->u.reg.start <= swLoc->u.reg.end &&
+                            sl->u.reg.end >= swLoc->u.reg.start &&
+                            swLoc->u.reg.end > swLoc->u.reg.start)
+                    {
+                        /* for struct array */
+                        splitRAswloc = gcvTRUE;
+                        found = gcvTRUE;
+                    }
                 }
 
                 if (!found)
@@ -674,6 +685,12 @@ void vscDISetHwLocToSWLoc(VSC_DIContext * context, VSC_DI_SW_LOC * swLoc, VSC_DI
                     hl->id = id;
                     hl->next = sl->hwLoc;
                     sl->hwLoc = hl->id;
+
+                    if(splitRAswloc == gcvTRUE)
+                    {
+                        hl->u.reg.start = hwLoc->u.reg.start + sl->u.reg.start - swLoc->u.reg.start;
+                        hl->u.reg.end = hl->u.reg.start;
+                    }
 
                     if (gcmOPT_EnableDebugDump())
                     {
@@ -703,6 +720,12 @@ void vscDISetHwLocToSWLoc(VSC_DIContext * context, VSC_DI_SW_LOC * swLoc, VSC_DI
                     {
                         /* when setting the hw location for uniforms,
                         need to find all the uniforms used in multiple kernels */
+                        found = gcvFALSE;
+                        continue;
+                    }
+                    else if(swLoc->u.reg.end > swLoc->u.reg.start)
+                    {
+                        /* when struct array,need to find all the struct elements */
                         found = gcvFALSE;
                         continue;
                     }
