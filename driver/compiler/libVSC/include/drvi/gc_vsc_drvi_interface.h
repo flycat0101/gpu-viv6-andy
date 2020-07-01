@@ -734,7 +734,8 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          hasPointSizeFix        : 1;
         gctUINT          supportVectorB0        : 1;
         gctUINT          hasAtomTimingFix       : 1;
-        gctUINT          reserved1              : 29;
+        gctUINT          hasUSCAtomicFix2       : 1;
+        gctUINT          reserved1              : 28;
 
         /* Last word */
         /* Followings will be removed after shader programming is removed out of VSC */
@@ -753,8 +754,7 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          newGPIPE               : 1;
         gctUINT          FEDrawDirect           : 1;
 
-        gctUINT          hasUSCAtomicFix2       : 1;
-        gctUINT          reserved2              : 18;
+        gctUINT          reserved2              : 19;
     } hwFeatureFlags;
 
     gctUINT              chipModel;
