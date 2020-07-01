@@ -8821,7 +8821,7 @@ gcoHARDWARE_FlushTarget(
     gctBOOL  superTiled = pColorTarget->superTiled;
     gctUINT format = pColorTarget->format;
     gctUINT32 stride = 0;
-    gctBOOL bOQEnable = (Hardware->QUERYStates->queryStatus[gcvQUERY_OCCLUSION] == gcvQUERY_Enabled);
+    gctBOOL bOQEnable = (Hardware->QUERYStates->queryStatus[gcvQUERY_OCCLUSION][0] == gcvQUERY_Enabled);
     gctBOOL bNeedNullRTForOQ = bOQEnable &&
                                Hardware->features[gcvFEATURE_PE_DISABLE_COLOR_PIPE] &&
                                !Hardware->features[gcvFEATURE_PE_DEPTH_ONLY_OQFIX] &&
@@ -10582,7 +10582,7 @@ gcoHARDWARE_FlushDepth(
         gceDEPTH_MODE depthMode = surface ? depthInfo->mode : gcvDEPTH_NONE;
         gceCOMPARE compare = surface ? depthInfo->compare : gcvCOMPARE_ALWAYS;
 
-        gctBOOL OQEnable = (Hardware->QUERYStates->queryStatus[gcvQUERY_OCCLUSION] == gcvQUERY_Enabled);
+        gctBOOL OQEnable = (Hardware->QUERYStates->queryStatus[gcvQUERY_OCCLUSION][0] == gcvQUERY_Enabled);
 
         gctBOOL ezEnabled = depthInfo->early &&
                             !Hardware->PEStates->disableAllEarlyDepth &&
@@ -11566,7 +11566,7 @@ gcoHARDWARE_FlushDepth(
     }
 
     if (Hardware->features[gcvFEATURE_RA_DEPTH_WRITE] &&
-        (Hardware->QUERYStates->queryStatus[gcvQUERY_OCCLUSION] == gcvQUERY_Enabled))
+        (Hardware->QUERYStates->queryStatus[gcvQUERY_OCCLUSION][0] == gcvQUERY_Enabled))
     {
         if (depthPipeSwitched)
         {
@@ -18476,8 +18476,8 @@ gcoHARDWARE_SetQuery(
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
-
-    gcmVERIFY_ARGUMENT(Type < gcvQUERY_MAX_NUM);
+    gcmVERIFY_ARGUMENT(Type < gcvQUERY_MAX_NUM && Index < gcvMAX_QUERY_SIZE);
+    gcmVERIFY_ARGUMENT(Index == 0 || (Type == gcvQUERY_XFB_WRITTEN || Type == gcvQUERY_PRIM_GENERATED));
 
     if ((Type == gcvQUERY_OCCLUSION && !Hardware->features[gcvFEATURE_HALTI0]) ||
         ((Type == gcvQUERY_XFB_WRITTEN || Type == gcvQUERY_PRIM_GENERATED) && !Hardware->features[gcvFEATURE_HW_TFB]))
@@ -18499,12 +18499,12 @@ gcoHARDWARE_SetQuery(
         {
             gctUINT32 oqSlot = QueryHeader;
 
-            gcmASSERT(Hardware->QUERYStates->queryStatus[Type] == gcvQUERY_Disabled);
+            gcmASSERT(Hardware->QUERYStates->queryStatus[Type][Index] == gcvQUERY_Disabled);
             gcmASSERT(QueryHeader != ~0U);
             gcmASSERT(Memory == gcvNULL);
 
-            Hardware->QUERYStates->queryHeaderPhysical[Type] = QueryHeader;
-            Hardware->QUERYStates->queryHeaderIndex[Type] = 0;
+            Hardware->QUERYStates->queryHeaderPhysical[Type][Index] = QueryHeader;
+            Hardware->QUERYStates->queryHeaderIndex[Type][Index] = 0;
 
             if (Type == gcvQUERY_OCCLUSION)
             {
@@ -18560,12 +18560,12 @@ gcoHARDWARE_SetQuery(
                         if (Hardware->features[gcvFEATURE_MULTI_CLUSTER])
                         {
                             oqSlot += gcmSIZEOF(gctUINT32) * (gctUINT32)(1 << clusterIDWidth);
-                            Hardware->QUERYStates->queryHeaderIndex[Type] += (gctINT32)(1 << clusterIDWidth);
+                            Hardware->QUERYStates->queryHeaderIndex[Type][Index] += (gctINT32)(1 << clusterIDWidth);
                         }
                         else
                         {
                             oqSlot += gcmSIZEOF(gctUINT32);
-                            Hardware->QUERYStates->queryHeaderIndex[Type]++;
+                            Hardware->QUERYStates->queryHeaderIndex[Type][Index]++;
                         }
                     }
                     { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -18597,11 +18597,11 @@ gcoHARDWARE_SetQuery(
                         ));
                     if (Hardware->features[gcvFEATURE_MULTI_CLUSTER])
                     {
-                        Hardware->QUERYStates->queryHeaderIndex[Type] += (gctINT32)(1 << clusterIDWidth);
+                        Hardware->QUERYStates->queryHeaderIndex[Type][Index] += (gctINT32)(1 << clusterIDWidth);
                     }
                     else
                     {
-                        Hardware->QUERYStates->queryHeaderIndex[Type]++;
+                        Hardware->QUERYStates->queryHeaderIndex[Type][Index]++;
                     }
                 }
 
@@ -18611,7 +18611,7 @@ gcoHARDWARE_SetQuery(
             {
                 gcmONERROR(gcoHARDWARE_LoadState32NEW(Hardware,
                     0x1C014,
-                    Hardware->QUERYStates->queryHeaderPhysical[Type],
+                    Hardware->QUERYStates->queryHeaderPhysical[Type][Index],
                     Memory
                     ));
 
@@ -18650,20 +18650,20 @@ gcoHARDWARE_SetQuery(
                     Memory
                     ));
 
-                Hardware->QUERYStates->queryHeaderIndex[Type]++;
+                Hardware->QUERYStates->queryHeaderIndex[Type][Index]++;
             }
             else
             {
                 gcmASSERT(0);
             }
 
-            Hardware->QUERYStates->queryStatus[Type] = gcvQUERY_Enabled;
+            Hardware->QUERYStates->queryStatus[Type][Index] = gcvQUERY_Enabled;
         }
         break;
 
     case gcvQUERYCMD_PAUSE:
         gcmASSERT(Memory);
-        if (Hardware->QUERYStates->queryStatus[Type] == gcvQUERY_Enabled)
+        if (Hardware->QUERYStates->queryStatus[Type][Index] == gcvQUERY_Enabled)
         {
             if (Type == gcvQUERY_OCCLUSION)
             {
@@ -18678,7 +18678,7 @@ gcoHARDWARE_SetQuery(
             {
                 gcmONERROR(gcoHARDWARE_LoadState32NEW(Hardware,
                     0x1C014,
-                    Hardware->QUERYStates->queryHeaderPhysical[Type],
+                    Hardware->QUERYStates->queryHeaderPhysical[Type][Index],
                     Memory
                     ));
 
@@ -18727,7 +18727,7 @@ gcoHARDWARE_SetQuery(
     case gcvQUERYCMD_RESUME:
         {
             gcmASSERT(Memory);
-            gcmASSERT(Hardware->QUERYStates->queryStatus[Type] == gcvQUERY_Enabled);
+            gcmASSERT(Hardware->QUERYStates->queryStatus[Type][Index] == gcvQUERY_Enabled);
 
             if (Type == gcvQUERY_OCCLUSION)
             {
@@ -18737,13 +18737,13 @@ gcoHARDWARE_SetQuery(
 
                 gcmONERROR(gcoHARDWARE_QueryCluster(Hardware, gcvNULL, gcvNULL, gcvNULL, &clusterIDWidth));
 
-                if (Hardware->QUERYStates->queryHeaderIndex[Type] >= (gctINT32)(64 * gpuCount * (1 << clusterIDWidth)))
+                if (Hardware->QUERYStates->queryHeaderIndex[Type][Index] >= (gctINT32)(64 * gpuCount * (1 << clusterIDWidth)))
                 {
                     gcmFATAL("commit 64 time, when OQ enable!!!!");
-                    Hardware->QUERYStates->queryHeaderIndex[Type] = (gctINT32)(63 * gpuCount * (1 << clusterIDWidth));
+                    Hardware->QUERYStates->queryHeaderIndex[Type][Index] = (gctINT32)(63 * gpuCount * (1 << clusterIDWidth));
                 }
-                oqSlot = Hardware->QUERYStates->queryHeaderPhysical[Type]
-                       + Hardware->QUERYStates->queryHeaderIndex[Type] * gcmSIZEOF(gctUINT32);
+                oqSlot = Hardware->QUERYStates->queryHeaderPhysical[Type][Index]
+                       + Hardware->QUERYStates->queryHeaderIndex[Type][Index] * gcmSIZEOF(gctUINT32);
 
                 if (gpuCount > 1)
                 {
@@ -18778,12 +18778,12 @@ gcoHARDWARE_SetQuery(
                         if (Hardware->features[gcvFEATURE_MULTI_CLUSTER])
                         {
                             oqSlot += gcmSIZEOF(gctUINT32) * (gctUINT32)(1 << clusterIDWidth);
-                            Hardware->QUERYStates->queryHeaderIndex[Type] += (gctINT32)(1 << clusterIDWidth);
+                            Hardware->QUERYStates->queryHeaderIndex[Type][Index] += (gctINT32)(1 << clusterIDWidth);
                         }
                         else
                         {
                             oqSlot += gcmSIZEOF(gctUINT32);
-                            Hardware->QUERYStates->queryHeaderIndex[Type]++;
+                            Hardware->QUERYStates->queryHeaderIndex[Type][Index]++;
                         }
                     }
                     { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -18814,11 +18814,11 @@ gcoHARDWARE_SetQuery(
 
                     if (Hardware->features[gcvFEATURE_MULTI_CLUSTER])
                     {
-                        Hardware->QUERYStates->queryHeaderIndex[Type] += (gctINT32)(1 << clusterIDWidth);
+                        Hardware->QUERYStates->queryHeaderIndex[Type][Index] += (gctINT32)(1 << clusterIDWidth);
                     }
                     else
                     {
-                        Hardware->QUERYStates->queryHeaderIndex[Type]++;
+                        Hardware->QUERYStates->queryHeaderIndex[Type][Index]++;
                     }
                 }
             }
@@ -18826,7 +18826,7 @@ gcoHARDWARE_SetQuery(
             {
                 gcmONERROR(gcoHARDWARE_LoadState32NEW(Hardware,
                     0x1C014,
-                    Hardware->QUERYStates->queryHeaderPhysical[Type],
+                    Hardware->QUERYStates->queryHeaderPhysical[Type][Index],
                     Memory
                     ));
 
@@ -18873,7 +18873,7 @@ gcoHARDWARE_SetQuery(
         break;
 
     case gcvQUERYCMD_END:
-        gcmASSERT(Hardware->QUERYStates->queryStatus[Type] == gcvQUERY_Enabled);
+        gcmASSERT(Hardware->QUERYStates->queryStatus[Type][Index] == gcvQUERY_Enabled);
         gcmASSERT(Memory == gcvNULL);
 
         if (Type == gcvQUERY_OCCLUSION)
@@ -18889,7 +18889,7 @@ gcoHARDWARE_SetQuery(
                 gcoHARDWARE_PauseTileStatus(Hardware, gcvTILE_STATUS_PAUSE);
             }
 
-            if (Hardware->QUERYStates->queryStatus[Type] == gcvQUERY_Enabled)
+            if (Hardware->QUERYStates->queryStatus[Type][Index] == gcvQUERY_Enabled)
             {
                 gcmONERROR(gcoHARDWARE_LoadCtrlStateNEW(
                         Hardware,
@@ -18915,7 +18915,7 @@ gcoHARDWARE_SetQuery(
         {
             gcmONERROR(gcoHARDWARE_LoadState32NEW(Hardware,
                 0x1C014,
-                Hardware->QUERYStates->queryHeaderPhysical[Type],
+                Hardware->QUERYStates->queryHeaderPhysical[Type][Index],
                 Memory
                 ));
 
@@ -18974,7 +18974,7 @@ gcoHARDWARE_SetQuery(
             gcmASSERT(0);
         }
 
-        Hardware->QUERYStates->queryStatus[Type] = gcvQUERY_Disabled;
+        Hardware->QUERYStates->queryStatus[Type][Index] = gcvQUERY_Disabled;
         break;
 
     default:
@@ -18994,12 +18994,13 @@ gceSTATUS
 gcoHARDWARE_GetQueryIndex(
     IN gcoHARDWARE Hardware,
     IN gceQueryType Type,
+    IN gctUINT32    IndexedId,
     IN gctINT32 * Index
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
 
-    gcmHEADER_ARG("Hardware=0x%x Type=%d, Index=%d", Hardware, Type, Index);
+    gcmHEADER_ARG("Hardware=0x%x Type=%d, IndexedId=%d Index=%d", Hardware, Type, IndexedId, Index);
 
     gcmGETHARDWARE(Hardware);
 
@@ -19011,7 +19012,7 @@ gcoHARDWARE_GetQueryIndex(
 
     if (Index)
     {
-        *Index = Hardware->QUERYStates->queryHeaderIndex[Type];
+        *Index = Hardware->QUERYStates->queryHeaderIndex[Type][IndexedId];
     }
 
 OnError:

@@ -1421,6 +1421,7 @@ gco3D_GetQuery(
     IN gcsSURF_NODE_PTR Node,
     IN gctUINT32    Size,
     IN gctPOINTER   Locked,
+    IN gctUINT32    IndexedId,
     OUT gctINT32 * Index
     );
 

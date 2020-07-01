@@ -853,11 +853,13 @@ typedef union _gcsXFBDIRTY
 
 /********* QUERY States *******************************
 */
+/* XFB_WRITTEN and PRIM_GENERATED can support multi-stream. */
+#define gcvMAX_QUERY_SIZE       gcdMAX_VERTEX_STREAM_COUNT
 typedef struct _gcsQUERYSTATES
 {
-    gceQueryStatus              queryStatus[gcvQUERY_MAX_NUM];
-    gctUINT32                   queryHeaderPhysical[gcvQUERY_MAX_NUM];
-    gctINT32                    queryHeaderIndex[gcvQUERY_MAX_NUM];
+    gceQueryStatus              queryStatus[gcvQUERY_MAX_NUM][gcvMAX_QUERY_SIZE];
+    gctUINT32                   queryHeaderPhysical[gcvQUERY_MAX_NUM][gcvMAX_QUERY_SIZE];
+    gctINT32                    queryHeaderIndex[gcvQUERY_MAX_NUM][gcvMAX_QUERY_SIZE];
 }gcsQUERYSTATES;
 
 
