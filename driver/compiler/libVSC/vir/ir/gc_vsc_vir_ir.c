@@ -14115,15 +14115,10 @@ VIR_Operand_NegateOperand(
         if(VIR_Operand_GetModifier(Operand) & VIR_MOD_NEG)
         {
             VIR_Operand_SetModifier(Operand, VIR_MOD_NEG ^ VIR_Operand_GetModifier(Operand));
-            VIR_Operand_SetModOrder(Operand, VIR_MODORDER_NONE);
         }
         else
         {
             VIR_Operand_SetModifier(Operand, VIR_MOD_NEG | VIR_Operand_GetModifier(Operand));
-            if (bHasAbs)
-            {
-                VIR_Operand_SetModOrder(Operand, VIR_MODORDER_ABS_NEG);
-            }
         }
         break;
 

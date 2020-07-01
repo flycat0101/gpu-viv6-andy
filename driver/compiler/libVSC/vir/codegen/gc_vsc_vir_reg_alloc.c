@@ -2894,7 +2894,6 @@ gctBOOL _VIR_RA_LS_removableLDARR(
 
                 /* We need to copy the modifier and the order from the usage operand. */
                 VIR_Operand_SetModifier(newOpnd, VIR_Operand_GetModifier(pUseOperand));
-                VIR_Operand_SetModOrder(newOpnd, VIR_Operand_GetModOrder(pUseOperand));
 
                 /* update the du - not complete yet
                    only delete the usage of t1, not add usage for base and offset */

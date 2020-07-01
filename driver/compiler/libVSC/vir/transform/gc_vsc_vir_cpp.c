@@ -468,7 +468,6 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
     gctBOOL                         bIsUsageSrcNeg = gcvFALSE, bIsUsageSrcAbs = gcvFALSE;
     gctBOOL                         bIsMovSrcNeg = gcvFALSE, bIsMovSrcAbs = gcvFALSE;
     gctBOOL                         bSetNeg = gcvFALSE, bSetAbs = gcvFALSE;
-    VIR_ModifierOrder               modOrder = VIR_MODORDER_NONE;
 
     do
     {
@@ -941,10 +940,6 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                         bSetAbs = bIsMovSrcAbs;
                         bSetNeg = bIsMovSrcNeg;
                     }
-                    if (bSetNeg && bSetAbs)
-                    {
-                        modOrder = VIR_MODORDER_ABS_NEG;
-                    }
                 }
                 else if (VIR_Operand_GetModifier(movSrc) != VIR_MOD_NONE)
                 {
@@ -1235,7 +1230,6 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                         {
                             VIR_Operand_ClrOneModifier(newSrc, VIR_MOD_NEG);
                         }
-                        VIR_Operand_SetModOrder(newSrc, modOrder);
                     }
 
                     /* Set the type id. */

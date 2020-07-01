@@ -957,8 +957,7 @@ VIR_IO_writeOperand(VIR_Shader_IOBuffer *Buf, VIR_Operand* pOperand)
         /* Word 2. */
         val = VIR_Operand_GetSwizzle(pOperand) << 24    |
               VIR_Operand_GetPrecision(pOperand) << 21  |
-              VIR_Operand_isBigEndian(pOperand) << 20   |
-              VIR_Operand_GetModOrder(pOperand) << 18;
+              VIR_Operand_isBigEndian(pOperand) << 20;
         ON_ERROR0(VIR_IO_writeUint(Buf, val));
 
         /* Word 3. */
@@ -2699,7 +2698,6 @@ VIR_IO_readOperand(VIR_Shader_IOBuffer *Buf, VIR_Operand* pOperand)
         }
         precision = (VIR_Precision)((val >> 21) & 0x07);
         VIR_Operand_SetBigEndian(pOperand, ((val >> 20) & 0x1));
-        VIR_Operand_SetModOrder(pOperand, ((val >> 18) & 0x2));
 
         /* Word 3. */
         ON_ERROR0(VIR_IO_readUint(Buf, &val));

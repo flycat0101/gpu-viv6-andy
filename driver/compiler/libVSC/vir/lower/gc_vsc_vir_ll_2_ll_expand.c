@@ -352,7 +352,7 @@ _set_ABS(
     VIR_Operand_SetModifier(Opnd, VIR_MOD_ABS | VIR_Operand_GetModifier(Opnd));
     if (VIR_Operand_GetModifier(Opnd) & VIR_MOD_NEG)
     {
-        VIR_Operand_SetModOrder(Opnd, VIR_MODORDER_NEG_ABS);
+        VIR_Operand_ClrOneModifier(Opnd, VIR_MOD_NEG); /* clear .neg modifier when abs is set after */
     }
     return gcvTRUE;
 }
