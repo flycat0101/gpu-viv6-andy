@@ -3310,7 +3310,7 @@ _Inst_RequireHPSrc(
 
 DEF_QUERY_PASS_PROP(vscVIR_AdjustPrecision)
 {
-    pPassProp->supportedLevels = VSC_PASS_LEVEL_ML | VSC_PASS_LEVEL_LL;
+    pPassProp->supportedLevels = (VSC_PASS_LEVEL)(VSC_PASS_LEVEL_ML | VSC_PASS_LEVEL_LL | VSC_PASS_LEVEL_MC);
 
     pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
 }
@@ -3319,15 +3319,8 @@ DEF_SH_NECESSITY_CHECK(vscVIR_AdjustPrecision)
 {
     VIR_Shader*                    pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
 
-    /* currently only PS is dual16-able */
-    if (VIR_Shader_GetKind(pShader) == VIR_SHADER_FRAGMENT &&
-        !VIR_Shader_IsVulkan(pShader) &&
-        !VIR_Shader_IsDesktopGL(pShader))
-    {
-        return gcvTRUE;
-    }
-
-    return gcvFALSE;
+    /* Only enable this pass when we need to check Dual16 for this shader. */
+    return VIR_Shader_NeedUpdatePrecision(pShader);
 }
 
 /* Based on HW dual16 restriction, adjust operand/symbol's precision */
@@ -3595,6 +3588,199 @@ VSC_ErrCode vscVIR_AdjustPrecision(VSC_SH_PASS_WORKER* pPassWorker)
     return errCode;
 }
 
+static VSC_ErrCode vscVIR_PrecisionUpdateSrc(VIR_Shader* shader, VIR_Operand* operand)
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+
+    gcmASSERT(operand);
+
+    gcmASSERT(!VIR_Shader_IsDesktopGL(shader));
+
+    switch(VIR_Operand_GetOpKind(operand))
+    {
+        case VIR_OPND_SYMBOL:
+        case VIR_OPND_VIRREG:
+        case VIR_OPND_ARRAY:
+        case VIR_OPND_FIELD:
+        case VIR_OPND_SAMPLER_INDEXING:
+        {
+            VIR_Symbol* sym = VIR_Operand_GetSymbol(operand);
+
+            gcmASSERT(VIR_Operand_GetPrecision(operand) != VIR_PRECISION_DEFAULT
+                                 || VIR_Shader_IsCLFromLanguage(shader));
+            if (!(VIR_Symbol_isSampler(sym) &&
+                  gcoOS_StrCmp(VIR_Shader_GetSymNameString(shader, sym), "#BaseSamplerSym") == gcvSTATUS_OK))
+            {
+                if(VIR_Operand_GetPrecision(operand) == VIR_PRECISION_ANY)
+                {
+                    gcmASSERT((VIR_Symbol_GetCurrPrecision(sym) != VIR_PRECISION_ANY &&
+                               VIR_Symbol_GetCurrPrecision(sym) != VIR_PRECISION_DEFAULT)
+                              || VIR_Shader_IsCLFromLanguage(shader));
+
+                    VIR_Operand_SetPrecision(operand, VIR_Symbol_GetCurrPrecision(sym));
+                }
+                else
+                {
+                    gcmASSERT(VIR_Symbol_GetPrecision(sym) == VIR_Operand_GetPrecision(operand) ||
+                              VIR_Symbol_GetPrecision(sym) == VIR_PRECISION_ANY
+                              || VIR_Shader_IsCLFromLanguage(shader));
+
+                }
+            }
+            break;
+        }
+
+        case VIR_OPND_TEXLDPARM:
+        {
+            gctUINT k;
+            VIR_Operand *texldOperand = (VIR_Operand*)operand;
+
+            for(k = 0; k < VIR_TEXLDMODIFIER_COUNT; ++k)
+            {
+                if(VIR_Operand_GetTexldModifier(texldOperand, k) != gcvNULL)
+                {
+                    vscVIR_PrecisionUpdateSrc(shader, VIR_Operand_GetTexldModifier(texldOperand, k));
+                    break;
+                }
+            }
+            break;
+        }
+        case VIR_OPND_PARAMETERS:
+        {
+            gctUINT k;
+            VIR_ParmPassing *parm = VIR_Operand_GetParameters(operand);
+
+            for(k = 0; k < parm->argNum; k++)
+            {
+                vscVIR_PrecisionUpdateSrc(shader, parm->args[k]);
+            }
+            break;
+        }
+        case VIR_OPND_IMMEDIATE:
+        case VIR_OPND_CONST:
+        case VIR_OPND_ADDRESS_OF:
+            gcmASSERT(VIR_Operand_GetPrecision(operand) == VIR_PRECISION_HIGH);
+            break;
+        case VIR_OPND_NAME:
+        case VIR_OPND_INTRINSIC:
+        case VIR_OPND_UNUSED:
+        case VIR_OPND_EVIS_MODIFIER:
+            break;
+        case VIR_OPND_LABEL:
+        case VIR_OPND_FUNCTION:
+            break;
+        default:
+            break;
+    }
+
+    return errCode;
+}
+
+static VSC_ErrCode vscVIR_PrecisionUpdateDst(VIR_Instruction* inst)
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VIR_Operand* dst = VIR_Inst_GetDest(inst);
+    VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
+
+    if(VIR_OPCODE_ExpectedResultPrecision(opcode))
+    {
+        gcmASSERT(VIR_Operand_GetPrecision(dst) != VIR_PRECISION_DEFAULT
+            || VIR_Shader_IsCLFromLanguage(VIR_Inst_GetShader(inst)));
+
+        if(VIR_Operand_GetPrecision(dst) == VIR_PRECISION_ANY)
+        {
+            VIR_Precision precision = VIR_Inst_GetExpectedResultPrecision(inst);
+            VIR_Symbol* sym = VIR_Operand_GetSymbol(dst);
+
+            if(VIR_Inst_GetOpcode(inst) == VIR_OP_LDARR)
+            {
+                VIR_Symbol* opndSym0 = VIR_Operand_GetSymbol(VIR_Inst_GetSource(inst, 0));
+                if (VIR_Symbol_isSampler(opndSym0) &&
+                    gcoOS_StrCmp(VIR_Shader_GetSymNameString(VIR_Inst_GetShader(inst), opndSym0), "#BaseSamplerSym") == gcvSTATUS_OK)
+                {
+                    precision = VIR_Operand_GetPrecision(VIR_Inst_GetSource(inst, 1));
+                }
+            }
+            VIR_Operand_SetPrecision(dst, precision);
+            VIR_Symbol_SetCurrPrecision(sym, precision);
+        }
+    }
+
+    return errCode;
+}
+
+/* Update the precision for all variables/operand. */
+DEF_QUERY_PASS_PROP(vscVIR_UpdatePrecision)
+{
+    pPassProp->supportedLevels = (VSC_PASS_LEVEL)(VSC_PASS_LEVEL_ML | VSC_PASS_LEVEL_LL | VSC_PASS_LEVEL_MC);
+
+    pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
+}
+
+DEF_SH_NECESSITY_CHECK(vscVIR_UpdatePrecision)
+{
+    VIR_Shader*             pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    /* Only enable this pass when we need to check Dual16 for this shader. */
+    return VIR_Shader_NeedUpdatePrecision(pShader);
+}
+
+VSC_ErrCode vscVIR_UpdatePrecision(VSC_SH_PASS_WORKER* pPassWorker)
+{
+    VSC_ErrCode                     errCode = VSC_ERR_NONE;
+    VIR_Shader*                     pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_FuncIterator                func_iter;
+    VIR_FunctionNode*               pFuncNode = gcvNULL;
+
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+    for (pFuncNode = VIR_FuncIterator_First(&func_iter);
+         pFuncNode != gcvNULL;
+         pFuncNode = VIR_FuncIterator_Next(&func_iter))
+    {
+        VIR_Function*               pFunc = pFuncNode->function;
+        VIR_InstIterator            inst_iter;
+        VIR_Instruction*            pInst = gcvNULL;
+        gctUINT                     i;
+
+        /* Update the precision for the function parameters. */
+        for (i = 0; i < VIR_IdList_Count(&pFunc->paramters); i++)
+        {
+            VIR_Id                  id = VIR_IdList_GetId(&pFunc->paramters, i);
+            VIR_Symbol*             pParam = VIR_Function_GetSymFromId(pFunc, id);
+            VIR_Symbol*             pVirReg = VIR_Shader_FindSymbolByTempIndex(pShader, VIR_Symbol_GetVariableVregIndex(pParam));
+
+            gcmASSERT(VIR_Symbol_GetPrecision(pParam) != VIR_PRECISION_DEFAULT || VIR_Shader_IsCLFromLanguage(pShader));
+            /* gcmASSERT(VIR_Symbol_GetVregVariable(virReg) == param); */ /* virReg's variable will be reset to another sym which came from old variable for function input/output */
+            if(VIR_Symbol_GetPrecision(pParam) == VIR_PRECISION_ANY)
+            {
+                VIR_Symbol_SetCurrPrecision(pParam, VIR_PRECISION_HIGH);
+                VIR_Symbol_SetCurrPrecision(pVirReg, VIR_PRECISION_HIGH);
+            }
+        }
+
+        /* Check all instructions. */
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(pFunc));
+        for (pInst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+             pInst != gcvNULL;
+             pInst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+        {
+            for (i = 0; i < VIR_Inst_GetSrcNum(pInst); i++)
+            {
+                VIR_Operand*    pSrcOpnd = VIR_Inst_GetSource(pInst, i);
+
+                vscVIR_PrecisionUpdateSrc(pShader, pSrcOpnd);
+            }
+
+            vscVIR_PrecisionUpdateDst(pInst);
+        }
+    }
+
+    if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    {
+        VIR_Shader_Dump(gcvNULL, "Update precision.", pShader, gcvTRUE);
+    }
+
+    return errCode;
+}
 
 static
 VIR_Operand * _vscVIR_FindParentImgOperandFromIndex(VIR_Instruction* inst, VIR_Operand* index, gctUINT channel)
@@ -5175,142 +5361,12 @@ vscVIR_ConvertVirtualInstructions(
     return errCode;
 }
 
-static VSC_ErrCode vscVIR_PrecisionUpdateSrc(VIR_Shader* shader, VIR_Operand* operand)
-{
-    VSC_ErrCode errCode = VSC_ERR_NONE;
-
-    gcmASSERT(operand);
-
-    if (VIR_Shader_IsDesktopGL(shader))
-    {
-        return errCode;
-    }
-    switch(VIR_Operand_GetOpKind(operand))
-    {
-        case VIR_OPND_SYMBOL:
-        case VIR_OPND_VIRREG:
-        case VIR_OPND_ARRAY:
-        case VIR_OPND_FIELD:
-        case VIR_OPND_SAMPLER_INDEXING:
-        {
-            VIR_Symbol* sym = VIR_Operand_GetSymbol(operand);
-
-            gcmASSERT(VIR_Operand_GetPrecision(operand) != VIR_PRECISION_DEFAULT
-                                 || VIR_Shader_IsCLFromLanguage(shader));
-            if (!(VIR_Symbol_isSampler(sym) &&
-                  gcoOS_StrCmp(VIR_Shader_GetSymNameString(shader, sym), "#BaseSamplerSym") == gcvSTATUS_OK))
-            {
-                if(VIR_Operand_GetPrecision(operand) == VIR_PRECISION_ANY)
-                {
-                    gcmASSERT((VIR_Symbol_GetCurrPrecision(sym) != VIR_PRECISION_ANY &&
-                               VIR_Symbol_GetCurrPrecision(sym) != VIR_PRECISION_DEFAULT)
-                              || VIR_Shader_IsCLFromLanguage(shader));
-
-                    VIR_Operand_SetPrecision(operand, VIR_Symbol_GetCurrPrecision(sym));
-                }
-                else
-                {
-                    gcmASSERT(VIR_Symbol_GetPrecision(sym) == VIR_Operand_GetPrecision(operand) ||
-                              VIR_Symbol_GetPrecision(sym) == VIR_PRECISION_ANY
-                              || VIR_Shader_IsCLFromLanguage(shader));
-
-                }
-            }
-            break;
-        }
-
-        case VIR_OPND_TEXLDPARM:
-        {
-            gctUINT k;
-            VIR_Operand *texldOperand = (VIR_Operand*)operand;
-
-            for(k = 0; k < VIR_TEXLDMODIFIER_COUNT; ++k)
-            {
-                if(VIR_Operand_GetTexldModifier(texldOperand, k) != gcvNULL)
-                {
-                    vscVIR_PrecisionUpdateSrc(shader, VIR_Operand_GetTexldModifier(texldOperand, k));
-                    break;
-                }
-            }
-            break;
-        }
-        case VIR_OPND_PARAMETERS:
-        {
-            gctUINT k;
-            VIR_ParmPassing *parm = VIR_Operand_GetParameters(operand);
-
-            for(k = 0; k < parm->argNum; k++)
-            {
-                vscVIR_PrecisionUpdateSrc(shader, parm->args[k]);
-            }
-            break;
-        }
-        case VIR_OPND_IMMEDIATE:
-        case VIR_OPND_CONST:
-        case VIR_OPND_ADDRESS_OF:
-            gcmASSERT(VIR_Operand_GetPrecision(operand) == VIR_PRECISION_HIGH);
-            break;
-        case VIR_OPND_NAME:
-        case VIR_OPND_INTRINSIC:
-        case VIR_OPND_UNUSED:
-        case VIR_OPND_EVIS_MODIFIER:
-            break;
-        case VIR_OPND_LABEL:
-        case VIR_OPND_FUNCTION:
-            break;
-        default:
-            break;
-    }
-
-    return errCode;
-}
-
-static VSC_ErrCode vscVIR_PrecisionUpdateDst(VIR_Instruction* inst)
-{
-    VSC_ErrCode errCode = VSC_ERR_NONE;
-    VIR_Operand* dst = VIR_Inst_GetDest(inst);
-    VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
-
-    if(VIR_OPCODE_ExpectedResultPrecision(opcode))
-    {
-        gcmASSERT(VIR_Operand_GetPrecision(dst) != VIR_PRECISION_DEFAULT
-            || VIR_Shader_IsCLFromLanguage(VIR_Inst_GetShader(inst)));
-
-        if(VIR_Operand_GetPrecision(dst) == VIR_PRECISION_ANY)
-        {
-            VIR_Precision precision = VIR_Inst_GetExpectedResultPrecision(inst);
-            VIR_Symbol* sym = VIR_Operand_GetSymbol(dst);
-
-            if(VIR_Inst_GetOpcode(inst) == VIR_OP_LDARR)
-            {
-                VIR_Symbol* opndSym0 = VIR_Operand_GetSymbol(VIR_Inst_GetSource(inst, 0));
-                if (VIR_Symbol_isSampler(opndSym0) &&
-                    gcoOS_StrCmp(VIR_Shader_GetSymNameString(VIR_Inst_GetShader(inst), opndSym0), "#BaseSamplerSym") == gcvSTATUS_OK)
-                {
-                    precision = VIR_Operand_GetPrecision(VIR_Inst_GetSource(inst, 1));
-                }
-            }
-            VIR_Operand_SetPrecision(dst, precision);
-            VIR_Symbol_SetCurrPrecision(sym, precision);
-        }
-    }
-
-    return errCode;
-}
-
-/* Update precision and pack mode. */
-static VSC_ErrCode _UpdatePrecisionAndPackMode(VIR_Shader* pShader)
+/* Update pack mode. */
+static VSC_ErrCode _UpdatePackMode(VSC_SH_PASS_WORKER* pPassWorker, VIR_Shader* pShader)
 {
     VSC_ErrCode             errCode = VSC_ERR_NONE;
     VIR_FuncIterator        func_iter;
     VIR_FunctionNode*       pFunc_node = gcvNULL;
-    gctBOOL                 bUpdatePrecision = gcvTRUE;
-
-    /* Check if we need to update the precision. */
-    if(!(VIR_Shader_IsFS(pShader) || VIR_Shader_IsCLFromLanguage(pShader)) || VIR_Shader_IsVulkan(pShader) || VIR_Shader_IsDesktopGL(pShader))
-    {
-        bUpdatePrecision = gcvFALSE;
-    }
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (pFunc_node = VIR_FuncIterator_First(&func_iter);
@@ -5320,26 +5376,6 @@ static VSC_ErrCode _UpdatePrecisionAndPackMode(VIR_Shader* pShader)
         VIR_Function*       pFunc = pFunc_node->function;
         VIR_InstIterator    inst_iter;
         VIR_Instruction*    pInst = gcvNULL;
-        gctUINT             i;
-
-        /* Update the precision for the function parameters. */
-        if (bUpdatePrecision)
-        {
-            for (i = 0; i < VIR_IdList_Count(&pFunc->paramters); i++)
-            {
-                VIR_Id      id = VIR_IdList_GetId(&pFunc->paramters, i);
-                VIR_Symbol* pParam = VIR_Function_GetSymFromId(pFunc, id);
-                VIR_Symbol* pVirReg = VIR_Shader_FindSymbolByTempIndex(pShader, VIR_Symbol_GetVariableVregIndex(pParam));
-
-                gcmASSERT(VIR_Symbol_GetPrecision(pParam) != VIR_PRECISION_DEFAULT || VIR_Shader_IsCLFromLanguage(pShader));
-                /* gcmASSERT(VIR_Symbol_GetVregVariable(virReg) == param); */ /* virReg's variable will be reset to another sym which came from old variable for function input/output */
-                if(VIR_Symbol_GetPrecision(pParam) == VIR_PRECISION_ANY)
-                {
-                    VIR_Symbol_SetCurrPrecision(pParam, VIR_PRECISION_HIGH);
-                    VIR_Symbol_SetCurrPrecision(pVirReg, VIR_PRECISION_HIGH);
-                }
-            }
-        }
 
         /* Check all instructions. */
         VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(pFunc));
@@ -5347,18 +5383,6 @@ static VSC_ErrCode _UpdatePrecisionAndPackMode(VIR_Shader* pShader)
              pInst != gcvNULL;
              pInst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
         {
-            if (bUpdatePrecision)
-            {
-                for (i = 0; i < VIR_Inst_GetSrcNum(pInst); i++)
-                {
-                    VIR_Operand*    pSrcOpnd = VIR_Inst_GetSource(pInst, i);
-
-                    vscVIR_PrecisionUpdateSrc(pShader, pSrcOpnd);
-                }
-
-                vscVIR_PrecisionUpdateDst(pInst);
-            }
-
             /* set pack mode if the instruction uses packed type.
              * adjust immediate date type for componentwise instruction */
             VIR_Inst_CheckAndSetPakedMode(pInst);
@@ -5367,7 +5391,7 @@ static VSC_ErrCode _UpdatePrecisionAndPackMode(VIR_Shader* pShader)
 
     if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
-        VIR_Shader_Dump(gcvNULL, "Update precision and pack mode.", pShader, gcvTRUE);
+        VIR_Shader_Dump(gcvNULL, "Update pack mode.", pShader, gcvTRUE);
     }
 
     return errCode;
@@ -6579,8 +6603,8 @@ VSC_ErrCode vscVIR_PreprocessLLShader(VSC_SH_PASS_WORKER* pPassWorker)
         ON_ERROR(errCode, "Convert PatchVerticesIn to uniform");
     }
 
-    /* Update precision and pack mode. */
-    errCode = _UpdatePrecisionAndPackMode(pShader);
+    /* Update pack mode. */
+    errCode = _UpdatePackMode(pPassWorker, pShader);
     ON_ERROR(errCode, "Update precision and pack mode.");
 
     /* Change all RETs to JMPs and only keep one RET at the end of the function. */
@@ -6932,37 +6956,10 @@ DEF_QUERY_PASS_PROP(vscVIR_CheckDual16able)
 
 DEF_SH_NECESSITY_CHECK(vscVIR_CheckDual16able)
 {
-    VSC_COMPILER_CONFIG     *compCfg = &pPassWorker->pCompilerParam->cfg;
     VIR_Shader              *Shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
-
+    gctBOOL                 bNeedToCheckDual16 = VIR_Shader_NeedUpdatePrecision(Shader);
     VIR_Shader_SetDual16Mode(Shader, gcvFALSE);
-
-    /* only fragment shader or ocl with VC_OPTION=DUAL16:num>0 can be dual16 shader,
-    ** and exclude OpenVG shader due to precision issue
-    */
-    if (!compCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.supportDual16 ||
-        (VIR_Shader_GetKind(Shader) != VIR_SHADER_FRAGMENT)       ||
-        (!VIR_Shader_IsFS(Shader) &&
-         !(VIR_Shader_IsCLFromLanguage(Shader) && gcGetDualFP16Mode(compCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasHalti2)))    ||
-        VIR_Shader_IsDesktopGL(Shader)                            ||
-        VIR_Shader_IsOpenVG(Shader)                               ||
-        VIR_Shader_HasOutputArrayHighp(Shader)                    || /* currently, we disable dual16 if the output array is highp */
-        !VirSHADER_DoDual16(VIR_Shader_GetId(Shader))             ||
-        gcmOPT_DisableOPTforDebugger()                               /* we disable dual16 for debugging mode */
-        )
-    {
-        return gcvFALSE;
-    }
-
-    if (VIR_Shader_IsVulkan(Shader))
-    {
-        if ((pPassWorker->pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_ENABLE_DUAL16_FOR_VK) == 0)
-        {
-            return gcvFALSE;
-        }
-    }
-
-    return gcvTRUE;
+    return bNeedToCheckDual16;
 }
 
 VSC_ErrCode vscVIR_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)

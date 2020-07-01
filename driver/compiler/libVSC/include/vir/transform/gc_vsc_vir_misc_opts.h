@@ -71,6 +71,10 @@ VSC_ErrCode vscVIR_AdjustPrecision(VSC_SH_PASS_WORKER* pPassWorker);
 DECLARE_QUERY_PASS_PROP(vscVIR_AdjustPrecision);
 DECLARE_SH_NECESSITY_CHECK(vscVIR_AdjustPrecision);
 
+VSC_ErrCode vscVIR_UpdatePrecision(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_UpdatePrecision);
+DECLARE_SH_NECESSITY_CHECK(vscVIR_UpdatePrecision);
+
 VSC_ErrCode vscVIR_ConvertVirtualInstructions(VSC_SH_PASS_WORKER* pPassWorker);
 DECLARE_QUERY_PASS_PROP(vscVIR_ConvertVirtualInstructions);
 DECLARE_SH_NECESSITY_CHECK(vscVIR_ConvertVirtualInstructions);

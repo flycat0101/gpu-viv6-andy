@@ -680,6 +680,18 @@ gceSTATUS vscLinkLibShaderToShader(SHADER_HANDLE              hMainShader,
 static VSC_ErrCode _PreprocessShader(VSC_SHADER_PASS_MANAGER* pShPassMnger)
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Shader*         pShader = (VIR_Shader*)pShPassMnger->pCompilerParam->hShader;
+
+    /* Set PM level firstly */
+    vscPM_SetCurPassLevel(&pShPassMnger->basePM, VSC_PASS_LEVEL_PRE);
+
+    /* add shader extflag if precision update is needed */
+    if (VIR_Shader_NeedToCheckDual16(pShader,
+                                     &(pShPassMnger->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg),
+                                     &(pShPassMnger->pCompilerParam->cfg)))
+    {
+        VIR_Shader_SetFlagExt1(pShader, VIR_SHFLAG_EXT1_ENABLE_PRECISION_UPDATE);
+    }
 
     /* Set PM level firstly */
     vscPM_SetCurPassLevel(&pShPassMnger->basePM, VSC_PASS_LEVEL_PRE);
@@ -829,6 +841,8 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
 
     /* Call (schedule) passes of LL by ourselves */
     CALL_SH_PASS(vscVIR_PreprocessLLShader, 0, &preLLPassData);
+    CALL_SH_PASS(vscVIR_AdjustPrecision, 0, gcvNULL);
+    CALL_SH_PASS(vscVIR_UpdatePrecision, 0, gcvNULL);
 
     /* If some functions are marked as FORCE_INLINED after pre-LL, we need to enable IL. */
     if (preLLPassData.bHasFuncNeedToForceInline)
@@ -863,7 +877,6 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
     CALL_SH_PASS(VSC_LCSE_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VSC_DCE_Perform, 0, gcvNULL);
     CALL_SH_PASS(VIR_CFO_PerformOnShader, 1, gcvNULL);
-    CALL_SH_PASS(vscVIR_AdjustPrecision, 0, gcvNULL);
 
     /* Call SIMP before the local vectorization because some code patterns are messed up after the vectorization. */
     CALL_SH_PASS(VSC_SIMP_Simplification_PerformOnShader, 0, gcvNULL);
@@ -913,7 +926,12 @@ static VSC_ErrCode _CompileShaderAtMCLevel(VSC_SHADER_PASS_MANAGER* pShPassMnger
     {
         CALL_SH_PASS(vscVIR_PreprocessMCShader, 0, gcvNULL);
         CALL_SH_PASS(vscVIR_PerformSpecialHwPatches, 0, gcvNULL);
+
+        /* Adjust and update the precision before doing the dual16 check. */
+        CALL_SH_PASS(vscVIR_AdjustPrecision, 0, gcvNULL);
+        CALL_SH_PASS(vscVIR_UpdatePrecision, 0, gcvNULL);
         CALL_SH_PASS(vscVIR_CheckDual16able, 0, gcvNULL);
+
         CALL_SH_PASS(vscVIR_PutScalarConstToImm, 0, gcvNULL);
         CALL_SH_PASS(vscVIR_PutImmValueToUniform, 0, gcvNULL);
         /* vscVIR_PutImmValueToUniform may generate uniform variable for constant vector
