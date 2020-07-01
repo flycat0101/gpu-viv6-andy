@@ -5410,10 +5410,6 @@ _LoadCLPatchLongULongLibrary(
             else
             {
                 status =  gcSHADER_ReadPatchLibFromFile(gcvTRUE, gcLIB_CL_LONG_ULONG_FUNCS, &library); /* read lib shader from file  */
-                if(gcmIS_ERROR(status))
-                {
-                    gcoOS_Print("gcSHADER_ReadPatchLibFromFile Error:%d\n", status);
-                }
             }
         }
 
