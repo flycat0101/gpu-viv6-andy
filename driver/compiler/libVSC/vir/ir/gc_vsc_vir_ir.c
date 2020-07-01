@@ -13039,6 +13039,44 @@ VIR_Enable_GetMappingSwizzle(
     return result;
 }
 
+VIR_Swizzle
+VIR_Enable_GetMappingFullChannelSwizzle(
+    IN VIR_Enable enable,
+    IN VIR_Swizzle swizzle
+    )
+{
+    VIR_Swizzle result = swizzle;
+    gctUINT8 set[VIR_CHANNEL_COUNT] = { 0 };
+    gctUINT8 i, j, lastChannel = 0;
+
+    for (i = 0; i < VIR_CHANNEL_COUNT; i++)
+    {
+        if (enable & (1 << i))
+        {
+            lastChannel = VIR_Swizzle_GetChannel(swizzle, i);
+            for (j = 0; j <= i; j++)
+            {
+                if (!set[j])
+                {
+                    VIR_Swizzle_SetChannel(result, j, lastChannel);
+                    set[j] = 1;
+                }
+            }
+        }
+    }
+
+    for (i = 0; i < VIR_CHANNEL_COUNT; i++)
+    {
+        if (!set[i])
+        {
+            VIR_Swizzle_SetChannel(result, i, lastChannel);
+            set[i] = 1;
+        }
+    }
+
+    return result;
+}
+
 VIR_Enable
 VIR_Enable_ApplyMappingSwizzle(
     IN VIR_Enable enable,

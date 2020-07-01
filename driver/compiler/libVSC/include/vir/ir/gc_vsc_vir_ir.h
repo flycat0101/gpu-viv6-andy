@@ -7039,6 +7039,12 @@ VIR_Enable_GetMappingSwizzle(
     IN VIR_Swizzle swizzle
     );
 
+VIR_Swizzle
+VIR_Enable_GetMappingFullChannelSwizzle(
+    IN VIR_Enable enable,
+    IN VIR_Swizzle swizzle
+    );
+
 VIR_Enable
 VIR_Enable_ApplyMappingSwizzle(
     IN VIR_Enable enable,

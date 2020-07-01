@@ -327,6 +327,97 @@ void _VIR_ReplaceSTARR(
     }
 }
 
+static VSC_ErrCode
+_VIR_SplitMovaInstruction(
+    VIR_Shader*             pShader,
+    VIR_Function*           pFunc,
+    VIR_DEF_USAGE_INFO*     pDuInfo,
+    VIR_Instruction*        pInst,
+    gctBOOL*                pChanged)
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VIR_Enable              instEnable = VIR_Inst_GetEnable(pInst), newEnable = VIR_ENABLE_NONE;
+    gctUINT8                prevEnableChannel = 0xFF, channel;
+    gctBOOL                 bHasGap = gcvFALSE;
+    VIR_Instruction*        pNewMovaInst = gcvNULL;
+    VIR_Operand*            pOpnd = gcvNULL;
+
+    gcmASSERT(VIR_CHANNEL_NUM == 4);
+
+    /* Skip one enabled channel or full enabled channles. */
+    if (VIR_Enable_Channel_Count(instEnable) == 1 || VIR_Enable_Channel_Count(instEnable) == VIR_CHANNEL_COUNT)
+    {
+        if (pChanged)
+        {
+            *pChanged = gcvFALSE;
+        }
+        return errCode;
+    }
+
+    /*
+    ** Since we have limited A0/B0 registers(normally there is only one A0/B0 register),
+    ** so do not leave any gap between two enabled channels, otherwise we need to reuse register in RA, which may cause some other issues in RA.
+    */
+    for (channel = VIR_CHANNEL_X; channel < VIR_CHANNEL_NUM; channel++)
+    {
+        if (!(instEnable & (1 << channel)))
+        {
+            continue;
+        }
+
+        if (prevEnableChannel != 0xFF && prevEnableChannel != channel - 1)
+        {
+            bHasGap = gcvTRUE;
+            break;
+        }
+
+        prevEnableChannel = channel;
+        newEnable |= 1 << channel;
+    }
+
+    /* No gap, just return. */
+    if (!bHasGap)
+    {
+        if (pChanged)
+        {
+            *pChanged = bHasGap;
+        }
+        return errCode;
+    }
+
+    /*
+    ** Split this MOVA instruction, and since there are 4 channels at most, we only need to insert one extra MOVA instruction.
+    */
+    errCode = VIR_Function_AddCopiedInstructionAfter(pFunc,
+                                                     pInst,
+                                                     pInst,
+                                                     gcvTRUE,
+                                                     &pNewMovaInst);
+    ON_ERROR(errCode, "Insert a MOVA instruction.");
+
+    /* Update the enable/swizzle of the new MOVA instruction. */
+    pOpnd = VIR_Inst_GetDest(pNewMovaInst);
+    VIR_Operand_SetEnable(pOpnd, (VIR_Enable)(instEnable & ~newEnable));
+
+    pOpnd = VIR_Inst_GetSource(pNewMovaInst, 0);
+    VIR_Operand_SetSwizzle(pOpnd, VIR_Enable_GetMappingFullChannelSwizzle((VIR_Enable)(instEnable & ~newEnable), VIR_Operand_GetSwizzle(pOpnd)));
+
+    /* Update the enable/swizzle of the original MOVA instruction. */
+    pOpnd = VIR_Inst_GetDest(pInst);
+    VIR_Operand_SetEnable(pOpnd, newEnable);
+
+    pOpnd = VIR_Inst_GetSource(pInst, 0);
+    VIR_Operand_SetSwizzle(pOpnd, VIR_Enable_GetMappingFullChannelSwizzle(newEnable, VIR_Operand_GetSwizzle(pOpnd)));
+
+    if (pChanged)
+    {
+        *pChanged = bHasGap;
+    }
+
+OnError:
+    return errCode;
+}
+
 /* in dual16 shader, we need to insert precison conv for
    implicit type interpretion (like floatBitsToInt...),
    since spec says "For mediump and lowp, the value is first
@@ -1703,10 +1794,16 @@ VSC_ErrCode vscVIR_PostMCCleanup(
                 {
                     _VIR_ReplaceLDARR(pShader, func, pDuInfo, inst, &bInvalidCfg);
                 }
-
-                if (opCode == VIR_OP_STARR)
+                else if (opCode == VIR_OP_STARR)
                 {
                     _VIR_ReplaceSTARR(pShader, func, pDuInfo, inst);
+                }
+            }
+            else
+            {
+                if (opCode == VIR_OP_MOVA)
+                {
+                    _VIR_SplitMovaInstruction(pShader, func, pDuInfo, inst, gcvNULL);
                 }
             }
 

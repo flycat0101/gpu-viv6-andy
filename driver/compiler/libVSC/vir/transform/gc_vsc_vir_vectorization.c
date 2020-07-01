@@ -1715,6 +1715,45 @@ static gctBOOL _IsAdjacentMovaToSeed(VIR_Instruction *pSeedInst,
     return gcvTRUE;
 }
 
+static gctBOOL _CanMovaVectorize(VIR_VECTORIZER_INFO* pVectorizerInfo,
+                                 VIR_Shader* pShader,
+                                 VIR_DEF_USAGE_INFO* pDuInfo,
+                                 VIR_Instruction* pSeedInst,
+                                 VIR_Instruction* pInst)
+{
+    VIR_Enable      seedInstEnable = VIR_Inst_GetEnable(pSeedInst);
+
+    /* For fragment shader, if it is a dual16 shader, we don't need to vectorize
+       more than 2 channels, since we only have a 4 channel A0, which can be used
+       for 2 HP channel. */
+    if (VIR_Shader_GetKind(pShader) == VIR_SHADER_FRAGMENT)
+    {
+        if (VIR_Enable_Channel_Count(seedInstEnable) >= 2)
+        {
+            return gcvFALSE;
+        }
+    }
+
+    /* B0 is a scalar, don't do vectorization */
+    if (pVectorizerInfo->pHwCfg->hwFeatureFlags.hasUniformB0)
+    {
+        if (_isMovaUniformBase(pDuInfo, pSeedInst) || _isMovaUniformBase(pDuInfo, pInst))
+        {
+            return gcvFALSE;
+        }
+    }
+
+    /* special case for MOVA, could not do vectorization if there's another MOVA
+     * between pSeedInst and pInst, which may increase allocation pressure of a0
+     */
+    if (!_IsAdjacentMovaToSeed(pSeedInst, pInst))
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
 static gctBOOL _CanInstVectorizeToSeedInst(VIR_VECTORIZER_INFO* pVectorizerInfo,
                                            VIR_Shader* pShader,
                                            VIR_DEF_USAGE_INFO* pDuInfo,
@@ -1767,30 +1806,6 @@ static gctBOOL _CanInstVectorizeToSeedInst(VIR_VECTORIZER_INFO* pVectorizerInfo,
         return gcvFALSE;
     }
 
-    /* For fragment shader, if it is a dual16 shader, we don't need to vectorize
-       more than 2 channels, since we only have a 4 channel A0, which can be used
-       for 2 HP channel. */
-
-    if (VIR_Shader_GetKind(pShader) == VIR_SHADER_FRAGMENT &&
-        VIR_Inst_GetOpcode(pSeedInst) == VIR_OP_MOVA)
-    {
-        if (VIR_Enable_Channel_Count(VIR_Operand_GetEnable(VIR_Inst_GetDest(pSeedInst))) >= 2)
-        {
-            return gcvFALSE;
-        }
-    }
-
-    /* B0 is a scalar, don't do vectorization */
-    if (pVectorizerInfo->pHwCfg->hwFeatureFlags.hasUniformB0 &&
-        VIR_Inst_GetOpcode(pSeedInst) == VIR_OP_MOVA)
-    {
-        if (_isMovaUniformBase(pDuInfo, pSeedInst) ||
-            _isMovaUniformBase(pDuInfo, pInst))
-        {
-            return gcvFALSE;
-        }
-    }
-
     /* could not do vectorization for dst has bHasUsageOnNoSwizzleInst */
     if (_IsDstHasNoSwizzleFlag(pDuInfo, pSeedInst) ||
         _IsDstHasNoSwizzleFlag(pDuInfo, pInst))
@@ -1798,13 +1813,13 @@ static gctBOOL _CanInstVectorizeToSeedInst(VIR_VECTORIZER_INFO* pVectorizerInfo,
         return gcvFALSE;
     }
 
-    /* special case for MOVA, could not do vectorization if there's another MOVA
-     * between pSeedInst and pInst, which may increase allocation pressure of a0
-     */
-    if ((VIR_Inst_GetOpcode(pSeedInst) == VIR_OP_MOVA) &&
-        (!_IsAdjacentMovaToSeed(pSeedInst, pInst)))
+    /* There some special requirements for MOVA instruction. */
+    if (VIR_Inst_GetOpcode(pSeedInst) == VIR_OP_MOVA)
     {
-        return gcvFALSE;
+        if (!_CanMovaVectorize(pVectorizerInfo, pShader, pDuInfo, pSeedInst, pInst))
+        {
+            return gcvFALSE;
+        }
     }
 
     /* if pSeedInst and pInst use same symbol in des operands, like following case

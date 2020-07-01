@@ -4534,7 +4534,7 @@ gctBOOL vscVIR_IsInstDefiniteWrite(VIR_DEF_USAGE_INFO*   pDuInfo,
         bDefiniteWrite = gcvTRUE;
     }
 
-    if (bCheckDef)
+    if (!bDefiniteWrite && bCheckDef)
     {
         /*
         ** Although this instruction is a conditional write, if it is the unique DEF instruction for this reg,
@@ -5113,59 +5113,21 @@ static gctBOOL _vscVIR_DefBBInBetween(
     }
 }
 
-/*
-    If there is define of srcOpnd that is between startInst and endInst,
-    return gcvTRUE.
-
-    For example:
-    MOV t1.x, t2.y        (startInst)
-    SUB t2.y, t5.x, t6.x  (def is between startInst and endInst, return gcvTRUE)
-    ADD t3.x, t1.x, t4.x  (endInst)
-
-    Make sure the loop is correctly handled.
-
-    Above check is not enough, it can't handle if redefine is after the endInst and there is a back JMP to the startInst.
-    For example, check the below code segment, the redfine Inst "r2 += r2" is after the endInst "r3 = r1".
-    To solve this, use CFG to check if there is not refineInst BB between startBB and endBB.
-
-    gctBOOL check = gcvFALSE;
-    for (; ;)
-    {
-        if (cond_true)
-        {
-            if (!check)
-            {
-                r1 = r2;
-                check = gcvTRUE;
-            }
-        }
-        else if (check)
-        {
-            r3 = r1;
-        }
-
-        r2 += r2;
-
-        if (...)
-        {
-            ...
-            break;
-        }
-    }
-
-*/
-gctBOOL vscVIR_RedefineBetweenInsts(
+static gctBOOL
+_IsRedefineBetweenInsts(
     IN VSC_MM                   *pMM,
     IN VIR_DEF_USAGE_INFO       *duInfo,
     IN VIR_Instruction          *startInst,
     IN VIR_Instruction          *endInst,
     IN VIR_Operand              *srcOpndOfStartInst,
+    IN gctBOOL                  bCheckSameBBOnly,
+    IN gctBOOL                  bCheckDifferentBBOnly,
+    OUT gctBOOL                 *pNoRefined,
     OUT VIR_Instruction         **redefInst
     )
 {
     gctBOOL         retValue = gcvFALSE;
     VIR_Instruction *pDefInst = gcvNULL;
-    VIR_Instruction *pIndexInst = gcvNULL;
     VSC_HASH_TABLE  *visitSet = gcvNULL;
 
     VIR_OperandInfo srcInfo;
@@ -5179,12 +5141,6 @@ gctBOOL vscVIR_RedefineBetweenInsts(
     if (VIR_Inst_GetBasicBlock(startInst) == VIR_Inst_GetBasicBlock(endInst))
     {
         bIsStartEndInSameBB = gcvTRUE;
-    }
-
-    /* If there is no other instruction between start and end, just return. */
-    if (bIsStartEndInSameBB && VIR_Inst_GetNext(startInst) == endInst)
-    {
-        return retValue;
     }
 
     VIR_Operand_GetOperandInfo(startInst, srcOpndOfStartInst, &srcInfo);
@@ -5218,6 +5174,22 @@ gctBOOL vscVIR_RedefineBetweenInsts(
                     continue;
                 }
 
+                if (bIsStartEndInSameBB)
+                {
+                    if (bCheckSameBBOnly &&
+                        (VIR_Inst_GetBasicBlock(pDefInst) !=VIR_Inst_GetBasicBlock(startInst)))
+                    {
+                        defIdx = pDef->nextDefIdxOfSameRegNo;
+                        continue;
+                    }
+                    else if (bCheckDifferentBBOnly &&
+                        (VIR_Inst_GetBasicBlock(pDefInst) ==VIR_Inst_GetBasicBlock(startInst)))
+                    {
+                        defIdx = pDef->nextDefIdxOfSameRegNo;
+                        continue;
+                    }
+                }
+
                 /* Get a refined match. */
                 if (pDefInst == endInst || pDefInst == startInst)
                 {
@@ -5228,23 +5200,69 @@ gctBOOL vscVIR_RedefineBetweenInsts(
 
                 /* Start to check this def. */
                 /*
-                ** If start/end/def instruction are in the same BB, the check would be more easier because
-                ** we don't need to check the back-jmp situation, we only need to check if this def instruction is within
-                ** this instruction fragment.
+                ** If START/END/DEF instruction are in the same BB, the check would be more easier because
+                ** we don't need to check the back-jmp situation, we only need to check if this DEF instruction is within
+                ** this instruction fragment:
+                ** 1) DEF is between START and END, just return TRUE.
+                ** 2) DEF is after END, continue to check the rest DEF instruction.
+                ** 3) DEF is before START: if this DEF is a definite write, we can just return FALSE.
                 */
                 if (bIsStartEndInSameBB && VIR_Inst_GetBasicBlock(pDefInst) == VIR_Inst_GetBasicBlock(startInst))
                 {
-                    pIndexInst = startInst;
+                    VIR_BB*                 pBB = VIR_Inst_GetBasicBlock(pDefInst);
+                    VIR_Instruction*        pIndexInst = gcvNULL;
+                    gctBOOL                 bMeetStart = gcvFALSE, bMeetEnd = gcvFALSE;
 
-                    while (pIndexInst && pIndexInst != endInst && VIR_Inst_GetBasicBlock(pIndexInst) == VIR_Inst_GetBasicBlock(startInst))
+                    pIndexInst = BB_GET_START_INST(pBB);
+
+                    while (pIndexInst && pIndexInst != VIR_Inst_GetNext(BB_GET_END_INST(pBB)))
                     {
+                        pIndexInst = VIR_Inst_GetNext(pIndexInst);
+
                         if (pIndexInst == pDefInst)
                         {
-                            retValue = gcvTRUE;
-                            *redefInst = pDefInst;
-                            break;
+                            /* DEF is after END, continue to check the rest DEF instruction. */
+                            if (bMeetEnd)
+                            {
+                                break;
+                            }
+                            /* DEF is between START and END, just return TRUE. */
+                            else if (bMeetStart)
+                            {
+                                retValue = gcvTRUE;
+                                *redefInst = pDefInst;
+                                break;
+                            }
+                            /* DEF is before START: if this DEF is a definite write, we can just return FALSE. */
+                            else
+                            {
+                                if (!vscVIR_IsInstDefiniteWrite(duInfo, pDefInst, 0, gcvTRUE))
+                                {
+                                    break;
+                                }
+
+                                /* Enable convers all channels. */
+                                if (!VIR_Enable_Covers(VIR_Inst_GetEnable(pDefInst), enableMask))
+                                {
+                                    break;
+                                }
+
+                                /* Find a matched DEF instruction. */
+                                if (pNoRefined)
+                                {
+                                    *pNoRefined = gcvTRUE;
+                                }
+                                return gcvFALSE;
+                            }
                         }
-                        pIndexInst = VIR_Inst_GetNext(pIndexInst);
+                        else if (pIndexInst == startInst)
+                        {
+                            bMeetStart = gcvTRUE;
+                        }
+                        else if (pIndexInst == endInst)
+                        {
+                            bMeetEnd = gcvTRUE;
+                        }
                     }
 
                     if (retValue)
@@ -5320,6 +5338,97 @@ gctBOOL vscVIR_RedefineBetweenInsts(
     vscHTBL_Destroy(visitSet);
 
     return retValue;
+}
+
+/*
+    If there is define of srcOpnd that is between startInst and endInst,
+    return gcvTRUE.
+
+    For example:
+    MOV t1.x, t2.y        (startInst)
+    SUB t2.y, t5.x, t6.x  (def is between startInst and endInst, return gcvTRUE)
+    ADD t3.x, t1.x, t4.x  (endInst)
+
+    Make sure the loop is correctly handled.
+
+    Above check is not enough, it can't handle if redefine is after the endInst and there is a back JMP to the startInst.
+    For example, check the below code segment, the redfine Inst "r2 += r2" is after the endInst "r3 = r1".
+    To solve this, use CFG to check if there is not refineInst BB between startBB and endBB.
+
+    gctBOOL check = gcvFALSE;
+    for (; ;)
+    {
+        if (cond_true)
+        {
+            if (!check)
+            {
+                r1 = r2;
+                check = gcvTRUE;
+            }
+        }
+        else if (check)
+        {
+            r3 = r1;
+        }
+
+        r2 += r2;
+
+        if (...)
+        {
+            ...
+            break;
+        }
+    }
+
+*/
+gctBOOL vscVIR_RedefineBetweenInsts(
+    IN VSC_MM                   *pMM,
+    IN VIR_DEF_USAGE_INFO       *duInfo,
+    IN VIR_Instruction          *startInst,
+    IN VIR_Instruction          *endInst,
+    IN VIR_Operand              *srcOpndOfStartInst,
+    OUT VIR_Instruction         **redefInst
+    )
+{
+    gctBOOL         retValue = gcvFALSE;
+    gctBOOL         bIsStartEndInSameBB = gcvFALSE;
+    gctBOOL         bNoRefined = gcvFALSE;
+
+    if (VIR_Inst_GetBasicBlock(startInst) == VIR_Inst_GetBasicBlock(endInst))
+    {
+        bIsStartEndInSameBB = gcvTRUE;
+    }
+
+    /* If there is no other instruction between start and end, just return. */
+    if (bIsStartEndInSameBB && VIR_Inst_GetNext(startInst) == endInst)
+    {
+        return retValue;
+    }
+
+    /* If START/END are in the same basic block, go through all DEFs within this BB first, it can save lots of CPU time for some large shaders. */
+    if (bIsStartEndInSameBB)
+    {
+        retValue = _IsRedefineBetweenInsts(pMM, duInfo, startInst, endInst, srcOpndOfStartInst, gcvTRUE, gcvFALSE, &bNoRefined, redefInst);
+
+        if (retValue)
+        {
+            return gcvTRUE;
+        }
+        else if (bNoRefined)
+        {
+            return gcvFALSE;
+        }
+        else
+        {
+            retValue = _IsRedefineBetweenInsts(pMM, duInfo, startInst, endInst, srcOpndOfStartInst, gcvFALSE, gcvTRUE, &bNoRefined, redefInst);
+            return retValue;
+        }
+    }
+    else
+    {
+        retValue = _IsRedefineBetweenInsts(pMM, duInfo, startInst, endInst, srcOpndOfStartInst, gcvFALSE, gcvFALSE, &bNoRefined, redefInst);
+        return retValue;
+    }
 }
 
 /* Find the unique nearest defined instruction. */

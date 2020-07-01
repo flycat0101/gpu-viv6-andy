@@ -53,7 +53,7 @@ gcOPTIMIZER_OPTION theOptimizerOption =
     gcvFALSE, /* SPIRV2FILE: dump SPIRV to tmp file for debugging */
     0, /* _dumpStart; */
     0x7fffffff, /* _dumpEnd */
-    1, /* RENUM:[0|1]: re-number instruction id when dumping IR */
+    0, /* renumberInst:[0|1]: re-number instruction id when dumping IR */
     gcvFALSE, /* LIB: dump library shader too */
 
     /* Varying Packing:
