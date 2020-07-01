@@ -80,6 +80,13 @@ slFuncCheckForAtrigAsIntrinsic(
     );
 
 gceSTATUS
+slFuncCheckForNoiseIntrinsic(
+    IN sloCOMPILER Compiler,
+    IN struct _slsNAME * FuncName,
+    IN struct _sloIR_POLYNARY_EXPR * PolynaryExpr
+    );
+
+gceSTATUS
 slFuncCheckForInterpolate(
     IN sloCOMPILER Compiler,
     IN struct _slsNAME * FuncName,

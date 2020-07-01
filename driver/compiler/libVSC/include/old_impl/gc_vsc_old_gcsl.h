@@ -127,9 +127,13 @@ BEGIN_EXTERN_C()
 
 /* bump up version to 1.42 for adding intrinsic functions vstore_half with rounding modes rtz, rtp and rtn 06/12/2020 */
 
+/* bump up version to 1.43 for adding intrinsic functions noise1, noise2 ... for OGL4.0 06/13/2020 */
+
+/* bump up version to 1.44 for adding intrinsic functions of double type for ldexp, frexp, fma, packDouble2x32 and unpackDouble2x32 for OGL4.0 06/04/2020 */
+
 /* current version */
-#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 43)
-#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 43)
+#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 45)
+#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 45)
 
 typedef union _gcsValue
 {

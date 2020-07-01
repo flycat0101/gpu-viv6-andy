@@ -473,6 +473,16 @@ _GenDegreesCode(
     );
 
 gceSTATUS
+_GenNoiseCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    );
+
+gceSTATUS
 _EvaluateSin(
     IN sloCOMPILER Compiler,
     IN gctUINT OperandCount,
@@ -3188,10 +3198,20 @@ static slsINTRINSIC_BUILTIN_FUNCTION CommonIntrinsicBuiltInFunctions[] =
     {{slvEXTENSION1_ES_31},    "ldexp", gcvNULL, gcvNULL,                  T_VEC3, _HP,     2, {T_VEC3, T_IVEC3}, {_IN,  _IN}, {_HP, _HP},gceINTRIN_source, "_viv_ldexp_vec3", {0}, {0}},
     {{slvEXTENSION1_ES_31},    "ldexp", gcvNULL, gcvNULL,                  T_VEC4, _HP,     2, {T_VEC4, T_IVEC4}, {_IN,  _IN}, {_HP, _HP},gceINTRIN_source, "_viv_ldexp_vec4", {0}, {0}},
 
+    {{slvEXTENSION1_DOUBLE_DATA_TYPE},    "ldexp", gcvNULL, gcvNULL,       T_DOUBLE,_HP,     2, {T_DOUBLE,  T_INT}, {_IN,  _IN}, {_HP, _HP},gceINTRIN_source, "_viv_ldexp_double", {0}, {0}},
+    {{slvEXTENSION1_DOUBLE_DATA_TYPE},    "ldexp", gcvNULL, gcvNULL,       T_DVEC2, _HP,     2, {T_DVEC2, T_IVEC2}, {_IN,  _IN}, {_HP, _HP},gceINTRIN_source, "_viv_ldexp_dvec2", {0}, {0}},
+    {{slvEXTENSION1_DOUBLE_DATA_TYPE},    "ldexp", gcvNULL, gcvNULL,       T_DVEC3, _HP,     2, {T_DVEC3, T_IVEC3}, {_IN,  _IN}, {_HP, _HP},gceINTRIN_source, "_viv_ldexp_dvec3", {0}, {0}},
+    {{slvEXTENSION1_DOUBLE_DATA_TYPE},    "ldexp", gcvNULL, gcvNULL,       T_DVEC4, _HP,     2, {T_DVEC4, T_IVEC4}, {_IN,  _IN}, {_HP, _HP},gceINTRIN_source, "_viv_ldexp_dvec4", {0}, {0}},
+
     {{slvEXTENSION1_ES_31},    "frexp", gcvNULL, gcvNULL,                  T_FLOAT,_HP,     2, {T_FLOAT,  T_INT}, {_IN,  _OT}, {_HP, _HP},gceINTRIN_source, "_viv_frexp_float", {0}, {0}},
     {{slvEXTENSION1_ES_31},    "frexp", gcvNULL, gcvNULL,                  T_VEC2, _HP,     2, {T_VEC2, T_IVEC2}, {_IN,  _OT}, {_HP, _HP},gceINTRIN_source, "_viv_frexp_vec2", {0}, {0}},
     {{slvEXTENSION1_ES_31},    "frexp", gcvNULL, gcvNULL,                  T_VEC3, _HP,     2, {T_VEC3, T_IVEC3}, {_IN,  _OT}, {_HP, _HP},gceINTRIN_source, "_viv_frexp_vec3", {0}, {0}},
     {{slvEXTENSION1_ES_31},    "frexp", gcvNULL, gcvNULL,                  T_VEC4, _HP,     2, {T_VEC4, T_IVEC4}, {_IN,  _OT}, {_HP, _HP},gceINTRIN_source, "_viv_frexp_vec4", {0}, {0}},
+
+    {{slvEXTENSION1_DOUBLE_DATA_TYPE},    "frexp", gcvNULL, gcvNULL,       T_DOUBLE,_HP,     2, {T_DOUBLE,  T_INT}, {_IN,  _OT}, {_HP, _HP},gceINTRIN_source, "_viv_frexp_double", {0}, {0}},
+    {{slvEXTENSION1_DOUBLE_DATA_TYPE},    "frexp", gcvNULL, gcvNULL,       T_DVEC2, _HP,     2, {T_DVEC2, T_IVEC2}, {_IN,  _OT}, {_HP, _HP},gceINTRIN_source, "_viv_frexp_dvec2", {0}, {0}},
+    {{slvEXTENSION1_DOUBLE_DATA_TYPE},    "frexp", gcvNULL, gcvNULL,       T_DVEC3, _HP,     2, {T_DVEC3, T_IVEC3}, {_IN,  _OT}, {_HP, _HP},gceINTRIN_source, "_viv_frexp_dvec3", {0}, {0}},
+    {{slvEXTENSION1_DOUBLE_DATA_TYPE},    "frexp", gcvNULL, gcvNULL,       T_DVEC4, _HP,     2, {T_DVEC4, T_IVEC4}, {_IN,  _OT}, {_HP, _HP},gceINTRIN_source, "_viv_frexp_dvec4", {0}, {0}},
 
     /* Floating-Point Pack and Unpack Functions for es3.0 */
     {{slvEXTENSION1_HALTI},    "packUnorm2x16", _EvaluatePackUnorm2x16, gcvNULL,          T_UINT, _HP,     1, {T_VEC2},          {_IN}, {ANY},gceINTRIN_source, "_viv_packUnorm2x16_vec2", {0}, {0}},
@@ -3206,6 +3226,10 @@ static slsINTRINSIC_BUILTIN_FUNCTION CommonIntrinsicBuiltInFunctions[] =
     {{slvEXTENSION1_ES_31},    "packSnorm4x8", gcvNULL, gcvNULL,           T_UINT, _HP,     1, {T_VEC4},          {_IN}, {_MP},gceINTRIN_source, "_viv_packSnorm4x8_vec4", {0}, {0}},
     {{slvEXTENSION1_ES_31},    "unpackUnorm4x8", gcvNULL, gcvNULL,         T_VEC4, _MP,     1, {T_UINT},          {_IN}, {_HP},gceINTRIN_source, "_viv_unpackUnorm4x8_uint", {0}, {0}},
     {{slvEXTENSION1_ES_31},    "unpackSnorm4x8", gcvNULL, gcvNULL,         T_VEC4, _MP,     1, {T_UINT},          {_IN}, {_HP},gceINTRIN_source, "_viv_unpackSnorm4x8_uint", {0}, {0}},
+
+    /* Double Pack and Unpack Functions */
+    {{slvEXTENSION1_DOUBLE_DATA_TYPE},    "packDouble2x32", gcvNULL, gcvNULL,          T_DOUBLE, _HP,     1, {T_UVEC2},          {_IN}, {ANY},gceINTRIN_source, "_viv_packDouble2x32_uvec2", {0}, {0}},
+    {{slvEXTENSION1_DOUBLE_DATA_TYPE},    "unpackDouble2x32", gcvNULL, gcvNULL,        T_UVEC2, _HP,     1, {T_DOUBLE},          {_IN}, {_HP},gceINTRIN_source, "_viv_unpackDouble2x32_double", {0}, {0}},
 
     {{slvEXTENSION1_ES_31},    "umulExtended", gcvNULL, gcvNULL,           T_VOID, _DP,     4, {T_UINT,  T_UINT,  T_UINT,  T_UINT},   {_IN, _IN, _OT, _OT}, {_HP, _HP, _HP, _HP},gceINTRIN_source, "_viv_umulExtended_uint", {0}, {0}},
     {{slvEXTENSION1_ES_31},    "umulExtended", gcvNULL, gcvNULL,           T_VOID, _DP,     4, {T_UVEC2, T_UVEC2, T_UVEC2, T_UVEC2},  {_IN, _IN, _OT, _OT}, {_HP, _HP, _HP, _HP},gceINTRIN_source, "_viv_umulExtended_uvec2", {0}, {0}},
@@ -3230,6 +3254,11 @@ static slsINTRINSIC_BUILTIN_FUNCTION CommonIntrinsicBuiltInFunctions[] =
     {{slvEXTENSION1_GPU_SHADER5},  "fma", gcvNULL, gcvNULL,                 T_VEC2, ANY,     3, {T_VEC2,  T_VEC2,  T_VEC2},   {_IN,  _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_fma_vec2", {0}, {0}},
     {{slvEXTENSION1_GPU_SHADER5},  "fma", gcvNULL, gcvNULL,                 T_VEC3, ANY,     3, {T_VEC3,  T_VEC3,  T_VEC3},   {_IN,  _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_fma_vec3", {0}, {0}},
     {{slvEXTENSION1_GPU_SHADER5},  "fma", gcvNULL, gcvNULL,                 T_VEC4, ANY,     3, {T_VEC4,  T_VEC4,  T_VEC4},   {_IN,  _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_fma_vec4", {0}, {0}},
+
+    {{slvEXTENSION1_GPU_SHADER5 | slvEXTENSION1_DOUBLE_DATA_TYPE},  "fma", gcvNULL, gcvNULL,     T_DOUBLE,ANY,     3, {T_DOUBLE, T_DOUBLE, T_DOUBLE},  {_IN,  _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_fma_double", {0}, {0}},
+    {{slvEXTENSION1_GPU_SHADER5 | slvEXTENSION1_DOUBLE_DATA_TYPE},  "fma", gcvNULL, gcvNULL,     T_DVEC2, ANY,     3, {T_DVEC2,  T_DVEC2,  T_DVEC2},   {_IN,  _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_fma_dvec2", {0}, {0}},
+    {{slvEXTENSION1_GPU_SHADER5 | slvEXTENSION1_DOUBLE_DATA_TYPE},  "fma", gcvNULL, gcvNULL,     T_DVEC3, ANY,     3, {T_DVEC3,  T_DVEC3,  T_DVEC3},   {_IN,  _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_fma_dvec3", {0}, {0}},
+    {{slvEXTENSION1_GPU_SHADER5 | slvEXTENSION1_DOUBLE_DATA_TYPE},  "fma", gcvNULL, gcvNULL,     T_DVEC4, ANY,     3, {T_DVEC4,  T_DVEC4,  T_DVEC4},   {_IN,  _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_fma_dvec4", {0}, {0}},
 
     {{slvEXTENSION1_NONE},     "reflect", _EvaluateReflect, gcvNULL,                T_FLOAT,ANY,     2, {T_FLOAT, T_FLOAT},  {_IN,  _IN}, {ANY, ANY},gceINTRIN_source, "_viv_reflect_float", {0}, {0}},
     {{slvEXTENSION1_NONE},     "reflect", _EvaluateReflect, gcvNULL,                T_VEC2, ANY,     2, {T_VEC2,  T_VEC2},   {_IN,  _IN}, {ANY, ANY},gceINTRIN_source, "_viv_reflect_vec2", {0}, {0}},
@@ -3603,6 +3632,22 @@ static slsINTRINSIC_BUILTIN_FUNCTION CommonIntrinsicBuiltInFunctions[] =
 
     {{slvEXTENSION1_EXT_TEXTURE_BUFFER},    "imageAtomicCompSwap", gcvNULL, gcvNULL,    T_INT,   _HP,   4, {T_IIMAGEBUFFER, T_INT, T_INT, T_INT}, {_IN, _IN, _IN, _IN}, {_HP, ANY, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_cmpxchg_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
     {{slvEXTENSION1_EXT_TEXTURE_BUFFER},    "imageAtomicCompSwap", gcvNULL, gcvNULL,    T_UINT,  _HP,   4, {T_UIMAGEBUFFER, T_INT, T_UINT, T_UINT}, {_IN, _IN, _IN, _IN}, {_HP, ANY, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_cmpxchg_buffer_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {{slvEXTENSION1_NONE},     "noise1", gcvNULL, _GenNoiseCode,             T_FLOAT,    ANY,  1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_noise1_float", {0}, {0}, slFuncCheckForNoiseIntrinsic},
+    {{slvEXTENSION1_NONE},     "noise1", gcvNULL, _GenNoiseCode,             T_FLOAT,    ANY,  1, {T_VEC2}, {_IN}, {ANY},gceINTRIN_source, "_viv_noise1_vec2", {0}, {0}, slFuncCheckForNoiseIntrinsic},
+    {{slvEXTENSION1_NONE},     "noise1", gcvNULL, _GenNoiseCode,             T_FLOAT,    ANY,  1, {T_VEC3}, {_IN}, {ANY},gceINTRIN_source, "_viv_noise1_vec3", {0}, {0}, slFuncCheckForNoiseIntrinsic},
+    {{slvEXTENSION1_NONE},     "noise1", gcvNULL, _GenNoiseCode,             T_FLOAT,    ANY,  1, {T_VEC4}, {_IN}, {ANY},gceINTRIN_source, "_viv_noise1_vec4", {0}, {0}, slFuncCheckForNoiseIntrinsic},
+    {{slvEXTENSION1_NONE},     "noise2", gcvNULL, _GenNoiseCode,             T_VEC2,     ANY,  1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_noise2_float", {0}, {0}, slFuncCheckForNoiseIntrinsic},
+    {{slvEXTENSION1_NONE},     "noise2", gcvNULL, _GenNoiseCode,             T_VEC2,     ANY,  1, {T_VEC2}, {_IN}, {ANY},gceINTRIN_source, "_viv_noise2_vec2", {0}, {0}, slFuncCheckForNoiseIntrinsic},
+    {{slvEXTENSION1_NONE},     "noise2", gcvNULL, _GenNoiseCode,             T_VEC2,     ANY,  1, {T_VEC3}, {_IN}, {ANY},gceINTRIN_source, "_viv_noise2_vec3", {0}, {0}, slFuncCheckForNoiseIntrinsic},
+    {{slvEXTENSION1_NONE},     "noise2", gcvNULL, _GenNoiseCode,             T_VEC2,     ANY,  1, {T_VEC4}, {_IN}, {ANY},gceINTRIN_source, "_viv_noise2_vec4", {0}, {0}, slFuncCheckForNoiseIntrinsic},
+    {{slvEXTENSION1_NONE},     "noise3", gcvNULL, _GenNoiseCode,             T_VEC3,     ANY,  1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_noise3_float", {0}, {0}, slFuncCheckForNoiseIntrinsic},
+    {{slvEXTENSION1_NONE},     "noise3", gcvNULL, _GenNoiseCode,             T_VEC3,     ANY,  1, {T_VEC2}, {_IN}, {ANY},gceINTRIN_source, "_viv_noise3_vec2", {0}, {0}, slFuncCheckForNoiseIntrinsic},
+    {{slvEXTENSION1_NONE},     "noise3", gcvNULL, _GenNoiseCode,             T_VEC3,     ANY,  1, {T_VEC3}, {_IN}, {ANY},gceINTRIN_source, "_viv_noise3_vec3", {0}, {0}, slFuncCheckForNoiseIntrinsic},
+    {{slvEXTENSION1_NONE},     "noise3", gcvNULL, _GenNoiseCode,             T_VEC3,     ANY,  1, {T_VEC4}, {_IN}, {ANY},gceINTRIN_source, "_viv_noise3_vec4", {0}, {0}, slFuncCheckForNoiseIntrinsic},
+    {{slvEXTENSION1_NONE},     "noise4", gcvNULL, _GenNoiseCode,             T_VEC4,     ANY,  1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_noise4_float", {0}, {0}, slFuncCheckForNoiseIntrinsic},
+    {{slvEXTENSION1_NONE},     "noise4", gcvNULL, _GenNoiseCode,             T_VEC3,     ANY,  1, {T_VEC2}, {_IN}, {ANY},gceINTRIN_source, "_viv_noise4_vec2", {0}, {0}, slFuncCheckForNoiseIntrinsic},
+    {{slvEXTENSION1_NONE},     "noise4", gcvNULL, _GenNoiseCode,             T_VEC4,     ANY,  1, {T_VEC3}, {_IN}, {ANY},gceINTRIN_source, "_viv_noise4_vec3", {0}, {0}, slFuncCheckForNoiseIntrinsic},
+    {{slvEXTENSION1_NONE},     "noise4", gcvNULL, _GenNoiseCode,             T_VEC4,     ANY,  1, {T_VEC4}, {_IN}, {ANY},gceINTRIN_source, "_viv_noise4_vec4", {0}, {0}, slFuncCheckForNoiseIntrinsic},
 };
 
 static gctUINT CommonIntrinsicBuiltInFunctionCount =
