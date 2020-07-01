@@ -205,6 +205,9 @@ struct VIR_RA_LS_LIVERANGE
 #define isLRLDDependence(LR)            (((LR)->flags & VIR_RA_LRFLAG_LD_DEP) != 0)
 #define isLRVX(LR)                      (((LR)->flags & VIR_RA_LRFLAG_VX) != 0)
 #define isLRHighpVec2(LR)               (((LR)->flags & VIR_RA_LRHIGHPVEC2) != 0)
+#define isLRA0(LR)                      ((LR)->hwType == VIR_RA_HWREG_A0)
+#define isLRB0(LR)                      ((LR)->hwType == VIR_RA_HWREG_B0)
+#define isLRA0OrB0(LR)                  (isLRA0(LR) || isLRB0(LR))
 
 typedef enum _VIR_RA_LS_FLAG
 {

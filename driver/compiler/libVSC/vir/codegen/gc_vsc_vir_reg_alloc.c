@@ -2492,7 +2492,7 @@ void _VIR_RS_LS_MarkLRDead(
     ==>
     1: mova t2.x, t1.x          [1, 4]
     2: ldarr dst, src0, t2.x    [2, 4] */
-    if (pLR->hwType == VIR_RA_HWREG_A0)
+    if (isLRA0(pLR))
     {
         gctUINT8    channel;
         gctUINT     movaDefIdx;
@@ -4057,7 +4057,7 @@ _VIR_RA_LS_SetUsedColorForLR(
         {
             if (newColor &&
                 pLR->colorFunc != VIR_RA_LS_ATTRIBUTE_FUNC &&
-                pLR->hwType != VIR_RA_HWREG_B0 &&
+                !isLRB0(pLR) &&
                 _VIR_RA_LS_TestUsedColor(pRA, pLR->hwType,
                     regNoHI,
                     _VIR_RA_Color_Channels(LREnable,
@@ -4656,8 +4656,7 @@ VIR_RA_HWReg_Color _VIR_RA_LS_FindNewColor(
                     if (allRegsFit == pLR->regNoRange)
                     {
                         /* B0 only has one component */
-                        if (!(pLR->hwType == VIR_RA_HWREG_B0 &&
-                              LRShift > 0))
+                        if (!(isLRB0(pLR) && LRShift > 0))
                         {
                             regno = regno - pLR->regNoRange;
                             _VIR_RA_MakeColor(regno, LRShift, &retValue);
@@ -4737,7 +4736,7 @@ VIR_RA_HWReg_Color _VIR_RA_LS_FindNewColor(
                     gctINT    j = 0, allChannelsFit = 0;
 
                     /* B0 should not needHI, since it only has one component */
-                    gcmASSERT(pLR->hwType ==  VIR_RA_HWREG_A0);
+                    gcmASSERT(isLRA0(pLR));
                     gcmASSERT(pLR->regNoRange == 1);
                     regnoHI = regno;
                     LRShiftHI = VIR_Enable_Channel_Count(A0Enable) + LRShift;
@@ -4791,7 +4790,7 @@ OnRet:
             VIR_LOG_FLUSH(pDumper);
         }
 
-        if (pLR->hwType == VIR_RA_HWREG_A0)
+        if (isLRA0(pLR))
         {
             /* when all 4 A0 channels are used, we need to keep ldarr (as a move) */
             if (LRShift == 3)
@@ -6630,8 +6629,7 @@ VSC_ErrCode _VIR_RA_LS_SortLRTable(
     {
         pLR = _VIR_RA_LS_Web2LR(pRA, webIdx);
 
-        if (pLR->hwType == VIR_RA_HWREG_A0 ||
-            pLR->hwType == VIR_RA_HWREG_B0)
+        if (isLRA0OrB0(pLR))
         {
             continue;
         }
@@ -7056,8 +7054,7 @@ VSC_ErrCode  _VIR_RA_LS_AssignColorLR(
                     VIR_LOG_FLUSH(pDumper);
                 }
                 /* we could not find a color */
-                if (pLR->hwType == VIR_RA_HWREG_A0 ||
-                    pLR->hwType == VIR_RA_HWREG_B0)
+                if (isLRA0OrB0(pLR))
                 {
                     retValue = VSC_RA_ERR_OUT_OF_REG_FAIL;
                     return retValue;
@@ -9363,7 +9360,7 @@ _VIR_RA_LS_RewriteColor_Src(
                 }
                 _VIR_RA_LS_SetOperandHwRegInfo(pRA, pOpnd, curColor);
             }
-            else if (pLR->hwType == VIR_RA_HWREG_A0)
+            else if (isLRA0(pLR))
             {
                 gcmASSERT(VIR_Operand_GetPrecision(pOpnd) != VIR_PRECISION_HIGH);
                 _VIR_RA_MakeColor(VIR_SR_A0,
@@ -9371,7 +9368,7 @@ _VIR_RA_LS_RewriteColor_Src(
                                   &curColor);
                 _VIR_RA_LS_SetOperandHwRegInfo(pRA, pOpnd, curColor);
             }
-            else if (pLR->hwType == VIR_RA_HWREG_B0)
+            else if (isLRB0(pLR))
             {
                 gcmASSERT(VIR_Operand_GetPrecision(pOpnd) != VIR_PRECISION_HIGH);
                 _VIR_RA_MakeColor(VIR_SR_B0,
@@ -11685,7 +11682,7 @@ _VIR_RA_LS_ClearUsedColorFromActiveLR(
     gctUINT                 shift = 0;
     gctUINT                 regCount = 0;
 
-    if (!(hwRegType == VIR_RA_HWREG_A0 || hwRegType == VIR_RA_HWREG_B0))
+    if (!isLRA0OrB0(pLR))
     {
         return gcvFALSE;
     }
@@ -11771,9 +11768,12 @@ VSC_ErrCode _VIR_RA_LS_AssignColorA0Inst(
         defIdx = _VIR_RA_LS_InstFirstDefIdx(pRA, pInst);
         pMovaLR = _VIR_RA_LS_Def2ColorLR(pRA, defIdx);
         webIdx = pMovaLR->webIdx;
+
+        gcmASSERT(isLRA0OrB0(pMovaLR));
+
         if (_VIR_RA_LS_IsInvalidColor(_VIR_RA_GetLRColor(pMovaLR)))
         {
-            if (pMovaLR->hwType == VIR_RA_HWREG_B0)
+            if (isLRB0(pMovaLR))
             {
                 curColor = _VIR_RA_LS_FindNewColor(pRA, webIdx, gcvFALSE, 0, -1, gcvNULL);
                 curColor._HIhwRegId = curColor._hwRegId;
@@ -11791,7 +11791,7 @@ VSC_ErrCode _VIR_RA_LS_AssignColorA0Inst(
 
                 if (bClearUsedColor)
                 {
-                    if (pMovaLR->hwType == VIR_RA_HWREG_B0)
+                    if (isLRB0(pMovaLR))
                     {
                         curColor = _VIR_RA_LS_FindNewColor(pRA, webIdx, gcvFALSE, 0, -1, gcvNULL);
                         curColor._HIhwRegId = curColor._hwRegId;
@@ -11826,11 +11826,11 @@ VSC_ErrCode _VIR_RA_LS_AssignColorA0Inst(
             retValue = _VIR_RA_LS_AddActiveLRs(pRA, webIdx, gcvTRUE, pFunc, 0);
         }
 
-        _VIR_RA_MakeColor((pMovaLR->hwType == VIR_RA_HWREG_B0) ? VIR_SR_B0 : VIR_SR_A0,
+        _VIR_RA_MakeColor(isLRB0(pMovaLR) ? VIR_SR_B0 : VIR_SR_A0,
                         _VIR_RA_Color_Shift(_VIR_RA_GetLRColor(pMovaLR)), &curColor);
         if (!_VIR_RA_LS_IsInvalidHIColor(_VIR_RA_GetLRColor(pMovaLR)))
         {
-            _VIR_RA_MakeColorHI((pMovaLR->hwType == VIR_RA_HWREG_B0) ? VIR_SR_B0 : VIR_SR_A0,
+            _VIR_RA_MakeColorHI(isLRB0(pMovaLR) ? VIR_SR_B0 : VIR_SR_A0,
                 _VIR_RA_Color_HIShift(_VIR_RA_GetLRColor(pMovaLR)), &curColor);
         }
 
@@ -11963,23 +11963,23 @@ VSC_ErrCode _VIR_RA_LS_AssignColorA0Inst(
                 VIR_Inst_SetThreadMode(pNewInst, VIR_THREAD_D16_DUAL_32);
             }
 
-            _VIR_RA_MakeColor((pMovaLR->hwType == VIR_RA_HWREG_B0) ? VIR_SR_B0 : VIR_SR_A0,
+            _VIR_RA_MakeColor(isLRB0(pMovaLR) ? VIR_SR_B0 : VIR_SR_A0,
                 _VIR_RA_Color_Shift(_VIR_RA_GetLRColor(pMovaLR)), &curColor);
 
             if (!_VIR_RA_LS_IsInvalidHIColor(_VIR_RA_GetLRColor(pMovaLR)))
             {
-                _VIR_RA_MakeColorHI((pMovaLR->hwType == VIR_RA_HWREG_B0) ? VIR_SR_B0 : VIR_SR_A0,
+                _VIR_RA_MakeColorHI(isLRB0(pMovaLR) ? VIR_SR_B0 : VIR_SR_A0,
                     _VIR_RA_Color_HIShift(_VIR_RA_GetLRColor(pMovaLR)), &curColor);
             }
 
             _VIR_RA_LS_SetOperandHwRegInfo(pRA, VIR_Inst_GetDest(pNewInst), curColor);
         }
 
-        _VIR_RA_MakeColor((pMovaLR->hwType == VIR_RA_HWREG_B0) ? VIR_SR_B0 : VIR_SR_A0,
+        _VIR_RA_MakeColor(isLRB0(pMovaLR) ? VIR_SR_B0 : VIR_SR_A0,
             _VIR_RA_Color_Shift(_VIR_RA_GetLRColor(pMovaLR)), &curColor);
         if (!_VIR_RA_LS_IsInvalidHIColor(_VIR_RA_GetLRColor(pMovaLR)))
         {
-            _VIR_RA_MakeColorHI((pMovaLR->hwType == VIR_RA_HWREG_B0) ? VIR_SR_B0 : VIR_SR_A0,
+            _VIR_RA_MakeColorHI(isLRB0(pMovaLR) ? VIR_SR_B0 : VIR_SR_A0,
                 _VIR_RA_Color_HIShift(_VIR_RA_GetLRColor(pMovaLR)), &curColor);
         }
 

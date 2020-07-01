@@ -5646,6 +5646,17 @@ VIR_LoopOpts_PerformOnFunction(
             }
         }
     }
+
+    /* Check if there are still some loops left. */
+    if (VIR_LoopInfoMgr_GetLoopInfoCount(VIR_LoopOpts_GetLoopInfoMgr(loopOpts)) > 0)
+    {
+        VIR_Function_SetFlag(func, VIR_FUNCFLAG_HAS_LOOP);
+    }
+    else
+    {
+        VIR_Function_ClrFlag(func, VIR_FUNCFLAG_HAS_LOOP);
+    }
+
     VIR_LoopOpts_DeleteLoopInfoMgr(loopOpts);
 
     if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(options), VSC_OPTN_LoopOptsOptions_TRACE_FUNC_OUTPUT))

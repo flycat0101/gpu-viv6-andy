@@ -3257,8 +3257,11 @@ _VSC_CPF_PerformOnFunction(
     errCode = _VSC_CPF_InitFunction(pCPF, pFunc, &loopOptions);
 
     /* We need to detect the loopInfo to analyze the back edge flow. */
-    VIR_LoopOpts_NewLoopInfoMgr(pLoopOpts);
-    VIR_LoopOpts_DetectNaturalLoops(pLoopOpts);
+    if (VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_HAS_LOOP))
+    {
+        VIR_LoopOpts_NewLoopInfoMgr(pLoopOpts);
+        VIR_LoopOpts_DetectNaturalLoops(pLoopOpts);
+    }
 
     /* Two phases algorithm:
        first do global constant data flow analysis;
