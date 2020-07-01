@@ -1684,6 +1684,7 @@ ppoPREPROCESSOR_Pragma(ppoPREPROCESSOR PP)
     cleOPENCLSetting  setting = OPENCL_INVALID;
     gctCHAR      settingStr[1024] = {0};
     gctUINT      len = 0, offset = 0;
+    ppoMACRO_SYMBOL ms = gcvNULL;
 
     /* Set current area as invalid so we can accept invalid tokens. */
     PP->doWeInValidArea = gcvFALSE;
@@ -1802,7 +1803,7 @@ ppoPREPROCESSOR_Pragma(ppoPREPROCESSOR PP)
                    {
                        ppoPREPROCESSOR_Report(PP,
                                               clvREPORT_ERROR,
-                                              "Can't enable a non-supported extension in pragma.",
+                                              "Can't enable a non-supported extension %s in pragma.",
                                               extToken->poolString
                                               );
                    }
@@ -1822,14 +1823,31 @@ ppoPREPROCESSOR_Pragma(ppoPREPROCESSOR PP)
                       {
                           ppoPREPROCESSOR_Report(PP,
                                                  clvREPORT_WARN,
-                                                 "Pragma OPENCL EXTENSION is not supported, ignoring pragma.",
+                                                 "Pragma OPENCL EXTENSION %s is not supported, ignoring pragma.",
                                                  extToken->poolString
                                                 );
                       }
                    }
                    break;
-                case clvEXTENSION_VASM:
                 case clvEXTENSION_CL_KHR_FP16:
+                   gcmONERROR(ppoMACRO_MANAGER_GetMacroSymbol(PP, PP->macroManager, extToken->poolString, &ms));
+
+                   if (ms == gcvNULL)
+                   {
+                       ppoPREPROCESSOR_Report(PP,
+                                              clvREPORT_WARN,
+                                              "Pragma OPENCL EXTENSION cl_khr_fp16 is not supported, ignoring pragma."
+                                             );
+                   }
+                   else
+                   {
+                       gcmVERIFY_OK(cloCOMPILER_EnableExtension(PP->compiler,
+                                                                oclExtension,
+                                                                setting == OPENCL_ENABLE ? gcvTRUE : gcvFALSE));
+                   }
+                   break;
+
+                case clvEXTENSION_VASM:
                 case clvEXTENSION_VIV_BITFIELD:
                 case clvEXTENSION_VIV_CMPLX:
                     gcmONERROR(ppoPREPROCESSOR_DefineUndefMacro(PP, extToken->poolString, setting, settingStr));
@@ -1891,8 +1909,7 @@ ppoPREPROCESSOR_Pragma(ppoPREPROCESSOR PP)
             {
                 ppoPREPROCESSOR_Report(PP,
                         clvREPORT_WARN,
-                        "Pragma OPENCL FENV_ACCESS ON is not supported, ignoring pragma.",
-                        extToken->poolString
+                        "Pragma OPENCL FENV_ACCESS ON is not supported, ignoring pragma."
                         );
             }
         }
