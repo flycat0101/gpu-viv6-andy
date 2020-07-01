@@ -777,6 +777,9 @@ static VSC_ErrCode _CompileShaderAtMedLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
 
         /* simplification pass on ML */
         CALL_SH_PASS(VSC_SIMP_Simplification_PerformOnShader, 0, gcvNULL);
+
+        /* check common intrinsic expression in function level and delete redundant ones to reduce code size */
+        CALL_SH_PASS(VSC_CIE_PerformOnShader, 0, gcvNULL);
     }
 
     /*

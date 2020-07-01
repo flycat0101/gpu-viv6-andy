@@ -1443,6 +1443,43 @@ void VSC_OPTN_UnifiedUniformOptions_Dump(
     IN struct _VIR_DUMPER* dumper
     );
 
+/* common intrinsic elimination options*/
+typedef struct _VSC_OPTN_CIEOPTIONS
+{
+    /* Must be first element */
+    VSC_OPTN_BASE optnBase;
+
+    gctUINT32 threshold; /* if >= threshold number of common intrinsic candidates, run the elimination */
+} VSC_OPTN_CIEOptions;
+
+#define VSC_OPTN_CIEOptions_GetSwitchOn(option)             VSC_OPTN_GetSwitchOn(&(option)->optnBase)
+#define VSC_OPTN_CIEOptions_SetSwitchOn(option, s)          VSC_OPTN_SetSwitchOn(&(option)->optnBase, (s))
+#define VSC_OPTN_CIEOptions_GetThreshold(option)            ((option)->threshold)
+#define VSC_OPTN_CIEOptions_SetThreshold(option, s)         ((option)->threshold = (s))
+#define VSC_OPTN_CIEOptions_GetTrace(option)                VSC_OPTN_GetTrace(&(option)->optnBase)
+#define VSC_OPTN_CIEOptions_SetTrace(option, t)             VSC_OPTN_SetTrace(&(option)->optnBase, (t))
+
+#define VSC_OPTN_CIEOptions_TRACE_ANALYSIS                  0x1
+
+void VSC_OPTN_CIEOptions_SetDefault(
+    IN OUT VSC_OPTN_CIEOptions* options,
+    IN gctUINT optLevel
+    );
+
+void VSC_OPTN_CIEOptions_GetOptionFromString(
+    IN gctSTRING str,
+    IN OUT VSC_OPTN_CIEOptions* options
+    );
+
+void VSC_OPTN_CIEOptions_Dump(
+    IN VSC_OPTN_CIEOptions* options,
+    IN struct _VIR_DUMPER* dumper
+    );
+
+void VSC_OPTN_CIEOptions_Usage(
+    IN struct _VIR_DUMPER* dumper
+    );
+
 #define VSC_OPTN_SCPP_COUNT 1
 #define VSC_OPTN_PARAMOPT_COUNT 1
 #define VSC_OPTN_LoopOpts_COUNT 1
@@ -1502,6 +1539,7 @@ typedef struct _VSC_OPTN_OPTIONS
     VSC_OPTN_ILFLinkOptions     ilflink_options;
     VSC_OPTN_UnifiedUniformOptions unifiedUniform_options;
     VSC_OPTN_ATOMPatchOptions   atompatch_options;
+    VSC_OPTN_CIEOptions         cie_options;
     gctBOOL                     options_usage;
     gctUINT                     cFlags;
 } VSC_OPTN_Options;
@@ -1537,6 +1575,7 @@ typedef enum _VSC_PASS_OPTN_TYPE
     VSC_PASS_OPTN_TYPE_ILF_LINK,
     VSC_PASS_OPTN_TYPE_UNIFIED_UNIFORM,
     VSC_PASS_OPTN_TYPE_ATOM_PATCH,
+    VSC_PASS_OPTN_TYPE_CIE, /* eliminate common intrinsic */
     VSC_PASS_OPTN_TYPE_MAX,
 } VSC_PASS_OPTN_TYPE;
 
@@ -1569,6 +1608,7 @@ typedef enum _VSC_PASS_OPTN_TYPE
 #define VSC_OPTN_Options_GetILFLinkOptions(option)         (&((option)->ilflink_options))
 #define VSC_OPTN_Options_GetUnifiedUniformOptions(option)  (&((option)->unifiedUniform_options))
 #define VSC_OPTN_Options_GetATOMPatchOptions(option)       (&((option)->atompatch_options))
+#define VSC_OPTN_Options_GetCIEOptions(option)             (&((option)->cie_options))
 #define VSC_OPTN_Options_GetOptionsUsage(option)           ((option)->options_usage)
 #define VSC_OPTN_Options_SetOptionsUsage(option, u)        ((option)->options_usage = (u))
 #define VSC_OPTN_Options_SetReset(option, u)               ((option)->reset = (u))

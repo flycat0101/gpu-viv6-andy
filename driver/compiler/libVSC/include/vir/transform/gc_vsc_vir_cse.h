@@ -28,6 +28,13 @@ extern VSC_ErrCode VSC_LCSE_PerformOnShader(
 DECLARE_QUERY_PASS_PROP(VSC_LCSE_PerformOnShader);
 DECLARE_SH_NECESSITY_CHECK(VSC_LCSE_PerformOnShader);
 
+/* common intrinsic elimination */
+extern VSC_ErrCode VSC_CIE_PerformOnShader(
+    IN VSC_SH_PASS_WORKER* pPassWorker
+    );
+DECLARE_QUERY_PASS_PROP(VSC_CIE_PerformOnShader);
+DECLARE_SH_NECESSITY_CHECK(VSC_CIE_PerformOnShader);
+
 END_EXTERN_C()
 
 #endif /* __gc_vsc_vir_cse_h_ */

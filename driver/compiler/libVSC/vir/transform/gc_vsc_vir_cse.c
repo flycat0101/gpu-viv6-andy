@@ -344,7 +344,7 @@ static VSC_LCSE_Key* _VSC_LCSE_ExpMap_FindSameExpKey(
         VIR_Instruction* keyInst = VSC_LCSE_Key_GetInst(key);
         VIR_OpCode      keyOpcode = VIR_Inst_GetOpcode(keyInst);
 
-        if(VIR_Inst_IdenticalExpression(keyInst, inst, VSC_LCSE_ExpMap_GetShader(expMap), gcvTRUE, gcvTRUE))
+        if(VIR_Inst_IdenticalExpression(keyInst, inst, VSC_LCSE_ExpMap_GetShader(expMap), gcvTRUE, gcvTRUE, gcvFALSE))
         {
             /* load r1.xy, base, offset
                load r1.yz, base, offset
@@ -893,6 +893,441 @@ VSC_ErrCode VSC_LCSE_PerformOnShader(
     if(VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(shader), VIR_Shader_GetId(shader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
         VIR_Shader_Dump(gcvNULL, "LCSE End", shader, gcvTRUE);
+    }
+
+    return errCode;
+}
+
+/* begin define of CIE */
+typedef struct VSC_CIE
+{
+    VIR_Shader*             shader;
+    VIR_Function*           currFunc;
+    gctUINT                 candThres; /* if the candlist >= threadhold, run the promotion */
+    VIR_Dumper*             dumper;
+    gctBOOL                 dumpTrace;
+    VSC_MM*                 pMM;
+    gctBOOL                 codeChanged;
+} VSC_CIE;
+
+#define VSC_CIE_GetShader(l)           ((l)->shader)
+#define VSC_CIE_SetShader(l, s)        ((l)->shader = (s))
+#define VSC_CIE_GetCurrFunc(l)         ((l)->currFunc)
+#define VSC_CIE_SetCurrFunc(l, f)      ((l)->currFunc = (f))
+#define VSC_CIE_GetOptions(l)          ((l)->options)
+#define VSC_CIE_SetOptions(l, o)       ((l)->options = (o))
+#define VSC_CIE_GetDumper(l)           ((l)->dumper)
+#define VSC_CIE_SetDumper(l, d)        ((l)->dumper = (d))
+#define VSC_CIE_DumpTrace(l)           ((l)->dumpTrace)
+#define VSC_CIE_SetDumpTrace(l, b)     ((l)->dumpTrace = (b))
+#define VSC_CIE_GetCodeChanged(l)      ((l)->codeChanged)
+#define VSC_CIE_SetCodeChanged(l, b)   ((l)->codeChanged = (b))
+#define VSC_CIE_SetMm(l, m)            ((l)->pMM = (m))
+#define VSC_CIE_GetMm(l)               ((l)->pMM)
+#define VSC_CIE_GetThresHold(l)        ((l)->candThres)
+#define VSC_CIE_SetThresHold(l, n)     ((l)->candThres = (n))
+
+static void _VSC_CIE_Init(
+    IN OUT VSC_CIE*             cie,
+    IN VIR_Shader*              shader,
+    IN VIR_Function*            currFunc,
+    IN VIR_Dumper*              dumper,
+    IN VSC_MM*                  pMM,
+    IN gctBOOL                  dumpTrace,
+    IN gctUINT                  threshold
+    )
+{
+    VSC_CIE_SetShader(cie, shader);
+    VSC_CIE_SetDumper(cie, dumper);
+    VSC_CIE_SetMm(cie, pMM);
+    VSC_CIE_SetCodeChanged(cie, gcvFALSE);
+    VSC_CIE_SetDumpTrace(cie, dumpTrace);
+    /*4 is the magic value for dEQP-VK.binding_model.shader_access.primary_cmd_buf.uniform_texel_buffer.geometry* cases */
+    VSC_CIE_SetThresHold(cie, threshold);
+}
+
+static gctBOOL _VSC_CIE_CheckIntrinsicWithConstant(
+    IN VIR_Instruction *pInst)
+{
+    gctUINT n = VIR_Inst_GetSrcNum(pInst);
+    VIR_Operand *paramOperand = VIR_Inst_GetSource(pInst, 1);
+    VIR_ParmPassing *opndParm = VIR_Operand_GetParameters(paramOperand);
+    gctUINT argNum = opndParm->argNum;
+    gctUINT i;
+    for (i = 0; i < argNum; i++)
+    {
+        VIR_Operand* pOperand = opndParm->args[i];
+        if (!pOperand ||
+            !(VIR_Operand_isImm(pOperand) || VIR_Operand_isConst(pOperand) ||
+              (VIR_Operand_isSymbol(pOperand) && VIR_Symbol_UseUniform(VIR_Operand_GetSymbol(pOperand)))))
+        {
+            break;
+        }
+    }
+    return i == n;
+}
+
+/*if return -1, not find */
+static gctINT _VSC_CIE_FindIntrinsicKey(
+    IN OUT VSC_CIE* cie,
+    VSC_SIMPLE_RESIZABLE_ARRAY *intrinsicKeys,
+    VIR_Instruction* pInst)
+{
+    gctUINT keyCount = vscSRARR_GetElementCount(intrinsicKeys);
+    gctUINT i;
+    for (i = 0; i < keyCount; i++)
+    {
+        VSC_SIMPLE_RESIZABLE_ARRAY *key = (VSC_SIMPLE_RESIZABLE_ARRAY *)vscSRARR_GetElement(intrinsicKeys, i);
+        VIR_Instruction *pKeyInst = *(VIR_Instruction**)vscSRARR_GetElement(key, 0);
+        if (VIR_Inst_IdenticalExpression(pKeyInst, pInst, VSC_CIE_GetShader(cie), gcvTRUE, gcvFALSE, gcvTRUE))
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+static void _VSC_CIE_DumpIntrinsicKey(
+    IN VSC_CIE* cie,
+    IN VSC_SIMPLE_RESIZABLE_ARRAY *intrinsicKeys)
+{
+    gctUINT keyCount = vscSRARR_GetElementCount(intrinsicKeys);
+    gctUINT i;
+    for (i = 0; i < keyCount; i++)
+    {
+        gctUINT j;
+
+        VSC_SIMPLE_RESIZABLE_ARRAY* candList = (VSC_SIMPLE_RESIZABLE_ARRAY*)vscSRARR_GetElement(intrinsicKeys, i);
+        VIR_LOG(VSC_CIE_GetDumper(cie), "common intrinsic in same group %d\n", i);
+        for (j = 0; j < vscSRARR_GetElementCount(candList); j++)
+        {
+            VIR_Instruction *pInst = *(VIR_Instruction**)vscSRARR_GetElement(candList, j);
+            VIR_Inst_Dump(cie->dumper, pInst);
+        }
+        VIR_LOG(VSC_CIE_GetDumper(cie), "===\n");
+    }
+}
+
+static gctBOOL _VSC_CIE_RemovalIntrinsic(
+    VIR_Instruction* pInst)
+{
+    if (VIR_Inst_GetOpcode(pInst) == VIR_OP_INTRINSIC)
+    {
+        VIR_IntrinsicsKind intrinsicKind = VIR_Operand_GetIntrinsicKind(VIR_Inst_GetSource(pInst, 0));
+        /*TODO:: add more intrinsic */
+        if (intrinsicKind == VIR_IK_image_fetch_for_sampler ||
+            intrinsicKind == VIR_IK_image_fetch)
+        {
+            return gcvTRUE;
+        }
+    }
+
+    return gcvFALSE;
+}
+
+/*go through instruction list and collect intrinsic with only uniform/const/immediate parameters */
+void _VSC_CIE_CollectCands(
+    IN VSC_CIE* cie,
+    IN VSC_SIMPLE_RESIZABLE_ARRAY *intrinsicKeys)
+{
+    VSC_SIMPLE_RESIZABLE_ARRAY* key;
+    VIR_Instruction     *pInst = VSC_CIE_GetCurrFunc(cie)->instList.pHead;
+    while(pInst != gcvNULL)
+    {
+        if (_VSC_CIE_RemovalIntrinsic(pInst) &&
+            _VSC_CIE_CheckIntrinsicWithConstant(pInst))
+        {
+            gctINT keyIndex = _VSC_CIE_FindIntrinsicKey(cie, intrinsicKeys, pInst);
+            if (keyIndex != -1)
+            {
+                /*found the key */
+                key = (VSC_SIMPLE_RESIZABLE_ARRAY*)vscSRARR_GetElement(intrinsicKeys, keyIndex);
+                vscSRARR_AddElement(key, &pInst);
+            }
+            else
+            {
+                /*create a new key and add to intrinsicKeys*/
+                gctUINT i = vscSRARR_GetElementCount(intrinsicKeys);
+                key = (VSC_SIMPLE_RESIZABLE_ARRAY*)vscSRARR_GetNextEmpty(intrinsicKeys, &i);
+
+                vscSRARR_Initialize(key,
+                                    VSC_CIE_GetMm(cie),
+                                    4,
+                                    sizeof(VIR_Instruction*),
+                                    gcvNULL);
+                vscSRARR_AddElement(key, &pInst);
+            }
+        }
+        pInst = VIR_Inst_GetNext(pInst);
+    }
+    /* dump the intrinsicKeys */
+    if (VSC_CIE_DumpTrace(cie))
+    {
+        _VSC_CIE_DumpIntrinsicKey(cie, intrinsicKeys);
+    }
+}
+
+static void _VSC_CIE_FINALIZE(
+    IN VSC_SIMPLE_RESIZABLE_ARRAY *intrinsicKeys)
+{
+    gctUINT i;
+    for (i = 0; i < vscSRARR_GetElementCount(intrinsicKeys); i++)
+    {
+        VSC_SIMPLE_RESIZABLE_ARRAY* pInstArray = (VSC_SIMPLE_RESIZABLE_ARRAY*)vscSRARR_GetElement(intrinsicKeys, i);
+        vscSRARR_Finalize(pInstArray);
+    }
+
+    vscSRARR_Finalize(intrinsicKeys);
+}
+
+static VIR_BASIC_BLOCK* _VSC_CIE_GetCommonDomBB(
+    VIR_BASIC_BLOCK* bb1,
+    VIR_BASIC_BLOCK* bb2)
+{
+    if (BB_IS_DOM(bb1, bb2))
+    {
+        return bb1;
+    }
+    else if (BB_IS_DOM(bb2, bb1))
+    {
+        return bb2;
+    }
+    else
+    {
+        VIR_BASIC_BLOCK* domBB1 = BB_GET_IDOM(bb1);
+        while (domBB1)
+        {
+            if (BB_IS_DOM(domBB1, bb2))
+            {
+                return domBB1;
+            }
+            domBB1 = BB_GET_IDOM(domBB1);
+        }
+    }
+    gcmASSERT(gcvFALSE); /* should not come here */
+    return gcvNULL;
+}
+
+static VIR_Instruction *_VSC_CIE_CheckAvaiableInsertPos(
+    IN VSC_SIMPLE_RESIZABLE_ARRAY *pInstArray,
+    VIR_Instruction **copyFromInst)
+{
+    gctUINT i;
+    VIR_BASIC_BLOCK* tbb;
+    VIR_Instruction *pInst = *(VIR_Instruction**)vscSRARR_GetElement(pInstArray, 0);
+    VIR_BASIC_BLOCK* commonDomBB = VIR_Inst_GetBasicBlock(pInst);
+    VIR_Instruction *posInst = pInst;
+    *copyFromInst = pInst;
+
+    for (i = 1; i < vscSRARR_GetElementCount(pInstArray); i++)
+    {
+        VIR_BASIC_BLOCK *newCommBB = gcvNULL;
+        pInst = *(VIR_Instruction**)vscSRARR_GetElement(pInstArray, i);
+        tbb = VIR_Inst_GetBasicBlock(pInst);
+        newCommBB = _VSC_CIE_GetCommonDomBB(commonDomBB, tbb);
+        if (newCommBB == tbb)
+        {
+            *copyFromInst = pInst;
+            posInst = pInst;
+        }
+        else if (newCommBB != commonDomBB && commonDomBB != tbb)
+        {
+            *copyFromInst = gcvNULL; /* find common dominator, reset reuseIntrinsicInst */
+        }
+        commonDomBB = newCommBB;
+        gcmASSERT(commonDomBB != gcvNULL);
+    }
+
+    if (*copyFromInst == gcvNULL)
+    {
+        *copyFromInst = *(VIR_Instruction**)vscSRARR_GetElement(pInstArray, 0);
+        posInst = BB_GET_START_INST(commonDomBB);
+    }
+    return posInst;
+}
+
+VSC_ErrCode _VSC_CIE_Replace(
+    IN VSC_CIE* cie,
+    IN VSC_SIMPLE_RESIZABLE_ARRAY *pInstArray)
+{
+    VIR_Instruction *pInst = gcvNULL;
+    VIR_Instruction *newCopiedInst = gcvNULL;
+    VSC_ErrCode      errCode = VSC_ERR_NONE;
+    gctUINT  i;
+    VIR_Instruction *posInst = _VSC_CIE_CheckAvaiableInsertPos(pInstArray, &pInst);
+    /* if no position instruction is found, skip the elimination */
+    if (!posInst)
+    {
+        return errCode;
+    }
+    /* copy pInst before posInst and new a dest */
+    if (VIR_Inst_GetOpcode(posInst) == VIR_OP_LABEL)
+    {
+        VIR_Function_AddCopiedInstructionAfter(VSC_CIE_GetCurrFunc(cie),
+                                               pInst,
+                                               posInst,
+                                               gcvTRUE,
+                                               &newCopiedInst);
+    }
+    else
+    {
+        VIR_Function_AddCopiedInstructionBefore(VSC_CIE_GetCurrFunc(cie),
+                                                pInst,
+                                                posInst,
+                                                gcvTRUE,
+                                                &newCopiedInst);
+    }
+
+    /* new dest temp variable */
+    {
+        VIR_Operand* dest = VIR_Inst_GetDest(newCopiedInst);
+        VIR_Symbol* destSym = VIR_Operand_GetSymbol(dest);
+        VIR_VirRegId newVirRegId = VIR_Shader_NewVirRegId(VSC_CIE_GetShader(cie), 1);
+        VIR_Operand* newDest = gcvNULL;
+        VIR_TypeId   newDestTypeID = destSym ? VIR_Symbol_GetTypeId(destSym) : VIR_Operand_GetTypeId(dest);
+        VIR_SymId    newDestSymId = VIR_INVALID_ID;
+        VIR_Symbol* newDestsym;
+        VIR_Precision prec = VIR_Operand_GetPrecision(dest);
+        VIR_Swizzle swizzle;
+        errCode = VIR_Shader_AddSymbol(VSC_CIE_GetShader(cie),
+                                           VIR_SYM_VIRREG,
+                                           newVirRegId,
+                                           VIR_Shader_GetTypeFromId(VSC_CIE_GetShader(cie), newDestTypeID),
+                                           VIR_STORAGE_UNKNOWN,
+                                           &newDestSymId);
+        newDest = VIR_Inst_GetDest(newCopiedInst);
+        VIR_Operand_SetTempRegister(newDest,
+                                    VSC_CIE_GetCurrFunc(cie),
+                                    newDestSymId,
+                                    newDestTypeID);
+        newDestsym = VIR_Shader_GetSymFromId(VSC_CIE_GetShader(cie), newDestSymId);
+        VIR_Symbol_SetPrecision(newDestsym, prec);
+
+        /* replace newDest to instruction of instArray */
+        swizzle = VIR_Enable_2_Swizzle(VIR_Operand_GetEnable(newDest));
+        for(i = 0; i < vscSRARR_GetElementCount(pInstArray); i++)
+        {
+            VIR_Instruction *inst = *(VIR_Instruction**)vscSRARR_GetElement(pInstArray, i);
+            VIR_Operand *src0 = VIR_Inst_GetSource(inst, 0);
+            VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
+            VIR_Inst_SetSrcNum(inst, 1);
+            VIR_Operand_SetTempRegister(src0, VSC_CIE_GetCurrFunc(cie), newDestSymId, newDestTypeID);
+            VIR_Operand_SetSwizzle(src0, swizzle);
+        }
+    }
+
+    return errCode;
+}
+
+void _VSC_CIE_EliminateCommonIntrinsic(
+    IN VSC_CIE* cie,
+    IN VSC_SIMPLE_RESIZABLE_ARRAY *intrinsicKeys)
+{
+    gctUINT i;
+    VIR_CONTROL_FLOW_GRAPH* cfg = VIR_Function_GetCFG(VSC_CIE_GetCurrFunc(cie));
+    vscVIR_BuildDOMTreePerCFG(cfg);
+
+    for (i = 0; i < vscSRARR_GetElementCount(intrinsicKeys); i++)
+    {
+        VSC_SIMPLE_RESIZABLE_ARRAY* pInstArray = (VSC_SIMPLE_RESIZABLE_ARRAY*)vscSRARR_GetElement(intrinsicKeys, i);
+        gctUINT   candCount = vscSRARR_GetElementCount(pInstArray);
+        if (candCount >= VSC_CIE_GetThresHold(cie))
+        {
+            _VSC_CIE_Replace(cie, pInstArray);
+            VSC_CIE_SetCodeChanged(cie,gcvTRUE);
+        }
+    }
+    /* delete dom tree */
+    vscVIR_DestroyDOMTreePerCFG(cfg);
+}
+
+VSC_ErrCode _VSC_CIE_PerformOnFunction(IN VSC_CIE* cie)
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VSC_SIMPLE_RESIZABLE_ARRAY intrinsicKeys;
+
+    vscSRARR_Initialize(&intrinsicKeys, VSC_CIE_GetMm(cie), 4, sizeof(VSC_SIMPLE_RESIZABLE_ARRAY), gcvNULL);
+
+    _VSC_CIE_CollectCands(cie, &intrinsicKeys);
+
+    /* replace common expression */
+    if (vscSRARR_GetElementCount(&intrinsicKeys) > 0)
+    {
+        _VSC_CIE_EliminateCommonIntrinsic(cie, &intrinsicKeys);
+    }
+
+    /*destroy */
+    _VSC_CIE_FINALIZE(&intrinsicKeys);
+    return errCode;
+}
+
+/* now only focus on INTRINSIC (UNIFORM, CONST) */
+DEF_QUERY_PASS_PROP(VSC_CIE_PerformOnShader)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_ML;
+    pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_CIE;
+    pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
+    pPassProp->passFlag.resCreationReq.s.bNeedCfg = gcvTRUE;
+}
+
+DEF_SH_NECESSITY_CHECK(VSC_CIE_PerformOnShader)
+{
+    VIR_Shader *Shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    if (VIR_Shader_GetKind(Shader) == VIR_SHADER_FRAGMENT ||
+        VIR_Shader_GetKind(Shader) == VIR_SHADER_GEOMETRY)
+    {
+        return gcvTRUE;
+    }
+    return gcvFALSE;
+}
+
+/* common expression elimination entry function */
+VSC_ErrCode VSC_CIE_PerformOnShader(
+    IN VSC_SH_PASS_WORKER* pPassWorker
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VIR_Shader           *shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_Dumper           *dumper = pPassWorker->basePassWorker.pDumper;
+    VSC_OPTN_CIEOptions* options = (VSC_OPTN_CIEOptions*)pPassWorker->basePassWorker.pBaseOption;
+    gctBOOL              enableTrace = VSC_OPTN_CIEOptions_GetTrace(options);
+
+    if(enableTrace)
+    {
+        VIR_Shader_Dump(gcvNULL, "Common INTRINSIC Elimination BEGIN", shader, gcvTRUE);
+    }
+
+    {
+        VSC_CIE cie;
+        VIR_FuncIterator funcIter;
+        VIR_FunctionNode* funcNode;
+        gctUINT funcIndex;
+
+        _VSC_CIE_Init(&cie, shader, gcvNULL, dumper, pPassWorker->basePassWorker.pMM, enableTrace, VSC_OPTN_CIEOptions_GetThreshold(options));
+        VIR_FuncIterator_Init(&funcIter, VIR_Shader_GetFunctions(shader));
+        for(funcNode = VIR_FuncIterator_First(&funcIter), funcIndex = 0;
+            funcNode != gcvNULL; funcNode = VIR_FuncIterator_Next(&funcIter), ++funcIndex)
+        {
+            VIR_Function* func = funcNode->function;
+            if (VIR_Function_GetInstCount(func) > 0)
+            {
+                VSC_CIE_SetCurrFunc(&cie, func);
+                errCode = _VSC_CIE_PerformOnFunction(&cie);
+                if(errCode)
+                {
+                    break;
+                }
+            }
+        }
+        if (VSC_CIE_GetCodeChanged(&cie))
+        {
+            pPassWorker->pResDestroyReq->s.bInvalidateDu = gcvTRUE;
+            pPassWorker->pResDestroyReq->s.bInvalidateRdFlow = gcvTRUE;
+        }
+    }
+    if(VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(shader), VIR_Shader_GetId(shader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    {
+        VIR_Shader_Dump(gcvNULL, "Common INTRINSIC Elimination End", shader, gcvTRUE);
     }
 
     return errCode;
