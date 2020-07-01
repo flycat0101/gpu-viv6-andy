@@ -2779,7 +2779,9 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION1_EXT_TEXTURE_BUFFER,     "texelFetch", gcvNULL, _GenTexelFetchCode,          T_UVEC4,    2, {T_USAMPLERBUFFER,     T_INT}, {0}, {0}},
 
     /* OGL texelFetch functions with more sampler types */
-    {slvEXTENSION1_SUPPORT_OGL,     "texelFetch", gcvNULL, _GenTexelFetchCode,     T_VEC4 ,    2, {T_SAMPLER2DRECT,        T_IVEC2}, {0}, {0}},
+    {slvEXTENSION1_SUPPORT_OGL,     "texelFetch", gcvNULL, _GenTexelFetchCode,     T_VEC4 ,    2, {T_SAMPLER2DRECT,         T_IVEC2}, {0}, {0}},
+    {slvEXTENSION1_SUPPORT_OGL,     "texelFetch", gcvNULL, _GenTexelFetchCode,     T_IVEC4 ,   2, {T_ISAMPLER2DRECT,        T_IVEC2}, {0}, {0}},
+    {slvEXTENSION1_SUPPORT_OGL,     "texelFetch", gcvNULL, _GenTexelFetchCode,     T_UVEC4 ,   2, {T_USAMPLER2DRECT,        T_IVEC2}, {0}, {0}},
 
     {slvEXTENSION1_HALTI | slvEXTENSION1_SUPPORT_OGL,     "texelFetch", gcvNULL, _GenTexelFetchCode,          T_VEC4 ,    3, {T_SAMPLER1D,        T_INT,     T_INT}, {0}, {0}},
     {slvEXTENSION1_HALTI | slvEXTENSION1_SUPPORT_OGL,     "texelFetch", gcvNULL, _GenTexelFetchCode,          T_IVEC4,    3, {T_ISAMPLER1D,       T_INT,     T_INT}, {0}, {0}},

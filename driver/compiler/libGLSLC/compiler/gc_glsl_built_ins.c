@@ -3738,6 +3738,8 @@ _GenTextureCode(
     case slvTYPE_USAMPLER2D:
     case slvTYPE_SAMPLEREXTERNALOES:
     case slvTYPE_SAMPLER2DRECT:
+    case slvTYPE_ISAMPLER2DRECT:
+    case slvTYPE_USAMPLER2DRECT:
         genCode = _GenTexture2DCode;
         break;
 
@@ -4044,6 +4046,8 @@ _GetSamplerCoordComponentCount(
     case slvTYPE_SAMPLER2D:
     case slvTYPE_SAMPLERCUBE:
     case slvTYPE_SAMPLER2DRECT:
+    case slvTYPE_ISAMPLER2DRECT:
+    case slvTYPE_USAMPLER2DRECT:
     case slvTYPE_SAMPLER2DSHADOW:
     case slvTYPE_SAMPLER2DRECTSHADOW:
     case slvTYPE_SAMPLER2DARRAY:
@@ -4064,6 +4068,8 @@ _GetSamplerCoordComponentCount(
         return 2;
 
     case slvTYPE_SAMPLER1DARRAY:
+    case slvTYPE_ISAMPLER1DARRAY:
+    case slvTYPE_USAMPLER1DARRAY:
     case slvTYPE_SAMPLER1DARRAYSHADOW:
     case slvTYPE_SAMPLER1D:
     case slvTYPE_ISAMPLER1D:
