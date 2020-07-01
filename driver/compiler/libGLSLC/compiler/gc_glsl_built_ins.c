@@ -466,7 +466,7 @@ _AddBuiltInConstants(
     {
         gctUINT j;
         slsBASIC_BUILT_IN_TYPE_INFO *basicBuiltInTypeInfo;
-        sloEXTENSION extension = {{0}};
+        sloEXTENSION extension = {0};
 
         extension.extension1 = ConstantInfos[i].extension;
         /* If this variable is not enabled in this shader, then we don't need to load it. */
@@ -790,7 +790,7 @@ _LoadBuiltInUniformState(
     slsDATA_TYPE *          structDataType;
     sltPOOL_STRING          structSymbol;
     sltPOOL_STRING          variableSymbol;
-    sloEXTENSION            extension = {{0}};
+    sloEXTENSION            extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x BasicBuiltInTypeInfos=0x%x",
                   Compiler, BasicBuiltInTypeInfos);
@@ -976,7 +976,7 @@ _LoadBuiltInVariablesForIOBlock(
     sltSTORAGE_QUALIFIER            qualifier;
     gctBOOL                         addMember;
     slsINTERFACE_BLOCK_MEMBER *     blockMember;
-    sloEXTENSION                    extension = {{0}};
+    sloEXTENSION                    extension = {0};
 
     extension.extension1 = slvEXTENSION1_NONE;
 
@@ -1156,7 +1156,7 @@ _LoadBuiltInVariables(
     slsBASIC_BUILT_IN_TYPE_INFO *   basicBuiltInTypeInfo;
     slsDATA_TYPE *                  dataType;
     sltPOOL_STRING                  symbolInPool;
-    sloEXTENSION                    extension = {{0}};
+    sloEXTENSION                    extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x BasicBuiltInTypeInfos=0x%x "
                   "BuiltInVariableCount=%u BuiltInVariables=0x%x",
@@ -1342,7 +1342,7 @@ slFuncCheckForAtrigAsIntrinsic(
     )
 {
     gceSTATUS    status = gcvSTATUS_OK;
-    sloEXTENSION extension = {{0}};
+    sloEXTENSION extension = {0};
     extension.extension1 = slvEXTENSION1_HALTI5_WITH_FMA_SUPPORT;
 
     if(sloCOMPILER_ExtensionEnabled(Compiler, &extension))
@@ -1482,7 +1482,7 @@ _LoadBuiltInFunctions(
     slsNAME *                       funcName = gcvNULL;
     slsNAME *                       paramName = gcvNULL;
     gctBOOL                         hasMemAccess;
-    sloEXTENSION                    extension = {{0}};
+    sloEXTENSION                    extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x BasicBuiltInTypeInfos=0x%x "
                   "BuiltInFunctionCount=%u BuiltInFunctions=0x%x",
@@ -1624,7 +1624,7 @@ _LoadIntrinsicBuiltInFunctions(
     slsNAME *                       paramName = gcvNULL;
     slsDATA_TYPE *                  dataType;
     gctBOOL                         hasMemAccess = gcvFALSE;
-    sloEXTENSION                    extension = {{0}};
+    sloEXTENSION                    extension = {0};
 
     gcmHEADER();
 
@@ -17719,7 +17719,7 @@ slGetBuiltinFunctionExtension(
     IN gctSTRING Symbol
 )
 {
-    sloEXTENSION extension = {{0}};
+    sloEXTENSION extension = {0};
     gctUINT i;
 
     extension.extension1 = slvEXTENSION1_NONE;

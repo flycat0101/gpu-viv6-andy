@@ -16823,7 +16823,7 @@ _CreateSharedVariableStorageBlock(
     gctPOINTER pointer;
     slsSHARED_VARIABLE *sharedVariable;
     slsSLINK_LIST *sharedVariableList;
-    sloEXTENSION extension = {{0}};
+    sloEXTENSION extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x Block=0x%x", Compiler, Block);
 
@@ -27674,7 +27674,7 @@ sloIR_POLYNARY_EXPR_GenConstructMatrixCode(
 
     if (Parameters->needROperand)
     {
-        sloEXTENSION extension = {{0}};
+        sloEXTENSION extension = {0};
         extension.extension1 = slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS;
         /* Allocate the register(s) */
         status = slsGEN_CODE_PARAMETERS_AllocateOperands(

@@ -1574,6 +1574,7 @@ static slsPREDEFINED_MACRO _PredefinedMacros[] =
    {"GL_OES_shader_multisample_interpolation", "1", gcvNULL, gcvTRUE},
    {"GL_EXT_gpu_shader5", "1", gcvNULL, gcvTRUE},
    {"GL_EXT_texture_cube_map_array", "1", gcvNULL, gcvTRUE},
+   {"GL_ARB_explicit_attrib_location", "1", gcvNULL, gcvTRUE},
    /* TS extension. */
    {"GL_EXT_tessellation_shader", "1", gcvNULL, gcvTRUE},
    {"GL_EXT_tessellation_point_size", "1", gcvNULL, gcvTRUE},

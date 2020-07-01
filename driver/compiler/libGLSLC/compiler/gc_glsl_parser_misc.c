@@ -1491,7 +1491,7 @@ _CheckErrorForSubscriptExpr(
     {
         if (sloCOMPILER_IsHaltiVersion(Compiler))
         {
-            sloEXTENSION extension = {{0}};
+            sloEXTENSION extension = {0};
             extension.extension1 = slvEXTENSION1_GPU_SHADER5;
             if(slsDATA_TYPE_IsUnderlyingInterfaceBlock(LeftOperand->dataType) &&
                !slsDATA_TYPE_IsUnderlyingIOBlock(LeftOperand->dataType) &&
@@ -1526,7 +1526,7 @@ _CheckErrorForSubscriptExpr(
         if (slsDATA_TYPE_IsSampler(LeftOperand->dataType) ||
             slsDATA_TYPE_IsImage(LeftOperand->dataType))
         {
-            sloEXTENSION extension = {{0}};
+            sloEXTENSION extension = {0};
             extension.extension1 = slvEXTENSION1_GPU_SHADER5;
             if (sloIR_OBJECT_GetType(&RightOperand->base) != slvIR_CONSTANT &&
                 !sloCOMPILER_ExtensionEnabled(Compiler, &extension) )
@@ -1707,7 +1707,7 @@ _CheckErrorAsArrayConstructor(
     gctUINT    operandCount;
     sloIR_EXPR operand;
     slsDATA_TYPE refDataType[1];
-    sloEXTENSION extension = {{0}};
+    sloEXTENSION extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x PolynaryExpr=0x%x",
                   Compiler, PolynaryExpr);
@@ -2388,7 +2388,7 @@ _CreateUnnamedConstantExpr(
                                         &unnamedConstant);
     if (status == gcvSTATUS_NOT_FOUND)
     { /* not found */
-       sloEXTENSION extension = {{0}};
+       sloEXTENSION extension = {0};
        status = sloCOMPILER_PushUnnamedSpace(Compiler, &nameSpace);
        if (gcmIS_ERROR(status)) return status;
 
@@ -2486,7 +2486,7 @@ slParseFuncCallExprAsExpr(
     gceSTATUS       status;
     sloIR_CONSTANT  constant;
     sloIR_EXPR      firstOperand;
-    sloEXTENSION    extension = {{0}};
+    sloEXTENSION    extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x FuncCall=0x%x",
                   Compiler, FuncCall);
@@ -3907,7 +3907,7 @@ _GetUniformBlockInfo(
     sloIR_VARIABLE variable;
     sloIR_BINARY_EXPR binaryExpr;
     sloIR_CONSTANT constant;
-    sloEXTENSION extension = {{0}};
+    sloEXTENSION extension = {0};
 
     gcmHEADER_ARG("UniformBlockExpr=0x%x BlockName=0x%x ArrayIndex=0x%x",
                   UniformBlockExpr, BlockName, ArrayIndex);
@@ -4022,7 +4022,7 @@ slParseFieldSelectionExpr(
         {
             slsNAME *blockName;
             gctINT arrayIndex;
-            sloEXTENSION extension = {{0}};
+            sloEXTENSION extension = {0};
 
             status = _GetUniformBlockInfo(Compiler, Operand, &blockName, &arrayIndex);
             if (gcmIS_ERROR(status))
@@ -4878,7 +4878,7 @@ _CheckErrorForArithmeticExpr(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    sloEXTENSION extension = {{0}};
+    sloEXTENSION extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x IsMul=%d LeftOperand=0x%x RightOperand=0x%x",
                   Compiler, IsMul, LeftOperand, RightOperand);
@@ -5118,7 +5118,7 @@ _CheckErrorForRelationalExpr(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    sloEXTENSION extension = {{0}};
+    sloEXTENSION extension = {0};
     gcmHEADER_ARG("Compiler=0x%x LeftOperand=0x%x RightOperand=0x%x",
                   Compiler, LeftOperand, RightOperand);
 
@@ -5201,7 +5201,7 @@ _CheckErrorForEqualityExpr(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    sloEXTENSION extension = {{0}};
+    sloEXTENSION extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x LeftOperand=0x%x RightOperand=0x%x",
                   Compiler, LeftOperand, RightOperand);
@@ -6174,7 +6174,7 @@ _CheckErrorForAssignmentExpr(
     )
 {
     gceSTATUS status;
-    sloEXTENSION extension = {{0}};
+    sloEXTENSION extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x LeftOperand=0x%x RightOperand=0x%x",
                   Compiler, LeftOperand, RightOperand);
@@ -6289,7 +6289,7 @@ _CheckErrorForArithmeticAssignmentExpr(
     )
 {
     gceSTATUS status;
-    sloEXTENSION extension = {{0}};
+    sloEXTENSION extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x IsMul=%d LeftOperand=0x%x RightOperand=0x%x",
                   Compiler, IsMul, LeftOperand, RightOperand);
@@ -7638,7 +7638,7 @@ _ParseVariableDecl(
     gceSTATUS    status;
     slsNAME *variableName;
     slsDATA_TYPE * dataType;
-    sloEXTENSION  extension = {{0}};
+    sloEXTENSION  extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x DataType=0x%x Identifier=0x%x",
                   Compiler, DataType, Identifier);
@@ -7810,7 +7810,7 @@ _ParseVariableDeclWithInitializer(
     slsNAME *           name;
     sloIR_VARIABLE      variable;
     sloIR_BINARY_EXPR   binaryExpr;
-    sloEXTENSION        extension = {{0}};
+    sloEXTENSION        extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x DataType=0x%x Identifier=0x%x Initializer=0x%x InitExpr=0x%x",
                   Compiler, DataType, Identifier, Initializer, InitExpr);
@@ -9665,7 +9665,7 @@ slParseFuncHeader(
     gceSTATUS       status;
     slsNAME *       name  = gcvNULL;
     slsNAME *       field = gcvNULL;
-    sloEXTENSION    extension = {{0}};
+    sloEXTENSION    extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x DataType=0x%x Identifier=0x%x",
                   Compiler, DataType, Identifier);
@@ -11131,7 +11131,7 @@ IN sloIR_BASE SwitchBody
         {
             sloIR_LABEL caseLabel = cases;
             gceSTATUS status = gcvSTATUS_OK;
-            sloEXTENSION extension = {{0}};
+            sloEXTENSION extension = {0};
             extension.extension1 = slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS;
             while(caseLabel)
             {
@@ -12173,7 +12173,7 @@ slParseNonArrayParameterDecl(
 {
     gceSTATUS       status;
     slsNAME *       name;
-    sloEXTENSION    extension = {{0}};
+    sloEXTENSION    extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x DataType=0x%x Identifier=0x%x",
                   Compiler, DataType, Identifier);
@@ -12251,7 +12251,7 @@ slParseArrayParameterDecl(
     gctINT         arrayLength;
     slsDATA_TYPE * arrayDataType;
     slsNAME *      name;
-    sloEXTENSION   extension = {{0}};
+    sloEXTENSION   extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x DataType=0x%x Identifier=0x%x ArrayLengthExpr=0x%x",
                   Compiler, DataType, Identifier, ArrayLengthExpr);
@@ -13493,13 +13493,20 @@ _ParseSearchLayoutId(
     sleLAYOUT_ID_EXT    layoutId2 = slvLAYOUT_EXT_NONE;
     sleSHADER_TYPE      shaderType;
     sleCOMPILER_FLAGS   flag;
+    sloEXTENSION extension = {0};
 
     shaderType = Compiler->shaderType;
     flag = Compiler->context.compilerFlags;
 
     /* Match layoutId1. */
+    extension.extension2 = slvEXTENSION2_GL_ARB_EXPLICIT_ATTRIB_LOCATION;
     if (gcmIS_SUCCESS(gcoOS_StrCmp(LayoutId->u.identifier, "location"))) {
-        layoutId1 = slvLAYOUT_LOCATION;
+        if (sloCOMPILER_GetLanguageVersion(Compiler) > _SHADER_GL32_VERSION ||
+            (sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL32_VERSION &&
+             sloCOMPILER_ExtensionEnabled(Compiler, &extension)))
+        {
+            layoutId1 = slvLAYOUT_LOCATION;
+        }
     }
     else if (gcmIS_SUCCESS(gcoOS_StrCmp(LayoutId->u.identifier, "shared"))) {
         layoutId1 = slvLAYOUT_SHARED;
@@ -13748,7 +13755,7 @@ slParseLayoutId(
     slvTES_ORDERING                 tesOrdering = slvTES_ORDERING_NONE;
     slvTES_POINT_MODE               tesPointMode = slvTES_POINT_MODE_NONE;
     slvGS_PRIMITIVE                 gsPrimitive = slvGS_PRIMITIVE_NONE;
-    sloEXTENSION                    extension = {{0}};
+    sloEXTENSION                    extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x Layout Id=0x%x Value=0x%x",
                   Compiler, LayoutId, Value);
@@ -14320,7 +14327,7 @@ slParseStructDeclEnd(
 
     if (Identifier != gcvNULL)
     {
-        sloEXTENSION extension = {{0}};
+        sloEXTENSION extension = {0};
         extension.extension1 = slvEXTENSION1_NONE;
         status = sloCOMPILER_CreateName(Compiler,
                                         Identifier->lineNo,
@@ -14398,7 +14405,7 @@ slParseStructReDeclEnd(
     slsNAME *       field;
     slsNAME_SPACE * prevNameSpace = gcvNULL;
     sltPOOL_STRING  typeName = TypeName->u.typeName->symbol;
-    sloEXTENSION    extension = {{0}};
+    sloEXTENSION    extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x TypeName=0x%x", Compiler, TypeName);
 
@@ -15008,7 +15015,7 @@ slParseInterfaceBlockDeclBegin(
     gceSTATUS       status;
     slsNAME_SPACE * nameSpace = gcvNULL;
     sleSHADER_TYPE  shaderType;
-    sloEXTENSION    extension = {{0}};
+    sloEXTENSION    extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x", Compiler);
 
@@ -15281,7 +15288,7 @@ slParseInterfaceBlockDeclEnd(
     if (BlockName != gcvNULL)
     {
         gctBOOL atGlobalNameSpace;
-        sloEXTENSION extension = {{0}};
+        sloEXTENSION extension = {0};
 
         gcmVERIFY_OK(sloCOMPILER_AtGlobalNameSpace(Compiler, &atGlobalNameSpace));
         if (!atGlobalNameSpace)
@@ -15910,7 +15917,7 @@ slParseArrayListParameterDecl(
     gceSTATUS status;
     slsDATA_TYPE * arrayDataType;
     slsNAME * name = gcvNULL;
-    sloEXTENSION extension = {{0}};
+    sloEXTENSION extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x DataType=0x%x Identifier=0x%x ArrayLengthExpr=0x%x",
                   Compiler, DataType, Identifier, LengthList);
@@ -16257,7 +16264,7 @@ slParseFieldListDecl(
     gctINT arrayLengthCount = 0, i = 0;
     gctINT * arrayLengthList = gcvNULL;
     slsDLINK_LIST * list;
-    sloEXTENSION extension = {{0}};
+    sloEXTENSION extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x Identifier=0x%x ArrayLengthExpr=0x%x",
                   Compiler, Identifier, LengthList);
@@ -16687,7 +16694,7 @@ slParseFieldDecl(
     slsNAME *       field;
     slsFieldDecl *  fieldDecl;
     gctPOINTER pointer = gcvNULL;
-    sloEXTENSION    extension = {{0}};
+    sloEXTENSION    extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x Identifier=0x%x ArrayLengthExpr=0x%x",
                   Compiler, Identifier, ArrayLengthExpr);
@@ -16771,7 +16778,7 @@ slParseImplicitArraySizeFieldDecl(
     slsNAME *       field;
     slsFieldDecl *  fieldDecl;
     gctPOINTER      pointer = gcvNULL;
-    sloEXTENSION    extension = {{0}};
+    sloEXTENSION    extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x Identifier=0x%x",
                   Compiler, Identifier);

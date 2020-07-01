@@ -79,6 +79,14 @@ static slsEXTENSION_INFO _DefinedExtensions1[] =
 
 #define __sldDefinedExtensions1Count (gcmSIZEOF(_DefinedExtensions1) / gcmSIZEOF(slsEXTENSION_INFO))
 
+static slsEXTENSION_INFO _DefinedExtensions2[] =
+{
+    /*GL desktop GL_ARB_explicit_attrib_location extension */
+    {"GL_ARB_explicit_attrib_location", slvEXTENSION2_GL_ARB_EXPLICIT_ATTRIB_LOCATION, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_HALTI_VERSION, gcvNULL},
+};
+
+#define __sldDefinedExtensions2Count (gcmSIZEOF(_DefinedExtensions2) / gcmSIZEOF(slsEXTENSION_INFO))
+
 static gceSTATUS _AddExtensionMacro(
     ppoPREPROCESSOR         PP,
     slsEXTENSION_INFO *     ExtInfo
@@ -168,6 +176,19 @@ gceSTATUS ppoPREPROCESSOR_InitExtensionTable(ppoPREPROCESSOR PP)
 
         case slvEXTENSION1_ANDROID_EXTENSION_PACK_ES31A:
             _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    for (i = 0; i < __sldDefinedExtensions2Count; i++)
+    {
+        switch (_DefinedExtensions2[i].flag)
+        {
+        case slvEXTENSION2_GL_ARB_EXPLICIT_ATTRIB_LOCATION:
+            _AddExtensionMacro(PP, &_DefinedExtensions2[i]);
             break;
 
         default:

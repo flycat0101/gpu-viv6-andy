@@ -582,7 +582,8 @@ sleEXTENSION1;
 
 typedef enum _sleEXTENSION2
 {
-    slvEXTENSION2_NONE                                      = 0x00000000,
+    slvEXTENSION2_NONE                                       = 0x00000000,
+    slvEXTENSION2_GL_ARB_EXPLICIT_ATTRIB_LOCATION            = 0x00000001
 }
 sleEXTENSION2;
 

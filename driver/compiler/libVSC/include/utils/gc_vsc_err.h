@@ -55,6 +55,8 @@ typedef enum _VSC_ERRCODE
     VSC_ERR_LOCATION_MISMATCH     =   1011,
     VSC_ERR_LOCATION_ALIASED      =   1012,
     VSC_ERR_UNSAT_LIB_SYMBOL      =   1013,
+    VSC_ERR_LOCATION_OVERLAP      =   1014,
+    VSC_ERR_LOCATION_NOTCONSISTENT=   1015,
 
     /* misc error */
     VSC_ERR_INVALID_TYPE          =   4000,

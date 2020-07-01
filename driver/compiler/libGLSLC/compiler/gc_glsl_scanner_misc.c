@@ -445,7 +445,7 @@ _SearchKeyword(
     slsKEYWORD_NODE *node;
     slsDLINK_NODE *bucket;
     gceSTATUS    status;
-    sloEXTENSION extension = {{0}}, nodeExtension = {{0}};
+    sloEXTENSION extension = {0}, nodeExtension = {0};
 
     length = gcoOS_StrLen(Symbol, gcvNULL);
 
@@ -1471,7 +1471,7 @@ slScanSpecialOperator(
     OUT slsLexToken * Token
     )
 {
-    sloEXTENSION extension = {{0}};
+    sloEXTENSION extension = {0};
     extension.extension1 = Extention;
     if(sloCOMPILER_ExtensionEnabled(Compiler, &extension))
     {
