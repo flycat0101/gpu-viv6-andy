@@ -98,59 +98,13 @@ VSC_ErrCode vscVIR_RecordInstructionStatus(VSC_SH_PASS_WORKER* pPassWorker)
         VIR_Function*    pFunc = pFunc_node->function;
         VIR_InstIterator inst_iter;
         VIR_Instruction* pInst;
-        VIR_OpCode       opCode;
 
         VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(pFunc));
         for (pInst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
              pInst != gcvNULL;
              pInst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
         {
-            opCode = VIR_Inst_GetOpcode(pInst);
-
-            if (VIR_OPCODE_isMemLd(opCode))
-            {
-                memoryAccessFlag |= VIR_MA_FLAG_LOAD;
-            }
-            else if (VIR_OPCODE_isMemSt(opCode))
-            {
-                memoryAccessFlag |= VIR_MA_FLAG_STORE;
-            }
-            else if (VIR_OPCODE_isImgLd(opCode))
-            {
-                memoryAccessFlag |= VIR_MA_FLAG_IMG_READ;
-            }
-            else if (VIR_OPCODE_isImgSt(opCode))
-            {
-                memoryAccessFlag |= VIR_MA_FLAG_IMG_WRITE;
-            }
-            else if (VIR_OPCODE_isAtom(opCode))
-            {
-                memoryAccessFlag |= VIR_MA_FLAG_ATOMIC;
-            }
-            else if (VIR_OPCODE_isBarrier(opCode))
-            {
-                memoryAccessFlag |= VIR_MA_FLAG_BARRIER;
-            }
-            else if (opCode == VIR_OP_VX_ATOMICADD)
-            {
-                memoryAccessFlag |= VIR_MA_FLAG_EVIS_ATOMADD;
-            }
-            else if (VIR_OPCODE_isBranch(opCode))
-            {
-                flowControlFlag |= VIR_FC_FLAG_JMP;
-            }
-            else if (VIR_OPCODE_isCall(opCode))
-            {
-                flowControlFlag |= VIR_FC_FLAG_CALL;
-            }
-            else if (opCode == VIR_OP_KILL)
-            {
-                flowControlFlag |= VIR_FC_FLAG_KILL;
-            }
-            else if (VIR_OPCODE_isTexLd(opCode))
-            {
-                texldFlag |= VIR_TEXLD_FLAG_TEXLD;
-            }
+            VIR_Inst_RecordInstStatus(pInst, &memoryAccessFlag, &flowControlFlag, &texldFlag);
         }
     }
 
