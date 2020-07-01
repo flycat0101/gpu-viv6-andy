@@ -1225,10 +1225,28 @@ void vscDIDumpDIE(VSC_DIContext * context, gctUINT16 id, gctUINT shift, gctUINT 
     }
 }
 
+gctUINT _calculateDIContextSize()
+{
+    /* If Added elements in struct VSC_DIContext, also need to add corresponding size of elements in this function.*/
+    gctUINT size = 0;
+
+    /* size of collect, cu, paddingBytes, callDepth, stepState */
+    size += 16;
+    /* size of Tables */
+    size += (16 * 5);
+    /* size of pfnAllocate and pfnFree and tempLog */
+    size += 24;
+    /* size of callStack */
+    size += (24 * 4);
+
+    return size;
+}
+
 gceSTATUS vscDISaveDebugInfo(VSC_DIContext * context, gctPOINTER * buffer, gctUINT32 * bufferSize)
 {
     gctUINT8 * ptr;
     VSC_DIContext * ctx;
+    gctUINT contextSize = _calculateDIContextSize();
 
     if (context == gcvNULL)
     {
@@ -1249,7 +1267,7 @@ gceSTATUS vscDISaveDebugInfo(VSC_DIContext * context, gctPOINTER * buffer, gctUI
     if (bufferSize)
     {
         *bufferSize += gcmSIZEOF(gctUINT8)
-                     + gcmSIZEOF(VSC_DIContext)
+                     + contextSize
                      + context->dieTable.usedCount* gcmSIZEOF(VSC_DIE)
                      + context->strTable.usedSize
                      + context->lineTable.count * gcmSIZEOF(VSC_DI_LINE_TABLE_MAP)
@@ -1259,22 +1277,125 @@ gceSTATUS vscDISaveDebugInfo(VSC_DIContext * context, gctPOINTER * buffer, gctUI
 
     if (buffer && *buffer)
     {
+        gctUINT offset = 0, i = 0 ;
+        gctUINT8 * pointer;
         ptr = (gctUINT8 *)(*buffer);
+        pointer = (gctUINT8 *)context;
 
         *ptr = 1;
         ptr += gcmSIZEOF(gctUINT8);
 
-        *(VSC_DIContext *)ptr = *context;
         ctx = (VSC_DIContext *)ptr;
-        ptr += gcmSIZEOF(VSC_DIContext);
+
+        /* save collect, cu, paddingBytes, callDepth, stepState */
+        gcoOS_MemCopy(ptr, pointer, 16);
+        ptr += 16;
+        offset += 16;
+
+        /* save strTable->size, strTable->usedSize */
+        pointer = (gctUINT8 *)context + offset;
+        gcoOS_MemCopy(ptr, pointer, 8);
+        ((VSC_DI_STRTABLE*)ptr)->size = ((VSC_DI_STRTABLE*)ptr)->usedSize = context->strTable.usedSize;
+        ptr += 8;
+        offset += 8;
+
+        /* save strTable->str */
+        pointer = (gctUINT8 *)context + offset;
+        gcoOS_MemCopy(ptr, pointer, gcmSIZEOF(gctSTRING));
+        ptr += 8;
+        offset += gcmSIZEOF(gctSTRING);
+
+        /* save dieTable->size, dieTable->usedSize, dieTable->paddingBytes */
+        pointer = (gctUINT8 *)context + offset;
+        gcoOS_MemCopy(ptr, pointer, 8);
+        ((VSC_DI_DIETABLE*)ptr)->count= ((VSC_DI_DIETABLE*)ptr)->usedCount = context->dieTable.usedCount;
+        ptr += 8;
+        offset += 8;
+
+        /* save dieTable->die */
+        pointer = (gctUINT8 *)context + offset;
+        gcoOS_MemCopy(ptr, pointer, gcmSIZEOF(gctSTRING));
+        ptr += 8;
+        offset += gcmSIZEOF(gctSTRING);
+
+        /* save lineTable->count, lineTable->paddingBytes */
+        pointer = (gctUINT8 *)context + offset;
+        gcoOS_MemCopy(ptr, pointer, 8);
+        ((VSC_DI_LINE_TABLE*)ptr)->count = context->lineTable.count;
+        ptr += 8;
+        offset += 8;
+
+        /* save lineTable->map */
+        pointer = (gctUINT8 *)context + offset;
+        gcoOS_MemCopy(ptr, pointer, gcmSIZEOF(gctSTRING));
+        ptr += 8;
+        offset += gcmSIZEOF(gctSTRING);
+
+        /* save hw locTable->count, locTable->usedCount, locTable->paddingBytes */
+        pointer = (gctUINT8 *)context + offset;
+        gcoOS_MemCopy(ptr, pointer, 8);
+        ((VSC_DI_HW_LOC_TABLE*)ptr)->count = ((VSC_DI_HW_LOC_TABLE*)ptr)->usedCount = context->locTable.usedCount;
+        ptr += 8;
+        offset += 8;
+
+        /* save hw locaTable->loc */
+        pointer = (gctUINT8 *)context + offset;
+        gcoOS_MemCopy(ptr, pointer, gcmSIZEOF(gctSTRING));
+        ptr += 8;
+        offset += gcmSIZEOF(gctSTRING);
+
+        /* save swlocTable->count, swlocTable->usedCount, swlocTable->paddingBytes */
+        pointer = (gctUINT8 *)context + offset;
+        gcoOS_MemCopy(ptr, pointer, 8);
+        ((VSC_DI_SW_LOC_TABLE*)ptr)->count = ((VSC_DI_SW_LOC_TABLE*)ptr)->usedCount = context->swLocTable.usedCount;
+        ptr += 8;
+        offset += 8;
+
+        /* save swlocaTable->loc */
+        pointer = (gctUINT8 *)context + offset;
+        gcoOS_MemCopy(ptr, pointer, gcmSIZEOF(gctSTRING));
+        ptr += 8;
+        offset += gcmSIZEOF(gctSTRING);
+
+        /* save pfnAllocate */
+        pointer = (gctUINT8 *)context + offset;
+        gcoOS_MemCopy(ptr, pointer, gcmSIZEOF(gctSTRING));
+        ptr += 8;
+        offset += gcmSIZEOF(gctSTRING);
+
+        /* save pfnFree */
+        pointer = (gctUINT8 *)context + offset;
+        gcoOS_MemCopy(ptr, pointer, gcmSIZEOF(gctSTRING));
+        ptr += 8;
+        offset += gcmSIZEOF(gctSTRING);
+
+        /* save tmpLog */
+        pointer = (gctUINT8 *)context + offset;
+        gcoOS_MemCopy(ptr, pointer, gcmSIZEOF(gctSTRING));
+        ptr += 8;
+        offset += gcmSIZEOF(gctSTRING);
+
+        /* save callStack */
+        for (i = 0; i < VSC_DI_CALL_DEPTH ; i++)
+        {
+            /* save sourceLoc, nextSourceLoc, nextPC, paddingBytes[4] */
+            pointer = (gctUINT8 *)context + offset;
+            gcoOS_MemCopy(ptr, pointer, 16);
+            ptr += 16;
+            offset += 16;
+
+            /* save die */
+            pointer = (gctUINT8 *)context + offset;
+            gcoOS_MemCopy(ptr, pointer, gcmSIZEOF(gctSTRING));
+            ptr += 8;
+            offset += gcmSIZEOF(gctSTRING);
+        }
 
         if (context->dieTable.usedCount > 0)
         {
             gcoOS_MemCopy(ptr, (gctPOINTER)context->dieTable.die, context->dieTable.usedCount* gcmSIZEOF(VSC_DIE) );
             ptr += context->dieTable.usedCount * gcmSIZEOF(VSC_DIE);
         }
-
-        ctx->dieTable.count = ctx->dieTable.usedCount = context->dieTable.usedCount;
 
         if (context->strTable.usedSize > 0)
         {
@@ -1290,25 +1411,17 @@ gceSTATUS vscDISaveDebugInfo(VSC_DIContext * context, gctPOINTER * buffer, gctUI
             ptr +=context->lineTable.count * gcmSIZEOF(VSC_DI_LINE_TABLE_MAP);
         }
 
-        ctx->lineTable.count = context->lineTable.count;
-
         if (context->swLocTable.usedCount> 0)
         {
             gcoOS_MemCopy(ptr, context->swLocTable.loc, context->swLocTable.usedCount* gcmSIZEOF(VSC_DI_SW_LOC));
             ptr += context->swLocTable.usedCount* gcmSIZEOF(VSC_DI_SW_LOC);
         }
 
-        ctx->swLocTable.count = ctx->swLocTable.usedCount = context->swLocTable.usedCount;
-
         if (context->locTable.usedCount> 0)
         {
             gcoOS_MemCopy(ptr, context->locTable.loc, context->locTable.usedCount* gcmSIZEOF(VSC_DI_HW_LOC));
             ptr += context->locTable.usedCount* gcmSIZEOF(VSC_DI_HW_LOC);
         }
-
-        ctx->locTable.count = ctx->locTable.usedCount = context->locTable.usedCount;
-
-        ctx->tmpLog = gcvNULL;
 
         *buffer = (gctPOINTER)ptr;
     }
@@ -1321,10 +1434,11 @@ vscDILoadDebugInfo(VSC_DIContext ** context, gctPOINTER* buffer, gctUINT32 * buf
 {
     VSC_DIContext * ctx;
     VSC_DIContext * ptr;
-    gctUINT8 * pos;
-    gctUINT size;
+    gctUINT8 * pos, *ctxPos;
+    gctUINT size, i;
     PFN_Allocate pfnAllocate;
     PFN_Free pfnFree;
+    gctUINT contextSize = _calculateDIContextSize();
 
     if (context == gcvNULL || buffer == gcvNULL)
         return gcvSTATUS_INVALID_ARGUMENT;
@@ -1334,20 +1448,102 @@ vscDILoadDebugInfo(VSC_DIContext ** context, gctPOINTER* buffer, gctUINT32 * buf
     pfnAllocate = gcoOS_Allocate;
     pfnFree = gcoOS_Free;
 
-    if (gcmIS_ERROR(pfnAllocate(gcvNULL,gcmSIZEOF(VSC_DIContext), (gctPOINTER *)&ctx)))
+    if (gcmIS_ERROR(pfnAllocate(gcvNULL, contextSize, (gctPOINTER *)&ctx)))
     {
         return gcvSTATUS_OUT_OF_MEMORY;
     }
 
     *context = ctx;
+    ctxPos = (gctUINT8 *)ctx;
+    pos = (gctUINT8 *)ptr;
 
-    *ctx = *ptr;
+    /* Load DIContext */
+    {
+        /* load collect, cu, paddingBytes, callDepth, stepState */
+        size = 16;
+        gcoOS_MemCopy(ctxPos, pos, size);
+        pos += size;
+        ctxPos += size;
+        *bufferSize -= size;
 
-    pos = (gctUINT8 *)(ptr + 1);
-    *bufferSize -= gcmSIZEOF(VSC_DIContext);
+        /* load strTable */
+        size = 16;
+        gcoOS_MemCopy(ctxPos, pos, size);
+        ctx->strTable = *(VSC_DI_STRTABLE *)ctxPos;
+        pos += size;
+        ctxPos += size;
+        *bufferSize -= size;
 
-    ctx->pfnAllocate = pfnAllocate;
-    ctx->pfnFree = pfnFree;
+        /* load dieTable */
+        size = 16;
+        gcoOS_MemCopy(ctxPos, pos, 16);
+        ctx->dieTable = *(VSC_DI_DIETABLE *)ctxPos;
+        pos += size;
+        ctxPos += size;
+        *bufferSize -= size;
+
+        /* load lineTable */
+        size = 16;
+        gcoOS_MemCopy(ctxPos, pos, size);
+        ctx->lineTable = *(VSC_DI_LINE_TABLE *)ctxPos;
+        pos += size;
+        ctxPos += size;
+        *bufferSize -= size;
+
+        /* load hw locTable */
+        size = 16;
+        gcoOS_MemCopy(ctxPos, pos, size);
+        ctx->locTable = *(VSC_DI_HW_LOC_TABLE *)ctxPos;
+        pos += size;
+        ctxPos += size;
+        *bufferSize -= size;
+
+        /* load swlocTable */
+        size = 16;
+        gcoOS_MemCopy(ctxPos, pos, size);
+        ctx->swLocTable = *(VSC_DI_SW_LOC_TABLE *)ctxPos;
+        pos += size;
+        ctxPos += size;
+        *bufferSize -= size;
+
+        /* load pfnAllocate */
+        size = 8;
+        gcoOS_MemCopy(ctxPos, pos, gcmSIZEOF(gctSTRING));
+        ctx->pfnAllocate = *(PFN_Allocate *)ctxPos;
+        pos += size;
+        ctxPos += size;
+        *bufferSize -= size;
+
+        /* load pfnFree */
+        size = 8;
+        gcoOS_MemCopy(ctxPos, pos, gcmSIZEOF(gctSTRING));
+        ctx->pfnFree = *(PFN_Free *)ctxPos;
+        pos += size;
+        ctxPos += size;
+        *bufferSize -= size;
+
+        /* load tmpLog */
+        size = 8;
+        gcoOS_MemCopy(ctxPos, pos, gcmSIZEOF(gctSTRING));
+        ctx->tmpLog = (gctCHAR *)ctxPos;
+        pos += size;
+        ctxPos += size;
+        *bufferSize -= size;
+
+        /* load callStack */
+        for (i = 0; i < VSC_DI_CALL_DEPTH ; i++)
+        {
+            /* load sourceLoc, nextSourceLoc, nextPC, paddingBytes[4], die */
+            size = 24;
+            gcoOS_MemCopy(ctxPos, pos, size);
+            ctx->callStack[i] = *(VSC_DI_CALL_STACK *)ctxPos;
+            pos += size;
+            ctxPos += size;
+            *bufferSize -= size;
+        }
+        ctx->pfnAllocate = pfnAllocate;
+        ctx->pfnFree = pfnFree;
+    }
 
     if (ctx->dieTable.count > 0)
     {
@@ -1441,6 +1637,7 @@ vscDICopyDebugInfo(VSC_DIContext* Context, gctPOINTER* Buffer)
     gctUINT size;
     PFN_Allocate pfnAllocate;
     PFN_Free pfnFree;
+    gctUINT contextSize = _calculateDIContextSize();
 
     if (Context == gcvNULL || Buffer == gcvNULL)
         return gcvSTATUS_INVALID_ARGUMENT;
@@ -1448,14 +1645,14 @@ vscDICopyDebugInfo(VSC_DIContext* Context, gctPOINTER* Buffer)
     pfnAllocate = gcoOS_Allocate;
     pfnFree = gcoOS_Free;
 
-    if (gcmIS_ERROR(pfnAllocate(gcvNULL,gcmSIZEOF(VSC_DIContext), (gctPOINTER *)&ctx)))
+    if (gcmIS_ERROR(pfnAllocate(gcvNULL, contextSize, (gctPOINTER *)&ctx)))
     {
         return gcvSTATUS_OUT_OF_MEMORY;
     }
 
     ctx->pfnAllocate = pfnAllocate;
     ctx->pfnFree = pfnFree;
-    gcoOS_MemCopy(ctx, Context, gcmSIZEOF(VSC_DIContext));
+    gcoOS_MemCopy(ctx, Context, contextSize);
 
     if (Context->dieTable.count > 0)
     {
@@ -1546,18 +1743,19 @@ gceSTATUS vscDIConstructContext(PFN_Allocate allocPfn, PFN_Free freePfn, VSC_DIC
     VSC_DIContext * ptr;
     PFN_Allocate pfnAllocate;
     PFN_Free pfnFree;
+    gctUINT contextSize = _calculateDIContextSize();
 
     if (gcmOPT_EnableDebug())
     {
         pfnAllocate = (allocPfn == gcvNULL) ? gcoOS_Allocate : allocPfn;
         pfnFree = (freePfn == gcvNULL) ? gcoOS_Free : freePfn;
 
-        if (gcmIS_ERROR(pfnAllocate(gcvNULL,gcmSIZEOF(VSC_DIContext), (gctPOINTER *)&ptr)))
+        if (gcmIS_ERROR(pfnAllocate(gcvNULL, contextSize, (gctPOINTER *)&ptr)))
         {
             return gcvSTATUS_OUT_OF_MEMORY;
         }
 
-        gcoOS_ZeroMemory(ptr, gcmSIZEOF(VSC_DIContext));
+        gcoOS_ZeroMemory(ptr, contextSize);
 
         ptr->pfnAllocate = pfnAllocate;
         ptr->pfnFree = pfnFree;
