@@ -1920,13 +1920,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_GetPhysicalDeviceImageFormatProperties2(
     }
 
 #if (ANDROID_SDK_VERSION >= 26)
-    extern uint64_t getAndroidHardwareBufferUsageFromVkUsage(const VkImageCreateFlags vk_create, const VkImageUsageFlags vk_usage);
-    if (output_ahw_usage)
-    {
-        output_ahw_usage->androidHardwareBufferUsage =
-                getAndroidHardwareBufferUsageFromVkUsage(pImageFormatInfo->flags,pImageFormatInfo->usage);
-    }
-
     if (externalInfo &&
         externalInfo->handleType == VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID &&
         format == VK_FORMAT_R8G8B8_UNORM)
@@ -1939,6 +1932,17 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_GetPhysicalDeviceImageFormatProperties2(
     formatFeatures = (tiling == VK_IMAGE_TILING_LINEAR)
                                         ? formatInfo->formatProperties.linearTilingFeatures
                                         : formatInfo->formatProperties.optimalTilingFeatures;
+#if (ANDROID_SDK_VERSION >= 26)
+    if (output_ahw_usage)
+    {
+        extern uint64_t getAndroidHardwareBufferUsageFromVkUsage(const VkImageCreateFlags vk_create, const VkImageUsageFlags vk_usage);
+        extern uint64_t getAndroidHardwareBufferGrallocUsage(__vkFormatInfo *formatInfo, VkImageTiling tiling);
+
+        output_ahw_usage->androidHardwareBufferUsage =
+            getAndroidHardwareBufferUsageFromVkUsage(pImageFormatInfo->flags,pImageFormatInfo->usage)
+            | getAndroidHardwareBufferGrallocUsage(formatInfo,tiling);
+    }
+#endif
 
     if (formatFeatures == 0)
     {
