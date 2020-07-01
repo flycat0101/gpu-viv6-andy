@@ -1451,6 +1451,10 @@ VX_PRIVATE_API vx_context vxoContext_Create()
 {
     vx_context context = VX_NULL;
     gcsPLS_PTR pls;
+    gcoHARDWARE savedHardware = gcvNULL;
+    gctUINT32 savedCoreIndex = 0;
+    gceHARDWARE_TYPE savedHardwareType = gcvHARDWARE_INVALID;
+
     gcmHEADER_ARG("context=%p", context);
     gcoHAL_GetPLS(&pls);
     vxmASSERT(pls->vxContextGlobalLock);
@@ -1513,6 +1517,9 @@ VX_PRIVATE_API vx_context vxoContext_Create()
             goto ErrorExit;
         }
 
+        /* Initial switch context after context is created. */
+        gcoVX_SwitchContext(0, &savedHardware, &savedHardwareType, &savedCoreIndex);
+
         context->targetTable[0].enabled = vx_true_e;
         context->targetPriorityTable[0] = 0;
 
@@ -1573,6 +1580,12 @@ VX_PRIVATE_API vx_context vxoContext_Create()
                 vxError("VX_EXTENSION_LIBS = %s, but load library failed!", oldEnv);
             }
         }
+
+#if VIVANTE_PROFILER
+        vxoProfiler_Initialize(context);
+#endif
+
+        gcoVX_RestoreContext(savedHardware, savedHardwareType, savedCoreIndex);
     }
 #if gcdUSE_SINGLE_CONTEXT
     else
@@ -1584,10 +1597,6 @@ VX_PRIVATE_API vx_context vxoContext_Create()
 #endif
 
     vxReleaseMutex(pls->vxContextGlobalLock);
-
-#if VIVANTE_PROFILER
-    vxoProfiler_Initialize(context);
-#endif
 
     if ((context->options.enableSaveBinary) || (context->options.enableCacheBinaryGraph))
     {
