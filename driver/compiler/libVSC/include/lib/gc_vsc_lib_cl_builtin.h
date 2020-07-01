@@ -24,12 +24,30 @@ extern gctSTRING gcCLLibHeader ;
 
 extern gctSTRING gcCLLibFunc_Extension;
 
+extern gctSTRING gcCLLibFunc_Defines;
+
 #if CompileIntrinsicLibfromSrc
 extern gctSTRING gcCLLibRelational_Funcs_packed;
 #else
 extern gctSTRING gcCLLibFMA_Func_fmaSupported;
 
 extern gctSTRING gcCLLibASIN_ACOS_Funcs_Common;
+
+extern gctSTRING gcCLLibPOW_Funcs;
+
+extern gctSTRING gcCLLibSIN_Funcs;
+
+extern gctSTRING gcCLLibCOS_Funcs;
+
+extern gctSTRING gcCLLibTAN_Funcs;
+
+extern gctSTRING gcCLLibSIN_noFMA_Funcs;
+
+extern gctSTRING gcCLLibCOS_noFMA_Funcs;
+
+extern gctSTRING gcCLLibTAN_noFMA_Funcs;
+
+extern gctSTRING gcCLLibPOW_noFMA_Funcs;
 
 extern gctSTRING gcCLLibASIN_Funcs;
 

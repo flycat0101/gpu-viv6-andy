@@ -1562,9 +1562,9 @@ clGetOpcodeName(
     case clvOPCODE_NOT:                return "!";
     case clvOPCODE_NEG:                return "-";
 
-    case clvOPCODE_SIN:                return "native_sin";
-    case clvOPCODE_COS:                return "native_cos";
-    case clvOPCODE_TAN:                return "native_tan";
+    case clvOPCODE_SIN:                return "sin";
+    case clvOPCODE_COS:                return "cos";
+    case clvOPCODE_TAN:                return "tan";
 
     case clvOPCODE_ASIN:        return "native#asin";
     case clvOPCODE_ACOS:        return "native#acos";
