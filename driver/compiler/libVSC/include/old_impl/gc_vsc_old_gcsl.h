@@ -217,6 +217,12 @@ gceFRAGOUT_USAGE;
 #define _SHADER_GL15_VERSION      gcmCC('\0', _SHADER_GL_VERSION_SIG, '\5', '\1')
 #define _SHADER_GL33_VERSION      gcmCC('\0', _SHADER_GL_VERSION_SIG, '\3', '\3')
 #define _SHADER_GL40_VERSION      gcmCC('\0', _SHADER_GL_VERSION_SIG, '\0', '\4')
+#define _SHADER_GL41_VERSION      gcmCC('\0', _SHADER_GL_VERSION_SIG, '\1', '\4')
+#define _SHADER_GL42_VERSION      gcmCC('\0', _SHADER_GL_VERSION_SIG, '\2', '\4')
+#define _SHADER_GL43_VERSION      gcmCC('\0', _SHADER_GL_VERSION_SIG, '\3', '\4')
+#define _SHADER_GL44_VERSION      gcmCC('\0', _SHADER_GL_VERSION_SIG, '\4', '\4')
+#define _SHADER_GL45_VERSION      gcmCC('\0', _SHADER_GL_VERSION_SIG, '\5', '\4')
+#define _SHADER_GL46_VERSION      gcmCC('\0', _SHADER_GL_VERSION_SIG, '\6', '\4')
 
 #define gcShader_IsCL(S)           (GetShaderType(S) == gcSHADER_TYPE_CL && (((S)->compilerVersion[0] & 0xFFFF) == _cldLanguageType))
 #define gcShader_IsGlCompute(S)    (GetShaderType(S) == gcSHADER_TYPE_COMPUTE && (((S)->compilerVersion[0] & 0xFFFF) != _cldLanguageType))
