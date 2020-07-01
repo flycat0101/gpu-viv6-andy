@@ -2251,7 +2251,8 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
                 VIR_Operand_ReplaceDefOperandWithDef(
                     def_inst_dest,
                     inst_dest,
-                    def_inst_enable);
+                    def_inst_enable,
+                    gcvFALSE);
                 VIR_Operand_SetTypeId(def_inst_dest, tyId);
 
                 memset(&nativeDefFlags, 0, sizeof(nativeDefFlags));

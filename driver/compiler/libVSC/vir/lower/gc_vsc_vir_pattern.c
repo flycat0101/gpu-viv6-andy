@@ -115,15 +115,12 @@ _Pattern_SetOperand(
     IN VIR_Operand     *Opnd
     )
 {
-    VIR_OperandId index;
     gcmASSERT(Inst != gcvNULL && Opnd != gcvNULL);
 
     if (No == 0)
     {
         VIR_Operand     *dest = VIR_Inst_GetDest(Inst);
-        index = VIR_Operand_GetIndex(dest);
         VIR_Operand_Copy(dest, Opnd);
-        VIR_Operand_SetIndex(dest, index);
 
         if (!VIR_Operand_isLvalue(Opnd))
         {
@@ -141,9 +138,7 @@ _Pattern_SetOperand(
 
         src = VIR_Inst_GetSource(Inst, No - 1);
         /* copy operand */
-        index = VIR_Operand_GetIndex(src);
         VIR_Operand_Copy(src, Opnd);
-        VIR_Operand_SetIndex(src, index);
 
         if (VIR_Operand_isLvalue(Opnd))
         {

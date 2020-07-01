@@ -12407,14 +12407,11 @@ VIR_Inst_CopySource(
 {
     VSC_ErrCode   errCode = VSC_ERR_NONE;
     VIR_TypeId    tyId;
-    gctUINT       index;
     VIR_Operand * operand = VIR_Inst_GetSource(Inst, SrcNum);
 
     gcmASSERT(operand != gcvNULL);
     tyId = VIR_Operand_GetTypeId(operand);
-    index = VIR_Operand_GetIndex(operand);
     VIR_Operand_Copy(operand, FromOperand);
-    VIR_Operand_SetIndex(operand, index);
     operand->header._lvalue = gcvFALSE;
 
     if (KeepSrcType)
@@ -15058,14 +15055,22 @@ void
 VIR_Operand_ReplaceDefOperandWithDef(
     IN OUT VIR_Operand *    Def,
     IN VIR_Operand *        New_Def,
-    IN VIR_Enable           New_Enable
+    IN VIR_Enable           New_Enable,
+    IN gctBOOL              bKeepPrecision
     )
 {
-    gctUINT index = VIR_Operand_GetIndex(Def);
+    VIR_Precision           originalPrecision = VIR_Operand_GetPrecision(Def);
+
     gcmASSERT(VIR_Operand_isLvalue(Def) && VIR_Operand_isLvalue(New_Def));
+
     VIR_Operand_Copy(Def, New_Def);
-    VIR_Operand_SetIndex(Def, index);
     VIR_Operand_SetEnable(Def, New_Enable);
+
+    /* Keep precision will also change the symbol precision of the New_Def. */
+    if (bKeepPrecision)
+    {
+        VIR_Operand_SetPrecision(Def, originalPrecision);
+    }
 }
 
 void

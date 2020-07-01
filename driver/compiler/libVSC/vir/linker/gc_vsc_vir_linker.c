@@ -5561,7 +5561,7 @@ _AddExtraSampler(
     IN VIR_Function     *pFunc,
     IN VIR_Operand      *samplerOpnd,
     IN gctUINT          arrayIndex,
-    OUT VIR_Operand     **newOpnd
+    OUT VIR_Operand     *pSrcOpnd
     )
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
@@ -5610,22 +5610,19 @@ _AddExtraSampler(
         extraLayer->u.samplerOrImageAttr.pYcbcrPlaneSymId = gcvNULL;
     }
 
-    /* New a operand with this extra image layer.  */
-    errCode = VIR_Function_NewOperand(pFunc, newOpnd);
-    ON_ERROR(errCode, "VIR_Function_NewOperand");
-
-    VIR_Operand_SetSymbol(*newOpnd, pFunc, extraLayerSymId);
-    VIR_Operand_SetTypeId(*newOpnd, VIR_Operand_GetTypeId(samplerOpnd));
-    VIR_Operand_SetSwizzle(*newOpnd, VIR_SWIZZLE_XYZW);
-    VIR_Operand_SetRoundMode(*newOpnd, VIR_ROUND_DEFAULT);
-    VIR_Operand_SetModifier(*newOpnd, VIR_MOD_NONE);
+    /* Set the source operand. */
+    VIR_Operand_SetSymbol(pSrcOpnd, pFunc, extraLayerSymId);
+    VIR_Operand_SetTypeId(pSrcOpnd, VIR_Operand_GetTypeId(samplerOpnd));
+    VIR_Operand_SetSwizzle(pSrcOpnd, VIR_SWIZZLE_XYZW);
+    VIR_Operand_SetRoundMode(pSrcOpnd, VIR_ROUND_DEFAULT);
+    VIR_Operand_SetModifier(pSrcOpnd, VIR_MOD_NONE);
 
     /* Copy the index from image operand. */
-    VIR_Operand_SetIsConstIndexing(*newOpnd, VIR_Operand_GetIsConstIndexing(samplerOpnd));
-    VIR_Operand_SetRelIndex(*newOpnd, VIR_Operand_GetRelIndexing(samplerOpnd));
-    VIR_Operand_SetRelAddrMode(*newOpnd, VIR_Operand_GetRelAddrMode(samplerOpnd));
-    VIR_Operand_SetMatrixConstIndex(*newOpnd, VIR_Operand_GetMatrixConstIndex(samplerOpnd));
-    VIR_Operand_SetRelAddrLevel(*newOpnd, VIR_Operand_GetRelAddrLevel(samplerOpnd));
+    VIR_Operand_SetIsConstIndexing(pSrcOpnd, VIR_Operand_GetIsConstIndexing(samplerOpnd));
+    VIR_Operand_SetRelIndex(pSrcOpnd, VIR_Operand_GetRelIndexing(samplerOpnd));
+    VIR_Operand_SetRelAddrMode(pSrcOpnd, VIR_Operand_GetRelAddrMode(samplerOpnd));
+    VIR_Operand_SetMatrixConstIndex(pSrcOpnd, VIR_Operand_GetMatrixConstIndex(samplerOpnd));
+    VIR_Operand_SetRelAddrLevel(pSrcOpnd, VIR_Operand_GetRelAddrLevel(samplerOpnd));
 
 OnError:
     return errCode;
@@ -5881,12 +5878,14 @@ _InsertCallTexld(
     /* create extra sampler */
     if (Context->linkPoint->u.resource.actBits & VSC_RES_ACT_BIT_EXTRA_SAMPLER)
     {
-        errCode = _AddExtraSampler(pShader, pFunc, VIR_Inst_GetSource(texldInst, 0),
-            Context->linkPoint->u.resource.arrayIndex, &newOpnd);
-        ON_ERROR(errCode, "Insert a parameter.");
         errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
         ON_ERROR(errCode, "Insert a parameter.");
-        newInst->src[0] = newOpnd;
+
+        /* create extra sampler */
+        newOpnd = VIR_Inst_GetSource(newInst, 0);
+        errCode = _AddExtraSampler(pShader, pFunc, VIR_Inst_GetSource(texldInst, 0),
+            Context->linkPoint->u.resource.arrayIndex, newOpnd);
+        ON_ERROR(errCode, "Add extra sampler.");
     }
     else
     {
@@ -5992,13 +5991,14 @@ _InsertCallTexldGather(
     /* extraSampler (may not be needed)*/
     if (Context->linkPoint->u.resource.actBits & VSC_RES_ACT_BIT_EXTRA_SAMPLER)
     {
-        /* create extra sampler */
-        errCode = _AddExtraSampler(pShader, pFunc, VIR_Inst_GetSource(texldInst, 0),
-            Context->linkPoint->u.resource.arrayIndex, &texldSrc);
-        ON_ERROR(errCode, "_InsertCallTexldGather");
         errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
-        ON_ERROR(errCode, "_InsertCallTexldGather");
-        newInst->src[0] = texldSrc;
+        ON_ERROR(errCode, "Insert a parameter.");
+
+        /* create extra sampler */
+        texldSrc = VIR_Inst_GetSource(newInst, 0);
+        errCode = _AddExtraSampler(pShader, pFunc, VIR_Inst_GetSource(texldInst, 0),
+            Context->linkPoint->u.resource.arrayIndex, texldSrc);
+        ON_ERROR(errCode, "Add extra sampler.");
     }
     else
     {

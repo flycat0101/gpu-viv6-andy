@@ -7450,7 +7450,8 @@ void
 VIR_Operand_ReplaceDefOperandWithDef(
     IN OUT VIR_Operand *    Def,
     IN VIR_Operand *        New_Def,
-    IN VIR_Enable           New_Enable
+    IN VIR_Enable           New_Enable,
+    IN gctBOOL              bKeepPrecision
     );
 
 void
