@@ -257,6 +257,8 @@ typedef struct _gcsHAL_QUERY_CHIP_OPTIONS
     gceSECURE_MODE              secureMode;
     gctBOOL                     enableNNTPParallel;
     gctUINT                     enableSwtilingPhase1;
+
+    gctBOOL                     hasShader;
 }
 gcsHAL_QUERY_CHIP_OPTIONS;
 
