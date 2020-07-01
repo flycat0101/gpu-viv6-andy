@@ -4926,6 +4926,7 @@ typedef enum _gcBuiltinConst
     gcBIConst_MaxGSAtomicCounterBuffers,
 
     /* Desktop GL */
+    gcBIConst_MaxLights,
     gcBIConst_MaxClipDistances,
     gcBIConst_MaxClipPlanes,
     gcBIConst_MaxFragmentUniformComponents,
