@@ -1568,39 +1568,6 @@ slParseSubscriptExpr(
         return gcvNULL;
     }
 
-    /* Check error */
-    status = _CheckErrorForSubscriptExpr(
-                                        Compiler,
-                                        LeftOperand,
-                                        RightOperand);
-
-    if (gcmIS_ERROR(status))
-    {
-        gcmFOOTER_ARG("<return>=%s", "<nil>");
-        return gcvNULL;
-    }
-
-    /* Constant calculation */
-    if (sloIR_OBJECT_GetType(&LeftOperand->base) == slvIR_CONSTANT
-        && sloIR_OBJECT_GetType(&RightOperand->base) == slvIR_CONSTANT)
-    {
-        status = sloIR_BINARY_EXPR_Evaluate(
-                                            Compiler,
-                                            slvBINARY_SUBSCRIPT,
-                                            (sloIR_CONSTANT)LeftOperand,
-                                            (sloIR_CONSTANT)RightOperand,
-                                            &resultConstant);
-
-        if (gcmIS_ERROR(status))
-        {
-            gcmFOOTER_ARG("<return>=%s", "<nil>");
-            return gcvNULL;
-        }
-
-        gcmFOOTER_ARG("<return>=0x%x", &resultConstant->exprBase);
-        return &resultConstant->exprBase;
-    }
-
     /* Check the UnSizeArray. */
     if (sloIR_OBJECT_GetType(&LeftOperand->base) == slvIR_VARIABLE && sloIR_OBJECT_GetType(&RightOperand->base) == slvIR_CONSTANT)
     {
@@ -1636,6 +1603,39 @@ slParseSubscriptExpr(
                 }
             }
         }
+    }
+
+    /* Check error */
+    status = _CheckErrorForSubscriptExpr(
+                                        Compiler,
+                                        LeftOperand,
+                                        RightOperand);
+
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER_ARG("<return>=%s", "<nil>");
+        return gcvNULL;
+    }
+
+    /* Constant calculation */
+    if (sloIR_OBJECT_GetType(&LeftOperand->base) == slvIR_CONSTANT
+        && sloIR_OBJECT_GetType(&RightOperand->base) == slvIR_CONSTANT)
+    {
+        status = sloIR_BINARY_EXPR_Evaluate(
+                                            Compiler,
+                                            slvBINARY_SUBSCRIPT,
+                                            (sloIR_CONSTANT)LeftOperand,
+                                            (sloIR_CONSTANT)RightOperand,
+                                            &resultConstant);
+
+        if (gcmIS_ERROR(status))
+        {
+            gcmFOOTER_ARG("<return>=%s", "<nil>");
+            return gcvNULL;
+        }
+
+        gcmFOOTER_ARG("<return>=0x%x", &resultConstant->exprBase);
+        return &resultConstant->exprBase;
     }
 
     /* Create the binary expression */

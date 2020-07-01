@@ -2410,6 +2410,19 @@ VIR_Shader_IsES31AndAboveCompiler(
     return isES31Compiler;
 }
 
+gctBOOL
+VIR_Shader_IsGL40(
+    IN VIR_Shader * Shader
+    )
+{
+    gctBOOL bMatch;
+
+    bMatch = ((Shader->compilerVersion[0] & 0xFFFF) == _SHADER_OGL_LANGUAGE_TYPE &&
+              (Shader->compilerVersion[1] == _SHADER_GL40_VERSION));
+
+    return bMatch;
+}
+
 VSC_BT_FREE_ENTRY* VIR_Operand_GetFreeEntry(VIR_Operand * pOperand)
 {
     /* set the operand kind to free entry kind */
