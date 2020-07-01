@@ -925,6 +925,11 @@ slsDATA_TYPE_NAME_Destory(
      (dataType)->elementType == slvTYPE_ISAMPLER1D      || \
      (dataType)->elementType == slvTYPE_USAMPLER1D)
 
+#define slsDATA_TYPE_IsSampler2D(dataType) \
+    ((dataType)->elementType == slvTYPE_SAMPLER2D       || \
+     (dataType)->elementType == slvTYPE_ISAMPLER2D      || \
+     (dataType)->elementType == slvTYPE_USAMPLER2D)
+
 #define slsDATA_TYPE_IsSampler1DArray(dataType) \
     ((dataType)->elementType == slvTYPE_SAMPLER1DARRAY  || \
      (dataType)->elementType == slvTYPE_ISAMPLER1DARRAY || \

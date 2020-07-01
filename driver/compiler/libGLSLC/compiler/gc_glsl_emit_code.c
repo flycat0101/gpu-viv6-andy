@@ -8333,7 +8333,7 @@ slEmitCompareSetCode(
 #if TREAT_ES20_INTEGER_AS_FLOAT
         sloCOMPILER_IsHaltiVersion(Compiler) &&
 #endif
-        (type == gcSHADER_FLOAT_X1))
+        type == gcSHADER_FLOAT_X1)
     {
         slsIOPERAND_New(Compiler, &intermIOperand[1], intermTargetType, Target->precision);
         gcsTARGET_InitializeUsingIOperand(&intermTarget[1], &intermIOperand[1]);

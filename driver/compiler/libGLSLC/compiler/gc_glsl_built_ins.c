@@ -2705,8 +2705,8 @@ _GenTexture2DRectCode(
         if(sampler->u.variableInfo.levelBaseSize == gcvNULL)
         {
             status = slAllocSamplerLevelBaseSize(Compiler,
-                                                    sampler,
-                                                    gcSHADER_FLOAT_X4);
+                                                 sampler,
+                                                 gcSHADER_FLOAT_X4);
             if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
         }
         gcmASSERT(sampler->u.variableInfo.levelBaseSize);
@@ -2986,38 +2986,75 @@ _ConvertCoordForSampler1D(
     slsIOPERAND         iOperand[1];
     slsROPERAND         rZero[1];
     sluCONSTANT_VALUE   cZero[1];
-    gctUINT8            componentCount;
-    gctBOOL             bIsSampler1DArray = gcvFALSE, bIs1DArrayShadow = gcvFALSE, bIs1DShadow = gcvFALSE;
+    gctUINT8            precomponentCount = 0;
+    gctUINT8            newcomponentCount = 0;
+    gctBOOL             needGenAccessLayer = gcvFALSE;
 
     /*
-    ** 1) For 1D, change the coord from "int p" to "ivec2(p, 0)".
-    ** 2) For 1DArray, change the coord from "ivec2 p" to "ivec3(p.x, 0, p.y)".
+    ** 1) For 1D, change the coord from "float p" to "vec2(p, 0)".
+    ** 2) For 1DArray, change the coord from "vec2 p" to "vec3(p.x, 0, p.y)".
     ** 3) For 1DShadow, change the coord from "vec3 p" to "vec3(p.x, 0, p.z)".
     ** 4) For 1DArrayShadow, change the coord from "vec3 p" to "vec4(p.x, 0, p.y, p.z)".
+    ** 5) In projection, for 1D, change the coord from "vec2 p" to "vec3(p.x, 0, p.y)"
+    **    or change the coord from "vec4 p" to "vec4(p.x, 0, p.z, p.w)".
     */
+    precomponentCount = gcGetDataTypeComponentCount(OperandsParameters[1].rOperands[0].dataType);
     if (slsDATA_TYPE_IsSampler1D(samplerOperand->dataType))
     {
-        componentCount = 2;
+        if (precomponentCount == 1)/* For 1D */
+        {
+            newcomponentCount = 2;
+        }
+        else if (precomponentCount == 2)/* For 1D in projection */
+        {
+            newcomponentCount = 3;
+        }
+        else if (precomponentCount == 4)/* For 1D in projection */
+        {
+            newcomponentCount = 4;
+        }
     }
     else if (slsDATA_TYPE_IsSampler1DArray(samplerOperand->dataType))
     {
-        componentCount = 3;
-        bIsSampler1DArray = gcvTRUE;
+        /* precomponentCount = 2 */
+        newcomponentCount = 3;
+        needGenAccessLayer = gcvTRUE;
     }
     else if ((samplerOperand->dataType)->elementType == slvTYPE_SAMPLER1DSHADOW)
     {
-        componentCount = 3;
-        bIs1DShadow = gcvTRUE;
+        if (precomponentCount == 4)/* For 1D in projection */
+        {
+            newcomponentCount = 4;
+        }
+        else
+        {
+            /* precomponentCount = 3 */
+            newcomponentCount = 3;
+        }
     }
     else
     {
         gcmASSERT((samplerOperand->dataType)->elementType == slvTYPE_SAMPLER1DARRAYSHADOW);
-        componentCount = 4;
-        bIs1DArrayShadow = gcvTRUE;
+        /* precomponentCount = 3 */
+        newcomponentCount = 4;
+        needGenAccessLayer = gcvTRUE;
+    }
+    gcmASSERT(precomponentCount > 0);
+    gcmASSERT(newcomponentCount > 1);
+
+    if(needGenAccessLayer == gcvTRUE)
+    {
+         status = _GenAccessLayerCode(Compiler,
+                                     PolynaryExpr->exprBase.base.lineNo,
+                                     PolynaryExpr->exprBase.base.stringNo,
+                                     &OperandsParameters[1].rOperands[0],
+                                     ComponentSelection_Y,
+                                     layerOperand);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
     }
 
     /* Get the component data type. */
-    if (bIsSampler1DArray || bIs1DArrayShadow || bIs1DShadow)
+    if (precomponentCount > 1)
     {
         coordElementType = gcGetComponentDataType(OperandsParameters[1].rOperands[0].dataType);
     }
@@ -3026,147 +3063,65 @@ _ConvertCoordForSampler1D(
         coordElementType = OperandsParameters[1].rOperands[0].dataType;
     }
     /* Generate the new coord data type. */
-    newCoordType = gcConvScalarToVectorDataType(coordElementType, componentCount);
+    newCoordType = gcConvScalarToVectorDataType(coordElementType, newcomponentCount);
 
     slsIOPERAND_New(Compiler,
                     iOperand,
                     newCoordType,
                     OperandsParameters[1].rOperands[0].u.reg.precision);
 
-    /* newCoord.x = p.x */
-    slsLOPERAND_InitializeUsingIOperand(intermLOperand, iOperand);
-    sloIR_LOperandComponentSelect(Compiler,
-                                  intermLOperand,
-                                  ComponentSelection_X,
-                                  intermLOperand);
-
-    if (bIsSampler1DArray || bIs1DArrayShadow || bIs1DShadow)
+    if (precomponentCount == newcomponentCount)
     {
-        status = sloIR_ROperandComponentSelect(Compiler,
-                                               &OperandsParameters[1].rOperands[0],
-                                               ComponentSelection_X,
-                                               intermROperand);
+        /* newCoord = p */
+        slsLOPERAND_InitializeUsingIOperand(intermLOperand, iOperand);
+
+        status = slGenAssignCode(Compiler,
+                                 PolynaryExpr->exprBase.base.lineNo,
+                                 PolynaryExpr->exprBase.base.stringNo,
+                                 intermLOperand,
+                                 &OperandsParameters[1].rOperands[0]);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        /* newCoord.y = 0 */
+        slsLOPERAND_InitializeUsingIOperand(intermLOperand, iOperand);
+        sloIR_LOperandComponentSelect(Compiler,
+                                      intermLOperand,
+                                      ComponentSelection_Y,
+                                      intermLOperand);
+        cZero[0].uintValue = 0;
+        slsROPERAND_InitializeConstant(&rZero[0],
+                                       coordElementType,
+                                       OperandsParameters[1].rOperands[0].u.reg.precision,
+                                       1,
+                                       cZero);
+        status = slGenAssignCode(Compiler,
+                                 PolynaryExpr->exprBase.base.lineNo,
+                                 PolynaryExpr->exprBase.base.stringNo,
+                                 intermLOperand,
+                                 &rZero[0]);
         if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
     }
     else
     {
-        intermROperand[0] = OperandsParameters[1].rOperands[0];
-    }
-
-    status = slGenAssignCode(Compiler,
-                             PolynaryExpr->exprBase.base.lineNo,
-                             PolynaryExpr->exprBase.base.stringNo,
-                             intermLOperand,
-                             &intermROperand[0]);
-    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-
-    /* newCoord.y = 0 */
-    slsLOPERAND_InitializeUsingIOperand(intermLOperand, iOperand);
-    sloIR_LOperandComponentSelect(Compiler,
-                                  intermLOperand,
-                                  ComponentSelection_Y,
-                                  intermLOperand);
-    cZero[0].uintValue = 0;
-    slsROPERAND_InitializeConstant(&rZero[0],
-                                   coordElementType,
-                                   OperandsParameters[1].rOperands[0].u.reg.precision,
-                                   1,
-                                   cZero);
-    status = slGenAssignCode(Compiler,
-                             PolynaryExpr->exprBase.base.lineNo,
-                             PolynaryExpr->exprBase.base.stringNo,
-                             intermLOperand,
-                             &rZero[0]);
-    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-
-    /* Check if it is a gsampler1DArray. */
-    if (bIsSampler1DArray)
-    {
-        status = _GenAccessLayerCode(Compiler,
-                                     PolynaryExpr->exprBase.base.lineNo,
-                                     PolynaryExpr->exprBase.base.stringNo,
-                                     &OperandsParameters[1].rOperands[0],
-                                     ComponentSelection_Y,
-                                     layerOperand);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-
-        /* newCoord.z = p.y */
+        /* newCoord.x = p.x */
         slsLOPERAND_InitializeUsingIOperand(intermLOperand, iOperand);
         sloIR_LOperandComponentSelect(Compiler,
                                       intermLOperand,
-                                      ComponentSelection_Z,
-                                      intermLOperand);
-        slsROPERAND_InitializeUsingIOperand(intermROperand, layerOperand);
-        status = slGenAssignCode(Compiler,
-                                 PolynaryExpr->exprBase.base.lineNo,
-                                 PolynaryExpr->exprBase.base.stringNo,
-                                 intermLOperand,
-                                 intermROperand);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-    }
-
-    /* Check if it is a sampler1DShadow. */
-    if (bIs1DShadow)
-    {
-        /* newCoord.z = p.z */
-        slsLOPERAND_InitializeUsingIOperand(intermLOperand, iOperand);
-        sloIR_LOperandComponentSelect(Compiler,
-                                      intermLOperand,
-                                      ComponentSelection_Z,
+                                      ComponentSelection_X,
                                       intermLOperand);
 
-        status = sloIR_ROperandComponentSelect(Compiler,
-                                               &OperandsParameters[1].rOperands[0],
-                                               ComponentSelection_Z,
-                                               intermROperand);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-
-        status = slGenAssignCode(Compiler,
-                                 PolynaryExpr->exprBase.base.lineNo,
-                                 PolynaryExpr->exprBase.base.stringNo,
-                                 intermLOperand,
-                                 intermROperand);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-    }
-
-    /* Check if it is a sampler1DArrayShadow. */
-    if (bIs1DArrayShadow)
-    {
-        status = _GenAccessLayerCode(Compiler,
-                                     PolynaryExpr->exprBase.base.lineNo,
-                                     PolynaryExpr->exprBase.base.stringNo,
-                                     &OperandsParameters[1].rOperands[0],
-                                     ComponentSelection_Y,
-                                     layerOperand);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-
-        /* newCoord.z = p.y */
-        slsLOPERAND_InitializeUsingIOperand(intermLOperand, iOperand);
-        sloIR_LOperandComponentSelect(Compiler,
-                                      intermLOperand,
-                                      ComponentSelection_Z,
-                                      intermLOperand);
-
-        slsROPERAND_InitializeUsingIOperand(intermROperand, layerOperand);
-        status = slGenAssignCode(Compiler,
-                                 PolynaryExpr->exprBase.base.lineNo,
-                                 PolynaryExpr->exprBase.base.stringNo,
-                                 intermLOperand,
-                                 intermROperand);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-
-        /* newCoord.w = p.z */
-        slsLOPERAND_InitializeUsingIOperand(intermLOperand, iOperand);
-        sloIR_LOperandComponentSelect(Compiler,
-                                      intermLOperand,
-                                      ComponentSelection_W,
-                                      intermLOperand);
-
-        status = sloIR_ROperandComponentSelect(Compiler,
-                                               &OperandsParameters[1].rOperands[0],
-                                               ComponentSelection_Z,
-                                               intermROperand);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        if (precomponentCount > 1)
+        {
+            status = sloIR_ROperandComponentSelect(Compiler,
+                                                   &OperandsParameters[1].rOperands[0],
+                                                   ComponentSelection_X,
+                                                   intermROperand);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        }
+        else
+        {
+            intermROperand[0] = OperandsParameters[1].rOperands[0];
+        }
 
         status = slGenAssignCode(Compiler,
                                  PolynaryExpr->exprBase.base.lineNo,
@@ -3175,6 +3130,76 @@ _ConvertCoordForSampler1D(
                                  &intermROperand[0]);
         if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
+        /* newCoord.y = 0 */
+        slsLOPERAND_InitializeUsingIOperand(intermLOperand, iOperand);
+        sloIR_LOperandComponentSelect(Compiler,
+                                      intermLOperand,
+                                      ComponentSelection_Y,
+                                      intermLOperand);
+        cZero[0].uintValue = 0;
+        slsROPERAND_InitializeConstant(&rZero[0],
+                                       coordElementType,
+                                       OperandsParameters[1].rOperands[0].u.reg.precision,
+                                       1,
+                                       cZero);
+        status = slGenAssignCode(Compiler,
+                                 PolynaryExpr->exprBase.base.lineNo,
+                                 PolynaryExpr->exprBase.base.stringNo,
+                                 intermLOperand,
+                                 &rZero[0]);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        if(newcomponentCount > 2)
+        {
+            /* newCoord.z = p.y */
+            slsLOPERAND_InitializeUsingIOperand(intermLOperand, iOperand);
+            sloIR_LOperandComponentSelect(Compiler,
+                                          intermLOperand,
+                                          ComponentSelection_Z,
+                                          intermLOperand);
+            if(needGenAccessLayer)
+            {
+                slsROPERAND_InitializeUsingIOperand(intermROperand, layerOperand);
+            }
+            else
+            {
+                status = sloIR_ROperandComponentSelect(Compiler,
+                                                       &OperandsParameters[1].rOperands[0],
+                                                       ComponentSelection_Y,
+                                                       intermROperand);
+                if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+            }
+
+            status = slGenAssignCode(Compiler,
+                                     PolynaryExpr->exprBase.base.lineNo,
+                                     PolynaryExpr->exprBase.base.stringNo,
+                                     intermLOperand,
+                                     &intermROperand[0]);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        }
+
+        if(newcomponentCount > 3)
+        {
+            /* newCoord.w = p.z */
+            slsLOPERAND_InitializeUsingIOperand(intermLOperand, iOperand);
+            sloIR_LOperandComponentSelect(Compiler,
+                                          intermLOperand,
+                                          ComponentSelection_W,
+                                          intermLOperand);
+
+            status = sloIR_ROperandComponentSelect(Compiler,
+                                                   &OperandsParameters[1].rOperands[0],
+                                                   ComponentSelection_Z,
+                                                   intermROperand);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+            status = slGenAssignCode(Compiler,
+                                     PolynaryExpr->exprBase.base.lineNo,
+                                     PolynaryExpr->exprBase.base.stringNo,
+                                     intermLOperand,
+                                     &intermROperand[0]);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        }
     }
 
     if (NewCoordIOperand)
@@ -3385,6 +3410,152 @@ _GenTexture2DProjCode(
     return gcvSTATUS_OK;
 }
 
+gceSTATUS
+_GenTexture2DRectProjCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    )
+{
+    gceSTATUS   status;
+    sloIR_EXPR  samplerOperand = slsDLINK_LIST_First(&PolynaryExpr->operands->members, struct _sloIR_EXPR);
+
+    gcmHEADER();
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    slmVERIFY_IR_OBJECT(PolynaryExpr, slvIR_POLYNARY_EXPR);
+    gcmASSERT(OperandCount == 2);
+    gcmASSERT(OperandsParameters);
+    gcmASSERT(IOperand);
+
+    if(slsDATA_TYPE_IsSampler2DRect(samplerOperand->dataType))
+    {
+       /*
+        slsIOPERAND_New(Compiler,
+                        intermIOperand,
+                        dataType,
+                        gcSHADER_PRECISION_MEDIUM);
+
+        status = _GenSamplerSizeCode(Compiler,
+                                     PolynaryExpr->exprBase.base.lineNo,
+                                     PolynaryExpr->exprBase.base.stringNo,
+                                     samplerOperand,
+                                     Sampler,
+                                     lod,
+                                     intermIOperand);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        slsROPERAND_InitializeUsingIOperand(sizeOperand, intermIOperand);
+
+        status = slsROPERAND_ChangeDataTypeFamily(Compiler,
+                                                  PolynaryExpr->exprBase.base.lineNo,
+                                                  PolynaryExpr->exprBase.base.stringNo,
+                                                  gcvFALSE,
+                                                  gcChangeElementDataType(sizeOperand->dataType,
+                                                                          gcSHADER_FLOAT_X1),
+                                                  sizeOperand);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        slGetVectorROperandSlice(sizeOperand,
+                                 0,
+                                 gcGetVectorDataTypeComponentCount(floatType),
+                                 texCoords);
+        slsIOPERAND_New(Compiler,
+                        intermIOperand,
+                        floatType,
+                        OffsetCoords->precision);
+        status = slGenArithmeticExprCode(Compiler,
+                                         PolynaryExpr->exprBase.base.lineNo,
+                                         PolynaryExpr->exprBase.base.stringNo,
+                                         slvOPCODE_DIV,
+                                         intermIOperand,
+                                         intermROperand,
+                                         texCoords);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        slsROPERAND_InitializeUsingIOperand(intermROperand, intermIOperand);
+        */
+    }
+
+    status = slGenGenericCode2(
+                            Compiler,
+                            PolynaryExpr->exprBase.base.lineNo,
+                            PolynaryExpr->exprBase.base.stringNo,
+                            slvOPCODE_TEXTURE_LOAD_PROJ,
+                            IOperand,
+                            &OperandsParameters[0].rOperands[0],
+                            &OperandsParameters[1].rOperands[0]);
+
+    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+_GenTexture1DProjCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    )
+{
+    gceSTATUS   status;
+    slsROPERAND         rOperand[1];
+    slsIOPERAND         iOperand[1];
+
+    gcmHEADER();
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    slmVERIFY_IR_OBJECT(PolynaryExpr, slvIR_POLYNARY_EXPR);
+    gcmASSERT(OperandCount == 2 || OperandCount == 3);
+    gcmASSERT(OperandsParameters);
+    gcmASSERT(IOperand);
+
+
+    /* Change the coordinate from "ivec2 p" to "ivec3(p.x, 0, p.y). */
+    status = _ConvertCoordForSampler1D(Compiler,
+                                       CodeGenerator,
+                                       PolynaryExpr,
+                                       OperandsParameters,
+                                       iOperand);
+
+    if (OperandCount == 3)
+    {
+        status = slGenGenericCode2(
+                                Compiler,
+                                PolynaryExpr->exprBase.base.lineNo,
+                                PolynaryExpr->exprBase.base.stringNo,
+                                slvOPCODE_TEXTURE_BIAS,
+                                IOperand,
+                                &OperandsParameters[0].rOperands[0],
+                                &OperandsParameters[2].rOperands[0]);
+
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+    }
+    slsROPERAND_InitializeUsingIOperand(rOperand, iOperand);
+    status = slGenGenericCode2(
+                            Compiler,
+                            PolynaryExpr->exprBase.base.lineNo,
+                            PolynaryExpr->exprBase.base.stringNo,
+                            slvOPCODE_TEXTURE_LOAD_PROJ,
+                            IOperand,
+                            &OperandsParameters[0].rOperands[0],
+                            rOperand);
+
+    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
 static gceSTATUS
 _GenTextureShadowProjCode(
     IN sloCOMPILER Compiler,
@@ -3428,6 +3599,66 @@ _GenTextureShadowProjCode(
                             IOperand,
                             &OperandsParameters[0].rOperands[0],
                             &OperandsParameters[1].rOperands[0]);
+
+    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS
+_GenTexture1DShadowProjCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    )
+{
+    gceSTATUS   status;
+    slsROPERAND         rOperand[1];
+    slsIOPERAND         iOperand[1];
+
+    gcmHEADER();
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    slmVERIFY_IR_OBJECT(PolynaryExpr, slvIR_POLYNARY_EXPR);
+    gcmASSERT(OperandCount == 2 || OperandCount == 3);
+    gcmASSERT(OperandsParameters);
+    gcmASSERT(IOperand);
+
+    /* Change the coordinate from "vec4 p" to "vec4(p.x, 0, p.y, p.z). */
+    status = _ConvertCoordForSampler1D(Compiler,
+                                           CodeGenerator,
+                                           PolynaryExpr,
+                                           OperandsParameters,
+                                           iOperand);
+
+    if (OperandCount == 3)
+    {
+        status = slGenGenericCode2(
+                                Compiler,
+                                PolynaryExpr->exprBase.base.lineNo,
+                                PolynaryExpr->exprBase.base.stringNo,
+                                slvOPCODE_TEXTURE_BIAS,
+                                IOperand,
+                                &OperandsParameters[0].rOperands[0],
+                                &OperandsParameters[2].rOperands[0]);
+
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+    }
+
+    slsROPERAND_InitializeUsingIOperand(rOperand, iOperand);
+    status = slGenGenericCode2(
+                            Compiler,
+                            PolynaryExpr->exprBase.base.lineNo,
+                            PolynaryExpr->exprBase.base.stringNo,
+                            slvOPCODE_TEXTURE_LOAD_PCFPROJ,
+                            IOperand,
+                            &OperandsParameters[0].rOperands[0],
+                            rOperand);
 
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
@@ -4512,6 +4743,12 @@ _GenTextureProjCode(
     expr = slsDLINK_LIST_First(&PolynaryExpr->operands->members, struct _sloIR_EXPR);
     switch(expr->dataType->elementType)
     {
+    case slvTYPE_SAMPLER1D:
+    case slvTYPE_ISAMPLER1D:
+    case slvTYPE_USAMPLER1D:
+        genCode = _GenTexture1DProjCode;
+        break;
+
     case slvTYPE_SAMPLER2D:
     case slvTYPE_ISAMPLER2D:
     case slvTYPE_USAMPLER2D:
@@ -4528,6 +4765,16 @@ _GenTextureProjCode(
     case slvTYPE_SAMPLER2DSHADOW:
     case slvTYPE_SAMPLER2DRECTSHADOW:
         genCode = _GenTextureShadowProjCode;
+        break;
+
+    case slvTYPE_SAMPLER1DSHADOW:
+        genCode = _GenTexture1DShadowProjCode;
+        break;
+
+    case slvTYPE_SAMPLER2DRECT:
+    case slvTYPE_ISAMPLER2DRECT:
+    case slvTYPE_USAMPLER2DRECT:
+        genCode = _GenTexture2DRectProjCode;
         break;
 
     default:
@@ -4946,6 +5193,7 @@ _GenSamplerSizeCode(
     gcmFOOTER();
     return status;
 }
+
 
 #define _LOG2_E             ((float)1.44269504088896340736)
 #define _RCP_OF_LOG2_E      ((float)0.69314718055994530942)
@@ -6141,30 +6389,7 @@ _ComputeOffsetCoords(
     else
         sizeElementType = Offset->dataType;
     dataType = gcConvScalarToVectorDataType(sizeElementType, sizeComponents);
-    slsIOPERAND_New(Compiler,
-                    intermIOperand,
-                    dataType,
-                    gcSHADER_PRECISION_MEDIUM);
 
-    status = _GenSamplerSizeCode(Compiler,
-                                 PolynaryExpr->exprBase.base.lineNo,
-                                 PolynaryExpr->exprBase.base.stringNo,
-                                 samplerOperand,
-                                 Sampler,
-                                 lod,
-                                 intermIOperand);
-    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-
-    slsROPERAND_InitializeUsingIOperand(sizeOperand, intermIOperand);
-
-    status = slsROPERAND_ChangeDataTypeFamily(Compiler,
-                                              PolynaryExpr->exprBase.base.lineNo,
-                                              PolynaryExpr->exprBase.base.stringNo,
-                                              gcvFALSE,
-                                              gcChangeElementDataType(sizeOperand->dataType,
-                                                                      gcSHADER_FLOAT_X1),
-                                              sizeOperand);
-    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
     floatType = gcChangeElementDataType(Offset->dataType,
                                         gcSHADER_FLOAT_X1);
@@ -6177,24 +6402,54 @@ _ComputeOffsetCoords(
                                               intermROperand);
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
-    slGetVectorROperandSlice(sizeOperand,
-                             0,
-                             gcGetVectorDataTypeComponentCount(floatType),
-                             texCoords);
-    slsIOPERAND_New(Compiler,
-                    intermIOperand,
-                    floatType,
-                    OffsetCoords->precision);
-    status = slGenArithmeticExprCode(Compiler,
+    /* if is sampler2DRect, don't normalise the offset. */
+    if(!slsDATA_TYPE_IsSampler2DRect(samplerName->dataType))
+    {
+        slsIOPERAND_New(Compiler,
+                        intermIOperand,
+                        dataType,
+                        gcSHADER_PRECISION_MEDIUM);
+
+        status = _GenSamplerSizeCode(Compiler,
                                      PolynaryExpr->exprBase.base.lineNo,
                                      PolynaryExpr->exprBase.base.stringNo,
-                                     slvOPCODE_DIV,
-                                     intermIOperand,
-                                     intermROperand,
-                                     texCoords);
-    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+                                     samplerOperand,
+                                     Sampler,
+                                     lod,
+                                     intermIOperand);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
-    slsROPERAND_InitializeUsingIOperand(intermROperand, intermIOperand);
+        slsROPERAND_InitializeUsingIOperand(sizeOperand, intermIOperand);
+
+        status = slsROPERAND_ChangeDataTypeFamily(Compiler,
+                                                  PolynaryExpr->exprBase.base.lineNo,
+                                                  PolynaryExpr->exprBase.base.stringNo,
+                                                  gcvFALSE,
+                                                  gcChangeElementDataType(sizeOperand->dataType,
+                                                                          gcSHADER_FLOAT_X1),
+                                                  sizeOperand);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        slGetVectorROperandSlice(sizeOperand,
+                                 0,
+                                 gcGetVectorDataTypeComponentCount(floatType),
+                                 texCoords);
+        slsIOPERAND_New(Compiler,
+                        intermIOperand,
+                        floatType,
+                        OffsetCoords->precision);
+        status = slGenArithmeticExprCode(Compiler,
+                                         PolynaryExpr->exprBase.base.lineNo,
+                                         PolynaryExpr->exprBase.base.stringNo,
+                                         slvOPCODE_DIV,
+                                         intermIOperand,
+                                         intermROperand,
+                                         texCoords);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        slsROPERAND_InitializeUsingIOperand(intermROperand, intermIOperand);
+    }
+
     slsIOPERAND_New(Compiler, intermIOperand, floatType, OffsetCoords->precision);
 
     slGetVectorROperandSlice(TextureCoords,
@@ -6264,13 +6519,13 @@ _GenTextureOffsetCode(
                     OperandsParameters[1].dataTypes[0],
                     OperandsParameters[1].rOperands[0].u.reg.precision);
     status = _ComputeOffsetCoords(Compiler,
-                                   PolynaryExpr,
-                                   &OperandsParameters[0].rOperands[0],
-                                   &OperandsParameters[1].rOperands[0],
-                                   OperandCount == 4 ? &OperandsParameters[3].rOperands[0] : gcvNULL,
-                                   gcvNULL,
-                                   &OperandsParameters[2].rOperands[0],
-                                   intermIOperand);
+                                  PolynaryExpr,
+                                  &OperandsParameters[0].rOperands[0],
+                                  &OperandsParameters[1].rOperands[0],
+                                  OperandCount == 4 ? &OperandsParameters[3].rOperands[0] : gcvNULL,
+                                  gcvNULL,
+                                  &OperandsParameters[2].rOperands[0],
+                                  intermIOperand);
 
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
@@ -7248,7 +7503,8 @@ _GenTextureProjOffsetCode(
     slsIOPERAND intermIOperand[1];
     slsGEN_CODE_PARAMETERS textureParameters[4];
     slsROPERAND texCoords[1];
-    gctUINT8 numProjCoordComponents;
+    gctUINT8    numProjCoordComponents;
+    sloIR_EXPR  samplerOperand = slsDLINK_LIST_First(&PolynaryExpr->operands->members, struct _sloIR_EXPR);
 
     gcmHEADER();
 
@@ -7287,6 +7543,21 @@ _GenTextureProjOffsetCode(
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
     slsROPERAND_InitializeUsingIOperand(texCoords, intermIOperand);
+
+    if (slsDATA_TYPE_IsSampler1D(samplerOperand->dataType) && numProjCoordComponents > 1)
+    {
+        slGetVectorROperandSlice(texCoords,
+                                 0,
+                                 1,
+                                 texCoords);
+    }
+    if ((slsDATA_TYPE_IsSampler2D(samplerOperand->dataType) || slsDATA_TYPE_IsSampler2DRect(samplerOperand->dataType)) && numProjCoordComponents > 2)
+    {
+        slGetVectorROperandSlice(texCoords,
+                                 0,
+                                 2,
+                                 texCoords);
+    }
 
     textureParameters[0] = OperandsParameters[0];
     textureParameters[1] = OperandsParameters[1];
