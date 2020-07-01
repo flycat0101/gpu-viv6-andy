@@ -2523,7 +2523,6 @@ slParseFuncCallExprAsExpr(
     gceSTATUS       status;
     sloIR_CONSTANT  constant;
     sloIR_EXPR      firstOperand;
-    sloEXTENSION    extension = {0};
 
     gcmHEADER_ARG("Compiler=0x%x FuncCall=0x%x",
                   Compiler, FuncCall);
@@ -2698,20 +2697,23 @@ slParseFuncCallExprAsExpr(
         gcmASSERT(0);
     }
 
-    extension.extension1 = slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS;
-    if (FuncCall->operands != gcvNULL &&
-        FuncCall->type == slvPOLYNARY_FUNC_CALL &&
-        sloCOMPILER_ExtensionEnabled(Compiler, &extension))
+    /* When GL_ARB_GPU_SHADERS extension is not enabled */
+    if(!sloCOMPILER_Extension2Enabled(Compiler, slvEXTENSION2_GL_ARB_GPU_SHADER5))
     {
-        sloIR_EXPR operand;
-        FOR_EACH_DLINK_NODE(&FuncCall->operands->members, struct _sloIR_EXPR, operand)
+        if (FuncCall->operands != gcvNULL &&
+            FuncCall->type == slvPOLYNARY_FUNC_CALL &&
+            sloCOMPILER_Extension1Enabled(Compiler, slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS))
         {
-            if (sloIR_EXPR_ImplicitConversionDone(operand))
+            sloIR_EXPR operand;
+            FOR_EACH_DLINK_NODE(&FuncCall->operands->members, struct _sloIR_EXPR, operand)
             {
-                slsDLINK_NODE node = operand->base.node;
-                sloIR_EXPR newOperand = _MakeImplicitConversionExpr(Compiler, operand);
-                slsDLINK_LIST_Replace(newOperand, &node);
-                operand = newOperand;
+                if (sloIR_EXPR_ImplicitConversionDone(operand))
+                {
+                    slsDLINK_NODE node = operand->base.node;
+                    sloIR_EXPR newOperand = _MakeImplicitConversionExpr(Compiler, operand);
+                    slsDLINK_LIST_Replace(newOperand, &node);
+                    operand = newOperand;
+                }
             }
         }
     }

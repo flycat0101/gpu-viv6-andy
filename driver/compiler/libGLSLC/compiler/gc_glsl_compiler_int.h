@@ -227,6 +227,18 @@ sloCOMPILER_ExpandNorm(
     );
 
 gctBOOL
+sloCOMPILER_Extension1Enabled(
+    IN sloCOMPILER Compiler,
+    IN sleEXTENSION1 Extension
+    );
+
+gctBOOL
+sloCOMPILER_Extension2Enabled(
+    IN sloCOMPILER Compiler,
+    IN sleEXTENSION2 Extension
+    );
+
+gctBOOL
 sloCOMPILER_ExtensionEnabled(
     IN sloCOMPILER Compiler,
     IN sloEXTENSION* Extension

@@ -3189,7 +3189,7 @@ _IsCorrespondingFuncName(
     sloIR_EXPR  argument;
     gctUINT     operandCount = 0;
     gctBOOL     hasVarArg = slsFUNC_HAS_FLAG(&(FuncName->u.funcInfo), slvFUNC_HAS_VAR_ARG);
-    gctINT      result = 0;
+    gctINT      result;
 
     gcmHEADER_ARG("Compiler=0x%x FuncName=0x%x PolynaryExpr=0x%x",
                    Compiler, FuncName, PolynaryExpr);
@@ -3233,6 +3233,7 @@ _IsCorrespondingFuncName(
         return 0;
     }
 
+    result = operandCount;
     for (paramName = (slsNAME *)FuncName->u.funcInfo.localSpace->names.next,
             argument = (sloIR_EXPR)PolynaryExpr->operands->members.next;
          ((slsDLINK_NODE *)paramName != &FuncName->u.funcInfo.localSpace->names
@@ -3278,7 +3279,6 @@ _IsCorrespondingFuncName(
                     gcmFOOTER_ARG("<return>=%d", -1);
                     return -1;
                 }
-                result = 1;
             }
             else
             {
@@ -3286,6 +3286,7 @@ _IsCorrespondingFuncName(
                 return -1;
             }
         }
+        else result--;
 
         if (slsFUNC_HAS_FLAG(&(FuncName->u.funcInfo), slvFUNC_HAS_MEM_ACCESS) &&
             slsDATA_TYPE_NeedMemoryAccess(argument->dataType))
@@ -3326,11 +3327,14 @@ slsNAME_SPACE_BindFuncName(
     gceSTATUS       status;
     slsNAME *       name;
     sltPRECISION_QUALIFIER returnPrecision = slvPRECISION_QUALIFIER_ANY;
-    gctINT          distance;
+    gctINT          distance, minDistance;
+    slsDATA_TYPE    **argDataTypes;
     gctPOINTER      nameCandidates[1024];
     gctINT          nameCandidateDistances[1024];
-    gctINT          currentCandidateIndex = 0;
+    slsDATA_TYPE    **nameCandidateArgDataTypes[1024];
+    gctUINT         i, currentCandidateIndex = 0;
     sloEXTENSION    extension = {0};
+    gctUINT         operandCount = 0;
 
     gcmHEADER_ARG("Compiler=0x%x NameSpace=0x%x PolynaryExpr=0x%x",
                    Compiler, NameSpace, PolynaryExpr);
@@ -3365,37 +3369,54 @@ slsNAME_SPACE_BindFuncName(
             /* find exact match */
             if (name->u.funcInfo.function != gcvNULL)
             {
-                status = (*name->u.funcInfo.function)(Compiler,
-                                                      name,
-                                                      PolynaryExpr);
-                if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+                gcmONERROR((*name->u.funcInfo.function)(Compiler,
+                                                        name,
+                                                        PolynaryExpr));
             }
 
             sloCOMPILER_GetDefaultPrecision(Compiler, name->dataType->elementType, &returnPrecision);
 
-            status = sloCOMPILER_CloneDataType(Compiler,
-                                               slvSTORAGE_QUALIFIER_CONST,
-                                               returnPrecision,
-                                               name->dataType,
-                                               &PolynaryExpr->exprBase.dataType);
-
-            if (gcmIS_ERROR(status))
-            {
-                gcmFOOTER();
-                return status;
-            }
+            gcmONERROR(sloCOMPILER_CloneDataType(Compiler,
+                                                 slvSTORAGE_QUALIFIER_CONST,
+                                                 returnPrecision,
+                                                 name->dataType,
+                                                 &PolynaryExpr->exprBase.dataType));
 
             PolynaryExpr->funcName  = name;
-
-            gcmFOOTER_ARG("PolynaryExpr=0x%x", PolynaryExpr);
-            return gcvSTATUS_OK;
+            goto cleanup;
         }
         else
         {
             if (currentCandidateIndex < 1024)
             {
+                gctPOINTER pointer;
+                sloIR_EXPR argument;
+
+                if(!operandCount)
+                {
+                    gcmVERIFY_OK(sloIR_SET_GetMemberCount(Compiler,
+                                                          PolynaryExpr->operands,
+                                                          &operandCount));
+                    minDistance = operandCount;
+                }
                 nameCandidates[currentCandidateIndex] = (gctPOINTER)name;
                 nameCandidateDistances[currentCandidateIndex] = distance;
+                if(distance < minDistance) minDistance = distance;
+
+                gcmASSERT(operandCount);
+                gcmONERROR(sloCOMPILER_Allocate(Compiler,
+                                                (gctSIZE_T)sizeof(slsDATA_TYPE *) * operandCount,
+                                                (gctPOINTER *) &pointer));
+
+                argDataTypes = (slsDATA_TYPE **) pointer;
+                nameCandidateArgDataTypes[currentCandidateIndex] = argDataTypes;
+                argument = (sloIR_EXPR)PolynaryExpr->operands->members.next;
+                for (i = 0; i < operandCount; i++)
+                {
+                    argDataTypes[i] = argument->toBeDataType;
+                    argument = (sloIR_EXPR)((slsDLINK_NODE *)argument)->next;
+                }
+
                 currentCandidateIndex++;
             }
             else
@@ -3407,43 +3428,45 @@ slsNAME_SPACE_BindFuncName(
 
     if (currentCandidateIndex > 0)
     {
+        sloIR_EXPR argument;
+
         /* find the best match */
-        gctINT i = 0;
-        for (; i < currentCandidateIndex; i++)
+        for (i = 0; i < currentCandidateIndex; i++)
         {
             name = (slsNAME *) nameCandidates[i];
             distance = nameCandidateDistances[i];
-            if (distance == 1)
+            argDataTypes = nameCandidateArgDataTypes[i];
+            if (distance == minDistance)
                 break;
-            /* TODO */
+            /* TODO: May need to resolve multiple candidates of same distance */
         }
 
         if (name->u.funcInfo.function != gcvNULL)
         {
-            status = (*name->u.funcInfo.function)(Compiler,
-                                                  name,
-                                                  PolynaryExpr);
-            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+            gcmONERROR((*name->u.funcInfo.function)(Compiler,
+                                                    name,
+                                                    PolynaryExpr));
         }
 
+        argument = (sloIR_EXPR)PolynaryExpr->operands->members.next;
+        gcmASSERT(operandCount);
+        /* copy to be data types to arguments data types */
+        for (i = 0; i < operandCount; i++)
+        {
+            argument->toBeDataType = argDataTypes[i];
+            argument = (sloIR_EXPR)((slsDLINK_NODE *)argument)->next;
+        }
         sloCOMPILER_GetDefaultPrecision(Compiler, name->dataType->elementType, &returnPrecision);
 
-        status = sloCOMPILER_CloneDataType(Compiler,
-                                           slvSTORAGE_QUALIFIER_CONST,
-                                           returnPrecision,
-                                           name->dataType,
-                                           &PolynaryExpr->exprBase.dataType);
-
-        if (gcmIS_ERROR(status))
-        {
-            gcmFOOTER();
-            return status;
-        }
+        gcmONERROR(sloCOMPILER_CloneDataType(Compiler,
+                                             slvSTORAGE_QUALIFIER_CONST,
+                                             returnPrecision,
+                                             name->dataType,
+                                             &PolynaryExpr->exprBase.dataType));
 
         PolynaryExpr->funcName = name;
 
-        gcmFOOTER_ARG("PolynaryExpr=0x%x", PolynaryExpr);
-        return gcvSTATUS_OK;
+        goto cleanup;
     }
 
     if (NameSpace->parent != gcvNULL)
@@ -3463,6 +3486,13 @@ slsNAME_SPACE_BindFuncName(
                                     PolynaryExpr->funcSymbol));
 
     status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+
+cleanup:
+OnError:
+    for(i = 0; i < currentCandidateIndex; i++)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Free(Compiler, nameCandidateArgDataTypes[i]));
+    }
     gcmFOOTER();
     return status;
 }
@@ -8962,8 +8992,8 @@ sloIR_VIV_ASM_Destroy(
 
     if (vivAsm->opndMods != gcvNULL)
     {
-        gctUINT i = 0;
-        for ( i = 0; i < operandCount; ++i)
+        gctUINT i;
+        for (i = 0; i < operandCount; ++i)
         {
             if (vivAsm->opndMods[i] != gcvNULL)
             {
@@ -10412,7 +10442,8 @@ slMakeImplicitConversionForOperand(
         return status;
     }
 
-    if (sloCOMPILER_IsOGL40Version(Compiler))
+    if (sloCOMPILER_IsOGL40Version(Compiler) ||
+        sloCOMPILER_Extension2Enabled(Compiler, slvEXTENSION2_GL_ARB_GPU_SHADER5))
     {
         switch(Operand->dataType->type)
         {
