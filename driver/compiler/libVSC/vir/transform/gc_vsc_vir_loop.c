@@ -3529,8 +3529,8 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
                 repeat = gcvFALSE;
                 break;
             }
-
-            if(!_VIR_LoopInfo_BBIsBackBone(loopInfo, bb))
+            /* if current bb is new added in loop pass which has no data flow information, skip it since no du is updated */
+            if(!_VIR_LoopInfo_BBIsBackBone(loopInfo, bb) || !(bb)->pTsWorkDataFlow)
             {
                 continue;
             }
@@ -5081,6 +5081,9 @@ _VIR_LoopInfo_DynamicallyUnroll(
                     VIR_Operand_SetTypeId(src0, VIR_LoopUpbound_GetUpboundOpndTypeId(upbound));
                 }
             }
+
+            /*set dest precision as src0 */
+            VIR_Operand_SetPrecision(dest, VIR_Operand_GetPrecision(src0));
 
             if(VIR_TypeId_isFloat(upboundTypeId))
             {
