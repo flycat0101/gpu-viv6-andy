@@ -654,11 +654,29 @@ static void _AddEdgesForCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
 }
 
 /* Callback for unreachability of basic block */
-static gctBOOL _RootBasicBlkHandlerDFSPost(VIR_CONTROL_FLOW_GRAPH* pCFG, VIR_BASIC_BLOCK* pBasicBlk, void* pNonParam)
+static gctBOOL _RootBasicBlkHandlerDFSPostFromHead(VIR_CONTROL_FLOW_GRAPH* pCFG, VIR_BASIC_BLOCK* pBasicBlk, void* pNonParam)
 {
     if (pBasicBlk == (VIR_BASIC_BLOCK*)DGNLST_GET_FIRST_NODE(&pCFG->dgGraph.nodeList))
     {
         /* Only start traversaling from entry block */
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
+static gctBOOL _RootBasicBlkHandlerDFSPostFromTail(VIR_CONTROL_FLOW_GRAPH* pCFG, VIR_BASIC_BLOCK* pBasicBlk, void* pNonParam)
+{
+    VSC_BI_LIST_NODE*       pSecondNode = pCFG->dgGraph.nodeList.pHead->pNextNode;
+
+    if (pSecondNode == gcvNULL)
+    {
+        return gcvTRUE;
+    }
+
+    if (pBasicBlk == (VIR_BASIC_BLOCK*)CAST_BLN_2_DGND(pSecondNode))
+    {
+        /* Only start traversaling from exit block */
         return gcvFALSE;
     }
 
@@ -760,16 +778,18 @@ static void _RemoveBasicBlockFromCFG(
     vscMM_Free(&pCFG->pmp.mmWrapper, pBasicBlk);
 }
 
-static void _RemoveUnreachableBasicBlocks(VIR_CONTROL_FLOW_GRAPH* pCFG)
+static gctBOOL _RemoveUnreachableBasicBlocks(VIR_CONTROL_FLOW_GRAPH* pCFG)
 {
+    VIR_Shader*             pShader = VIR_Function_GetShader(pCFG->pOwnerFuncBlk->pVIRFunc);
     CFG_ITERATOR            basicBlkIter;
     VIR_BASIC_BLOCK*        pThisBlock;
+    gctBOOL                 bRemoved = gcvFALSE;
 
-    /* Firstly do traversal CFG to find unreachable basic-blocks which are not visisted ones */
+    /* I: do the post-order CFG from the head node: for those not-visisted nodes, they are unreachable. */
     vscDG_TraversalCB(&pCFG->dgGraph,
                       VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                       gcvFALSE,
-                      (PFN_DG_NODE_HANLDER)_RootBasicBlkHandlerDFSPost,
+                      (PFN_DG_NODE_HANLDER)_RootBasicBlkHandlerDFSPostFromHead,
                       gcvNULL,
                       gcvNULL,
                       gcvNULL,
@@ -785,8 +805,46 @@ static void _RemoveUnreachableBasicBlocks(VIR_CONTROL_FLOW_GRAPH* pCFG)
         if (!pThisBlock->dgNode.bVisited)
         {
             _RemoveBasicBlockFromCFG(pCFG, pThisBlock, gcvTRUE);
+
+            bRemoved = gcvTRUE;
         }
     }
+
+    /*
+    ** II: do the post-order CFG from the tail node:
+    **  for those not-visisted nodes, they may be reachable, but they can't reach the exit node, so we can still remove them.
+    */
+    /* So far we only enable this optimization for spir-v case only. */
+    if (!VIR_Shader_IsVulkan(pShader))
+    {
+        return bRemoved;
+    }
+
+    vscDG_TraversalCB(&pCFG->dgGraph,
+                      VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
+                      gcvTRUE,
+                      (PFN_DG_NODE_HANLDER)_RootBasicBlkHandlerDFSPostFromTail,
+                      gcvNULL,
+                      gcvNULL,
+                      gcvNULL,
+                      gcvNULL,
+                      gcvNULL,
+                      gcvNULL);
+
+    CFG_ITERATOR_INIT(&basicBlkIter, pCFG);
+    pThisBlock = (VIR_BASIC_BLOCK *)CFG_ITERATOR_FIRST(&basicBlkIter);
+    for (; pThisBlock != gcvNULL; pThisBlock = (VIR_BASIC_BLOCK *)CFG_ITERATOR_NEXT(&basicBlkIter))
+    {
+        /* Any unvisited one is unreachable, so remove it from graph */
+        if (!pThisBlock->dgNode.bVisited)
+        {
+            _RemoveBasicBlockFromCFG(pCFG, pThisBlock, gcvTRUE);
+
+            bRemoved = gcvTRUE;
+        }
+    }
+
+    return bRemoved;
 }
 
 VSC_ErrCode vscVIR_BuildCFGPerFunc(VSC_MM* pScratchMemPool, VIR_Function* pFunc)

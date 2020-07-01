@@ -2609,7 +2609,7 @@ static VSC_ErrCode _VSC_PH_GenerateLValueModifier(
                 /* this statement is the modification */
                 vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph), work_inst, inst_src0_info.u1.virRegInfo.virReg,
                                  1, old_work_inst_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
-                VIR_Operand_ReplaceDefOperandWithDef(work_inst_dest, inst_dest, new_work_inst_enable);
+                VIR_Operand_ReplaceDefOperandWithDef(work_inst_dest, inst_dest, new_work_inst_enable, gcvFALSE);
 
                 memset(&nativeDefFlags, 0, sizeof(nativeDefFlags));
                 nativeDefFlags.bIsInput = inst_dest_info.isInput;
@@ -5180,7 +5180,8 @@ static VSC_ErrCode _VSC_PH_VEC_MergeInst(
                 VIR_Operand_ReplaceDefOperandWithDef(
                     merged_inst_dst,
                     new_dst,
-                    merged_inst->enable);
+                    merged_inst->enable,
+                    gcvFALSE);
                 VIR_Function_FreeOperand(func, new_dst);
 
                 vscVIR_AddNewDef(VSC_PH_Peephole_GetDUInfo(ph),
