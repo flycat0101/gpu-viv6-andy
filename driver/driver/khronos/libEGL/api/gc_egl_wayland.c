@@ -84,9 +84,6 @@ typedef struct __WLEGLSurfaceRec
 
     gceSURF_FORMAT format;
     gceSURF_TYPE type;
-#ifdef gcdUSE_ZWP_SYNCHRONIZATION
-    int client_fence_fd;
-#endif
     pthread_mutex_t commit_mutex;
 
     gctHANDLE tid;
@@ -137,6 +134,7 @@ struct __WLEGLBufferRec
     EGLint age;
     volatile int state;
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
+    int client_fence_fd;
     int release_fence_fd;
     struct zwp_linux_buffer_release_v1 *buffer_release;
 #endif
@@ -808,6 +806,7 @@ __wl_egl_buffer_create(__WLEGLSurface egl_surface, __WLEGLBuffer buffer)
 
     buffer->parent          = egl_surface;
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
+    buffer->client_fence_fd = -1;
     buffer->release_fence_fd = -1;
 #endif
     buffer->wl_buf =
@@ -920,6 +919,12 @@ __wl_egl_buffer_destroy(__WLEGLSurface egl_surface, __WLEGLBuffer buffer)
             buffer->info.ts_fd = -1;
         }
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
+        if (buffer->client_fence_fd >= 0)
+        {
+            close(buffer->client_fence_fd);
+            buffer->client_fence_fd = -1;
+        }
+
         if (buffer->buffer_release)
         {
             zwp_linux_buffer_release_v1_destroy(buffer->buffer_release);
@@ -1042,11 +1047,6 @@ __wl_egl_surface_destroy(__WLEGLSurface egl_surface)
     egl_surface->signature = 0;
     egl_surface->frame_callback = gcvNULL;
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
-    if (egl_surface->client_fence_fd >= 0)
-    {
-        close(egl_surface->client_fence_fd);
-        egl_surface->client_fence_fd = -1;
-    }
     if (egl_surface->surface_sync)
     {
         zwp_linux_surface_synchronization_v1_destroy(egl_surface->surface_sync);
@@ -1163,9 +1163,6 @@ __wl_egl_surface_create(struct wl_egl_window *window)
     egl_surface->type   = gcvSURF_BITMAP;
     egl_surface->swap_interval = 1;
     egl_surface->frame_callback = gcvNULL;
-#ifdef gcdUSE_ZWP_SYNCHRONIZATION
-    egl_surface->client_fence_fd = -1;
-#endif
     egl_surface->enable_tile_status = 1;
 
     pthread_mutex_init(&egl_surface->commit_mutex, NULL);
@@ -2573,15 +2570,16 @@ _PostWindowBackBufferFence(
 
     if (display->use_explicit_sync)
     {
-        if(egl_surface->client_fence_fd > 0)
+        if(buffer->client_fence_fd > 0)
         {
-            wait_native_fence(egl_surface->client_fence_fd);
-            close(egl_surface->client_fence_fd);
+            wait_native_fence(buffer->client_fence_fd);
+            close(buffer->client_fence_fd);
+
         }
 
         if(fence_fd > 0)
         {
-            egl_surface->client_fence_fd = fence_fd;
+            buffer->client_fence_fd = fence_fd;
             zwp_linux_surface_synchronization_v1_set_acquire_fence(
                 egl_surface->surface_sync, fence_fd);
         }
