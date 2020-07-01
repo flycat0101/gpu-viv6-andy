@@ -1059,7 +1059,7 @@ VIR_Inst_IsHWBarrier(
         /* Only CS/CL and TCS can support BARRIER instruction. */
         if (bGenerateMC
             &&
-            !(VIR_Shader_IsCL(pShader) || VIR_Shader_IsGlCompute(pShader) || VIR_Shader_IsTCS(pShader)))
+            !(VIR_Shader_IsCLFromLanguage(pShader) || VIR_Shader_IsGlCompute(pShader) || VIR_Shader_IsTCS(pShader)))
         {
             return gcvFALSE;
         }
@@ -1839,7 +1839,7 @@ _initOpenGLBuiltinNames(VIR_Shader * Shader, VIR_StringTable *StrTable)
 static void
 _initBuiltinNames(VIR_Shader * Shader)
 {
-    if (VIR_Shader_IsCL(Shader))
+    if (VIR_Shader_IsCLFromLanguage(Shader))
     {
         _initOpenCLBuiltinNames(Shader, &Shader->stringTable);
     }
@@ -2248,7 +2248,7 @@ VIR_Shader_DecodeLangVersionToCompilerVersion(
     gctUINT            shMinorVer = 0;
     gctUINT            compilerVersion = 0;
 
-    if (VIR_Shader_IsCL(Shader))
+    if (VIR_Shader_IsCLFromLanguage(Shader))
     {
         compilerVersion = _cldCL1Dot1;
     }
@@ -2285,7 +2285,7 @@ VIR_Shader_DecodeCompilerVersionToShVersion(
     shMajorVer = CompilerVersion >> 24;
     shMinorVer = CompilerVersion >> 16;
 
-    if (VIR_Shader_IsCL(Shader) && shMinorVer == 0)
+    if (VIR_Shader_IsCLFromLanguage(Shader) && shMinorVer == 0)
     {
         shMinorVer = 1;
     }
@@ -9415,7 +9415,7 @@ VIR_Shader_GetShareMemorySize(
 {
     gctUINT shareMemSizeInByte = 0;
 
-    if (VIR_Shader_IsCL(pShader))
+    if (VIR_Shader_IsCLFromLanguage(pShader))
     {
         VIR_Function* pMainFunc = VIR_Shader_GetCurrentKernelFunction(pShader);
 
@@ -18778,7 +18778,7 @@ VIR_Shader_GetWorkGroupSize(
 {
     gctUINT workGroupSize = 0;
 
-    gcmASSERT(VIR_Shader_IsGlCompute(pShader) || VIR_Shader_IsCL(pShader));
+    gcmASSERT(VIR_Shader_IsGlCompute(pShader) || VIR_Shader_IsCLFromLanguage(pShader));
 
     if (VIR_Shader_IsGlCompute(pShader))
     {
@@ -18826,7 +18826,7 @@ VIR_Shader_GetMaxFreeRegCountPerThread(
         gcmASSERT(pShader->shaderKind == VIR_SHADER_COMPUTE || pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL);
         threadCount = (gctFLOAT)(pHwCfg->maxCoreCount * 4 * (VIR_Shader_isDual16Mode(pShader) ? 2 : 1));
 
-        if (VIR_Shader_IsGlCompute(pShader) || VIR_Shader_IsCL(pShader))
+        if (VIR_Shader_IsGlCompute(pShader) || VIR_Shader_IsCLFromLanguage(pShader))
         {
             /* Use initWorkGroupSizeToCalcRegCount to calculate the maxRegCount if needed. */
             if (!VIR_Shader_IsWorkGroupSizeAdjusted(pShader) &&
@@ -18943,7 +18943,7 @@ VIR_Shader_ComputeWorkGroupNum(
     gctUINT workGroupSize = 0;
     gctUINT threadCount = pHwCfg->maxCoreCount * 4 * (VIR_Shader_isDual16Mode(pShader) ? 2 : 1);
 
-    gcmASSERT(VIR_Shader_IsGlCompute(pShader) || VIR_Shader_IsCL(pShader));
+    gcmASSERT(VIR_Shader_IsGlCompute(pShader) || VIR_Shader_IsCLFromLanguage(pShader));
 
     workGroupSize = VIR_Shader_GetWorkGroupSize(pShader);
 
@@ -19031,7 +19031,7 @@ VIR_Shader_AdjustWorkGroupSize(
     /* Adjust the workGroupSize only it is not fixed. */
     if (!VIR_Shader_CheckWorkGroupSizeFixed(pShader))
     {
-        if (VIR_Shader_IsCL(pShader))
+        if (VIR_Shader_IsCLFromLanguage(pShader))
         {
             workGroupSize = VIR_Shader_GetAdjustedWorkGroupSize(pShader);
 

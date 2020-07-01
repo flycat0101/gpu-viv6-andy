@@ -12624,7 +12624,7 @@ void _VIR_RA_LS_UpdateWorkgroupIdAndBaseAddr(
     VIR_Operand     *localAddrOpnd = gcvNULL;
     VIR_Symbol      *localAddrSym = gcvNULL;
     gctBOOL         updated = gcvFALSE;
-    gctBOOL         isOCL = VIR_Shader_IsCL(pShader);
+    gctBOOL         isOCL = VIR_Shader_IsCLFromLanguage(pShader);
 
     VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(mainFunc));
     for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
@@ -12887,7 +12887,7 @@ void _VIR_RA_LS_SetRegWatermark(
     VIR_Shader_SetRegWatermark(pShader, hwRegCount);
 
     /* Calculate the concurrent workGroupNumber and workThreadNumber first. */
-    if (VIR_Shader_IsCL(pShader) || VIR_Shader_IsGlCompute(pShader))
+    if (VIR_Shader_IsCLFromLanguage(pShader) || VIR_Shader_IsGlCompute(pShader))
     {
         /* Set the work group number. */
         numWorkGroup = VIR_Shader_ComputeWorkGroupNum(pShader, pHwCfg);
@@ -12916,7 +12916,7 @@ void _VIR_RA_LS_SetRegWatermark(
     {
         gctUINT localMemorySize = VIR_Shader_GetShareMemorySize(pShader);
 
-        gcmASSERT(VIR_Shader_IsCL(pShader) || VIR_Shader_IsGlCompute(pShader));
+        gcmASSERT(VIR_Shader_IsCLFromLanguage(pShader) || VIR_Shader_IsGlCompute(pShader));
 
         if (localMemorySize  == 0)
         {

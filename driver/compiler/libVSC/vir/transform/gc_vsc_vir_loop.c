@@ -3588,7 +3588,7 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
                                 continue;
                             }
 
-                            if(VIR_Shader_IsCL(VIR_LoopInfo_GetShader(loopInfo)) &&
+                            if(VIR_Shader_IsCLFromLanguage(VIR_LoopInfo_GetShader(loopInfo)) &&
                                VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(inst)) &&
                                VIR_LoopInfo_HasFlag(loopInfo, VIR_LoopInfo_Flags_HasStore))
                             {
@@ -5718,7 +5718,7 @@ _VIR_MaxInvariantCodeMotionCount(
         threadCount = (gctFLOAT)(pHwCfg->maxCoreCount * 4 * (VIR_Shader_isDual16Mode(pShader) ? 2 : 1));
         maxFreeReg = vscGetHWMaxFreeRegCount(pHwCfg);
 
-        if (VIR_Shader_IsGlCompute(pShader) || VIR_Shader_IsCL(pShader))
+        if (VIR_Shader_IsGlCompute(pShader) || VIR_Shader_IsCLFromLanguage(pShader))
         {
             /* Use initWorkGroupSizeToCalcRegCount to calculate the maxRegCount if needed. */
             if (!VIR_Shader_IsWorkGroupSizeAdjusted(pShader) &&

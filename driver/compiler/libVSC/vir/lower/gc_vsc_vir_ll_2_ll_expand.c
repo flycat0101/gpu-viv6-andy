@@ -1080,7 +1080,7 @@ _isCLShader(
     IN VIR_Instruction    *Inst
     )
 {
-    return VIR_Shader_IsCL(Context->shader);
+    return VIR_Shader_IsCLFromLanguage(Context->shader);
 }
 
 gctBOOL

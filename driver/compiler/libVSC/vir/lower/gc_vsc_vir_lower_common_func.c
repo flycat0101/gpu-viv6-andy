@@ -412,7 +412,7 @@ VIR_Lower_SetZeroOrSamllestPositive(
     IN VIR_Operand        *Opnd
     )
 {
-    if(VIR_Lower_HasHalti4(Context, Inst) || VIR_Shader_IsCL(Context->shader))
+    if(VIR_Lower_HasHalti4(Context, Inst) || VIR_Shader_IsCLFromLanguage(Context->shader))
     {
         VIR_Lower_SetZero(Context, Inst, Opnd);
     }
@@ -1078,7 +1078,7 @@ VIR_Lower_IsNotCLShader(
     IN VIR_Instruction    *Inst
     )
 {
-    return !VIR_Shader_IsCL(Context->shader);
+    return !VIR_Shader_IsCLFromLanguage(Context->shader);
 }
 
 gctBOOL

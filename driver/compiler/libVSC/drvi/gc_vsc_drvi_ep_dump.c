@@ -549,7 +549,7 @@ void vscPrintSEP(VSC_SYS_CONTEXT* pSysCtx, SHADER_EXECUTABLE_PROFILE* pSEP, SHAD
     vscDumper_DumpBuffer(&sepDumper);
 
     /* Print kernel function name. */
-    if (pShader && VIR_Shader_IsCL(pShader))
+    if (pShader && VIR_Shader_IsCLFromLanguage(pShader))
     {
         gcmASSERT(VIR_Shader_GetKernelNameId(pShader) != VIR_INVALID_ID);
         vscDumper_PrintStrSafe(&sepDumper, "KernelFunction: %s", VIR_Shader_GetStringFromId(pShader, VIR_Shader_GetKernelNameId(pShader)));

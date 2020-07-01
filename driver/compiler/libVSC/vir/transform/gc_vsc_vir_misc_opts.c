@@ -1329,7 +1329,7 @@ DEF_SH_NECESSITY_CHECK(vscVIR_CheckEvisInstSwizzleRestriction)
     VIR_Shader*                pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
 
     /* If it is not OCL, just bail out */
-    if (!VIR_Shader_IsCL(pShader))
+    if (!VIR_Shader_IsCLFromLanguage(pShader))
     {
         return gcvFALSE;
     }
@@ -5204,7 +5204,7 @@ static VSC_ErrCode vscVIR_PrecisionUpdateSrc(VIR_Shader* shader, VIR_Operand* op
             VIR_Symbol* sym = VIR_Operand_GetSymbol(operand);
 
             gcmASSERT(VIR_Operand_GetPrecision(operand) != VIR_PRECISION_DEFAULT
-                                 || VIR_Shader_IsCL(shader));
+                                 || VIR_Shader_IsCLFromLanguage(shader));
             if (!(VIR_Symbol_isSampler(sym) &&
                   gcoOS_StrCmp(VIR_Shader_GetSymNameString(shader, sym), "#BaseSamplerSym") == gcvSTATUS_OK))
             {
@@ -5212,7 +5212,7 @@ static VSC_ErrCode vscVIR_PrecisionUpdateSrc(VIR_Shader* shader, VIR_Operand* op
                 {
                     gcmASSERT((VIR_Symbol_GetCurrPrecision(sym) != VIR_PRECISION_ANY &&
                                VIR_Symbol_GetCurrPrecision(sym) != VIR_PRECISION_DEFAULT)
-                              || VIR_Shader_IsCL(shader));
+                              || VIR_Shader_IsCLFromLanguage(shader));
 
                     VIR_Operand_SetPrecision(operand, VIR_Symbol_GetCurrPrecision(sym));
                 }
@@ -5220,7 +5220,7 @@ static VSC_ErrCode vscVIR_PrecisionUpdateSrc(VIR_Shader* shader, VIR_Operand* op
                 {
                     gcmASSERT(VIR_Symbol_GetPrecision(sym) == VIR_Operand_GetPrecision(operand) ||
                               VIR_Symbol_GetPrecision(sym) == VIR_PRECISION_ANY
-                              || VIR_Shader_IsCL(shader));
+                              || VIR_Shader_IsCLFromLanguage(shader));
 
                 }
             }
@@ -5282,7 +5282,7 @@ static VSC_ErrCode vscVIR_PrecisionUpdateDst(VIR_Instruction* inst)
     if(VIR_OPCODE_ExpectedResultPrecision(opcode))
     {
         gcmASSERT(VIR_Operand_GetPrecision(dst) != VIR_PRECISION_DEFAULT
-            || VIR_Shader_IsCL(VIR_Inst_GetShader(inst)));
+            || VIR_Shader_IsCLFromLanguage(VIR_Inst_GetShader(inst)));
 
         if(VIR_Operand_GetPrecision(dst) == VIR_PRECISION_ANY)
         {
@@ -5315,7 +5315,7 @@ static VSC_ErrCode _UpdatePrecisionAndPackMode(VIR_Shader* pShader)
     gctBOOL                 bUpdatePrecision = gcvTRUE;
 
     /* Check if we need to update the precision. */
-    if(!(VIR_Shader_IsFS(pShader) || VIR_Shader_IsCL(pShader)) || VIR_Shader_IsVulkan(pShader) || VIR_Shader_IsDesktopGL(pShader))
+    if(!(VIR_Shader_IsFS(pShader) || VIR_Shader_IsCLFromLanguage(pShader)) || VIR_Shader_IsVulkan(pShader) || VIR_Shader_IsDesktopGL(pShader))
     {
         bUpdatePrecision = gcvFALSE;
     }
@@ -5339,7 +5339,7 @@ static VSC_ErrCode _UpdatePrecisionAndPackMode(VIR_Shader* pShader)
                 VIR_Symbol* pParam = VIR_Function_GetSymFromId(pFunc, id);
                 VIR_Symbol* pVirReg = VIR_Shader_FindSymbolByTempIndex(pShader, VIR_Symbol_GetVariableVregIndex(pParam));
 
-                gcmASSERT(VIR_Symbol_GetPrecision(pParam) != VIR_PRECISION_DEFAULT || VIR_Shader_IsCL(pShader));
+                gcmASSERT(VIR_Symbol_GetPrecision(pParam) != VIR_PRECISION_DEFAULT || VIR_Shader_IsCLFromLanguage(pShader));
                 /* gcmASSERT(VIR_Symbol_GetVregVariable(virReg) == param); */ /* virReg's variable will be reset to another sym which came from old variable for function input/output */
                 if(VIR_Symbol_GetPrecision(pParam) == VIR_PRECISION_ANY)
                 {
@@ -6951,7 +6951,7 @@ DEF_SH_NECESSITY_CHECK(vscVIR_CheckDual16able)
     if (!compCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.supportDual16 ||
         (VIR_Shader_GetKind(Shader) != VIR_SHADER_FRAGMENT)       ||
         (!VIR_Shader_IsFS(Shader) &&
-         !(VIR_Shader_IsCL(Shader) && gcGetDualFP16Mode(compCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasHalti2)))    ||
+         !(VIR_Shader_IsCLFromLanguage(Shader) && gcGetDualFP16Mode(compCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasHalti2)))    ||
         VIR_Shader_IsDesktopGL(Shader)                            ||
         VIR_Shader_IsOpenVG(Shader)                               ||
         VIR_Shader_HasOutputArrayHighp(Shader)                    || /* currently, we disable dual16 if the output array is highp */
@@ -10201,7 +10201,7 @@ static gctBOOL _IsLocalMemoryCalculateInst(
     VIR_OpCode          opCode = VIR_Inst_GetOpcode(pInst);
     VIR_Symbol          *localMemAddrSym = gcvNULL;
     VIR_Symbol          *localMemSym = gcvNULL;
-    gctBOOL             isOCL = VIR_Shader_IsCL(pShader);
+    gctBOOL             isOCL = VIR_Shader_IsCLFromLanguage(pShader);
 
     if (opCode == VIR_OP_ADD && VIR_Operand_isSymbol(VIR_Inst_GetSource(pInst, VIR_Operand_Src1)))
     {
@@ -10394,8 +10394,7 @@ static VSC_ErrCode _UpdateLocalMemoryCalc(
     else
     {
         /* Generate a uniform to save the workGroupCount, we need to do this for OCL only because the totalNumGroups of CS is fixed. */
-        if (VIR_Shader_IsCL(pShader) &&
-            !VIR_Shader_IsVulkan(pShader) &&
+        if (VIR_Shader_IsCLFromLanguage(pShader) &&
             VIR_Shader_GetShareMemorySize(pShader) > 0)
         {
             errCode = _CalculateIndexForLocalMemory(pDuInfo, pShader, pFunc, pInst);
@@ -10434,8 +10433,7 @@ _UpdateLocMemAndPrivMem(
              inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
         {
             /* Only support OCL now. */
-            if (VIR_Shader_IsCL(pShader) &&
-                !VIR_Shader_IsVulkan(pShader) &&
+            if (VIR_Shader_IsCLFromLanguage(pShader) &&
                 VIR_Shader_GetPrivateMemorySize(pShader) > 0)
             {
                 errCode = _CalculateIndexForPrivateMemory(pDuInfo, pShader, bNeedOOBCheck, func, inst);
@@ -10443,7 +10441,7 @@ _UpdateLocMemAndPrivMem(
             }
 
             /* Convert local memory if local memory is used. */
-            if ((VIR_Shader_IsCL(pShader) || VIR_Shader_IsGlCompute(pShader))
+            if ((VIR_Shader_IsCLFromLanguage(pShader) || VIR_Shader_IsGlCompute(pShader))
                 &&
                 VIR_Shader_GetShareMemorySize(pShader) > 0)
             {
@@ -11248,7 +11246,7 @@ VSC_ErrCode vscVIR_PreprocessMCShader(VSC_SH_PASS_WORKER* pPassWorker)
         &&
         pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.supportMultiGPU
         &&
-        (VIR_Shader_IsCL(pShader) || VIR_Shader_IsGlCompute(pShader)))
+        (VIR_Shader_IsCLFromLanguage(pShader) || VIR_Shader_IsGlCompute(pShader)))
     {
         _UpdateWorkGroupIdForMultiGPU(pPassWorker, &bChanged);
     }

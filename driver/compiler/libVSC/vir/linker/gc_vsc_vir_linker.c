@@ -2560,7 +2560,7 @@ _IntrinsicOrExtFuncName(
         gctCHAR buffer[128];
         gctUINT offset = 0;
 
-        if (VIR_Shader_IsCL(pShader))
+        if (VIR_Shader_IsCLFromLanguage(pShader))
         {
             gcoOS_PrintStrSafe(buffer, 128, &offset, "_%s", VIR_GetTypeName(imageTypeId));
             gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, buffer);

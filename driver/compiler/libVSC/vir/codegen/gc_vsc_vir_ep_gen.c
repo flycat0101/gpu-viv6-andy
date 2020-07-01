@@ -2546,7 +2546,7 @@ static void _CollectExeHints(VSC_SHADER_COMPILER_PARAM* pCompilerParam, VSC_SEP_
     if (pShader->shaderKind == VIR_SHADER_COMPUTE)
     {
         /* Private memory set, only support OCL now. */
-        if (VIR_Shader_IsCL(pShader) && !VIR_Shader_IsVulkan(pShader))
+        if (VIR_Shader_IsCLFromLanguage(pShader))
         {
             pOutSEP->exeHints.nativeHints.prvStates.gps.privMemSizePerThreadInByte = VIR_Shader_GetPrivateMemorySize(pShader);
             pOutSEP->exeHints.nativeHints.prvStates.gps.currWorkThreadNum = VIR_Shader_GetCurrWorkThreadNum(pShader);
