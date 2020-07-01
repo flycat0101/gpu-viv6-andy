@@ -18815,7 +18815,7 @@ VIR_Lower_ArraryIndexing_To_LDARR_STARR(
                    1) if the output is point, we don't need to set the flag */
                 if (!VIR_Shader_GS_HasRestartOp(Shader))
                 {
-                    if ((opcode == VIR_OP_RESTART0) &&
+                    if ((opcode == VIR_OP_RESTART0 || opcode == VIR_OP_RESTART_STREAM) &&
                         (Shader->shaderLayout.geo.geoOutPrimitive != VIR_GEO_POINTS))
                     {
                         VIR_Shader_SetFlag(Shader, VIR_SHFLAG_GS_HAS_RESTART_OP);
