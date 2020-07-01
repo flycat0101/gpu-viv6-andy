@@ -1407,7 +1407,7 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
     gctBOOL covered_channels[VIR_CHANNEL_NUM] = {gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE};
     gctBOOL movInstRemappable, needRemapChannel = gcvFALSE, def2UsageRemappable;
 
-    gcmASSERT(VIR_Inst_GetOpcode(inst) == VIR_OP_MOV);
+    gcmASSERT(VIR_Inst_GetOpcode(inst) == VIR_OP_MOV || VIR_Inst_GetOpcode(inst) == VIR_OP_SAT);
 
     inst_src0 = VIR_Inst_GetSource(inst, 0);
     VIR_Operand_GetOperandInfo(inst, inst_src0, &inst_src0_info);
@@ -1759,6 +1759,24 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
             break;
         }
 
+        /* if def_inst doesn't support sat_0_to_1, skip the change
+         * Only support sat for FLOAT32 or LOAD/STORE/IMG_STORE/I2I/CONV
+         */
+        if (VIR_Inst_GetOpcode(inst) == VIR_OP_SAT &&
+            (!(VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISFLOAT) || (VIR_OPCODE_NotSupportSat0to1(opcode))))
+        {
+            if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
+                              VSC_OPTN_CPPOptions_TRACE_BACKWARD_OPT))
+            {
+                VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                VIR_LOG(dumper, "[BW] ==> bail out because of its def instruction [doesn't support .sat]:\n");
+                VIR_LOG_FLUSH(dumper);
+                VIR_Inst_Dump(dumper, def_inst);
+                VIR_LOG_FLUSH(dumper);
+            }
+            invalid_case = gcvTRUE;
+            break;
+        }
         /* inst_enable should cover def_dest_enable */
         if (!VIR_Enable_Covers(inst_dest_enable, def_inst_enable) &&
             opcode != VIR_OP_CMAD   &&
@@ -2204,6 +2222,11 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
                     gcvNULL);
 
                 VIR_Operand_SetModifier(def_inst_dest, VIR_Operand_GetModifier(inst_src0));
+                if (VIR_Inst_GetOpcode(inst) == VIR_OP_SAT)
+                {
+                    gcmASSERT(VIR_Operand_GetModifier(def_inst_dest) == VIR_MOD_NONE);
+                    VIR_Operand_SetModifier(def_inst_dest, VIR_MOD_SAT_0_TO_1);
+                }
 
                 if (VIR_Inst_GetThreadMode(inst) == VIR_THREAD_D16_DUAL_32 &&
                     VIR_Operand_GetPrecision(inst_dest) == VIR_PRECISION_HIGH)
@@ -2347,7 +2370,8 @@ static VSC_ErrCode _VSC_CPP_CopyPropagationForBB(
             _VSC_CPP_CopyFromMOV(cpp, inst, visitSet);
         }
 
-        if (VIR_Inst_GetOpcode(inst) == VIR_OP_MOV)
+        /* treat SAT as MOV and dest_inst has some specialty */
+        if (VIR_Inst_GetOpcode(inst) == VIR_OP_MOV || VIR_Inst_GetOpcode(inst) == VIR_OP_SAT)
         {
             if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetOPTS(options),
                 VSC_OPTN_CPPOptions_BACKWARD_OPT))
