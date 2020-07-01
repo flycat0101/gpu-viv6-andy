@@ -30,6 +30,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short",      T_SHORT,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort",     T_USHORT, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float",      T_FLOAT,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_NONE, "viv_convert_half",   T_HALF,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_CL_KHR_FP16, "convert_half",       T_HALF,   1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char_rte",   T_CHAR,   1, {T_GENTYPE}, {0}, {0}, 1},
@@ -132,6 +133,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short2",      T_SHORT2,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort2",     T_USHORT2, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float2",      T_FLOAT2,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_NONE, "viv_convert_half2",   T_HALF2,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_CL_KHR_FP16, "convert_half2",       T_HALF2,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char2_rte",   T_CHAR2,   1, {T_GENTYPE}, {0}, {0}, 1},
@@ -234,6 +236,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short3",      T_SHORT3,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort3",     T_USHORT3, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float3",      T_FLOAT3,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_NONE, "viv_convert_half3",   T_HALF3,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_CL_KHR_FP16, "convert_float3",       T_HALF3,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char3_rte",   T_CHAR3,   1, {T_GENTYPE}, {0}, {0}, 1},
@@ -336,7 +339,8 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short4",      T_SHORT4,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort4",     T_USHORT4, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float4",      T_FLOAT4,  1, {T_GENTYPE}, {0}, {0}, 1},
-    {clvEXTENSION_CL_KHR_FP16, "convert_half4",       T_HALF4,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_NONE, "viv_convert_half4",   T_HALF4,   1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half4",           T_HALF4,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char4_rte",   T_CHAR4,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar4_rte",  T_UCHAR4,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -438,6 +442,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short8",      T_SHORT8,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort8",     T_USHORT8, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float8",      T_FLOAT8,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_NONE, "viv_convert_half8",   T_HALF8,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_CL_KHR_FP16, "convert_half8",       T_HALF8,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char8_rte",   T_CHAR8,   1, {T_GENTYPE}, {0}, {0}, 1},
@@ -540,6 +545,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short16",      T_SHORT16,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort16",     T_USHORT16, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float16",      T_FLOAT16,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_NONE, "viv_convert_half16",   T_HALF16,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_CL_KHR_FP16, "convert_half16",       T_HALF16,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char16_rte",   T_CHAR16,   1, {T_GENTYPE}, {0}, {0}, 1},
@@ -696,6 +702,12 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "as_float8",   T_FLOAT8,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "as_float16",  T_FLOAT16,  1, {T_GENTYPE}, {0}, {0}, 1},
 
+    {clvEXTENSION_NONE, "viv_as_half",    T_HALF,    1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_NONE, "viv_as_half2",   T_HALF2,   1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_NONE, "viv_as_half3",   T_HALF3,   1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_NONE, "viv_as_half4",   T_HALF4,   1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_NONE, "viv_as_half8",   T_HALF8,   1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_NONE, "viv_as_half16",  T_HALF16,  1, {T_GENTYPE}, {0}, {0}, 1},
 };
 
 #define _cldConvBuiltinFunctionCount (sizeof(ConvBuiltinFunctions) / sizeof(clsBUILTIN_FUNCTION))

@@ -104,7 +104,6 @@ static clsINTRINSIC_BUILTIN_FUNCTION IntrinsicBuiltinFunctions[] =
     {clvEXTENSION_NONE,  "_viv_mulhi_long",   gceINTRIN_source, "_viv_mulhi_long",    T_LONG,  2, {T_LONG,  T_LONG},  {0}, {0}, 1},
     {clvEXTENSION_NONE,  "_viv_mulhi_ulong",  gceINTRIN_source, "_viv_mulhi_ulong",   T_ULONG, 2, {T_ULONG, T_ULONG}, {0}, {0}, 1},
     {clvEXTENSION_NONE,  "nextafter",         gceINTRIN_source, "_viv_nextafter",     T_FLOAT, 2, {T_FLOAT, T_FLOAT}, {0}, {0}, 1},
-
     {clvEXTENSION_NONE,  "_viv_image_query_width_image2d_t",   gceINTRIN_source,   "_viv_image_query_width_image2d_t",   T_INT, 1, {T_UINT8}, {0}, {0}, 1},
     {clvEXTENSION_NONE,  "_viv_image_query_width_image3d_t",   gceINTRIN_source,   "_viv_image_query_width_image3d_t",   T_INT, 1, {T_UINT8}, {0}, {0}, 1},
     {clvEXTENSION_NONE,  "_viv_image_query_width_image1d_t",   gceINTRIN_source,   "_viv_image_query_width_image1d_t",   T_INT, 1, {T_UINT8}, {0}, {0}, 1},
@@ -132,6 +131,47 @@ static clsINTRINSIC_BUILTIN_FUNCTION IntrinsicBuiltinFunctions[] =
     {clvEXTENSION_NONE,  "_viv_image_query_size_image1d_t",   gceINTRIN_source,   "_viv_image_query_size_image1d_t",   T_INT2, 1, {T_UINT8}, {0}, {0}, 1},
     {clvEXTENSION_NONE,  "_viv_image_query_array_size_image1d_array_t",   gceINTRIN_source,   "_viv_image_query_array_size_image1d_array_t",   T_INT, 1, {T_UINT8}, {0}, {0}, 1},
     {clvEXTENSION_NONE,  "_viv_image_query_array_size_image2d_array_t",   gceINTRIN_source,   "_viv_image_query_array_size_image2d_array_t",   T_INT, 1, {T_UINT8}, {0}, {0}, 1},
+    {clvEXTENSION_NONE,    "vstore_half_rtz",      gceINTRIN_source,  "_viv_vstore_half_rtz", T_VOID, 3, {T_FLOAT, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half2_rtz",     gceINTRIN_source,  "_viv_vstore_half2_rtz", T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half3_rtz",     gceINTRIN_source,  "_viv_vstore_half3_rtz", T_VOID, 3, {T_FLOAT3, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half4_rtz",     gceINTRIN_source,  "_viv_vstore_half4_rtz", T_VOID, 3, {T_FLOAT4, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half8_rtz",     gceINTRIN_source,  "_viv_vstore_half8_rtz", T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half16_rtz",    gceINTRIN_source,  "_viv_vstore_half16_rtz", T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+
+    {clvEXTENSION_NONE,    "vstore_half_rtp",      gceINTRIN_source, "_viv_vstore_half_rtp", T_VOID, 3, {T_FLOAT, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half2_rtp",     gceINTRIN_source, "_viv_vstore_half2_rtp", T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half3_rtp",     gceINTRIN_source, "_viv_vstore_half3_rtp", T_VOID, 3, {T_FLOAT3, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half4_rtp",     gceINTRIN_source, "_viv_vstore_half4_rtp", T_VOID, 3, {T_FLOAT4, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half8_rtp",     gceINTRIN_source, "_viv_vstore_half8_rtp", T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half16_rtp",    gceINTRIN_source, "_viv_vstore_half16_rtp", T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+
+    {clvEXTENSION_NONE,    "vstore_half_rtn",      gceINTRIN_source, "_viv_vstore_half_rtn", T_VOID, 3, {T_FLOAT, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half2_rtn",     gceINTRIN_source, "_viv_vstore_half2_rtn", T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half3_rtn",     gceINTRIN_source, "_viv_vstore_half3_rtn", T_VOID, 3, {T_FLOAT3, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half4_rtn",     gceINTRIN_source, "_viv_vstore_half4_rtn", T_VOID, 3, {T_FLOAT4, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half8_rtn",     gceINTRIN_source, "_viv_vstore_half8_rtn", T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half16_rtn",    gceINTRIN_source, "_viv_vstore_half16_rtn", T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+
+    {clvEXTENSION_NONE,    "vstorea_half_rtz",      gceINTRIN_source,  "_viv_vstorea_half_rtz", T_VOID, 3, {T_FLOAT, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half2_rtz",     gceINTRIN_source,  "_viv_vstorea_half2_rtz", T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half3_rtz",     gceINTRIN_source,  "_viv_vstorea_half3_rtz", T_VOID, 3, {T_FLOAT3, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half4_rtz",     gceINTRIN_source,  "_viv_vstorea_half4_rtz", T_VOID, 3, {T_FLOAT4, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half8_rtz",     gceINTRIN_source,  "_viv_vstorea_half8_rtz", T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half16_rtz",    gceINTRIN_source,  "_viv_vstorea_half16_rtz", T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+
+    {clvEXTENSION_NONE,    "vstorea_half_rtp",      gceINTRIN_source, "_viv_vstorea_half_rtp", T_VOID, 3, {T_FLOAT, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half2_rtp",     gceINTRIN_source, "_viv_vstorea_half2_rtp", T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half3_rtp",     gceINTRIN_source, "_viv_vstorea_half3_rtp", T_VOID, 3, {T_FLOAT3, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half4_rtp",     gceINTRIN_source, "_viv_vstorea_half4_rtp", T_VOID, 3, {T_FLOAT4, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half8_rtp",     gceINTRIN_source, "_viv_vstorea_half8_rtp", T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half16_rtp",    gceINTRIN_source, "_viv_vstorea_half16_rtp", T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+
+    {clvEXTENSION_NONE,    "vstorea_half_rtn",      gceINTRIN_source, "_viv_vstorea_half_rtn", T_VOID, 3, {T_FLOAT, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half2_rtn",     gceINTRIN_source, "_viv_vstorea_half2_rtn", T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half3_rtn",     gceINTRIN_source, "_viv_vstorea_half3_rtn", T_VOID, 3, {T_FLOAT3, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half4_rtn",     gceINTRIN_source, "_viv_vstorea_half4_rtn", T_VOID, 3, {T_FLOAT4, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half8_rtn",     gceINTRIN_source, "_viv_vstorea_half8_rtn", T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half16_rtn",    gceINTRIN_source, "_viv_vstorea_half16_rtn", T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
 };
 
 #define _cldIntrinsicBuiltinFunctionCount (sizeof(IntrinsicBuiltinFunctions) / sizeof(clsINTRINSIC_BUILTIN_FUNCTION))

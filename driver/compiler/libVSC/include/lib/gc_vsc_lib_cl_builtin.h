@@ -83,6 +83,8 @@ extern gctSTRING gcCLLibATAN2_Funcs_halti5_fmaSupported;
 extern gctSTRING gcCLLibLongMADSAT_Funcs;
 
 extern gctSTRING gcCLLibLongNEXTAFTER_Funcs;
+
+extern gctSTRING gcCLLibVSTORE_HALF_Funcs;
 #endif
 
 /*****************************

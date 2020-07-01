@@ -194,26 +194,6 @@ static clsBUILTIN_FUNCTION    VectorBuiltinFunctions[] =
     {clvEXTENSION_NONE,    "vstore_half8_rte",     T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
     {clvEXTENSION_NONE,    "vstore_half16_rte",    T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
 
-    {clvEXTENSION_NONE,    "vstore_half_rtz",      T_VOID, 3, {T_FLOAT, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstore_half2_rtz",     T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstore_half3_rtz",     T_VOID, 3, {T_FLOAT3, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstore_half4_rtz",     T_VOID, 3, {T_FLOAT4, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstore_half8_rtz",     T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstore_half16_rtz",    T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-
-    {clvEXTENSION_NONE,    "vstore_half_rtp",      T_VOID, 3, {T_FLOAT, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstore_half2_rtp",     T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstore_half3_rtp",     T_VOID, 3, {T_FLOAT3, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstore_half4_rtp",     T_VOID, 3, {T_FLOAT4, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstore_half8_rtp",     T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstore_half16_rtp",    T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-
-    {clvEXTENSION_NONE,    "vstore_half_rtn",      T_VOID, 3, {T_FLOAT, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstore_half2_rtn",     T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstore_half3_rtn",     T_VOID, 3, {T_FLOAT3, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstore_half4_rtn",     T_VOID, 3, {T_FLOAT4, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstore_half8_rtn",     T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstore_half16_rtn",    T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
 
     {clvEXTENSION_NONE,    "vstorea_half",     T_VOID, 3, {T_FLOAT, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
     {clvEXTENSION_NONE,    "vstorea_half2",    T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
@@ -229,26 +209,6 @@ static clsBUILTIN_FUNCTION    VectorBuiltinFunctions[] =
     {clvEXTENSION_NONE,    "vstorea_half8_rte",    T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
     {clvEXTENSION_NONE,    "vstorea_half16_rte",   T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
 
-    {clvEXTENSION_NONE,    "vstorea_half_rtz",     T_VOID, 3, {T_FLOAT, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstorea_half2_rtz",    T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstorea_half3_rtz",    T_VOID, 3, {T_FLOAT3, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstorea_half4_rtz",    T_VOID, 3, {T_FLOAT4, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstorea_half8_rtz",    T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstorea_half16_rtz",   T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-
-    {clvEXTENSION_NONE,    "vstorea_half_rtp",     T_VOID, 3, {T_FLOAT, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstorea_half2_rtp",    T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstorea_half3_rtp",    T_VOID, 3, {T_FLOAT3, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstorea_half4_rtp",    T_VOID, 3, {T_FLOAT4, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstorea_half8_rtp",    T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstorea_half16_rtp",   T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-
-    {clvEXTENSION_NONE,    "vstorea_half_rtn",     T_VOID, 3, {T_FLOAT, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstorea_half2_rtn",    T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstorea_half3_rtn",    T_VOID, 3, {T_FLOAT3, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstorea_half4_rtn",    T_VOID, 3, {T_FLOAT4, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstorea_half8_rtn",    T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
-    {clvEXTENSION_NONE,    "vstorea_half16_rtn",   T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
 
     {clvEXTENSION_NONE,    "viv_getlonglo",    T_UINT, 1, {T_LONG}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "viv_getlonglo2",   T_UINT2, 1, {T_LONG2}, {0}, {0}, 1},
