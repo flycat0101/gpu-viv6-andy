@@ -1293,7 +1293,7 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
     gctUINT                    outputCount = VIR_IdList_Count(pOutputIdLstsOfUpperShader);
     gctUINT                    soOutputCount = 0;
     VIR_Symbol*                pAttrSym;
-    VIR_Symbol*                pOutputSym;
+    VIR_Symbol*                pOutputSym, *sym;
     VIR_Symbol*                pSoSym;
     VSC_BIT_VECTOR             outputWorkingMask;
     gctUINT                    thisOutputRegCount, thisAttrRegCount;
@@ -1301,7 +1301,9 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
     VIR_Type*                  pOutputType;
     gctBOOL                    bLlSlotForLayerCalced = gcvFALSE;
     gctBOOL                    bCheckInterpolation = _NeedCheckInterpolation(pUpperShader);
-
+    gctSTRING                  outputName = gcvNULL;
+    VIR_NameId                 nameId;
+    VIR_SymId                  symId;
     /*
        !!!! IO-index layout rule:
             general IOs                                    +
@@ -1316,6 +1318,72 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
     {
         return VSC_ERR_NONE;
     }
+
+    /* Check if the pLowerShader is TCS or TES and it not have gl_Position.
+       If TCS or TES not have gl_Position, need save the previous shader gl_Position in pLowerShader.
+       From The OpenGL Graphics System:A Specification(Version 4.0)--Tessellation Evaluation Shader Inputs:
+            If a tessellation control shader active, the values of gl_in will be taken from tessellation control shader outputs.
+            Otherwise, they will be taken from vertex shader outputs.
+       Pay Attention: OpenGLES not have this feature. OpenGL4.0 and later OGL version has this feature.
+     */
+    for (outputIdx = 0; outputIdx < pUpperShader->outputs.count; outputIdx ++)
+    {
+        outputName = VIR_Shader_GetSymNameStringFromId(pUpperShader, VIR_IdList_GetId(&pUpperShader->outputs, outputIdx));
+        pOutputSym = VIR_Shader_GetSymFromId(pUpperShader, VIR_IdList_GetId(&pUpperShader->outputs, outputIdx));
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(outputName, "gl_Position")) && pLowerShader->outputs.count == 0 &&
+            (pLowerShader->shaderKind == VIR_SHADER_TESSELLATION_EVALUATION || pLowerShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL) &&
+             VIR_Shader_IsGL40OrAbove(pUpperShader))
+        {
+            for (outputIdx = 0; outputIdx < pLowerShader->outputs.count; outputIdx ++)
+            {
+                outputName = VIR_Shader_GetSymNameStringFromId(pLowerShader, VIR_IdList_GetId(&pLowerShader->outputs, outputIdx));
+                if (gcmIS_SUCCESS(gcoOS_StrCmp(outputName, "gl_Position")))
+                {
+                    break;
+                }
+            }
+
+            if (outputIdx == pLowerShader->outputs.count)
+            {
+                /* add "gl_Position" to lower shader outputs */
+                errCode = VIR_Shader_AddString(pLowerShader,
+                                               "gl_Position",
+                                               &nameId);
+                if (errCode != VSC_ERR_NONE) return errCode;
+                errCode = VIR_Shader_AddSymbol(pLowerShader,
+                                               pOutputSym->_kind,
+                                               nameId,
+                                               VIR_Shader_GetTypeFromId(pLowerShader, pOutputSym->typeId),
+                                               VIR_STORAGE_OUTPUT,
+                                               &symId);
+                if (errCode != VSC_ERR_NONE)
+                {
+                    gcoOS_Print("Failed to add output symbol");
+                    goto OnError;
+                }
+
+                sym = VIR_Shader_GetSymFromId(pLowerShader, symId);
+
+                VIR_Symbol_SetTyQualifier(sym, pOutputSym->_qualifier);
+                VIR_Symbol_SetPrecision(sym, pOutputSym->_precision);
+
+                sym->u2.tempIndex = pOutputSym->u2.tempIndex;
+
+                sym->ioBlockIndex = pOutputSym->ioBlockIndex;
+
+                VIR_Symbol_SetFlag(sym, pOutputSym->flags);
+                VIR_Symbol_SetFlag(sym, VIR_SYMFLAG_ARRAYED_PER_VERTEX);
+                VIR_Symbol_SetFlagsExt(sym, pOutputSym->flagsExt);
+
+                /* set layout info */
+                VIR_Symbol_SetLayoutQualifier(sym, pOutputSym->layout.layoutQualifier);
+                VIR_Symbol_SetLocation(sym, pOutputSym->layout.location);
+                VIR_Symbol_SetStreamNumber(sym, pOutputSym->layout.streamNumber);
+            }
+        }
+
+    }
+
 
     /* Check io aliased locations. NOTE that it looks spec needs this check before true IO linkage, but if
        aliased IOs are not used by shader, we actually can regard the shader as good shader because there
@@ -1527,7 +1595,6 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
                 break;
             }
         }
-
         if (outputIdx == outputCount)
         {
             /* No matching vertex output found. */

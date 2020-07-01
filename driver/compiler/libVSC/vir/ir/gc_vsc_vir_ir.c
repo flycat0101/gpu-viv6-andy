@@ -2463,6 +2463,18 @@ VIR_Shader_IsGL45(
     return bMatch;
 }
 
+gctBOOL
+VIR_Shader_IsGL40OrAbove(
+    IN VIR_Shader * Shader
+    )
+{
+    gctBOOL bMatch;
+    bMatch = ((Shader->compilerVersion[0] & 0xFFFF) == _SHADER_OGL_LANGUAGE_TYPE &&
+              (Shader->compilerVersion[1] >= _SHADER_GL40_VERSION));
+
+    return bMatch;
+}
+
 VSC_BT_FREE_ENTRY* VIR_Operand_GetFreeEntry(VIR_Operand * pOperand)
 {
     /* set the operand kind to free entry kind */
@@ -4043,7 +4055,7 @@ VIR_Shader_GenSimpleAssignment(
     return errCode;
 }
 
-    VSC_ErrCode
+VSC_ErrCode
 VIR_Shader_GenVectorAssignment(
     IN OUT  VIR_Shader*     pShader,
     IN  VIR_Function*       pFunction,
@@ -11386,7 +11398,6 @@ VIR_Function_RemoveInstruction(
     }
     return errCode;
 }
-
 /* delete instruction and free its operands */
 VSC_ErrCode
 VIR_Function_DeleteInstruction(
