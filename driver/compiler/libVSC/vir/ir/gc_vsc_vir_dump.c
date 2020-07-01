@@ -117,7 +117,7 @@ static VIR_DumpConstFormat formats[] = {
     { VIR_TYPE_UNKNOWN, "%s", 0, 0, VIR_DUMP_CONST_INVALID, gcvNULL},
     { VIR_TYPE_VOID, "%s", 0, 0, VIR_DUMP_CONST_INVALID, gcvNULL},
     { VIR_TYPE_FLOAT32, "%f", 1, 32, VIR_DUMP_CONST_NONE, gcvNULL},
-    { VIR_TYPE_FLOAT16, "%f", 1, 32, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_FLOAT16, "%f", 1, 16, VIR_DUMP_CONST_NONE, gcvNULL},
     { VIR_TYPE_INT32, "%d", 1, 32, VIR_DUMP_CONST_NONE, gcvNULL},
     { VIR_TYPE_INT16, "%hd", 1, 16, VIR_DUMP_CONST_NONE, gcvNULL},
     { VIR_TYPE_INT8, "%hhd", 1, 8, VIR_DUMP_CONST_NONE, gcvNULL},
@@ -546,6 +546,8 @@ _DumpVecConst(
     gctUINT16 *p16 = (gctUINT16 *)Value;
     gctUINT8  *p8  = (gctUINT8  *)Value;
 
+    gctFLOAT f32 = 0.0;
+
     void      *pointer = gcvNULL;
 
     gcmASSERT(Value != gcvNULL &&
@@ -634,6 +636,17 @@ _DumpVecConst(
                 }
                 break;
             case 16:
+                if(TyFlag & VIR_TYFLAG_ISFLOAT)
+                {
+                    f32 = gcoMATH_UIntAsFloat(gcoMATH_Float16ToFloat(p16[i]));
+                    VERIFY_OK(VIR_LOG(Dumper, Format->Format, f32));
+                    VERIFY_OK(VIR_LOG(Dumper, "[%x]", p32[i]));
+                }
+                else
+                {
+                    VERIFY_OK(VIR_LOG(Dumper, Format->Format, p32[i]));
+                }
+                break;
             case 8:
                 VERIFY_OK(VIR_LOG(Dumper, Format->Format, p32[i]));
                 break;

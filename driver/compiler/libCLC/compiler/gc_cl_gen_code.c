@@ -4914,19 +4914,29 @@ IN OUT gctUINT *NumTempRegNeeded
         gctINT  regOfFirstArrayEle = -1;
 
         gctUINT16   die = VSC_DI_INVALIDE_DIE;
+        gctUINT16   subDie = VSC_DI_INVALIDE_DIE;
 
         if (addDieFlag == gcvTRUE)
         {
             cloCOMPILER_SetCollectDIE(Compiler, gcvTRUE);
-            die = cloCOMPILER_AddDIE(Compiler, VSC_DI_TAG_VARIABE, ParentName->die, Name->symbol, 0, 0, 0, 0);
+            die = cloCOMPILER_AddDIE(Compiler, VSC_DI_TAG_VARIABE, ParentName->die, Symbol, 0, 0, 0, 0);
             cloCOMPILER_SetDIEType(Compiler, Decl, die);
             if (die == VSC_DI_INVALIDE_DIE) return status;
             cloCOMPILER_SetCollectDIE(Compiler, gcvFALSE);
         }
+        addDieFlag = gcvTRUE;
         arrayRef = Decl->array;
-        if (clmDECL_IsArray(Decl)) {
+        if (clmDECL_IsArray(Decl))
+        {
            int j;
            clmGetArrayElementCount(Decl->array, 0, count);
+
+           /*set die array type*/
+           if (addDieFlag == gcvTRUE && die != VSC_DI_INVALIDE_DIE)
+           {
+               cloCOMPILER_SetDIEArrayWithArray(Compiler, die, &(Decl->array));
+           }
+
            for(j = 0; j < Decl->array.numDim; j++) {
               arrayRef.length[j] = 0;
            }
@@ -4997,7 +5007,7 @@ IN OUT gctUINT *NumTempRegNeeded
                 }
 
                 status = clNewStructIntermediateElementSymbol(Compiler,
-                               Symbol,
+                               symbol,
                                _ConvElementDataTypeForRegAlloc(Compiler, Name),
                                1,
                                gcvNULL,
@@ -5009,6 +5019,15 @@ IN OUT gctUINT *NumTempRegNeeded
                                arrayElePrevSibling,
                                &arrayElePrevSibling);
                 if (gcmIS_ERROR(status)) return status;
+
+                if (addDieFlag == gcvTRUE)
+                {
+                    cloCOMPILER_SetCollectDIE(Compiler, gcvTRUE);
+                    subDie = cloCOMPILER_AddDIE(Compiler, VSC_DI_TAG_VARIABE, die != VSC_DI_INVALIDE_DIE?die:dieTmp, symbol, 0, 0, 0, 0);
+                    cloCOMPILER_SetDIEType(Compiler, Decl, subDie);
+                    if (subDie == VSC_DI_INVALIDE_DIE) return status;
+                    cloCOMPILER_SetCollectDIE(Compiler, gcvFALSE);
+                }
 
                 structEleParent = arrayElePrevSibling;
             }
@@ -5051,10 +5070,12 @@ IN OUT gctUINT *NumTempRegNeeded
                                     fieldName->symbol));
                 }
 
-                if ((((fieldName)->mySpace)->scopeName)->symbol != ((((((ParentName)->decl).dataType)->u).fieldSpace)->scopeName)->symbol)
+                if (die != VSC_DI_INVALIDE_DIE || subDie != VSC_DI_INVALIDE_DIE)
                 {
-                    dieTmp = ParentName->die;
-                    ParentName->die = die;
+                    if(subDie != VSC_DI_INVALIDE_DIE)
+                        ParentName->die = subDie;
+                    else
+                        ParentName->die = die;
                 }
                 else
                 {
@@ -5153,7 +5174,7 @@ IN OUT gctUINT *NumTempRegNeeded
                         NumTempRegNeeded);
         if (gcmIS_ERROR(status)) return status;
     }
-
+    ParentName->die = dieTmp;
     return gcvSTATUS_OK;
 }
 

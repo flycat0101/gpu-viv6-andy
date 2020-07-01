@@ -10667,7 +10667,7 @@ gcSHADER_Save(
     gctUINT32   tfbVaryingCount = 0;
 
 #if gcdUSE_WCLIP_PATCH
-    gctUINT32   wclipListCount1 = 0, wclipListCount2 = 0;
+    gctUINT16   wclipListCount1 = 0, wclipListCount2 = 0;
 #endif
     gctUINT16 ltcUniformMappingCount = 0;
     gcSHADER_LIST list;
@@ -39171,10 +39171,12 @@ _gcLoadProgramHeader(
 
     if((bytePtr[0] == 'E' && bytePtr[1] != 'S') ||
        (bytePtr[0] == 'C' && bytePtr[1] != 'L') ||
-       (bytePtr[0] != 'E' && bytePtr[0] != 'C')) {
-       gcoOS_Print("_gcLoadProgramHeader: unrecognizable laguage type \"%c%c\"", bytePtr[0], bytePtr[1]);
-       gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-       return gcvSTATUS_INVALID_DATA;
+       (bytePtr[3] == 'E' && bytePtr[2] != 'S') ||
+       (bytePtr[3] == 'C' && bytePtr[2] != 'L') ||
+       (bytePtr[0] != 'E' && bytePtr[0] != 'C' && bytePtr[3] != 'E' && bytePtr[3] != 'C')) {
+        gcoOS_Print("_gcLoadProgramHeader: unrecognizable laguage type \"%c%c%c%c\"", bytePtr[0], bytePtr[1], bytePtr[2], bytePtr[3]);
+        gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+        return gcvSTATUS_INVALID_DATA;
     }
 
     /* Word 4: chip model */
@@ -39194,7 +39196,16 @@ _gcLoadProgramHeader(
         return gcvSTATUS_INVALID_DATA;
     }
     /* Success. */
-    *(gctUINT32 *)Language = *language;
+    if(bytePtr[0] == 'E' || bytePtr[0] == 'C')
+        *(gctUINT32 *)Language = *language;
+    else /* little endian */
+    {
+        gctUINT8 * outBytePtr = (gctUINT8 *) Language;
+        outBytePtr[0] = bytePtr[3];
+        outBytePtr[1] = bytePtr[2];
+        outBytePtr[2] = bytePtr[1];
+        outBytePtr[3] = bytePtr[0];
+    }
     gcmFOOTER_ARG("*Language=%u", *language);
     return gcvSTATUS_OK;
 }
@@ -39324,11 +39335,8 @@ gcSaveGraphicsProgram(
         buffer    = (gctUINT8_PTR) *Binary;
 
         /* Word 1: program binary signature */
-        buffer[0] = 'P';
-        buffer[1] = 'R';
-        buffer[2] = 'G';
-        buffer[3] = 'M';
-        buffer += 4;
+        *(gctUINT32 *) buffer = gcmCC('P', 'R', 'G', 'M');
+        buffer += sizeof(gctUINT32);
 
         /* Word 2: binary file version # */
         *(gctUINT32 *) buffer = gcdSL_PROGRAM_BINARY_FILE_VERSION;
@@ -39577,11 +39585,8 @@ gcSaveComputeProgram(
         buffer    = (gctUINT8_PTR) *Binary;
 
         /* Word 1: program binary signature */
-        buffer[0] = 'P';
-        buffer[1] = 'R';
-        buffer[2] = 'G';
-        buffer[3] = 'M';
-        buffer += 4;
+        *(gctUINT32 *) buffer = gcmCC('P', 'R', 'G', 'M');
+        buffer += sizeof(gctUINT32);
 
         /* Word 2: binary file version # */
         *(gctUINT32 *) buffer = gcdSL_PROGRAM_BINARY_FILE_VERSION;
@@ -39800,11 +39805,8 @@ gcSaveCLSingleKernel(
         buffer    = (gctUINT8_PTR) *Binary;
 
         /* Word 1: program binary signature */
-        buffer[0] = 'P';
-        buffer[1] = 'R';
-        buffer[2] = 'G';
-        buffer[3] = 'M';
-        buffer += 4;
+        *(gctUINT32 *) buffer = gcmCC('P', 'R', 'G', 'M');
+        buffer += sizeof(gctUINT32);
 
         /* Word 2: binary file version # */
         *(gctUINT32 *) buffer = gcdSL_PROGRAM_BINARY_FILE_VERSION;

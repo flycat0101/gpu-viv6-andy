@@ -1353,6 +1353,13 @@ IN clsNAME * Variable
 );
 
 void
+cloCOMPILER_SetDIEArrayWithArray(
+IN cloCOMPILER Compiler,
+IN gctUINT16   Id,
+IN clsARRAY    *array
+);
+
+void
 cloCOMPILER_SetStructDIELogicalReg(
 IN cloCOMPILER Compiler,
 IN clsDECL * Decl,

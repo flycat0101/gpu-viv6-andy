@@ -4656,6 +4656,29 @@ IN clsNAME * Variable
 }
 
 void
+cloCOMPILER_SetDIEArrayWithArray(
+IN cloCOMPILER Compiler,
+IN gctUINT16   Id,
+IN clsARRAY    *array
+)
+{
+    VSC_DIE * die;
+    gctINT i;
+
+    if (Compiler->context.debugInfo == gcvNULL)  return;
+
+    die = vscDIGetDIE(Compiler->context.debugInfo, Id);
+    if(array && array->numDim > 0)
+    {
+        die->u.variable.type.array.numDim = array->numDim;
+        for (i = 0 ; i < die->u.variable.type.array.numDim; i++)
+        {
+            die->u.variable.type.array.length[i] = array->length[i];
+        }
+    }
+}
+
+void
 cloCOMPILER_SetDIEType(
 IN  cloCOMPILER Compiler,
 IN  clsDECL     *Decl,
