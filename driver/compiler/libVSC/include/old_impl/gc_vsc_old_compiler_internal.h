@@ -234,6 +234,7 @@ typedef struct _gcBuiltinsTempIndex
    gctINT       BoundingBoxTempIndex;
    gctINT       LastFragDataTempIndex;
    gctINT       ClusterIDTempIndex;
+   gctINT       ClipDistanceTempIndex;
 } gcBuiltinsTempIndex;
 
 typedef struct _gcShaderCodeInfo

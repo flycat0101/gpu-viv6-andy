@@ -1601,6 +1601,43 @@ slParseSubscriptExpr(
         return &resultConstant->exprBase;
     }
 
+    /* Check the UnSizeArray. */
+    if (sloIR_OBJECT_GetType(&LeftOperand->base) == slvIR_VARIABLE && sloIR_OBJECT_GetType(&RightOperand->base) == slvIR_CONSTANT)
+    {
+        sloIR_VARIABLE variable = (sloIR_VARIABLE)(LeftOperand);
+        gctINT arraySize = ((sloIR_CONSTANT)RightOperand)->values[0].intValue + 1;
+
+        if (variable->name->symbol && gcmIS_SUCCESS(gcoOS_StrCmp(variable->name->symbol, "gl_ClipDistance")))
+        {
+            if (!variable->name->isUnsizeArraySet)
+            {
+                if (arraySize > variable->name->dataType->arrayLength)
+                {
+                    gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                                    LeftOperand->base.lineNo,
+                                                    LeftOperand->base.stringNo,
+                                                    slvREPORT_ERROR,
+                                                    "The array index is larger than the array size."));
+
+                    gcmFOOTER_ARG("<return>=%s", "<nil>");
+                    return gcvNULL;
+                }
+
+                variable->name->dataType->arrayLength = arraySize;
+                variable->name->dataType->arrayLengthList[0] = arraySize;
+                variable->name->isUnsizeArraySet = gcvTRUE;
+            }
+            else
+            {
+                if (arraySize > variable->name->dataType->arrayLength)
+                {
+                    variable->name->dataType->arrayLength = arraySize;
+                    variable->name->dataType->arrayLengthList[0] = arraySize;
+                }
+            }
+        }
+    }
+
     /* Create the binary expression */
     status = sloIR_BINARY_EXPR_Construct(
                                         Compiler,

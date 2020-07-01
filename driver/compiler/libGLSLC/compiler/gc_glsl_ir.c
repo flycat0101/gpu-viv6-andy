@@ -2802,8 +2802,8 @@ slsNAME_SPACE_Search(
     }
 }
 
-static gceSTATUS
-_SearchBuiltinVariable(
+gceSTATUS
+slsNAME_SPACE_SearchBuiltinVariable(
     IN sloCOMPILER     Compiler,
     IN slsNAME_SPACE * NameSpace,
     IN sltPOOL_STRING  Symbol,
@@ -2813,8 +2813,8 @@ _SearchBuiltinVariable(
 {
     slsNAME *       name;
     gceSTATUS       status = gcvSTATUS_OK;
-    gcmHEADER_ARG("Compiler=0x%x NameSpace=0x%x Symbol=0x%x Extension=%d Name=0x%x",
-        Compiler, NameSpace, Symbol, Extension.extension1, Name);
+    gcmHEADER_ARG("Compiler=0x%x NameSpace=0x%x Symbol=0x%x Extension1=%d Extension2=%d Name=0x%x",
+        Compiler, NameSpace, Symbol, Extension.extension1, Extension.extension2, Name);
 
     /* Verify the arguments. */
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
@@ -3550,57 +3550,21 @@ slsNAME_SPACE_CreateName(
         {
             if (IsBuiltIn)
             {
-                sleSHADER_TYPE shaderType;
-
-                shaderType = Compiler->shaderType;
-                if (sloCOMPILER_IsOGLVersion(Compiler))
+                sleSHADER_TYPE shaderType = Compiler->shaderType;
+                status = slsNAME_SPACE_SearchBuiltinVariable(Compiler,
+                                                             NameSpace,
+                                                             Symbol,
+                                                             Extension,
+                                                             &name);
+                /* some builtin names can be redefined. */
+                if (status == gcvSTATUS_OK &&
+                    (shaderType == slvSHADER_TYPE_TCS || shaderType == slvSHADER_TYPE_TES ) &&
+                    (gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_Position")) || gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_PointSize"))))
                 {
-                    status = _SearchBuiltinVariable(Compiler,
-                                                    Compiler->context.builtinSpace,
-                                                    Symbol,
-                                                    Extension,
-                                                    &name);
-                    /* The following predeclared variables can be redeclared with an interpolation qualifier:
-                    Vertex and geometry languages: gl_FrontColor / gl_BackColor / gl_FrontSecondaryColor / gl_BackSecondaryColor
-                    Fragment language: gl_Color / gl_SecondaryColor */
-                    if (status == gcvSTATUS_OK)
-                    {
-                        if(((shaderType == slvSHADER_TYPE_VERTEX || shaderType == slvSHADER_TYPE_GS ) &&
-                        (gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_FrontColor")) ||
-                         gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_BackColor")) ||
-                         gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_FrontSecondaryColor")) ||
-                         gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_BackSecondaryColor")))) ||
-                        (shaderType == slvSHADER_TYPE_FRAGMENT &&
-                        (gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_Color")) ||
-                         gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_SecondaryColor")))))
-                        {
-                            name->dataType->qualifiers.interpolation = DataType->qualifiers.interpolation;
-                            if (Name != gcvNULL) *Name = name;
+                    if (Name != gcvNULL) *Name = name;
 
-                            gcmFOOTER_ARG("*Name=0x%x", gcmOPT_POINTER(Name));
-                            return gcvSTATUS_OK;
-                        }
-                    }
-                }
-                else
-                {
-                    status = _SearchBuiltinVariable(Compiler,
-                                                    NameSpace,
-                                                    Symbol,
-                                                    Extension,
-                                                    &name);
-                    /* some builtin names can be redefined. */
-                    if (status == gcvSTATUS_OK &&
-                        (shaderType == slvSHADER_TYPE_TCS ||
-                         shaderType == slvSHADER_TYPE_TES ) &&
-                        (gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_Position")) ||
-                         gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_PointSize"))))
-                    {
-                        if (Name != gcvNULL) *Name = name;
-
-                        gcmFOOTER_ARG("*Name=0x%x", gcmOPT_POINTER(Name));
-                        return gcvSTATUS_OK;
-                    }
+                    gcmFOOTER_ARG("*Name=0x%x", gcmOPT_POINTER(Name));
+                    return gcvSTATUS_OK;
                 }
             }
             else

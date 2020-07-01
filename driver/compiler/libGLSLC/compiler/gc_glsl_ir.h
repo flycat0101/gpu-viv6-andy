@@ -1224,6 +1224,7 @@ typedef struct _slsNAME
     slsDATA_TYPE *                          dataType;
     sltPOOL_STRING                          symbol;
     gctBOOL                                 isBuiltIn;
+    gctBOOL                                 isUnsizeArraySet;
     sloEXTENSION                            extension;
     /* Whether this variable is a per-vertex array, TC/GS only. */
     gctBOOL                                 isPerVertexArray;
@@ -1495,6 +1496,15 @@ slsNAME_SPACE_Search(
     IN void * CompareData,
     IN gctBOOL Recursive,
     IN gctBOOL MangleNameMatch,
+    OUT slsNAME ** Name
+    );
+
+gceSTATUS
+slsNAME_SPACE_SearchBuiltinVariable(
+    IN sloCOMPILER Compiler,
+    IN slsNAME_SPACE * NameSpace,
+    IN sltPOOL_STRING Symbol,
+    IN sloEXTENSION Extension,
     OUT slsNAME ** Name
     );
 

@@ -260,6 +260,7 @@ gcSL_GetName(
     _print_name(gcSL_BOUNDING_BOX, "#BoundingBox");
     _print_name(gcSL_LAST_FRAG_DATA, "#LastFragData");
     _print_name(gcSL_CLUSTER_ID, "#cluster_id");
+    _print_name(gcSL_CLIP_DISTANCE, "gl_ClipDistance");
     default:
         gcmASSERT((gctINT)Length > 0);
         break;

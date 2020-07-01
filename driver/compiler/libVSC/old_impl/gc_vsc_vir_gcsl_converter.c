@@ -800,6 +800,8 @@ _ConvVirNameIdToBuiltinNameKind(
         kind = gcSL_GLOBAL_INVOCATION_ID;
     }  else if (VirNameId == VIR_NAME_CLUSTER_ID) {
         kind = gcSL_CLUSTER_ID;
+    }  else if (VirNameId == VIR_NAME_CLIP_DISTANCE) {
+        kind = gcSL_CLIP_DISTANCE;
     }  else if (VirNameId == VIR_NAME_HELPER_INVOCATION) {
         kind = gcSL_HELPER_INVOCATION;
     } else if (VirNameId == VIR_NAME_FRONT_COLOR) {
