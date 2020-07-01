@@ -131,7 +131,7 @@ typedef enum _VIR_RA_LR_FLAG
 
     VIR_RA_LRFLAG_NO_USED_COLOR     = 0x400, /* whether LR should not assign a used color */
 
-    VIR_RA_LRFLAG_A0_INVALID        = 0x1000, /* this A0 LR has been invalid */
+    VIR_RA_LRFLAG_A0B0_INVALID      = 0x1000, /* this A0/B0 LR has been invalid */
 
     VIR_RA_LRFLAG_ST_DEP            = 0x2000, /* whether this LR has depedence because of store */
     VIR_RA_LRFLAG_LD_DEP            = 0x4000, /* whether this LR has depedence because of load */
@@ -200,7 +200,7 @@ struct VIR_RA_LS_LIVERANGE
 #define isLRVXEven(LR)                  (((LR)->flags & VIR_RA_LRFLAG_VX_EVEN) != 0)
 #define isLRVXOdd(LR)                   (((LR)->flags & VIR_RA_LRFLAG_VX_ODD) != 0)
 #define isLRNoUsedColor(LR)             (((LR)->flags & VIR_RA_LRFLAG_NO_USED_COLOR) != 0)
-#define isLRA0Invalid(LR)               (((LR)->flags & VIR_RA_LRFLAG_A0_INVALID) != 0)
+#define isLRA0B0Invalid(LR)             (((LR)->flags & VIR_RA_LRFLAG_A0B0_INVALID) != 0)
 #define isLRSTDependence(LR)            (((LR)->flags & VIR_RA_LRFLAG_ST_DEP) != 0)
 #define isLRLDDependence(LR)            (((LR)->flags & VIR_RA_LRFLAG_LD_DEP) != 0)
 #define isLRVX(LR)                      (((LR)->flags & VIR_RA_LRFLAG_VX) != 0)
