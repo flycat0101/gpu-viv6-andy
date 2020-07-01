@@ -576,6 +576,17 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
      (Opcode) == VIR_OP_SETP            ||      \
      (Opcode) == VIR_OP_CMOV)
 
+#define VIR_OPCODE_NotSupportSat0to1(Opcode)        \
+     (VIR_OPCODE_isVX(Opcode)          ||    \
+      VIR_OPCODE_isMemLd(Opcode)       ||    \
+      VIR_OPCODE_isMemSt(Opcode)       ||    \
+      VIR_OPCODE_isAttrLd(Opcode)      ||    \
+      VIR_OPCODE_isAttrSt(Opcode)      ||    \
+      VIR_OPCODE_isTexLd(Opcode)       ||    \
+      VIR_OPCODE_isImgLd(Opcode)       ||    \
+      VIR_OPCODE_isImgSt(Opcode)       ||    \
+      (Opcode) == VIR_OP_I2I)
+
 #define VIR_SymTable_MaxValidId(SymTable)   BT_GET_MAX_VALID_ID(SymTable)
 
 #define VIR_Function_GetLastInstId(Func)    ((Func)->_lastInstId)
