@@ -2605,6 +2605,56 @@ _GenTexture2DCode(
     )
 {
     gceSTATUS   status;
+
+    gcmHEADER();
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    slmVERIFY_IR_OBJECT(PolynaryExpr, slvIR_POLYNARY_EXPR);
+    gcmASSERT(OperandCount == 2 || OperandCount == 3);
+    gcmASSERT(OperandsParameters);
+    gcmASSERT(IOperand);
+
+    if (OperandCount == 3)
+    {
+        status = slGenGenericCode2(
+                                Compiler,
+                                PolynaryExpr->exprBase.base.lineNo,
+                                PolynaryExpr->exprBase.base.stringNo,
+                                slvOPCODE_TEXTURE_BIAS,
+                                IOperand,
+                                &OperandsParameters[0].rOperands[0],
+                                &OperandsParameters[2].rOperands[0]);
+
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+    }
+
+    status = slGenGenericCode2(
+                            Compiler,
+                            PolynaryExpr->exprBase.base.lineNo,
+                            PolynaryExpr->exprBase.base.stringNo,
+                            slvOPCODE_TEXTURE_LOAD,
+                            IOperand,
+                            &OperandsParameters[0].rOperands[0],
+                            &OperandsParameters[1].rOperands[0]);
+
+    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+_GenTexture2DRectCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    )
+{
+    gceSTATUS   status;
     slsROPERAND sizeOperand[1];
     slsROPERAND intermROperand[1];
     slsLOPERAND intermLOperand[1];
@@ -2620,129 +2670,149 @@ _GenTexture2DCode(
     /* Verify the arguments. */
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     slmVERIFY_IR_OBJECT(PolynaryExpr, slvIR_POLYNARY_EXPR);
-    gcmASSERT(OperandCount == 2 || OperandCount == 3);
+    gcmASSERT(OperandCount == 2);
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
     gcmASSERT(!slsDLINK_LIST_IsEmpty(&PolynaryExpr->operands->members));
 
     samplerOperand = slsDLINK_LIST_First(&PolynaryExpr->operands->members, struct _sloIR_EXPR);
-    if (slsDATA_TYPE_IsSampler2DRect(samplerOperand->dataType))
+    gcmASSERT(!slsDATA_TYPE_IsSampler2DRect(samplerOperand->dataType));
+
+    /*
+    ** If HW can support INTEGER coord, we don't need to convert it to FLOAT.
+    ** And we generate TEXLD_U instead of TEXLD.
+    */
+    if (GetHWHasUniversalTexldV2() && GetHWHasTexldUFix())
     {
-        gcmASSERT(OperandCount == 2);
-
-        /*
-        ** If HW can support INTEGER coord, we don't need to convert it to FLOAT.
-        ** And we generate TEXLD_U instead of TEXLD.
-        */
-        if (GetHWHasUniversalTexldV2() && GetHWHasTexldUFix())
-        {
-            textureParameters[0] = OperandsParameters[0];
-            textureParameters[1] = OperandsParameters[1];
-            textureParameters[1].genTexldU = gcvTRUE;
-        }
-        else
-        {
-            slsIOPERAND_New(Compiler,
-                            intermIOperand,
-                            OperandsParameters[1].dataTypes[0],
-                            OperandsParameters[1].rOperands[0].u.reg.precision);
-
-            slsROPERAND_InitializeUsingIOperand(sizeOperand, intermIOperand);
-            floatType = gcChangeElementDataType(OperandsParameters[1].dataTypes[0],
-                                                gcSHADER_FLOAT_X1);
-
-            status = slsROPERAND_ChangeDataTypeFamily(Compiler,
-                                                      PolynaryExpr->exprBase.base.lineNo,
-                                                      PolynaryExpr->exprBase.base.stringNo,
-                                                      gcvFALSE,
-                                                      floatType,
-                                                      sizeOperand);
-            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-
-            texCoords[0] = OperandsParameters[1].rOperands[0];
-
-            status = slsROPERAND_ChangeDataTypeFamily(Compiler,
-                                                      PolynaryExpr->exprBase.base.lineNo,
-                                                      PolynaryExpr->exprBase.base.stringNo,
-                                                      gcvFALSE,
-                                                      floatType,
-                                                      texCoords);
-            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-
-            numCoordComponents = gcGetDataTypeComponentCount(floatType);
-            if(gcIsSamplerArrayDataType(OperandsParameters[0].dataTypes[0]))
-            {
-                numCoordComponents--;
-            }
-
-            slsIOPERAND_New(Compiler,
-                            intermIOperand,
-                            texCoords->dataType,
-                            texCoords->u.reg.precision);
-            slsLOPERAND_InitializeUsingIOperand(intermLOperand, intermIOperand);
-            status = slGenAssignCode(Compiler,
-                                     PolynaryExpr->exprBase.base.lineNo,
-                                     PolynaryExpr->exprBase.base.stringNo,
-                                     intermLOperand,
-                                     texCoords);
-            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-
-            slsROPERAND_InitializeUsingIOperand(texCoords, intermIOperand);
-
-            slGetVectorROperandSlice(texCoords,
-                                     0,
-                                     numCoordComponents,
-                                     intermROperand);
-            slGetVectorROperandSlice(sizeOperand,
-                                     0,
-                                     numCoordComponents,
-                                     sizeOperand);
-            slsIOPERAND_New(Compiler,
-                            intermIOperand,
-                            intermROperand->dataType,
-                            intermROperand->u.reg.precision);
-            status = slGenArithmeticExprCode(Compiler,
-                                             PolynaryExpr->exprBase.base.lineNo,
-                                             PolynaryExpr->exprBase.base.stringNo,
-                                             slvOPCODE_DIV,
-                                             intermIOperand,
-                                             intermROperand,
-                                             sizeOperand);
-            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-
-            slsROPERAND_InitializeUsingIOperand(intermROperand, intermIOperand);
-            slGetVectorLOperandSlice(intermLOperand,
-                                     0,
-                                     numCoordComponents,
-                                     intermLOperand);
-
-            status = slGenAssignCode(Compiler,
-                                     PolynaryExpr->exprBase.base.lineNo,
-                                     PolynaryExpr->exprBase.base.stringNo,
-                                     intermLOperand,
-                                     intermROperand);
-            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-        }
+        textureParameters[0] = OperandsParameters[0];
+        textureParameters[1] = OperandsParameters[1];
+        textureParameters[1].genTexldU = gcvTRUE;
     }
-
-    textureParameters[0] = OperandsParameters[0];
-    textureParameters[1] = OperandsParameters[1];
-    textureParameters[2] = OperandsParameters[2];
-    textureParameters[1].dataTypes = &texCoords->dataType;
-    textureParameters[1].rOperands = texCoords;
-
-    if (OperandCount == 3)
+    else
     {
-        status = slGenGenericCode2(
-                                Compiler,
-                                PolynaryExpr->exprBase.base.lineNo,
-                                PolynaryExpr->exprBase.base.stringNo,
-                                slvOPCODE_TEXTURE_BIAS,
-                                IOperand,
-                                &textureParameters[0].rOperands[0],
-                                &textureParameters[2].rOperands[0]);
+        slsLOGICAL_REG logicalReg[1];
+        slsNAME *sampler;
+        slsROPERAND rOperand[1];
+        slsROPERAND constantOne[1];
 
+        sampler = ((sloIR_VARIABLE)samplerOperand)->name;
+
+        slsIOPERAND_New(Compiler,
+                        intermIOperand,
+                        OperandsParameters[1].dataTypes[0],
+                        OperandsParameters[1].rOperands[0].u.reg.precision);
+
+        if(sampler->u.variableInfo.levelBaseSize == gcvNULL)
+        {
+            status = slAllocSamplerLevelBaseSize(Compiler,
+                                                    sampler,
+                                                    gcSHADER_FLOAT_X4);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        }
+        gcmASSERT(sampler->u.variableInfo.levelBaseSize);
+
+        slsLOGICAL_REG_InitializeUniform(logicalReg,
+                                            slvSTORAGE_QUALIFIER_UNIFORM,
+                                            intermIOperand->dataType,
+                                            gcSHADER_PRECISION_MEDIUM,
+                                            sampler->u.variableInfo.levelBaseSize,
+                                            0);
+        slsROPERAND_InitializeReg(rOperand, logicalReg);
+
+        slsROPERAND_InitializeIntOrIVecConstant(constantOne,
+                                                gcSHADER_INTEGER_X1,
+                                                gcSHADER_PRECISION_MEDIUM,
+                                                (gctINT) 1);
+
+        status = slGenGenericCode2(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
+                                    slvOPCODE_MAX,
+                                    intermIOperand,
+                                    rOperand,
+                                    constantOne);
         if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        slsROPERAND_InitializeUsingIOperand(sizeOperand, intermIOperand);
+        floatType = gcChangeElementDataType(OperandsParameters[1].dataTypes[0],
+                                            gcSHADER_FLOAT_X1);
+
+        status = slsROPERAND_ChangeDataTypeFamily(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
+                                                    gcvFALSE,
+                                                    floatType,
+                                                    sizeOperand);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        texCoords[0] = OperandsParameters[1].rOperands[0];
+
+        status = slsROPERAND_ChangeDataTypeFamily(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
+                                                    gcvFALSE,
+                                                    floatType,
+                                                    texCoords);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        numCoordComponents = gcGetDataTypeComponentCount(floatType);
+        if(gcIsSamplerArrayDataType(OperandsParameters[0].dataTypes[0]))
+        {
+            numCoordComponents--;
+        }
+
+        slsIOPERAND_New(Compiler,
+                        intermIOperand,
+                        texCoords->dataType,
+                        texCoords->u.reg.precision);
+        slsLOPERAND_InitializeUsingIOperand(intermLOperand, intermIOperand);
+        status = slGenAssignCode(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
+                                    intermLOperand,
+                                    texCoords);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        slsROPERAND_InitializeUsingIOperand(texCoords, intermIOperand);
+
+        slGetVectorROperandSlice(texCoords,
+                                    0,
+                                    numCoordComponents,
+                                    intermROperand);
+        slGetVectorROperandSlice(sizeOperand,
+                                    0,
+                                    numCoordComponents,
+                                    sizeOperand);
+        slsIOPERAND_New(Compiler,
+                        intermIOperand,
+                        intermROperand->dataType,
+                        intermROperand->u.reg.precision);
+        status = slGenArithmeticExprCode(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
+                                            slvOPCODE_DIV,
+                                            intermIOperand,
+                                            intermROperand,
+                                            sizeOperand);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        slsROPERAND_InitializeUsingIOperand(intermROperand, intermIOperand);
+        slGetVectorLOperandSlice(intermLOperand,
+                                    0,
+                                    numCoordComponents,
+                                    intermLOperand);
+
+        status = slGenAssignCode(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
+                                    intermLOperand,
+                                    intermROperand);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        textureParameters[0] = OperandsParameters[0];
+        textureParameters[1] = OperandsParameters[1];
+        textureParameters[1].dataTypes = &texCoords->dataType;
+        textureParameters[1].rOperands = texCoords;
     }
 
     status = slGenGenericCode2(
@@ -6552,10 +6622,48 @@ _GenTexelFetchCode(
         }
         else
         {
+            slsLOGICAL_REG logicalReg[1];
+            slsNAME *sampler;
+            slsROPERAND rOperand[1];
+            slsROPERAND constantOne[1];
+
+            sampler = ((sloIR_VARIABLE)samplerOperand)->name;
+
             slsIOPERAND_New(Compiler,
                             intermIOperand,
                             OperandsParameters[1].dataTypes[0],
                             OperandsParameters[1].rOperands[0].u.reg.precision);
+
+            if(sampler->u.variableInfo.levelBaseSize == gcvNULL)
+            {
+                status = slAllocSamplerLevelBaseSize(Compiler,
+                                                     sampler,
+                                                     gcSHADER_FLOAT_X4);
+                if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+            }
+            gcmASSERT(sampler->u.variableInfo.levelBaseSize);
+
+            slsLOGICAL_REG_InitializeUniform(logicalReg,
+                                             slvSTORAGE_QUALIFIER_UNIFORM,
+                                             intermIOperand->dataType,
+                                             gcSHADER_PRECISION_MEDIUM,
+                                             sampler->u.variableInfo.levelBaseSize,
+                                             0);
+            slsROPERAND_InitializeReg(rOperand, logicalReg);
+
+            slsROPERAND_InitializeIntOrIVecConstant(constantOne,
+                                                    gcSHADER_INTEGER_X1,
+                                                    gcSHADER_PRECISION_MEDIUM,
+                                                    (gctINT) 1);
+
+            status = slGenGenericCode2(Compiler,
+                                       PolynaryExpr->exprBase.base.lineNo,
+                                       PolynaryExpr->exprBase.base.stringNo,
+                                       slvOPCODE_MAX,
+                                       intermIOperand,
+                                       rOperand,
+                                       constantOne);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
             slsROPERAND_InitializeUsingIOperand(sizeOperand, intermIOperand);
             floatType = gcChangeElementDataType(OperandsParameters[1].dataTypes[0],

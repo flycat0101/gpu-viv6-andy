@@ -107,6 +107,16 @@ _GenTexture2DCode(
     );
 
 gceSTATUS
+_GenTexture2DRectCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    );
+
+gceSTATUS
 _GenTexture2DProjCode(
     IN sloCOMPILER Compiler,
     IN sloCODE_GENERATOR CodeGenerator,
@@ -2594,9 +2604,9 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
 
     {{slvEXTENSION1_SUPPORT_OGL},     "texture", gcvNULL, _GenTextureCode,            T_FLOAT,    2, {T_SAMPLER1DARRAYSHADOW, T_VEC3},  {0}, {0}},
 
-    {{slvEXTENSION1_SUPPORT_OGL},     "texture", gcvNULL, _GenTextureCode,            T_VEC4,     2, {T_SAMPLER2DRECT,        T_VEC2},  {0}, {0}},
-    {{slvEXTENSION1_SUPPORT_OGL},     "texture", gcvNULL, _GenTextureCode,            T_IVEC4,    2, {T_ISAMPLER2DRECT,       T_VEC2},  {0}, {0}},
-    {{slvEXTENSION1_SUPPORT_OGL},     "texture", gcvNULL, _GenTextureCode,            T_UVEC4,    2, {T_USAMPLER2DRECT,       T_VEC2},  {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "texture", gcvNULL, _GenTexture2DRectCode,      T_VEC4,     2, {T_SAMPLER2DRECT,        T_VEC2},  {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "texture", gcvNULL, _GenTexture2DRectCode,      T_IVEC4,    2, {T_ISAMPLER2DRECT,       T_VEC2},  {0}, {0}},
+    {{slvEXTENSION1_SUPPORT_OGL},     "texture", gcvNULL, _GenTexture2DRectCode,      T_UVEC4,    2, {T_USAMPLER2DRECT,       T_VEC2},  {0}, {0}},
 
     {{slvEXTENSION1_SUPPORT_OGL},     "texture",gcvNULL, _GenTextureCode,            T_VEC4,     2, {T_SAMPLER2DSHADOW,      T_VEC3},  {0}, {0}},
 
