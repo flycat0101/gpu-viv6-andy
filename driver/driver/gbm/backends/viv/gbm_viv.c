@@ -1100,7 +1100,7 @@ gbm_viv_surface_create(
     */
     if (surf->aSync)
     {
-        surf->buffer_count = gcmMIN(8, (3 + extraBufferCount));
+        surf->buffer_count = gcmMIN(GBM_MAX_BUFFER, (3 + extraBufferCount));
     }
     else
     {
