@@ -355,11 +355,16 @@ _DmabufMapUser(
     gcsDMABUF *buf_desc = Mdl->priv;
     gctINT8_PTR userLogical = gcvNULL;
     gceSTATUS status = gcvSTATUS_OK;
+    struct file *fd = buf_desc->dmabuf->file;
+    unsigned long flag = 0;
 
-    userLogical = (gctINT8_PTR)vm_mmap(buf_desc->dmabuf->file,
+    flag |= (fd->f_mode & FMODE_READ ? PROT_READ : 0);
+    flag |= (fd->f_mode & FMODE_WRITE ? PROT_WRITE : 0);
+
+    userLogical = (gctINT8_PTR)vm_mmap(fd,
                     0L,
                     Mdl->numPages << PAGE_SHIFT,
-                    PROT_READ | PROT_WRITE,
+                    flag,
                     MAP_SHARED | MAP_NORESERVE,
                     0);
 
