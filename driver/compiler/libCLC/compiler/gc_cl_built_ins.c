@@ -3438,6 +3438,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rtzCode},
     {"convert_ushort",     gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rtzCode},
     {"convert_float",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_FloatDefaultCode},
+    {"viv_convert_half",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_FloatDefaultCode},
     {"convert_half",       gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_FloatDefaultCode},
 
     {"convert_char_rte",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rteCode},
@@ -3541,6 +3542,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short2",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_rtzCode},
     {"convert_ushort2",     gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_rtzCode},
     {"convert_float2",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_FloatDefaultCode},
+    {"viv_convert_half2",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_FloatDefaultCode},
     {"convert_half2",       gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_FloatDefaultCode},
 
 #if _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION
@@ -3677,6 +3679,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short3",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rtzCode},
     {"convert_ushort3",     gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rtzCode},
     {"convert_float3",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_FloatDefaultCode},
+    {"viv_convert_half3",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_FloatDefaultCode},
     {"convert_half3",       gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_FloatDefaultCode},
 
 #if _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION
@@ -3813,6 +3816,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short4",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert4_rtzCode},
     {"convert_ushort4",     gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert4_rtzCode},
     {"convert_float4",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert4_FloatDefaultCode},
+    {"viv_convert_half4",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert4_FloatDefaultCode},
     {"convert_half4",       gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert4_FloatDefaultCode},
 
 #if _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION
@@ -3948,6 +3952,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short8",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rtzCode},
     {"convert_ushort8",     gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rtzCode},
     {"convert_float8",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_FloatDefaultCode},
+    {"viv_convert_half8",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_FloatDefaultCode},
     {"convert_half8",       gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_FloatDefaultCode},
 
 #if _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION
@@ -4084,6 +4089,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short16",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rtzCode},
     {"convert_ushort16",     gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rtzCode},
     {"convert_float16",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_FloatDefaultCode},
+    {"viv_convert_half16",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_FloatDefaultCode},
     {"convert_half16",       gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_FloatDefaultCode},
 
 #if _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION
@@ -4782,8 +4788,15 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"as_float2",     gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_TypeCode},
     {"as_float3",     gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_Type3Code},
     {"as_float4",     gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_TypeCode},
-    {"as_float8",     gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
-    {"as_float16",    gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_float8",     gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_TypeCode},
+    {"as_float16",    gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_TypeCode},
+
+    {"viv_as_half",      gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_TypeCode},
+    {"viv_as_half2",     gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_TypeCode},
+    {"viv_as_half3",     gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_Type3Code},
+    {"viv_as_half4",     gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_TypeCode},
+    {"viv_as_half8",     gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_TypeCode},
+    {"viv_as_half16",    gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_TypeCode},
 
     /* Image functions. */
     {"read_imagef",                 gcvTRUE,       gcvFALSE,       gcvNULL, _GenReadImageFCode},
@@ -4844,24 +4857,6 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"vstore_half4_rte",    gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreHalfRteCode},
     {"vstore_half8_rte",    gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreHalfRteCode},
     {"vstore_half16_rte",   gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreHalfRteCode},
-    {"vstore_half_rtz",     gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreHalfRtzCode},
-    {"vstore_half2_rtz",    gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreHalfRtzCode},
-    {"vstore_half3_rtz",    gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreHalfRtzCode},
-    {"vstore_half4_rtz",    gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreHalfRtzCode},
-    {"vstore_half8_rtz",    gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreHalfRtzCode},
-    {"vstore_half16_rtz",   gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreHalfRtzCode},
-    {"vstore_half_rtp",     gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreHalfRtpCode},
-    {"vstore_half2_rtp",    gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreHalfRtpCode},
-    {"vstore_half3_rtp",    gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreHalfRtpCode},
-    {"vstore_half4_rtp",    gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreHalfRtpCode},
-    {"vstore_half8_rtp",    gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreHalfRtpCode},
-    {"vstore_half16_rtp",   gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreHalfRtpCode},
-    {"vstore_half_rtn",     gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreHalfRtnCode},
-    {"vstore_half2_rtn",    gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreHalfRtnCode},
-    {"vstore_half3_rtn",    gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreHalfRtnCode},
-    {"vstore_half4_rtn",    gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreHalfRtnCode},
-    {"vstore_half8_rtn",    gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreHalfRtnCode},
-    {"vstore_half16_rtn",   gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreHalfRtnCode},
     {"vstorea_half",    gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfCode},
     {"vstorea_half2",   gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfCode},
     {"vstorea_half3",   gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfCode},
@@ -4874,24 +4869,6 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"vstorea_half4_rte",   gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfRteCode},
     {"vstorea_half8_rte",   gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfRteCode},
     {"vstorea_half16_rte",  gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfRteCode},
-    {"vstorea_half_rtz",    gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfRtzCode},
-    {"vstorea_half2_rtz",   gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfRtzCode},
-    {"vstorea_half3_rtz",   gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfRtzCode},
-    {"vstorea_half4_rtz",   gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfRtzCode},
-    {"vstorea_half8_rtz",   gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfRtzCode},
-    {"vstorea_half16_rtz",  gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfRtzCode},
-    {"vstorea_half_rtp",    gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfRtpCode},
-    {"vstorea_half2_rtp",   gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfRtpCode},
-    {"vstorea_half3_rtp",   gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfRtpCode},
-    {"vstorea_half4_rtp",   gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfRtpCode},
-    {"vstorea_half8_rtp",   gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfRtpCode},
-    {"vstorea_half16_rtp",  gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfRtpCode},
-    {"vstorea_half_rtn",    gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfRtnCode},
-    {"vstorea_half2_rtn",   gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfRtnCode},
-    {"vstorea_half3_rtn",   gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfRtnCode},
-    {"vstorea_half4_rtn",   gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfRtnCode},
-    {"vstorea_half8_rtn",   gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfRtnCode},
-    {"vstorea_half16_rtn",  gcvFALSE,       gcvFALSE,       gcvNULL, _GenVstoreaHalfRtnCode},
 
     {"viv_getlonglo",   gcvFALSE,       gcvFALSE,       gcvNULL, _GenGetLongLoCode},
     {"viv_getlonglo2",  gcvFALSE,       gcvFALSE,       gcvNULL, _GenGetLongLoCode},

@@ -125,11 +125,11 @@ BEGIN_EXTERN_C()
 /* bump up version to 1.41 for saving the stream number for gcOUTPUT on 11/07/2019 */
 #define gcdSL_SHADER_BINARY_BEFORE_SAVING_STREAM_NUMBER_FOR_OUTPUT gcmCC(0, 0, 1, 41)
 
-/* bump up version to 1.42 for saving adding intrinsic functions sin, cos, tan 11/8/2019 */
-/* current version */
-#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 42)
+/* bump up version to 1.42 for adding intrinsic functions vstore_half with rounding modes rtz, rtp and rtn 06/12/2020 */
 
-#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 42)
+/* current version */
+#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 43)
+#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 43)
 
 typedef union _gcsValue
 {
