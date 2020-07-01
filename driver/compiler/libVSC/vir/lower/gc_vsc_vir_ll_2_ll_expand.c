@@ -18044,6 +18044,47 @@ static VIR_Pattern _imgTypePattern[] = {
 };
 
 gctBOOL
+_SetDestTypeInt(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand *dest = VIR_Inst_GetDest(Inst);
+    VIR_PrimitiveTypeId  format;
+    VIR_TypeId typeId;
+    gctUINT components;
+
+    typeId = VIR_Lower_GetBaseType(Context->shader, dest);
+    format = VIR_GetTypeComponentType(typeId);
+
+    format = VIR_TYPE_INT32;
+    components = VIR_GetTypeComponents(typeId);
+    typeId = VIR_TypeId_ComposeNonOpaqueType(format, components, 1);
+    VIR_Operand_SetTypeId(dest, typeId);
+    return gcvTRUE;
+}
+
+static VIR_PatternMatchInst _ctzPatInst0[] = {
+    { VIR_OP_CTZ, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { VIR_Lower_IsLongOpcode }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _ctzRepInst0[] = {
+    { VIR_OP_LONGLO, 0, 0, { -1, 2, 0, 0 }, { VIR_Lower_SetLongUlongDestTypeOnly } },
+    { VIR_OP_CTZ, 0, 0, { -2,-1, 0, 0 }, { VIR_Lower_SetLongUlongDestTypeOnly } },
+    { VIR_OP_LONGHI, 0, 0, { -3, 2, 0, 0 }, { VIR_Lower_SetLongUlongDestTypeOnly } },
+    { VIR_OP_CTZ, 0, 0, { -4, -3, 0, 0 }, { VIR_Lower_SetLongUlongDestTypeOnly } },
+    { VIR_OP_ADD, 0, 0, { -5, -2, -4, 0 }, { VIR_Lower_SetLongUlongDestTypeOnly } },
+    { VIR_OP_CSELECT, VIR_COP_NOT_ZERO, 0, { 1, -1, -2, -5 }, { _SetDestTypeInt } },
+    { VIR_OP_MOV, 0, 0, { 1, 0, 0, 0 }, { VIR_Lower_SetLongUlongSecondDest, VIR_Lower_SetIntZero } }
+};
+
+static VIR_Pattern _ctzPattern[] = {
+    { VIR_PATN_FLAG_RECURSIVE_SCAN, CODEPATTERN(_ctz, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+gctBOOL
 _SplitPackedGT16ByteInst(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
@@ -18145,6 +18186,8 @@ _GetLowerPatternPhaseExpand(
     else {
         switch(opCode)
         {
+        case VIR_OP_CTZ:
+            return _ctzPattern;
         case VIR_OP_POW:
             return _powPattern;
         case VIR_OP_STARR:

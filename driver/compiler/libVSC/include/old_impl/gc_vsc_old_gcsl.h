@@ -392,6 +392,7 @@ typedef enum _gcSL_OPCODE
     gcSL_CLAMPCOORD, /* 0x9C clamp image 2d cooridate to its width and height */
     gcSL_EMIT_STREAM_VERTEX, /* 0x9D For function "EmitStreamVertex" */
     gcSL_END_STREAM_PRIMITIVE, /* 0x9E For function "EndStreamPrimitive" */
+    gcSL_CTZ, /* 0x9F For function "ctz()" */
     gcSL_MAXOPCODE
 }
 gcSL_OPCODE;

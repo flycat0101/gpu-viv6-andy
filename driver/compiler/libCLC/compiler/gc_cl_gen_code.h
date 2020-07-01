@@ -325,6 +325,8 @@ typedef enum _cleOPCODE
     clvOPCODE_GETEXP,
     clvOPCODE_GETMANT,
 
+    clvOPCODE_CTZ,
+
     /*Integer only, get the overflow part*/
     clvOPCODE_MULHI,
 

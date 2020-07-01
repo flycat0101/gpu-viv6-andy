@@ -1202,6 +1202,7 @@ decode[] =
     { "CLAMPCOORD", gcvTRUE, gcvFALSE },
     { "EMIT_STREAM_VERTEX", gcvFALSE, gcvFALSE },
     { "END_STREAM_PRIMITIVE", gcvFALSE, gcvFALSE },
+    { "CTZ", gcvFALSE, gcvFALSE },
 };
 
 char _checkDecodeArray_size[sizeof(decode)/sizeof(decode[0]) == gcSL_MAXOPCODE];

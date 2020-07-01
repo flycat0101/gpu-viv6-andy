@@ -63,6 +63,20 @@ VIR_Lower_MiddleLevel_To_LowLevel_Machine_Post(
     );
 
 gctBOOL
+VIR_Lower_SetLongUlongDestTypeOnly(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetLongUlongSecondDest(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
 VIR_Lower_SetOpndNeg(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
@@ -301,6 +315,12 @@ VIR_Lower_GetBaseType(
 
 gctBOOL
 VIR_Lower_IsIntOpcode(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
+VIR_Lower_IsLongOpcode(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
     );
