@@ -5694,14 +5694,16 @@ static VSC_ErrCode _PostProcessVkCombStTable(VSC_PEP_GEN_HELPER* pPepGenHelper, 
         }
 
         /* Ycbcr planes layer */
-        gcmASSERT(pComTsEntry->hwMappings[stageIdx].ppYcbcrPlanes);
-        for (k = 0; k < (__YCBCR_PLANE_COUNT__ * pComTsEntry->combTsBinding.arraySize); k++)
+        if (pComTsEntry->hwMappings[stageIdx].ppYcbcrPlanes)
         {
-            pPrivUavEntry = pComTsEntry->hwMappings[stageIdx].ppYcbcrPlanes[k];
-            if (pPrivUavEntry)
+            for (k = 0; k < (__YCBCR_PLANE_COUNT__ * pComTsEntry->combTsBinding.arraySize); k++)
             {
-                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivUavEntry->commonPrivm.pPrivateData);
-                *(gctUINT*)pPrivUavEntry->commonPrivm.pPrivateData = pComTsEntry->combTsEntryIndex;
+                pPrivUavEntry = pComTsEntry->hwMappings[stageIdx].ppYcbcrPlanes[k];
+                if (pPrivUavEntry)
+                {
+                    gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivUavEntry->commonPrivm.pPrivateData);
+                    *(gctUINT*)pPrivUavEntry->commonPrivm.pPrivateData = pComTsEntry->combTsEntryIndex;
+                }
             }
         }
 
