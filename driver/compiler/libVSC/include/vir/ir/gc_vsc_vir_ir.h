@@ -5503,6 +5503,22 @@ VIR_Inst_IsHWBarrier(
     IN gctBOOL              bGenerateMC
     );
 
+gctBOOL
+VIR_Inst_IsSupportNegModifier(
+    IN VIR_Shader          *pShader,
+    IN VSC_HW_CONFIG       *pHwCfg,
+    IN VIR_Instruction     *pInst,
+    IN gctUINT              srcIndex
+    );
+
+gctUINT
+VIR_Inst_GetHwInstType(
+    IN VIR_Shader          *pShader,
+    IN VSC_HW_CONFIG       *pHwCfg,
+    IN VIR_Instruction     *pInst,
+    IN gctBOOL              bReturnVirType
+    );
+
 /* VIR_ConditionOp */
 extern gctBOOL
 VIR_ConditionOp_Reversable(

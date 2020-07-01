@@ -1081,6 +1081,460 @@ VIR_Inst_IsHWBarrier(
     return gcvFALSE;
 }
 
+gctBOOL
+VIR_Inst_IsSupportNegModifier(
+    IN VIR_Shader          *pShader,
+    IN VSC_HW_CONFIG       *pHwCfg,
+    IN VIR_Instruction     *pInst,
+    IN gctUINT              srcIndex
+    )
+{
+    gctBOOL                 bIsSupport = gcvTRUE;
+    VIR_TypeId              instVirTypeId = (VIR_TypeId)VIR_Inst_GetHwInstType(pShader, pHwCfg, pInst, gcvTRUE);
+    VIR_OpCode              opCode = VIR_Inst_GetOpcode(pInst);
+    gctUINT                 lastSrcIndex = VIR_Inst_GetSrcNum(pInst) - 1;
+
+    /* EVIS instruction can support NEG. */
+    if (VIR_OPCODE_isVX(opCode))
+    {
+        return bIsSupport;
+    }
+
+    switch (instVirTypeId)
+    {
+    case VIR_TYPE_INT8:
+    case VIR_TYPE_INT16:
+    case VIR_TYPE_UINT8:
+    case VIR_TYPE_UINT16:
+        if ((opCode != VIR_OP_ADD && opCode != VIR_OP_ADDSAT
+             &&
+             opCode != VIR_OP_SUB && opCode != VIR_OP_SUBSAT
+             &&
+             opCode != VIR_OP_ABS)
+            ||
+            srcIndex != lastSrcIndex)
+        {
+            bIsSupport = gcvFALSE;
+        }
+        break;
+
+    case VIR_TYPE_INT32:
+    case VIR_TYPE_UINT32:
+        if ((opCode != VIR_OP_ADD && opCode != VIR_OP_ADDSAT
+             &&
+             opCode != VIR_OP_SUB && opCode != VIR_OP_SUBSAT
+             &&
+             opCode != VIR_OP_ABS
+             &&
+             opCode != VIR_OP_ATOMADD && opCode != VIR_OP_ATOMADD_L && opCode != VIR_OP_ATOMADD_S
+             &&
+             opCode != VIR_OP_ATOMSUB && opCode != VIR_OP_ATOMSUB_L)
+            ||
+            srcIndex != lastSrcIndex)
+        {
+            bIsSupport = gcvFALSE;
+        }
+        break;
+
+    default:
+        break;
+    }
+
+    return bIsSupport;
+}
+
+/* Get the HW instruction type from the image format. */
+static gctUINT
+_VIR_Inst_GetHwInstTypeFromImgFmt(
+    IN VIR_ImageFormat  imgQual
+    )
+{
+    switch (imgQual)
+    {
+    case VIR_IMAGE_FORMAT_RGBA32F:
+    case VIR_IMAGE_FORMAT_RG32F:
+    case VIR_IMAGE_FORMAT_R32F:
+    case VIR_IMAGE_FORMAT_RGBA16F:
+    case VIR_IMAGE_FORMAT_RG16F:
+    case VIR_IMAGE_FORMAT_R16F:
+        return 0x0;
+
+    case VIR_IMAGE_FORMAT_BGRA8_UNORM:
+    case VIR_IMAGE_FORMAT_RGBA8:
+    case VIR_IMAGE_FORMAT_RG8:
+    case VIR_IMAGE_FORMAT_R8:
+        return 0x0;
+
+    case VIR_IMAGE_FORMAT_RGBA8_SNORM:
+    case VIR_IMAGE_FORMAT_RG8_SNORM:
+    case VIR_IMAGE_FORMAT_R8_SNORM:
+        return 0x0;
+
+    case VIR_IMAGE_FORMAT_RGBA16:
+    case VIR_IMAGE_FORMAT_RG16:
+    case VIR_IMAGE_FORMAT_R16:
+        return 0x0;
+
+    case VIR_IMAGE_FORMAT_RGBA16_SNORM:
+    case VIR_IMAGE_FORMAT_RG16_SNORM:
+    case VIR_IMAGE_FORMAT_R16_SNORM:
+        return 0x0;
+
+    case VIR_IMAGE_FORMAT_RGBA32I:
+    case VIR_IMAGE_FORMAT_RG32I:
+    case VIR_IMAGE_FORMAT_R32I:
+    case VIR_IMAGE_FORMAT_RGBA16I:
+    case VIR_IMAGE_FORMAT_RG16I:
+    case VIR_IMAGE_FORMAT_R16I:
+    case VIR_IMAGE_FORMAT_RGBA8I:
+    case VIR_IMAGE_FORMAT_RG8I:
+    case VIR_IMAGE_FORMAT_R8I:
+    case VIR_IMAGE_FORMAT_ABGR8I_PACK32:
+        return 0x2;
+
+    case VIR_IMAGE_FORMAT_RGBA32UI:
+    case VIR_IMAGE_FORMAT_RG32UI:
+    case VIR_IMAGE_FORMAT_R32UI:
+    case VIR_IMAGE_FORMAT_RGBA16UI:
+    case VIR_IMAGE_FORMAT_RG16UI:
+    case VIR_IMAGE_FORMAT_R16UI:
+    case VIR_IMAGE_FORMAT_RGBA8UI:
+    case VIR_IMAGE_FORMAT_RG8UI:
+    case VIR_IMAGE_FORMAT_R8UI:
+    case VIR_IMAGE_FORMAT_ABGR8UI_PACK32:
+    case VIR_IMAGE_FORMAT_A2B10G10R10UI_PACK32:
+        return 0x5;
+
+    case VIR_IMAGE_FORMAT_R5G6B5_UNORM_PACK16:
+    case VIR_IMAGE_FORMAT_ABGR8_UNORM_PACK32:
+    case VIR_IMAGE_FORMAT_A2R10G10B10_UNORM_PACK32:
+    case VIR_IMAGE_FORMAT_A2B10G10R10_UNORM_PACK32:
+        return 0x0;
+
+    default:
+        gcmASSERT(gcvFALSE);
+        break;;
+    }
+
+    return 0x2;
+}
+
+/* Get the HW instruction type. */
+static gctUINT
+_VIR_Inst_GetInstType(
+    IN VIR_Shader          *pShader,
+    IN VSC_HW_CONFIG       *pHwCfg,
+    IN VIR_Instruction     *pInst,
+    IN VIR_Operand         *pOpnd
+    )
+{
+    VIR_OpCode              opcode = VIR_Inst_GetOpcode(pInst);
+    VIR_Symbol*             pSym = VIR_Operand_GetSymbol(pOpnd);
+    VIR_TypeId              ty = VIR_Operand_GetTypeId(pOpnd);
+    VIR_OperandKind         opndKind = VIR_Operand_GetOpKind(pOpnd);
+    VIR_TypeId              componentTy;
+    VIR_ImageFormat         imgQual;
+
+    if(opndKind == VIR_OPND_NONE || opndKind == VIR_OPND_UNDEF)
+    {
+        return 0x0;
+    }
+
+    /* Inst type of img_load is regareded as result type which is converted from src img fmt.
+       So far, we dont support arbitary conversion, so just get corresponding inst type from
+       image fmt */
+    if (opcode == VIR_OP_IMG_LOAD || opcode == VIR_OP_IMG_LOAD_3D)
+    {
+        gcmASSERT(VIR_Symbol_GetKind(pSym) == VIR_SYM_IMAGE     ||
+                  VIR_Symbol_GetKind(pSym) == VIR_SYM_IMAGE_T   || /* IMAGE_T will be invalid here */
+                  isSymUniformTreatSamplerAsConst(pSym));
+
+        imgQual = VIR_Symbol_GetImageFormat(pSym);
+
+        /* OCL image type has no layout info */
+        if (imgQual != VIR_IMAGE_FORMAT_NONE)
+        {
+            return _VIR_Inst_GetHwInstTypeFromImgFmt(imgQual);
+        }
+        else
+        {
+            /* need to get the image type from dest for load */
+            pOpnd       = VIR_Inst_GetDest(pInst);
+            opndKind   = VIR_Operand_GetOpKind(pOpnd);
+            ty         = VIR_Operand_GetTypeId(pOpnd);
+        }
+    }
+
+    if (VIR_OPCODE_isTexLd(opcode))
+    {
+        /* Only v60 HW supports inst-type for texld related insts */
+        if (!pHwCfg->hwFeatureFlags.hasHalti5)
+        {
+            return 0x0;
+        }
+    }
+
+    gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
+
+    if (VIR_TypeId_isSampler(ty))
+    {
+        componentTy = VIR_TYPE_UINT32;
+    }
+    else
+    {
+        componentTy  = VIR_GetTypeComponentType(ty);
+    }
+
+    /* we change the integer/boolen from highp to mediump for dual-t*/
+    if (VIR_Shader_isDual16Mode(pShader) &&
+        (VIR_Inst_GetThreadMode(pInst) == VIR_THREAD_D16_DUAL_16 ||
+         VIR_Inst_GetThreadMode(pInst) == VIR_THREAD_D16_DUAL_HIGHPVEC2))
+    {
+        if (componentTy == VIR_TYPE_INT32)
+        {
+            componentTy = VIR_TYPE_INT16;
+        }
+        else if (componentTy == VIR_TYPE_UINT32)
+        {
+            componentTy = VIR_TYPE_UINT16;
+        }
+        else if (componentTy == VIR_TYPE_BOOLEAN)
+        {
+            componentTy = VIR_TYPE_INT16;
+        }
+    }
+
+    switch (componentTy)
+    {
+    case VIR_TYPE_FLOAT32:
+        return 0x0;
+    case VIR_TYPE_FLOAT16:
+        return 0x1;
+    case VIR_TYPE_INT32:
+    case VIR_TYPE_BOOLEAN:
+        return 0x2;
+    case VIR_TYPE_INT16:
+        return 0x3;
+    case VIR_TYPE_INT8:
+        return 0x4;
+    case VIR_TYPE_UINT32:
+        return 0x5;
+    case VIR_TYPE_UINT16:
+        return 0x6;
+    case VIR_TYPE_UINT8:
+        return 0x7;
+    case VIR_TYPE_INT64:
+        return 0xA;
+    case VIR_TYPE_UINT64:
+        return 0xD;
+    default:
+        gcmASSERT(0);
+        return 0x0;
+    }
+}
+
+/* Check if the dest is FP16. */
+static gctBOOL
+_VIR_Inst_IsDestTypeFP16(
+    IN VIR_Instruction *Inst
+    )
+{
+    VIR_Operand *dest = VIR_Inst_GetDest(Inst);
+    VIR_TypeId typeId;
+    gcmASSERT(dest);
+
+    typeId = VIR_Operand_GetTypeId(dest);
+
+    return VIR_TypeId_isFloat16(typeId);
+}
+
+gctUINT
+VIR_Inst_GetHwInstType(
+    IN VIR_Shader          *pShader,
+    IN VSC_HW_CONFIG       *pHwCfg,
+    IN VIR_Instruction     *pInst,
+    IN gctBOOL              bReturnVirType
+    )
+{
+    VIR_OpCode              opCode = VIR_Inst_GetOpcode(pInst);
+    gctUINT                 hwInstType = 0x0;
+    VIR_TypeId              virTypeId = VIR_TYPE_FLOAT32;
+
+    switch(opCode)
+    {
+    case VIR_OP_LOOP:
+    case VIR_OP_KILL:
+    case VIR_OP_FLUSH:
+    case VIR_OP_JMPC:
+    case VIR_OP_JMP_ANY:
+    /*case VIR_OP_MOVA:, let mova be determined by dst because old gcsl has no type info for indexing reg */
+    case VIR_OP_ABS:
+    case VIR_OP_NEG:
+    case VIR_OP_CMP:
+    case VIR_OP_SET:
+    case VIR_OP_I2I:
+    case VIR_OP_I2F:
+    case VIR_OP_RCP:
+    case VIR_OP_IMG_LOAD:
+    case VIR_OP_IMG_LOAD_3D:
+    case VIR_OP_BITFIND_LSB:
+    case VIR_OP_BITFIND_MSB:
+    case VIR_OP_MOV:
+    case VIR_OP_MOV_DUAL16:
+        gcmASSERT(VIR_OPCODE_useSrc0AsInstType(opCode));
+        hwInstType = _VIR_Inst_GetInstType(pShader, pHwCfg, pInst, VIR_Inst_GetSource(pInst, 0));
+        break;
+
+    case VIR_OP_CMOV:
+    case VIR_OP_SELECT:
+        if (VIR_Inst_GetConditionOp(pInst) == VIR_COP_ALLMSB ||
+            VIR_Inst_GetConditionOp(pInst) == VIR_COP_ANYMSB ||
+            VIR_Inst_GetConditionOp(pInst) == VIR_COP_SELMSB)
+        {
+            /* HW limitation: one instruction type to do two things:
+               to control comparison and to control implicit conversion (e.g., f32 -> f16).
+               We have issue when src0 is integer type, but src1 is float type for dual16.
+               Using src0 integer type will lose the implict conversion for source/destination. */
+            if (VIR_Inst_GetFlags(pInst) & VIR_INSTFLAG_PACKEDMODE)
+            {
+                hwInstType = _VIR_Inst_GetInstType(pShader, pHwCfg, pInst, VIR_Inst_GetSource(pInst, 0));
+            }
+            else
+            {
+                hwInstType = _VIR_Inst_GetInstType(pShader, pHwCfg, pInst, VIR_Inst_GetSource(pInst, 1));
+            }
+        }
+        else
+        {
+            VIR_TypeId src0TypeId = VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetSource(pInst, 0)));
+            VIR_TypeId src1TypeId = VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetSource(pInst, 1)));
+
+            if ((VIR_TypeId_isFloat(src0TypeId) && VIR_TypeId_isFloat(src1TypeId))
+                ||
+                (VIR_TypeId_isInteger(src0TypeId) && VIR_TypeId_isInteger(src1TypeId)))
+            {
+                /* Try to use the dataType of src0 first. */
+                if (VIR_GetTypeSize(src0TypeId) >= VIR_GetTypeSize(src1TypeId))
+                {
+                    hwInstType = _VIR_Inst_GetInstType(pShader, pHwCfg, pInst, VIR_Inst_GetSource(pInst, 0));
+                }
+                else
+                {
+                    hwInstType = _VIR_Inst_GetInstType(pShader, pHwCfg, pInst, VIR_Inst_GetSource(pInst, 1));
+                }
+            }
+            else
+            {
+                hwInstType = _VIR_Inst_GetInstType(pShader, pHwCfg, pInst, VIR_Inst_GetSource(pInst, 0));
+            }
+        }
+        break;
+
+    case VIR_OP_STORE:
+    case VIR_OP_STORE_S:
+    case VIR_OP_STORE_L:
+        gcmASSERT(VIR_OPCODE_useSrc2AsInstType(opCode));
+        if(_VIR_Inst_IsDestTypeFP16(pInst))
+        {
+            hwInstType = _VIR_Inst_GetInstType(pShader, pHwCfg, pInst, VIR_Inst_GetDest(pInst));
+        }
+        else
+        {
+            hwInstType = _VIR_Inst_GetInstType(pShader, pHwCfg, pInst, VIR_Inst_GetSource(pInst, 2));
+        }
+        break;
+
+    case VIR_OP_STORE_ATTR:
+    case VIR_OP_IMG_STORE:
+    case VIR_OP_VX_IMG_STORE:
+    case VIR_OP_IMG_STORE_3D:
+    case VIR_OP_VX_IMG_STORE_3D:
+        gcmASSERT(VIR_OPCODE_useSrc2AsInstType(opCode));
+        hwInstType = _VIR_Inst_GetInstType(pShader, pHwCfg, pInst, VIR_Inst_GetSource(pInst, 2));
+        break;
+
+    case VIR_OP_VX_SCATTER:
+    case VIR_OP_VX_ATOMIC_S:
+        gcmASSERT(VIR_OPCODE_useSrc2AsInstType(opCode));
+        hwInstType = _VIR_Inst_GetInstType(pShader, pHwCfg, pInst, VIR_Inst_GetSource(pInst, 2));
+        break;
+
+    case VIR_OP_VX_SCATTER_B:
+    case VIR_OP_VX_ATOMIC_S_B:
+        gcmASSERT(VIR_OPCODE_useSrc3AsInstType(opCode));
+        hwInstType = _VIR_Inst_GetInstType(pShader, pHwCfg, pInst, VIR_Inst_GetSource(pInst, 3));
+        break;
+
+        /* No dest. */
+    case VIR_OP_NOP:
+    case VIR_OP_CALL:
+    case VIR_OP_JMP:
+    case VIR_OP_BARRIER:
+    case VIR_OP_MEM_BARRIER:
+    case VIR_OP_FENCE:
+    case VIR_OP_RET:
+    case VIR_OP_EXIT:
+    case VIR_OP_THREADEXIT:
+    case VIR_OP_ENDLOOP:
+    case VIR_OP_REP:
+    case VIR_OP_ENDREP:
+    case VIR_OP_PREFETCH:
+        hwInstType = 0x0;
+        break;
+
+    default:
+        hwInstType = _VIR_Inst_GetInstType(pShader, pHwCfg, pInst, VIR_Inst_GetDest(pInst));
+        break;
+    }
+
+    if (bReturnVirType)
+    {
+        switch (hwInstType)
+        {
+        case 0x0:
+            virTypeId = VIR_TYPE_FLOAT32;
+            break;
+
+        case 0x1:
+            virTypeId = VIR_TYPE_FLOAT16;
+            break;
+
+        case 0x2:
+            virTypeId = VIR_TYPE_INT32;
+            break;
+
+        case 0x3:
+            virTypeId = VIR_TYPE_INT16;
+            break;
+
+        case 0x4:
+            virTypeId = VIR_TYPE_INT8;
+            break;
+
+        case 0x5:
+            virTypeId = VIR_TYPE_UINT32;
+            break;
+
+        case 0x6:
+            virTypeId = VIR_TYPE_UINT16;
+            break;
+
+        case 0x7:
+            virTypeId = VIR_TYPE_UINT8;
+            break;
+
+        default:
+            gcmASSERT(gcvFALSE);
+            virTypeId = VIR_TYPE_FLOAT32;
+            break;
+        }
+
+        return virTypeId;
+    }
+
+    return hwInstType;
+}
+
 VSC_ErrCode
 VIR_Uniform_UpdateResOpBitFromSampledImage(
     IN VIR_Shader* Shader,

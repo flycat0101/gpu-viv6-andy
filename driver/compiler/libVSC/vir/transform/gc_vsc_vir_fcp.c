@@ -1547,10 +1547,27 @@ OnError:
     return errCode;
 }
 
+static gctBOOL _VSC_InstSupportAbs(
+    IN     VIR_Instruction*     inst
+    )
+{
+    VIR_Operand* pDest = VIR_Inst_GetDest(inst);
+    if (pDest)
+    {
+        VIR_TypeId ty0 = VIR_Operand_GetTypeId(pDest);
+        if ((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISFLOAT) && !VIR_OPCODE_isVX(VIR_Inst_GetOpcode(inst)))
+        {
+            return gcvTRUE;
+        }
+    }
+    return gcvFALSE;
+}
+
 static VSC_ErrCode
-_ProcessModOrder(
+_ProcessModifier(
     VIR_DEF_USAGE_INFO* pDuInfo,
     VIR_Shader*         pShader,
+    VSC_HW_CONFIG*      pHwCfg,
     VIR_Function*       pFunc,
     VIR_Instruction*    pInst)
 {
@@ -1563,8 +1580,8 @@ _ProcessModOrder(
 
     /*
     ** 1) Process the immediate operand.
-    ** 2) HW takes absolute values first then takes negative, so we can only accept this order,
-    **    for the order NEG-ABS, we need to insert a MOV to handle NEG first.
+    ** 2) check .neg/.abs modifier, if current instruction doesn't support this modifier,
+    **    insert sub/abs instruction if current instruction doesn't support this modifier
     */
     for (i = 0; i < VIR_Inst_GetSrcNum(pInst); i++)
     {
@@ -1612,11 +1629,222 @@ _ProcessModOrder(
 
             if (bHasAbs)
             {
-                VIR_Operand_SetModifier(pOpnd, VIR_MOD_ABS ^ VIR_Operand_GetModifier(pOpnd));
+                VIR_Operand_ClrOneModifier(pOpnd, VIR_MOD_ABS);
             }
             if (bHasNeg)
             {
-                VIR_Operand_SetModifier(pOpnd, VIR_MOD_NEG ^ VIR_Operand_GetModifier(pOpnd));
+                VIR_Operand_ClrOneModifier(pOpnd, VIR_MOD_NEG);
+            }
+        }
+        else if (opndKind == VIR_OPND_SYMBOL)
+        {
+            /* Skip none modifier. */
+            if (!bHasAbs && !bHasNeg)
+            {
+                continue;
+            }
+            if (bHasAbs && !_VSC_InstSupportAbs(pInst))
+            {
+                /*insert ABS before pInst */
+                VIR_VirRegId        regId;                     /* newly created temp reg id */
+                VIR_SymId           regSymId;
+                VIR_TypeId          regTypeId;
+                VIR_Enable          newEnable;
+                VIR_Swizzle         newSwizzle;
+                VIR_OperandInfo     srcOpndInfo;
+                VIR_Instruction     *pNewInst;
+                VIR_Operand         *pNewOpnd;
+
+                VIR_Operand_GetOperandInfo(pInst, pOpnd, &srcOpndInfo);
+
+                /* Add a new vreg. */
+                regId = VIR_Shader_NewVirRegId(pShader, 1);
+                regTypeId = VIR_Operand_GetTypeId(pOpnd);
+                newEnable = VIR_TypeId_Conv2Enable(regTypeId);
+                newSwizzle = VIR_TypeId_Conv2Swizzle(regTypeId);
+                errCode = VIR_Shader_AddSymbol(pShader,
+                                               VIR_SYM_VIRREG,
+                                               regId,
+                                               VIR_Shader_GetTypeFromId(pShader, regTypeId),
+                                               VIR_STORAGE_UNKNOWN,
+                                               &regSymId);
+
+               /* Insert ABS, newReg, pOpnd */
+                errCode = VIR_Function_AddInstructionBefore(pFunc,
+                                                            VIR_OP_ABS,
+                                                            regTypeId,
+                                                            pInst,
+                                                            gcvTRUE,
+                                                            &pNewInst);
+                pNewOpnd = VIR_Inst_GetDest(pNewInst);
+                VIR_Operand_SetSymbol(pNewOpnd, pFunc, regSymId);
+                VIR_Operand_SetEnable(pNewOpnd, newEnable);
+
+                pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
+                VIR_Operand_Copy(pNewOpnd, pOpnd);
+
+                /* remove MOD_ABS modifier */
+                VIR_Operand_ClrOneModifier(pNewOpnd, VIR_MOD_ABS);
+
+                /* Add def. */
+                vscVIR_AddNewDef(pDuInfo,
+                                 pNewInst,
+                                 regId,
+                                 1,
+                                 newEnable,
+                                 VIR_HALF_CHANNEL_MASK_FULL,
+                                 gcvNULL,
+                                 gcvNULL);
+                if (srcOpndInfo.isVreg)
+                {
+                    /* Add usage of pNewOpnd */
+                    vscVIR_AddNewUsageToDef(pDuInfo,
+                                            VIR_ANY_DEF_INST,
+                                            pNewInst,
+                                            pNewOpnd,
+                                            gcvFALSE,
+                                            srcOpndInfo.u1.virRegInfo.virReg,
+                                            1,
+                                            VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pNewOpnd)),
+                                            VIR_HALF_CHANNEL_MASK_FULL,
+                                            gcvNULL);
+
+                    /* Delete the old usage. */
+                    vscVIR_DeleteUsage(pDuInfo,
+                                       VIR_ANY_DEF_INST,
+                                       pInst,
+                                       pOpnd,
+                                       gcvFALSE,
+                                       srcOpndInfo.u1.virRegInfo.virReg,
+                                       1,
+                                       VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pOpnd)),
+                                       VIR_HALF_CHANNEL_MASK_FULL,
+                                       gcvNULL);
+                }
+
+                /*update pOpnd with new regSym */
+                VIR_Operand_SetSymbol(pOpnd, pFunc, regSymId);
+                VIR_Operand_SetSwizzle(pOpnd, newSwizzle);
+                VIR_Operand_ClrOneModifier(pOpnd, VIR_MOD_ABS);
+
+                /* Add usage. */
+                vscVIR_AddNewUsageToDef(pDuInfo,
+                                        pNewInst,
+                                        pInst,
+                                        pOpnd,
+                                        gcvFALSE,
+                                        regId,
+                                        1,
+                                        newEnable,
+                                        VIR_HALF_CHANNEL_MASK_FULL,
+                                        gcvNULL);
+            }
+            if (bHasNeg && !VIR_Inst_IsSupportNegModifier(pShader, pHwCfg, pInst, i))
+            {
+                /*insert SUB before pINst */
+                VIR_VirRegId        regId;
+                VIR_SymId           regSymId;
+                VIR_TypeId          regTypeId;
+                VIR_Enable          newEnable;
+                VIR_Swizzle         newSwizzle;
+                VIR_OperandInfo     srcOpndInfo;
+                VIR_Instruction     *pNewInst;
+                VIR_Operand         *pNewOpnd;
+
+                VIR_Operand_GetOperandInfo(pInst, pOpnd, &srcOpndInfo);
+
+                /* Add a new vreg. */
+                regId = VIR_Shader_NewVirRegId(pShader, 1);
+                regTypeId = VIR_Operand_GetTypeId(pOpnd);
+                newEnable = VIR_TypeId_Conv2Enable(regTypeId);
+                newSwizzle = VIR_TypeId_Conv2Swizzle(regTypeId);
+                errCode = VIR_Shader_AddSymbol(pShader,
+                                               VIR_SYM_VIRREG,
+                                               regId,
+                                               VIR_Shader_GetTypeFromId(pShader, regTypeId),
+                                               VIR_STORAGE_UNKNOWN,
+                                               &regSymId);
+
+               /* Insert SUB, 0, pOpnd */
+                errCode = VIR_Function_AddInstructionBefore(pFunc,
+                                                            VIR_OP_SUB,
+                                                            regTypeId,
+                                                            pInst,
+                                                            gcvTRUE,
+                                                            &pNewInst);
+                pNewOpnd = VIR_Inst_GetDest(pNewInst);
+                VIR_Operand_SetSymbol(pNewOpnd, pFunc, regSymId);
+                VIR_Operand_SetEnable(pNewOpnd, newEnable);
+                /* src0 is immediate 0 */
+                pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
+                if (VIR_GetTypeFlag(regTypeId) & VIR_TYFLAG_ISFLOAT)
+                {
+                    VIR_Operand_SetImmediateFloat(pNewOpnd, 0.0);
+                }
+                else
+                {
+                    VIR_Operand_SetImmediateInt(pNewOpnd, 0);
+                }
+                pNewOpnd = VIR_Inst_GetSource(pNewInst, 1);
+                VIR_Operand_Copy(pNewOpnd, pOpnd);
+
+                /* remove MOD_NEG modifier */
+                VIR_Operand_ClrOneModifier(pNewOpnd, VIR_MOD_NEG);
+
+                /* Add def. */
+                vscVIR_AddNewDef(pDuInfo,
+                                 pNewInst,
+                                 regId,
+                                 1,
+                                 newEnable,
+                                 VIR_HALF_CHANNEL_MASK_FULL,
+                                 gcvNULL,
+                                 gcvNULL);
+                if (srcOpndInfo.isVreg)
+                {
+                    /* Add usage of pNewOpnd */
+                    vscVIR_AddNewUsageToDef(pDuInfo,
+                                            VIR_ANY_DEF_INST,
+                                            pNewInst,
+                                            pNewOpnd,
+                                            gcvFALSE,
+                                            srcOpndInfo.u1.virRegInfo.virReg,
+                                            1,
+                                            VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pNewOpnd)),
+                                            VIR_HALF_CHANNEL_MASK_FULL,
+                                            gcvNULL);
+
+                    /* Delete the old usage. */
+                    vscVIR_DeleteUsage(pDuInfo,
+                                       VIR_ANY_DEF_INST,
+                                       pInst,
+                                       pOpnd,
+                                       gcvFALSE,
+                                       srcOpndInfo.u1.virRegInfo.virReg,
+                                       1,
+                                       VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pOpnd)),
+                                       VIR_HALF_CHANNEL_MASK_FULL,
+                                       gcvNULL);
+                }
+
+                /*update pOpnd with new regSym */
+                VIR_Operand_SetSymbol(pOpnd, pFunc, regSymId);
+                VIR_Operand_SetSwizzle(pOpnd, newSwizzle);
+
+                /* remove MOD_NEG modifier */
+                VIR_Operand_ClrOneModifier(pOpnd, VIR_MOD_NEG);
+
+                /* Add usage. */
+                vscVIR_AddNewUsageToDef(pDuInfo,
+                                        pNewInst,
+                                        pInst,
+                                        pOpnd,
+                                        gcvFALSE,
+                                        regId,
+                                        1,
+                                        newEnable,
+                                        VIR_HALF_CHANNEL_MASK_FULL,
+                                        gcvNULL);
             }
         }
     }
@@ -1736,7 +1964,7 @@ VSC_ErrCode vscVIR_PostMCCleanup(
             }
 
             /* Process the modifier order. */
-            errCode = _ProcessModOrder(pDuInfo, pShader, func, inst);
+            errCode = _ProcessModifier(pDuInfo, pShader, pHwCfg, func, inst);
             ON_ERROR(errCode, "Process modifier order.");
         }
     }

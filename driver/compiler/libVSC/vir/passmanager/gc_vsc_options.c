@@ -2037,7 +2037,8 @@ void VSC_OPTN_CPPOptions_SetDefault(
 {
     gctUINT i;
     gctUINT option = VSC_OPTN_CPPOptions_FORWARD_OPT        |
-                     VSC_OPTN_CPPOptions_BACKWARD_OPT;
+                     VSC_OPTN_CPPOptions_BACKWARD_OPT       |
+                     VSC_OPTN_CPPOptions_HANDLE_MODIFIER;
 
     for(i = 0; i < VSC_OPTN_CPP_COUNT; i++)
     {
