@@ -1428,6 +1428,7 @@ _ConvVirOpcode2Opcode(
     case VIR_OP_ATOMXOR:        return gcSL_ATOMXOR;
     case VIR_OP_BITSEL:         return gcSL_BITSEL;
     case VIR_OP_LEADZERO:       return gcSL_LEADZERO;
+    case VIR_OP_CTZ:            return gcSL_CTZ;
     case VIR_OP_GETEXP:         return gcSL_GETEXP;
     case VIR_OP_GETMANT:        return gcSL_GETMANT;
     case VIR_OP_JMP:            return gcSL_JMP;

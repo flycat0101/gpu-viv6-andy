@@ -372,6 +372,20 @@ static VIR_Pattern _cmovPattern[] = {
 };
 
 
+static VIR_PatternMatchInst _ctzPatInst0[] = {
+    { VIR_OP_CTZ, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { VIR_Lower_IsIntOpcode }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _ctzRepInst0[] = {
+    { VIR_OP_BITREV, 0, 0, { -1, 2, 0, 0 }, { 0 } },
+    { VIR_OP_LEADZERO, 0, 0, { 1, -1, 0, 0 }, { 0 } }
+};
+
+static VIR_Pattern _ctzPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_ctz, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
 static VIR_PatternMatchInst _madPatInst0[] = {
     { VIR_OP_MAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { VIR_Lower_IsIntOpcode, VIR_Lower_IsDstInt16, VIR_Lower_HasNoHalti4 }, VIR_PATN_MATCH_FLAG_AND },
 
@@ -2416,6 +2430,8 @@ _GetPattern0(
         return _madPattern;
     case VIR_OP_NORM:
         return _normPattern;
+    case VIR_OP_CTZ:
+        return _ctzPattern;
 
     /* High-level read_image. */
     case  VIR_OP_IMG_READ:

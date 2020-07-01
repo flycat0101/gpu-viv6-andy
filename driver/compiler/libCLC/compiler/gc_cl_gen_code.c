@@ -1585,6 +1585,7 @@ clGetOpcodeName(
     case clvOPCODE_LEADZERO:    return "leadzero";
     case clvOPCODE_GETEXP:      return "getexp";
     case clvOPCODE_GETMANT:     return "getmant";
+    case clvOPCODE_CTZ:         return "ctz";
 
     case clvOPCODE_POW:         return "viv_pow";
     case clvOPCODE_EXP2:        return "viv_exp2";
@@ -34074,6 +34075,7 @@ clGenBuiltInAsmCode(
     case clvOPCODE_FWIDTH:
     case clvOPCODE_POPCOUNT:
     case clvOPCODE_LEADZERO:
+    case clvOPCODE_CTZ:
 
     case clvOPCODE_LONGLO:
     case clvOPCODE_LONGHI:

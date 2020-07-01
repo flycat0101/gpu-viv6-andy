@@ -103,6 +103,7 @@ static clsBUILTIN_FUNCTION    IntBuiltinFunctions[] =
     {clvEXTENSION_NONE,     "upsample",             T_LONG16,        2, {T_INT16, T_UINT16}, {0}, {0}, 1},
     {clvEXTENSION_NONE,     "upsample",             T_ULONG16,       2, {T_UINT16, T_UINT16}, {0}, {0}, 1},
     {clvEXTENSION_NONE,     "clz",                  T_IU_GENTYPE,    1, {T_IU_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_NONE,     "ctz",                  T_IU_GENTYPE,    1, {T_IU_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE,     "popcount",             T_GENTYPE,       1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE,     "viv_abs",              T_U_GENTYPE,        1, {T_IU_GENTYPE}, {0}, {1}, 1},
@@ -189,6 +190,38 @@ _GenClzCode(
                 PolynaryExpr->exprBase.base.lineNo,
                 PolynaryExpr->exprBase.base.stringNo,
                 clvOPCODE_LEADZERO,
+                IOperand,
+                &OperandsParameters[0].rOperands[0]);
+
+    if (gcmIS_ERROR(status)) return status;
+
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS
+_GenCtzCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    gceSTATUS    status;
+
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+    clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
+    gcmASSERT(OperandCount == 1);
+    gcmASSERT(OperandsParameters);
+    gcmASSERT(IOperand);
+
+    /* grab leading zero */
+    status = clGenGenericCode1(Compiler,
+                PolynaryExpr->exprBase.base.lineNo,
+                PolynaryExpr->exprBase.base.stringNo,
+                clvOPCODE_CTZ,
                 IOperand,
                 &OperandsParameters[0].rOperands[0]);
 

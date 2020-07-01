@@ -900,6 +900,7 @@ _addInstructionToLTCList(
         case gcSL_ROTATE:
         case gcSL_BITSEL:
         case gcSL_LEADZERO:
+        case gcSL_CTZ:
         case gcSL_ADDLO:
         case gcSL_MULLO:
         case gcSL_MULHI:
@@ -3933,6 +3934,7 @@ gceSTATUS gcOPT_DoConstantFoldingLTC(
     case gcSL_ROTATE:
     case gcSL_BITSEL:
     case gcSL_LEADZERO:
+    case gcSL_CTZ:
     case gcSL_ADDLO:
     case gcSL_MULLO:
     case gcSL_MULHI:

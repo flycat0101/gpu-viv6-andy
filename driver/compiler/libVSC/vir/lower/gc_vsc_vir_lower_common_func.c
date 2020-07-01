@@ -797,6 +797,89 @@ VIR_Lower_IsIntOpcode(
     return gcvFALSE;
 }
 
+gctBOOL
+VIR_Lower_IsLongOpcode(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_PrimitiveTypeId format;
+
+    gcmASSERT(VIR_Inst_GetDest(Inst) != gcvNULL);
+
+    format = VIR_GetTypeComponentType(VIR_Lower_GetBaseType(Context->shader, VIR_Inst_GetDest(Inst)));
+    return format == VIR_TYPE_INT64 || format == VIR_TYPE_UINT64;
+
+}
+
+gctBOOL
+VIR_Lower_SetLongUlongDestTypeOnly(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand *dest = VIR_Inst_GetDest(Inst);
+    VIR_PrimitiveTypeId  format;
+    VIR_TypeId typeId;
+    gctUINT components;
+
+    typeId = VIR_Lower_GetBaseType(Context->shader, dest);
+    format = VIR_GetTypeComponentType(typeId);
+
+    if(format == VIR_TYPE_INT64 || format == VIR_TYPE_UINT64) format = VIR_TYPE_UINT32;
+    components = VIR_GetTypeComponents(typeId);
+    typeId = VIR_TypeId_ComposeNonOpaqueType(format, components, 1);
+    VIR_Operand_SetTypeId(dest, typeId);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetLongUlongSecondDest(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VSC_ErrCode   virErrCode = VSC_ERR_NONE;
+    VIR_TypeId    tyId;
+    VIR_Symbol    *sym;
+    VIR_VirRegId  regId;
+    VIR_SymId     symId;
+    gctUINT       rowOffset;
+    VIR_Operand   *dest = VIR_Inst_GetDest(Inst);
+
+    VIR_Enable enable = VIR_Inst_GetEnable(Inst);
+
+    tyId = VIR_Operand_GetTypeId(dest);
+    gcmASSERT(VIR_GetTypeRows(tyId) > 1);
+    rowOffset = VIR_GetTypeRows(tyId) >> 1;
+
+    sym = VIR_Operand_GetSymbol(dest);
+    regId = VIR_Symbol_GetOffsetTempIndex(sym, rowOffset);
+    virErrCode = VIR_Shader_GetVirRegSymByVirRegId(Context->shader,
+                                                   regId,
+                                                   &symId);
+    if(virErrCode != VSC_ERR_NONE) return gcvFALSE;
+    if(symId == VIR_INVALID_ID) {
+        virErrCode = VIR_Shader_AddSymbol(Context->shader,
+                                          VIR_SYM_VIRREG,
+                                          regId,
+                                          VIR_Shader_GetTypeFromId(Context->shader, VIR_TYPE_UNKNOWN),
+                                          VIR_STORAGE_UNKNOWN,
+                                          &symId);
+        if(virErrCode != VSC_ERR_NONE) return gcvFALSE;
+    }
+
+    VIR_Operand_SetTempRegister(dest,
+                                VIR_Inst_GetFunction(Inst),
+                                symId,
+                                VIR_Operand_GetTypeId(dest));
+
+    VIR_Operand_SetEnable(VIR_Inst_GetDest(Inst), enable);
+    return VIR_Lower_SetLongUlongDestTypeOnly(Context, Inst, Opnd);
+}
+
 /* Count the number of enables using the 4bit VIR_ENABLE_* as indexing to table */
 static gctUINT
 _enableCount[16] = { 0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4};

@@ -1181,6 +1181,7 @@ void vscDIDumpDIE(VSC_DIContext * context, gctUINT16 id, gctUINT shift, gctUINT 
                             gcoOS_StrCopySafe(tempstr, 1024, typeName);
                             gcoOS_StrCatSafe(tempstr, 1024, dieName);
                             _SetNameStr(context, typeDie->name, tempstr);
+                            gcoOS_Free(gcvNULL, tempstr);
                         }
                     }
                 }
@@ -1477,6 +1478,7 @@ vscDILoadDebugInfo(VSC_DIContext ** context, gctPOINTER* buffer, gctUINT32 * buf
     }
 
     *context = ctx;
+    gcoOS_ZeroMemory(ctx, contextSize);
     ctxPos = (gctUINT8 *)ctx;
     pos = (gctUINT8 *)ptr;
 
@@ -1573,6 +1575,7 @@ vscDILoadDebugInfo(VSC_DIContext ** context, gctPOINTER* buffer, gctUINT32 * buf
         size = ctx->dieTable.count * gcmSIZEOF(VSC_DIE);
         if (gcmIS_ERROR(ctx->pfnAllocate(gcvNULL, size, (gctPOINTER *)&ctx->dieTable.die)))
         {
+            vscDIDestroyContext(ctx);
             vsdDIPRINT("out of memory when allocate dieTable");
             return gcvSTATUS_OUT_OF_MEMORY;
         }
@@ -1588,6 +1591,7 @@ vscDILoadDebugInfo(VSC_DIContext ** context, gctPOINTER* buffer, gctUINT32 * buf
         size = ctx->strTable.size;
         if (gcmIS_ERROR(ctx->pfnAllocate(gcvNULL, size, (gctPOINTER *)&ctx->strTable.str)))
         {
+            vscDIDestroyContext(ctx);
             vsdDIPRINT("out of memory when allocate strTable");
             return gcvSTATUS_OUT_OF_MEMORY;
         }
@@ -1603,6 +1607,7 @@ vscDILoadDebugInfo(VSC_DIContext ** context, gctPOINTER* buffer, gctUINT32 * buf
         size = ctx->lineTable.count * gcmSIZEOF(VSC_DI_LINE_TABLE_MAP);
         if (gcmIS_ERROR(ctx->pfnAllocate(gcvNULL, size, (gctPOINTER *)&ctx->lineTable.map)))
         {
+            vscDIDestroyContext(ctx);
             vsdDIPRINT("out of memory when allocate dieTable");
             return gcvSTATUS_OUT_OF_MEMORY;
         }
@@ -1618,6 +1623,7 @@ vscDILoadDebugInfo(VSC_DIContext ** context, gctPOINTER* buffer, gctUINT32 * buf
         size = ctx->swLocTable.count * gcmSIZEOF(VSC_DI_SW_LOC);
         if (gcmIS_ERROR(ctx->pfnAllocate(gcvNULL, size, (gctPOINTER *)&ctx->swLocTable.loc)))
         {
+            vscDIDestroyContext(ctx);
             vsdDIPRINT("out of memory when allocate dieTable");
             return gcvSTATUS_OUT_OF_MEMORY;
         }
@@ -1633,6 +1639,7 @@ vscDILoadDebugInfo(VSC_DIContext ** context, gctPOINTER* buffer, gctUINT32 * buf
         size = ctx->locTable.count * gcmSIZEOF(VSC_DI_HW_LOC);
         if (gcmIS_ERROR(ctx->pfnAllocate(gcvNULL, size, (gctPOINTER *)&ctx->locTable.loc)))
         {
+            vscDIDestroyContext(ctx);
             vsdDIPRINT("out of memory when allocate dieTable");
             return gcvSTATUS_OUT_OF_MEMORY;
         }
@@ -1645,8 +1652,11 @@ vscDILoadDebugInfo(VSC_DIContext ** context, gctPOINTER* buffer, gctUINT32 * buf
 
     if (gcmIS_ERROR(pfnAllocate(gcvNULL,VSC_DI_TEMP_LOG_SIZE,(gctPOINTER *)&ctx->tmpLog)))
     {
+        vscDIDestroyContext(ctx);
         return gcvSTATUS_OUT_OF_MEMORY;
     }
+
+    *context = ctx;
 
     *buffer = (gctPOINTER)pos;
 
@@ -1677,11 +1687,19 @@ vscDICopyDebugInfo(VSC_DIContext* Context, gctPOINTER* Buffer)
     ctx->pfnFree = pfnFree;
     gcoOS_MemCopy(ctx, Context, contextSize);
 
+    ctx->dieTable.die = gcvNULL;
+    ctx->strTable.str = gcvNULL;
+    ctx->lineTable.map = gcvNULL;
+    ctx->swLocTable.loc = gcvNULL;
+    ctx->locTable.loc = gcvNULL;
+    ctx->tmpLog = gcvNULL;
+
     if (Context->dieTable.count > 0)
     {
         size = Context->dieTable.count * gcmSIZEOF(VSC_DIE);
         if (gcmIS_ERROR(ctx->pfnAllocate(gcvNULL, size, (gctPOINTER *)&ctx->dieTable.die)))
         {
+            vscDIDestroyContext(ctx);
             vsdDIPRINT("out of memory when allocate dieTable");
             return gcvSTATUS_OUT_OF_MEMORY;
         }
@@ -1694,6 +1712,7 @@ vscDICopyDebugInfo(VSC_DIContext* Context, gctPOINTER* Buffer)
         size = Context->strTable.size;
         if (gcmIS_ERROR(ctx->pfnAllocate(gcvNULL, size, (gctPOINTER *)&ctx->strTable.str)))
         {
+            vscDIDestroyContext(ctx);
             vsdDIPRINT("out of memory when allocate strTable");
             return gcvSTATUS_OUT_OF_MEMORY;
         }
@@ -1706,6 +1725,7 @@ vscDICopyDebugInfo(VSC_DIContext* Context, gctPOINTER* Buffer)
         size = Context->lineTable.count * gcmSIZEOF(VSC_DI_LINE_TABLE_MAP);
         if (gcmIS_ERROR(ctx->pfnAllocate(gcvNULL, size, (gctPOINTER *)&ctx->lineTable.map)))
         {
+            vscDIDestroyContext(ctx);
             vsdDIPRINT("out of memory when allocate dieTable");
             return gcvSTATUS_OUT_OF_MEMORY;
         }
@@ -1718,6 +1738,7 @@ vscDICopyDebugInfo(VSC_DIContext* Context, gctPOINTER* Buffer)
         size = Context->swLocTable.count * gcmSIZEOF(VSC_DI_SW_LOC);
         if (gcmIS_ERROR(ctx->pfnAllocate(gcvNULL, size, (gctPOINTER *)&ctx->swLocTable.loc)))
         {
+            vscDIDestroyContext(ctx);
             vsdDIPRINT("out of memory when allocate dieTable");
             return gcvSTATUS_OUT_OF_MEMORY;
         }
@@ -1730,6 +1751,7 @@ vscDICopyDebugInfo(VSC_DIContext* Context, gctPOINTER* Buffer)
         size = Context->locTable.count * gcmSIZEOF(VSC_DI_HW_LOC);
         if (gcmIS_ERROR(ctx->pfnAllocate(gcvNULL, size, (gctPOINTER *)&ctx->locTable.loc)))
         {
+            vscDIDestroyContext(ctx);
             vsdDIPRINT("out of memory when allocate dieTable");
             return gcvSTATUS_OUT_OF_MEMORY;
         }
@@ -1739,6 +1761,7 @@ vscDICopyDebugInfo(VSC_DIContext* Context, gctPOINTER* Buffer)
 
     if (gcmIS_ERROR(pfnAllocate(gcvNULL,VSC_DI_TEMP_LOG_SIZE,(gctPOINTER *)&ctx->tmpLog)))
     {
+        vscDIDestroyContext(ctx);
         vsdDIPRINT("out of memory when allocate dieTable");
         return gcvSTATUS_OUT_OF_MEMORY;
     }
@@ -1791,6 +1814,7 @@ gceSTATUS vscDIConstructContext(PFN_Allocate allocPfn, PFN_Free freePfn, VSC_DIC
 
         if (gcmIS_ERROR(pfnAllocate(gcvNULL,VSC_DI_TEMP_LOG_SIZE,(gctPOINTER *) &ptr->tmpLog)))
         {
+            pfnFree(gcvNULL, ptr);
             return gcvSTATUS_OUT_OF_MEMORY;
         }
 
@@ -2747,15 +2771,19 @@ void vscDIGetVariableInfo(
                 varName[index + 1] = tempstr[index];
             varName[index + 1] = 0;
 
+            gcoOS_Free(gcvNULL, tempstr);
+
             if(Vdie->u.variable.type.array.numDim > 0 && (gctINT)dimDepth == Vdie->u.variable.type.array.numDim)
             {
-                char tempStr[50]={0};
+                gcoOS_AllocateMemory(NULL, nameLength*sizeof(char), &memory);
+                tempstr = (char*)memory;
                 offset = 0;
                 for (index = 0; index < dimDepth; index++)
                 {
-                    gcoOS_PrintStrSafe(tempStr, 50, &offset, "[%d]", dimNum[index]);
+                    gcoOS_PrintStrSafe(tempstr, nameLength, &offset, "[%d]", dimNum[index]);
                 }
-                gcoOS_StrCatSafe(varName, nameLength, tempStr);
+                gcoOS_StrCatSafe(varName, nameLength, tempstr);
+                gcoOS_Free(gcvNULL, tempstr);
             }
         }
 

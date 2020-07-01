@@ -213,6 +213,7 @@ const gcSL_OPCODE_ATTR gcvOpcodeAttr[] =
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_HIA     }, /* gcSL_CLAMPCOORD, 0x9C clamp image 2d cooridate to its width and height */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_INVALID }, /* gcSL_EMIT_STREAM_VERTEX, 0x9D For function "EmitStreamVertex" */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_INVALID }, /* gcSL_END_STREAM_PRIMITIVE, 0x9E For function "EndStreamPrimitive" */
+    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_CTZ, 0x9F */
 };
 char _checkOpAttr_size[sizeof(gcvOpcodeAttr)/sizeof(gcvOpcodeAttr[0]) == gcSL_MAXOPCODE];
 

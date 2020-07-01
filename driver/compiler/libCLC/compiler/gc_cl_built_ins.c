@@ -5036,6 +5036,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"fast_fma",        gcvTRUE,        gcvFALSE,       gcvNULL, _GenFastFmaCode},
     {"mad",             gcvTRUE,        gcvFALSE,       gcvNULL, _GenMadCode},
     {"clz",             gcvTRUE,        gcvFALSE,       gcvNULL, _GenClzCode},
+    {"ctz",             gcvTRUE,        gcvFALSE,       gcvNULL, _GenCtzCode},
     {"popcount",        gcvTRUE,        gcvFALSE,       gcvNULL, _GenPopcountCode},
 
     /* Geometric Functions */

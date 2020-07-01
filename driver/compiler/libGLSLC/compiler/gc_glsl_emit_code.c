@@ -577,6 +577,7 @@ static gctCONST_STRING OpName[] =
     "gcSL_CLAMPCOORD",                    /* 0x9C */
     "gcSL_EMIT_STREAM_VERTEX",            /* 0x9D For function "EmitStreamVertex" */
     "gcSL_END_STREAM_PRIMITIVE",          /* 0x9E For function "EndStreamPrimitive" */
+    "gcSL_CTZ",                           /* 0x9F For function "ctz()" */
 };
 char _checkOpName_size[sizeof(OpName)/sizeof(OpName[0]) == gcSL_MAXOPCODE];
 

@@ -21699,6 +21699,7 @@ const gcsSL_PATTERN_PTR  patterns[] =
     gcvNULL, /* 0x9C gcSL_CLAMPCOORD */
     gcvNULL, /* 0x9D For function "EmitStreamVertex" */
     gcvNULL, /* 0x9E For function "EndStreamPrimitive" */
+    gcvNULL, /* 0x9F For function "CTZ" */
 };
 
 #ifdef WIN32

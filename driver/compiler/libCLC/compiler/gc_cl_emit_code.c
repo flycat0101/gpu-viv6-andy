@@ -316,6 +316,8 @@ IN gcSL_OPCODE Opcode
     case gcSL_MULSAT:    return "gcSL_MULSAT";
     case gcSL_MADSAT:    return "gcSL_MADSAT";
 
+    case gcSL_CTZ:       return "gcSL_CTZ";
+
     case gcSL_ATOMADD:    return "gcSL_ATOMADD";
     case gcSL_ATOMSUB:    return "gcSL_ATOMSUB";
     case gcSL_ATOMXCHG:    return "gcSL_ATOMXCHG";
@@ -4499,6 +4501,7 @@ _ConvOpcode(
     case clvOPCODE_LEADZERO:         return gcSL_LEADZERO;
     case clvOPCODE_GETEXP:           return gcSL_GETEXP;
     case clvOPCODE_GETMANT:          return gcSL_GETMANT;
+    case clvOPCODE_CTZ:              return gcSL_CTZ;
 
     case clvOPCODE_POW:              return gcSL_POW;
     case clvOPCODE_EXP2:             return gcSL_EXP;
