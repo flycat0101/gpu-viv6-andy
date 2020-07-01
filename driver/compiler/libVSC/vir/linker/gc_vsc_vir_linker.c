@@ -259,6 +259,13 @@ _CreateIntrinsicLib(
         gcLibTextureCommon_Func,
     };
 
+    gctSTRING   BuiltinLib_GL_Common[] =
+    {
+        gcLibLDEXP_GL_Func,
+        gcLibFREXP_GL_Func,
+        gcLibPackUnpack_GL_Func,
+    };
+
     gctSTRING   BuiltinLib_Reflect[] =
     {
         gcLibREFLECT_Func_float,
@@ -738,6 +745,25 @@ _CreateIntrinsicLib(
                 __LL_LIB_LENGTH__, BuiltinLib_common[i]);
         }
 
+        if (forDesktopGL)
+        {
+            stringNum = sizeof(BuiltinLib_GL_Common) / sizeof(gctSTRING);
+            for (i = 0; i < stringNum; i++)
+            {
+                gcoOS_StrCatSafe(sloBuiltinSource,
+                    __BUILTIN_SHADER_LENGTH__, BuiltinLib_GL_Common[i]);
+            }
+            if (GetHWHasFmaSupport())
+            {
+                gcoOS_StrCatSafe(sloBuiltinSource,
+                    __BUILTIN_SHADER_LENGTH__, gcLibFMA_GL_Func_fmaSupported);
+            }
+            else
+            {
+                gcoOS_StrCatSafe(sloBuiltinSource,
+                    __BUILTIN_SHADER_LENGTH__, gcLibFMA_GL_Func_fmaNotSupported);
+            }
+        }
         /* fma supported */
         if (pHwCfg->hwFeatureFlags.supportAdvancedInsts &&
             pHwCfg->hwFeatureFlags.hasHalti5)
