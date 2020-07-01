@@ -210,7 +210,9 @@ const gcSL_OPCODE_ATTR gcvOpcodeAttr[] =
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcsl_CSUBCJ, 0x99 */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcsl_CADD, 0x9A */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcsl_GET_IMAGE_TYPE, 0x9B */
-    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_HIA     }, /* gcSL_CLAMPCOORD, clamp image 2d cooridate to its width and height */
+    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_HIA     }, /* gcSL_CLAMPCOORD, 0x9C clamp image 2d cooridate to its width and height */
+    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_INVALID }, /* gcSL_EMIT_STREAM_VERTEX, 0x9D For function "EmitStreamVertex" */
+    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_INVALID }, /* gcSL_END_STREAM_PRIMITIVE, 0x9E For function "EndStreamPrimitive" */
 };
 char _checkOpAttr_size[sizeof(gcvOpcodeAttr)/sizeof(gcvOpcodeAttr[0]) == gcSL_MAXOPCODE];
 
@@ -8866,6 +8868,12 @@ gcSHADER_Load(
             versionAdjustment += sizeof(binaryOutput->typeNameVarIndex);
         }
 
+        if (shaderVersion <= gcdSL_SHADER_BINARY_BEFORE_SAVING_STREAM_NUMBER_FOR_OUTPUT)
+        {
+            /* layout field which is not in the version */
+            versionAdjustment += sizeof(binaryOutput->streamNumber);
+        }
+
         /* Parse all outputs. */
         psClrOutputLoc = 0;
         for (i = 0; i < Shader->outputCount; i++)
@@ -8974,6 +8982,15 @@ gcSHADER_Load(
             else
             {
                 output->location     = -1;
+            }
+
+            if (shaderVersion <= gcdSL_SHADER_BINARY_BEFORE_SAVING_STREAM_NUMBER_FOR_OUTPUT)
+            {
+                output->streamNumber = gcSHADER_PRECISION_DEFAULT;
+            }
+            else
+            {
+                output->streamNumber = (gctINT)binaryOutput->streamNumber;
             }
 
             output->nameLength   = binaryOutput->nameLength;
@@ -11272,6 +11289,7 @@ gcSHADER_Save(
         binary->prevSibling         = output->prevSibling;
         binary->typeNameVarIndex    = output->typeNameVarIndex;
         binary->shaderMode          = (gctINT16) output->shaderMode;
+        binary->streamNumber        = (gctINT16) output->streamNumber;
 
         gcoOS_MemCopy(binary->layoutQualifier,
                       (gctPOINTER)&output->layoutQualifier,

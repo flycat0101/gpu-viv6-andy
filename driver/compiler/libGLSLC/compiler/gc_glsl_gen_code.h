@@ -185,6 +185,8 @@ typedef enum _sleOPCODE
     /* GS-only opcode. */
     slvOPCODE_EMIT_VERTEX,
     slvOPCODE_END_PRIMITIVE,
+    slvOPCODE_EMIT_STREAM_VERTEX,
+    slvOPCODE_END_STREAM_PRIMITIVE,
 
     /* local memory */
     slvOPCODE_LOAD_L,

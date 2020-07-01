@@ -6641,6 +6641,7 @@ _BuildEmitOutputUsageForCode(
         }
 
         if (opcode != gcSL_EMIT_VERTEX && opcode != gcSL_END_PRIMITIVE &&
+            opcode != gcSL_EMIT_STREAM_VERTEX && opcode != gcSL_END_STREAM_PRIMITIVE &&
             !callHasEmit)
         {
             continue;
@@ -6656,7 +6657,8 @@ _BuildEmitOutputUsageForCode(
 
             prevOpcode = gcmSL_OPCODE_GET(prevCode->instruction.opcode, Opcode);
 
-            if (prevOpcode == gcSL_EMIT_VERTEX || prevOpcode == gcSL_END_PRIMITIVE)
+            if (prevOpcode == gcSL_EMIT_VERTEX || prevOpcode == gcSL_END_PRIMITIVE ||
+                prevOpcode == gcSL_EMIT_STREAM_VERTEX || prevOpcode == gcSL_END_STREAM_PRIMITIVE)
                 break;
 
             switch(prevOpcode)

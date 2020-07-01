@@ -301,7 +301,9 @@ conv2VirsVirOpcodeMap _virOpcodeMap[] =
     {VIR_OP_CSUBCJ, /* gcSL_CSUBCJ, 0x99 */ VIR_MOD_NONE, 0, -1},
     {VIR_OP_CADD, /* gcSL_CADD, 0x9A */ VIR_MOD_NONE, 0, -1},
     {VIR_OP_IMG_TYPE, /* gcSL_GET_IMAGE_TYPE, 0x9B */ VIR_MOD_NONE, 0, -1},
-    {VIR_OP_CLAMPCOORD, /* gcSL_CLAMPCOORD, */     VIR_MOD_NONE, 0, 0},
+    {VIR_OP_CLAMPCOORD, /* gcSL_CLAMPCOORD, 0x9C */     VIR_MOD_NONE, 0, 0},
+    {VIR_OP_EMIT_STREAM0, /* gcSL_EMIT_VERTEX, 0x9D */ VIR_MOD_NONE, 0, 0},
+    {VIR_OP_RESTART_STREAM0, /* gcSL_END_PRIMITIVE, 0x9E */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_MAXOPCODE, /* gcSL_MAXOPCODE */                    VIR_MOD_NONE, 0, 0},
 };
 
@@ -4562,6 +4564,7 @@ _ConvShaderOutput2Vir(
         /* set layout info */
         VIR_Symbol_SetLayoutQualifier(sym, VIR_LAYQUAL_NONE);
         VIR_Symbol_SetLocation(sym, Output->location);
+        VIR_Symbol_SetStreamNumber(sym, GetOutputStreamNumber(Output));
     }
 
     gcTYPE_GetTypeInfo(Output->type, &components, &rows, 0);

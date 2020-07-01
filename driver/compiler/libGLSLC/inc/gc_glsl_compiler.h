@@ -253,8 +253,9 @@ sloCOMPILER_IsOGL40Version(
 );
 
 gctBOOL
-sloCOMPILER_IsOGL33Version(
-    IN sloCOMPILER Compiler
+sloCOMPILER_IsOGL33VersionOrAbove(
+    IN sloCOMPILER Compiler,
+    IN gctBOOL     bCheckAbove
 );
 
 gceSTATUS

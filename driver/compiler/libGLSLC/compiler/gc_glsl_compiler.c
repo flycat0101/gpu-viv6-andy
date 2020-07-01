@@ -453,6 +453,8 @@ sloCOMPILER_Construct(
 
         /* Init output layout. */
         compiler->context.outDefaultLayout.gsPrimitive = slvGS_PRIMITIVE_NONE;
+        /* The initial default stream number is zero. */
+        compiler->context.outDefaultLayout.streamNumber = 0;
         compiler->context.outDefaultLayout.maxVerticesNumber = (gctINT)GetGLMaxTessPatchVertices();
         compiler->context.outDefaultLayout.maxGSVerticesNumber = -1;
         compiler->context.outDefaultLayout.verticesNumber = -1;
@@ -4418,11 +4420,19 @@ sloCOMPILER_IsOGL15Version(
 }
 
 gctBOOL
-sloCOMPILER_IsOGL33Version(
-    IN sloCOMPILER Compiler
+sloCOMPILER_IsOGL33VersionOrAbove(
+    IN sloCOMPILER Compiler,
+    IN gctBOOL     bCheckAbove
     )
 {
-    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL33_VERSION;
+    if (bCheckAbove)
+    {
+        return sloCOMPILER_GetLanguageVersion(Compiler) >= _SHADER_GL33_VERSION;
+    }
+    else
+    {
+        return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL33_VERSION;
+    }
 }
 
 gctBOOL

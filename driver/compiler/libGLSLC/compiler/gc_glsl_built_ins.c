@@ -17760,6 +17760,56 @@ _GenEndPrimitiveCode(
 }
 
 gceSTATUS
+_GenEmitStreamVertexCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER();
+
+    status = slGenGenericNullTargetCode(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
+                                        slvOPCODE_EMIT_STREAM_VERTEX,
+                                        &OperandsParameters->rOperands[0],
+                                        gcvNULL);
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+_GenEndStreamPrimitiveCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER();
+
+    status = slGenGenericNullTargetCode(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
+                                        slvOPCODE_END_STREAM_PRIMITIVE,
+                                        &OperandsParameters->rOperands[0],
+                                        gcvNULL);
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
 slEvaluateBuiltInFunction(
     IN sloCOMPILER Compiler,
     IN sloIR_POLYNARY_EXPR PolynaryExpr,

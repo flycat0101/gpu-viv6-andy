@@ -4932,6 +4932,10 @@ gcLINKTREE_RemoveDeadCode(
                         /* fall through */
                     case gcSL_END_PRIMITIVE:
                         break;
+                    case gcSL_EMIT_STREAM_VERTEX:
+                        /* fall through */
+                    case gcSL_END_STREAM_PRIMITIVE:
+                        break;
 
                     case gcSL_SET:
                     case gcSL_CMP:
