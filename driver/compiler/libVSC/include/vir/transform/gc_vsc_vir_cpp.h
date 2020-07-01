@@ -59,6 +59,9 @@ typedef struct VIR_CPP_COPYPROPAGATION
 
     VSC_HW_CONFIG           *pHwCfg;
 
+    /* Save the resource to check the redefined instruction. */
+    VSC_CHECK_REDEFINED_RES checkRedefinedResInfo;
+
     gctBOOL                 bInvalidCfg;
 
 } VSC_CPP_CopyPropagation;

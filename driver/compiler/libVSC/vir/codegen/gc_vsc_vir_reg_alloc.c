@@ -1427,6 +1427,9 @@ static void _VIR_RA_LS_Init(
     VIR_RA_LS_SetInstIdChanged(pRA, gcvFALSE);
     VIR_RA_LS_SetEnableDebug(pRA, gcvFALSE);
     VIR_RA_LS_SetDisableDual16AndRecolor(pRA, gcvFALSE);
+
+    memset(&pRA->checkRedefinedResInfo, 0, sizeof(VSC_CHECK_REDEFINED_RES));
+    pRA->checkRedefinedResInfo.pMM = pMM;
 }
 
 static VSC_ErrCode
@@ -1470,6 +1473,8 @@ void VIR_RA_ColorPool_Finalize(
 static void _VIR_RA_LS_Final(
     VIR_RA_LS       *pRA)
 {
+    VSC_CHECK_REDEFINED_RES checkRedefinedResInfo = pRA->checkRedefinedResInfo;
+
     VIR_RA_LS_SetShader(pRA, gcvNULL);
     VIR_RA_LS_SetOptions(pRA, gcvNULL);
     VIR_RA_LS_SetDumper(pRA, gcvNULL);
@@ -1479,6 +1484,32 @@ static void _VIR_RA_LS_Final(
     if (pRA->bReservedMovaReg)
     {
         vscHTBL_Destroy(pRA->movaHash);
+    }
+
+    /* Free the resource for the redefined instruction. */
+    if (checkRedefinedResInfo.pInstHashTable != gcvNULL)
+    {
+        vscHTBL_Destroy(checkRedefinedResInfo.pInstHashTable);
+    }
+
+    if (checkRedefinedResInfo.pBBHashTable != gcvNULL)
+    {
+        vscHTBL_Destroy(checkRedefinedResInfo.pBBHashTable);
+    }
+
+    if (checkRedefinedResInfo.pBBFlowMask != gcvNULL)
+    {
+        vscBV_Destroy(checkRedefinedResInfo.pBBFlowMask);
+    }
+
+    if (checkRedefinedResInfo.pBBCheckStatusMask != gcvNULL)
+    {
+        vscBV_Destroy(checkRedefinedResInfo.pBBCheckStatusMask);
+    }
+
+    if (checkRedefinedResInfo.pBBCheckValueMask != gcvNULL)
+    {
+        vscBV_Destroy(checkRedefinedResInfo.pBBCheckValueMask);
     }
 }
 
@@ -2742,7 +2773,7 @@ gctBOOL _VIR_RA_LS_removableLDARR(
             }
 
             /* check baseOpnd is redefined between pInst and pUseInst */
-            if (vscVIR_RedefineBetweenInsts(pRA->pMM, pLvInfo->pDuInfo, pInst, pUseInst, pBaseOpnd, &redefinedBase))
+            if (vscVIR_RedefineBetweenInsts(&pRA->checkRedefinedResInfo, pLvInfo->pDuInfo, pInst, pUseInst, pBaseOpnd, &redefinedBase))
             {
                 retValue = gcvFALSE;
                 continue;
@@ -11257,7 +11288,13 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
         ** If the dest operand of a MOVA is invalid(optimize this in _VIR_RA_LS_AssignColorForA0B0Inst),
         ** then we don't need to write the source operand.
         */
-        if (VIR_Operand_GetHwRegId(VIR_Inst_GetDest(pInst)) != VIR_INVALID_HWREG)
+        if (VIR_Inst_GetFlags(pInst) & VIR_INSTFLAG_DEAD_INST)
+        {
+            gcmASSERT(VIR_Operand_GetHwRegId(VIR_Inst_GetDest(pInst)) == VIR_INVALID_HWREG);
+
+            VIR_Pass_DeleteInstruction(pFunc, pInst, gcvNULL);
+        }
+        else
         {
             _VIR_RA_LS_RewriteColor_Src(pRA, pInst, pInst->src[0], pInst, pInst->src[0]);
         }
@@ -11876,6 +11913,9 @@ VSC_ErrCode _VIR_RA_LS_AssignColorForA0B0Inst(
             if (bAllUsageSpilled)
             {
                 _VIR_RA_LS_ExpireActiveLRs(pRA, VIR_Inst_GetId(pInst));
+
+                /* This MOVA is unused and can be deleted. */
+                VIR_Inst_SetFlag(pInst, VIR_INSTFLAG_DEAD_INST);
                 return retValue;
             }
         }

@@ -811,7 +811,17 @@ gctBOOL vscVIR_IsUniqueDefInstOfUsagesInItsDUChain(VIR_DEF_USAGE_INFO* pDuInfo,
                                                    VIR_Instruction**   ppFirstOtherDefInst,
                                                    VIR_Instruction**   ppFirstMultiDefUsageInst);
 
-gctBOOL vscVIR_RedefineBetweenInsts(IN VSC_MM                   *pMM,
+typedef struct _VSC_CHECK_REDEFINED_RES
+{
+    VSC_MM*             pMM;
+    VSC_HASH_TABLE*     pInstHashTable;
+    VSC_HASH_TABLE*     pBBHashTable;
+    VSC_BIT_VECTOR*     pBBFlowMask;
+    VSC_BIT_VECTOR*     pBBCheckStatusMask;
+    VSC_BIT_VECTOR*     pBBCheckValueMask;
+} VSC_CHECK_REDEFINED_RES;
+
+gctBOOL vscVIR_RedefineBetweenInsts(IN VSC_CHECK_REDEFINED_RES  *pResInfo,
                                     IN VIR_DEF_USAGE_INFO       *duInfo,
                                     IN VIR_Instruction          *startInst,
                                     IN VIR_Instruction          *endInst,
