@@ -207,7 +207,7 @@ white_sp_nl                                     [ \t\n]+
 "^="								{ DUMP_SOURCE(); return SL_SCAN_OPERATOR(T_XOR_ASSIGN); }
 "|="								{ DUMP_SOURCE(); return SL_SCAN_OPERATOR(T_OR_ASSIGN); }
 "-="								{ DUMP_SOURCE(); return SL_SCAN_OPERATOR(T_SUB_ASSIGN); }
-"!<"								{ DUMP_SOURCE(); return SL_SCAN_SPECIAL_OPERATOR(slvEXTENSION_VASM, T_ASM_OPND_BRACKET); }
+"!<"								{ DUMP_SOURCE(); return SL_SCAN_SPECIAL_OPERATOR(slvEXTENSION1_VASM, T_ASM_OPND_BRACKET); }
 
 "("									{ DUMP_SOURCE(); return SL_SCAN_OPERATOR('('); }
 ")"									{ DUMP_SOURCE(); return SL_SCAN_OPERATOR(')'); }

@@ -224,7 +224,7 @@ sloCOMPILER_ExpandNorm(
 gctBOOL
 sloCOMPILER_ExtensionEnabled(
     IN sloCOMPILER Compiler,
-    IN sleEXTENSION Extension
+    IN sloEXTENSION* Extension
     );
 
 gceSTATUS
@@ -347,7 +347,7 @@ struct _sloCOMPILER
         gctUINT16               warnCount;
         slsHASH_TABLE           privateStringPool;
         sltOPTIMIZATION_OPTIONS optimizationOptions;
-        sltEXTENSIONS           extensions;
+        sloEXTENSION            extensions;
         sltDUMP_OPTIONS         dumpOptions;
         gctUINT16               dumpOffset;
         sleSCANNER_STATE        scannerState;

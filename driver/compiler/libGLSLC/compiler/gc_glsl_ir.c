@@ -2138,7 +2138,7 @@ slsNAME_Construct(
     IN slsDATA_TYPE * DataType,
     IN sltPOOL_STRING Symbol,
     IN gctBOOL IsBuiltIn,
-    IN sleEXTENSION Extension,
+    IN sloEXTENSION Extension,
     OUT slsNAME ** Name
     )
 {
@@ -2723,6 +2723,7 @@ slsNAME_SPACE_Search(
 {
     slsNAME *       name;
     gceSTATUS       status = gcvSTATUS_OK;
+    sloEXTENSION    extension = {{0}};
     gcmHEADER_ARG("Compiler=0x%x NameSpace=0x%x Symbol=0x%x Recursive=%d Name=0x%x",
                    Compiler, NameSpace, Symbol, Recursive, Name);
 
@@ -2736,12 +2737,13 @@ slsNAME_SPACE_Search(
 
     FOR_EACH_DLINK_NODE(&NameSpace->names, slsNAME, name)
     {
+        extension.extension1 = name->extension.extension1;
         if (MangleNameMatch)
         {
             if (name->type == slvFUNC_NAME && name->u.funcInfo.mangled_symbol == Symbol)
             {
                 if (!sloCOMPILER_ExtensionEnabled(Compiler,
-                                                    name->extension))
+                                                  &extension))
                 {
                     continue;
                 }
@@ -2756,7 +2758,7 @@ slsNAME_SPACE_Search(
             if (name->symbol == Symbol)
             {
                 if (!sloCOMPILER_ExtensionEnabled(Compiler,
-                                                  name->extension))
+                                                  &extension))
                 {
                     continue;
                 }
@@ -2802,17 +2804,17 @@ slsNAME_SPACE_Search(
 
 static gceSTATUS
 _SearchBuiltinVariable(
-    IN sloCOMPILER Compiler,
+    IN sloCOMPILER     Compiler,
     IN slsNAME_SPACE * NameSpace,
-    IN sltPOOL_STRING Symbol,
-    IN sleEXTENSION Extension,
-    OUT slsNAME ** Name
+    IN sltPOOL_STRING  Symbol,
+    IN sloEXTENSION    Extension,
+    OUT slsNAME **     Name
     )
 {
     slsNAME *       name;
     gceSTATUS       status = gcvSTATUS_OK;
     gcmHEADER_ARG("Compiler=0x%x NameSpace=0x%x Symbol=0x%x Extension=%d Name=0x%x",
-                   Compiler, NameSpace, Symbol, Extension,Name);
+        Compiler, NameSpace, Symbol, Extension.extension1, Name);
 
     /* Verify the arguments. */
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
@@ -2826,7 +2828,7 @@ _SearchBuiltinVariable(
     {
         if (name->symbol == Symbol)
         {
-            if (name->extension != Extension)
+            if (name->extension.extension1 != Extension.extension1)
             {
                 continue;
             }
@@ -2857,6 +2859,7 @@ slsNAME_SPACE_CheckNewFuncName(
     slsNAME *       name;
     gctBOOL         areAllParamQualifiersEqual;
     gceSTATUS       status = gcvSTATUS_OK;
+    sloEXTENSION    extension = {{0}};
 
     gcmHEADER_ARG("Compiler=0x%x NameSpace=0x%x FuncName=0x%x FirstFuncName=0x%x",
                    Compiler, NameSpace, FuncName, FirstFuncName);
@@ -2912,13 +2915,14 @@ slsNAME_SPACE_CheckNewFuncName(
 
     FOR_EACH_DLINK_NODE(&NameSpace->names, slsNAME, name)
     {
+        extension.extension1 = name->extension.extension1;
         /* check all built-in functions. */
         if (name->isBuiltIn)
         {
             if (name->type == slvFUNC_NAME)
             {
                 /* es20 and es30 have different built-in functions. */
-                if (!sloCOMPILER_ExtensionEnabled(Compiler, name->extension))
+                if (!sloCOMPILER_ExtensionEnabled(Compiler, &extension))
                 {
                     continue;
                 }
@@ -3252,6 +3256,8 @@ _IsCorrespondingFuncName(
         sloIR_EXPR_SetToBeTheSameDataType(argument);
         if (!slsDATA_TYPE_IsEqual(effectiveType, argument->toBeDataType))
         {
+            sloEXTENSION extension = {{0}};
+            extension.extension1 = slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS;
             /* For now we cannot handle double-precision floating point constants, so treat them as single-precision ones */
             if (sloIR_OBJECT_GetType(&argument->base) == slvIR_CONSTANT
                 && argument->toBeDataType->elementType == slvTYPE_FLOAT
@@ -3260,7 +3266,7 @@ _IsCorrespondingFuncName(
                 argument->toBeDataType->elementType = slvTYPE_DOUBLE;
             }
 
-            if (sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS))
+            if (sloCOMPILER_ExtensionEnabled(Compiler, &extension))
             {
                 gcmVERIFY_OK(slMakeImplicitConversionForOperand(Compiler,
                                                                argument,
@@ -3322,6 +3328,7 @@ slsNAME_SPACE_BindFuncName(
     gctPOINTER      nameCandidates[1024];
     gctINT          nameCandidateDistances[1024];
     gctINT          currentCandidateIndex = 0;
+    sloEXTENSION    extension = {{0}};
 
     gcmHEADER_ARG("Compiler=0x%x NameSpace=0x%x PolynaryExpr=0x%x",
                    Compiler, NameSpace, PolynaryExpr);
@@ -3332,14 +3339,15 @@ slsNAME_SPACE_BindFuncName(
 
     FOR_EACH_DLINK_NODE(&NameSpace->names, slsNAME, name)
     {
+        extension.extension1 = name->extension.extension1;
         if (name->type != slvFUNC_NAME)
         {
             continue;
         }
 
-        if (name->extension != slvEXTENSION_NONE)
+        if (name->extension.extension1 != slvEXTENSION1_NONE)
         {
-            if (!sloCOMPILER_ExtensionEnabled(Compiler, name->extension))
+            if (!sloCOMPILER_ExtensionEnabled(Compiler, &extension))
             {
                 continue;
             }
@@ -3467,7 +3475,7 @@ slsNAME_SPACE_CreateName(
     IN slsDATA_TYPE * DataType,
     IN sltPOOL_STRING Symbol,
     IN gctBOOL IsBuiltIn,
-    IN sleEXTENSION Extension,
+    IN sloEXTENSION Extension,
     IN gctBOOL CheckExistedName,
     OUT slsNAME ** Name
     )
@@ -3478,7 +3486,7 @@ slsNAME_SPACE_CreateName(
     gcmHEADER_ARG("Compiler=0x%x NameSpace=0x%x LineNo=%u StringNo=%u "
                   "Type=%d DataType=0x%x Symbol=0x%x IsBuiltIn=%d Extension=0x%x Name=0x%x",
                   Compiler, NameSpace, LineNo, StringNo,
-                  Type, DataType, Symbol, IsBuiltIn, Extension, Name);
+                  Type, DataType, Symbol, IsBuiltIn, Extension.extension1, Name);
 
     /* Verify the arguments. */
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);

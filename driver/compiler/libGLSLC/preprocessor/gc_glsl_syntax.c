@@ -19,7 +19,7 @@ static int _slHaltiSupport = _ppd_HALTI_SUPPORT;
 typedef struct _slsEXTENSION_INFO
 {
    gctSTRING str;
-   sleEXTENSION  flag;
+   gctUINT   flag;
    gctBOOL   enable;
    gctBOOL   disable;
    gctBOOL   warn;
@@ -30,54 +30,54 @@ typedef struct _slsEXTENSION_INFO
 }
 slsEXTENSION_INFO;
 
-/* need to add extension macros to _PredefinedMacros[] when adding new extension,
+/* need to add extension macros to _PredefinedMacros[] when adding new &extension,
 ** and Caps->extensions within gcInitGLSLCaps.
 */
-static slsEXTENSION_INFO _DefinedExtensions[] =
+static slsEXTENSION_INFO _DefinedExtensions1[] =
 {
-    {"all",   slvEXTENSION_ALL, gcvFALSE, gcvTRUE, gcvTRUE, gcvFALSE, 0, gcvNULL},
-    {"GL_KHR_blend_equation_advanced", slvEXTENSION_BLEND_EQUATION_ADVANCED, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_ES31_VERSION, gcvNULL},
+    {"all",   slvEXTENSION1_ALL, gcvFALSE, gcvTRUE, gcvTRUE, gcvFALSE, 0, gcvNULL},
+    {"GL_KHR_blend_equation_advanced", slvEXTENSION1_BLEND_EQUATION_ADVANCED, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_ES31_VERSION, gcvNULL},
 
-    {"GL_OES_standard_derivatives", slvEXTENSION_STANDARD_DERIVATIVES, gcvTRUE, gcvTRUE, gcvFALSE, gcvTRUE, 0, gcvNULL},
-    {"GL_OES_texture_3D", slvEXTENSION_TEXTURE_3D, gcvTRUE, gcvTRUE, gcvFALSE, gcvFALSE, 0, gcvNULL},
-    {"GL_OES_EGL_image_external", slvEXTENSION_EGL_IMAGE_EXTERNAL, gcvTRUE, gcvTRUE, gcvFALSE, gcvTRUE, 0, gcvNULL},
-    {"GL_OES_EGL_image_external_essl3", slvEXTENSION_EGL_IMAGE_EXTERNAL_ESSL3, gcvTRUE, gcvTRUE, gcvFALSE, gcvTRUE, 0, gcvNULL},
-    {"GL_OES_texture_storage_multisample_2d_array", slvEXTENSION_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_ES31_VERSION, gcvNULL},
-    {"GL_OES_shader_image_atomic", slvEXTENSION_IMAGE_ATOMIC, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_ES31_VERSION, gcvNULL},
+    {"GL_OES_standard_derivatives", slvEXTENSION1_STANDARD_DERIVATIVES, gcvTRUE, gcvTRUE, gcvFALSE, gcvTRUE, 0, gcvNULL},
+    {"GL_OES_texture_3D", slvEXTENSION1_TEXTURE_3D, gcvTRUE, gcvTRUE, gcvFALSE, gcvFALSE, 0, gcvNULL},
+    {"GL_OES_EGL_image_external", slvEXTENSION1_EGL_IMAGE_EXTERNAL, gcvTRUE, gcvTRUE, gcvFALSE, gcvTRUE, 0, gcvNULL},
+    {"GL_OES_EGL_image_external_essl3", slvEXTENSION1_EGL_IMAGE_EXTERNAL_ESSL3, gcvTRUE, gcvTRUE, gcvFALSE, gcvTRUE, 0, gcvNULL},
+    {"GL_OES_texture_storage_multisample_2d_array", slvEXTENSION1_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_ES31_VERSION, gcvNULL},
+    {"GL_OES_shader_image_atomic", slvEXTENSION1_IMAGE_ATOMIC, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_ES31_VERSION, gcvNULL},
     /* sample shading extension. */
-    {"GL_OES_sample_variables", slvEXTENSION_SAMPLE_VARIABLES, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_HALTI_VERSION, gcvNULL},
-    {"GL_OES_shader_multisample_interpolation", slvEXTENSION_SHADER_MULTISAMPLE_INTERPOLATION, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_HALTI_VERSION, gcvNULL},
+    {"GL_OES_sample_variables", slvEXTENSION1_SAMPLE_VARIABLES, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_HALTI_VERSION, gcvNULL},
+    {"GL_OES_shader_multisample_interpolation", slvEXTENSION1_SHADER_MULTISAMPLE_INTERPOLATION, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_HALTI_VERSION, gcvNULL},
 
-    {"GL_EXT_texture_array", slvEXTENSION_TEXTURE_ARRAY, gcvTRUE, gcvTRUE, gcvFALSE, gcvFALSE, 0, gcvNULL},
-    {"GL_EXT_frag_depth", slvEXTENSION_FRAG_DEPTH, gcvTRUE, gcvTRUE, gcvFALSE, gcvFALSE, 0, gcvNULL},
-    {"GL_EXT_shadow_samplers", slvEXTENSION_SHADOW_SAMPLER, gcvFALSE, gcvTRUE, gcvFALSE, gcvTRUE, 0, gcvNULL},
+    {"GL_EXT_texture_array", slvEXTENSION1_TEXTURE_ARRAY, gcvTRUE, gcvTRUE, gcvFALSE, gcvFALSE, 0, gcvNULL},
+    {"GL_EXT_frag_depth", slvEXTENSION1_FRAG_DEPTH, gcvTRUE, gcvTRUE, gcvFALSE, gcvFALSE, 0, gcvNULL},
+    {"GL_EXT_shadow_samplers", slvEXTENSION1_SHADOW_SAMPLER, gcvFALSE, gcvTRUE, gcvFALSE, gcvTRUE, 0, gcvNULL},
     /* cube array extension. */
-    {"GL_EXT_texture_cube_map_array", slvEXTENSION_TEXTURE_CUBE_MAP_ARRAY, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_texture_cube_map_array"},
+    {"GL_EXT_texture_cube_map_array", slvEXTENSION1_TEXTURE_CUBE_MAP_ARRAY, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_texture_cube_map_array"},
     /* TS extension. */
-    {"GL_EXT_tessellation_shader", slvEXTENSION_TESSELLATION_SHADER, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_tessellation_shader"},
-    {"GL_EXT_tessellation_point_size", slvEXTENSION_TESSELLATION_POINT_SIZE, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_tessellation_point_size",},
+    {"GL_EXT_tessellation_shader", slvEXTENSION1_TESSELLATION_SHADER, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_tessellation_shader"},
+    {"GL_EXT_tessellation_point_size", slvEXTENSION1_TESSELLATION_POINT_SIZE, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_tessellation_point_size",},
     /* GS extension. */
-    {"GL_EXT_geometry_shader", slvEXTENSION_EXT_GEOMETRY_SHADER, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_geometry_shader"},
-    {"GL_EXT_geometry_point_size", slvEXTENSION_EXT_GEOMETRY_POINT_SIZE, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_geometry_point_size"},
+    {"GL_EXT_geometry_shader", slvEXTENSION1_EXT_GEOMETRY_SHADER, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_geometry_shader"},
+    {"GL_EXT_geometry_point_size", slvEXTENSION1_EXT_GEOMETRY_POINT_SIZE, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_geometry_point_size"},
     /* IO block extension. */
-    {"GL_EXT_shader_io_blocks", slvEXTENSION_IO_BLOCKS, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_shader_io_blocks"},
+    {"GL_EXT_shader_io_blocks", slvEXTENSION1_IO_BLOCKS, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_shader_io_blocks"},
     /* GPU_Shader5 extension. */
-    {"GL_EXT_gpu_shader5", slvEXTENSION_GPU_SHADER5, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_gpu_shader5"},
+    {"GL_EXT_gpu_shader5", slvEXTENSION1_GPU_SHADER5, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_gpu_shader5"},
     /* shader implicit conversions extension. */
-    {"GL_EXT_shader_implicit_conversions", slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS, gcvTRUE, gcvFALSE, gcvFALSE, gcvTRUE, _SHADER_ES31_VERSION, gcvNULL},
+    {"GL_EXT_shader_implicit_conversions", slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS, gcvTRUE, gcvFALSE, gcvFALSE, gcvTRUE, _SHADER_ES31_VERSION, gcvNULL},
     /* texture buffer extension. */
-    {"GL_EXT_texture_buffer", slvEXTENSION_EXT_TEXTURE_BUFFER, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_texture_buffer"},
+    {"GL_EXT_texture_buffer", slvEXTENSION1_EXT_TEXTURE_BUFFER, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_texture_buffer"},
     /* primitive bounding box extension. */
-    {"GL_EXT_primitive_bounding_box", slvEXTENSION_EXT_PRIMITIVE_BOUNDING_BOX, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, gcvNULL},
+    {"GL_EXT_primitive_bounding_box", slvEXTENSION1_EXT_PRIMITIVE_BOUNDING_BOX, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, gcvNULL},
     /* frame buffer fetch extension. */
-    {"GL_EXT_shader_framebuffer_fetch", slvEXTENSION_SHADER_FRAMEBUFFER_FETCH, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, 0, "EXT_shader_framebuffer_fetch"},
+    {"GL_EXT_shader_framebuffer_fetch", slvEXTENSION1_SHADER_FRAMEBUFFER_FETCH, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, 0, "EXT_shader_framebuffer_fetch"},
     /* ANDROID_extension_pack_es31a extension. */
-    {"GL_ANDROID_extension_pack_es31a", slvEXTENSION_ANDROID_EXTENSION_PACK_ES31A, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, gcvNULL},
+    {"GL_ANDROID_extension_pack_es31a", slvEXTENSION1_ANDROID_EXTENSION_PACK_ES31A, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, gcvNULL},
 
-    {"GL_VIV_asm", slvEXTENSION_VASM, gcvTRUE, gcvTRUE, gcvFALSE, gcvFALSE, 0, gcvNULL }, /* It is a internal option. */
+    {"GL_VIV_asm", slvEXTENSION1_VASM, gcvTRUE, gcvTRUE, gcvFALSE, gcvFALSE, 0, gcvNULL }, /* It is a internal option. */
 };
 
-#define __sldDefinedExtensionsCount (gcmSIZEOF(_DefinedExtensions) / gcmSIZEOF(slsEXTENSION_INFO))
+#define __sldDefinedExtensions1Count (gcmSIZEOF(_DefinedExtensions1) / gcmSIZEOF(slsEXTENSION_INFO))
 
 static gceSTATUS _AddExtensionMacro(
     ppoPREPROCESSOR         PP,
@@ -104,70 +104,70 @@ gceSTATUS ppoPREPROCESSOR_InitExtensionTable(ppoPREPROCESSOR PP)
     gctSIZE_T i;
     gceSTATUS status = gcvSTATUS_OK;
 
-    for (i = 0; i < __sldDefinedExtensionsCount; i++)
+    for (i = 0; i < __sldDefinedExtensions1Count; i++)
     {
-        switch (_DefinedExtensions[i].flag)
+        switch (_DefinedExtensions1[i].flag)
         {
-        case slvEXTENSION_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY:
-            _AddExtensionMacro(PP, &_DefinedExtensions[i]);
+        case slvEXTENSION1_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY:
+            _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
             break;
-        case slvEXTENSION_BLEND_EQUATION_ADVANCED:
-            _AddExtensionMacro(PP, &_DefinedExtensions[i]);
-            break;
-
-        case slvEXTENSION_EXT_TEXTURE_BUFFER:
-            _AddExtensionMacro(PP, &_DefinedExtensions[i]);
+        case slvEXTENSION1_BLEND_EQUATION_ADVANCED:
+            _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
             break;
 
-        case slvEXTENSION_SHADOW_SAMPLER:
+        case slvEXTENSION1_EXT_TEXTURE_BUFFER:
+            _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
+            break;
+
+        case slvEXTENSION1_SHADOW_SAMPLER:
             if (sloCOMPILER_GetClientApiVersion(PP->compiler) == gcvAPI_OPENGL_ES30)
             {
-                _DefinedExtensions[i].enable = gcvTRUE;
+                _DefinedExtensions1[i].enable = gcvTRUE;
             }
             else
             {
-                _DefinedExtensions[i].enable = gcvFALSE;
+                _DefinedExtensions1[i].enable = gcvFALSE;
             }
             break;
 
-        case slvEXTENSION_TEXTURE_CUBE_MAP_ARRAY:
-            _AddExtensionMacro(PP, &_DefinedExtensions[i]);
+        case slvEXTENSION1_TEXTURE_CUBE_MAP_ARRAY:
+            _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
             break;
 
-        case slvEXTENSION_IO_BLOCKS:
-        case slvEXTENSION_GPU_SHADER5: /* FMA */
-            _AddExtensionMacro(PP, &_DefinedExtensions[i]);
+        case slvEXTENSION1_IO_BLOCKS:
+        case slvEXTENSION1_GPU_SHADER5: /* FMA */
+            _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
             break;
 
-        case slvEXTENSION_EXT_GEOMETRY_SHADER:
-        case slvEXTENSION_EXT_GEOMETRY_POINT_SIZE:
-            _AddExtensionMacro(PP, &_DefinedExtensions[i]);
+        case slvEXTENSION1_EXT_GEOMETRY_SHADER:
+        case slvEXTENSION1_EXT_GEOMETRY_POINT_SIZE:
+            _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
             break;
 
-        case slvEXTENSION_TESSELLATION_SHADER:
-        case slvEXTENSION_TESSELLATION_POINT_SIZE:
-            _AddExtensionMacro(PP, &_DefinedExtensions[i]);
+        case slvEXTENSION1_TESSELLATION_SHADER:
+        case slvEXTENSION1_TESSELLATION_POINT_SIZE:
+            _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
             break;
 
-        case slvEXTENSION_SAMPLE_VARIABLES:
-        case slvEXTENSION_SHADER_MULTISAMPLE_INTERPOLATION:
-            _AddExtensionMacro(PP, &_DefinedExtensions[i]);
+        case slvEXTENSION1_SAMPLE_VARIABLES:
+        case slvEXTENSION1_SHADER_MULTISAMPLE_INTERPOLATION:
+            _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
             break;
 
-        case slvEXTENSION_IMAGE_ATOMIC:
-            _AddExtensionMacro(PP, &_DefinedExtensions[i]);
+        case slvEXTENSION1_IMAGE_ATOMIC:
+            _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
             break;
 
-        case slvEXTENSION_EXT_PRIMITIVE_BOUNDING_BOX:
-            _AddExtensionMacro(PP, &_DefinedExtensions[i]);
+        case slvEXTENSION1_EXT_PRIMITIVE_BOUNDING_BOX:
+            _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
             break;
 
-        case slvEXTENSION_SHADER_FRAMEBUFFER_FETCH:
-            _AddExtensionMacro(PP, &_DefinedExtensions[i]);
+        case slvEXTENSION1_SHADER_FRAMEBUFFER_FETCH:
+            _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
             break;
 
-        case slvEXTENSION_ANDROID_EXTENSION_PACK_ES31A:
-            _AddExtensionMacro(PP, &_DefinedExtensions[i]);
+        case slvEXTENSION1_ANDROID_EXTENSION_PACK_ES31A:
+            _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
             break;
 
         default:
@@ -1839,7 +1839,6 @@ gceSTATUS ppoPREPROCESSOR_Extension(ppoPREPROCESSOR PP)
         gctUINT  i;
         gctINT    extensionIndex = -1;
 
-
         if(PP->nonpreprocessorStatementHasAlreadyAppeared)
         {
             ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR, "Extension directives must occur before any non-preprrocessor tokens.");
@@ -1858,11 +1857,11 @@ gceSTATUS ppoPREPROCESSOR_Extension(ppoPREPROCESSOR PP)
         feature = ntoken;
 
 
-        for(i=0; i < __sldDefinedExtensionsCount; i++) {
+        for(i=0; i < __sldDefinedExtensions1Count; i++) {
 
-           if ((gcmIS_SUCCESS(gcoOS_StrCmp(feature->poolString, _DefinedExtensions[i].str)))
-            || (_DefinedExtensions[i].alias
-                && (gcmIS_SUCCESS(gcoOS_StrCmp(feature->poolString, _DefinedExtensions[i].alias)))
+           if ((gcmIS_SUCCESS(gcoOS_StrCmp(feature->poolString, _DefinedExtensions1[i].str)))
+            || (_DefinedExtensions1[i].alias
+                && (gcmIS_SUCCESS(gcoOS_StrCmp(feature->poolString, _DefinedExtensions1[i].alias)))
                )
               )
            {
@@ -1923,8 +1922,8 @@ gceSTATUS ppoPREPROCESSOR_Extension(ppoPREPROCESSOR PP)
                 gcmONERROR(gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR);
             }
             else if(extensionIndex < 0 ||
-                    _DefinedExtensions[extensionIndex].require == gcvFALSE ||
-                    sloCOMPILER_GetLanguageVersion(PP->compiler) < _DefinedExtensions[extensionIndex].minLanguageVersion)
+                    _DefinedExtensions1[extensionIndex].require == gcvFALSE ||
+                    sloCOMPILER_GetLanguageVersion(PP->compiler) < _DefinedExtensions1[extensionIndex].minLanguageVersion)
             {
                 ppoPREPROCESSOR_Report(PP,
                                        slvREPORT_ERROR,"Extension : %s is not provided by this compiler.",
@@ -1933,8 +1932,10 @@ gceSTATUS ppoPREPROCESSOR_Extension(ppoPREPROCESSOR PP)
             }
             else
             {
+                sloEXTENSION extension = {{0}};
+                extension.extension1 = _DefinedExtensions1[extensionIndex].flag;
                 gcmVERIFY_OK(sloCOMPILER_EnableExtension(PP->compiler,
-                                                         _DefinedExtensions[extensionIndex].flag,
+                                                         &extension,
                                                          gcvTRUE));
             }
         }
@@ -1949,8 +1950,8 @@ gceSTATUS ppoPREPROCESSOR_Extension(ppoPREPROCESSOR PP)
 
             }
             else if(extensionIndex < 0 ||
-                    _DefinedExtensions[extensionIndex].enable == gcvFALSE ||
-                    sloCOMPILER_GetLanguageVersion(PP->compiler) < _DefinedExtensions[extensionIndex].minLanguageVersion)
+                    _DefinedExtensions1[extensionIndex].enable == gcvFALSE ||
+                    sloCOMPILER_GetLanguageVersion(PP->compiler) < _DefinedExtensions1[extensionIndex].minLanguageVersion)
             {
                 ppoPREPROCESSOR_Report(PP,
                                        slvREPORT_WARN,"Extension : %s is not provided by this compiler.",
@@ -1958,8 +1959,10 @@ gceSTATUS ppoPREPROCESSOR_Extension(ppoPREPROCESSOR PP)
             }
             else
             {
+                sloEXTENSION extension = {{0}};
+                extension.extension1 = _DefinedExtensions1[extensionIndex].flag;
                 gcmVERIFY_OK(sloCOMPILER_EnableExtension(PP->compiler,
-                                                         _DefinedExtensions[extensionIndex].flag,
+                                                         &extension,
                                                          gcvTRUE));
             }
         }
@@ -1968,8 +1971,8 @@ gceSTATUS ppoPREPROCESSOR_Extension(ppoPREPROCESSOR PP)
         if( behavior->poolString == PP->keyword->warn)
         {
             if(extensionIndex < 0 ||
-               _DefinedExtensions[extensionIndex].warn == gcvFALSE ||
-               sloCOMPILER_GetLanguageVersion(PP->compiler) < _DefinedExtensions[extensionIndex].minLanguageVersion)
+               _DefinedExtensions1[extensionIndex].warn == gcvFALSE ||
+               sloCOMPILER_GetLanguageVersion(PP->compiler) < _DefinedExtensions1[extensionIndex].minLanguageVersion)
             {
                 ppoPREPROCESSOR_Report(PP,
                                        slvREPORT_WARN,"Extension : %s is not provided by this compiler.",
@@ -1977,8 +1980,10 @@ gceSTATUS ppoPREPROCESSOR_Extension(ppoPREPROCESSOR PP)
             }
             else
             {
+                sloEXTENSION extension = {{0}};
+                extension.extension1 = _DefinedExtensions1[extensionIndex].flag;
                 gcmVERIFY_OK(sloCOMPILER_EnableExtension(PP->compiler,
-                                                         _DefinedExtensions[extensionIndex].flag,
+                                                         &extension,
                                                          gcvTRUE));
                 ppoPREPROCESSOR_Report(PP,
                                        slvREPORT_WARN,"Extension : %s is used.",
@@ -1990,8 +1995,8 @@ gceSTATUS ppoPREPROCESSOR_Extension(ppoPREPROCESSOR PP)
         if( behavior->poolString == PP->keyword->disable)
         {
             if(extensionIndex < 0 ||
-                    _DefinedExtensions[extensionIndex].disable == gcvFALSE ||
-                    sloCOMPILER_GetLanguageVersion(PP->compiler) < _DefinedExtensions[extensionIndex].minLanguageVersion)
+                    _DefinedExtensions1[extensionIndex].disable == gcvFALSE ||
+                    sloCOMPILER_GetLanguageVersion(PP->compiler) < _DefinedExtensions1[extensionIndex].minLanguageVersion)
             {
                 ppoPREPROCESSOR_Report(PP,
                                        slvREPORT_WARN,"Extension : %s is not provided by this compiler.",
@@ -1999,8 +2004,10 @@ gceSTATUS ppoPREPROCESSOR_Extension(ppoPREPROCESSOR PP)
             }
             else
             {
+                sloEXTENSION extension = {{0}};
+                extension.extension1 = _DefinedExtensions1[extensionIndex].flag;
                 gcmVERIFY_OK(sloCOMPILER_EnableExtension(PP->compiler,
-                                                         _DefinedExtensions[extensionIndex].flag,
+                                                         &extension,
                                                          gcvFALSE));
             }
         }

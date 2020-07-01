@@ -93,7 +93,7 @@ slFuncCheckForTextureGatherOffsets(
     IN struct _sloIR_POLYNARY_EXPR * PolynaryExpr
     );
 
-sleEXTENSION
+sloEXTENSION
 slGetBuiltinFunctionExtension(
     IN gctSTRING Symbol
 );
