@@ -1414,14 +1414,6 @@ sloCOMPILER_Compile(
         sloCOMPILER_EnableExtension(Compiler, &extension, gcvTRUE);
     }
 
-    /* Check if "GL_ARB_gpu_shader5" extention is enable. */
-    if (gcoOS_StrStr(GetGLExtensionString(), "GL_ARB_gpu_shader5", gcvNULL))
-    {
-        sloEXTENSION extension = {0};
-        extension.extension2 = slvEXTENSION2_GL_ARB_GPU_SHADER5;
-        sloCOMPILER_EnableExtension(Compiler, &extension, gcvTRUE);
-    }
-
     /* Check if HW has HALTI5 and FMA support */
     if(GetHWHasHalti5() && GetHWHasFmaSupport())
     {
