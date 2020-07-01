@@ -1320,6 +1320,17 @@ This define enables the use of VM for gckCommand and fence buffers.
 #   define gcdIGNORE_DRIVER_VERSIONS_MISMATCH  0
 #endif
 
+/*
+    gcdEXTERNAL_SRAM_DEFAULT_POOL
+        When enabled, external SRAM can be used for the initial command,
+        but the external SRAM base and size must be set by customer.
+        AXI-SRAM only can be used if pool type is speficied
+        with gcvSRAM_EXTERNAL[X] when allocating video memory.
+*/
+#ifndef gcdEXTERNAL_SRAM_DEFAULT_POOL
+#   define gcdEXTERNAL_SRAM_DEFAULT_POOL 0
+#endif
+
 #endif /* __gc_hal_options_h_ */
 
 
