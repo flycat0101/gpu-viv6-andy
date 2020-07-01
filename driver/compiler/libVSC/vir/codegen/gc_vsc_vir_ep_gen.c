@@ -3240,23 +3240,27 @@ static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGen
             case VIR_UNIFORM_YCBCR_PLANE:
                 {
                     VIR_Symbol* pParentSym = VIR_Shader_GetSymFromId(pShader, pVirUniform->u.samplerOrImageAttr.parentSamplerSymId);
-                    VIR_Uniform*pParentUniform = VIR_Symbol_GetUniformPointer(pShader, pParentSym);
+                    VIR_Uniform *pParentUniform = VIR_Symbol_GetUniformPointer(pShader, pParentSym);
                     gctUINT     i;
+                    VIR_SymId   *pPlaneSymId;
 
                     privMemKind = SHS_PRIV_MEM_KIND_YCBCR_PLANE;
                     bAddLlResSlot = gcvFALSE;
                     bSpecifiedPrivmKindIndex = gcvTRUE;
 
+                    gcmASSERT(pParentUniform->u.samplerOrImageAttr.pYcbcrPlaneSymId);
+                    pPlaneSymId = pParentUniform->u.samplerOrImageAttr.pYcbcrPlaneSymId +
+                                      (pVirUniform->u.samplerOrImageAttr.arrayIdxInParent * __YCBCR_PLANE_COUNT__);
                     for (i = 0; i < __YCBCR_PLANE_COUNT__; i++)
                     {
-                        if (pParentUniform->u.samplerOrImageAttr.ycbcrPlaneSymId[i] == VIR_Symbol_GetIndex(pVirUniformSym))
+                        if (pPlaneSymId[i] == VIR_Symbol_GetIndex(pVirUniformSym))
                         {
                             break;
                         }
                     }
 
                     gcmASSERT(i != __YCBCR_PLANE_COUNT__);
-                    specifiedPrivmKindIndex = i;
+                    specifiedPrivmKindIndex = pVirUniform->u.samplerOrImageAttr.arrayIdxInParent * __YCBCR_PLANE_COUNT__ + i;
                 }
                 break;
 
@@ -5239,6 +5243,8 @@ static VSC_ErrCode _AddVkCombStEntryToCombStTableOfPEP(VSC_PEP_GEN_HELPER* pPepG
     /* Extra samplers for VSC_LIB_LINK_TYPE_RESOURCE */
     if (pResAllocEntry->hwRegNo != NOT_ASSIGNED)
     {
+        gctUINT planes;
+
         _AddExtraSamplerArray(&pCombTsEntry->hwMappings[stageIdx].ppExtraSamplerArray,
                               &pCombTsEntry->combTsBinding,
                               pShader,
@@ -5249,9 +5255,20 @@ static VSC_ErrCode _AddVkCombStEntryToCombStTableOfPEP(VSC_PEP_GEN_HELPER* pPepG
                               1,
                               0);
 
-        for (j = 0; j < __YCBCR_PLANE_COUNT__; j++)
+        planes = __YCBCR_PLANE_COUNT__ * pCombTsEntry->combTsBinding.arraySize;
+        if (pCombTsEntry->hwMappings[stageIdx].ppYcbcrPlanes == gcvNULL)
         {
-            _AddPrivateImageUniform(&pCombTsEntry->hwMappings[stageIdx].pYcbcrPlanes[j],
+            gctPOINTER ptr;
+
+            gcoOS_Allocate(gcvNULL, sizeof(SHADER_PRIV_UAV_ENTRY*) * planes,
+                           (gctPOINTER *) &ptr);
+
+            pCombTsEntry->hwMappings[stageIdx].ppYcbcrPlanes = ptr;
+            memset(ptr, 0, sizeof(SHADER_PRIV_UAV_ENTRY*) * planes);
+        }
+        for (j = 0; j < planes; j++)
+        {
+            _AddPrivateImageUniform(pCombTsEntry->hwMappings[stageIdx].ppYcbcrPlanes + j,
                                     &pCombTsEntry->combTsBinding,
                                     pSep,
                                     SHS_PRIV_MEM_KIND_YCBCR_PLANE,
@@ -5677,9 +5694,10 @@ static VSC_ErrCode _PostProcessVkCombStTable(VSC_PEP_GEN_HELPER* pPepGenHelper, 
         }
 
         /* Ycbcr planes layer */
-        for (k = 0; k < __YCBCR_PLANE_COUNT__; k++)
+        gcmASSERT(pComTsEntry->hwMappings[stageIdx].ppYcbcrPlanes);
+        for (k = 0; k < (__YCBCR_PLANE_COUNT__ * pComTsEntry->combTsBinding.arraySize); k++)
         {
-            pPrivUavEntry = pComTsEntry->hwMappings[stageIdx].pYcbcrPlanes[k];
+            pPrivUavEntry = pComTsEntry->hwMappings[stageIdx].ppYcbcrPlanes[k];
             if (pPrivUavEntry)
             {
                 gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivUavEntry->commonPrivm.pPrivateData);
