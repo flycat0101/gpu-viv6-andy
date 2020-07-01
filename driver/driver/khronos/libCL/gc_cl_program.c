@@ -642,7 +642,7 @@ static void clfGetIDEOption(clsIDE_OPTION * option)
         }
 
         gcoOS_StrStr(p, "-O1", &pos);
-        if(pos)
+        if(pos || !option->optimize0)
         {
             option->optimize1 = gcvTRUE;
             option->size += 4;
@@ -650,32 +650,125 @@ static void clfGetIDEOption(clsIDE_OPTION * option)
     }
 }
 
-static void clfUpdateBuildOptionForIDE(gctSTRING *options, gctSIZE_T length)
+static void clfUpdateBuildOptionForIDE(gctSTRING *options, gctSIZE_T length, clsIDE_OPTION * ideOption)
 {
     char * p, *q;
     gctSIZE_T size = length;
 
     p = q = *options;
 
-    gcoOS_StrStr(p, "-g ", &q);
+    gcoOS_StrStr(p, "-g", &q);
     if(q)
     {
-        size = (size-(q-p)-3);
-        gcoOS_StrCopySafe(q, size, q+3);
+        if (strcmp(p, "-g") == 0) {
+            size = (size-(q-p)-2);
+            gcoOS_StrCopySafe(q, size, q+2);
+            if (!ideOption->enbaleSymbol) {
+                ideOption->enbaleSymbol= gcvTRUE;
+                ideOption->size += 3;
+            }
+            return;
+        }else if (*(q+2) == ' '){
+            size = (size-(q-p)-3);
+            gcoOS_StrCopySafe(q, size, q+3);
+            if (!ideOption->enbaleSymbol) {
+                ideOption->enbaleSymbol= gcvTRUE;
+                ideOption->size += 3;
+            }
+        }else if (q-p != 0 && *(q-1) == ' '){
+            size = (size-(q-1-p)-3);
+            gcoOS_StrCopySafe(q-1, size, q-1+3);
+            if (!ideOption->enbaleSymbol) {
+                ideOption->enbaleSymbol= gcvTRUE;
+                ideOption->size += 3;
+            }
+        }
     }
 
-    gcoOS_StrStr(p, "-O0 ", &q);
+    size = strlen(p) +1;
+    gcoOS_StrStr(p, "-O0", &q);
     if(q)
     {
-        size = (size-(q-p)-4);
-        gcoOS_StrCopySafe(q, size, q+4);
+        if (strcmp(p, "-O0") == 0) {
+            size = (size-(q-p)-3);
+            gcoOS_StrCopySafe(q, size, q+3);
+            if (!ideOption->optimize0) {
+                ideOption->optimize0= gcvTRUE;
+                ideOption->size += 4;
+            }
+            if (ideOption->optimize1) {
+                ideOption->optimize1= gcvFALSE;
+                ideOption->size -= 4;
+            }
+            return;
+        }else if (*(q+3) == ' '){
+            size = (size-(q-p)-4);
+            gcoOS_StrCopySafe(q, size, q+4);
+            if (!ideOption->optimize0) {
+                ideOption->optimize0= gcvTRUE;
+                ideOption->size += 4;
+            }
+            if (ideOption->optimize1) {
+                ideOption->optimize1= gcvFALSE;
+                ideOption->size -= 4;
+            }
+            return;
+        }else if (q-p != 0 && *(q-1) == ' '){
+            size = (size-(q-1-p)-4);
+            gcoOS_StrCopySafe(q-1, size, q-1+4);
+            if (!ideOption->optimize0) {
+                ideOption->optimize0= gcvTRUE;
+                ideOption->size += 4;
+            }
+            if (ideOption->optimize1) {
+                ideOption->optimize1= gcvFALSE;
+                ideOption->size -= 4;
+            }
+            return;
+        }
     }
 
-    gcoOS_StrStr(p, "-O1 ", &q);
+    size = strlen(p) +1;
+    gcoOS_StrStr(p, "-O1", &q);
     if(q)
     {
-        size = (size-(q-p)-4);
-        gcoOS_StrCopySafe(q, size, q+4);
+        if (strcmp(p, "-O1") == 0) {
+            size = (size-(q-p)-3);
+            gcoOS_StrCopySafe(q, size, q+3);
+            if (!ideOption->optimize1) {
+                ideOption->optimize1= gcvTRUE;
+                ideOption->size += 4;
+            }
+            if (ideOption->optimize0) {
+                ideOption->optimize0= gcvFALSE;
+                ideOption->size -= 4;
+            }
+            return;
+        }else if (*(q+3) == ' '){
+            size = (size-(q-p)-4);
+            gcoOS_StrCopySafe(q, size, q+4);
+            if (!ideOption->optimize1) {
+                ideOption->optimize1= gcvTRUE;
+                ideOption->size += 4;
+            }
+            if (ideOption->optimize0) {
+                ideOption->optimize0= gcvFALSE;
+                ideOption->size -= 4;
+            }
+            return;
+        }else if (q-p != 0 && *(q-1) == ' '){
+            size = (size-(q-1-p)-4);
+            gcoOS_StrCopySafe(q-1, size, q-1+4);
+            if (!ideOption->optimize1) {
+                ideOption->optimize1= gcvTRUE;
+                ideOption->size += 4;
+            }
+            if (ideOption->optimize0) {
+                ideOption->optimize0= gcvFALSE;
+                ideOption->size -= 4;
+            }
+            return;
+        }
     }
 }
 
@@ -874,13 +967,14 @@ clBuildProgram(
             gcoOS_MemFill(tempOption, 0, length+currentIDEOption->size);
             gcoOS_StrCopySafe((gctSTRING)tempOption, length, (gctSTRING)Options);
 
-            clfUpdateBuildOptionForIDE((gctSTRING *)&tempOption, length);
+            clfUpdateBuildOptionForIDE((gctSTRING *)&tempOption, length, currentIDEOption);
 
             if(currentIDEOption->size)
             {
                 gctSTRING p = (gctSTRING)tempOption;
 
                 length += currentIDEOption->size;
+
                 if(currentIDEOption->enbaleSymbol)
                 {
                     gcoOS_StrCatSafe((gctSTRING)p, length, " -g");
