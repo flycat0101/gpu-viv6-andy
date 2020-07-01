@@ -1610,6 +1610,10 @@ _QueryFeatureDatabase(
         available = database->OCB_COUNTER;
         break;
 
+    case gcvFEATURE_AI_GPU:
+        available = database->AI_GPU;
+        break;
+
     case gcvFEATURE_NN_ENGINE:
         available = database->NNCoreCount > 0;
         break;
@@ -2141,6 +2145,10 @@ gckHARDWARE_Construct(
     else if (gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_PIPE_2D))
     {
         hardware->type = gcvHARDWARE_2D;
+    }
+    else if (gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_AI_GPU))
+    {
+        hardware->type = gcvHARDWARE_3D;
     }
     else if (gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_NN_ENGINE)
      || gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_TP_ENGINE)
