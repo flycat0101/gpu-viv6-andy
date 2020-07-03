@@ -1433,12 +1433,33 @@ gbm_viv_surface_get_in_fence_fd(struct gbm_surface *surface)
 }
 
 static void
+wait_native_fence(int fenceFd)
+{
+    gceSTATUS status;
+
+    /* GPU wait for 2000 ms. */
+    status = gcoOS_WaitNativeFence(gcvNULL, fenceFd, 2000);
+
+    if (status == gcvSTATUS_TIMEOUT)
+    {
+        /* Print a warning. */
+        gcmPRINT("%s: Warning: wait for fence fd=%d", __func__, fenceFd);
+
+        /* Wait for ever. */
+        status = gcoOS_WaitNativeFence(gcvNULL, fenceFd, gcvINFINITE);
+    }
+}
+
+static void
 gbm_viv_surface_set_in_fence_fd(struct gbm_surface *surface, int fd)
 {
     struct gbm_viv_surface *surf = (struct gbm_viv_surface*)surface;
 
     if (surf->fence_fd >= 0 && surf->fence_fd != fd)
+    {
+        wait_native_fence(surf->fence_fd);
         close(surf->fence_fd);
+    }
     surf->fence_fd = fd;
 }
 
