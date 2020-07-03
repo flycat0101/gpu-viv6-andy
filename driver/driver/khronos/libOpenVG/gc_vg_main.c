@@ -61,10 +61,7 @@ vgsTHREADDATA_PTR vgfGetThreadData(
 
         if ((thread == gcvNULL) && Create)
         {
-            /* Allocate memory for thread. */
-            thread = malloc(gcmSIZEOF(struct _vgsTHREADDATA));
-
-            if (thread != gcvNULL)
+            if (gcmIS_SUCCESS(gcoOS_Allocate(gcvNULL, gcmSIZEOF(struct _vgsTHREADDATA), (gctPOINTER*) &thread)))
             {
                 /* Updata thread data. */
                 pthread_setspecific(tlsKey, thread);
@@ -96,9 +93,7 @@ vgsTHREADDATA_PTR vgfGetThreadData(
     if ((thread == gcvNULL) && Create)
     {
         /* Allocate memory for thread. */
-        thread = LocalAlloc(LPTR, gcmSIZEOF(struct _vgsTHREADDATA));
-
-        if (thread != gcvNULL)
+        if (gcmIS_SUCCESS(gcoOS_Allocate(gcvNULL, gcmSIZEOF(struct _vgsTHREADDATA), (gctPOINTER*) &thread)))
         {
             /* Updata thread data. */
             TlsSetValue(TLSIndex, thread);
@@ -148,7 +143,7 @@ gctBOOL __stdcall DllMain(
         data = TlsGetValue(TLSIndex);
         if (data != gcvNULL)
         {
-            LocalFree((HLOCAL) data);
+            gcmOS_SAFE_FREE(gcvNULL, data);
         }
         break;
 
@@ -159,7 +154,7 @@ gctBOOL __stdcall DllMain(
         data = TlsGetValue(TLSIndex);
         if (data != gcvNULL)
         {
-            LocalFree((HLOCAL) data);
+            gcmOS_SAFE_FREE(gcvNULL, data);
         }
 
         /* Release the TLS index. */
