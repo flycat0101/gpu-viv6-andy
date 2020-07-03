@@ -502,7 +502,6 @@ enum vx_kernel_internal_e
     VX_KERNEL_INTERNAL_MULTIPLY_2D_MATRIXES        = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x39,
 
     VX_KERNEL_INTERNAL_ROI_POOLING_RELU_LAYER      = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x3A,
-    VX_KERNEL_INTERNAL_CONVOLVE5X5                 = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x3D,
 };
 
 
@@ -1099,6 +1098,8 @@ typedef struct _vx_kernel
     vx_uint32                               kernelShaderCount;
     vx_uint32                               currShaderID;
 
+    vx_char                                 subname[VX_MAX_KERNEL_NAME];
+
     vx_signature_s                          signature;
 
     vx_bool                                 enabled;
@@ -1473,8 +1474,6 @@ typedef struct _vx_node
 
 
     vx_kernel_attribute_s                   kernelAttributes;
-
-    vx_char                                 kernelsubname[VX_MAX_KERNEL_NAME];
 
     vx_uint32                               targetIndex;
 
