@@ -644,6 +644,12 @@ __buffer_callback_handle_done(void *data, struct wl_callback *callback, uint32_t
         buffer->info.ts_fd = -1;
     }
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
+    if (buffer->client_fence_fd >= 0)
+    {
+        close(buffer->client_fence_fd);
+        buffer->client_fence_fd = -1;
+    }
+
     if (buffer->buffer_release)
     {
         zwp_linux_buffer_release_v1_destroy(buffer->buffer_release);
@@ -2586,9 +2592,8 @@ _PostWindowBackBufferFence(
     {
         if(buffer->client_fence_fd > 0)
         {
-            wait_native_fence(buffer->client_fence_fd);
             close(buffer->client_fence_fd);
-
+            buffer->client_fence_fd = -1;
         }
 
         if(fence_fd > 0)
