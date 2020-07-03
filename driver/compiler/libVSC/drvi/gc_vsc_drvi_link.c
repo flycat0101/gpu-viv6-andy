@@ -4855,16 +4855,20 @@ static VSC_ErrCode _CalcInputHwCompIndexPerExeObj(VSC_BASE_LINKER_HELPER* pBaseL
     VIR_Symbol*                pAttrSym;
     gctBOOL                    bNeedIoMemPacked, bHasNoAssignedLocation = gcvFALSE;;
 
-    vscBV_Initialize(&inputWorkingMask, pBaseLinkHelper->pMM,
-                     pBaseLinkHelper->pHwCfg->maxAttributeCount * CHANNEL_NUM);
-
     bNeedIoMemPacked = _NeedInputHwMemPacked(pBaseLinkHelper, pShader, pAttrIdLsts);
 
-    /* HW reserve 8 packed components for TCS's per-patch data for tess-factors and other specials */
+    /* HW reserve 8 packed components for TES's per-patch data for tess-factors and other specials */
     if (pShader->shaderKind == VIR_SHADER_TESSELLATION_EVALUATION && bPerPrim)
     {
+        vscBV_Initialize(&inputWorkingMask, pBaseLinkHelper->pMM,
+                         pBaseLinkHelper->pHwCfg->maxTcsOutPatchVectors * CHANNEL_NUM + 8);
         hwChannelIdx = 2 * CHANNEL_NUM;
         vscBV_SetInRange(&inputWorkingMask, 0, (2 * CHANNEL_NUM));
+    }
+    else
+    {
+        vscBV_Initialize(&inputWorkingMask, pBaseLinkHelper->pMM,
+                         pBaseLinkHelper->pHwCfg->maxAttributeCount * CHANNEL_NUM);
     }
 
     /* Firstly for all inputs with 'location' */
@@ -5017,16 +5021,20 @@ static VSC_ErrCode _CalcOutputHwCompIndexPerExeObj(VSC_BASE_LINKER_HELPER* pBase
     gctINT                     location, ioIdx = 0;
     gctBOOL                    bNeedIoMemPacked, bHasNoAssignedLocation = gcvFALSE;
 
-    vscBV_Initialize(&outputWorkingMask, pBaseLinkHelper->pMM,
-                     pBaseLinkHelper->pHwCfg->maxAttributeCount * CHANNEL_NUM);
-
     bNeedIoMemPacked = _NeedOutputHwMemPacked(pBaseLinkHelper, pShader, pOutputIdLsts);
 
-    /* HW reserve 8 packed components for TCS's per-patch data for tess-factors and other specials */
+    /* HW reserve 8 packed components for TES's per-patch data for tess-factors and other specials */
     if (pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL && bPerPrim)
     {
+        vscBV_Initialize(&outputWorkingMask, pBaseLinkHelper->pMM,
+                         pBaseLinkHelper->pHwCfg->maxTcsOutPatchVectors * CHANNEL_NUM + 8);
         hwChannelIdx = 2 * CHANNEL_NUM;
         vscBV_SetInRange(&outputWorkingMask, 0, (2 * CHANNEL_NUM));
+    }
+    else
+    {
+        vscBV_Initialize(&outputWorkingMask, pBaseLinkHelper->pMM,
+                         pBaseLinkHelper->pHwCfg->maxAttributeCount * CHANNEL_NUM);
     }
 
     /* Firstly for all outputs with 'location' */

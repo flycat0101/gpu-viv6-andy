@@ -102,6 +102,8 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
     pVscHwCfg->tesConstRegAddrBase                   = Hardware->config->vsConstBase;
     pVscHwCfg->gsConstRegAddrBase                    = Hardware->config->vsConstBase;
     pVscHwCfg->psConstRegAddrBase                    = Hardware->config->psConstBase;
+    pVscHwCfg->maxTcsOutPatchVectors                 = 30;
+
     /*
     ** Set sample base and count. Here is the sampler order:
     ** PS: 0~15
