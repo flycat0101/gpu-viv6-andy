@@ -12,14 +12,18 @@
 
 
 #include "gc_egl_precomp.h"
+#if gcdENABLE_3D
 #include <GLES3/gl32.h>
 #include <GLES2/gl2ext.h>
+#endif
 
 #define VIV_EGL_BUILD
+#if gcdENABLE_3D
 #include "../../libGLESv11/gc_glff_functions.h"
 #include "../../libGLESv3/include/glcore/gc_es_dispatch.h"
 #if !defined(VIVANTE_NO_GL4)
 #include "../../libGL4/include/glcore/gc_es_dispatch.h"
+#endif
 #endif
 #if !defined(VIVANTE_NO_VG)
 #include "../../libOpenVG_3D/vg11/driver/gc_vgsh_dump.h"
@@ -29,6 +33,7 @@
 /* Zone used for header/footer. */
 #define _GC_OBJ_ZONE    gcdZONE_EGL_API
 
+#if gcdENABLE_3D
 
 #define COMMON_ES_INDEX(_api) _api##_index
 #define COMMON_ES_API(_api) forward_##_api
@@ -468,6 +473,7 @@ void GL_APIENTRY COMMON_ES_API(glTexDirectTiledMapVIV)(GLenum Target, GLsizei Wi
     CALL_ES_API(PFNGLTEXDIRECTTILEDMAPVIVPROC, TexDirectTiledMapVIV, Target, Width, Height, Format, Logical, Physical);
 }
 
+#endif /* gcdENABLE_3D */
 
 EGLAPI EGLBoolean EGLAPIENTRY eglPatchID(EGLenum *PatchID, EGLBoolean Set)
 {
@@ -575,6 +581,8 @@ veglClientApiEntry eglApiEntryTbl[] =
     eglApiEntry(eglPatchID),
     { gcvNULL, gcvNULL }
 };
+
+#if gcdENABLE_3D
 
 veglClientApiEntry glExtApiAliasTbl[] =
 {
@@ -826,6 +834,8 @@ veglClientApiEntry gl4xApiEntryTbl[] =
 };
 #endif
 
+#endif /* gcdENABLE_3D */
+
 #if !defined(VIVANTE_NO_VG)
 veglClientApiEntry vgApiEntryTbl[] =
 {
@@ -860,6 +870,31 @@ void veglInitClientApiProcTbl(gctHANDLE library, veglClientApiEntry *lookupTbl, 
     }
 }
 
+static EGL_PROC _LookupProc(veglClientApiEntry *lookupTbl, const char *apiName, int offset)
+{
+    /* Loop while there are entries in the lookup table. */
+    while (lookupTbl->name != gcvNULL)
+    {
+        /* See if we have a match. */
+        if (gcmIS_SUCCESS(gcoOS_StrCmp((apiName + offset), lookupTbl->name)))
+        {
+            if (lookupTbl->function)
+            {
+                /* Return the function pointer. */
+                return lookupTbl->function;
+            }
+            return gcvNULL;
+        }
+
+        /* Next lookup entry. */
+        ++lookupTbl;
+    }
+
+    /* No match found. */
+    return gcvNULL;
+}
+
+#if gcdENABLE_3D
 void veglInitEsCommonApiDispatchTbl(gctHANDLE es11lib, gctHANDLE es2xlib, veglCommonEsApiDispatch *lookupTbl, const char *prefix)
 {
     char apiName[80];
@@ -894,30 +929,6 @@ void veglInitEsCommonApiDispatchTbl(gctHANDLE es11lib, gctHANDLE es2xlib, veglCo
         /* Next lookup entry. */
         ++lookupTbl;
     }
-}
-
-static EGL_PROC _LookupProc(veglClientApiEntry *lookupTbl, const char *apiName, int offset)
-{
-    /* Loop while there are entries in the lookup table. */
-    while (lookupTbl->name != gcvNULL)
-    {
-        /* See if we have a match. */
-        if (gcmIS_SUCCESS(gcoOS_StrCmp((apiName + offset), lookupTbl->name)))
-        {
-            if (lookupTbl->function)
-            {
-                /* Return the function pointer. */
-                return lookupTbl->function;
-            }
-            return gcvNULL;
-        }
-
-        /* Next lookup entry. */
-        ++lookupTbl;
-    }
-
-    /* No match found. */
-    return gcvNULL;
 }
 
 static gctBOOL LookupGLExtAliasApiProc(veglClientApiEntry *lookupTbl, char *apiName)
@@ -971,6 +982,7 @@ static EGL_PROC _GetCommonGlesApiProc(EGLint index)
 
     return func;
 }
+#endif
 
 EGLAPI __eglMustCastToProperFunctionPointerType EGLAPIENTRY
 eglGetProcAddress(const char *procname)
@@ -978,7 +990,6 @@ eglGetProcAddress(const char *procname)
     __eglMustCastToProperFunctionPointerType func = gcvNULL;
     VEGLThreadData thread;
     char apiName[80];
-    char fwApiName[80];
 
     gcmHEADER_ARG("procname=%s", procname);
     VEGL_TRACE_API_PRE(GetProcAddress)(procname);
@@ -1003,9 +1014,12 @@ eglGetProcAddress(const char *procname)
             break;
         }
 
+#if gcdENABLE_3D
         /* Look for GLES and GL function from OpenGL API tables */
         if (gcmIS_SUCCESS(gcoOS_StrNCmp(apiName, "gl", 2)))
         {
+            char fwApiName[80];
+
             if (thread->api == EGL_OPENGL_ES_API)
             {
                 /* Look up common GLES API in glesCommonApiEntryTbl first */
@@ -1039,6 +1053,7 @@ eglGetProcAddress(const char *procname)
             }
 #endif
         }
+#endif
 
 #if !defined(VIVANTE_NO_VG)
         /* Look for OpenVG function from vgApiEntryTbl[] */

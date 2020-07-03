@@ -29,8 +29,10 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 #include "gc_vdk.h"
+#if gcdENABLE_3D
 #include <GLES3/gl32.h>
 #include <GLES2/gl2ext.h>
+#endif
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,6 +41,8 @@
 #ifdef UNDER_CE
 #include <windows.h>
 #endif
+
+#if gcdENABLE_3D
 
 #ifndef GL_GENERATE_MIPMAP
 # define GL_GENERATE_MIPMAP 0x8191
@@ -1012,3 +1016,5 @@ vdkDeleteProgram(
 
     return 1;
 }
+
+#endif /* gcdENABLE_3D */
