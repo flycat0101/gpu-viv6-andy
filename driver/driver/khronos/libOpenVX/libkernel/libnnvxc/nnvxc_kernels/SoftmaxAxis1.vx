@@ -95,11 +95,11 @@ __kernel void softmax_axis1_##src_name##to##dst_name \
 
 SOFTMAX_AXIS1_SH_IMPL(F16, F16, vxc_half8, vxc_short8, half4,  vxc_short8,\
 CONV, 1, 0, VXC_VertMax3_Half)
-//SOFTMAX_AXIS1_SH_IMPL(F16, I16, vxc_half8, vxc_short8, short4, vxc_short8,\
+SOFTMAX_AXIS1_SH_IMPL(F16, I16, vxc_half8, vxc_short8, short4, vxc_short8,\
 CONV_SAT_RTE, outputScale, outputZP, VXC_VertMax3_Half)
-//SOFTMAX_AXIS1_SH_IMPL(F16, I8,  vxc_half8, vxc_short8, char4,  vxc_char8,\
+SOFTMAX_AXIS1_SH_IMPL(F16, I8,  vxc_half8, vxc_short8, char4,  vxc_char8,\
 CONV_SAT_RTE, outputScale, outputZP, VXC_VertMax3_Half)
-//SOFTMAX_AXIS1_SH_IMPL(F16, U8,  vxc_half8, vxc_short8, uchar4,\
+SOFTMAX_AXIS1_SH_IMPL(F16, U8,  vxc_half8, vxc_short8, uchar4,\
 vxc_uchar8, CONV_SAT_RTE, outputScale, outputZP, VXC_VertMax3_Half)
 
 SOFTMAX_AXIS1_SH_IMPL(I16, I16, vxc_short8, vxc_short8, short4, vxc_short8,\
@@ -136,11 +136,11 @@ __kernel void softmax_axis1_##src_name##to##dst_name##_2D \
 
 SOFTMAX_AXIS1_2D_SH_IMPL(F16, F16, vxc_half8, vxc_short8, half4,  vxc_short8,\
 CONV, 1, 0, VXC_VertMax3_Half)
-//SOFTMAX_AXIS1_2D_SH_IMPL(F16, I16, vxc_half8, vxc_short8, short4, vxc_short8,\
+SOFTMAX_AXIS1_2D_SH_IMPL(F16, I16, vxc_half8, vxc_short8, short4, vxc_short8,\
 CONV_SAT_RTE, outputScale, outputZP, VXC_VertMax3_Half)
-//SOFTMAX_AXIS1_2D_SH_IMPL(F16, I8,  vxc_half8, vxc_short8, char4,  vxc_char8,\
+SOFTMAX_AXIS1_2D_SH_IMPL(F16, I8,  vxc_half8, vxc_short8, char4,  vxc_char8,\
 CONV_SAT_RTE, outputScale, outputZP, VXC_VertMax3_Half)
-//SOFTMAX_AXIS1_2D_SH_IMPL(F16, U8,  vxc_half8, vxc_short8, uchar4,\
+SOFTMAX_AXIS1_2D_SH_IMPL(F16, U8,  vxc_half8, vxc_short8, uchar4,\
 vxc_uchar8, CONV_SAT_RTE, outputScale, outputZP, VXC_VertMax3_Half)
 
 SOFTMAX_AXIS1_2D_SH_IMPL(I16, I16, vxc_short8, vxc_short8, short4, vxc_short8,\
