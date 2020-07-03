@@ -462,8 +462,6 @@ conv2VirsVirBuiltinMap _virBuiltinMap[] =
     { "gl_LastFragData", {0, VIR_STORAGE_INPUT, 0,}},
     { "#cluster_id", {0, 0, 0, VIR_STORAGE_INPUT,}},
     { "gl_ClipDistance", {0, 0, 0, VIR_STORAGE_OUTPUT,}},
-    { "gl_Local_invocation_index", {0, 0, 0, VIR_STORAGE_INPUT,}},
-    { "gl_Global_invocation_index",{0, 0, 0, VIR_STORAGE_INPUT,}},
 };
 
 #define _gcdBuiltinMapCount (sizeof(_virBuiltinMap)/sizeof(conv2VirsVirBuiltinMap))
@@ -1482,8 +1480,6 @@ _ConvBuiltinNameKindToVirNameId(
     Case(gcSL_LAST_FRAG_DATA, VIR_NAME_LAST_FRAG_DATA);
     Case(gcSL_CLUSTER_ID, VIR_NAME_CLUSTER_ID);
     Case(gcSL_CLIP_DISTANCE, VIR_NAME_CLIP_DISTANCE);
-    Case(gcSL_LOCAL_INVOCATION_INDEX, VIR_NAME_LOCAL_INVOCATION_INDEX);
-    Case(gcSL_GLOBAL_INVOCATION_INDEX, VIR_NAME_GLOBAL_INVOCATION_INDEX);
     default:
         if((gctINT) Kind < 0) {
             gcmASSERT(0);
