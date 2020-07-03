@@ -902,6 +902,71 @@ _vscEP_Buffer_SaveImageDerivedInfo(
     VSC_IO_writeUint(pIoBuf, (gctUINT)pImageDerivedInfo->imageFormatInfo.bSetInSpriv);
 }
 
+/* Save the sampler derived information. */
+static void
+_vscEP_Buffer_SaveSamplerDerivedInfo(
+    VSC_EP_IO_BUFFER*       pEPBuf,
+    PROG_VK_SAMPLER_DERIVED_INFO* pSamplerDerivedInfo
+    )
+{
+    VSC_IO_BUFFER* pIoBuf = pEPBuf->pIoBuf;
+    gctUINT i, entryMask;
+
+    /* Save texture size. */
+    entryMask = 0;
+    for (i = 0; i < 2; i++)
+    {
+        if (pSamplerDerivedInfo->pTextureSize[i])
+        {
+            entryMask |= (1 << (i));
+        }
+    }
+    VSC_IO_writeUint(pIoBuf, entryMask);
+    for (i = 0; i < 2; i++)
+    {
+        if (pSamplerDerivedInfo->pTextureSize[i])
+        {
+            _vscEP_Buffer_SavePrivConstEntry(pEPBuf, pSamplerDerivedInfo->pTextureSize[i]);
+        }
+    }
+
+    /* Save lodMinMax */
+    entryMask = 0;
+    for (i = 0; i < 2; i++)
+    {
+        if (pSamplerDerivedInfo->pLodMinMax[i])
+        {
+            entryMask |= (1 << (i));
+        }
+    }
+    VSC_IO_writeUint(pIoBuf, entryMask);
+    for (i = 0; i < 2; i++)
+    {
+        if (pSamplerDerivedInfo->pLodMinMax[i])
+        {
+            _vscEP_Buffer_SavePrivConstEntry(pEPBuf, pSamplerDerivedInfo->pLodMinMax[i]);
+        }
+    }
+
+    /* Save levelsSamples */
+    entryMask = 0;
+    for (i = 0; i < 2; i++)
+    {
+        if (pSamplerDerivedInfo->pLevelsSamples[i])
+        {
+            entryMask |= (1 << (i));
+        }
+    }
+    VSC_IO_writeUint(pIoBuf, entryMask);
+    for (i = 0; i < 2; i++)
+    {
+        if (pSamplerDerivedInfo->pLevelsSamples[i])
+        {
+            _vscEP_Buffer_SavePrivConstEntry(pEPBuf, pSamplerDerivedInfo->pLevelsSamples[i]);
+        }
+    }
+}
+
 /****************************************Save PEP-related functions****************************************/
 /****************************************GL-related functions****************************************/
 /* Save attribute table entry. */
@@ -1384,84 +1449,17 @@ _vscEP_Buffer_SaveVKCombinedTextureSamplerEntry(
     )
 {
     VSC_IO_BUFFER* pIoBuf = pEPBuf->pIoBuf;
-    gctUINT i, j;
-    gctUINT entryMask = 0;
+    gctUINT i;
 
     _vscEP_Buffer_SaveShaderResourceBinding(pEPBuf, &pCombTsEntry->combTsBinding);
     VSC_IO_writeUint(pIoBuf, pCombTsEntry->combTsEntryIndex);
     VSC_IO_writeUint(pIoBuf, pCombTsEntry->stageBits);
     VSC_IO_writeUint(pIoBuf, pCombTsEntry->activeStageMask);
 
-    /* Save texture size. */
-    entryMask = 0;
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
     {
-        for (j = 0; j < 2; j++)
-        {
-            if (pCombTsEntry->pTextureSize[i][j])
-            {
-                entryMask |= (1 << (i * 2 + j));
-            }
-        }
-    }
-    VSC_IO_writeUint(pIoBuf, entryMask);
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        for (j = 0; j < 2; j++)
-        {
-            if (pCombTsEntry->pTextureSize[i][j])
-            {
-                _vscEP_Buffer_SavePrivConstEntry(pEPBuf, pCombTsEntry->pTextureSize[i][j]);
-            }
-        }
-    }
-
-    /* Save lodMinMax */
-    entryMask = 0;
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        for (j = 0; j < 2; j++)
-        {
-            if (pCombTsEntry->pLodMinMax[i][j])
-            {
-                entryMask |= (1 << (i * 2 + j));
-            }
-        }
-    }
-    VSC_IO_writeUint(pIoBuf, entryMask);
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        for (j = 0; j < 2; j++)
-        {
-            if (pCombTsEntry->pLodMinMax[i][j])
-            {
-                _vscEP_Buffer_SavePrivConstEntry(pEPBuf, pCombTsEntry->pLodMinMax[i][j]);
-            }
-        }
-    }
-
-    /* Save levels samples. */
-    entryMask = 0;
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        for (j = 0; j < 2; j++)
-        {
-            if (pCombTsEntry->pLevelsSamples[i][j])
-            {
-                entryMask |= (1 << (i * 2 + j));
-            }
-        }
-    }
-    VSC_IO_writeUint(pIoBuf, entryMask);
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        for (j = 0; j < 2; j++)
-        {
-            if (pCombTsEntry->pLevelsSamples[i][j])
-            {
-                _vscEP_Buffer_SavePrivConstEntry(pEPBuf, pCombTsEntry->pLevelsSamples[i][j]);
-            }
-        }
+        /* Save the sampler derived information. */
+        _vscEP_Buffer_SaveSamplerDerivedInfo(pEPBuf, &pCombTsEntry->samplerDerivedInfo[i]);
     }
 
     if (pCombTsEntry->combTsBinding.arraySize != 0)
@@ -1681,8 +1679,7 @@ _vscEP_Buffer_SaveVKUniformTexelBufferEntry(
     )
 {
     VSC_IO_BUFFER* pIoBuf = pEPBuf->pIoBuf;
-    gctUINT i, j;
-    gctUINT entryMask = 0;
+    gctUINT i;
 
     _vscEP_Buffer_SaveShaderResourceBinding(pEPBuf, &pUniformTexelBufferEntry->utbBinding);
     VSC_IO_writeUint(pIoBuf, pUniformTexelBufferEntry->utbEntryIndex);
@@ -1691,32 +1688,12 @@ _vscEP_Buffer_SaveVKUniformTexelBufferEntry(
 
     VSC_IO_writeUint(pIoBuf, (gctUINT)pUniformTexelBufferEntry->utbEntryFlag);
 
-    /* Save texture size. */
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
     {
-        for (j = 0; j < 2; j++)
-        {
-            if (pUniformTexelBufferEntry->pTextureSize[i][j])
-            {
-                entryMask |= (1 << (i * 2 + j));
-            }
-        }
-    }
-    VSC_IO_writeUint(pIoBuf, entryMask);
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        for (j = 0; j < 2; j++)
-        {
-            if (pUniformTexelBufferEntry->pTextureSize[i][j])
-            {
-                _vscEP_Buffer_SavePrivConstEntry(pEPBuf, pUniformTexelBufferEntry->pTextureSize[i][j]);
-            }
-        }
-    }
+        /* Save the sampler derived information. */
+        _vscEP_Buffer_SaveSamplerDerivedInfo(pEPBuf, &pUniformTexelBufferEntry->samplerDerivedInfo[i]);
 
-    /* Save the image derived information. */
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
+        /* Save the image derived information. */
         _vscEP_Buffer_SaveImageDerivedInfo(pEPBuf, &pUniformTexelBufferEntry->imageDerivedInfo[i]);
     }
 
@@ -1788,8 +1765,7 @@ _vscEP_Buffer_SaveVKInutAttachmentEntry(
     )
 {
     VSC_IO_BUFFER* pIoBuf = pEPBuf->pIoBuf;
-    gctUINT i, j;
-    gctUINT entryMask = 0;
+    gctUINT i;
 
     _vscEP_Buffer_SaveShaderResourceBinding(pEPBuf, &pInputAttachmentEntry->iaBinding);
 
@@ -1797,82 +1773,13 @@ _vscEP_Buffer_SaveVKInutAttachmentEntry(
     VSC_IO_writeUint(pIoBuf, pInputAttachmentEntry->stageBits);
     VSC_IO_writeUint(pIoBuf, pInputAttachmentEntry->activeStageMask);
 
-    /* Save the image derived information. */
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
     {
+        /* Save the image derived information. */
         _vscEP_Buffer_SaveImageDerivedInfo(pEPBuf, &pInputAttachmentEntry->imageDerivedInfo[i]);
-    }
 
-    /* Save texture size. */
-    entryMask = 0;
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        for (j = 0; j < 2; j++)
-        {
-            if (pInputAttachmentEntry->pTextureSize[i][j])
-            {
-                entryMask |= (1 << (i * 2 + j));
-            }
-        }
-    }
-    VSC_IO_writeUint(pIoBuf, entryMask);
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        for (j = 0; j < 2; j++)
-        {
-            if (pInputAttachmentEntry->pTextureSize[i][j])
-            {
-                _vscEP_Buffer_SavePrivConstEntry(pEPBuf, pInputAttachmentEntry->pTextureSize[i][j]);
-            }
-        }
-    }
-
-    /* Save lodMinMax */
-    entryMask = 0;
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        for (j = 0; j < 2; j++)
-        {
-            if (pInputAttachmentEntry->pLodMinMax[i][j])
-            {
-                entryMask |= (1 << (i * 2 + j));
-            }
-        }
-    }
-    VSC_IO_writeUint(pIoBuf, entryMask);
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        for (j = 0; j < 2; j++)
-        {
-            if (pInputAttachmentEntry->pLodMinMax[i][j])
-            {
-                _vscEP_Buffer_SavePrivConstEntry(pEPBuf, pInputAttachmentEntry->pLodMinMax[i][j]);
-            }
-        }
-    }
-
-    /* Save levels samples. */
-    entryMask = 0;
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        for (j = 0; j < 2; j++)
-        {
-            if (pInputAttachmentEntry->pLevelsSamples[i][j])
-            {
-                entryMask |= (1 << (i * 2 + j));
-            }
-        }
-    }
-    VSC_IO_writeUint(pIoBuf, entryMask);
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        for (j = 0; j < 2; j++)
-        {
-            if (pInputAttachmentEntry->pLevelsSamples[i][j])
-            {
-                _vscEP_Buffer_SavePrivConstEntry(pEPBuf, pInputAttachmentEntry->pLevelsSamples[i][j]);
-            }
-        }
+        /* Save the sampler derived information. */
+        _vscEP_Buffer_SaveSamplerDerivedInfo(pEPBuf, &pInputAttachmentEntry->samplerDerivedInfo[i]);
     }
 
     /* Save resOpBits. */
@@ -2146,6 +2053,9 @@ _vscEP_Buffer_SaveVKPrivCombTexSampHwMapping(
     {
         VSC_IO_writeUint(pIoBuf, 0);
     }
+
+    /* Save the sampler derived information. */
+    _vscEP_Buffer_SaveSamplerDerivedInfo(pEPBuf, &pPrivCombTexSampHwMapping->samplerDerivedInfo);
 }
 
 /* Save Vulkan private CTS hw mapping pool. */
@@ -3528,6 +3438,76 @@ _vscEP_Buffer_LoadImageDerivedInfo(
     VSC_IO_readUint(pIoBuf, (gctUINT*)&pImageDerivedInfo->imageFormatInfo.bSetInSpriv);
 }
 
+/* Load the sampler derived information. */
+static VSC_ErrCode
+_vscEP_Buffer_LoadSamplerDerivedInfo(
+    VSC_EP_IO_BUFFER*       pEPBuf,
+    PROG_VK_SAMPLER_DERIVED_INFO* pSamplerDerivedInfo
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VSC_IO_BUFFER* pIoBuf = pEPBuf->pIoBuf;
+    gctUINT i;
+    gctUINT entryMask = 0;
+
+    /* Load texture size. */
+    entryMask = 0;
+    VSC_IO_readUint(pIoBuf, &entryMask);
+    for (i = 0; i < 2; i++)
+    {
+        if (entryMask & (1 << i))
+        {
+            VSC_EP_ALLOC_MEM(pSamplerDerivedInfo->pTextureSize[i],
+                             SHADER_PRIV_CONSTANT_ENTRY,
+                             sizeof(SHADER_PRIV_CONSTANT_ENTRY));
+            ON_ERROR0(_vscEP_Buffer_LoadPrivConstEntry(pEPBuf, pSamplerDerivedInfo->pTextureSize[i]));
+        }
+        else
+        {
+            pSamplerDerivedInfo->pTextureSize[i] = gcvNULL;
+        }
+    }
+
+    /* Load lodMinMax */
+    entryMask = 0;
+    VSC_IO_readUint(pIoBuf, &entryMask);
+    for (i = 0; i < 2; i++)
+    {
+        if (entryMask & (1 << i))
+        {
+            VSC_EP_ALLOC_MEM(pSamplerDerivedInfo->pLodMinMax[i],
+                             SHADER_PRIV_CONSTANT_ENTRY,
+                             sizeof(SHADER_PRIV_CONSTANT_ENTRY));
+            ON_ERROR0(_vscEP_Buffer_LoadPrivConstEntry(pEPBuf, pSamplerDerivedInfo->pLodMinMax[i]));
+        }
+        else
+        {
+            pSamplerDerivedInfo->pLodMinMax[i] = gcvNULL;
+        }
+    }
+
+    /* Load levels samples. */
+    entryMask = 0;
+    VSC_IO_readUint(pIoBuf, &entryMask);
+    for (i = 0; i < 2; i++)
+    {
+        if (entryMask & (1 << i))
+        {
+            VSC_EP_ALLOC_MEM(pSamplerDerivedInfo->pLevelsSamples[i],
+                             SHADER_PRIV_CONSTANT_ENTRY,
+                             sizeof(SHADER_PRIV_CONSTANT_ENTRY));
+            ON_ERROR0(_vscEP_Buffer_LoadPrivConstEntry(pEPBuf, pSamplerDerivedInfo->pLevelsSamples[i]));
+        }
+        else
+        {
+            pSamplerDerivedInfo->pLevelsSamples[i] = gcvNULL;
+        }
+    }
+
+OnError:
+    return errCode;
+}
+
 /****************************************Load PEP-related functions****************************************/
 /****************************************GL-related functions****************************************/
 /* Load attribute table entry. */
@@ -4263,75 +4243,17 @@ _vscEP_Buffer_LoadVKCombinedTextureSamplerEntry(
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_IO_BUFFER* pIoBuf = pEPBuf->pIoBuf;
-    gctUINT i, j;
-    gctUINT entryMask = 0;
+    gctUINT i;
 
     ON_ERROR0(_vscEP_Buffer_LoadShaderResourceBinding(pEPBuf, &pCombTsEntry->combTsBinding));
     VSC_IO_readUint(pIoBuf, &pCombTsEntry->combTsEntryIndex);
     VSC_IO_readUint(pIoBuf, (gctUINT*)&pCombTsEntry->stageBits);
     VSC_IO_readUint(pIoBuf, &pCombTsEntry->activeStageMask);
 
-    /* Load texture size. */
-    entryMask = 0;
-    VSC_IO_readUint(pIoBuf, &entryMask);
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
     {
-        for (j = 0; j < 2; j++)
-        {
-            if (entryMask & (1 << (i * 2 + j)))
-            {
-                VSC_EP_ALLOC_MEM(pCombTsEntry->pTextureSize[i][j],
-                                 SHADER_PRIV_CONSTANT_ENTRY,
-                                 sizeof(SHADER_PRIV_CONSTANT_ENTRY));
-                ON_ERROR0(_vscEP_Buffer_LoadPrivConstEntry(pEPBuf, pCombTsEntry->pTextureSize[i][j]));
-            }
-            else
-            {
-                pCombTsEntry->pTextureSize[i][j] = gcvNULL;
-            }
-        }
-    }
-
-    /* Load lodMinMax */
-    entryMask = 0;
-    VSC_IO_readUint(pIoBuf, &entryMask);
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        for (j = 0; j < 2; j++)
-        {
-            if (entryMask & (1 << (i * 2 + j)))
-            {
-                VSC_EP_ALLOC_MEM(pCombTsEntry->pLodMinMax[i][j],
-                                 SHADER_PRIV_CONSTANT_ENTRY,
-                                 sizeof(SHADER_PRIV_CONSTANT_ENTRY));
-                ON_ERROR0(_vscEP_Buffer_LoadPrivConstEntry(pEPBuf, pCombTsEntry->pLodMinMax[i][j]));
-            }
-            else
-            {
-                pCombTsEntry->pLodMinMax[i][j] = gcvNULL;
-            }
-        }
-    }
-
-    /* Load levels samples. */
-    entryMask = 0;
-    VSC_IO_readUint(pIoBuf, &entryMask);
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        for (j = 0; j < 2; j++)
-        {
-            if (entryMask & (1 << (i * 2 + j)))
-            {
-                VSC_EP_ALLOC_MEM(pCombTsEntry->pLevelsSamples[i][j],
-                                 SHADER_PRIV_CONSTANT_ENTRY,
-                                 sizeof(SHADER_PRIV_CONSTANT_ENTRY));
-                ON_ERROR0(_vscEP_Buffer_LoadPrivConstEntry(pEPBuf, pCombTsEntry->pLevelsSamples[i][j]));
-            }
-            else
-            {
-                pCombTsEntry->pLevelsSamples[i][j] = gcvNULL;
-            }
-        }
+        /* Load the sampler derived information. */
+        _vscEP_Buffer_LoadSamplerDerivedInfo(pEPBuf, &pCombTsEntry->samplerDerivedInfo[i]);
     }
 
     if (pCombTsEntry->combTsBinding.arraySize != 0)
@@ -4649,8 +4571,7 @@ _vscEP_Buffer_LoadVKUniformTexelBufferEntry(
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_IO_BUFFER* pIoBuf = pEPBuf->pIoBuf;
-    gctUINT i, j;
-    gctUINT entryMask = 0;
+    gctUINT i;
 
     ON_ERROR0(_vscEP_Buffer_LoadShaderResourceBinding(pEPBuf, &pUniformTexelBufferEntry->utbBinding));
     VSC_IO_readUint(pIoBuf, &pUniformTexelBufferEntry->utbEntryIndex);
@@ -4659,28 +4580,12 @@ _vscEP_Buffer_LoadVKUniformTexelBufferEntry(
 
     VSC_IO_readUint(pIoBuf, (gctUINT*)&pUniformTexelBufferEntry->utbEntryFlag);
 
-    VSC_IO_readUint(pIoBuf, &entryMask);
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
     {
-        for (j = 0; j < 2; j++)
-        {
-            if (entryMask & (1 << (i * 2 + j)))
-            {
-                VSC_EP_ALLOC_MEM(pUniformTexelBufferEntry->pTextureSize[i][j],
-                                 SHADER_PRIV_CONSTANT_ENTRY,
-                                 sizeof(SHADER_PRIV_CONSTANT_ENTRY));
-                ON_ERROR0(_vscEP_Buffer_LoadPrivConstEntry(pEPBuf, pUniformTexelBufferEntry->pTextureSize[i][j]));
-            }
-            else
-            {
-                pUniformTexelBufferEntry->pTextureSize[i][j] = gcvNULL;
-            }
-        }
-    }
+        /* Load the sampler derived information. */
+        _vscEP_Buffer_LoadSamplerDerivedInfo(pEPBuf, &pUniformTexelBufferEntry->samplerDerivedInfo[i]);
 
-    /* Load the image derived information. */
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
+        /* Load the image derived information. */
         _vscEP_Buffer_LoadImageDerivedInfo(pEPBuf, &pUniformTexelBufferEntry->imageDerivedInfo[i]);
     }
 
@@ -4784,8 +4689,7 @@ _vscEP_Buffer_LoadVKInutAttachmentEntry(
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_IO_BUFFER* pIoBuf = pEPBuf->pIoBuf;
-    gctUINT i, j;
-    gctUINT entryMask = 0;
+    gctUINT i;
 
     ON_ERROR0(_vscEP_Buffer_LoadShaderResourceBinding(pEPBuf, &pInputAttachmentEntry->iaBinding));
 
@@ -4793,73 +4697,13 @@ _vscEP_Buffer_LoadVKInutAttachmentEntry(
     VSC_IO_readUint(pIoBuf, (gctUINT*)&pInputAttachmentEntry->stageBits);
     VSC_IO_readUint(pIoBuf, &pInputAttachmentEntry->activeStageMask);
 
-    /* Load the image derived information. */
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
     {
+        /* Load the image derived information. */
         _vscEP_Buffer_LoadImageDerivedInfo(pEPBuf, &pInputAttachmentEntry->imageDerivedInfo[i]);
-    }
 
-    /* Load texture size. */
-    entryMask = 0;
-    VSC_IO_readUint(pIoBuf, &entryMask);
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        for (j = 0; j < 2; j++)
-        {
-            if (entryMask & (1 << (i * 2 + j)))
-            {
-                VSC_EP_ALLOC_MEM(pInputAttachmentEntry->pTextureSize[i][j],
-                                 SHADER_PRIV_CONSTANT_ENTRY,
-                                 sizeof(SHADER_PRIV_CONSTANT_ENTRY));
-                ON_ERROR0(_vscEP_Buffer_LoadPrivConstEntry(pEPBuf, pInputAttachmentEntry->pTextureSize[i][j]));
-            }
-            else
-            {
-                pInputAttachmentEntry->pTextureSize[i][j] = gcvNULL;
-            }
-        }
-    }
-
-    /* Load lodMinMax */
-    entryMask = 0;
-    VSC_IO_readUint(pIoBuf, &entryMask);
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        for (j = 0; j < 2; j++)
-        {
-            if (entryMask & (1 << (i * 2 + j)))
-            {
-                VSC_EP_ALLOC_MEM(pInputAttachmentEntry->pLodMinMax[i][j],
-                                 SHADER_PRIV_CONSTANT_ENTRY,
-                                 sizeof(SHADER_PRIV_CONSTANT_ENTRY));
-                ON_ERROR0(_vscEP_Buffer_LoadPrivConstEntry(pEPBuf, pInputAttachmentEntry->pLodMinMax[i][j]));
-            }
-            else
-            {
-                pInputAttachmentEntry->pLodMinMax[i][j] = gcvNULL;
-            }
-        }
-    }
-
-    /* Load levels samples. */
-    entryMask = 0;
-    VSC_IO_readUint(pIoBuf, &entryMask);
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        for (j = 0; j < 2; j++)
-        {
-            if (entryMask & (1 << (i * 2 + j)))
-            {
-                VSC_EP_ALLOC_MEM(pInputAttachmentEntry->pLevelsSamples[i][j],
-                                 SHADER_PRIV_CONSTANT_ENTRY,
-                                 sizeof(SHADER_PRIV_CONSTANT_ENTRY));
-                ON_ERROR0(_vscEP_Buffer_LoadPrivConstEntry(pEPBuf, pInputAttachmentEntry->pLevelsSamples[i][j]));
-            }
-            else
-            {
-                pInputAttachmentEntry->pLevelsSamples[i][j] = gcvNULL;
-            }
-        }
+        /* Load the sampler derived information. */
+        _vscEP_Buffer_LoadSamplerDerivedInfo(pEPBuf, &pInputAttachmentEntry->samplerDerivedInfo[i]);
     }
 
     /* Load ResOpBits. */
@@ -5246,6 +5090,9 @@ _vscEP_Buffer_LoadVKPrivCombTexSampHwMapping(
     {
         pPrivCombTexSampHwMapping->ppExtraSamplerArray = gcvNULL;
     }
+
+    /* Load the sampler derived information. */
+    _vscEP_Buffer_LoadSamplerDerivedInfo(pEPBuf, &pPrivCombTexSampHwMapping->samplerDerivedInfo);
 
 OnError:
     return errCode;

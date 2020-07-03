@@ -433,15 +433,6 @@ static VIR_Enable virEnable [] =
     VIR_ENABLE_W
 };
 
-static VIR_Swizzle virSwizzleCompact [] =
-{
-    VIR_SWIZZLE_XYZW,
-    VIR_SWIZZLE_X,
-    VIR_SWIZZLE_XYYY,
-    VIR_SWIZZLE_XYZZ,
-    VIR_SWIZZLE_XYZW,
-};
-
 static VIR_Enable
 __SpvGenEnable(
     IN gcSPV spv,
@@ -596,68 +587,83 @@ __ConvVectorIndexToSwizzle(
 
 
 static VIR_Swizzle
-__SpvID2Swizzle (
+__SpvID2Swizzle(
     IN gcSPV spv,
     IN gctUINT id
     )
 {
-    VIR_Swizzle virSwizzle = VIR_SWIZZLE_XYZW;
-    SpvIDType idType = SPV_ID_TYPE(id);
-    SpvId     sampler = 0;
+    VIR_Swizzle     virSwizzle = VIR_SWIZZLE_XYZW;
+    SpvIDType       idType = SPV_ID_TYPE(id), baseIdType;
+    SpvId           sampler = 0;
+
     if (id >= spv->idDescSize)
     {
         return virSwizzle;
     }
 
+    /* Get the type from id. */
     switch (idType)
     {
-    case SPV_ID_TYPE_SYMBOL:        idType = SPV_ID_SYM_SPV_TYPE(id);
-                                    sampler = SPV_ID_SYM_SAMPLEDIMAGE_SAMPLER(id);
-                                    break;
-    case SPV_ID_TYPE_CONST:         idType = SPV_ID_CST_SPV_TYPE(id); break;
-    case SPV_ID_TYPE_FUNC_DEFINE:   idType = SPV_ID_FUNC_TYPE_ID(id); break;
-    case SPV_ID_TYPE_TYPE:          idType = id; break;
-    default: gcmASSERT(gcvFALSE); break;
+    case SPV_ID_TYPE_SYMBOL:
+        idType = SPV_ID_SYM_SPV_TYPE(id);
+        sampler = SPV_ID_SYM_SAMPLEDIMAGE_SAMPLER(id);
+        break;
+
+    case SPV_ID_TYPE_CONST:
+        idType = SPV_ID_CST_SPV_TYPE(id);
+        break;
+
+    case SPV_ID_TYPE_FUNC_DEFINE:
+        idType = SPV_ID_FUNC_TYPE_ID(id);
+        break;
+
+    case SPV_ID_TYPE_TYPE:
+        idType = id;
+        break;
+
+    default:
+        gcmASSERT(gcvFALSE);
+        break;
     }
 
-    if (SPV_ID_TYPE_IS_POINTER(idType))
+    baseIdType = idType;
+
+    /* Get the basic type if it is a pointer. */
+    while (SPV_ID_TYPE_IS_POINTER(baseIdType))
     {
-        if (SPV_ID_TYPE_IS_VECTOR(idType))
+        baseIdType = SPV_ID_TYPE_POINTER_OBJECT_SPV_TYPE(baseIdType);
+    }
+
+    /* Get the swizzle based on the type. */
+    if (SPV_ID_TYPE_IS_VECTOR(baseIdType))
+    {
+        /* Use the w-shift swizzle for a vector. */
+        virSwizzle = VIR_Swizzle_GenSwizzleByComponentCount(SPV_ID_TYPE_VEC_COMP_NUM(baseIdType));
+    }
+    else if (SPV_ID_TYPE_IS_IMAGE(baseIdType) || SPV_ID_TYPE_IS_SAMPLER(baseIdType) || sampler != 0)
+    {
+        /* Always use XYWZ for a sampler or an image. */
+        virSwizzle = VIR_SWIZZLE_XYZW;
+    }
+    else if (SPV_ID_TYPE_IS_SCALAR(baseIdType) || SPV_ID_TYPE_IS_BOOLEAN(baseIdType))
+    {
+        /* vec4 in_te_attr[] and get value of in_te_attr[0].z,
+            * resultId.enable is set .z, set virSwizzle is of src0 .zzzz instead of .x
+            *   ATTR_LD            hp global  #spv_id61.hp.z, hp  #spv_id22.hp.z,  uint 0,   uint 0
+            */
+        if (SPV_ID_TYPE_IS_POINTER(idType) &&
+            spv->resultId &&
+            (SPV_ID_SYM_VECTOR_OFFSET_VALUE(spv->resultId) != VIR_INVALID_ID) &&
+            (SPV_ID_SYM_VECTOR_OFFSET_TYPE(spv->resultId) == VIR_SYM_CONST))
         {
-            virSwizzle = virSwizzleCompact[SPV_ID_TYPE_VEC_COMP_NUM(SPV_ID_TYPE_POINTER_OBJECT_SPV_TYPE(idType))];
-        }
-        else if (sampler != 0)
-        {
-            /* the accessed symbol is sampler, use VIR_SWIZZLE_XYZW */
-            virSwizzle = VIR_SWIZZLE_XYZW;
+            virSwizzle = __ConvVectorIndexToSwizzle(SPV_ID_VIR_TYPE_ID(spv->resultId),
+                                                    SPV_ID_SYM_VECTOR_OFFSET_VALUE(spv->resultId),
+                                                    !SPV_ID_SYM_NO_NEED_WSHIFT(spv->resultId));
         }
         else
         {
-            /* vec4 in_te_attr[] and get value of in_te_attr[0].z,
-             * resultId.enable is set .z, set virSwizzle is of src0 .zzzz instead of .x
-             *   ATTR_LD            hp global  #spv_id61.hp.z, hp  #spv_id22.hp.z,  uint 0,   uint 0
-             */
-            if (spv->resultId &&
-                (SPV_ID_SYM_VECTOR_OFFSET_VALUE(spv->resultId) != VIR_INVALID_ID) &&
-                (SPV_ID_SYM_VECTOR_OFFSET_TYPE(spv->resultId) == VIR_SYM_CONST))
-            {
-                virSwizzle = __ConvVectorIndexToSwizzle(SPV_ID_VIR_TYPE_ID(spv->resultId),
-                                                        SPV_ID_SYM_VECTOR_OFFSET_VALUE(spv->resultId),
-                                                        !SPV_ID_SYM_NO_NEED_WSHIFT(spv->resultId));
-            }
-            else
-            {
-                virSwizzle = VIR_SWIZZLE_XXXX;
-            }
+            virSwizzle = VIR_SWIZZLE_XXXX;
         }
-    }
-    else if (SPV_ID_TYPE_IS_VECTOR(idType))
-    {
-        virSwizzle = VIR_Swizzle_GenSwizzleByComponentCount(SPV_ID_TYPE_VEC_COMP_NUM(idType));
-    }
-    else if (SPV_ID_TYPE_IS_SCALAR(idType) || SPV_ID_TYPE_IS_BOOLEAN(idType))
-    {
-        virSwizzle = VIR_SWIZZLE_XXXX;
     }
     else
     {
@@ -12401,7 +12407,7 @@ static gceSTATUS __SpvConstructAndInitializeVIRShader(
     /* It is a pre-high level shader. */
     VIR_Shader_SetLevel((*virShader), VIR_SHLEVEL_Pre_High);
 
-    VIR_Shader_SetFlag((*virShader), VIR_SHFLAG_GENERATED_BY_SPIRV);
+    VIR_Shader_SetFlag((*virShader), VIR_SHFLAG_GENERATED_FROM_SPIRV);
 
     (*virShader)->useEarlyFragTest = 0;
     if (spv->spvSpecFlag & SPV_SPECFLAG_DISABLE_IR_DUMP)
@@ -12431,6 +12437,32 @@ static gceSTATUS __SpvConstructAndInitializeVIRShader(
     __SpvAddBuiltinVariable(spv, *virShader);
 
     __SpvSetClientVersion(spv, (model != SpvExecutionModelKernel), *virShader);
+
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS __SpvSetVirCapability(
+    IN gcSPV spv,
+    IN VIR_Shader * virShader
+    )
+{
+    VIR_SpirvInfo*       pSpirvCapa = &(VIR_Shader_GetSpirvInfo(virShader));
+    VIR_Spirv_Capability spirvCap = VIR_SPIRV_CAPABILITY_NONE;
+
+    if (spv->capability.SpvCapabilityClipDistance)
+    {
+        spirvCap |= VIR_SPIRV_CAPABILITY_CLIP_DISTANCE;
+    }
+    if (spv->capability.SpvCapabilityCullDistance)
+    {
+        spirvCap |= VIR_SPIRV_CAPABILITY_CULL_DISTANCE;
+    }
+    if (spv->capability.SpvCapabilityTessellationPointSize || spv->capability.SpvCapabilityGeometryPointSize)
+    {
+        spirvCap |= VIR_SPIRV_CAPABILITY_POINT_SIZE;
+    }
+
+    VIR_SprivInfo_SetCap(pSpirvCapa, spirvCap);
 
     return gcvSTATUS_OK;
 }
@@ -12512,6 +12544,8 @@ static gceSTATUS __SpvCreateEntryPoint(
         default: break;
         }
     }
+
+    __SpvSetVirCapability(spv, *virShader);
 
     gcmASSERT(spv->word == spv->nextInst);
 

@@ -7375,7 +7375,7 @@ _CheckOperandForVarUsage(
 
             /* it is possible that the underlying symbol is NULL, like invocationIndex and workgroupIndex,
                since they are replaced by invocationID and workgroupID */
-            if (opndSym)
+            if (opndSym && !VIR_Symbol_IsSymbolUnsupport(pShader, opndSym))
             {
                 VIR_Symbol_ClrFlag(opndSym, VIR_SYMFLAG_UNUSED);
                 VIR_Symbol_SetFlag(opndSym, VIR_SYMFLAG_STATICALLY_USED);
@@ -7491,8 +7491,11 @@ VSC_ErrCode vscVIR_CheckVariableUsage(VSC_SH_PASS_WORKER* pPassWorker)
                 {
                     pOutputSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pOutputIdLsts, outputIdx));
 
-                    VIR_Symbol_ClrFlag(pOutputSym, VIR_SYMFLAG_UNUSED);
-                    VIR_Symbol_SetFlag(pOutputSym, VIR_SYMFLAG_STATICALLY_USED);
+                    if (!VIR_Symbol_IsSymbolUnsupport(pShader, pOutputSym))
+                    {
+                        VIR_Symbol_ClrFlag(pOutputSym, VIR_SYMFLAG_UNUSED);
+                        VIR_Symbol_SetFlag(pOutputSym, VIR_SYMFLAG_STATICALLY_USED);
+                    }
                 }
             }
 
