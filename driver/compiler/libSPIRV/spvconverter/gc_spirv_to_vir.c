@@ -12711,7 +12711,7 @@ static gceSTATUS __SpvAddNewFuncCallToTable(
         return status;
     }
 
-    SPV_CHECK_DYNAMIC_SIZE(
+    SPV_CHECK_DYNAMIC_SIZE1(
         memPool,
         funcTable->funcs,
         SpvFuncCallInfo*,
@@ -12737,7 +12737,7 @@ static gceSTATUS __SpvAddNewFuncToCallInfo(
         return status;
     }
 
-    SPV_CHECK_DYNAMIC_SIZE(
+    SPV_CHECK_DYNAMIC_SIZE1(
         memPool,
         funcCall->calleeIds,
         gctUINT,
@@ -13097,7 +13097,7 @@ static gceSTATUS __SpvValidate(
     vscPMP_Intialize(&spv->pmp, gcvNULL, 8, gcmSIZEOF(void *), gcvTRUE);
 
     /* Initialize internal ID. */
-    SPV_CHECK_IDDESCRIPTOR(spv, spv->bound + SPV_INTERNAL_ID_NUM);
+    SPV_CHECK_IDDESCRIPTOR1(spv, spv->bound + SPV_INTERNAL_ID_NUM);
     gcmASSERT(spv->internalIds == gcvNULL);
     gcmONERROR(spvAllocate(spv->spvMemPool, gcmSIZEOF(SpvId) * SPV_INTERNAL_ID_NUM, (gctPOINTER *)&spv->internalIds));
     gcoOS_ZeroMemory(spv->internalIds, gcmSIZEOF(SpvId) * SPV_INTERNAL_ID_NUM);
