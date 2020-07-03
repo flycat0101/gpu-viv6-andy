@@ -10349,7 +10349,9 @@ vxnne_shader_executable vxnneGetGPUTensorPad2ShaderExecutable(
     vx_uint32     output_depth               = TENSOR_VIEW_SIZE_INDEX(outputs, 2);
     vx_uint32     output_batch               = TENSOR_VIEW_SIZE_INDEX(outputs, 3);
     vx_enum       inputFormat                = TENSOR_DATA_TYPE(inputs);
+    vx_enum       outputFormat               = TENSOR_DATA_TYPE(outputs);
     vx_int32      padConstv                  = padConst->value->n32;
+    vx_int32      padQuant                   = 0;
     vx_uint32     maxWorkGroupSize           = 8;
     vx_uint32     width                      = output_width;
     vx_uint32     height                     = output_height;
@@ -10357,16 +10359,21 @@ vxnne_shader_executable vxnneGetGPUTensorPad2ShaderExecutable(
     vx_tensor     src                        = NULL;
     vx_tensor     dst                        = NULL;
     vx_int32      sizes[4]  = {1, 1, 1, 1};
+    vx_int32      padBatch                   = pad_dims[6];
     vx_int32      padChn                     = pad_dims[4];
     vx_int32      padTop                     = pad_dims[2];
     vx_int32      padLeft                    = pad_dims[0];
     vx_scalar     in_chn_num                 = vxCreateScalar(context, VX_TYPE_INT32, &input_depth);
     vx_scalar     out_chn_num                = vxCreateScalar(context, VX_TYPE_INT32, &output_depth);
+    vx_scalar     in_batch_num               = vxCreateScalar(context, VX_TYPE_INT32, &input_batch);
     vx_scalar     leftScl                    = vxCreateScalar(context, VX_TYPE_INT32, &padLeft);
     vx_scalar     topScl                     = vxCreateScalar(context, VX_TYPE_INT32, &padTop);
     vx_scalar     chnScl                     = vxCreateScalar(context, VX_TYPE_INT32, &padChn);
-    vx_reference  parameters[8]             = {(vx_reference)inputs, (vx_reference)in_chn_num, (vx_reference)out_chn_num,
-                                                (vx_reference)leftScl, (vx_reference)topScl, (vx_reference)chnScl,
+    vx_scalar     batchScl                   = vxCreateScalar(context, VX_TYPE_INT32, &padBatch);
+    vx_scalar     qPadVal                    = NULL;
+    vx_reference  parameters[10]             = {(vx_reference)inputs, (vx_reference)in_chn_num, (vx_reference)out_chn_num,
+                                                (vx_reference)in_batch_num, (vx_reference)leftScl, (vx_reference)topScl,
+                                                (vx_reference)chnScl, (vx_reference)batchScl,
                                                 (vx_reference)padConst, (vx_reference)outputs};
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, inputs=%p, outputs=%p",
@@ -10374,7 +10381,8 @@ vxnne_shader_executable vxnneGetGPUTensorPad2ShaderExecutable(
 
     if(output_batch > 1)
     {
-        if(output_depth != input_depth)
+        if((output_depth != input_depth)
+            || (output_batch != input_batch))
         {
             if(output_depth * output_batch < 65536)
             {
@@ -10436,34 +10444,45 @@ vxnne_shader_executable vxnneGetGPUTensorPad2ShaderExecutable(
         sizes[1] = height;
         sizes[2] = depth;
         dst = vxoTensor_ReshapeTensor(outputs, sizes, 3);
-        parameters[7] = (vx_reference)dst;
+        parameters[9] = (vx_reference)dst;
     }
 
     {
         borderMode->mode = VX_BORDER_CONSTANT;
 
-        if (TENSOR_QUANT_TYPE(inputs) == VX_QUANT_DYNAMIC_FIXED_POINT)
+        if (TENSOR_QUANT_TYPE(outputs) == VX_QUANT_DYNAMIC_FIXED_POINT)
         {
-            vx_int32 fl = (vx_int32)TENSOR_POS(inputs);
+            vx_int32 fl = (vx_int32)TENSOR_POS(outputs);
             vx_float32 data = (vx_float32)(fl > 0 ? padConstv * (vx_float32)(1 << fl) : padConstv * (1.0f / (vx_float32)(1 << -fl)));
             vx_int32   padV = (vx_int32)vxnneRound(data, VX_NN_ROUNDING_MODE_RTNE);
 
-            if (inputFormat == VX_TYPE_INT16)
-                borderMode->constant_value.S16 = (vx_int16)(padV > 32767 ? 32767 : (padV < -32768) ? -32768 : padV);
+            if (outputFormat == VX_TYPE_INT16)
+            {
+                padQuant = (padV > 32767 ? 32767 : (padV < -32768) ? -32768 : padV);
+                borderMode->constant_value.S16 = (vx_int16)(padQuant);
+            }
             else
-                borderMode->constant_value.U8 = (vx_uint8)(padV > 127 ? 127 : (padV < -128) ? -128 : padV);
+            {
+                padQuant = (padV > 127 ? 127 : (padV < -128) ? -128 : padV);
+                borderMode->constant_value.U8 = (vx_uint8)(padQuant);
+            }
+            qPadVal = vxCreateScalar(context, VX_TYPE_INT32, &padQuant);
+            parameters[8] = (vx_reference)qPadVal;
         }
-        else if (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT16)
+        else if (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_INT16)
             borderMode->constant_value.S16 = (vx_int16)padConstv;
-        else if (TENSOR_QUANT_TYPE(inputs) == VX_QUANT_AFFINE_SCALE)
+        else if (TENSOR_QUANT_TYPE(outputs) == VX_QUANT_AFFINE_SCALE)
         {
-            vx_float32 scale = TENSOR_TF_SCALE(inputs);
-            vx_int32 zeroPoint = TENSOR_TF_ZEROPOINT(inputs);
+            vx_float32 scale = TENSOR_TF_SCALE(outputs);
+            vx_int32 zeroPoint = TENSOR_TF_ZEROPOINT(outputs);
             vx_int32 padV = (vx_int32)vxnneRound(padConstv / scale  + (vx_uint8)zeroPoint, VX_NN_ROUNDING_MODE_RTNE);
 
-            borderMode->constant_value.U8 = (vx_uint8)(padV > 255 ? 255 : padV < 0 ? 0 : padV);
+            padQuant = padV > 255 ? 255 : padV < 0 ? 0 : padV;
+            borderMode->constant_value.U8 = (vx_uint8)(padQuant);
+            qPadVal = vxCreateScalar(context, VX_TYPE_INT32, &padQuant);
+            parameters[8] = (vx_reference)qPadVal;
         }
-        else if (inputFormat == VX_TYPE_UINT8 || inputFormat == VX_TYPE_INT8)
+        else if (outputFormat == VX_TYPE_UINT8 || outputFormat == VX_TYPE_INT8)
             borderMode->constant_value.U8 = (vx_uint8)padConstv;
     }
 
@@ -10497,21 +10516,47 @@ vxnne_shader_executable vxnneGetGPUTensorPad2ShaderExecutable(
         status = vxBuildProgram(program, "-cl-viv-vx-extension");
         if (status != VX_SUCCESS) goto OnError;
 
-        kernel = vxnneAddKernelShadersInProgram(context, "gpuTensorPad2", program, 8, kernelEnum);
+        kernel = vxnneAddKernelShadersInProgram(context, "gpuTensorPad2", program, 10, kernelEnum);
         if (!kernel) goto OnError;
 
         vxReleaseProgram(&program);
     }
 
-    if(input_width != output_width || input_height != output_height)
+    if(inputFormat == VX_TYPE_FLOAT32 || inputFormat == VX_TYPE_FLOAT16)
     {
-        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_whc", borderMode);
-        if (!shaderExecutable) goto OnError;
+        if(output_batch != input_batch)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_nchw", borderMode);
+            if (!shaderExecutable) goto OnError;
+        }
+        else if(output_depth == input_depth)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_wh", borderMode);
+            if (!shaderExecutable) goto OnError;
+        }
+        else
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_chn", borderMode);
+            if (!shaderExecutable) goto OnError;
+        }
     }
-    else
+    else if(inputFormat == VX_TYPE_UINT8)
     {
-        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_chn", borderMode);
-        if (!shaderExecutable) goto OnError;
+        if(output_batch != input_batch)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8_nchw", borderMode);
+            if (!shaderExecutable) goto OnError;
+        }
+        else if(output_depth == input_depth)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8_wh", borderMode);
+            if (!shaderExecutable) goto OnError;
+        }
+        else
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8_chn", borderMode);
+            if (!shaderExecutable) goto OnError;
+        }
     }
 
     status = vxnneShaderExecutable_GetMaxWorkGroupSize(shaderExecutable, &maxWorkGroupSize);
@@ -10527,7 +10572,7 @@ vxnne_shader_executable vxnneGetGPUTensorPad2ShaderExecutable(
     execution_parameters.globalWorkSize[1]   = height;
     execution_parameters.globalWorkSize[2]   = depth;
 
-    status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 8);
+    status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 10);
     if (status != VX_SUCCESS) goto OnError;
 
     status = vxnneShaderExecutable_SetExecutionParameters(shaderExecutable, &execution_parameters);
@@ -10535,6 +10580,14 @@ vxnne_shader_executable vxnneGetGPUTensorPad2ShaderExecutable(
 
     if (src) vxoTensor_ReleaseTensor(&src);
     if (dst) vxoTensor_ReleaseTensor(&dst);
+    if (in_chn_num) vxReleaseScalar(&in_chn_num);
+    if (out_chn_num) vxReleaseScalar(&out_chn_num);
+    if (in_batch_num) vxReleaseScalar(&in_batch_num);
+    if (leftScl) vxReleaseScalar(&leftScl);
+    if (topScl) vxReleaseScalar(&topScl);
+    if (chnScl) vxReleaseScalar(&chnScl);
+    if (batchScl) vxReleaseScalar(&batchScl);
+    if (qPadVal) vxReleaseScalar(&qPadVal);
 
     gcmFOOTER_ARG("%p", shaderExecutable);
     return shaderExecutable;
@@ -10544,6 +10597,14 @@ OnError:
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
     if (src) vxoTensor_ReleaseTensor(&src);
     if (dst) vxoTensor_ReleaseTensor(&dst);
+    if (in_chn_num) vxReleaseScalar(&in_chn_num);
+    if (out_chn_num) vxReleaseScalar(&out_chn_num);
+    if (in_batch_num) vxReleaseScalar(&in_batch_num);
+    if (leftScl) vxReleaseScalar(&leftScl);
+    if (topScl) vxReleaseScalar(&topScl);
+    if (chnScl) vxReleaseScalar(&chnScl);
+    if (batchScl) vxReleaseScalar(&batchScl);
+    if (qPadVal) vxReleaseScalar(&qPadVal);
 
 #if !gcdUSE_VXC_BINARY
     if (programSources)

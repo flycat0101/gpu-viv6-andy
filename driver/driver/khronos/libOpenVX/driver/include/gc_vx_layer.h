@@ -3674,6 +3674,22 @@ vxnne_shader_executable vxnneGetTensorPad2ShaderExecutable(
     vx_tensor               outputs,
     vx_int32                *pad_dims);
 
+vxnne_shader_executable vxnneGetTensorPadSymShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               inputs,
+    vx_tensor               outputs,
+    vx_int32                *pad_dims);
+
+vxnne_shader_executable vxnneGetTensorPadRefShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               inputs,
+    vx_tensor               outputs,
+    vx_int32                *pad_dims);
+
 vxnne_shader_executable vxnneGetTFAvgPoolingShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
