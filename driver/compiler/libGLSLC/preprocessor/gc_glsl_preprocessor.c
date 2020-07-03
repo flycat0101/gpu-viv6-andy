@@ -1584,6 +1584,7 @@ static slsPREDEFINED_MACRO _PredefinedMacros[] =
    {"GL_ARB_tessellation_shader", "1", gcvNULL, gcvTRUE},
    {"GL_ARB_uniform_buffer_object", "1", gcvNULL, gcvTRUE},
    {"GL_ARB_gpu_shader5", "1", gcvNULL, gcvTRUE},
+   {"GL_ARB_compatibility", "1", gcvNULL, gcvTRUE},
    /* TS extension. */
    {"GL_EXT_tessellation_shader", "1", gcvNULL, gcvTRUE},
    {"GL_EXT_tessellation_point_size", "1", gcvNULL, gcvTRUE},

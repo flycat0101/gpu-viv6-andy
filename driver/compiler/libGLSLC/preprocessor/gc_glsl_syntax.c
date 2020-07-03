@@ -78,13 +78,21 @@ gceSTATUS ppoPREPROCESSOR_InitExtensionTable(ppoPREPROCESSOR PP)
         switch (_DefinedExtensions1[i].flag)
         {
         case slvEXTENSION1_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY:
-            _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
-            break;
         case slvEXTENSION1_BLEND_EQUATION_ADVANCED:
-            _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
-            break;
-
         case slvEXTENSION1_EXT_TEXTURE_BUFFER:
+        case slvEXTENSION1_TEXTURE_CUBE_MAP_ARRAY:
+        case slvEXTENSION1_IO_BLOCKS:
+        case slvEXTENSION1_GPU_SHADER5: /* FMA */
+        case slvEXTENSION1_EXT_GEOMETRY_SHADER:
+        case slvEXTENSION1_EXT_GEOMETRY_POINT_SIZE:
+        case slvEXTENSION1_TESSELLATION_SHADER:
+        case slvEXTENSION1_TESSELLATION_POINT_SIZE:
+        case slvEXTENSION1_SAMPLE_VARIABLES:
+        case slvEXTENSION1_SHADER_MULTISAMPLE_INTERPOLATION:
+        case slvEXTENSION1_IMAGE_ATOMIC:
+        case slvEXTENSION1_EXT_PRIMITIVE_BOUNDING_BOX:
+        case slvEXTENSION1_SHADER_FRAMEBUFFER_FETCH:
+        case slvEXTENSION1_ANDROID_EXTENSION_PACK_ES31A:
             _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
             break;
 
@@ -99,46 +107,6 @@ gceSTATUS ppoPREPROCESSOR_InitExtensionTable(ppoPREPROCESSOR PP)
             }
             break;
 
-        case slvEXTENSION1_TEXTURE_CUBE_MAP_ARRAY:
-            _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
-            break;
-
-        case slvEXTENSION1_IO_BLOCKS:
-        case slvEXTENSION1_GPU_SHADER5: /* FMA */
-            _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
-            break;
-
-        case slvEXTENSION1_EXT_GEOMETRY_SHADER:
-        case slvEXTENSION1_EXT_GEOMETRY_POINT_SIZE:
-            _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
-            break;
-
-        case slvEXTENSION1_TESSELLATION_SHADER:
-        case slvEXTENSION1_TESSELLATION_POINT_SIZE:
-            _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
-            break;
-
-        case slvEXTENSION1_SAMPLE_VARIABLES:
-        case slvEXTENSION1_SHADER_MULTISAMPLE_INTERPOLATION:
-            _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
-            break;
-
-        case slvEXTENSION1_IMAGE_ATOMIC:
-            _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
-            break;
-
-        case slvEXTENSION1_EXT_PRIMITIVE_BOUNDING_BOX:
-            _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
-            break;
-
-        case slvEXTENSION1_SHADER_FRAMEBUFFER_FETCH:
-            _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
-            break;
-
-        case slvEXTENSION1_ANDROID_EXTENSION_PACK_ES31A:
-            _AddExtensionMacro(PP, &_DefinedExtensions1[i]);
-            break;
-
         default:
             break;
         }
@@ -149,18 +117,10 @@ gceSTATUS ppoPREPROCESSOR_InitExtensionTable(ppoPREPROCESSOR PP)
         switch (_DefinedExtensions2[i].flag)
         {
         case slvEXTENSION2_GL_ARB_EXPLICIT_ATTRIB_LOCATION:
-            _AddExtensionMacro(PP, &_DefinedExtensions2[i]);
-            break;
-
         case slvEXTENSION2_GL_ARB_TESSELLATION_SHADER:
-            _AddExtensionMacro(PP, &_DefinedExtensions2[i]);
-            break;
-
         case slvEXTENSION2_GL_ARB_UNIFORM_BUFFER_OBJECT:
-            _AddExtensionMacro(PP, &_DefinedExtensions2[i]);
-            break;
-
         case slvEXTENSION2_GL_ARB_GPU_SHADER5:
+        case slvEXTENSION2_GL_ARB_COMPATIBILITY:
             _AddExtensionMacro(PP, &_DefinedExtensions2[i]);
             break;
 

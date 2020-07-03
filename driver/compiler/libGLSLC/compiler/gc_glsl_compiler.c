@@ -1414,6 +1414,14 @@ sloCOMPILER_Compile(
         sloCOMPILER_EnableExtension(Compiler, &extension, gcvTRUE);
     }
 
+    /* Check if "GL_ARB_compatibility" extention is enable. */
+    if (gcoOS_StrStr(GetGLExtensionString(), "GL_ARB_compatibility", gcvNULL))
+    {
+        sloEXTENSION extension = {0};
+        extension.extension2 = slvEXTENSION2_GL_ARB_COMPATIBILITY;
+        sloCOMPILER_EnableExtension(Compiler, &extension, gcvTRUE);
+    }
+
     /* Check if HW has HALTI5 and FMA support */
     if(GetHWHasHalti5() && GetHWHasFmaSupport())
     {
@@ -3335,9 +3343,11 @@ sloCOMPILER_CreateName(
 
             for (i = 0; i < redeclaredVariableCount; i++)
             {
+                sloEXTENSION extension = {0};
+                extension = redeclaredVariable.extension;
                 redeclaredVariable = pRedeclaredVariableList[i];
 
-                if (!sloCOMPILER_ExtensionEnabled(Compiler, &redeclaredVariable.extension))
+                if (!sloCOMPILER_ExtensionEnabled(Compiler, &extension))
                 {
                     continue;
                 }
@@ -3350,7 +3360,7 @@ sloCOMPILER_CreateName(
                 gcmONERROR(slsNAME_SPACE_SearchBuiltinVariable(Compiler,
                                                                Compiler->context.builtinSpace,
                                                                Symbol,
-                                                               Extension,
+                                                               extension,
                                                                &pBuiltinName));
 
                 if (pBuiltinName == gcvNULL)
