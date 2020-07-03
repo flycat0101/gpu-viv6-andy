@@ -1590,6 +1590,8 @@ static slsPREDEFINED_MACRO _PredefinedMacros[] =
    /* GS extension. */
    {"GL_EXT_geometry_shader", "1", gcvNULL, gcvTRUE},
    {"GL_EXT_geometry_point_size", "1", gcvNULL, gcvTRUE},
+   {"GL_ARB_geometry_shader4", "1", gcvNULL, gcvTRUE},
+   {"GL_EXT_geometry_shader4", "1", gcvNULL, gcvTRUE},
    /* IO block extension. */
    {"GL_EXT_shader_io_blocks", "1", gcvNULL, gcvTRUE},
    /* shader implicit conversions extension. */

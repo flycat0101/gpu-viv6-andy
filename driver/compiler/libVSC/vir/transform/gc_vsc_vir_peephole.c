@@ -174,6 +174,7 @@ typedef struct VSC_PH_OPNDTARGET
 {
     VIR_Instruction* inst;
     VIR_Operand* opnd;
+    void* pPrivData;
 } VSC_PH_OpndTarget;
 
 static gctUINT _VSC_PH_OpndTarget_HFUNC(const void* ptr)
@@ -195,6 +196,7 @@ static VSC_PH_OpndTarget* _VSC_PH_Peephole_NewOpndTarget(
     VSC_PH_OpndTarget* ot = (VSC_PH_OpndTarget*)vscMM_Alloc(VSC_PH_Peephole_GetMM(ph), sizeof(VSC_PH_OpndTarget));
     ot->inst = usage->usageKey.pUsageInst;
     ot->opnd = usage->usageKey.pOperand;
+    ot->pPrivData = gcvNULL;
     return ot;
 }
 
@@ -2953,8 +2955,8 @@ static VSC_ErrCode _VSC_PH_GenerateRValueModifier(
             }
             /* there should be no def of inst_src0 between inst and use_inst */
             {
-                VIR_Instruction* next = VIR_Inst_GetNext(inst);
-                while(next != usage_inst)
+                VIR_Instruction* next = inst;
+                while(next && next != usage_inst)
                 {
                     if(VIR_Operand_SameLocation(inst, inst_src0, next, VIR_Inst_GetDest(next)))
                     {
@@ -3515,8 +3517,8 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
             }
             /* there should be no def of mul_src0 and mul_src1 between mul and use_inst */
             {
-                VIR_Instruction* next = VIR_Inst_GetNext(mul);
-                while(next != use_inst)
+                VIR_Instruction* next = mul;
+                while(next && next != use_inst)
                 {
                     if(VIR_Operand_SameLocation(mul, mul_src0, next, VIR_Inst_GetDest(next))
                         || VIR_Operand_SameLocation(mul, mul_src1, next, VIR_Inst_GetDest(next)))
@@ -3777,6 +3779,424 @@ OnError:
    return errCode;
 }
 
+/*
+** a = b + c
+** d = c - a
+**  -->
+** a = b + c
+** d = -b
+*/
+typedef struct _VSC_PH_ADD_SRC_INFO
+{
+    VIR_Operand*    pSrcOpnd;
+    gctBOOL         bIsNegative;
+} VSC_PH_AddSrcInfo;
+
+static VSC_ErrCode _VSC_PH_MergeAddSubSameValue(
+    VSC_PH_Peephole*        pPh,
+    VIR_Instruction*        pFirstAddInst,
+    gctBOOL*                pChanged
+    )
+{
+    VSC_ErrCode             errCode  = VSC_ERR_NONE;
+    VIR_Shader*             pShader = VSC_PH_Peephole_GetShader(pPh);
+    VIR_DEF_USAGE_INFO*     pDuInfo = VSC_PH_Peephole_GetDUInfo(pPh);
+    gctBOOL                 bChanged = gcvFALSE;
+    VSC_PH_AddSrcInfo       firstInstSrcInfo[3], secondInstSrcInfo[2];
+    VIR_OpCode              firstOpcode = VIR_Inst_GetOpcode(pFirstAddInst);
+    VIR_OperandInfo         opndInfo;
+    VIR_Operand*            pFirstInstDestOpnd = VIR_Inst_GetDest(pFirstAddInst);
+    VIR_Enable              firstInstEnable = VIR_Operand_GetEnable(pFirstInstDestOpnd);
+    gctUINT                 i;
+    VSC_HASH_TABLE*         pAddSubSet = gcvNULL;
+    gctUINT8                channel;
+    VIR_GENERAL_DU_ITERATOR du_iter;
+    VSC_HASH_ITERATOR       hashIter;
+    VSC_DIRECT_HNODE_PAIR   nodePair;
+    VIR_SrcOperand_Iterator opndIter;
+    VIR_Operand*            pNextOpnd;
+
+    gcmASSERT(firstOpcode == VIR_OP_ADD || firstOpcode == VIR_OP_SUB || firstOpcode == VIR_OP_MAD);
+
+    /* Get the operand information of the first DEST. */
+    VIR_Operand_GetOperandInfo(pFirstAddInst, pFirstInstDestOpnd, &opndInfo);
+
+    /* Get the source information of the first ADD instruction. */
+    for (i = 0; i < VIR_Inst_GetSrcNum(pFirstAddInst); i++)
+    {
+        firstInstSrcInfo[i].pSrcOpnd = VIR_Inst_GetSource(pFirstAddInst, i);
+
+        if (firstOpcode != VIR_OP_SUB || i == 0)
+        {
+            firstInstSrcInfo[i].bIsNegative = (VIR_Operand_GetModifier(firstInstSrcInfo[i].pSrcOpnd) & VIR_MOD_NEG) != 0;
+        }
+        else
+        {
+            firstInstSrcInfo[i].bIsNegative = (VIR_Operand_GetModifier(firstInstSrcInfo[i].pSrcOpnd) & VIR_MOD_NEG) == 0;
+        }
+    }
+
+    errCode = _VSC_PH_InitHashTable(pPh,
+                                    &VSC_PH_Peephole_WorkSet(pPh),
+                                    _VSC_PH_OpndTarget_HFUNC,
+                                    _VSC_PH_OpndTarget_HKCMP, 16);
+    ON_ERROR(errCode, "Failed to initialize the hash table.");
+    pAddSubSet = VSC_PH_Peephole_WorkSet(pPh);
+
+    /* get usage of MUL's dest in per channel way*/
+    for(channel = 0; channel < VIR_CHANNEL_NUM; channel++)
+    {
+        VIR_USAGE*              pUsage;
+
+        if(!(firstInstEnable & (1 << channel)))
+        {
+            continue;
+        }
+
+        /* Get all the usage, now only check the usages within the same BB. */
+        vscVIR_InitGeneralDuIterator(&du_iter,
+                                     pDuInfo,
+                                     pFirstAddInst,
+                                     opndInfo.u1.virRegInfo.virReg,
+                                     channel,
+                                     gcvTRUE);
+        for (pUsage = vscVIR_GeneralDuIterator_First(&du_iter);
+             pUsage != gcvNULL;
+             pUsage = vscVIR_GeneralDuIterator_Next(&du_iter))
+        {
+            VIR_Instruction*    pUsageInst;
+            VIR_Instruction*    pTempInst;
+            VIR_Operand*        pUsageOpnd;
+            VIR_OpCode          usageOpcode;
+            gctBOOL             bSrcNeg[2], bRedefined = gcvFALSE;
+            gctUINT             usageSrcIndex = 0xFFFFFFFF, oppositeSrcIndex = 0, matchSrcIndex = 0;
+            VSC_PH_OpndTarget*  pOpndTarget = gcvNULL;
+
+            if (vscHTBL_DirectTestAndGet(pAddSubSet, (void*)&(pUsage->usageKey), gcvNULL))
+            {
+                continue;
+            }
+
+            /* Skip no matched instruction. */
+            if (pUsage->usageKey.bIsIndexingRegUsage)
+            {
+                continue;
+            }
+            pUsageInst = pUsage->usageKey.pUsageInst;
+            if (VIR_IS_OUTPUT_USAGE_INST(pUsageInst))
+            {
+                continue;
+            }
+            usageOpcode = VIR_Inst_GetOpcode(pUsageInst);
+            if (usageOpcode != VIR_OP_ADD && usageOpcode != VIR_OP_SUB)
+            {
+                continue;
+            }
+            pUsageOpnd = pUsage->usageKey.pOperand;
+
+            /* Get the source information of the second ADD instruction. */
+            for (i = 0; i < 2; i++)
+            {
+                secondInstSrcInfo[i].pSrcOpnd = VIR_Inst_GetSource(pUsageInst, i);
+
+                if (secondInstSrcInfo[i].pSrcOpnd == pUsageOpnd)
+                {
+                    usageSrcIndex = i;
+
+                    oppositeSrcIndex = ((i == 0) ? 1 : 0);
+                }
+
+                if (usageOpcode == VIR_OP_ADD || i == 0)
+                {
+                    secondInstSrcInfo[i].bIsNegative = (VIR_Operand_GetModifier(secondInstSrcInfo[i].pSrcOpnd) & VIR_MOD_NEG) != 0;
+                }
+                else
+                {
+                    secondInstSrcInfo[i].bIsNegative = (VIR_Operand_GetModifier(secondInstSrcInfo[i].pSrcOpnd) & VIR_MOD_NEG) == 0;
+                }
+            }
+            if (usageSrcIndex == 0xFFFFFFFF)
+            {
+                continue;
+            }
+
+            /* Don't check NEG modifier here. */
+            if (!VIR_Operand_Identical(pFirstInstDestOpnd, pUsageOpnd, pShader, gcvTRUE))
+            {
+                continue;
+            }
+
+            /*
+            ** The other source of the second ADD must be the source of the first ADD,
+            ** and these two sources must have the different sign bit.
+            */
+            for (i = 0; i < VIR_Inst_GetSrcNum(pFirstAddInst); i++)
+            {
+                if (firstOpcode == VIR_OP_MAD && i != 2)
+                {
+                    continue;
+                }
+
+                if (!VIR_Operand_Identical(firstInstSrcInfo[i].pSrcOpnd, secondInstSrcInfo[oppositeSrcIndex].pSrcOpnd, pShader, gcvTRUE))
+                {
+                    continue;
+                }
+
+                bSrcNeg[0] = firstInstSrcInfo[i].bIsNegative;
+                bSrcNeg[1] = secondInstSrcInfo[oppositeSrcIndex].bIsNegative;
+
+                if (secondInstSrcInfo[usageSrcIndex].bIsNegative)
+                {
+                    bSrcNeg[0] = !bSrcNeg[0];
+                }
+
+                if (bSrcNeg[0] == bSrcNeg[1])
+                {
+                    continue;
+                }
+                else
+                {
+                    matchSrcIndex = i;
+                    break;
+                }
+            }
+            if (i == VIR_Inst_GetSrcNum(pFirstAddInst))
+            {
+                continue;
+            }
+
+            /* in case of loop, the first ADD should be the only def of the second ADD usage. */
+            if (!vscVIR_IsUniqueDefInstOfUsageInst(pDuInfo,
+                                                   pUsageInst,
+                                                   pUsageOpnd,
+                                                   pUsage->usageKey.bIsIndexingRegUsage,
+                                                   pFirstAddInst,
+                                                   gcvNULL))
+            {
+                continue;
+            }
+
+            /* there should be no def of first ADD's SRC between ADD and usage_inst */
+            pTempInst = pFirstAddInst;
+            while(pTempInst && pTempInst != pUsageInst)
+            {
+                VIR_SrcOperand_Iterator_Init(pFirstAddInst, &opndIter);
+
+                for (pNextOpnd = VIR_SrcOperand_Iterator_First(&opndIter);
+                     pNextOpnd != gcvNULL;
+                     pNextOpnd = VIR_SrcOperand_Iterator_Next(&opndIter))
+                {
+                    if (VIR_Operand_SameLocation(pFirstAddInst,
+                                                 pNextOpnd,
+                                                 pTempInst,
+                                                 VIR_Inst_GetDest(pTempInst)))
+                    {
+                        bRedefined = gcvTRUE;
+                        break;
+                    }
+                }
+                if (bRedefined)
+                {
+                    break;
+                }
+                pTempInst = VIR_Inst_GetNext(pTempInst);
+            }
+            if (bRedefined)
+            {
+                continue;
+            }
+
+            pOpndTarget = _VSC_PH_Peephole_NewOpndTarget(pPh, pUsage);
+            pOpndTarget->pPrivData = (void*)(gctUINTPTR_T)matchSrcIndex;
+            vscHTBL_DirectSet(pAddSubSet, (void*)pOpndTarget, gcvNULL);
+        }
+    }
+
+    /* No match case, just return. */
+    if (HTBL_GET_ITEM_COUNT(pAddSubSet) == 0)
+    {
+        _VSC_PH_ResetHashTable(pAddSubSet);
+        return errCode;
+    }
+
+    /* Start to merge the code. */
+    vscHTBLIterator_Init(&hashIter, pAddSubSet);
+    for (nodePair = vscHTBLIterator_DirectFirst(&hashIter);
+         IS_VALID_DIRECT_HNODE_PAIR(&nodePair);
+         nodePair = vscHTBLIterator_DirectNext(&hashIter))
+    {
+        VSC_PH_OpndTarget*      pOpndTarget = (VSC_PH_OpndTarget*)VSC_DIRECT_HNODE_PAIR_FIRST(&nodePair);
+        VIR_Instruction*        pUsageInst = pOpndTarget->inst;
+        VIR_Operand*            pUsageOpnd = pOpndTarget->opnd;
+        VIR_OpCode              usageOpcode = VIR_Inst_GetOpcode(pUsageInst);
+        gctUINT                 matchSrcIndex = (gctUINT)(gctUINTPTR_T)pOpndTarget->pPrivData;
+        gctBOOL                 bInverse = gcvFALSE;
+        VIR_GENERAL_UD_ITERATOR inst_ud_iter;
+        VIR_DEF*                pDef;
+
+        if (usageOpcode == VIR_OP_ADD || (pUsageOpnd == VIR_Inst_GetSource(pUsageInst, 0)))
+        {
+            bInverse = (VIR_Operand_GetModifier(pUsageOpnd) & VIR_MOD_NEG) != 0;
+        }
+        else
+        {
+            bInverse = (VIR_Operand_GetModifier(pUsageOpnd) & VIR_MOD_NEG) == 0;
+        }
+
+        /*
+        ** a = b + c
+        ** d = c - a
+        **  -->
+        ** a = b + c
+        ** d = -b
+        **  Or
+        ** a = b * d + c
+        ** d = c - a
+        **  -->
+        ** a = b * d + c
+        ** d = -b * d
+        */
+
+        /* Delete the usage. */
+        for (i = 0; i < VIR_Inst_GetSrcNum(pUsageInst); i++)
+        {
+            /* Get the operand information. */
+            VIR_Operand_GetOperandInfo(pUsageInst, VIR_Inst_GetSource(pUsageInst, i), &opndInfo);
+
+            if (opndInfo.isVreg)
+            {
+                vscVIR_DeleteUsage(pDuInfo,
+                                   VIR_ANY_DEF_INST,
+                                   pUsageInst,
+                                   VIR_Inst_GetSource(pUsageInst, i),
+                                   gcvFALSE,
+                                   opndInfo.u1.virRegInfo.virReg,
+                                   1,
+                                   VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(pUsageInst, i))),
+                                   VIR_HALF_CHANNEL_MASK_FULL,
+                                   gcvNULL);
+            }
+        }
+
+        if (firstOpcode == VIR_OP_MAD)
+        {
+            /* Change the opcode. */
+            VIR_Inst_SetOpcode(pUsageInst, VIR_OP_MUL);
+            VIR_Inst_SetSrcNum(pUsageInst, 2);
+
+            /* Copy the source. */
+            for (i = 0; i < 2; i++)
+            {
+                VIR_Inst_CopySource(pUsageInst, i, VIR_Inst_GetSource(pFirstAddInst, i), gcvFALSE);
+
+                /* Get the operand information. */
+                VIR_Operand_GetOperandInfo(pUsageInst, VIR_Inst_GetSource(pUsageInst, i), &opndInfo);
+
+                /* Update the usage. */
+                if (opndInfo.isVreg)
+                {
+                    vscVIR_InitGeneralUdIterator(&inst_ud_iter,
+                                                 pDuInfo,
+                                                 pFirstAddInst,
+                                                 VIR_Inst_GetSource(pFirstAddInst, i),
+                                                 gcvFALSE,
+                                                 gcvFALSE);
+                    for (pDef = vscVIR_GeneralUdIterator_First(&inst_ud_iter);
+                         pDef != gcvNULL;
+                         pDef = vscVIR_GeneralUdIterator_Next(&inst_ud_iter))
+                    {
+                        vscVIR_AddNewUsageToDef(pDuInfo,
+                                                pDef->defKey.pDefInst,
+                                                pUsageInst,
+                                                VIR_Inst_GetSource(pUsageInst, i),
+                                                gcvFALSE,
+                                                opndInfo.u1.virRegInfo.virReg,
+                                                1,
+                                                VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(pUsageInst, i))),
+                                                VIR_HALF_CHANNEL_MASK_FULL,
+                                                gcvNULL);
+                    }
+                }
+            }
+
+            /* Inverse the source if needed. */
+            if (bInverse)
+            {
+                if ((VIR_Operand_GetModifier(VIR_Inst_GetSource(pUsageInst, 0)) & VIR_MOD_NEG) != 0)
+                {
+                    VIR_Operand_SetModifier(VIR_Inst_GetSource(pUsageInst, 0), VIR_MOD_NEG ^ VIR_Operand_GetModifier(VIR_Inst_GetSource(pUsageInst, 0)));
+                }
+                else
+                {
+                    VIR_Operand_SetModifier(VIR_Inst_GetSource(pUsageInst, 0), VIR_MOD_NEG | VIR_Operand_GetModifier(VIR_Inst_GetSource(pUsageInst, 0)));
+                }
+            }
+        }
+        else
+        {
+            /* Change the opcode. */
+            VIR_Inst_SetOpcode(pUsageInst, VIR_OP_MOV);
+            VIR_Inst_SetSrcNum(pUsageInst, 1);
+
+            /* Copy the source. */
+            VIR_Inst_CopySource(pUsageInst, 0, VIR_Inst_GetSource(pFirstAddInst, (matchSrcIndex == 0 ? 1 : 0)), gcvFALSE);
+
+            /* Get the operand information. */
+            VIR_Operand_GetOperandInfo(pUsageInst, VIR_Inst_GetSource(pUsageInst, 0), &opndInfo);
+
+            /* Update the usage. */
+            if (opndInfo.isVreg)
+            {
+                vscVIR_InitGeneralUdIterator(&inst_ud_iter,
+                                             pDuInfo,
+                                             pFirstAddInst,
+                                             VIR_Inst_GetSource(pFirstAddInst, (matchSrcIndex == 0 ? 1 : 0)),
+                                             gcvFALSE,
+                                             gcvFALSE);
+                for (pDef = vscVIR_GeneralUdIterator_First(&inst_ud_iter);
+                     pDef != gcvNULL;
+                     pDef = vscVIR_GeneralUdIterator_Next(&inst_ud_iter))
+                {
+                    vscVIR_AddNewUsageToDef(pDuInfo,
+                                            pDef->defKey.pDefInst,
+                                            pUsageInst,
+                                            VIR_Inst_GetSource(pUsageInst, 0),
+                                            gcvFALSE,
+                                            opndInfo.u1.virRegInfo.virReg,
+                                            1,
+                                            VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(pUsageInst, 0))),
+                                            VIR_HALF_CHANNEL_MASK_FULL,
+                                            gcvNULL);
+                }
+            }
+
+            /* Inverse the source if needed. */
+            if (bInverse)
+            {
+                if ((VIR_Operand_GetModifier(VIR_Inst_GetSource(pUsageInst, 0)) & VIR_MOD_NEG) != 0)
+                {
+                    VIR_Operand_SetModifier(VIR_Inst_GetSource(pUsageInst, 0), VIR_MOD_NEG ^ VIR_Operand_GetModifier(VIR_Inst_GetSource(pUsageInst, 0)));
+                }
+                else
+                {
+                    VIR_Operand_SetModifier(VIR_Inst_GetSource(pUsageInst, 0), VIR_MOD_NEG | VIR_Operand_GetModifier(VIR_Inst_GetSource(pUsageInst, 0)));
+                }
+            }
+        }
+
+        bChanged = gcvTRUE;
+    }
+
+    if (pChanged)
+    {
+        *pChanged = bChanged;
+    }
+
+OnError:
+    _VSC_PH_ResetHashTable(pAddSubSet);
+    return errCode;
+}
+
 static VSC_ErrCode _VSC_PH_GenerateRSQ(
     IN OUT VSC_PH_Peephole* ph,
     IN VIR_Instruction* sqrt,
@@ -3981,8 +4401,8 @@ static VSC_ErrCode _VSC_PH_GenerateRSQ(
             }
             /* there should be no def of sqrt_src0 between sqrt and use_inst */
             {
-                VIR_Instruction* next = VIR_Inst_GetNext(sqrt);
-                while(next != use_inst)
+                VIR_Instruction* next = sqrt;
+                while(next && next != use_inst)
                 {
                     if(VIR_Operand_SameLocation(sqrt, sqrt_src0, next, VIR_Inst_GetDest(next)))
                     {
@@ -4363,8 +4783,8 @@ static VSC_ErrCode _VSC_PH_GenerateLShiftedLS(
             }
             /* there should be no def of lshift_src0 between lshift and use_inst */
             {
-                VIR_Instruction* next = VIR_Inst_GetNext(lshift);
-                while(next != use_inst)
+                VIR_Instruction* next = lshift;
+                while(next && next != use_inst)
                 {
                     if(VIR_Operand_SameLocation(lshift, lshift_src0, next, VIR_Inst_GetDest(next)))
                     {
@@ -5355,11 +5775,11 @@ static VSC_ErrCode _VSC_PH_MoveDefCode(
         if(VIR_Inst_GetBasicBlock(*defInst) == VIR_Inst_GetBasicBlock(inst))
         {
             /* there is no redefine of defInst'src in between */
-            VIR_Instruction *next = VIR_Inst_GetNext(*defInst);
+            VIR_Instruction *next = *defInst;
             VIR_SrcOperand_Iterator opndIter;
             VIR_Operand     *nextOpnd;
 
-            while(next != inst)
+            while(next && next != inst)
             {
                 VIR_SrcOperand_Iterator_Init(*defInst, &opndIter);
                 nextOpnd = VIR_SrcOperand_Iterator_First(&opndIter);
@@ -5797,6 +6217,23 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
             VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
             VIR_LOG(dumper, "%s\nMAD ended\n%s\n", VSC_TRACE_SHARP_LINE, VSC_TRACE_SHARP_LINE);
             VIR_LOG_FLUSH(dumper);
+        }
+    }
+
+    /* Merge two ADD/SUB instruction to one. */
+    if (VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetOPTS(options), VSC_OPTN_PHOptions_OPTS_MERGE_ADD))
+    {
+        inst = BB_GET_START_INST(bb);
+        while (inst != VIR_Inst_GetNext(BB_GET_END_INST(bb)))
+        {
+            VIR_OpCode  opCode = VIR_Inst_GetOpcode(inst);
+            gctBOOL     bChanged = gcvFALSE;
+
+            if (opCode == VIR_OP_ADD || opCode == VIR_OP_SUB || opCode == VIR_OP_MAD)
+            {
+                _VSC_PH_MergeAddSubSameValue(ph, inst, &bChanged);
+            }
+            inst = VIR_Inst_GetNext(inst);
         }
     }
 

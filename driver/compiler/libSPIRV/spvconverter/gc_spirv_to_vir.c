@@ -12516,6 +12516,8 @@ static gceSTATUS __SpvCreateEntryPoint(
         spv->entryPointName = entryPointName;
         spv->entryID = entryId;
         spv->entryExeMode = model;
+
+        __SpvSetVirCapability(spv, *virShader);
     }
     else
     {
@@ -12544,8 +12546,6 @@ static gceSTATUS __SpvCreateEntryPoint(
         default: break;
         }
     }
-
-    __SpvSetVirCapability(spv, *virShader);
 
     gcmASSERT(spv->word == spv->nextInst);
 

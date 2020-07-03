@@ -595,6 +595,7 @@ typedef struct _VSC_OPTN_PHOPTIONS
 #define VSC_OPTN_PHOptions_OPTS_LOC_MEM                 0x100
 #define VSC_OPTN_PHOptions_OPTS_ADD_MEM_ADDR            0x200
 #define VSC_OPTN_PHOptions_OPTS_REDUNDANT_MOV_DEF       0x400
+#define VSC_OPTN_PHOptions_OPTS_MERGE_ADD               0x800
 
 #define VSC_OPTN_PHOptions_GetModifiers(option)         ((option)->modifiers)
 #define VSC_OPTN_PHOptions_SetModifiers(option, m)      ((option)->modifiers = (m))

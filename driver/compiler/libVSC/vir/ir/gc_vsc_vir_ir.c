@@ -12902,7 +12902,7 @@ VIR_Inst_IdenticalExpression(
     bMatched = gcvTRUE;
     for (i = srcStart; i < VIR_Inst_GetSrcNum(Inst0); i++)
     {
-        if (!VIR_Operand_Identical(VIR_Inst_GetSource(Inst0, i), VIR_Inst_GetSource(Inst1, i), Shader))
+        if (!VIR_Operand_Identical(VIR_Inst_GetSource(Inst0, i), VIR_Inst_GetSource(Inst1, i), Shader, gcvFALSE))
         {
             bMatched = gcvFALSE;
             break;
@@ -12917,11 +12917,11 @@ VIR_Inst_IdenticalExpression(
     if (i < 2 && VIR_OPCODE_Src0Src1Commutative(VIR_Inst_GetOpcode(Inst0)))
     {
         /* Swap src0 and src1. */
-        if (!VIR_Operand_Identical(VIR_Inst_GetSource(Inst0, 0), VIR_Inst_GetSource(Inst1, 1), Shader))
+        if (!VIR_Operand_Identical(VIR_Inst_GetSource(Inst0, 0), VIR_Inst_GetSource(Inst1, 1), Shader, gcvFALSE))
         {
             return gcvFALSE;
         }
-        if (!VIR_Operand_Identical(VIR_Inst_GetSource(Inst0, 1), VIR_Inst_GetSource(Inst1, 0), Shader))
+        if (!VIR_Operand_Identical(VIR_Inst_GetSource(Inst0, 1), VIR_Inst_GetSource(Inst1, 0), Shader, gcvFALSE))
         {
             return gcvFALSE;
         }
@@ -12929,7 +12929,7 @@ VIR_Inst_IdenticalExpression(
         /* Check the left sources. */
         for (i = 2; i < VIR_Inst_GetSrcNum(Inst0); i++)
         {
-            if (!VIR_Operand_Identical(VIR_Inst_GetSource(Inst0, i), VIR_Inst_GetSource(Inst1, i), Shader))
+            if (!VIR_Operand_Identical(VIR_Inst_GetSource(Inst0, i), VIR_Inst_GetSource(Inst1, i), Shader, gcvFALSE))
             {
                 return gcvFALSE;
             }
@@ -13176,7 +13176,7 @@ VIR_Inst_CanGetConditionResult(
                 }
 
                 if(VIR_ConditionOp_Reversable(cop) &&
-                   VIR_Operand_Identical(src0, src1, VIR_Inst_GetShader(pInst)))
+                   VIR_Operand_Identical(src0, src1, VIR_Inst_GetShader(pInst), gcvFALSE))
                 {
                     if(VIR_TypeId_isFloat(VIR_Operand_GetTypeId(src0)))
                     {
@@ -13280,7 +13280,7 @@ VIR_Inst_EvaluateConditionResult(
     }
     else
     {
-        gcmASSERT(VIR_Operand_isSymbol(src0) && VIR_Operand_Identical(src0, src1, pShader));
+        gcmASSERT(VIR_Operand_isSymbol(src0) && VIR_Operand_Identical(src0, src1, pShader, gcvFALSE));
 
         switch (comp)
         {
@@ -14994,7 +14994,8 @@ gctBOOL
 VIR_Operand_Identical(
     IN VIR_Operand  *Opnd0,
     IN VIR_Operand  *Opnd1,
-    IN VIR_Shader   *Shader
+    IN VIR_Shader   *Shader,
+    IN gctBOOL       bIgnoreNegModifier
     )
 {
     if(Opnd0 == Opnd1)
@@ -15007,9 +15008,19 @@ VIR_Operand_Identical(
         return gcvFALSE;
     }
 
-    if (VIR_Operand_GetModifier(Opnd0) != VIR_Operand_GetModifier(Opnd1))
+    if (bIgnoreNegModifier)
     {
-        return gcvFALSE;
+        if ((VIR_Operand_GetModifier(Opnd0) & ~VIR_MOD_NEG) != (VIR_Operand_GetModifier(Opnd1) & ~VIR_MOD_NEG))
+        {
+            return gcvFALSE;
+        }
+    }
+    else
+    {
+        if (VIR_Operand_GetModifier(Opnd0) != VIR_Operand_GetModifier(Opnd1))
+        {
+            return gcvFALSE;
+        }
     }
 
     if (VIR_Operand_GetLShift(Opnd0) != VIR_Operand_GetLShift(Opnd1))
@@ -15097,7 +15108,7 @@ VIR_Operand_Identical(
                 {
                     VIR_Operand *opnd1 = opndParm1->args[i];
                     VIR_Operand *opnd2 = opndParm2->args[i];
-                    if (!VIR_Operand_Identical(opnd1, opnd2, Shader))
+                    if (!VIR_Operand_Identical(opnd1, opnd2, Shader, gcvFALSE))
                     {
                         return gcvFALSE;
                     }

@@ -25,6 +25,7 @@ typedef struct _slsEXTENSION_INFO
    gctBOOL   warn;
    gctBOOL   require;
    gctUINT   minLanguageVersion;
+   gctUINT   maxLanguageVersion;
    gctSTRING alias;
    gctBOOL   checked;
 }
@@ -35,59 +36,14 @@ slsEXTENSION_INFO;
 */
 static slsEXTENSION_INFO _DefinedExtensions1[] =
 {
-    {"all",   slvEXTENSION1_ALL, gcvFALSE, gcvTRUE, gcvTRUE, gcvFALSE, 0, gcvNULL},
-    {"GL_KHR_blend_equation_advanced", slvEXTENSION1_BLEND_EQUATION_ADVANCED, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_ES31_VERSION, gcvNULL},
-
-    {"GL_OES_standard_derivatives", slvEXTENSION1_STANDARD_DERIVATIVES, gcvTRUE, gcvTRUE, gcvFALSE, gcvTRUE, 0, gcvNULL},
-    {"GL_OES_texture_3D", slvEXTENSION1_TEXTURE_3D, gcvTRUE, gcvTRUE, gcvFALSE, gcvFALSE, 0, gcvNULL},
-    {"GL_OES_EGL_image_external", slvEXTENSION1_EGL_IMAGE_EXTERNAL, gcvTRUE, gcvTRUE, gcvFALSE, gcvTRUE, 0, gcvNULL},
-    {"GL_OES_EGL_image_external_essl3", slvEXTENSION1_EGL_IMAGE_EXTERNAL_ESSL3, gcvTRUE, gcvTRUE, gcvFALSE, gcvTRUE, 0, gcvNULL},
-    {"GL_OES_texture_storage_multisample_2d_array", slvEXTENSION1_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_ES31_VERSION, gcvNULL},
-    {"GL_OES_shader_image_atomic", slvEXTENSION1_IMAGE_ATOMIC, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_ES31_VERSION, gcvNULL},
-    /* sample shading extension. */
-    {"GL_OES_sample_variables", slvEXTENSION1_SAMPLE_VARIABLES, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_HALTI_VERSION, gcvNULL},
-    {"GL_OES_shader_multisample_interpolation", slvEXTENSION1_SHADER_MULTISAMPLE_INTERPOLATION, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_HALTI_VERSION, gcvNULL},
-
-    {"GL_EXT_texture_array", slvEXTENSION1_TEXTURE_ARRAY, gcvTRUE, gcvTRUE, gcvFALSE, gcvFALSE, 0, gcvNULL},
-    {"GL_EXT_frag_depth", slvEXTENSION1_FRAG_DEPTH, gcvTRUE, gcvTRUE, gcvFALSE, gcvFALSE, 0, gcvNULL},
-    {"GL_EXT_shadow_samplers", slvEXTENSION1_SHADOW_SAMPLER, gcvFALSE, gcvTRUE, gcvFALSE, gcvTRUE, 0, gcvNULL},
-    /* cube array extension. */
-    {"GL_EXT_texture_cube_map_array", slvEXTENSION1_TEXTURE_CUBE_MAP_ARRAY, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_texture_cube_map_array"},
-    /* TS extension. */
-    {"GL_EXT_tessellation_shader", slvEXTENSION1_TESSELLATION_SHADER, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_tessellation_shader"},
-    {"GL_EXT_tessellation_point_size", slvEXTENSION1_TESSELLATION_POINT_SIZE, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_tessellation_point_size",},
-    /* GS extension. */
-    {"GL_EXT_geometry_shader", slvEXTENSION1_EXT_GEOMETRY_SHADER, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_geometry_shader"},
-    {"GL_EXT_geometry_point_size", slvEXTENSION1_EXT_GEOMETRY_POINT_SIZE, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_geometry_point_size"},
-    /* IO block extension. */
-    {"GL_EXT_shader_io_blocks", slvEXTENSION1_IO_BLOCKS, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_shader_io_blocks"},
-    /* GPU_Shader5 extension. */
-    {"GL_EXT_gpu_shader5", slvEXTENSION1_GPU_SHADER5, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_gpu_shader5"},
-    /* shader implicit conversions extension. */
-    {"GL_EXT_shader_implicit_conversions", slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS, gcvTRUE, gcvFALSE, gcvFALSE, gcvTRUE, _SHADER_ES31_VERSION, gcvNULL},
-    /* texture buffer extension. */
-    {"GL_EXT_texture_buffer", slvEXTENSION1_EXT_TEXTURE_BUFFER, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_texture_buffer"},
-    /* primitive bounding box extension. */
-    {"GL_EXT_primitive_bounding_box", slvEXTENSION1_EXT_PRIMITIVE_BOUNDING_BOX, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, gcvNULL},
-    /* frame buffer fetch extension. */
-    {"GL_EXT_shader_framebuffer_fetch", slvEXTENSION1_SHADER_FRAMEBUFFER_FETCH, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, 0, "EXT_shader_framebuffer_fetch"},
-    /* ANDROID_extension_pack_es31a extension. */
-    {"GL_ANDROID_extension_pack_es31a", slvEXTENSION1_ANDROID_EXTENSION_PACK_ES31A, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, gcvNULL},
-
-    {"GL_VIV_asm", slvEXTENSION1_VASM, gcvTRUE, gcvTRUE, gcvFALSE, gcvFALSE, 0, gcvNULL }, /* It is a internal option. */
+    #include "gc_glsl_extensions1.def.h"
 };
 
 #define __sldDefinedExtensions1Count (gcmSIZEOF(_DefinedExtensions1) / gcmSIZEOF(slsEXTENSION_INFO))
 
 static slsEXTENSION_INFO _DefinedExtensions2[] =
 {
-    /*GL desktop GL_ARB_explicit_attrib_location extension */
-    {"GL_ARB_explicit_attrib_location", slvEXTENSION2_GL_ARB_EXPLICIT_ATTRIB_LOCATION, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_HALTI_VERSION, gcvNULL},
-    /*GL desktop GL_ARB_tessellation_shader extension */
-    {"GL_ARB_tessellation_shader", slvEXTENSION2_GL_ARB_TESSELLATION_SHADER, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_GL15_VERSION, gcvNULL},
-        /*GL desktop GL_ARB_uniform_buffer_object extension */
-    {"GL_ARB_uniform_buffer_object", slvEXTENSION2_GL_ARB_UNIFORM_BUFFER_OBJECT, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_GL15_VERSION, gcvNULL},
-    {"GL_ARB_gpu_shader5", slvEXTENSION2_GL_ARB_GPU_SHADER5, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_GL13_VERSION, gcvNULL},
+    #include "gc_glsl_extensions2.def.h"
 };
 
 #define __sldDefinedExtensions2Count (gcmSIZEOF(_DefinedExtensions2) / gcmSIZEOF(slsEXTENSION_INFO))
@@ -1920,6 +1876,9 @@ gctBOOL judgeToSetExtension(ppoPREPROCESSOR PP, gctINT ExtensionIndex, gctUINT E
         extensionInfo = _DefinedExtensions2[ExtensionIndex];
 
     if(sloCOMPILER_GetLanguageVersion(PP->compiler) < extensionInfo.minLanguageVersion)
+        return gcvFALSE;
+
+    if(sloCOMPILER_GetLanguageVersion(PP->compiler) > extensionInfo.maxLanguageVersion)
         return gcvFALSE;
 
     if(BehaviorStr == PP->keyword->require && extensionInfo.require == gcvFALSE)
