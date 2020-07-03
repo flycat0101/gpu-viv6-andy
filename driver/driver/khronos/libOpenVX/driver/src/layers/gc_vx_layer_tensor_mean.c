@@ -246,7 +246,7 @@ VX_PRIVATE_API vx_bool vxoNNTensorMean_SH_EVIS_Support_Ext(vx_node node, const v
     vx_int32     resolved_dim_count = 0;
     vx_uint32    i                  = 0;
     vx_uint32    j                  = 0;
-    vx_uint32   input_axis;
+    /*vx_uint32   input_axis;*/
 
 
     vx_enum     inputFormat         = TENSOR_DATA_TYPE(input);
@@ -280,7 +280,7 @@ VX_PRIVATE_API vx_bool vxoNNTensorMean_SH_EVIS_Support_Ext(vx_node node, const v
             resolved_dim[resolved_dim_count++] = current_axis;
     }
 
-    input_axis = 0;
+    /*input_axis = 0;*/
 
     {
         vx_uint32 dst_elementCount = 0;

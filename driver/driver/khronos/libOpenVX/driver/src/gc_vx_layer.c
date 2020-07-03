@@ -16878,7 +16878,13 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
     vx_uint32  width            = TENSOR_VIEW_SIZE_INDEX(input, 0);
     vx_uint32  height           = TENSOR_VIEW_SIZE_INDEX(input, 1);
     vx_uint32  channels         = TENSOR_VIEW_SIZE_INDEX(input, 2);
+    vx_uint32  out_dims         = TENSOR_DIM_NUM(output);
+    vx_uint32  out_width        = TENSOR_VIEW_SIZE_INDEX(output, 0);
+    vx_uint32  out_height       = out_dims > 1 ? TENSOR_VIEW_SIZE_INDEX(output, 1) : 1;
+    vx_uint32  out_depth        = out_dims > 2 ? TENSOR_VIEW_SIZE_INDEX(output, 2) : 1;
+    vx_uint32  out_batch        = out_dims > 3 ? TENSOR_VIEW_SIZE_INDEX(output, 3) : 1;
     vx_tensor  src              = VX_NULL;
+    vx_tensor  dst              = VX_NULL;
     vx_bool    enable_K1S1      = vx_false_e;
     vxnne_shader_executable shaderExecutable = VX_NULL;
     vxnne_kernel_shaders        kernel;
@@ -16906,7 +16912,15 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
     }
     else if (inputFormat == VX_TYPE_INT8)
     {
-        borderMode->constant_value.U8 = 0;
+        if (TENSOR_QUANT_TYPE(input) == VX_QUANT_AFFINE_SCALE)
+        {
+            borderMode->constant_value.U8 = (vx_uint8)TENSOR_TF_ZEROPOINT(input);
+        }
+        else
+        {
+            borderMode->constant_value.U8 = 0;
+        }
+
         if ((padding_x > 0)  && ((width + padding_x) < 16))
         {
             is_use_fast_mode = vx_false_e;
@@ -16919,6 +16933,13 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
         {
             is_use_fast_mode = vx_false_e;
         }
+    }
+
+    if (useImage2DFlag)
+    {
+        vx_int32 sizes[4] = {out_width, out_height * out_depth, 1, out_batch};
+        dst = vxoTensor_ReshapeTensor(output, sizes, 4);
+        parameters[1] = (vx_reference)dst;
     }
 
     if (kernelSize_x == 1 && kernelSize_y == 1 && stride_x == 1 && stride_y == 1
@@ -17606,12 +17627,13 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
     if (status != VX_SUCCESS) goto OnError;
 
     if (src) vxoTensor_ReleaseTensor(&src);
-
+    if (dst) vxoTensor_ReleaseTensor(&dst);
     gcmFOOTER_ARG("%p", shaderExecutable);
     return shaderExecutable;
 
 OnError:
     if (src) vxoTensor_ReleaseTensor(&src);
+    if (dst) vxoTensor_ReleaseTensor(&dst);
     if (program) vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
