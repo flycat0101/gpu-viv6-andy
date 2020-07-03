@@ -246,7 +246,12 @@ vscVIR_PerformSEPBackPatch(
     if (VSC_OPTN_SEPGenOptions_GetTrace(sepgen_options) ||
         VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_CG))
     {
-        vscPrintSEP(pPassWorker->pCompilerParam->cfg.ctx.pSysCtx, pOutSEP, pShader);
+        if (vscPrintSEP(pPassWorker->pCompilerParam->cfg.ctx.pSysCtx, pOutSEP, pShader) == gcvFALSE)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR(errCode, "Failed to allocate memory during Print SEP.");
+            return errCode;
+        }
     }
 
     /* check shader instruction in dual16 mode, same check as AQSHADER30::Execute */

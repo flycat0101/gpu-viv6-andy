@@ -1179,7 +1179,7 @@ static gctBOOL _VIR_CG_isSamplerType(
     return retValue;
 }
 
-void
+gctBOOL
 _VIR_CG_UniformListQueue(
     IN VSC_MM                   *pMM,
     IN VSC_SIMPLE_QUEUE         *WorkList,
@@ -1188,9 +1188,14 @@ _VIR_CG_UniformListQueue(
 {
     VSC_UNI_LIST_NODE_EXT *worklistNode = (VSC_UNI_LIST_NODE_EXT *)vscMM_Alloc(pMM,
         sizeof(VSC_UNI_LIST_NODE_EXT));
+    if (worklistNode == gcvNULL)
+    {
+        return gcvFALSE;
+    }
 
     vscULNDEXT_Initialize(worklistNode, pUniform);
     QUEUE_PUT_ENTRY(WorkList, worklistNode);
+    return gcvTRUE;
 }
 
 void
@@ -1441,7 +1446,12 @@ VSC_ErrCode _VIR_CG_MapNonSamplerUniforms(
         arraySize += rows;
 
         /* put this uniform to a queue */
-        _VIR_CG_UniformListQueue(pMM, &uniformList, symUniform);
+        if (_VIR_CG_UniformListQueue(pMM, &uniformList, symUniform) == gcvFALSE)
+        {
+            retValue = VSC_ERR_OUT_OF_MEMORY;
+            ERR_REPORT(retValue, "Failed to allocate memory for worklistNode.");
+            return retValue;
+        }
     }
 
     /* Try to get a uniform which can be vectorized with this working uniform. */
@@ -1951,7 +1961,7 @@ static gctBOOL _VIG_CG_IsUniformPushConst(
     return bIsPushConst;
 }
 
-static void _VIR_CG_FindPushConstUniform(
+static gctBOOL _VIR_CG_FindPushConstUniform(
     IN VIR_Shader           *pShader,
     IN VSC_MM               *pMM,
     IN VSC_SHADER_PUSH_CONSTANT_RANGE *pConstRange,
@@ -1995,7 +2005,10 @@ static void _VIR_CG_FindPushConstUniform(
                 }
 
                 pushConstUniform = uniform;
-                _VIR_CG_UniformListQueue(pMM, pushConstList, pushConstUniform);
+                if (_VIR_CG_UniformListQueue(pMM, pushConstList, pushConstUniform) == gcvFALSE)
+                {
+                    return gcvFALSE;
+                }
 
                 if (pushConstUBO)
                 {
@@ -2020,7 +2033,10 @@ static void _VIR_CG_FindPushConstUniform(
                 }
 
                 pushConstUniform = VIR_Symbol_GetUniform(sym);
-                _VIR_CG_UniformListQueue(pMM, pushConstList, pushConstUniform);
+                if (_VIR_CG_UniformListQueue(pMM, pushConstList, pushConstUniform) == gcvFALSE)
+                {
+                    return gcvFALSE;
+                }
                 /* the alignment of struct is the largest base alignment */
                 if (VIR_Type_GetAlignement(symType) > *maxAlignment)
                 {
@@ -2029,6 +2045,7 @@ static void _VIR_CG_FindPushConstUniform(
             }
         }
     }
+    return gcvTRUE;
 }
 
 static gctUINT
@@ -2306,6 +2323,12 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
     {
         pResAllocLayout->pResAllocEntries = (VIR_SHADER_RESOURCE_ALLOC_ENTRY*)vscMM_Alloc(&pShader->pmp.mmWrapper,
                                             sizeof(VIR_SHADER_RESOURCE_ALLOC_ENTRY) * pResLayout->resourceBindingCount);
+        if (pResAllocLayout->pResAllocEntries == gcvNULL)
+        {
+            retValue = VSC_ERR_OUT_OF_MEMORY;
+            ERR_REPORT(retValue, "Failed to allocate memory for pResAllocEntries.");
+            return retValue;
+        }
         pResAllocLayout->resAllocEntryCount = pResLayout->resourceBindingCount;
 
         for (i = 0; i < pResLayout->resourceBindingCount; i ++)
@@ -2318,6 +2341,12 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
     {
         pResAllocLayout->pPushCnstAllocEntries = (VIR_SHADER_PUSH_CONSTANT_ALLOC_ENTRY*)vscMM_Alloc(&pShader->pmp.mmWrapper,
                                      sizeof(VIR_SHADER_PUSH_CONSTANT_ALLOC_ENTRY) * pResLayout->pushConstantRangeCount);
+        if (pResAllocLayout->pPushCnstAllocEntries == gcvNULL)
+        {
+            retValue = VSC_ERR_OUT_OF_MEMORY;
+            ERR_REPORT(retValue, "Failed to allocate memory for pPushCnstAllocEntries.");
+            return retValue;
+        }
         pResAllocLayout->pushCnstAllocEntryCount = pResLayout->pushConstantRangeCount;
 
         for (i = 0; i < pResLayout->pushConstantRangeCount; i ++)
@@ -2487,6 +2516,12 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                 {
                     pResAllocLayout->pResAllocEntries[i].pCombinedSampledImage =
                         (VIR_SHADER_RESOURCE_ALLOC_ENTRY*)vscMM_Alloc(&pShader->pmp.mmWrapper, sizeof(VIR_SHADER_RESOURCE_ALLOC_ENTRY));
+                    if (pResAllocLayout->pResAllocEntries[i].pCombinedSampledImage == gcvNULL)
+                    {
+                        retValue = VSC_ERR_OUT_OF_MEMORY;
+                        ERR_REPORT(retValue, "Failed to allocate memory for pCombinedSampledImage.");
+                        return retValue;
+                    }
                     memset(pResAllocLayout->pResAllocEntries[i].pCombinedSampledImage, 0, sizeof(VIR_SHADER_RESOURCE_ALLOC_ENTRY));
 
                     memcpy(&pResAllocLayout->pResAllocEntries[i].pCombinedSampledImage->resBinding, &resBinding, sizeof(VSC_SHADER_RESOURCE_BINDING));
@@ -2609,6 +2644,12 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                 {
                     pResAllocLayout->pResAllocEntries[i].pConstRegForUbo =
                         (VIR_SHADER_RESOURCE_ALLOC_ENTRY*)vscMM_Alloc(&pShader->pmp.mmWrapper, sizeof(VIR_SHADER_RESOURCE_ALLOC_ENTRY));
+                    if (pResAllocLayout->pResAllocEntries[i].pConstRegForUbo  == gcvNULL)
+                    {
+                        retValue = VSC_ERR_OUT_OF_MEMORY;
+                        ERR_REPORT(retValue, "Failed to allocate memory for pConstRegForUbo.");
+                        return retValue;
+                    }
                     memset(pResAllocLayout->pResAllocEntries[i].pConstRegForUbo, 0, sizeof(VIR_SHADER_RESOURCE_ALLOC_ENTRY));
 
                     memcpy(&pResAllocLayout->pResAllocEntries[i].pConstRegForUbo->resBinding, &resBinding, sizeof(VSC_SHADER_RESOURCE_BINDING));
@@ -2759,7 +2800,12 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
 
         memcpy(&pResAllocLayout->pPushCnstAllocEntries[i].pushCnstRange, &pushConst, sizeof(VSC_SHADER_PUSH_CONSTANT_RANGE));
 
-        _VIR_CG_FindPushConstUniform(pShader, pMM, &pushConst, &maxAlignment, &pushConstList, &bPushConstUBO);
+        if (_VIR_CG_FindPushConstUniform(pShader, pMM, &pushConst, &maxAlignment, &pushConstList, &bPushConstUBO) == gcvFALSE)
+        {
+            retValue = VSC_ERR_OUT_OF_MEMORY;
+            ERR_REPORT(retValue, "Failed to allocate memory for worklistNode.");
+            return retValue;
+        }
         pushConstCount = vscUNILST_GetNodeCount(&pushConstList);
 
         if (bPushConstUBO)

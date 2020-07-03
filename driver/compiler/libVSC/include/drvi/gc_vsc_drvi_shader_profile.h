@@ -1405,7 +1405,7 @@ void vscSortIOsByHwLoc(SHADER_IO_MAPPING_PER_EXE_OBJ* pIoMappingPerExeObj, gctUI
 /* If hShader != NULL, mapping 'symbol->#->hw resource' is dumped, otherwise
    only '#->hw' is dumped. For the 2nd case, it is easy for driver to dump any
    SEP when flushing to hw to triage bugs */
-void vscPrintSEP(VSC_SYS_CONTEXT* pSysCtx, SHADER_EXECUTABLE_PROFILE* pSEP, SHADER_HANDLE hShader);
+gctBOOL vscPrintSEP(VSC_SYS_CONTEXT* pSysCtx, SHADER_EXECUTABLE_PROFILE* pSEP, SHADER_HANDLE hShader);
 
 /* Linkage info */
 typedef struct SHADER_IO_REG_LINKAGE

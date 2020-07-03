@@ -114,6 +114,10 @@ _VSC_MC_GEN_Initialize(
     {
         Gen->InstMark = (VSC_MC_InstMark *)vscMM_Alloc(Gen->pMM,
             sizeof(VSC_MC_InstMark) * maxInstId);
+        if (Gen->InstMark == gcvNULL)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
 
         _VSC_MC_GEN_InitializeInstMark(Gen->Shader, Gen->InstMark, maxInstId);
     }

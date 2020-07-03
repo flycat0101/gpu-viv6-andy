@@ -499,7 +499,7 @@ void _PrintExeHints(SHADER_EXECUTABLE_PROFILE* pSEP, VSC_DUMPER* pDumper)
     vscDumper_DumpBuffer(pDumper);
 }
 
-void vscPrintSEP(VSC_SYS_CONTEXT* pSysCtx, SHADER_EXECUTABLE_PROFILE* pSEP, SHADER_HANDLE hShader)
+gctBOOL vscPrintSEP(VSC_SYS_CONTEXT* pSysCtx, SHADER_EXECUTABLE_PROFILE* pSEP, SHADER_HANDLE hShader)
 {
     VSC_DUMPER    sepDumper;
     gctUINT       dumpBufferSize = 1024;
@@ -518,7 +518,7 @@ void vscPrintSEP(VSC_SYS_CONTEXT* pSysCtx, SHADER_EXECUTABLE_PROFILE* pSEP, SHAD
 
     if (gcoOS_Allocate(gcvNULL, dumpBufferSize, (gctPOINTER*)&pDumpBuffer) != gcvSTATUS_OK)
     {
-        return;
+        return gcvFALSE;
     }
 
     vscDumper_Initialize(&sepDumper,
@@ -581,6 +581,7 @@ void vscPrintSEP(VSC_SYS_CONTEXT* pSysCtx, SHADER_EXECUTABLE_PROFILE* pSEP, SHAD
 
     /* Release dumper buffer */
     gcoOS_Free(gcvNULL, pDumpBuffer);
+    return gcvTRUE;
 }
 
 
