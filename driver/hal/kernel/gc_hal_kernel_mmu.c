@@ -3237,27 +3237,8 @@ gckMMU_SetupSRAM(
                     gcvTRUE,
                     &Device->extSRAMBaseAddresses[i]
                     ));
-
-                kernel->extSRAMBaseAddresses[i] = Device->extSRAMBaseAddresses[i];
-
-                Hardware->options.extSRAMGPUVirtAddrs[i] = Device->extSRAMBaseAddresses[i];
-                Hardware->options.extSRAMSizes[i]        = Device->extSRAMSizes[i];
-                Hardware->options.extSRAMCPUPhysAddrs[i] = Device->extSRAMBases[i];
-                Hardware->options.extSRAMGPUPhysAddrs[i] = Device->extSRAMGPUBases[i];
-
-                if (Device->showSRAMMapInfo)
-                {
-                    gcmkPRINT("Galcore Info: MMU mapped external shared SRAM[%d] CPU view base=0x%llx GPU view base=0x%llx GPU virtual address=0x%x size=0x%x",
-                        i,
-                        Device->extSRAMBases[i],
-                        Device->extSRAMGPUBases[i],
-                        kernel->extSRAMBaseAddresses[i],
-                        Device->extSRAMSizes[i]
-                        );
-                }
             }
         }
-
         Mmu->sRAMMapped = gcvTRUE;
     }
 
@@ -3314,6 +3295,30 @@ gckMMU_SetupSRAM(
                     i,
                     kernel->sRAMBaseAddresses[i],
                     kernel->sRAMSizes[i]
+                    );
+            }
+        }
+    }
+
+    for (i = gcvSRAM_EXTERNAL0; i < gcvSRAM_EXT_COUNT; i++)
+    {
+        if (Device->extSRAMSizes[i] &&
+            (Device->extSRAMBases[i] != gcvINVALID_PHYSICAL_ADDRESS))
+        {
+            kernel->extSRAMBaseAddresses[i] = Device->extSRAMBaseAddresses[i];
+
+            Hardware->options.extSRAMGPUVirtAddrs[i] = Device->extSRAMBaseAddresses[i];
+            Hardware->options.extSRAMSizes[i] = Device->extSRAMSizes[i];
+            Hardware->options.extSRAMGPUPhysAddrs[i] = Device->extSRAMBases[i];
+            Hardware->options.extSRAMGPUPhysNames[i] = gckKERNEL_AllocateNameFromPointer(kernel, Device->extSRAMPhysical[i]);
+
+            if (Device->showSRAMMapInfo)
+            {
+                gcmkPRINT("Galcore Info: MMU mapped external shared SRAM[%d] CPU base=0x%llx GPU virtual address=0x%x size=0x%x",
+                    i,
+                    Device->extSRAMBases[i],
+                    kernel->extSRAMBaseAddresses[i],
+                    Device->extSRAMSizes[i]
                     );
             }
         }
