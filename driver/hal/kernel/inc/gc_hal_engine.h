@@ -1894,6 +1894,8 @@ typedef struct _gcsTEXTURE
     gceTEXTURE_COMPARE_MODE     compareMode;
     gceCOMPARE                  compareFunc;
 
+    gceTEXTURE_DS_TEX_MODE      dsTextureMode;
+
     gceTEXTURE_DS_MODE          dsMode;
 
     /* sRGB decode */

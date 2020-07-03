@@ -1211,7 +1211,7 @@ void __glChipClearShareData(__GLdrawablePrivate *draw)
 
 }
 
-void __glChipAddSwapHintRectWIN(__GLdrawablePrivate* draw, RECT* rect, GLuint count)
+void __glChipAddSwapHintRectWIN(__GLdrawablePrivate* draw, __GLrect* rect, GLuint count)
 {
 
 }
@@ -1337,7 +1337,7 @@ GLboolean __glChipPresentBuffers(__GLcontext* gc,
             GLvoid* hSurface,
             GLboolean bSwapFront,
             GLboolean DWMEnabled,
-            ULONGLONG presentToken)
+            GLuint presentToken)
 {
     __glChipSwapBuffers(gc, draw, bSwapFront);
     return GL_TRUE;

@@ -23,8 +23,8 @@ typedef struct __GLchipGlobalRec
     GLuint  processID;
     GLuint  numContext;
     GLbyte                  *__glPFDTable;      /* Table of pixel format */
-    LONG                    dPFDSize;           /*Displayable size*/
-    LONG                    dPFDSizeNonDisplay; /*Non-Displayable size*/
+    GLint                    dPFDSize;           /*Displayable size*/
+    GLint                    dPFDSizeNonDisplay; /*Non-Displayable size*/
 
     /* Desktop information */
     GLuint                  width;

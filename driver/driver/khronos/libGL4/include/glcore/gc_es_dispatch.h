@@ -2037,9 +2037,9 @@ enum {
     /* GL_EXT_discard_framebuffer */ \
     GLvoid         glApiMacro(DiscardFramebufferEXT) (_gcArgComma_ GLenum target, GLsizei numAttachments, const GLenum *attachments); \
     /* GL_ARB_shader_objects */ \
-    GLvoid         glApiMacro(DeleteObjectARB) (_gcArgComma_ UINT obj); \
-    GLvoid         glApiMacro(GetObjectParameterivARB) (_gcArgComma_ UINT obj, GLenum pname, GLint *params); \
-    GLvoid         glApiMacro(GetInfoLogARB) (_gcArgComma_ UINT obj, GLsizei maxLength, GLsizei *length, char *infoLog);
+    GLvoid         glApiMacro(DeleteObjectARB) (_gcArgComma_ GLuint obj); \
+    GLvoid         glApiMacro(GetObjectParameterivARB) (_gcArgComma_ GLuint obj, GLenum pname, GLint *params); \
+    GLvoid         glApiMacro(GetInfoLogARB) (_gcArgComma_ GLuint obj, GLsizei maxLength, GLsizei *length, char *infoLog);
 
 
 #define dipatchMacro(api)   (GL_APIENTRY * api)

@@ -5521,7 +5521,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __glim_GetObjectParameterivARB(__GLcontext *gc, UINT obj, GLenum pname, GLint *params)
+GLvoid GL_APIENTRY __glim_GetObjectParameterivARB(__GLcontext *gc, GLuint obj, GLenum pname, GLint *params)
 {
     __GLshaderObject * object;
 

@@ -15,14 +15,19 @@
 #define __gc_es_core_h__
 
 #include <sys/types.h>
-#ifdef _LINUX_
-#include "win2unix.h"
-#endif
 
 typedef struct __GLcontextRec __GLcontext;
 typedef struct __GLmipMapLevelRec __GLmipMapLevel;
 typedef struct __GLtextureObjectRec __GLtextureObject;
 typedef struct __GLdispatchTableRec __GLdispatchTable;
+
+typedef struct __GLtagRect
+{
+    GLuint left;
+    GLuint top;
+    GLuint right;
+    GLuint bottom;
+} __GLrect;
 
 typedef enum __GLdrawableTypeEnum {
     __GL_WINDOW,
@@ -618,7 +623,7 @@ struct __GLdrawablePrivateRec
         GLvoid (*freeBuffers)(__GLdrawablePrivate *, GLboolean);
         GLvoid (*restoreFrontBuffer)(__GLdrawablePrivate *);
         GLvoid (*clearShareData)(__GLdrawablePrivate *);
-        GLvoid (*addSwapHintRectWIN)(__GLdrawablePrivate *,RECT * , GLuint );
+        GLvoid (*addSwapHintRectWIN)(__GLdrawablePrivate *,__GLrect * , GLuint );
         GLvoid (*clearSwapHintRectWIN)(__GLdrawablePrivate *);
         GLvoid (* bindRenderBuffer)(__GLdrawablePrivate *, __GLdrawableBuffer *);
         GLvoid (* deleteRenderBuffer)(__GLdrawablePrivate *, __GLdrawableBuffer *);
@@ -630,7 +635,7 @@ struct __GLdrawablePrivateRec
         GLvoid(*ExclusiveModeChange)(__GLcontext *gc);
 
         /* for DrvPresentBuffers to perform dp present buffers. NULL for XP*/
-        GLboolean (*presentBuffers)(__GLcontext *gc, __GLdrawablePrivate *, GLvoid *, GLboolean, GLboolean, ULONGLONG presentToken);
+        GLboolean (*presentBuffers)(__GLcontext *gc, __GLdrawablePrivate *, GLvoid *, GLboolean, GLboolean, GLuint presentToken);
 
         /* for DrvSwapBuffers to perform dp swap buffers, NULL for Vista*/
         GLboolean (*swapBuffers)(__GLcontext *, __GLdrawablePrivate *, GLboolean);
