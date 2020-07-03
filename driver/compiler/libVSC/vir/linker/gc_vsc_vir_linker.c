@@ -725,7 +725,7 @@ _CreateIntrinsicLib(
         /* add the extension source */
         if (supportTexMSAA2DArray)
         {
-            gcoOS_StrCatSafe(sloBuiltinSource, __LL_LIB_LENGTH__, gcLibFunc_Extension_For_TexMS2DArray);
+            gcoOS_StrCatSafe(sloBuiltinSource, __LL_LIB_LENGTH__, gcLibFunc_Extension_For_OESTexMS2DArray);
         }
 
         if (supportMSShading)

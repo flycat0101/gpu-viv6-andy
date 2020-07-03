@@ -25,8 +25,12 @@ gctSTRING gcLibFunc_Extension_For_GL =
 "#extension GL_VIV_asm: enable\n"
 ;
 
-gctSTRING gcLibFunc_Extension_For_TexMS2DArray =
+gctSTRING gcLibFunc_Extension_For_OESTexMS2DArray =
 "#extension GL_OES_texture_storage_multisample_2d_array:    enable\n"
+;
+
+gctSTRING gcLibFunc_Extension_For_GLTexMS2DArray =
+"#extension GL_ARB_texture_multisample:    enable\n"
 ;
 
 gctSTRING gcLibFunc_Extension_For_CubeMapArray =

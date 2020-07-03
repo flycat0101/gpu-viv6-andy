@@ -18,7 +18,8 @@
 
 extern gctSTRING gcLibFunc_Extension;
 extern gctSTRING gcLibFunc_Extension_For_GL;
-extern gctSTRING gcLibFunc_Extension_For_TexMS2DArray;
+extern gctSTRING gcLibFunc_Extension_For_OESTexMS2DArray;
+extern gctSTRING gcLibFunc_Extension_For_GLTexMS2DArray;
 extern gctSTRING gcLibFunc_Extension_For_CubeMapArray;
 extern gctSTRING gcLibFunc_Extension_For_TextureBuffer;
 extern gctSTRING gcLibFunc_Extension_For_MSShading;
