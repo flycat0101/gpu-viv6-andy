@@ -1236,62 +1236,6 @@ _GenVstoreHalfRteCode(
                                            IOperand);
 }
 
-static gceSTATUS
-_GenVstoreHalfRtzCode(
-    IN cloCOMPILER Compiler,
-    IN cloCODE_GENERATOR CodeGenerator,
-    IN cloIR_POLYNARY_EXPR PolynaryExpr,
-    IN gctUINT OperandCount,
-    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
-    IN clsIOPERAND * IOperand
-    )
-{
-    return  _GenVstoreHalfWithRoundingCode(Compiler,
-                                           CodeGenerator,
-                                           PolynaryExpr,
-                                           clvOPCODE_STORE1_RTZ,
-                                           OperandCount,
-                                           OperandsParameters,
-                                           IOperand);
-}
-
-static gceSTATUS
-_GenVstoreHalfRtpCode(
-    IN cloCOMPILER Compiler,
-    IN cloCODE_GENERATOR CodeGenerator,
-    IN cloIR_POLYNARY_EXPR PolynaryExpr,
-    IN gctUINT OperandCount,
-    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
-    IN clsIOPERAND * IOperand
-    )
-{
-    return  _GenVstoreHalfWithRoundingCode(Compiler,
-                                           CodeGenerator,
-                                           PolynaryExpr,
-                                           clvOPCODE_STORE1_RTP,
-                                           OperandCount,
-                                           OperandsParameters,
-                                           IOperand);
-}
-
-static gceSTATUS
-_GenVstoreHalfRtnCode(
-    IN cloCOMPILER Compiler,
-    IN cloCODE_GENERATOR CodeGenerator,
-    IN cloIR_POLYNARY_EXPR PolynaryExpr,
-    IN gctUINT OperandCount,
-    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
-    IN clsIOPERAND * IOperand
-    )
-{
-    return  _GenVstoreHalfWithRoundingCode(Compiler,
-                                           CodeGenerator,
-                                           PolynaryExpr,
-                                           clvOPCODE_STORE1_RTN,
-                                           OperandCount,
-                                           OperandsParameters,
-                                           IOperand);
-}
 
 static gceSTATUS
 _GenVloadaHalfCode(
@@ -1488,62 +1432,6 @@ _GenVstoreaHalfRteCode(
                                             IOperand);
 }
 
-static gceSTATUS
-_GenVstoreaHalfRtzCode(
-    IN cloCOMPILER Compiler,
-    IN cloCODE_GENERATOR CodeGenerator,
-    IN cloIR_POLYNARY_EXPR PolynaryExpr,
-    IN gctUINT OperandCount,
-    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
-    IN clsIOPERAND * IOperand
-    )
-{
-    return  _GenVstoreaHalfWithRoundingCode(Compiler,
-                                            CodeGenerator,
-                                            PolynaryExpr,
-                                            clvOPCODE_STORE1_RTZ,
-                                            OperandCount,
-                                            OperandsParameters,
-                                            IOperand);
-}
-
-static gceSTATUS
-_GenVstoreaHalfRtpCode(
-    IN cloCOMPILER Compiler,
-    IN cloCODE_GENERATOR CodeGenerator,
-    IN cloIR_POLYNARY_EXPR PolynaryExpr,
-    IN gctUINT OperandCount,
-    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
-    IN clsIOPERAND * IOperand
-    )
-{
-    return  _GenVstoreaHalfWithRoundingCode(Compiler,
-                                            CodeGenerator,
-                                            PolynaryExpr,
-                                            clvOPCODE_STORE1_RTP,
-                                            OperandCount,
-                                            OperandsParameters,
-                                            IOperand);
-}
-
-static gceSTATUS
-_GenVstoreaHalfRtnCode(
-    IN cloCOMPILER Compiler,
-    IN cloCODE_GENERATOR CodeGenerator,
-    IN cloIR_POLYNARY_EXPR PolynaryExpr,
-    IN gctUINT OperandCount,
-    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
-    IN clsIOPERAND * IOperand
-    )
-{
-    return  _GenVstoreaHalfWithRoundingCode(Compiler,
-                                            CodeGenerator,
-                                            PolynaryExpr,
-                                            clvOPCODE_STORE1_RTN,
-                                            OperandCount,
-                                            OperandsParameters,
-                                            IOperand);
-}
 
 static gceSTATUS
 _GenUnpackCode(
