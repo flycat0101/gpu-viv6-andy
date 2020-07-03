@@ -275,7 +275,7 @@ enum vxnne_kernel_e
     VXNNE_KERNEL_GPU_NORMALIZATION,
     VXNNE_KERNEL_FULLYCONNECTED,
     VXNNE_KERNEL_GPU_FULLYCONNECTED,
-    VXNNE_KERNEL_ACTIVATION,
+    VXNNE_KERNEL_RELUN,
     VXNNE_KERNEL_GPU_ACTIVATION,
     VXNNE_KERNEL_SOFTMAX,
     VXNNE_KERNEL_GPU_SOFTMAX,
@@ -313,7 +313,6 @@ enum vxnne_kernel_e
     VXNNE_KERNEL_GPU_TENSOR_LSTMUNIT,
     VXNNE_KERNEL_AVGPOOLING_INT16,
     VXNNE_KERNEL_AVGPOOLING_UINT8,
-    VXNNE_KERNEL_ACTIVATION_UINT8,
     VXNNE_KERNEL_TF_AVGPOOLING,
     VXNNE_KERNEL_ROIPOOL,
     VXNNE_KERNEL_GPU_ROIPOOL,
@@ -378,6 +377,8 @@ enum vxnne_kernel_e
     VXNNE_KERNEL_GPU_BATCH2SPACE,
     VXNNE_KERNEL_SHUFFLECHANNEL,
     VXNNE_KERNEL_GPU_SHUFFLECHANNEL,
+    VXNNE_KERNEL_TENSOR_LINEAR,
+    VXNNE_KERNEL_GPU_TENSOR_LINEAR,
     VXNNE_KERNEL_TENSOREXPAND,
     VXNNE_KERNEL_GPU_TENSOREXPAND,
     VXNNE_KERNEL_FC_TP_CHECK,
@@ -3008,15 +3009,7 @@ vxnne_shader_executable vxnneGetActivationShaderExecutable(
     vx_float32              maxVal,
     vx_tensor               output);
 
-vxnne_shader_executable vxnneGetActivation_UInt8ShaderExecutable(
-    vx_context              context,
-    vx_enum                 kernelEnum,
-    vx_border_mode_t        *borderMode,
-    vx_enum                 funcType,
-    vx_tensor               input,
-    vx_float32              minVal,
-    vx_float32              maxVal,
-    vx_tensor               output);
+
 
 vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
     vx_context              context,
@@ -3714,6 +3707,15 @@ vxnne_shader_executable vxnneGetTensor2DAddShaderExecutable(
     vx_enum                 operation,
     vx_tensor               output);
 
+vxnne_shader_executable vxnneGetTensorLinearShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_scalar               a_s,
+    vx_scalar               b_s,
+    vx_tensor               output);
+
 vxnne_shader_executable vxnneGetTensorAbsShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
@@ -4261,6 +4263,15 @@ vxnne_shader_executable vxnneGetGPUBatchNormShaderExecutable(
     vx_tensor               weights,
     vx_tensor               biases,
     vx_tensor               output);
+
+vxnne_shader_executable vxnneGetGPUTensorLinearShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               inputs,
+    vx_scalar               a_s,
+    vx_scalar               b_s,
+    vx_tensor               outputs);
 
 vxnne_shader_executable vxnneGetGPUTensorTRShaderExecutable(
     vx_context              context,
