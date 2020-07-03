@@ -25,6 +25,7 @@ extern GLvoid initPolygonStipplePatch(__GLcontext *gc, __GLchipContext *chipCtx)
 extern GLvoid initLineStipplePatch(__GLcontext *gc, __GLchipContext *chipCtx);
 extern GLvoid freePolygonStipplePatch(__GLcontext *gc,  __GLchipContext *chipCtx);
 extern GLvoid freeLineStipplePatch(__GLcontext *gc,  __GLchipContext *chipCtx);
+extern GLvoid freeAccumBufferPatch(__GLcontext *gc,  __GLchipContext *chipCtx);
 
 #if defined(GL4_DRI_BUILD)
 extern GLvoid __glChipNotifyChangeBufferSize(__GLcontext * gc);
@@ -2047,6 +2048,7 @@ __glChipDestroyContext(
         gcmVERIFY_OK(deinitializeHashTable(chipCtx));
         freePolygonStipplePatch(gc, chipCtx);
         freeLineStipplePatch(gc, chipCtx);
+        freeAccumBufferPatch(gc, chipCtx);
     }
 #endif
 

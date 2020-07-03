@@ -200,8 +200,7 @@ GLvoid __glFillImage3D(__GLcontext *gc,
         {
             rowsize += alignment - padding;
         }
-        start = ((const GLubyte*) userdata) + skip_lines * rowsize +
-                (skip_pixels * components / 8);
+        start = ((const GLubyte*) userdata) + skip_lines * rowsize;
         bit_offset = (skip_pixels * components) % 8;
         high_bit_mask = LowBitsMask[8-bit_offset];
         low_bit_mask = HighBitsMask[bit_offset];
@@ -210,7 +209,7 @@ GLvoid __glFillImage3D(__GLcontext *gc,
         for (i = 0; i < height; i++)
         {
             elements_left = elements_per_line;
-            src = start;
+            src = start + (skip_pixels * components / 8);
             while (elements_left)
             {
                 /* First retrieve low bits from current byte */
@@ -261,6 +260,9 @@ GLvoid __glFillImage3D(__GLcontext *gc,
             }
             start += rowsize;
         }
+        gc->clientState.pixel.unpackModes.skipLines = 0;
+        gc->clientState.pixel.unpackModes.skipPixels = 0;
+        gc->clientState.pixel.unpackModes.lineLength = width;
     }
     else
     {

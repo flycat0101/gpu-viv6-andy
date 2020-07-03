@@ -2120,6 +2120,13 @@ typedef struct _gcsFORMAT_CLASS_TYPE_DEPTH
 }
 gcsFORMAT_CLASS_TYPE_DEPTH;
 
+/* Intensity format class. */
+typedef struct _gcsFORMAT_CLASs_TYPE_INTENSITY
+{
+    gcsFORMAT_COMPONENT         value;
+}
+gcsFORMAT_CLASs_TYPE_INTENSITY;
+
 typedef union _gcuPIXEL_FORMAT_CLASS
 {
     gcsFORMAT_CLASS_TYPE_BUMP       bump;
@@ -2128,6 +2135,7 @@ typedef union _gcuPIXEL_FORMAT_CLASS
     gcsFORMAT_CLASS_TYPE_LUMINANCE  lum;
     gcsFORMAT_CLASS_TYPE_INDEX      index;
     gcsFORMAT_CLASS_TYPE_DEPTH      depth;
+    gcsFORMAT_CLASs_TYPE_INTENSITY  intensity;
 }
 gcuPIXEL_FORMAT_CLASS;
 

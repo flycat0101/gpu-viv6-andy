@@ -4353,6 +4353,15 @@ gcChipSetAlphaBlend(
     shaderBlendPatch = GL_FALSE;
 #endif
 
+    if (gc->state.enables.colorBuffer.logicOp)
+    {
+        for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; i++)
+        {
+            gc->state.raster.blendEquationRGB[i] = GL_FUNC_ADD;
+            gc->state.raster.blendEquationAlpha[i] = GL_FUNC_ADD;
+        }
+    }
+
     for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; i++)
     {
         for (j = 0; j < chipCtx->rtHalMapping[i].numOfSlots; j++)

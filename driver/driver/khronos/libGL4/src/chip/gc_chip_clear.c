@@ -98,74 +98,48 @@ OnError:
 }
 
 #ifdef OPENGL40
+
+/*
+* This implementation can support gcChipclearAccumBuffer for glAcccum (Together with __glChipAccum).
+* The original code isn't deleted, which may be a reference for possible future optimization.
+*/
+extern gceSTATUS initAccumBufferPatch(__GLcontext* gc, __GLchipContext *chipCtx);
+
 gceSTATUS gcChipclearAccumBuffer(__GLcontext* gc,
                                  glsCHIPACCUMBUFFER *chipAccumBuffer)
 {
     __GLchipContext     *chipCtx = CHIP_CTXINFO(gc);
-    gcsRECT             clearRect = {0};
-    GLboolean           bFullClear = GL_TRUE;
-    GLuint              i = 0;
-    gcsSURF_CLEAR_ARGS  clearArg;
-    __GLrasterState     *pRasterState = &gc->state.raster;
-    gceSTATUS           status = gcvSTATUS_OK;
-    gctBOOL             tsEnabled = gcvFALSE;
-    gcsSURF_VIEW        accumView = {gcvNULL, 0, 1};
-    gcoSURF             accumSurf = NULL;
+    gceSTATUS status = gcvSTATUS_OK;
+    GLint width  = 0;
+    GLint height = 0;
+    GLfloat * accumBuffer;
+    GLint i = 0;
+    __GLcolor *color = &gc->state.accum.clear;
 
     gcmHEADER_ARG("gc=0x%x",gc);
 
-    accumSurf = chipAccumBuffer->renderTarget;
-    accumView.surf = accumSurf;
+    gcmONERROR(initAccumBufferPatch(gc, chipCtx));
 
-    if (accumSurf)
+    width  = chipCtx->accumBufferWidth;
+    height = chipCtx->accumBufferHeight;
+    accumBuffer = chipCtx->accumBufferData;
+
+    if ((0.0f == color->r) && (0.0f == color->g) && (0.0f == color->b) && (0.0f == color->a))
     {
-        __GL_MEMZERO(&clearArg, sizeof(clearArg));
-
-        gcmONERROR(gcChipGetClearRect(gc, accumSurf, &clearRect, &bFullClear));
-
-        clearArg.color.r.floatValue = gc->state.accum.clear.r;
-        clearArg.color.g.floatValue = gc->state.accum.clear.g;
-        clearArg.color.b.floatValue = gc->state.accum.clear.b;
-        clearArg.color.a.floatValue = gc->state.accum.clear.a;
-        clearArg.color.valueType = gcvVALUE_FLOAT;
-        clearArg.colorMask = (gctUINT8) pRasterState->colorMask[i].redMask          |
-                            ((gctUINT8) pRasterState->colorMask[i].greenMask << 1)  |
-                            ((gctUINT8) pRasterState->colorMask[i].blueMask  << 2)  |
-                            ((gctUINT8) pRasterState->colorMask[i].alphaMask << 3);
-
-        if ((!gcoSURF_QueryFlags(accumView.surf, gcvSURF_FLAG_CONTENT_PRESERVED)) &&
-            (!gcoSURF_QueryFlags(accumView.surf, gcvSURF_FLAG_CONTENT_UPDATED))
-            )
+        __GL_MEMSET(accumBuffer, 0, width*height*4*sizeof(GLfloat));
+    }
+    else
+    {
+        for (i=0; i<width*height; i++)
         {
-            clearArg.colorMask = (clearArg.colorMask) ? 0xF: 0x0;
-        }
-
-        clearArg.flags = gcvCLEAR_COLOR;
-//        clearArg.flags |= chipCtx->drawLayered ? gcvCLEAR_MULTI_SLICES : 0;
-
-        if (bFullClear)
-        {
-            clearArg.clearRect = GL_NONE;
-        }
-        else
-        {
-            clearArg.clearRect = &clearRect;
-        }
-
-        tsEnabled = gcoSURF_IsTileStatusEnabled(&(accumView));
-
-        gcmONERROR(gcoSURF_Clear(&accumView, &clearArg));
-
-        /* TS from disable to enable */
-        if (!tsEnabled &&
-            gcoSURF_IsTileStatusEnabled(&(accumView)))
-        {
-            chipCtx->chipDirty.uBuffer.sBuffer.rtSurfDirty = gcvTRUE;
+            accumBuffer[i*4]   = color->r;
+            accumBuffer[i*4+1] = color->g;
+            accumBuffer[i*4+2] = color->b;
+            accumBuffer[i*4+3] = color->a;
         }
     }
 
 OnError:
-
     gcmFOOTER();
     return status;
 }
