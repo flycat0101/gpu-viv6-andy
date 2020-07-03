@@ -7385,6 +7385,9 @@ gcoSURF_Resample(
     gcsSAMPLES srcSampleInfo = {1, 1, 1};
     gcsSAMPLES dstSampleInfo = {1, 1, 1};
     gceSTATUS status = gcvSTATUS_OK;
+#if gcdCAPTURE_ONLY_MODE
+    gctBOOL doCpuBlitAgain = gcvFALSE;
+#endif
 
     gcmHEADER_ARG("SrcSurf=0x%x DstSurf=0x%x", SrcSurf, DstSurf);
 
@@ -7527,6 +7530,14 @@ gcoSURF_Resample(
         {
             srcView.firstSlice = dstView.firstSlice = i;
             gcmONERROR(gcoSURF_ResolveRect(&srcView, &dstView, &rlvArgs));
+#if gcdCAPTURE_ONLY_MODE
+            if ((srcView.surf->sampleInfo.x == 2 && srcView.surf->sampleInfo.y == 2) &&
+                (dstView.surf->sampleInfo.y == 1 && dstView.surf->sampleInfo.y == 1) &&
+                dstView.surf->tiling != gcvLINEAR)
+            {
+                doCpuBlitAgain = gcvTRUE;
+            }
+#endif
         }
     }
 
@@ -7541,7 +7552,11 @@ OnError:
     }
 
     /* Fallback to CPU resampling */
-    if (gcmIS_ERROR(status))
+    if (gcmIS_ERROR(status)
+#if gcdCAPTURE_ONLY_MODE
+        || doCpuBlitAgain
+#endif
+        )
     {
         gcsSURF_BLIT_ARGS blitArgs;
 
