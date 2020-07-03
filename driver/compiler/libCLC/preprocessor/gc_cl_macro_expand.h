@@ -16,11 +16,12 @@
 
 gceSTATUS
 ppoPREPROCESSOR_MacroExpand(
-                            ppoPREPROCESSOR        PP,
-                            ppoINPUT_STREAM        *IS,
+                            ppoPREPROCESSOR     PP,
+                            ppoINPUT_STREAM     *IS,
                             ppoTOKEN            *Head,
                             ppoTOKEN            *End,
-                            gctBOOL                *AnyExpanationHappened
+                            gctBOOL             isArg,
+                            gctBOOL             *AnyExpanationHappened
                             );
 
 gceSTATUS
@@ -50,11 +51,12 @@ gceSTATUS
 ppoPREPROCESSOR_MacroExpand_2_NoFormalArgs(
     ppoPREPROCESSOR        PP,
     ppoINPUT_STREAM        *IS,
-    ppoTOKEN            *Head,
-    ppoTOKEN            *End,
+    ppoTOKEN               *Head,
+    ppoTOKEN               *End,
     gctBOOL                *AnyExpanationHappened,
     gctBOOL                *MatchCase,
-    ppoTOKEN            ID,
+    ppoTOKEN               ID,
+    gctBOOL                isArg,
     ppoMACRO_SYMBOL        MS
     );
 

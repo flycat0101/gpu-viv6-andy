@@ -964,6 +964,7 @@ ppoPREPROCESSOR_ArgsMacroExpand(
                     (ppoINPUT_STREAM*)IS,
                     &expanded_id_head,
                     &expanded_id_end,
+                    gcvTRUE,
                     &any_expanation_happened);
             if(status != gcvSTATUS_OK) return status;
 
@@ -1305,6 +1306,7 @@ ppoPREPROCESSOR_TextLine(ppoPREPROCESSOR PP)
                         &(PP->inputStream),
                         &head,
                         &end,
+                        gcvFALSE,
                         &any_expanation_happened);
                     if(status != gcvSTATUS_OK) return status;
 

@@ -421,6 +421,7 @@ gceSTATUS    ppoPREPROCESSOR_Eval_GetToken(
         &(PP->inputStream),
         &expanded_head,
         &expanded_end,
+        gcvFALSE,
         &is_there_any_expanation_happened_internal));
 
     /*both null or both not null*/
