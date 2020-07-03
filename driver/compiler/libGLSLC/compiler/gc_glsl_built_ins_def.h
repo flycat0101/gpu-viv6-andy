@@ -3296,11 +3296,6 @@ static slsINTRINSIC_BUILTIN_FUNCTION CommonIntrinsicBuiltInFunctions[] =
     {{slvEXTENSION1_ES_31},    "textureSize", gcvNULL, gcvNULL,            T_IVEC2,_HP,     1, {T_ISAMPLER2DMS},                            {_IN},   {ANY},        gceINTRIN_create_size_for_sampler, "_viv_textureSize_int_2DMS", {0}, {0}},
     {{slvEXTENSION1_ES_31},    "textureSize", gcvNULL, gcvNULL,            T_IVEC2,_HP,     1, {T_USAMPLER2DMS},                            {_IN},   {ANY},        gceINTRIN_create_size_for_sampler, "_viv_textureSize_uint_2DMS", {0}, {0}},
 
-    {{slvEXTENSION1_HALTI},    "textureSize", gcvNULL, gcvNULL,            T_IVEC2,_HP,     1, {T_SAMPLER2DMSARRAY},                        {_IN},   {ANY},        gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_2DMSArray", {0}, {0}},
-    {{slvEXTENSION1_HALTI},    "textureSize", gcvNULL, gcvNULL,            T_IVEC2,_HP,     1, {T_ISAMPLER2DMSARRAY},                       {_IN},   {ANY},        gceINTRIN_create_size_for_sampler, "_viv_textureSize_int_2DMSArray", {0}, {0}},
-    {{slvEXTENSION1_HALTI},    "textureSize", gcvNULL, gcvNULL,            T_IVEC2,_HP,     1, {T_USAMPLER2DMSARRAY},                       {_IN},   {ANY},        gceINTRIN_create_size_for_sampler, "_viv_textureSize_uint_2DMSArray", {0}, {0}},
-
-
     {{slvEXTENSION1_SUPPORT_OGL},    "textureSize", gcvNULL, gcvNULL,      T_INT, _HP,      2, {T_SAMPLER1D,       T_INT},                   {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_1D", {0}, {0}},
     {{slvEXTENSION1_SUPPORT_OGL},    "textureSize", gcvNULL, gcvNULL,      T_INT, _HP,      2, {T_ISAMPLER1D,      T_INT},                   {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_1D", {0}, {0}},
     {{slvEXTENSION1_SUPPORT_OGL},    "textureSize", gcvNULL, gcvNULL,      T_INT, _HP,      2, {T_USAMPLER1D,      T_INT},                   {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_1D", {0}, {0}},
@@ -3319,6 +3314,10 @@ static slsINTRINSIC_BUILTIN_FUNCTION CommonIntrinsicBuiltInFunctions[] =
     {{slvEXTENSION1_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY}, "textureSize", gcvNULL, gcvNULL,    T_IVEC3, _HP,   1, {T_SAMPLER2DMSARRAY},   {_IN},   {ANY},          gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_MSArray", {0}, {0}},
     {{slvEXTENSION1_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY}, "textureSize", gcvNULL, gcvNULL,    T_IVEC3, _HP,   1, {T_ISAMPLER2DMSARRAY},  {_IN},   {ANY},          gceINTRIN_create_size_for_sampler, "_viv_textureSize_int_MSArray", {0}, {0}},
     {{slvEXTENSION1_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY}, "textureSize", gcvNULL, gcvNULL,    T_IVEC3, _HP,   1, {T_USAMPLER2DMSARRAY},  {_IN},   {ANY},          gceINTRIN_create_size_for_sampler, "_viv_textureSize_uint_MSArray", {0}, {0}},
+
+    {{slvEXTENSION1_NONE, slvEXTENSION2_GL_ARB_TEXTURE_MULTISAMPLE},    "textureSize", gcvNULL, gcvNULL,      T_IVEC2,_HP,     1, {T_SAMPLER2DMSARRAY},                        {_IN},   {ANY},        gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_2DMSArray", {0}, {0}},
+    {{slvEXTENSION1_NONE, slvEXTENSION2_GL_ARB_TEXTURE_MULTISAMPLE},    "textureSize", gcvNULL, gcvNULL,      T_IVEC2,_HP,     1, {T_ISAMPLER2DMSARRAY},                       {_IN},   {ANY},        gceINTRIN_create_size_for_sampler, "_viv_textureSize_int_2DMSArray", {0}, {0}},
+    {{slvEXTENSION1_NONE, slvEXTENSION2_GL_ARB_TEXTURE_MULTISAMPLE},    "textureSize", gcvNULL, gcvNULL,      T_IVEC2,_HP,     1, {T_USAMPLER2DMSARRAY},                       {_IN},   {ANY},        gceINTRIN_create_size_for_sampler, "_viv_textureSize_uint_2DMSArray", {0}, {0}},
 
     {{slvEXTENSION1_EXT_TEXTURE_BUFFER},   "textureSize", gcvNULL, gcvNULL,            T_INT, _HP,    1, {T_SAMPLERBUFFER},                    {_IN}, {ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_buffer", {0}, {0}},
     {{slvEXTENSION1_EXT_TEXTURE_BUFFER},   "textureSize", gcvNULL, gcvNULL,            T_INT, _HP,    1, {T_ISAMPLERBUFFER},                   {_IN}, {ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_int_buffer", {0}, {0}},

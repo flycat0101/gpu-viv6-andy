@@ -1875,10 +1875,11 @@ gcSHADER_InitBuiltinLibrary(
     isSupportImgAddr;
     gctBOOL     isSupportTexelFetchForMSAA = gcHWCaps.hwFeatureFlags.supportMSAATexture;
     /* Use extension string to check extension feature. */
-    gctBOOL     isSupportTexMSAA2DArray = gcoOS_StrStr(GetGLExtensionString(), "GL_OES_texture_storage_multisample_2d_array", gcvNULL);
+    gctBOOL     isSupportOESTexMSAA2DArray = gcoOS_StrStr(GetGLExtensionString(), "GL_OES_texture_storage_multisample_2d_array", gcvNULL);
     gctBOOL     isSupportCubeMapArray = gcoOS_StrStr(GetGLExtensionString(), "GL_EXT_texture_cube_map_array", gcvNULL);
     gctBOOL     isSupportTextureBuffer = gcoOS_StrStr(GetGLExtensionString(), "GL_EXT_texture_buffer", gcvNULL);
     gctBOOL     isSupportMSShading = gcoOS_StrStr(GetGLExtensionString(), "GL_OES_shader_multisample_interpolation", gcvNULL);
+    gctBOOL     isSupportGLTexMS2DArray = gcoOS_StrStr(GetGLExtensionString(), "GL_ARB_texture_multisample", gcvNULL);
 
 
 
@@ -2006,12 +2007,6 @@ gcSHADER_InitBuiltinLibrary(
         gcLibTextureSize_Func_16,
         gcLibTextureSize_Func_17,
         gcLibTextureSize_Func_18,
-        gcLibTextureSize_Func_33,
-        gcLibTextureSize_Func_34,
-        gcLibTextureSize_Func_35,
-        gcLibTextureSize_Func_36,
-        gcLibTextureSize_Func_37,
-        gcLibTextureSize_Func_38,
 
         gcLibTextureCommon_Func,
         gcLibTextureGatherCommon_Func_1,
@@ -2223,6 +2218,13 @@ gcSHADER_InitBuiltinLibrary(
         gcLibTexelFetchForMSAA_Func_2_4,
         gcLibTexelFetchForMSAA_Func_2_5,
         gcLibTexelFetchForMSAA_Func_2_6
+    };
+
+    gctSTRING GLTexMS2DArrayLib[] =
+    {
+        gcLibTextureSize_Func_36,
+        gcLibTextureSize_Func_37,
+        gcLibTextureSize_Func_38
     };
 
     gctSTRING ImageLib_common[] =
@@ -2666,6 +2668,9 @@ gcSHADER_InitBuiltinLibrary(
         gcLibTextureSize_Func_30,
         gcLibTextureSize_Func_31,
         gcLibTextureSize_Func_32,
+        gcLibTextureSize_Func_33,
+        gcLibTextureSize_Func_34,
+        gcLibTextureSize_Func_35,
     };
 
     if (isSupportImgAddr && !isSupportImgInst &&
@@ -2732,11 +2737,15 @@ gcSHADER_InitBuiltinLibrary(
     }
 
     /* add the extension source */
-    if (isSupportTexMSAA2DArray)
+    if (isSupportOESTexMSAA2DArray)
     {
-        gcoOS_StrCatSafe(*sloBuiltinSource, __BUILTIN_SHADER_LENGTH__, gcLibFunc_Extension_For_TexMS2DArray);
+        gcoOS_StrCatSafe(*sloBuiltinSource, __BUILTIN_SHADER_LENGTH__, gcLibFunc_Extension_For_OESTexMS2DArray);
     }
 
+    if (isSupportGLTexMS2DArray)
+    {
+        gcoOS_StrCatSafe(*sloBuiltinSource, __BUILTIN_SHADER_LENGTH__, gcLibFunc_Extension_For_GLTexMS2DArray);
+    }
     if (isSupportCubeMapArray)
     {
         gcoOS_StrCatSafe(*sloBuiltinSource, __BUILTIN_SHADER_LENGTH__, gcLibFunc_Extension_For_CubeMapArray);
@@ -2965,7 +2974,7 @@ gcSHADER_InitBuiltinLibrary(
         }
 
         /* MSAA Tex 2D Array */
-        if (isSupportTexMSAA2DArray)
+        if (isSupportOESTexMSAA2DArray)
         {
             if (isSupportTexelFetchForMSAA)
             {
@@ -2982,6 +2991,15 @@ gcSHADER_InitBuiltinLibrary(
                 {
                     gcoOS_StrCatSafe(*sloBuiltinSource, __BUILTIN_SHADER_LENGTH__, TexMS2DArrayLib_2[i]);
                 }
+            }
+        }
+
+        if (isSupportGLTexMS2DArray)
+        {
+            stringNum = sizeof(GLTexMS2DArrayLib) / sizeof(gctSTRING);
+            for (i = 0; i < stringNum; i++)
+            {
+                gcoOS_StrCatSafe(*sloBuiltinSource, __BUILTIN_SHADER_LENGTH__, GLTexMS2DArrayLib[i]);
             }
         }
 
