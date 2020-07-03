@@ -300,9 +300,7 @@ VSC_ErrCode vscVIR_DoBackwardIterativeMsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_MS_DFA
                                                 (pDefInst) == VIR_INPUT_DEF_INST)
 
 #define VIR_IS_OUTPUT_USAGE_INST(pUsageInst)   ((pUsageInst) == VIR_OUTPUT_USAGE_INST               || \
-                                                VIR_Inst_GetOpcode((pUsageInst)) == VIR_OP_EMIT0    || \
-                                                VIR_Inst_GetOpcode((pUsageInst)) == VIR_OP_EMIT     || \
-                                                VIR_Inst_GetOpcode((pUsageInst)) == VIR_OP_EMIT_STREAM)
+                                                (VIR_OPCODE_isEmit(VIR_Inst_GetOpcode(pUsageInst))))
 
 #define VIR_IS_IMPLICIT_USAGE_INST(pUsageInst) ((pUsageInst) == VIR_OUTPUT_USAGE_INST)
 #define VIR_IS_SPECIAL_INST(pDefInst)          ((pDefInst) == VIR_ANY_DEF_INST        || \

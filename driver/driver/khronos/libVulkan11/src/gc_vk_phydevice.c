@@ -587,6 +587,11 @@ static void __vki_InitializeShaderCaps(
     shaderCaps->maxWorkGroupInvocation = phyDevProp->limits.maxComputeWorkGroupInvocations;
     shaderCaps->maxShareMemorySize = phyDevProp->limits.maxComputeSharedMemorySize;
 
+    /* Primtive Clipping limits */
+    shaderCaps->maxClipDistances = phyDevProp->limits.maxClipDistances;
+    shaderCaps->maxCullDistances = phyDevProp->limits.maxCullDistances;
+    shaderCaps->maxCombinedClipAndCullDistances = phyDevProp->limits.maxCombinedClipAndCullDistances;
+
     /* TS-only limits */
     shaderCaps->maxTessPatchVertices = phyDevProp->limits.maxTessellationPatchSize;
     shaderCaps->maxTessGenLevel = phyDevProp->limits.maxTessellationGenerationLevel;
@@ -675,8 +680,8 @@ static void __vki_InitializePhysicalDeviceFeatures(
     phyDev->phyDevFeatures.shaderSampledImageArrayDynamicIndexing  = VK_FALSE;
     phyDev->phyDevFeatures.shaderStorageBufferArrayDynamicIndexing = VK_FALSE;
     phyDev->phyDevFeatures.shaderStorageImageArrayDynamicIndexing  = VK_FALSE;
-    phyDev->phyDevFeatures.shaderClipDistance                      = VK_FALSE;
-    phyDev->phyDevFeatures.shaderCullDistance                      = VK_FALSE;
+    phyDev->phyDevFeatures.shaderClipDistance                      = VK_TRUE;
+    phyDev->phyDevFeatures.shaderCullDistance                      = VK_TRUE;
     phyDev->phyDevFeatures.shaderFloat64                           = VK_FALSE;
     phyDev->phyDevFeatures.shaderInt64                             = VK_FALSE;
     phyDev->phyDevFeatures.shaderInt16                             = VK_FALSE;
@@ -1107,9 +1112,9 @@ static void __vki_InitializePhysicalDevicePorperties(
                                                                               : VK_SAMPLE_COUNT_1_BIT;
     phyDev->phyDevProp.limits.maxSampleMaskWords                              = 1;
     phyDev->phyDevProp.limits.timestampPeriod                                 = 0.0f;
-    phyDev->phyDevProp.limits.maxClipDistances                                = 0;
-    phyDev->phyDevProp.limits.maxCullDistances                                = 0;
-    phyDev->phyDevProp.limits.maxCombinedClipAndCullDistances                 = 0;
+    phyDev->phyDevProp.limits.maxClipDistances                                = 8;
+    phyDev->phyDevProp.limits.maxCullDistances                                = 8;
+    phyDev->phyDevProp.limits.maxCombinedClipAndCullDistances                 = 8;
     phyDev->phyDevProp.limits.discreteQueuePriorities                         = 2;
     phyDev->phyDevProp.limits.pointSizeGranularity                            = 0.125f;
     phyDev->phyDevProp.limits.pointSizeRange[0]                               = 1.0f;

@@ -1680,6 +1680,12 @@ __glChipGetDeviceConstants(
 
     constants->maxNumTextureLevels = __glFloorLog2(constants->maxTextureSize) + 1;
 
+    /* OES can't support these. */
+    shaderCaps->maxClipPlanes = 0;
+    shaderCaps->maxClipDistances = 0;
+    shaderCaps->maxCullDistances = 0;
+    shaderCaps->maxCombinedClipAndCullDistances = 0;
+
     /* Assert reported caps are less than macro */
     GL_ASSERT(shaderCaps->maxUserVertAttributes <= __GL_MAX_VERTEX_ATTRIBUTES);
     GL_ASSERT(constants->maxVertexAttribBindings <= __GL_MAX_VERTEX_ATTRIBUTE_BINDINGS);

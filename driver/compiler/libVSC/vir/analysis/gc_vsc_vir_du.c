@@ -1265,9 +1265,7 @@ static void _ReachDef_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS
         }
 
         /* Emit will implicitly kill all output's defs */
-        if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0   ||
-            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT    ||
-            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT_STREAM)
+        if (VIR_OPCODE_isEmit(VIR_Inst_GetOpcode(pInst)))
         {
             gctBOOL     bCheckAllOutput = gcvTRUE;
             gctINT      streamNumber = 0;
@@ -2162,9 +2160,7 @@ static gctBOOL _CanAddUsageToOutputDef(VIR_DEF_USAGE_INFO* pDuInfo,
     {
         /* Calling here is because we need determine implicits output usages for EMIT */
 
-        gcmASSERT(VIR_Inst_GetOpcode(pOutputUsageInst) == VIR_OP_EMIT0  ||
-                  VIR_Inst_GetOpcode(pOutputUsageInst) == VIR_OP_EMIT   ||
-                  VIR_Inst_GetOpcode(pOutputUsageInst) == VIR_OP_EMIT_STREAM);
+        gcmASSERT(VIR_OPCODE_isEmit(VIR_Inst_GetOpcode(pOutputUsageInst)));
 
         if (vscBV_TestBit(pWorkingDefFlow, outputDefIdx))
         {
@@ -2439,9 +2435,7 @@ static void _AddUsages(VIR_Shader* pShader,
     }
 
     /* Emit will implicitly use all outputs */
-    if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0   ||
-        VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT    ||
-        VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT_STREAM)
+    if (VIR_OPCODE_isEmit(VIR_Inst_GetOpcode(pInst)))
     {
         gctBOOL     bCheckAllOutput = gcvTRUE;
         gctINT      streamNumber = 0;
@@ -2517,9 +2511,7 @@ static void _BuildDUUDChainPerBB(VIR_BASIC_BLOCK* pBasicBlk, VIR_DEF_USAGE_INFO*
         }
 
         /* Emit will implicitly kill all output's defs */
-        if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0   ||
-            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT    ||
-            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT_STREAM)
+        if (VIR_OPCODE_isEmit(VIR_Inst_GetOpcode(pInst)))
         {
             gctBOOL     bCheckAllOutput = gcvTRUE;
             gctINT      streamNumber = 0;
