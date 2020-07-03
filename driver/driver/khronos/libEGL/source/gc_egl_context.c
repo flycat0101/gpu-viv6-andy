@@ -351,91 +351,6 @@ _DereferenceImage(
     veglDereferenceImage(thread, image->display, image);
 }
 
-static gctPOINTER
-_Malloc(
-    void *ctx,
-    gctSIZE_T size
-    )
-{
-    gctPOINTER data = gcvNULL;
-
-    if (0x0 == size)
-    {
-        return gcvNULL;
-    }
-
-    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, size, &data)))
-    {
-        gcmFATAL("%s(%d): gcoOS_Allocate failed", __FUNCTION__, __LINE__);
-    }
-
-    gcoOS_ZeroMemory(data, size);
-    return data;
-}
-
-static gctPOINTER
-_Calloc(
-    void *ctx,
-    gctSIZE_T numElements,
-    gctSIZE_T elementSize
-    )
-{
-    gctPOINTER data = gcvNULL;
-    gctSIZE_T  size = numElements * elementSize;
-    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, size, &data)))
-    {
-        gcmFATAL("%s(%d): gcoOS_Allocate failed", __FUNCTION__, __LINE__);
-        return data;
-    }
-    gcoOS_ZeroMemory(data, size);
-    return data;
-}
-
-static gctPOINTER
-_Realloc(
-    void *ctx,
-    gctPOINTER oldPtr,
-    gctSIZE_T newSize
-    )
-{
-    gctSIZE_T  oldSize = 0;
-    gctPOINTER newPtr  = gcvNULL;
-
-    gcoOS_GetMemorySize(gcvNULL, oldPtr, &oldSize);
-
-    if (newSize <= oldSize)
-    {
-        if (0 == newSize)
-        {
-            gcoOS_Free(gcvNULL, oldPtr);
-            return gcvNULL;
-        }
-        return oldPtr;
-    }
-
-    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, newSize, &newPtr)))
-    {
-        return gcvNULL;
-    }
-
-    if ((oldPtr) && (0 != oldSize))
-    {
-        gcoOS_MemCopy(newPtr, oldPtr, oldSize);
-        gcoOS_Free(gcvNULL, oldPtr);
-    }
-
-    return newPtr;
-}
-
-static void
-_Free(
-    void *ctx,
-    gctPOINTER ptr
-    )
-{
-    gcoOS_Free(gcvNULL, ptr);
-}
-
 static void
 _CreateUserMutex(
     VEGLLock *mp
@@ -494,10 +409,10 @@ _CreateApiContext(
         _ReferenceImage,         /* referenceImage */
         _DereferenceImage,       /* dereferenceImage */
 
-        _Malloc,                 /* malloc */
-        _Calloc,                 /* calloc */
-        _Realloc,                /* realloc */
-        _Free,                   /* free */
+        gcvNULL,                 /* malloc */
+        gcvNULL,                 /* calloc */
+        gcvNULL,                 /* realloc */
+        gcvNULL,                 /* free */
 
         _CreateUserMutex,        /* createMutex */
         _DestroyUserMutex,       /* destroyMutex */
