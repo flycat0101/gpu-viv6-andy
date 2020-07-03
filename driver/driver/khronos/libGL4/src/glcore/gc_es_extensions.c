@@ -64,6 +64,8 @@ __GLextension __glExtension[] =
     {__GL_EXTID_ARB_gpu_shader5, "GL_ARB_gpu_shader5", GL_FALSE, GL_FALSE},
     {__GL_EXTID_ARB_timer_query, "GL_ARB_timer_query", GL_TRUE, GL_FALSE},
     {__GL_EXTID_ARB_texture_rg, "GL_ARB_texture_rg", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_ARB_geometry_shader4, "GL_ARB_geometry_shader4", GL_TRUE, GL_TRUE},
+    {__GL_EXTID_ARB_compatibility, "GL_ARB_compatibility", GL_TRUE, GL_TRUE},
 
     {__GL_EXTID_EXT_framebuffer_blit, "GL_EXT_framebuffer_blit", GL_TRUE, GL_FALSE},
     {__GL_EXTID_EXT_framebuffer_object, "GL_EXT_framebuffer_object", GL_TRUE, GL_FALSE},
@@ -75,6 +77,7 @@ __GLextension __glExtension[] =
     {__GL_EXTID_EXT_texture_sRGB, "GL_EXT_texture_sRGB", GL_TRUE, GL_FALSE},
     {__GL_EXTID_EXT_timer_query, "GL_EXT_timer_query", GL_TRUE, GL_FALSE},
     {__GL_EXTID_EXT_framebuffer_multisample, "RenderbufferStorageMultisampleEXT", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_EXT_geometry_shader4, "GL_EXT_geometry_shader4", GL_TRUE, GL_TRUE},
 #endif
 
     {__GL_EXTID_OES_vertex_type_10_10_10_2, "GL_OES_vertex_type_10_10_10_2", GL_FALSE, GL_FALSE},

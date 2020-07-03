@@ -1047,19 +1047,20 @@ GLvoid GL_APIENTRY __glim_DrawElements(__GLcontext *gc, GLenum mode, GLsizei cou
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
-#ifdef OPENGL40
-    if (gc->imports.conformGLSpec &&
-        mode > GL_TRIANGLE_STRIP_ADJACENCY_EXT)
+    if (gc->imports.conformGLSpec)
     {
-        __glSetError(gc, GL_INVALID_ENUM);
-        return;
+        if (mode > GL_TRIANGLE_STRIP_ADJACENCY_EXT)
+        {
+            __GL_ERROR_EXIT(GL_INVALID_ENUM);
+        }
     }
     else
-#endif
-    if ((mode > GL_TRIANGLE_FAN) &&
-        (mode < GL_LINES_ADJACENCY_EXT || mode > GL_PATCHES_EXT))
     {
-        __GL_ERROR_EXIT(GL_INVALID_ENUM);
+        if ((mode > GL_TRIANGLE_FAN) &&
+            (mode < GL_LINES_ADJACENCY_EXT || mode > GL_PATCHES_EXT))
+        {
+            __GL_ERROR_EXIT(GL_INVALID_ENUM);
+        }
     }
 
     if (!__glCheckVAOState(gc, GL_FALSE, GL_FALSE))

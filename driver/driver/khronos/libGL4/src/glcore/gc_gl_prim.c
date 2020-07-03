@@ -482,7 +482,11 @@ GLvoid __glComputeRequiredInputMask(__GLcontext *gc)
             }
         }
 
-        if (gc->state.enables.fog && gc->state.fog.coordSource == GL_FOG_COORDINATE) {
+        /* When fog is enable, no matter the fog.coordSource is GL_FOG_COORD or GL_FRAGMENT_DEPTH,
+        * both need to do a bitwise AND with __GL_INPUT_FOGCOORD for vsInputMask
+        */
+        if (gc->state.enables.fog)
+        {
             vsInputMask |= __GL_INPUT_FOGCOORD;
         }
     }
@@ -647,7 +651,10 @@ GLvoid __glComputeRequiredInputMaskInstancedEXT(__GLcontext *gc)
             }
         }
 
-        if (gc->state.enables.fog && gc->state.fog.coordSource == GL_FOG_COORDINATE) {
+        /* When fog is enable, no matter the fog.coordSource is GL_FOG_COORD or GL_FRAGMENT_DEPTH,
+        * both need to do a bitwise AND with __GL_INPUT_FOGCOORD for vsInputMask */
+        if (gc->state.enables.fog)
+        {
             vsInputMask |= __GL_INPUT_FOGCOORD;
         }
     }
