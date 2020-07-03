@@ -1099,8 +1099,6 @@ typedef struct _vx_kernel
     vx_uint32                               kernelShaderCount;
     vx_uint32                               currShaderID;
 
-    vx_char                                 subname[VX_MAX_KERNEL_NAME];
-
     vx_signature_s                          signature;
 
     vx_bool                                 enabled;
@@ -1475,6 +1473,8 @@ typedef struct _vx_node
 
 
     vx_kernel_attribute_s                   kernelAttributes;
+
+    vx_char                                 kernelsubname[VX_MAX_KERNEL_NAME];
 
     vx_uint32                               targetIndex;
 

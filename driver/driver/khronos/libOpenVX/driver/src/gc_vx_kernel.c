@@ -4909,7 +4909,7 @@ VX_INTERNAL_API vx_status vxoProgramKernel_GetCurrentShaderID(vx_node node, gctU
         return VX_FAILURE;
     }
     gcoOS_StrCopySafe(kernelName, 256, _getShaderName(node->kernel->name, kernelMainName));
-    gcoOS_StrCatSafe(kernelName, 256, node->kernel->subname);
+    gcoOS_StrCatSafe(kernelName, 256, node->kernelsubname);
 
     for(i = 0; i < node->kernel->kernelShaderCount; i++)
     {
@@ -5582,7 +5582,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSelectKernelSubname(vx_node node, const vx_
     gcmHEADER_ARG("node=%p, subname=%s", node, subname);
     gcmDUMP_API("$VX vxSelectKernelSubname: node=%p, subname=%s", node, subname);
 
-    gcoOS_StrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, subname);
+    gcoOS_StrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, subname);
 
     gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
