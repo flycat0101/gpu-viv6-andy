@@ -2116,7 +2116,7 @@ sloCOMPILER_ExtensionEnabled(
     IN sloEXTENSION* Extension
     )
 {
-    gctBOOL result = gcvTRUE;
+    gctBOOL result = gcvFALSE;
     sleEXTENSION1 extension1 = Extension->extension1;
     sleEXTENSION2 extension2 = Extension->extension2;
 
@@ -2127,11 +2127,15 @@ sloCOMPILER_ExtensionEnabled(
     slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
 
     /* Check if any extension is enabled. */
+    if (extension1 == slvEXTENSION1_NONE && extension2 == slvEXTENSION2_NONE)
+    {
+        return gcvTRUE;
+    }
     if (extension1 != slvEXTENSION1_NONE)
     {
-        result = sloCOMPILER_Extension1Enabled(Compiler, extension1);
+        result |= sloCOMPILER_Extension1Enabled(Compiler, extension1);
     }
-    if (!result && extension2 != slvEXTENSION2_NONE)
+    if (extension2 != slvEXTENSION2_NONE)
     {
         result |= sloCOMPILER_Extension2Enabled(Compiler, extension2);
     }
@@ -4294,7 +4298,10 @@ sloCOMPILER_SetVersionProfile(
    }
    else
    {
+       sloEXTENSION extension = {0};
        slsCOMPILER_SetCompatibilityProfile(Compiler->context.compilerFlags);
+       extension.extension2 = slvEXTENSION2_GL_ARB_COMPATIBILITY;
+       sloCOMPILER_EnableExtension(Compiler, &extension, gcvTRUE);
    }
    return gcvSTATUS_OK;
 }
@@ -4323,18 +4330,21 @@ sloCOMPILER_SetLanguageVersion(
           Compiler->langVersion = _SHADER_GL11_VERSION;
           Compiler->context.extensions.extension1 &= ~slvEXTENSION1_ES_30_AND_ABOVE;
           Compiler->context.extensions.extension1 |= slvEXTENSION1_NON_HALTI;
+          Compiler->context.extensions.extension2 |= slvEXTENSION2_GL_ARB_COMPATIBILITY;
           break;
 
        case 120:
           Compiler->langVersion = _SHADER_GL12_VERSION;
           Compiler->context.extensions.extension1 &= ~slvEXTENSION1_ES_30_AND_ABOVE;
           Compiler->context.extensions.extension1 |= slvEXTENSION1_NON_HALTI | slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS;
+          Compiler->context.extensions.extension2 |= slvEXTENSION2_GL_ARB_COMPATIBILITY;
           break;
 
        case 130:
           Compiler->langVersion = _SHADER_GL13_VERSION;
           Compiler->context.extensions.extension1 |=
               (slvEXTENSION1_HALTI | slvEXTENSION1_NON_HALTI | slvEXTENSION1_ES_31 | slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS);
+          Compiler->context.extensions.extension2 |= slvEXTENSION2_GL_ARB_COMPATIBILITY;
           break;
 
        case 140:
@@ -4440,6 +4450,21 @@ sloCOMPILER_SetLanguageVersion(
 
    gcmFOOTER_NO();
    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_CleanLanguageVersion(
+    IN sloCOMPILER Compiler
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x",Compiler);
+
+    Compiler->langVersion = 0;
+    Compiler->context.extensions.extension1 = slvEXTENSION1_NONE;
+    Compiler->context.extensions.extension2 = slvEXTENSION2_NONE;
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
 }
 
 gctUINT32

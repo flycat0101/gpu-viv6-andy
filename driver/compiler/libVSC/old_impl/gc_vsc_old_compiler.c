@@ -34866,6 +34866,9 @@ _findBuiltinVariableTempIndex(
             case gcSL_SUBSAMPLE_DEPTH:
                 BuiltinsTempIndex->SubsampleDepthTempIndex = output->tempIndex;
                 break;
+            case gcSL_CLIP_VERTEX:
+                BuiltinsTempIndex->ClipVertexTempIndex = output->tempIndex;
+                break;
             case gcSL_INVOCATION_ID:
                 BuiltinsTempIndex->InvocationIDTempIndex = output->tempIndex;
                 break;
@@ -34980,6 +34983,9 @@ _findBuiltinVariableTempIndex(
                 break;
             case gcSL_BACK_SECONDARY_COLOR:
                 BuiltinsTempIndex->BackColorSecondaryTempIndex = variable->tempIndex;
+                break;
+            case gcSL_CLIP_VERTEX:
+                BuiltinsTempIndex->ClipVertexTempIndex = variable->tempIndex;
                 break;
             case gcSL_INVOCATION_ID:
                 BuiltinsTempIndex->InvocationIDTempIndex = variable->tempIndex;

@@ -909,7 +909,7 @@ _loadBuiltInOfDepthRange(
 
 
 static gctBOOL
-_DoesGLShaderSupportBuiltinUniform(
+_IsGLShaderSupportCompatibilityBuiltins(
     IN sloCOMPILER Compiler
     )
 {
@@ -1358,7 +1358,7 @@ _LoadBuiltInVariables(
     slsDATA_TYPE *                  dataType;
     sltPOOL_STRING                  symbolInPool;
     sloEXTENSION                    extension = {0};
-    gctBOOL                         isGLUniformSupported = _DoesGLShaderSupportBuiltinUniform(Compiler);
+    gctBOOL                         isGLSupportCompatibility = _IsGLShaderSupportCompatibilityBuiltins(Compiler);
 
     gcmHEADER_ARG("Compiler=0x%x BasicBuiltInTypeInfos=0x%x "
                   "BuiltInVariableCount=%u BuiltInVariables=0x%x",
@@ -1380,13 +1380,6 @@ _LoadBuiltInVariables(
             continue;
         }
 
-        if (extension.extension1 == slvEXTENSION1_SUPPORT_OGL
-            && BuiltInVariables[i].qualifier == slvSTORAGE_QUALIFIER_UNIFORM
-            && !isGLUniformSupported)
-        {
-            continue;
-        }
-
         /* Load the filed variables for a struct. */
         if (BuiltInVariables[i].type == T_IO_BLOCK &&
             BuiltInVariables[i].fieldVariables != gcvNULL)
@@ -1404,7 +1397,7 @@ _LoadBuiltInVariables(
         }
 
 
-        if (_DoesGLShaderSupportBuiltinUniform(Compiler) &&
+        if (isGLSupportCompatibility &&
             BuiltInVariables[i].qualifier == slvSTORAGE_QUALIFIER_UNIFORM &&
             BuiltInVariables[i].fieldVariables != gcvNULL)
         {
