@@ -66,6 +66,7 @@ ppoPREPROCESSOR_MacroExpand(
                             ppoINPUT_STREAM     *IS,
                             ppoTOKEN            *Head,
                             ppoTOKEN            *End,
+                            gctBOOL             isArg,
                             gctBOOL             *AnyExpanationHappened)
 {
     gceSTATUS status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
@@ -107,7 +108,7 @@ ppoPREPROCESSOR_MacroExpand(
     }
 
     gcmONERROR(
-        ppoPREPROCESSOR_MacroExpand_2_NoFormalArgs(PP, IS, Head, End, AnyExpanationHappened, &match_case, id, ms)
+        ppoPREPROCESSOR_MacroExpand_2_NoFormalArgs(PP, IS, Head, End, AnyExpanationHappened, &match_case, id, isArg, ms)
         );
 
     if (match_case == gcvTRUE)
@@ -373,6 +374,7 @@ ppoPREPROCESSOR_MacroExpand_2_NoFormalArgs(
     gctBOOL             *AnyExpanationHappened,
     gctBOOL             *MatchCase,
     ppoTOKEN            ID,
+    gctBOOL             isArg,
     ppoMACRO_SYMBOL     MS)
 {
     gceSTATUS status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
@@ -435,6 +437,18 @@ ppoPREPROCESSOR_MacroExpand_2_NoFormalArgs(
                 gcmONERROR(ppoINPUT_STREAM_UnGetToken(PP, (ppoINPUT_STREAM *)IS, lpara));
                 gcmONERROR(ppoTOKEN_Destroy(PP,lpara));
             }
+        }
+        else if (isArg && ms->hasPara && !(*IS))
+        {
+            /* This macro needs more info of the parameters to expand correctly, so don't expand it here,
+            and it will be expanded in the replacement string */
+            *Head   = gcvNULL;
+            *End    = gcvNULL;
+            *AnyExpanationHappened = gcvFALSE;
+            *MatchCase = gcvFALSE;
+            gcmFOOTER_ARG("*Head=0x%x *End=0x%x *AnyExpanationHappened=%d *MatchCase=%d",
+                           *Head, *End, *AnyExpanationHappened, *MatchCase);
+            return gcvSTATUS_OK;
         }
 
         if (ms->replacementList == gcvNULL)
