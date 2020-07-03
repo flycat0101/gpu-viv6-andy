@@ -284,17 +284,20 @@ _CMAFSLFree(
     gckOS os = Allocator->os;
     struct mdl_cma_priv *mdlPriv=(struct mdl_cma_priv *)Mdl->priv;
     gcsCMA_PRIV_PTR priv = (gcsCMA_PRIV_PTR)Allocator->privateData;
+
+#if gcdENABLE_BUFFERABLE_VIDEO_MEMORY
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0)
     dma_free_wc(&os->device->platform->device->dev,
-            Mdl->numPages * PAGE_SIZE,
-            mdlPriv->kvaddr,
-            mdlPriv->physical);
 #else
     dma_free_writecombine(&os->device->platform->device->dev,
+#endif
+#else
+    dma_free_coherent(&os->device->platform->device->dev,
+#endif
             Mdl->numPages * PAGE_SIZE,
             mdlPriv->kvaddr,
             mdlPriv->physical);
-#endif
+
     gckOS_Free(os, mdlPriv);
     atomic_sub(Mdl->numPages, &priv->cmasize);
 }
