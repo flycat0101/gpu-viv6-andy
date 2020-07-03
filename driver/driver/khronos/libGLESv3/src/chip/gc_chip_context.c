@@ -1235,6 +1235,20 @@ __glChipGetDeviceConstants(
         constants->majorVersion = 2;
         constants->minorVersion = 0;
     }
+
+#if defined(ANDROID)
+    if (((chipModel == gcv2000 && chipRevision == 0x5108) ||
+        (chipModel == gcv3000 && chipRevision == 0x5450) ||
+        (chipModel == gcv880 && chipRevision == 0x5106)) &&
+        (patchId == gcvPATCH_SKIA_SKQP))
+    {
+        gcoOS_StrCopySafe(constants->version, __GL_MAX_VERSION_LEN, __GL_VERSION20);
+        constants->GLSLVersion = __GL_GLSL_VERSION20;
+        constants->majorVersion = 2;
+        constants->minorVersion = 0;
+    }
+#endif
+
     gcoOS_StrCatSafe(constants->version, __GL_MAX_VERSION_LEN, gcvVERSION_STRING);
 
     isEs31 = (constants->majorVersion >= 3) && (constants->minorVersion >= 1);
