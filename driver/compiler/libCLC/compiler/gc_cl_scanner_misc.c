@@ -1706,7 +1706,10 @@ OUT clsLexToken * Token
     gctSTRING strEnd;
 
     strEnd = _ConvStringToIntConstant(String + orgIndex, Base, &result);
-    Token->u.constant.longValue = result;
+    if (Token->type == T_LONG)
+        Token->u.constant.longValue = result;
+    else
+        Token->u.constant.intValue = (gctINT32) result;
 
     if(strEnd == String + orgIndex) { /*there is error*/
         gctBOOL overFlow = gcvFALSE;
@@ -1759,7 +1762,10 @@ OUT clsLexToken * Token
     gctSTRING strEnd;
 
     strEnd = _ConvStringToUintConstant(String + orgIndex, Base, &result);
-    Token->u.constant.ulongValue = result;
+    if(Token->type == T_ULONG)
+        Token->u.constant.ulongValue = result;
+    else
+        Token->u.constant.uintValue = (gctUINT32) result;
 
     if(strEnd == String + orgIndex) { /*there is error*/
         gctBOOL overFlow = gcvFALSE;
