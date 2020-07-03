@@ -2810,9 +2810,10 @@ VSC_ErrCode vscVIR_DestroyDomFrontier(VIR_Shader* pShader)
  * BB reach-relation functions
  */
 
-static void _BbReach_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow)
+static VSC_ErrCode _BbReach_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow)
 {
     vscBV_SetBit(&pTsBlockFlow->genFlow, pTsBlockFlow->pOwnerBB->globalBbId);
+    return VSC_ERR_NONE;
 }
 
 static void _BbReach_Init_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow)

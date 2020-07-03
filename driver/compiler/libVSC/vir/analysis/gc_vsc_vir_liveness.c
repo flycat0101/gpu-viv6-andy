@@ -457,8 +457,9 @@ static void _Update_Liveness_Local_Gens(VIR_Shader* pShader,
     }
 }
 
-static void _Liveness_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow)
+static VSC_ErrCode _Liveness_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow)
 {
+    VSC_ErrCode            errCode = VSC_ERR_NONE;
     VIR_BASIC_BLOCK*       pBasicBlock = pTsBlockFlow->pOwnerBB;
     VIR_Shader*            pShader = pBasicBlock->pOwnerCFG->pOwnerFuncBlk->pOwnerCG->pOwnerShader;
     VIR_DEF_USAGE_INFO*    pDuInfo = ((VIR_LIVENESS_INFO*)pBaseTsDFA)->pDuInfo;
@@ -478,7 +479,8 @@ static void _Liveness_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS
        VIR_HALF_CHANNEL_MASK_HIGH (2),
        VIR_HALF_CHANNEL_MASK_FULL (3)
     */
-    vscSV_Initialize(&localHalfChannelKillFlow, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize, 4);
+    errCode = vscSV_Initialize(&localHalfChannelKillFlow, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize, 4);
+    CHECK_ERROR(errCode, "Failed in vscSV_Initialize.");
 
     /* Go through all instructions of basic block to analyze local gen and kill set */
     while (pInst)
@@ -555,6 +557,7 @@ static void _Liveness_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS
     gcmASSERT(vscSV_All(&localHalfChannelKillFlow, VIR_HALF_CHANNEL_MASK_NONE));
 
     vscSV_Finalize(&localHalfChannelKillFlow);
+    return errCode;
 }
 
 static void _Liveness_Init_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow)
