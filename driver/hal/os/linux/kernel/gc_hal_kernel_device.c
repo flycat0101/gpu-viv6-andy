@@ -1588,11 +1588,16 @@ _SetupContiguousVidMem(
         else
         {
             gckALLOCATOR allocator;
+            gctBOOL contiguousRequested = Args->contiguousRequested;
+
+#if gcdCAPTURE_ONLY_MODE
+            contiguousRequested = gcvTRUE;
+#endif
 
             gcmkONERROR(gckOS_RequestReservedMemory(
                 device->os, Args->contiguousBase, Args->contiguousSize,
                 "galcore contiguous memory",
-                Args->contiguousRequested,
+                contiguousRequested,
                 &device->contiguousPhysical
                 ));
 
@@ -1944,7 +1949,11 @@ gckGALDEVICE_Construct(
     gckKERNEL kernel = gcvNULL;
     gckGALDEVICE device;
     gctINT32 i;
+
+#if !gcdCAPTURE_ONLY_MODE
     gceHARDWARE_TYPE type;
+#endif
+
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmkHEADER_ARG("Platform=%p Args=%p", Platform, Args);
@@ -2127,6 +2136,7 @@ gckGALDEVICE_Construct(
         }
     }
 
+#if !gcdCAPTURE_ONLY_MODE
     if (device->irqLines[gcvCORE_2D] != -1)
     {
         gcmkONERROR(gckDEVICE_AddCore(
@@ -2192,6 +2202,11 @@ gckGALDEVICE_Construct(
     {
         device->kernels[gcvCORE_VG] = gcvNULL;
     }
+#else
+    device->kernels[gcvCORE_2D] = gcvNULL;
+
+    device->kernels[gcvCORE_VG] = gcvNULL;
+#endif
 
 #if !gcdEXTERNAL_SRAM_DEFAULT_POOL
     /* Setup external SRAM video memory pool. */

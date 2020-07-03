@@ -2816,6 +2816,15 @@ gcoHAL_LockVideoMemory(
         iface.u.LockVideoMemory.node = Node;
         iface.u.LockVideoMemory.cacheable = Cacheable;
 
+#if gcdCAPTURE_ONLY_MODE
+        iface.u.LockVideoMemory.queryCapSize = gcvTRUE;
+
+        gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
+
+        gcmONERROR(gcoOS_Allocate(gcvNULL, iface.u.LockVideoMemory.captureSize, &iface.u.LockVideoMemory.captureLogical));
+
+        iface.u.LockVideoMemory.queryCapSize = gcvFALSE;
+#endif
         /* Call the kernel. */
         gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
     }
@@ -2827,6 +2836,15 @@ gcoHAL_LockVideoMemory(
         iface.u.LockVideoMemory.node = Node;
         iface.u.LockVideoMemory.cacheable = Cacheable;
 
+#if gcdCAPTURE_ONLY_MODE
+        iface.u.LockVideoMemory.queryCapSize = gcvTRUE;
+
+        gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
+
+        gcmONERROR(gcoOS_Allocate(gcvNULL, iface.u.LockVideoMemory.captureSize, &iface.u.LockVideoMemory.captureLogical));
+
+        iface.u.LockVideoMemory.queryCapSize = gcvFALSE;
+#endif
         /* Call the kernel. */
         gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
     }
@@ -2904,6 +2922,10 @@ gcoHAL_UnlockVideoMemory(
     {
         status = gcvSTATUS_INVALID_ARGUMENT;
     }
+
+#if gcdCAPTURE_ONLY_MODE
+    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, iface.u.UnlockVideoMemory.captureLogical));
+#endif
 
 OnError:
     /* Return status. */

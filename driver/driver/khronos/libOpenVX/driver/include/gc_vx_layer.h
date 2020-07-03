@@ -65,6 +65,10 @@ typedef struct _vxnne_sram_s
     gctUINT32                               used;
     gctUINT32                               tailUsed;
     gcsSURF_NODE_PTR                        node; /* video memory node to emulate SRAM */
+
+#if gcdCAPTURE_ONLY_MODE
+    gctPOINTER                              captureLogical;
+#endif
 }vxnne_sram_s, *vxnne_sram;
 
 

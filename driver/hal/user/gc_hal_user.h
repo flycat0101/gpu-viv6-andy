@@ -3903,6 +3903,13 @@ gcoBUFFER_IsCaptureEnabled(
     IN gcoBUFFER Buffer
     );
 
+#if gcdCAPTURE_ONLY_MODE
+gceSTATUS
+gcoBUFFER_SetContextLogical(
+    IN gctPOINTER * ContextLogical,
+    OUT gcoBUFFER Buffer
+    );
+#endif
 
 #if gcdSYNC
 typedef enum _gceFENCE_STATUS

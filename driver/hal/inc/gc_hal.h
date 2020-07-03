@@ -117,7 +117,6 @@ extern "C" {
 
 typedef struct _gckHARDWARE *       gckHARDWARE;
 
-
 #define gcdMAX_GPU_COUNT               gcvCORE_COUNT
 
 #define gcdMAX_SURF_LAYERS             4

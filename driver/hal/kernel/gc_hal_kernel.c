@@ -59,6 +59,10 @@
 #include "viv_dec300_main.h"
 #endif
 
+#if gcdCAPTURE_ONLY_MODE
+#include "arch/gc_hal_kernel_context.h"
+#endif
+
 #define _GC_OBJ_ZONE    gcvZONE_KERNEL
 
 /*******************************************************************************
@@ -1083,6 +1087,13 @@ gckKERNEL_AllocateVideoMemory(
 
 AllocateMemory:
 
+#if gcdCAPTURE_ONLY_MODE
+    if (*Pool != gcvPOOL_VIRTUAL)
+    {
+        *Pool = gcvPOOL_SYSTEM;
+    }
+#endif
+
     /* Get initial pool. */
     switch (pool = *Pool)
     {
@@ -1235,6 +1246,13 @@ AllocateMemory:
                     /* Memory allocated. */
                     break;
                 }
+#if gcdCAPTURE_ONLY_MODE
+                else
+                {
+                    gcmkPRINT("Capture only mode: Out of Memory");
+                }
+#endif
+
             }
         }
 
@@ -1313,6 +1331,10 @@ AllocateMemory:
         /* Nothing allocated. */
         gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
     }
+
+#if gcdCAPTURE_ONLY_MODE
+    nodeObject->captureSize = bytes;
+#endif
 
     /* Return node and pool used for allocation. */
     *Pool  = pool;
@@ -1595,6 +1617,18 @@ _LockVideoMemory(
     gcmkONERROR(gckVIDMEM_NODE_Reference(Kernel, nodeObject));
     referenced = gcvTRUE;
 
+#if gcdCAPTURE_ONLY_MODE
+    if (Interface->u.LockVideoMemory.queryCapSize)
+    {
+        Interface->u.LockVideoMemory.captureSize = nodeObject->captureSize;
+        return gcvSTATUS_OK;
+    }
+    else
+    {
+        nodeObject->captureLogical = Interface->u.LockVideoMemory.captureLogical;
+    }
+#endif
+
     /* Lock for userspace CPU userspace. */
     gcmkONERROR(
         gckVIDMEM_NODE_LockCPU(Kernel,
@@ -1739,6 +1773,10 @@ _UnlockVideoMemory(
 
     Interface->u.UnlockVideoMemory.pool  = nodeObject->pool;
     Interface->u.UnlockVideoMemory.bytes = bytes;
+
+#if gcdCAPTURE_ONLY_MODE
+    Interface->u.UnlockVideoMemory.captureLogical = nodeObject->captureLogical;
+#endif
 
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;
@@ -3313,6 +3351,44 @@ gckKERNEL_Dispatch(
     case gcvHAL_ATTACH:
         if (Kernel->command)
         {
+#if gcdCAPTURE_ONLY_MODE
+           gckVIDMEM_NODE nodeObject = gcvNULL;
+
+           if (Interface->u.Attach.queryCapSize)
+           {
+                /* Attach user process. */
+                gcmkONERROR(
+                    gckCOMMAND_Attach(Kernel->command,
+                                      &context,
+                                      &bytes,
+                                      &Interface->u.Attach.numStates,
+                                      processID));
+
+                Interface->u.Attach.maxState = bytes;
+                Interface->u.Attach.context = gcmPTR_TO_NAME(context);
+
+                gcmkONERROR(
+                    gckVIDMEM_HANDLE_Lookup(Kernel, processID, context->buffer->handle, &nodeObject));
+
+                Interface->u.Attach.captureSize = nodeObject->captureSize;
+                break;
+            }
+            else
+            {
+                gctUINT i = 0;
+                context = gcmNAME_TO_PTR(Interface->u.Attach.context);
+
+                for (i = 0; i < gcdCONTEXT_BUFFER_NUM; ++i)
+                {
+                    gcsCONTEXT_PTR buffer = context->buffer;
+
+                    gckOS_CopyToUserData(Kernel->os, buffer->logical, Interface->u.Attach.contextLogical[i], Interface->u.Attach.captureSize);
+
+                    buffer = buffer->next;
+                }
+            }
+
+#else
             /* Attach user process. */
             gcmkONERROR(
                 gckCOMMAND_Attach(Kernel->command,
@@ -3323,15 +3399,30 @@ gckKERNEL_Dispatch(
 
             Interface->u.Attach.maxState = bytes;
             Interface->u.Attach.context = gcmPTR_TO_NAME(context);
+#endif
 
             if (Interface->u.Attach.map)
             {
                 if (context != gcvNULL)
                 {
-                    gcmkVERIFY_OK(
-                        gckCONTEXT_MapBuffer(context,
-                                             Interface->u.Attach.logicals,
-                                             &Interface->u.Attach.bytes));
+#if gcdCAPTURE_ONLY_MODE
+                    gctUINT i = 0;
+
+                    for (i = 0; i < gcdCONTEXT_BUFFER_NUM; ++i)
+                    {
+                        Interface->u.Attach.logicals[i] = gcmPTR_TO_UINT64(Interface->u.Attach.contextLogical[i]);
+                    }
+
+                    Interface->u.Attach.bytes = (gctUINT)context->totalSize;
+#else
+                    if (Kernel->command->feType == gcvHW_FE_WAIT_LINK)
+                    {
+                        gcmkVERIFY_OK(
+                            gckCONTEXT_MapBuffer(context,
+                                                Interface->u.Attach.logicals,
+                                                &Interface->u.Attach.bytes));
+                    }
+#endif
                 }
                 else
                 {
@@ -5074,7 +5165,13 @@ gckFENCE_Create(
     )
 {
     gceSTATUS status;
+
+#if !gcdCAPTURE_ONLY_MODE
     gcePOOL pool = gcvPOOL_DEFAULT;
+#else
+    gcePOOL pool = gcvPOOL_VIRTUAL;
+#endif
+
     gckFENCE fence = gcvNULL;
     gctSIZE_T size = 8;
     gctUINT32 allocFlag = gcvALLOC_FLAG_CONTIGUOUS;

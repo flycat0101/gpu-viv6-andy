@@ -1332,6 +1332,11 @@ typedef struct _gcsVIDMEM_NODE
     gctUINT32                   tilingMode;
     gctUINT32                   tsMode;
     gctUINT64                   clearValue;
+
+#if gcdCAPTURE_ONLY_MODE
+    gctSIZE_T                   captureSize;
+    gctPOINTER                  captureLogical;
+#endif
 }
 gcsVIDMEM_NODE;
 
