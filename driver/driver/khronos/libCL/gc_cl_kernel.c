@@ -7274,7 +7274,7 @@ OnError:
     {
         if(kernel->referenceCount) gcoOS_AtomDestroy(gcvNULL, kernel->referenceCount);
 
-        if(kernel->name) gcmOS_SAFE_FREE(gcvNULL, kernel->name);
+        if(kernel->name) {gcmOS_SAFE_FREE(gcvNULL, kernel->name);}
 
         if(kernel->argMutex) gcoOS_DeleteMutex(gcvNULL, kernel->argMutex);
 
