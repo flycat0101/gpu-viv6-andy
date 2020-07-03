@@ -960,6 +960,46 @@ slsROPERAND_IsFloatOrVecConstant(
 }
 
 static gceSTATUS
+_IsOutputClipDistanceOrClipVertexAddBefore(
+    IN sloCOMPILER Compiler,
+    IN gctCONST_STRING Symbol
+    )
+{
+    gcSHADER   binary;
+    gctUINT32  i, count;
+    gcOUTPUT   output;
+    gctINT     symLength = 0;
+
+    gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
+
+    gcSHADER_GetOutputCount(binary, &count);
+
+    if (gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "#ClipVertex")))
+    {
+        symLength = gcSL_CLIP_DISTANCE;
+    }
+    else if (gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "#ClipDistance")))
+    {
+        symLength = gcSL_CLIP_VERTEX;
+    }
+    else
+    {
+        return gcvSTATUS_FALSE;
+    }
+
+    for (i = 0; i < count; i++)
+    {
+        gcSHADER_GetOutput(binary, i, &output);
+        if (output->nameLength == symLength)
+        {
+            return gcvSTATUS_TRUE;
+        }
+    }
+
+    return gcvSTATUS_FALSE;
+}
+
+static gceSTATUS
 _IsOutputColorAddBefore(
     IN sloCOMPILER Compiler
     )
@@ -2061,6 +2101,21 @@ _AllocLogicalRegOrArray(
         }
 
         tempRegIndex = slNewTempRegs(Compiler, logicalRegCount * binaryDataTypeSize);
+
+        /* According to OGL4.0 spec:It is an error for the set of shaders forming a program to statically
+           read or write both gl_ClipVertex and gl_ClipDistance. */
+        if (_IsOutputClipDistanceOrClipVertexAddBefore(Compiler, Symbol))
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                            Name->lineNo,
+                                            Name->stringNo,
+                                            slvREPORT_ERROR,
+                                            "Can not write output use both gl_ClipVertex and gl_ClipDistance."));
+
+            gcmFOOTER_ARG("status=%d", gcvSTATUS_COMPILER_FE_PARSER_ERROR);
+
+            return gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+        }
 
         if (sloCOMPILER_IsHaltiVersion(Compiler) && !sloCOMPILER_IsOGL11Version(Compiler))
         {
