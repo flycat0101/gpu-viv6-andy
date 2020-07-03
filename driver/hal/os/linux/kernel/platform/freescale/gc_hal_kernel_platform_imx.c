@@ -141,28 +141,26 @@ struct platform_device *pdevice;
 #  include <linux/sched.h>
 #  include <linux/profile.h>
 
-struct task_struct *lowmem_deathpending;
-
-static int
-task_notify_func(struct notifier_block *self, unsigned long val, void *data);
-
-static struct notifier_block task_nb = {
-    .notifier_call  = task_notify_func,
-};
+struct task_struct *oom_crashpending;
 
 static int
 task_notify_func(struct notifier_block *self, unsigned long val, void *data)
 {
     struct task_struct *task = data;
 
-    if (task == lowmem_deathpending)
-        lowmem_deathpending = NULL;
+    if (task == oom_crashpending) {
+        oom_crashpending = NULL;
+    }
 
     return NOTIFY_DONE;
 }
 
-extern struct task_struct *lowmem_deathpending;
-static unsigned long lowmem_deathpending_timeout;
+static struct notifier_block task_nb = {
+    .notifier_call  = task_notify_func,
+};
+
+extern struct task_struct *oom_crashpending;
+static unsigned long oom_crashpending_timeout;
 
 static int force_contiguous_lowmem_shrink(IN gckKERNEL Kernel)
 {
@@ -173,16 +171,13 @@ static int force_contiguous_lowmem_shrink(IN gckKERNEL Kernel)
     int min_adj = 0;
     int selected_tasksize = 0;
     int selected_oom_adj;
-    /*
-     * If we already have a death outstanding, then
-     * bail out right away; indicating to vmscan
-     * that we have nothing further to offer on
-     * this pass.
-     *
+
+    /* Return if we already have a oom crash pending
      */
-    if (lowmem_deathpending &&
-        time_before_eq(jiffies, lowmem_deathpending_timeout))
+    if (oom_crashpending &&
+        time_before_eq(jiffies, oom_crashpending_timeout)) {
         return 0;
+    }
     selected_oom_adj = min_adj;
 
     rcu_read_lock();
@@ -241,8 +236,8 @@ static int force_contiguous_lowmem_shrink(IN gckKERNEL Kernel)
         printk("<gpu> send sigkill to %d (%s), adj %d, size %d\n",
                  selected->pid, selected->comm,
                  selected_oom_adj, selected_tasksize);
-        lowmem_deathpending = selected;
-        lowmem_deathpending_timeout = jiffies + HZ;
+        oom_crashpending = selected;
+        oom_crashpending_timeout = jiffies + HZ;
         force_sig(SIGKILL, selected);
         ret = 0;
     }
