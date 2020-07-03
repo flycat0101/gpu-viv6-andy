@@ -286,5 +286,11 @@ gckMCFE_Execute(
     IN gctUINT32 Bytes
     );
 
+/* Query hardware module idle */
+gceSTATUS
+gckMCFE_HardwareIdle(
+    IN gckHARDWARE Hardware,
+    OUT gctBOOL_PTR IsIdle
+    );
 #endif
 
