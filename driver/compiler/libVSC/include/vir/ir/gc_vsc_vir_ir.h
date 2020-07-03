@@ -5923,6 +5923,12 @@ VIR_Shader_GetLogicalCount(
     IN  VIR_Type *      Type
     );
 
+gctUINT
+VIR_Shader_GetNextLlSlot(
+    IN  VIR_Shader*     pShader,
+    IN  VIR_IdList*     pSymIdList
+    );
+
 VIR_Symbol*
 VIR_Shader_AddBuiltinAttribute(
     IN  VIR_Shader *    VirShader,

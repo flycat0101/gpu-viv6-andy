@@ -131,9 +131,12 @@ BEGIN_EXTERN_C()
 
 /* bump up version to 1.44 for adding intrinsic functions of double type for ldexp, frexp, fma, packDouble2x32 and unpackDouble2x32 for OGL4.0 06/04/2020 */
 
+/* bump up version to 1.45 for saving cl_program_binary_type for gcSHADER on 03/12/2020 */
+#define gcdSL_SHADER_BINARY_BEFORE_SAVING_CL_PROGRAM_BINARY_TYPE gcmCC(0, 0, 1, 45)
+
 /* current version */
-#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 45)
-#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 45)
+#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 46)
+#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 46)
 
 typedef union _gcsValue
 {
@@ -4459,6 +4462,15 @@ typedef struct _gcGEOLAYOUT
     gcGeoPrimitive        geoOutPrimitive;
 } gcGEOLayout;
 
+/* same value as cl_program_binary_type. */
+typedef enum _gcCL_PROGRAM_BINARY_TYPE
+{
+    gcCL_PROGRAM_BINARY_TYPE_NONE                   = 0x0,
+    gcCL_PROGRAM_BINARY_TYPE_COMPILED_OBJECT        = 0x1,
+    gcCL_PROGRAM_BINARY_TYPE_LIBRARY                = 0x2,
+    gcCL_PROGRAM_BINARY_TYPE_EXECUTABLE             = 0x4,
+} gcCL_PROGRAM_BINARY_TYPE;
+
 /* The structure that defines the gcSHADER object to the outside world. */
 struct _gcSHADER
 {
@@ -4490,6 +4502,9 @@ struct _gcSHADER
 
     /* Type of shader. */
     gcSHADER_KIND               type;
+
+    /* Save the cl_program_binary_type which is set by OCL driver. */
+    gcCL_PROGRAM_BINARY_TYPE    clProgramBinaryType;
 
     /* Flags */
     gcSHADER_FLAGS              flags;

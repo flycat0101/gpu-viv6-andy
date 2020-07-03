@@ -8605,6 +8605,12 @@ gcSHADER_SetAttrLocationByDriver(
     IN gctINT               Location
     );
 
+gceSTATUS
+gcSHADER_SetCLProgramBinaryType(
+    IN gcSHADER             Shader,
+    IN gctUINT              clProgramBinaryType
+    );
+
 gctBOOL
 gceLAYOUT_QUALIFIER_HasHWNotSupportingBlendMode(
     IN gceLAYOUT_QUALIFIER         Qualifier
