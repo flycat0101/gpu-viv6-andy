@@ -202,7 +202,7 @@ _setAbs(
     IN VIR_Operand        *Opnd
     )
 {
-    VIR_Operand_SetModifier(Opnd, VIR_MOD_ABS | VIR_Operand_GetModifier(Opnd));
+    VIR_Operand_SetOneModifier(Opnd, VIR_MOD_ABS);
     if (VIR_Operand_GetModifier(Opnd) & VIR_MOD_NEG)
     {
         VIR_Operand_ClrOneModifier(Opnd, VIR_MOD_NEG);
@@ -218,7 +218,7 @@ _setConj(
     )
 {
     gcmASSERT(VIR_OPCODE_isCmplx(VIR_Inst_GetOpcode(Inst)));
-    VIR_Operand_SetModifier(Opnd, VIR_MOD_ABS | VIR_Operand_GetModifier(Opnd));
+    VIR_Operand_SetOneModifier(Opnd, VIR_MOD_ABS);
     if (VIR_Operand_GetModifier(Opnd) & VIR_MOD_NEG)
     {
         VIR_Operand_ClrOneModifier(Opnd, VIR_MOD_NEG);
@@ -235,7 +235,7 @@ _setConjNeg(
 {
     gcmASSERT(VIR_OPCODE_isCmplx(VIR_Inst_GetOpcode(Inst)));
     VIR_Operand_NegateOperand(Context->shader, Opnd);
-    VIR_Operand_SetModifier(Opnd, VIR_MOD_ABS | VIR_Operand_GetModifier(Opnd));
+    VIR_Operand_SetOneModifier(Opnd, VIR_MOD_ABS);
     if (VIR_Operand_GetModifier(Opnd) & VIR_MOD_NEG)
     {
         VIR_Operand_ClrOneModifier(Opnd, VIR_MOD_NEG);

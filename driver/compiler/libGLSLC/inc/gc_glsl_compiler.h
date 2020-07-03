@@ -204,8 +204,9 @@ sloCOMPILER_GetLanguageVersion(
 gctBOOL
 sloCOMPILER_IsHaltiVersion(
     IN sloCOMPILER Compiler
-);
+    );
 
+/* Check the GLSL ES version. */
 gctBOOL
 sloCOMPILER_IsES20Version(
     IN sloCOMPILER Compiler
@@ -214,7 +215,7 @@ sloCOMPILER_IsES20Version(
 gctBOOL
 sloCOMPILER_IsES30Version(
     IN sloCOMPILER Compiler
-);
+    );
 
 gctBOOL
 sloCOMPILER_IsES30VersionOrAbove(
@@ -224,48 +225,57 @@ sloCOMPILER_IsES30VersionOrAbove(
 gctBOOL
 sloCOMPILER_IsES31VersionOrAbove(
     IN sloCOMPILER Compiler
-);
+    );
 
+gctBOOL
+sloCOMPILER_IsES32VersionOrAbove(
+    IN sloCOMPILER Compiler,
+    IN gctBOOL     bCheckAbove
+    );
+
+/* Check the GLSL version. */
 gctBOOL
 sloCOMPILER_IsOGLVersion(
     IN sloCOMPILER Compiler
-);
+    );
 
 gctBOOL
 sloCOMPILER_IsOGL11Version(
     IN sloCOMPILER Compiler
-);
+    );
 
 gctBOOL
 sloCOMPILER_IsOGL12Version(
     IN sloCOMPILER Compiler
-);
+    );
 
 gctBOOL
 sloCOMPILER_IsOGL13Version(
     IN sloCOMPILER Compiler
-);
+    );
 
 gctBOOL
 sloCOMPILER_IsOGL14Version(
     IN sloCOMPILER Compiler
-);
+    );
 
 gctBOOL
-sloCOMPILER_IsOGL15Version(
-    IN sloCOMPILER Compiler
-);
-
-gctBOOL
-sloCOMPILER_IsOGL40Version(
-    IN sloCOMPILER Compiler
-);
+sloCOMPILER_IsOGL15VersionOrAbove(
+    IN sloCOMPILER Compiler,
+    IN gctBOOL     bCheckAbove
+    );
 
 gctBOOL
 sloCOMPILER_IsOGL33VersionOrAbove(
     IN sloCOMPILER Compiler,
     IN gctBOOL     bCheckAbove
-);
+    );
+
+gctBOOL
+sloCOMPILER_IsOGL40VersionOrAbove(
+    IN sloCOMPILER Compiler,
+    IN gctBOOL     bCheckAbove
+    );
 
 gceSTATUS
 sloCOMPILER_SetDebug(

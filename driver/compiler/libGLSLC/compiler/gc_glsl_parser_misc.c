@@ -7144,9 +7144,9 @@ _ParseUpdateHaltiQualifiers(
             {
                 if (sloCOMPILER_IsOGLVersion(Compiler))
                 {
-                    if (sloCOMPILER_IsOGL40Version(Compiler) ||
+                    if (sloCOMPILER_IsOGL40VersionOrAbove(Compiler, gcvFALSE) ||
                         sloCOMPILER_IsOGL33VersionOrAbove(Compiler, gcvFALSE) ||
-                        sloCOMPILER_IsOGL15Version(Compiler))
+                        sloCOMPILER_IsOGL15VersionOrAbove(Compiler, gcvFALSE))
                     {
                         if (shaderType == slvSHADER_TYPE_FRAGMENT &&
                             DataType->qualifiers.interpolation != slvINTERPOLATION_QUALIFIER_FLAT &&
@@ -7830,9 +7830,9 @@ _ParseArrayVariableDecl(
         shaderType = Compiler->shaderType;
 
         if(shaderType == slvSHADER_TYPE_VERTEX &&
-           !sloCOMPILER_IsOGL40Version(Compiler) &&
+           !sloCOMPILER_IsOGL40VersionOrAbove(Compiler, gcvFALSE) &&
            !sloCOMPILER_IsOGL33VersionOrAbove(Compiler, gcvFALSE) &&
-           !sloCOMPILER_IsOGL15Version(Compiler))
+           !sloCOMPILER_IsOGL15VersionOrAbove(Compiler, gcvFALSE))
         {
            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                            Identifier->lineNo,
@@ -8045,9 +8045,9 @@ _ParseArrayVariableDeclWithInitializer(
         shaderType = Compiler->shaderType;
 
         if(shaderType == slvSHADER_TYPE_VERTEX &&
-           !sloCOMPILER_IsOGL40Version(Compiler) &&
+           !sloCOMPILER_IsOGL40VersionOrAbove(Compiler, gcvFALSE) &&
            !sloCOMPILER_IsOGL33VersionOrAbove(Compiler, gcvFALSE) &&
-           !sloCOMPILER_IsOGL15Version(Compiler))
+           !sloCOMPILER_IsOGL15VersionOrAbove(Compiler, gcvFALSE))
         {
            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                            Identifier->lineNo,
@@ -8373,9 +8373,9 @@ _CheckErrorForArray(
            shaderType = Compiler->shaderType;
 
            if(shaderType == slvSHADER_TYPE_VERTEX &&
-              !sloCOMPILER_IsOGL40Version(Compiler) &&
+              !sloCOMPILER_IsOGL40VersionOrAbove(Compiler, gcvFALSE) &&
               !sloCOMPILER_IsOGL33VersionOrAbove(Compiler, gcvFALSE) &&
-              !sloCOMPILER_IsOGL15Version(Compiler))
+              !sloCOMPILER_IsOGL15VersionOrAbove(Compiler, gcvFALSE))
            {
               gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                               Identifier->lineNo,

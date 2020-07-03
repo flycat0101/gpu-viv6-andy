@@ -30,7 +30,7 @@
 /* Global PMP counter */
 static gctINT pmpCounter = 0;
 
-static void _CreateNewChunk(VSC_PRIMARY_MEM_POOL* pPMP, gctUINT reqSize)
+static void* _CreateNewChunk(VSC_PRIMARY_MEM_POOL* pPMP, gctUINT reqSize)
 {
     VSC_PRIMARY_MEM_CHUNK* pNewChunk;
     gctINT                 chunkHeaderSize;
@@ -65,6 +65,8 @@ static void _CreateNewChunk(VSC_PRIMARY_MEM_POOL* pPMP, gctUINT reqSize)
         /* ERROR */
         gcmASSERT(gcvFALSE);
     }
+
+    return pMem;
 }
 
 static void _DeleteChunk(VSC_PRIMARY_MEM_POOL* pPMP, VSC_PRIMARY_MEM_CHUNK* pChunkToDelete)
@@ -137,13 +139,18 @@ void* vscPMP_Alloc(VSC_PRIMARY_MEM_POOL* pPMP, gctUINT reqSize)
     VSC_COMMON_BLOCK_HEADER* pCmnBlkHeader;
     gctINT                   chunkHeaderSize;
     gctUINT                  alignedSize;
-    void*                    retPtr;
+    void*                    retPtr = gcvNULL;
 
     /* If we are not at pooling status, just call underlying alloc */
     if (!pPMP->flags.bPooling)
     {
         retPtr = pPMP->mmParam.pfnAlloc(reqSize);
-        gcmASSERT(retPtr);
+
+        if (retPtr == gcvNULL)
+        {
+            gcmASSERT(gcvFALSE);
+            return gcvNULL;
+        }
 
         pThisNativeAddrNode = (VSC_BI_LIST_NODE_EXT*)pPMP->mmParam.pfnAlloc(sizeof(VSC_BI_LIST_NODE_EXT));
         if (pThisNativeAddrNode)
@@ -157,6 +164,7 @@ void* vscPMP_Alloc(VSC_PRIMARY_MEM_POOL* pPMP, gctUINT reqSize)
         {
             /* ERROR */
             gcmASSERT(gcvFALSE);
+            return gcvNULL;
         }
 
         return retPtr;
@@ -188,7 +196,10 @@ void* vscPMP_Alloc(VSC_PRIMARY_MEM_POOL* pPMP, gctUINT reqSize)
         /* If no found, let's create a new chunk */
         if (!pThisChunkNode)
         {
-            _CreateNewChunk(pPMP, alignedSize);
+            if (_CreateNewChunk(pPMP, alignedSize) == gcvNULL)
+            {
+                return gcvNULL;
+            }
         }
     }
 
@@ -353,7 +364,7 @@ void vscPMP_Free(VSC_PRIMARY_MEM_POOL* pPMP, void *pData)
     pPMP->mmParam.pfnFree(pThisNativeAddrNode);
 }
 
-void vscPMP_ForceFreeChunk(VSC_PRIMARY_MEM_POOL* pPMP, void *pChunkValidBase)
+gctBOOL vscPMP_ForceFreeChunk(VSC_PRIMARY_MEM_POOL* pPMP, void *pChunkValidBase)
 {
     VSC_PRIMARY_MEM_CHUNK* pChunkToDelete;
     VSC_PRIMARY_MEM_CHUNK* pChunk;
@@ -362,7 +373,7 @@ void vscPMP_ForceFreeChunk(VSC_PRIMARY_MEM_POOL* pPMP, void *pChunkValidBase)
 
     if (!pPMP->flags.bPooling)
     {
-        return;
+        return gcvTRUE;
     }
 
     chunkHeaderSize = VSC_UTILS_ALIGN(sizeof(VSC_PRIMARY_MEM_CHUNK), pPMP->alignInSize);
@@ -386,11 +397,16 @@ void vscPMP_ForceFreeChunk(VSC_PRIMARY_MEM_POOL* pPMP, void *pChunkValidBase)
     /* Create a default chunk if no chunk is in the chain */
     if (vscBILST_IsEmpty(&pPMP->biChunkChain))
     {
-        _CreateNewChunk(pPMP, 0);
+        if (_CreateNewChunk(pPMP, 0) == gcvNULL)
+        {
+            return gcvFALSE;
+        }
     }
+
+    return gcvTRUE;
 }
 
-void vscPMP_ForceFreeAllHugeChunks(VSC_PRIMARY_MEM_POOL* pPMP)
+gctBOOL vscPMP_ForceFreeAllHugeChunks(VSC_PRIMARY_MEM_POOL* pPMP)
 {
     VSC_PRIMARY_MEM_CHUNK* pChunk;
     VSC_BI_LIST_NODE_EXT*  pThisChunkNode;
@@ -399,7 +415,7 @@ void vscPMP_ForceFreeAllHugeChunks(VSC_PRIMARY_MEM_POOL* pPMP)
 
     if (!pPMP->flags.bPooling)
     {
-        return;
+        return gcvTRUE;
     }
 
     chunkHeaderSize = VSC_UTILS_ALIGN(sizeof(VSC_PRIMARY_MEM_CHUNK), pPMP->alignInSize);
@@ -427,8 +443,13 @@ void vscPMP_ForceFreeAllHugeChunks(VSC_PRIMARY_MEM_POOL* pPMP)
     /* Create a default chunk if no chunk is in the chain */
     if (vscBILST_IsEmpty(&pPMP->biChunkChain))
     {
-        _CreateNewChunk(pPMP, 0);
+        if (_CreateNewChunk(pPMP, 0) == gcvNULL)
+        {
+            return gcvFALSE;
+        }
     }
+
+    return gcvTRUE;
 }
 
 void vscPMP_Finalize(VSC_PRIMARY_MEM_POOL* pPMP)

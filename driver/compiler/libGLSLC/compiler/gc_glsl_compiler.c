@@ -1434,8 +1434,8 @@ sloCOMPILER_Compile(
         /* Dump IR. */
         gcmERR_BREAK(sloCOMPILER_DumpIR(Compiler));
 
-        /* Check extension. */
-        gcmERR_BREAK(sloCOMPILER_CheckExtensions(Compiler));
+        /* Check processor supported. */
+        gcmERR_BREAK(sloCOMPILER_CheckProcessorSupported(Compiler));
 
         if (Compiler->context.errorCount > 0)
         {
@@ -1707,50 +1707,93 @@ sloCOMPILER_DumpIR(
 }
 
 gceSTATUS
-sloCOMPILER_CheckExtensions(
+sloCOMPILER_CheckProcessorSupported(
     IN sloCOMPILER Compiler
     )
 {
+    gctBOOL         bSupportGS = gcvFALSE, bSupportTS = gcvFALSE;
+    sloEXTENSION    extensionGS = { slvEXTENSION1_NONE, slvEXTENSION2_NONE }, extensionTS = { slvEXTENSION1_NONE, slvEXTENSION2_NONE };
+
     gcmHEADER_ARG("Compiler=0x%x", Compiler);
 
     /* Verify the arguments. */
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
 
-    /* For TES/TCS/GS shader, if they are not natively supported in this lang version, the corresponding extended behavior must first be enabled. */
+    if (sloCOMPILER_IsOGLVersion(Compiler))
     {
-        sloEXTENSION extensionTes = {0}, extensionGeo = {0};
-        extensionTes.extension1 = slvEXTENSION1_TESSELLATION_SHADER;
-        extensionGeo.extension1 = slvEXTENSION1_EXT_GEOMETRY_SHADER;
-        switch (Compiler->shaderType)
+        /* GLSL 1.5.0 or later can natively suppoort GS. */
+        if (sloCOMPILER_IsOGL15VersionOrAbove(Compiler, gcvTRUE))
         {
-        case slvSHADER_TYPE_TCS:
-        case slvSHADER_TYPE_TES:
-            if (Compiler->langVersion < _SHADER_ES32_VERSION &&
-                !sloCOMPILER_ExtensionEnabled(Compiler, &extensionTes))
-            {
-                gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                                                0,
-                                                0,
-                                                slvREPORT_ERROR,
-                                                "TESSELLATION extension is not enabled/required."));
-            }
-            break;
-
-        case slvSHADER_TYPE_GS:
-            if (Compiler->langVersion < _SHADER_ES32_VERSION &&
-                !sloCOMPILER_ExtensionEnabled(Compiler, &extensionGeo))
-            {
-                gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                                                0,
-                                                0,
-                                                slvREPORT_ERROR,
-                                                "GEOMETRY extension is not enabled/required."));
-            }
-            break;
-
-        default:
-            break;
+            bSupportGS = gcvTRUE;
         }
+        else
+        {
+            extensionGS.extension2 = (sleEXTENSION2)(slvEXTENSION2_GL_ARB_GEOMETRY_SHADER4 | slvEXTENSION2_GL_EXT_GEOMETRY_SHADER4);
+
+            if (sloCOMPILER_ExtensionEnabled(Compiler, &extensionGS))
+            {
+                bSupportGS = gcvTRUE;
+            }
+        }
+
+        /* GLSL 4.0.0 or later can natively suppoort TS. */
+        if (sloCOMPILER_IsOGL40VersionOrAbove(Compiler, gcvTRUE))
+        {
+            bSupportTS = gcvTRUE;
+        }
+    }
+    else
+    {
+        /* GLSL ES 3.2.0 or later can natively suppoort GS and TS. */
+        if (sloCOMPILER_IsES32VersionOrAbove(Compiler, gcvTRUE))
+        {
+            bSupportGS = gcvTRUE;
+            bSupportTS = gcvTRUE;
+        }
+        else
+        {
+            extensionGS.extension1 = slvEXTENSION1_EXT_GEOMETRY_SHADER;
+            extensionTS.extension1 = slvEXTENSION1_TESSELLATION_SHADER;
+
+            if (sloCOMPILER_ExtensionEnabled(Compiler, &extensionGS))
+            {
+                bSupportGS = gcvTRUE;
+            }
+
+            if (sloCOMPILER_ExtensionEnabled(Compiler, &extensionTS))
+            {
+                bSupportTS = gcvTRUE;
+            }
+        }
+    }
+
+    switch (Compiler->shaderType)
+    {
+    case slvSHADER_TYPE_TCS:
+    case slvSHADER_TYPE_TES:
+        if (!bSupportTS)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                            0,
+                                            0,
+                                            slvREPORT_ERROR,
+                                            "TESSELLATION extension is not enabled."));
+        }
+        break;
+
+    case slvSHADER_TYPE_GS:
+        if (!bSupportGS)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                            0,
+                                            0,
+                                            slvREPORT_ERROR,
+                                            "GEOMETRY extension is not enabled."));
+        }
+        break;
+
+    default:
+        break;
     }
 
     gcmFOOTER_NO();
@@ -2024,6 +2067,11 @@ sloCOMPILER_Extension1Enabled(
     /* Verify the arguments. */
     slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
 
+    if (Extension == slvEXTENSION1_NONE)
+    {
+        return gcvTRUE;
+    }
+
     result = (Compiler->context.extensions.extension1 & Extension);
     gcmFOOTER_ARG("<return>=%d", result);
 
@@ -2043,6 +2091,11 @@ sloCOMPILER_Extension2Enabled(
     /* Verify the arguments. */
     slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
 
+    if (Extension == slvEXTENSION2_NONE)
+    {
+        return gcvTRUE;
+    }
+
     result = (Compiler->context.extensions.extension2 & Extension);
     gcmFOOTER_ARG("<return>=%d", result);
 
@@ -2055,21 +2108,26 @@ sloCOMPILER_ExtensionEnabled(
     IN sloEXTENSION* Extension
     )
 {
-    gctBOOL result;
-    gcmHEADER_ARG("Compiler=0x%x Extension=%d",
-                  Compiler, Extension->extension1);
+    gctBOOL result = gcvTRUE;
+    sleEXTENSION1 extension1 = Extension->extension1;
+    sleEXTENSION2 extension2 = Extension->extension2;
+
+    gcmHEADER_ARG("Compiler=0x%x Extension1=%d Extension2=%d",
+                  Compiler, extension1, extension2);
 
     /* Verify the arguments. */
     slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
 
-    if (Extension->extension2)
+    /* Check if any extension is enabled. */
+    if (extension1 != slvEXTENSION1_NONE)
     {
-        result = (Extension->extension2 == slvEXTENSION2_NONE) || (Compiler->context.extensions.extension2 & Extension->extension2);
+        result = sloCOMPILER_Extension1Enabled(Compiler, extension1);
     }
-    else
+    if (!result && extension2 != slvEXTENSION2_NONE)
     {
-        result = (Extension->extension1 == slvEXTENSION1_NONE) || (Compiler->context.extensions.extension1 & Extension->extension1);
+        result |= sloCOMPILER_Extension2Enabled(Compiler, extension2);
     }
+
     gcmFOOTER_ARG("<return>=%d", result);
 
     return result;
@@ -4267,26 +4325,34 @@ sloCOMPILER_SetLanguageVersion(
 
        case 130:
           Compiler->langVersion = _SHADER_GL13_VERSION;
-          Compiler->context.extensions.extension1 |= (slvEXTENSION1_HALTI | slvEXTENSION1_NON_HALTI | slvEXTENSION1_ES_31
-                                          |slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS);
+          Compiler->context.extensions.extension1 |=
+              (slvEXTENSION1_HALTI | slvEXTENSION1_NON_HALTI | slvEXTENSION1_ES_31 | slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS);
           break;
 
        case 140:
           Compiler->langVersion = _SHADER_GL14_VERSION;
-          Compiler->context.extensions.extension1 |= (slvEXTENSION1_HALTI | slvEXTENSION1_NON_HALTI | slvEXTENSION1_ES_31
-                                          |slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS);
+          Compiler->context.extensions.extension1 |=
+              (slvEXTENSION1_HALTI | slvEXTENSION1_NON_HALTI | slvEXTENSION1_ES_31 | slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS);
           break;
 
        case 150:
           Compiler->langVersion = _SHADER_GL15_VERSION;
-          Compiler->context.extensions.extension1 |= (slvEXTENSION1_HALTI | slvEXTENSION1_NON_HALTI | slvEXTENSION1_ES_31
-                                          |slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS | slvEXTENSION1_EXT_GEOMETRY_SHADER );
+          Compiler->context.extensions.extension1 |= slvEXTENSION1_HALTI
+                                                   | slvEXTENSION1_NON_HALTI
+                                                   | slvEXTENSION1_ES_31
+                                                   | slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS
+                                                   | slvEXTENSION1_EXT_GEOMETRY_SHADER
+                                                   | slvEXTENSION1_EXT_GEOMETRY_POINT_SIZE;
           break;
 
        case 330:
           Compiler->langVersion = _SHADER_GL33_VERSION;
-          Compiler->context.extensions.extension1 |= (slvEXTENSION1_HALTI | slvEXTENSION1_NON_HALTI | slvEXTENSION1_ES_31
-                                          |slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS |slvEXTENSION1_EXT_GEOMETRY_SHADER );
+          Compiler->context.extensions.extension1 |= slvEXTENSION1_HALTI
+                                                   | slvEXTENSION1_NON_HALTI
+                                                   | slvEXTENSION1_ES_31
+                                                   | slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS
+                                                   | slvEXTENSION1_EXT_GEOMETRY_SHADER
+                                                   | slvEXTENSION1_EXT_GEOMETRY_POINT_SIZE;
           break;
 
        case 400:
@@ -4294,8 +4360,14 @@ sloCOMPILER_SetLanguageVersion(
              sleSHADER_TYPE shaderType;
              sloCOMPILER_GetShaderType(Compiler, &shaderType);
              Compiler->langVersion = _SHADER_GL40_VERSION;
-             Compiler->context.extensions.extension1 |= (slvEXTENSION1_HALTI |slvEXTENSION1_NON_HALTI | slvEXTENSION1_DOUBLE_DATA_TYPE | slvEXTENSION1_ES_31
-                                          | slvEXTENSION1_EXT_GEOMETRY_SHADER | slvEXTENSION1_TESSELLATION_SHADER | slvEXTENSION1_TEXTURE_CUBE_MAP_ARRAY );
+             Compiler->context.extensions.extension1 |= slvEXTENSION1_HALTI |slvEXTENSION1_NON_HALTI
+                                                      | slvEXTENSION1_DOUBLE_DATA_TYPE
+                                                      | slvEXTENSION1_ES_31
+                                                      | slvEXTENSION1_EXT_GEOMETRY_SHADER
+                                                      | slvEXTENSION1_EXT_GEOMETRY_POINT_SIZE
+                                                      | slvEXTENSION1_TESSELLATION_SHADER
+                                                      | slvEXTENSION1_TESSELLATION_POINT_SIZE
+                                                      | slvEXTENSION1_TEXTURE_CUBE_MAP_ARRAY;
              if (shaderType != slvSHADER_TYPE_LIBRARY)
              {
                  Compiler->context.extensions.extension1 |= slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS;
@@ -4409,6 +4481,7 @@ sloCOMPILER_IsHaltiVersion(
     return (sloCOMPILER_GetLanguageVersion(Compiler) >= _SHADER_HALTI_VERSION || sloCOMPILER_IsOGLVersion(Compiler));
 }
 
+/* Check the GLSL ES version. */
 gctBOOL
 sloCOMPILER_IsES20Version(
     IN sloCOMPILER Compiler
@@ -4422,7 +4495,7 @@ sloCOMPILER_IsES30Version(
     IN sloCOMPILER Compiler
     )
 {
-    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_HALTI_VERSION;
+    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_HALTI_VERSION && !sloCOMPILER_IsOGLVersion(Compiler);
 }
 
 gctBOOL
@@ -4442,6 +4515,28 @@ sloCOMPILER_IsES31VersionOrAbove(
 }
 
 gctBOOL
+sloCOMPILER_IsES32VersionOrAbove(
+    IN sloCOMPILER Compiler,
+    IN gctBOOL     bCheckAbove
+    )
+{
+    if (sloCOMPILER_IsOGLVersion(Compiler))
+    {
+        return gcvFALSE;
+    }
+
+    if (bCheckAbove)
+    {
+        return (sloCOMPILER_GetLanguageVersion(Compiler) >= _SHADER_ES32_VERSION);
+    }
+    else
+    {
+        return (sloCOMPILER_GetLanguageVersion(Compiler) >= _SHADER_ES32_VERSION);
+    }
+}
+
+/* Check the GLSL version. */
+gctBOOL
 sloCOMPILER_IsOGLVersion(
     IN sloCOMPILER Compiler
     )
@@ -4455,6 +4550,11 @@ sloCOMPILER_IsOGL11Version(
     IN sloCOMPILER Compiler
     )
 {
+    if (!sloCOMPILER_IsOGLVersion(Compiler))
+    {
+        return gcvFALSE;
+    }
+
     return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL11_VERSION;
 }
 
@@ -4463,6 +4563,11 @@ sloCOMPILER_IsOGL12Version(
     IN sloCOMPILER Compiler
     )
 {
+    if (!sloCOMPILER_IsOGLVersion(Compiler))
+    {
+        return gcvFALSE;
+    }
+
     return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL12_VERSION;
 }
 
@@ -4471,6 +4576,11 @@ sloCOMPILER_IsOGL13Version(
     IN sloCOMPILER Compiler
     )
 {
+    if (!sloCOMPILER_IsOGLVersion(Compiler))
+    {
+        return gcvFALSE;
+    }
+
     return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL13_VERSION;
 }
 
@@ -4479,15 +4589,33 @@ sloCOMPILER_IsOGL14Version(
     IN sloCOMPILER Compiler
     )
 {
+    if (!sloCOMPILER_IsOGLVersion(Compiler))
+    {
+        return gcvFALSE;
+    }
+
     return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL14_VERSION;
 }
 
 gctBOOL
-sloCOMPILER_IsOGL15Version(
-    IN sloCOMPILER Compiler
+sloCOMPILER_IsOGL15VersionOrAbove(
+    IN sloCOMPILER Compiler,
+    IN gctBOOL     bCheckAbove
     )
 {
-    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL15_VERSION;
+    if (!sloCOMPILER_IsOGLVersion(Compiler))
+    {
+        return gcvFALSE;
+    }
+
+    if (bCheckAbove)
+    {
+        return sloCOMPILER_GetLanguageVersion(Compiler) >= _SHADER_GL15_VERSION;
+    }
+    else
+    {
+        return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL15_VERSION;
+    }
 }
 
 gctBOOL
@@ -4496,6 +4624,11 @@ sloCOMPILER_IsOGL33VersionOrAbove(
     IN gctBOOL     bCheckAbove
     )
 {
+    if (!sloCOMPILER_IsOGLVersion(Compiler))
+    {
+        return gcvFALSE;
+    }
+
     if (bCheckAbove)
     {
         return sloCOMPILER_GetLanguageVersion(Compiler) >= _SHADER_GL33_VERSION;
@@ -4507,11 +4640,24 @@ sloCOMPILER_IsOGL33VersionOrAbove(
 }
 
 gctBOOL
-sloCOMPILER_IsOGL40Version(
-    IN sloCOMPILER Compiler
+sloCOMPILER_IsOGL40VersionOrAbove(
+    IN sloCOMPILER Compiler,
+    IN gctBOOL     bCheckAbove
     )
 {
-    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL40_VERSION;
+    if (!sloCOMPILER_IsOGLVersion(Compiler))
+    {
+        return gcvFALSE;
+    }
+
+    if (bCheckAbove)
+    {
+        return sloCOMPILER_GetLanguageVersion(Compiler) >= _SHADER_GL40_VERSION;
+    }
+    else
+    {
+        return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL40_VERSION;
+    }
 }
 
 gctLABEL

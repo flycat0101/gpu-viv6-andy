@@ -1060,7 +1060,7 @@ _IsGLShaderHaveBuiltinUniform(
             isHave = gcvFALSE;
         else if(sloCOMPILER_IsOGL14Version(Compiler) /* TODO: && extension GL_ARB_compatibility is enable */ )
             isHave = gcvTRUE;
-        else if((sloCOMPILER_IsOGL15Version(Compiler) || sloCOMPILER_IsOGL33VersionOrAbove(Compiler, gcvTRUE)) &&
+        else if((sloCOMPILER_IsOGL15VersionOrAbove(Compiler, gcvFALSE) || sloCOMPILER_IsOGL33VersionOrAbove(Compiler, gcvTRUE)) &&
                  slsCOMPILER_HasCompatibilityProfile(slvCOMPILER_IS_COMPATIBILITY_PROFILE))
             isHave = gcvTRUE;
     }

@@ -349,7 +349,7 @@ _set_ABS(
     IN VIR_Operand        *Opnd
     )
 {
-    VIR_Operand_SetModifier(Opnd, VIR_MOD_ABS | VIR_Operand_GetModifier(Opnd));
+    VIR_Operand_SetOneModifier(Opnd, VIR_MOD_ABS);
     if (VIR_Operand_GetModifier(Opnd) & VIR_MOD_NEG)
     {
         VIR_Operand_ClrOneModifier(Opnd, VIR_MOD_NEG); /* clear .neg modifier when abs is set after */

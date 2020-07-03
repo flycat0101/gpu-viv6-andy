@@ -10444,7 +10444,7 @@ slMakeImplicitConversionForOperand(
         return status;
     }
 
-    if (sloCOMPILER_IsOGL40Version(Compiler) ||
+    if (sloCOMPILER_IsOGL40VersionOrAbove(Compiler, gcvFALSE) ||
         sloCOMPILER_Extension2Enabled(Compiler, slvEXTENSION2_GL_ARB_GPU_SHADER5))
     {
         switch(Operand->dataType->type)

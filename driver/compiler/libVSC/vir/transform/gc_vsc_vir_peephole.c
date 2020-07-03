@@ -4122,14 +4122,7 @@ static VSC_ErrCode _VSC_PH_MergeAddSubSameValue(
             /* Inverse the source if needed. */
             if (bInverse)
             {
-                if ((VIR_Operand_GetModifier(VIR_Inst_GetSource(pUsageInst, 0)) & VIR_MOD_NEG) != 0)
-                {
-                    VIR_Operand_SetModifier(VIR_Inst_GetSource(pUsageInst, 0), VIR_MOD_NEG ^ VIR_Operand_GetModifier(VIR_Inst_GetSource(pUsageInst, 0)));
-                }
-                else
-                {
-                    VIR_Operand_SetModifier(VIR_Inst_GetSource(pUsageInst, 0), VIR_MOD_NEG | VIR_Operand_GetModifier(VIR_Inst_GetSource(pUsageInst, 0)));
-                }
+                VIR_Operand_NegateOperand(pShader, VIR_Inst_GetSource(pUsageInst, 0));
             }
         }
         else
@@ -4179,14 +4172,7 @@ static VSC_ErrCode _VSC_PH_MergeAddSubSameValue(
             /* Inverse the source if needed. */
             if (bInverse)
             {
-                if ((VIR_Operand_GetModifier(VIR_Inst_GetSource(pUsageInst, 0)) & VIR_MOD_NEG) != 0)
-                {
-                    VIR_Operand_SetModifier(VIR_Inst_GetSource(pUsageInst, 0), VIR_MOD_NEG ^ VIR_Operand_GetModifier(VIR_Inst_GetSource(pUsageInst, 0)));
-                }
-                else
-                {
-                    VIR_Operand_SetModifier(VIR_Inst_GetSource(pUsageInst, 0), VIR_MOD_NEG | VIR_Operand_GetModifier(VIR_Inst_GetSource(pUsageInst, 0)));
-                }
+                VIR_Operand_NegateOperand(pShader, VIR_Inst_GetSource(pUsageInst, 0));
             }
         }
 

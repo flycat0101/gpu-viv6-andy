@@ -1042,6 +1042,7 @@ typedef struct _VSC_OPTN_LCSEOPTIONS
 #define VSC_OPTN_LCSEOptions_OPT_LOAD                       0x1
 #define VSC_OPTN_LCSEOptions_OPT_ATTR_LD                    0x2
 #define VSC_OPTN_LCSEOptions_OPT_OTHERS                     0x4
+#define VSC_OPTN_LCSEOptions_OPT_VECTORIZE_ATTR_LD          0x8
 
 #define VSC_OPTN_LCSEOptions_GetBeforeShader(option)        ((option)->before_shader)
 #define VSC_OPTN_LCSEOptions_SetBeforeShader(option, b)     ((option)->before_shader = (b))

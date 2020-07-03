@@ -41,11 +41,15 @@ static void _InitializeChunk(VSC_ARENA_MEM_SYS* pAMS, VSC_ARENA_MEM_CHUNK* pChun
     pChunk->pStartOfRemainderValidData = (gctUINT8*)pChunk + alignedChunkHeaderSize;
 }
 
-static void _CreateNewChunk(VSC_ARENA_MEM_SYS* pAMS)
+static void* _CreateNewChunk(VSC_ARENA_MEM_SYS* pAMS)
 {
     VSC_ARENA_MEM_CHUNK* pNewChunk;
 
     pNewChunk = (VSC_ARENA_MEM_CHUNK*)vscBMS_Alloc(pAMS->pBuddyMemSys, pAMS->baseChunkSize);
+    if (pNewChunk == gcvNULL)
+    {
+        return gcvNULL;
+    }
 
     /* Fill in contents */
     _InitializeChunk(pAMS, pNewChunk);
@@ -63,6 +67,8 @@ static void _CreateNewChunk(VSC_ARENA_MEM_SYS* pAMS)
     }
 
     pAMS->pCurChunk = pNewChunk;
+
+    return pNewChunk;
 }
 
 void vscAMS_Initialize(VSC_ARENA_MEM_SYS* pAMS, VSC_BUDDY_MEM_SYS* pBaseMemPool,
@@ -104,7 +110,10 @@ void* vscAMS_Alloc(VSC_ARENA_MEM_SYS* pAMS, gctUINT reqSize)
         }
         else
         {
-            _CreateNewChunk(pAMS);
+            if (_CreateNewChunk(pAMS) == gcvNULL)
+            {
+                return gcvNULL;
+            }
         }
     }
 

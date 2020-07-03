@@ -1095,10 +1095,10 @@ VIR_Inst_IsSupportNegModifier(
     VIR_OpCode              opCode = VIR_Inst_GetOpcode(pInst);
     gctUINT                 lastSrcIndex = VIR_Inst_GetSrcNum(pInst) - 1;
 
-    /* EVIS instruction can support NEG. */
+    /* EVIS instruction can't support NEG. */
     if (VIR_OPCODE_isVX(opCode))
     {
-        return bIsSupport;
+        return gcvFALSE;
     }
 
     switch (instVirTypeId)
@@ -15142,29 +15142,39 @@ VIR_Operand_NegateOperand(
 {
     /* HW takes absolute values first, then takes negative, we need to follow this order. */
     gctBOOL                 bHasAbs = VIR_Operand_GetModifier(Operand) & VIR_MOD_ABS;
+    gctBOOL                 bHasNeg = VIR_Operand_GetModifier(Operand) & VIR_MOD_NEG;
 
     switch(VIR_Operand_GetOpKind(Operand))
     {
     case VIR_OPND_IMMEDIATE:
         {
             VIR_PrimitiveTypeId type = VIR_Operand_GetTypeId(Operand);
+
             if (bHasAbs)
             {
                 VIR_ScalarConstVal_GetAbs(type, &VIR_Operand_GetScalarImmediate(Operand), &VIR_Operand_GetScalarImmediate(Operand));
-                VIR_Operand_SetModifier(Operand, VIR_MOD_ABS ^ VIR_Operand_GetModifier(Operand));
+                VIR_Operand_ClrOneModifier(Operand, VIR_MOD_ABS);
             }
-            VIR_ScalarConstVal_GetNeg(type, &VIR_Operand_GetScalarImmediate(Operand), &VIR_Operand_GetScalarImmediate(Operand));
+
+            if (bHasNeg)
+            {
+                VIR_Operand_ClrOneModifier(Operand, VIR_MOD_NEG);
+            }
+            else
+            {
+                VIR_ScalarConstVal_GetNeg(type, &VIR_Operand_GetScalarImmediate(Operand), &VIR_Operand_GetScalarImmediate(Operand));
+            }
             break;
         }
 
     case VIR_OPND_SYMBOL:
-        if(VIR_Operand_GetModifier(Operand) & VIR_MOD_NEG)
+        if (bHasNeg)
         {
-            VIR_Operand_SetModifier(Operand, VIR_MOD_NEG ^ VIR_Operand_GetModifier(Operand));
+            VIR_Operand_ClrOneModifier(Operand, VIR_MOD_NEG);
         }
         else
         {
-            VIR_Operand_SetModifier(Operand, VIR_MOD_NEG | VIR_Operand_GetModifier(Operand));
+            VIR_Operand_SetOneModifier(Operand, VIR_MOD_NEG);
         }
         break;
 
@@ -15174,21 +15184,39 @@ VIR_Operand_NegateOperand(
                                                     VIR_Operand_GetConstId(Operand));
             VIR_ConstVal new_const;
             VIR_ConstId new_const_id;
+            gctBOOL bUpdate = gcvTRUE;
 
             memset(&new_const, 0, sizeof(VIR_ConstVal));
 
             if (bHasAbs)
             {
                 VIR_VecConstVal_GetAbs(cur_const->type, &cur_const->value.vecVal, &new_const.vecVal);
-                VIR_VecConstVal_GetNeg(cur_const->type, &new_const.vecVal, &new_const.vecVal);
-                VIR_Operand_SetModifier(Operand, VIR_MOD_ABS ^ VIR_Operand_GetModifier(Operand));
+                VIR_Operand_ClrOneModifier(Operand, VIR_MOD_ABS);
+
+                if (bHasNeg)
+                {
+                    VIR_Operand_ClrOneModifier(Operand, VIR_MOD_NEG);
+                }
+                else
+                {
+                    VIR_VecConstVal_GetNeg(cur_const->type, &new_const.vecVal, &new_const.vecVal);
+                }
+            }
+            else if (bHasNeg)
+            {
+                VIR_Operand_ClrOneModifier(Operand, VIR_MOD_NEG);
+                bUpdate = gcvFALSE;
             }
             else
             {
                 VIR_VecConstVal_GetNeg(cur_const->type, &cur_const->value.vecVal, &new_const.vecVal);
             }
-            VIR_Shader_AddConstant(Shader, cur_const->type, &new_const, &new_const_id);
-            VIR_Operand_SetConstId(Operand, new_const_id);
+
+            if (bUpdate)
+            {
+                VIR_Shader_AddConstant(Shader, cur_const->type, &new_const, &new_const_id);
+                VIR_Operand_SetConstId(Operand, new_const_id);
+            }
             break;
         }
 
@@ -15800,6 +15828,7 @@ VIR_Operand_ExtractOneChannelConstantValue(
     OUT VIR_TypeId      *pTypeId
     )
 {
+    VIR_ScalarConstVal scalarResult;
     gctUINT result = 0;
 
     gcmASSERT(VIR_Operand_ContainsConstantValue(pOpnd));
@@ -15841,6 +15870,20 @@ VIR_Operand_ExtractOneChannelConstantValue(
 
         result = pConst->value.vecVal.u32Value[VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(pOpnd), Channel)];
     }
+
+    scalarResult.uValue = result;
+
+    if (VIR_Operand_GetModifier(pOpnd) & VIR_MOD_ABS)
+    {
+        VIR_ScalarConstVal_GetAbs(VIR_GetTypeComponentType(VIR_Operand_GetTypeId(pOpnd)), &scalarResult, &scalarResult);
+    }
+
+    if (VIR_Operand_GetModifier(pOpnd) & VIR_MOD_NEG)
+    {
+        VIR_ScalarConstVal_GetNeg(VIR_GetTypeComponentType(VIR_Operand_GetTypeId(pOpnd)), &scalarResult, &scalarResult);
+    }
+
+    result = scalarResult.uValue;
 
     if(pTypeId)
     {

@@ -318,7 +318,7 @@ sloCOMPILER_DumpIR(
     );
 
 gceSTATUS
-sloCOMPILER_CheckExtensions(
+sloCOMPILER_CheckProcessorSupported(
     IN sloCOMPILER Compiler
     );
 
