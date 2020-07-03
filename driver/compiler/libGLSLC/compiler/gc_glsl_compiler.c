@@ -4261,7 +4261,7 @@ sloCOMPILER_SetLanguageVersion(
        case 120:
           Compiler->langVersion = _SHADER_GL12_VERSION;
           Compiler->context.extensions.extension1 &= ~slvEXTENSION1_ES_30_AND_ABOVE;
-          Compiler->context.extensions.extension1 |= slvEXTENSION1_NON_HALTI;
+          Compiler->context.extensions.extension1 |= slvEXTENSION1_NON_HALTI | slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS;
           break;
 
        case 130:
