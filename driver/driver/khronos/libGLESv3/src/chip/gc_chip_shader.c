@@ -8204,7 +8204,6 @@ gcChipProgramBinary_V0(
                 {
                     gctUINT32 nameLen = (gctUINT32)strlen(&GetFeedbackVaryings(&(masterPgInstance->binaries[i]->transformFeedback))->name[j]) + 1;
                     gcmONERROR(gcoOS_Allocate(gcvNULL, nameLen, (gctPOINTER *)&programObject->ppXfbVaryingNames[nameCount]));
-                    gcoOS_ZeroMemory(programObject->ppXfbVaryingNames[nameCount], nameLen);
                     strcpy(programObject->ppXfbVaryingNames[nameCount],&GetFeedbackVaryings(&(masterPgInstance->binaries[i]->transformFeedback))->name[j]);
                     nameCount += 1;
                 }
