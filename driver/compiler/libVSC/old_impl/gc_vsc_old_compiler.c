@@ -36133,6 +36133,7 @@ gcInitGLSLCaps(
     Caps->provokingVertex = gcvPROVOKING_VERTEX_LAST;
 
     /* desktop GL limits. Should meet spec minimum requirements */
+    Caps->maxLights = gcmMAX(Caps->maxLights, 8);
     Caps->maxClipDistances = gcmMAX(Caps->maxClipDistances, 8);
     Caps->maxClipPlanes = gcmMAX(Caps->maxClipPlanes, 8);
     Caps->maxFragmentUniformComponents = gcmMAX(Caps->maxFragmentUniformComponents, 1024);

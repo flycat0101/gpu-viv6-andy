@@ -1019,6 +1019,37 @@ updateForClipDistance(
     return gcvSTATUS_OK;
 }
 
+gceSTATUS
+updateForTextureCoord(
+    IN sloCOMPILER Compiler,
+    OUT slsDATA_TYPE** DataType
+    )
+{
+    gctINT arrayLength = (gctINT)GetGLMaxTextureCoords();
+
+    if (sloCOMPILER_GetLanguageVersion(Compiler) < _SHADER_GL13_VERSION)
+        arrayLength = (arrayLength > 2) ? 2 : arrayLength;
+
+    (*DataType)->arrayLength = arrayLength;
+    (*DataType)->arrayLengthList[0] = arrayLength;
+
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+updateForLights(
+    IN sloCOMPILER Compiler,
+    OUT slsDATA_TYPE** DataType
+    )
+{
+    gctINT arrayLength = (gctINT)GetGLMaxLights();
+
+    (*DataType)->arrayLength = arrayLength;
+    (*DataType)->arrayLengthList[0] = arrayLength;
+
+    return gcvSTATUS_OK;
+}
+
 static gceSTATUS
 _LoadBuiltInVariablesForIOBlock(
     IN sloCOMPILER Compiler,
@@ -2276,6 +2307,22 @@ slLoadBuiltIns(
     gcmFOOTER();
     return status;
 }
+gctBOOL
+_BeStructArrayUnifromSymbol(IN gctCONST_STRING Symbol )
+{
+    gctBOOL beSupport = gcvFALSE;
+
+    if (gcmIS_SUCCESS(gcoOS_StrNCmp(Symbol, "gl_LightSource[", 15)))
+        beSupport = gcvTRUE;
+    else if(gcmIS_SUCCESS(gcoOS_StrNCmp(Symbol, "gl_FrontLightProduct[", 21)))
+        beSupport = gcvTRUE;
+    else if (gcmIS_SUCCESS(gcoOS_StrNCmp(Symbol, "gl_BackLightProduct[", 20)))
+        beSupport = gcvTRUE;
+    else
+        beSupport = gcvFALSE;
+
+    return beSupport;
+}
 
 gceSTATUS
 slGetBuiltInVariableImplSymbol(
@@ -2325,10 +2372,13 @@ slGetBuiltInVariableImplSymbol(
             gl_LightSource[0].ambient ===> #LightSource[0].ambient
             gl_LightSource[0].diffuse ===> #LightSource[0].diffuse
         PS: gl_LightSource only used in VS and FS.
+
+        uniform gl_FrontLightProduct[gl_MaxLights], gl_BackLightProduct[gl_MaxLights] same as gl_LightSource.;
+
     */
 
     if((shaderType == slvSHADER_TYPE_VERTEX || shaderType == slvSHADER_TYPE_FRAGMENT) &&
-        gcmIS_SUCCESS(gcoOS_StrNCmp(Symbol, "gl_LightSource[", 15)))
+        _BeStructArrayUnifromSymbol(Symbol))
     {
         gctSTRING subString = gcvNULL;
         gctSTRING string = gcvNULL;

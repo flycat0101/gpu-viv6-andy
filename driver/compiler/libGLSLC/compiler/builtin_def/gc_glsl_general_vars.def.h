@@ -80,7 +80,8 @@
         LightSourceParameters,
         "gl_LightSourceParameters",
         12,
-        gcvFALSE
+        gcvFALSE,
+        updateForLights
     },
     {
         {slvEXTENSION1_SUPPORT_OGL},
@@ -149,7 +150,8 @@
         gcvNULL,
         gcvNULL,
         0,
-        gcvFALSE
+        gcvFALSE,
+        updateForTextureCoord
     },
 
     {
@@ -262,7 +264,8 @@
         gcvNULL,
         gcvNULL,
         0,
-        gcvFALSE
+        gcvFALSE,
+        updateForTextureCoord
     },
 
     {
@@ -319,7 +322,8 @@
         gcvNULL,
         gcvNULL,
         0,
-        gcvFALSE
+        gcvFALSE,
+        updateForTextureCoord
     },
 
     {
@@ -447,7 +451,8 @@
         FrontLightProductParameters,
         "gl_FrontLightProductParameters",
         3,
-        gcvFALSE
+        gcvFALSE,
+        updateForLights
     },
     {
         {slvEXTENSION1_SUPPORT_OGL},
@@ -461,7 +466,8 @@
         BackLightProductParameters,
         "gl_BackLightProductParameters",
         3,
-        gcvFALSE
+        gcvFALSE,
+        updateForLights
     },
     {
         {slvEXTENSION1_SUPPORT_OGL},
@@ -489,7 +495,8 @@
         gcvNULL,
         gcvNULL,
         0,
-        gcvFALSE
+        gcvFALSE,
+        updateForTextureCoord
     },
     {
         {slvEXTENSION1_SUPPORT_OGL},
@@ -503,7 +510,8 @@
         gcvNULL,
         gcvNULL,
         0,
-        gcvFALSE
+        gcvFALSE,
+        updateForTextureCoord
     },
     {
         {slvEXTENSION1_SUPPORT_OGL},
@@ -517,7 +525,8 @@
         gcvNULL,
         gcvNULL,
         0,
-        gcvFALSE
+        gcvFALSE,
+        updateForTextureCoord
     },
     {
         {slvEXTENSION1_SUPPORT_OGL},
@@ -531,7 +540,8 @@
         gcvNULL,
         gcvNULL,
         0,
-        gcvFALSE
+        gcvFALSE,
+        updateForTextureCoord
     },
      {
         {slvEXTENSION1_SUPPORT_OGL},
@@ -545,7 +555,8 @@
         gcvNULL,
         gcvNULL,
         0,
-        gcvFALSE
+        gcvFALSE,
+        updateForTextureCoord
     },
     {
         {slvEXTENSION1_SUPPORT_OGL},
@@ -559,7 +570,8 @@
         gcvNULL,
         gcvNULL,
         0,
-        gcvFALSE
+        gcvFALSE,
+        updateForTextureCoord
     },
     {
         {slvEXTENSION1_SUPPORT_OGL},
@@ -573,7 +585,8 @@
         gcvNULL,
         gcvNULL,
         0,
-        gcvFALSE
+        gcvFALSE,
+        updateForTextureCoord
     },
     {
         {slvEXTENSION1_SUPPORT_OGL},
@@ -587,7 +600,8 @@
         gcvNULL,
         gcvNULL,
         0,
-        gcvFALSE
+        gcvFALSE,
+        updateForTextureCoord
     },
     {
         {slvEXTENSION1_SUPPORT_OGL},
@@ -603,4 +617,3 @@
         5,
         gcvFALSE
     },
-
