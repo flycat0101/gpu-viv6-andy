@@ -1671,7 +1671,7 @@ gcSHADER_InitClBuiltinLibrary(
     gctINT      i, stringNum = 0;
     gctSIZE_T   length;
     gctPOINTER  pointer = gcvNULL;
-    gctBOOL     fmaSupported = gcHWCaps.hwFeatureFlags.supportAdvancedInsts;
+    gctBOOL     fmaSupported = GetHWHasFmaSupport();
     gctBOOL     isHalti5 = gcHWCaps.hwFeatureFlags.hasHalti5;
     gctBOOL     isHalti2 = gcHWCaps.hwFeatureFlags.hasHalti2;
     gctBOOL     useImgInst = gcHWCaps.hwFeatureFlags.supportImgAddr&&
@@ -1797,7 +1797,7 @@ gcSHADER_InitClBuiltinLibrary(
             }
         }
 
-        if(fmaSupported && isHalti5)
+        if(fmaSupported)
         {
             gcoOS_StrCatSafe(*builtinSource,
                 __BUILTIN_SHADER_LENGTH__, gcCLLibFMA_Func_fmaSupported);
@@ -1863,7 +1863,7 @@ gcSHADER_InitBuiltinLibrary(
     gctINT      i, stringNum = 0;
 
 
-    gctBOOL     fmaSupported = gcHWCaps.hwFeatureFlags.supportAdvancedInsts;
+    gctBOOL     fmaSupported = GetHWHasFmaSupport();
     gctBOOL     isHalti5 = gcHWCaps.hwFeatureFlags.hasHalti5;
     gctBOOL     isHalti4 = gcHWCaps.hwFeatureFlags.hasHalti4;
     gctBOOL     isHalti2 = gcHWCaps.hwFeatureFlags.hasHalti2;
@@ -2788,7 +2788,7 @@ gcSHADER_InitBuiltinLibrary(
             }
         }
 
-        if (fmaSupported && isHalti5)
+        if (fmaSupported)
         {
             gcoOS_StrCatSafe(*sloBuiltinSource,
                 __BUILTIN_SHADER_LENGTH__, gcLibASIN_ACOS_Funcs_halti5_fmaSupported);

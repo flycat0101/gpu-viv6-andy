@@ -10505,12 +10505,41 @@ _markUsedCode(
     return gcvSTATUS_OK;
 }
 
-
 typedef struct regMap
 {
     gctUINT  isUsed : 2;
     gctUINT packedIndex : 30;
 }regMap;
+
+static void
+_ProcessStructVariableUsage(
+    IN gcSHADER         shader,
+    IN gcVARIABLE       parentVariable,
+    IN gctINT8*         pVarUsageList
+    )
+{
+    gcVARIABLE          childVariable = gcvNULL;
+    gctINT16            varIndex;
+
+    varIndex = GetVariableFirstChild(parentVariable);
+
+    while (varIndex != -1)
+    {
+        childVariable = shader->variables[varIndex];
+
+        if (pVarUsageList[GetVariableIndex(childVariable)] == gcvFALSE)
+        {
+            pVarUsageList[GetVariableIndex(childVariable)] = gcvTRUE;
+
+            if (isVariableStruct(childVariable))
+            {
+                _ProcessStructVariableUsage(shader, childVariable, pVarUsageList);
+            }
+        }
+
+        varIndex = GetVariableNextSibling(childVariable);
+    }
+}
 
 /*******************************************************************************
                             _packRegester
@@ -10550,7 +10579,6 @@ gceSTATUS
 gcSHADER_PackRegister(
     IN gcSHADER Shader
     )
-
 {
     gctSIZE_T i;
     gctSIZE_T j;
@@ -10750,15 +10778,26 @@ gcSHADER_PackRegister(
         For each variables, search from start index to end index, if any one register is marked as
         used in regMapList, mark this variable as used.
         For each used variable, add all its registers to regMapList.
+        Note that one struct element is used, mark all elments within this struct as used.
     *********************************************************************************************/
+    /* Go through all variables. */
     for (i = 0; i < maxVarCount; i++)
     {
         gcVARIABLE variable = variables[i];
+        gcVARIABLE parentVariable = gcvNULL;
         gctUINT arraySize = GetVariableKnownArraySize(variable);
         gctUINT32 startIndex = variable->tempIndex;
-        gctUINT endIndex = startIndex + arraySize * gcmType_Rows(variable->u.type);
+        gctUINT endIndex;
 
-        for (j = startIndex; j <= endIndex && j < maxRegCount; j++)
+        /* Skip a structure or a used variable. */
+        if (!isVariableSimple(variable) || varUsageList[i])
+        {
+            continue;
+        }
+
+        /* Check if this variable is used or not. */
+        endIndex = startIndex + arraySize * gcmType_Rows(variable->u.type);
+        for (j = startIndex; j < endIndex && j < maxRegCount; j++)
         {
             if (regMapList[j].isUsed == gcvTRUE)
             {
@@ -10766,15 +10805,52 @@ gcSHADER_PackRegister(
                 break;
             }
         }
-        if (varUsageList[i])
+
+        if (!varUsageList[i])
         {
-            for (j = startIndex; j <= endIndex && j < maxRegCount; j++)
+            continue;
+        }
+
+        /* If this variable is a structure element, mark all elements within this structure as used. */
+        parentVariable = variable;
+        while (GetVariableParent(parentVariable) != -1)
+        {
+            parentVariable = Shader->variables[GetVariableParent(parentVariable)];
+
+            if (varUsageList[GetVariableIndex(parentVariable)] == gcvFALSE)
             {
-                if (regMapList[j].isUsed == gcvFALSE)
-                {
-                    regMapList[j].isUsed = gcvTRUE;
-                    regCount++;
-                }
+                varUsageList[GetVariableIndex(parentVariable)] = gcvTRUE;
+
+                _ProcessStructVariableUsage(Shader, parentVariable, varUsageList);
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
+
+    /* Go through all registers. */
+    for (i = 0; i < maxVarCount; i++)
+    {
+        gcVARIABLE variable = variables[i];
+        gctUINT arraySize = GetVariableKnownArraySize(variable);
+        gctUINT32 startIndex = variable->tempIndex;
+        gctUINT endIndex;
+
+        /* Skip a structure or a unused variable. */
+        if (!isVariableSimple(variable) || !varUsageList[i])
+        {
+            continue;
+        }
+
+        endIndex = startIndex + arraySize * gcmType_Rows(variable->u.type);
+        for (j = startIndex; j < endIndex && j < maxRegCount; j++)
+        {
+            if (regMapList[j].isUsed == gcvFALSE)
+            {
+                regMapList[j].isUsed = gcvTRUE;
+                regCount++;
             }
         }
     }
@@ -10818,7 +10894,7 @@ gcSHADER_PackRegister(
             gctUINT arraySize = GetVariableKnownArraySize(variable);
             gctUINT endIndex = startIndex + arraySize * gcmType_Rows(variable->u.type);
 
-            for (k = startIndex; k <= endIndex && k < maxRegCount; k++)
+            for (k = startIndex; k < endIndex && k < maxRegCount; k++)
             {
                 if (regMapList[k].isUsed == gcvFALSE)
                 {
@@ -10875,7 +10951,7 @@ gcSHADER_PackRegister(
             gctUINT arraySize = GetVariableKnownArraySize(variable);
             gctUINT endIndex = startIndex + arraySize * gcmType_Rows(variable->u.type);
 
-            for (k = startIndex; k <= endIndex && k < maxRegCount; k++)
+            for (k = startIndex; k < endIndex && k < maxRegCount; k++)
             {
                 if (regMapList[k].isUsed == gcvFALSE)
                 {

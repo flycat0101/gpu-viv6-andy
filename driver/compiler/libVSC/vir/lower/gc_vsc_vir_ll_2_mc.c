@@ -1026,7 +1026,7 @@ _noFMASupport(
     IN VIR_Instruction    *Inst
     )
 {
-    return !gcHWCaps.hwFeatureFlags.supportAdvancedInsts;
+    return !GetHWHasFmaSupport();
 }
 
 static VIR_PatternMatchInst _fmaPatInst0[] = {

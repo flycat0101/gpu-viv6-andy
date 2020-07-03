@@ -765,8 +765,7 @@ _CreateIntrinsicLib(
             }
         }
         /* fma supported */
-        if (pHwCfg->hwFeatureFlags.supportAdvancedInsts &&
-            pHwCfg->hwFeatureFlags.hasHalti5)
+        if (GetHWHasFmaSupport())
         {
             gcoOS_StrCatSafe(sloBuiltinSource,
                     __LL_LIB_LENGTH__, gcLibFMA_Func_fmaSupported);
@@ -2400,9 +2399,6 @@ _IntrinsicImageAddrFuncName(
 {
     VIR_TypeId       imageTypeId = VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(pImageSym));
 
-    gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__,
-        VIR_Shader_GetTypeNameString(pShader, VIR_Shader_GetTypeFromId(pShader, typeId)));
-
     if (VIR_TypeId_isImage3D(imageTypeId) ||
         VIR_TypeId_isImageCube(imageTypeId) ||
         VIR_TypeId_isImageArray(imageTypeId))
@@ -2423,6 +2419,10 @@ _IntrinsicImageAddrFuncName(
     else if (VIR_TypeId_isImage1D(imageTypeId))
     {
         gcoOS_StrCopySafe(*pLibName, __LIB_NAME_LENGTH__, "_viv_image_addr_image_1d");
+    }
+    else if (VIR_TypeId_isImageBuffer(imageTypeId))
+    {
+        gcoOS_StrCopySafe(*pLibName, __LIB_NAME_LENGTH__, "_viv_image_addr_image_buffer");
     }
     else
     {

@@ -478,7 +478,7 @@ PROG_VK_IMAGE_FORMAT_INFO;
 
 typedef struct PROG_VK_IMAGE_DERIVED_INFO
 {
-    /* For a image, it might need a image-size attached. As each image in
+    /* For an image, it might need an image-size attached. As each image in
        Binding::arraySize array has image-size, so this is the first entry
        of image-size array. */
     SHADER_PRIV_CONSTANT_ENTRY*                 pImageSize;
@@ -487,6 +487,11 @@ typedef struct PROG_VK_IMAGE_DERIVED_INFO
        array, if one image has extra image, all other images must have extra image, so
        this is the first entry of extra-image */
     SHADER_PRIV_UAV_ENTRY*                      pExtraLayer;
+
+    /* For an image, it might need a mip level attached. As each texel buffer in
+       Binding::arraySize array has levelsSamples, so this is the first entry
+       of pMipLevel array. */
+    SHADER_PRIV_CONSTANT_ENTRY*                 pMipLevel;
 
     /* ImageFormat, can be NONE. */
     PROG_VK_IMAGE_FORMAT_INFO                   imageFormatInfo;

@@ -886,6 +886,17 @@ _vscEP_Buffer_SaveImageDerivedInfo(
         VSC_IO_writeUint(pIoBuf, 0);
     }
 
+    /* Save the mip level. */
+    if (pImageDerivedInfo->pMipLevel)
+    {
+        VSC_IO_writeUint(pIoBuf, 1);
+        _vscEP_Buffer_SavePrivConstEntry(pEPBuf, pImageDerivedInfo->pMipLevel);
+    }
+    else
+    {
+        VSC_IO_writeUint(pIoBuf, 0);
+    }
+
     /* Save the image format. */
     VSC_IO_writeUint(pIoBuf, (gctUINT)pImageDerivedInfo->imageFormatInfo.imageFormat);
     VSC_IO_writeUint(pIoBuf, (gctUINT)pImageDerivedInfo->imageFormatInfo.bSetInSpriv);
@@ -3498,6 +3509,18 @@ _vscEP_Buffer_LoadImageDerivedInfo(
     else
     {
         pImageDerivedInfo->pExtraLayer = gcvNULL;
+    }
+
+    /* Load the mip level. */
+    VSC_IO_readUint(pIoBuf, &uVal);
+    if (uVal == 1)
+    {
+        VSC_EP_ALLOC_MEM(pImageDerivedInfo->pMipLevel, SHADER_PRIV_CONSTANT_ENTRY, sizeof(SHADER_PRIV_CONSTANT_ENTRY));
+        _vscEP_Buffer_LoadPrivConstEntry(pEPBuf, pImageDerivedInfo->pMipLevel);
+    }
+    else
+    {
+        pImageDerivedInfo->pMipLevel = gcvNULL;
     }
 
     /* Load the image format. */
