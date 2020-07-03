@@ -2485,6 +2485,8 @@ clfSubmitCommand(
         clmASSERT(commandEvent, CL_INVALID_VALUE);
         clfWaitForEvent(commandEvent);
         clfReleaseEvent(commandEvent);
+
+        CommandQueue->needEnqueueNOP = gcvFALSE;
     }
 
     gcmFOOTER_ARG("%d", CL_SUCCESS);
@@ -3081,6 +3083,7 @@ clCreateCommandQueue(
     queue->nextEnqueueNo        = 0;
     queue->commitRequestList    = gcvNULL;
     queue->privateBufList       = gcvNULL;
+    queue->needEnqueueNOP       = gcvFALSE;
 
     /* Create a reference count object and set it to 1. */
     clmONERROR(gcoOS_AtomConstruct(gcvNULL, &queue->referenceCount),
@@ -3410,9 +3413,10 @@ clFinish(
         clmRETURN_ERROR(CL_OUT_OF_RESOURCES);
     }
 
-    if (CommandQueue->inThread)
+    if (CommandQueue->inThread && CommandQueue->needEnqueueNOP != gcvFALSE)
     {
         status = clfEnqueueNOP(CommandQueue);
+        CommandQueue->needEnqueueNOP = gcvFALSE;
     }
 
     VCL_TRACE_API(Finish)(CommandQueue);

@@ -5480,6 +5480,7 @@ clfEnqueueNDRangeVIRKernel(
         clmONERROR(gcoCL_CreateSignal(gcvTRUE,
                                       &command->releaseSignal),
                    CL_OUT_OF_HOST_MEMORY);
+        CommandQueue->needEnqueueNOP = gcvTRUE;
     }
 
     NDRangeKernel                       = &command->u.NDRangeVIRKernel;
