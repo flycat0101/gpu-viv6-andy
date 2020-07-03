@@ -2327,7 +2327,6 @@ slGetBuiltInVariableImplSymbol(
 {
     gctUINT     i;
     sleSHADER_TYPE shaderType;
-    gceSTATUS  status = gcvSTATUS_OK;
     gcmHEADER_ARG("Symbol=0x%x ImplSymbol=0x%x ImplQualifier=0x%x",
                   Symbol, ImplSymbol, ImplQualifier);
 
@@ -2374,22 +2373,17 @@ slGetBuiltInVariableImplSymbol(
         _BeStructArrayUnifromSymbol(Symbol))
     {
         gctSTRING subString = gcvNULL;
-        gctSTRING string = gcvNULL;
-        gctPOINTER pointer = gcvNULL;
         gctCHAR   sharp[2] = "#";
-        gctUINT length = gcoOS_StrLen(Symbol, NULL);
+        gctCHAR   sym[1024] = {0};
+        gctSIZE_T length = gcoOS_StrLen(Symbol, NULL);
 
-        status = gcoOS_Allocate(gcvNULL, length, &pointer);
-        if (gcmIS_ERROR(status))
-        {
-            return status;
-        }
-        string = pointer;
-        gcoOS_StrCopySafe(string, 2, sharp);
+        gcoOS_StrCopySafe(sym, length + 1, Symbol);
+        gcoOS_ZeroMemory((gctPOINTER)Symbol, length);
+        gcoOS_StrCopySafe((gctSTRING)Symbol, 2, sharp);
 
-        gcoOS_StrFindReverse(Symbol, '_', &subString);
-        gcoOS_StrCatSafe(string, length - 1, (subString + 1));
-        *ImplSymbol = string;
+        gcoOS_StrFindReverse(sym, '_', &subString);
+        gcoOS_StrCatSafe((gctSTRING)Symbol, length - 1, (subString + 1));
+        *ImplSymbol = Symbol;
         *ImplQualifier  = slvSTORAGE_QUALIFIER_UNIFORM;
     }
     else if(shaderType == slvSHADER_TYPE_VERTEX)
