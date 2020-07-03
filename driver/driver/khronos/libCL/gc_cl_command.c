@@ -2369,6 +2369,7 @@ clfFlushCommandQueue(
     }
     /* Delete the used commit request */
     gcmVERIFY_OK(clfDeleteCommitRequest(commitRequest));
+    commitRequest = gcvNULL;
 
     gcoCL_SetHardwareType(gcvHARDWARE_3D);
 

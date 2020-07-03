@@ -7270,16 +7270,11 @@ OnError:
         *ErrcodeRet = status;
     }
 
-    if(pointer)
-    {
-        gcmOS_SAFE_FREE(gcvNULL, pointer);
-    }
-
     if (kernel)
     {
         if(kernel->referenceCount) gcoOS_AtomDestroy(gcvNULL, kernel->referenceCount);
 
-        if(kernel->name) kernel->name = gcvNULL;
+        if(kernel->name) gcmOS_SAFE_FREE(gcvNULL, kernel->name);
 
         if(kernel->argMutex) gcoOS_DeleteMutex(gcvNULL, kernel->argMutex);
 
