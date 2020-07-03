@@ -276,6 +276,11 @@ _GetDisplayByIndex(
 
         *Display = display->gbm;
 
+        if (fd >= 0)
+        {
+            close(fd);
+        }
+
         gcmFOOTER_NO();
         return gcvSTATUS_OK;
     }
