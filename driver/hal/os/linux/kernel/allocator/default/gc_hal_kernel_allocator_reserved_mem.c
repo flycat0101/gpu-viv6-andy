@@ -257,7 +257,11 @@ reserved_mem_mmap(
 
     /* Make this mapping non-cached. */
     vma->vm_flags |= gcdVM_FLAGS;
+#if gcdENABLE_BUFFERABLE_VIDEO_MEMORY
     vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+#else
+    vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+#endif
 
     if (remap_pfn_range(vma, vma->vm_start,
             pfn, numPages << PAGE_SHIFT, vma->vm_page_prot) < 0)
@@ -395,7 +399,11 @@ reserved_mem_map_kernel(
     }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0)
+#if gcdENABLE_BUFFERABLE_VIDEO_MEMORY
     vaddr = memremap(res->start + Offset, Bytes, MEMREMAP_WC);
+#else
+    vaddr = memremap(res->start + Offset, Bytes, MEMREMAP_WT);
+#endif
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0)
     vaddr = memremap(res->start + Offset, Bytes, MEMREMAP_WT);
 #else

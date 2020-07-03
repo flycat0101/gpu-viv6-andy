@@ -169,17 +169,18 @@ _CMAFSLAlloc(
     }
 #endif
 
+#if gcdENABLE_BUFFERABLE_VIDEO_MEMORY
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0)
     mdl_priv->kvaddr = dma_alloc_wc(&os->device->platform->device->dev,
-            NumPages * PAGE_SIZE,
-            &mdl_priv->physical,
-            gfp);
 #else
     mdl_priv->kvaddr = dma_alloc_writecombine(&os->device->platform->device->dev,
+#endif
+#else
+    mdl_priv->kvaddr = dma_alloc_coherent(&os->device->platform->device->dev,
+#endif
             NumPages * PAGE_SIZE,
             &mdl_priv->physical,
             gfp);
-#endif
 
     if (mdl_priv->kvaddr == gcvNULL)
     {
@@ -319,20 +320,21 @@ _CMAFSLMmap(
     /* Now map all the vmalloc pages to this user address. */
     if (Mdl->contiguous)
     {
+#if gcdENABLE_BUFFERABLE_VIDEO_MEMORY
         /* map kernel memory to user space.. */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0)
         if (dma_mmap_wc(&os->device->platform->device->dev,
-                vma,
-                (gctINT8_PTR)mdlPriv->kvaddr + (skipPages << PAGE_SHIFT),
-                mdlPriv->physical + (skipPages << PAGE_SHIFT),
-                numPages << PAGE_SHIFT) < 0)
 #else
         if (dma_mmap_writecombine(&os->device->platform->device->dev,
-                vma,
-                (gctINT8_PTR)mdlPriv->kvaddr + (skipPages << PAGE_SHIFT),
-                mdlPriv->physical + (skipPages << PAGE_SHIFT),
-                numPages << PAGE_SHIFT) < 0)
 #endif
+#else
+        if (dma_mmap_coherent(&os->device->platform->device->dev,
+#endif
+            vma,
+            (gctINT8_PTR)mdlPriv->kvaddr + (skipPages << PAGE_SHIFT),
+            mdlPriv->physical + (skipPages << PAGE_SHIFT),
+            numPages << PAGE_SHIFT) < 0)
+
         {
             gcmkTRACE_ZONE(
                 gcvLEVEL_WARNING, gcvZONE_OS,

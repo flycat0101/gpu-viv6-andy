@@ -618,7 +618,11 @@ This define enables the use of VM for gckCommand and fence buffers.
         When non-zero, all video memory will be bufferable by default.
 */
 #ifndef gcdENABLE_BUFFERABLE_VIDEO_MEMORY
+#if gcdFPGA_BUILD
+#   define gcdENABLE_BUFFERABLE_VIDEO_MEMORY           0
+#else
 #   define gcdENABLE_BUFFERABLE_VIDEO_MEMORY           1
+#endif
 #endif
 
 /*
