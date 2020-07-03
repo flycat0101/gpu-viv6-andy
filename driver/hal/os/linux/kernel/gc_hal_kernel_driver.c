@@ -1335,6 +1335,11 @@ static int __devinit gpu_probe(struct platform_device *pdev)
     /* Update module param because drv_init() uses them directly. */
     _SyncModuleParam(&moduleParam);
 
+    if (powerManagement == 0)
+    {
+        gcmkPRINT("[galcore warning]: power saveing is disabled.");
+    }
+
     ret = drv_init();
 
     if (!ret)
