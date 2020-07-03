@@ -20,6 +20,8 @@ VSC_SIMPLE_RESIZABLE_ARRAY* vscSRARR_Create(VSC_MM* pMM, gctUINT initAllocEleCou
     VSC_SIMPLE_RESIZABLE_ARRAY*   pArray = gcvNULL;
 
     pArray = (VSC_SIMPLE_RESIZABLE_ARRAY*)vscMM_Alloc(pMM, sizeof(VSC_SIMPLE_RESIZABLE_ARRAY));
+    if (pArray == gcvNULL)
+        return pArray;
     vscSRARR_Initialize(pArray, pMM, initAllocEleCount, elementSize, pfnEleCmp);
 
     return pArray;

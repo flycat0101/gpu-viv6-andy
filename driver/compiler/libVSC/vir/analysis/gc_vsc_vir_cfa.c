@@ -57,6 +57,11 @@ static VIR_FUNC_BLOCK* _TryAddFuncBlockToCallGraph(VIR_CALL_GRAPH* pCg, VIR_Func
     if (pFuncBlk == gcvNULL)
     {
         pFuncBlk = (VIR_FUNC_BLOCK*)vscMM_Alloc(&pCg->pmp.mmWrapper, sizeof(VIR_FUNC_BLOCK));
+        if (pFuncBlk == gcvNULL)
+        {
+            ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Fail to add function block");
+            return pFuncBlk;
+        }
         vscDGND_Initialize(&pFuncBlk->dgNode);
         pFuncBlk->pVIRFunc = pVIRFunc;
         pFuncBlk->pOwnerCG = pCg;
@@ -211,7 +216,7 @@ static gctBOOL _SuccFuncBlkHandlerDFSPost(VIR_CALL_GRAPH* pCg, VIR_FUNC_BLOCK* p
     return gcvFALSE;
 }
 
-static void _AddEdgeForCG(VIR_CALL_GRAPH* pCg, VIR_FUNC_BLOCK* pFromFB,
+static VIR_CG_EDGE* _AddEdgeForCG(VIR_CALL_GRAPH* pCg, VIR_FUNC_BLOCK* pFromFB,
                           VIR_FUNC_BLOCK* pToFB, VIR_Instruction* pCallSiteInst)
 {
     VIR_CG_EDGE*           pEdge;
@@ -219,6 +224,8 @@ static void _AddEdgeForCG(VIR_CALL_GRAPH* pCg, VIR_FUNC_BLOCK* pFromFB,
 
     /* We only consider successor edge */
     pEdge = (VIR_CG_EDGE*)vscDG_AddEdge(&pCg->dgGraph, &pFromFB->dgNode, &pToFB->dgNode, &bIsNewEdge);
+    if (!pEdge)
+        return gcvNULL;
 
     if (bIsNewEdge)
     {
@@ -227,6 +234,7 @@ static void _AddEdgeForCG(VIR_CALL_GRAPH* pCg, VIR_FUNC_BLOCK* pFromFB,
 
     /* Add this call site */
     vscSRARR_AddElement(&pEdge->callSiteArray, (void*)&pCallSiteInst);
+    return pEdge;
 }
 
 VSC_ErrCode vscVIR_BuildCallGraph(VSC_MM* pScratchMemPool, VIR_Shader* pShader, VIR_CALL_GRAPH* pCg)
@@ -242,6 +250,7 @@ VSC_ErrCode vscVIR_BuildCallGraph(VSC_MM* pScratchMemPool, VIR_Shader* pShader, 
     VIR_FUNC_BLOCK*        pCalleeFuncBlk;
     VIR_Instruction*       pInst;
     VSC_CALL_DEPTH_HELPER  callDepth;
+    VIR_CG_EDGE*           pEdge;
 
     /* So far when we building the call grap we need to remove all unused functions, which is unacceptable for some shaders. */
     gcmASSERT(VIR_Shader_CanRemoveUnusedFunctions(pShader));
@@ -259,6 +268,11 @@ VSC_ErrCode vscVIR_BuildCallGraph(VSC_MM* pScratchMemPool, VIR_Shader* pShader, 
         /* Check wether this func has been added into graph, if no, create a func-block (graph node)
            and add into graph */
         pThisFuncBlk = _TryAddFuncBlockToCallGraph(pCg, pFunc);
+        if (!pThisFuncBlk)
+        {
+            errCode = VSC_ERR_INVALID_DATA;
+            CHECK_ERROR(errCode, "Build call graph");
+        }
 
         /* Now, we can search all 'call' opcodes in current func to find out all callees and connect caller
            and callee together in call graph */
@@ -270,9 +284,19 @@ VSC_ErrCode vscVIR_BuildCallGraph(VSC_MM* pScratchMemPool, VIR_Shader* pShader, 
             {
                 pCalleeFunc = VIR_Inst_GetCallee(pInst);
                 pCalleeFuncBlk = _TryAddFuncBlockToCallGraph(pCg, pCalleeFunc);
+                if (!pCalleeFuncBlk)
+                {
+                    errCode = VSC_ERR_INVALID_DATA;
+                    CHECK_ERROR(errCode, "Build call graph");
+                }
 
                 /* OK, add this call relation to CG */
-                _AddEdgeForCG(pCg, pThisFuncBlk, pCalleeFuncBlk, pInst);
+                pEdge = _AddEdgeForCG(pCg, pThisFuncBlk, pCalleeFuncBlk, pInst);
+                if (!pEdge)
+                {
+                    errCode = VSC_ERR_INVALID_DATA;
+                    CHECK_ERROR(errCode, "Build call graph");
+                }
 
                 vscSRARR_AddElement(&pThisFuncBlk->mixedCallSiteArray, (void*)&pInst);
 
@@ -290,8 +314,13 @@ VSC_ErrCode vscVIR_BuildCallGraph(VSC_MM* pScratchMemPool, VIR_Shader* pShader, 
     /* Now we can do one pass DFS traversal to determine recursive func and call depth of each func */
     callDepth.callDepth = 0;
     callDepth.ppCallStack = (VIR_FUNC_BLOCK**)vscMM_Alloc(&pCg->pmp.mmWrapper, vscDG_GetNodeCount(&pCg->dgGraph)*sizeof(VIR_FUNC_BLOCK*));
+    if (callDepth.ppCallStack == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        CHECK_ERROR(errCode, "Build call graph");
+    }
     callDepth.ppCallStack[0] = pMainFunc->pFuncBlock;
-    vscDG_TraversalCB(&pCg->dgGraph,
+    errCode = vscDG_TraversalCB(&pCg->dgGraph,
                       VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                       gcvFALSE,
                       gcvNULL,
@@ -301,6 +330,7 @@ VSC_ErrCode vscVIR_BuildCallGraph(VSC_MM* pScratchMemPool, VIR_Shader* pShader, 
                       (PFN_DG_NODE_HANLDER)_SuccFuncBlkHandlerDFSPost,
                       gcvNULL,
                       &callDepth);
+    CHECK_ERROR(errCode, "Build call graph");
 
     vscMM_Free(&pCg->pmp.mmWrapper, callDepth.ppCallStack);
 
@@ -426,9 +456,15 @@ static void _FinalizeBbReachRelation(VIR_BB_REACH_RELATION* pBbReachRelation)
 
 static VIR_BASIC_BLOCK* _AddBasicBlockToCFG(VIR_CONTROL_FLOW_GRAPH* pCfg)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VIR_BASIC_BLOCK* pBasicBlock = gcvNULL;
 
     pBasicBlock = (VIR_BASIC_BLOCK*)vscMM_Alloc(&pCfg->pmp.mmWrapper, sizeof(VIR_BASIC_BLOCK));
+    if (!pBasicBlock)
+    {
+        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Fail to add bb");
+        return pBasicBlock;
+    }
     vscDGND_Initialize(&pBasicBlock->dgNode);
 
     pBasicBlock->pOwnerCFG = pCfg;
@@ -448,10 +484,18 @@ static VIR_BASIC_BLOCK* _AddBasicBlockToCFG(VIR_CONTROL_FLOW_GRAPH* pCfg)
     vscHTBL_DirectSet(&pCfg->pOwnerFuncBlk->pOwnerCG->globalBbHashTable,
                       (void*)(gctUINTPTR_T)pBasicBlock->globalBbId, pBasicBlock);
 
-    vscBV_Initialize(&pBasicBlock->domSet, gcvNULL, 0);
-    vscBV_Initialize(&pBasicBlock->postDomSet, gcvNULL, 0);
-    vscBV_Initialize(&pBasicBlock->dfSet, gcvNULL, 0);
-    vscBV_Initialize(&pBasicBlock->cdSet, gcvNULL, 0);
+    errCode = vscBV_Initialize(&pBasicBlock->domSet, gcvNULL, 0);
+    if(errCode != VSC_ERR_NONE)
+        return gcvNULL;
+    errCode = vscBV_Initialize(&pBasicBlock->postDomSet, gcvNULL, 0);
+    if(errCode != VSC_ERR_NONE)
+        return gcvNULL;
+    errCode = vscBV_Initialize(&pBasicBlock->dfSet, gcvNULL, 0);
+    if(errCode != VSC_ERR_NONE)
+        return gcvNULL;
+    errCode = vscBV_Initialize(&pBasicBlock->cdSet, gcvNULL, 0);
+    if(errCode != VSC_ERR_NONE)
+        return gcvNULL;
 
     _InitializeBbReachRelation(&pBasicBlock->globalReachSet, gcvNULL, 0);
     _InitializeBbReachRelation(&pBasicBlock->localReachSet, gcvNULL, 0);
@@ -487,7 +531,7 @@ static void _AssociateAnInstToBasicBlock(VIR_BASIC_BLOCK* pBasicBlock, VIR_Instr
     }
 }
 
-static void _AddBasicBlocksToCFG(VIR_CONTROL_FLOW_GRAPH* pCFG, VIR_Function* pFunc)
+static VSC_ErrCode _AddBasicBlocksToCFG(VIR_CONTROL_FLOW_GRAPH* pCFG, VIR_Function* pFunc)
 {
     VIR_BASIC_BLOCK*        pEntryBlock;
     VIR_BASIC_BLOCK*        pExitBlock;
@@ -495,23 +539,39 @@ static void _AddBasicBlocksToCFG(VIR_CONTROL_FLOW_GRAPH* pCFG, VIR_Function* pFu
     VIR_Instruction*        pThisInst = gcvNULL;
     VIR_Instruction*        pPrevInst = gcvNULL;
     VIR_InstIterator        instIter;
+    VSC_ErrCode             errCode  = VSC_ERR_NONE;
 
     /* Firstly add an entry block which has id == 0 */
     pEntryBlock = _AddBasicBlockToCFG(pCFG);
+    if (!pEntryBlock)
+    {
+        errCode = VSC_ERR_INVALID_DATA;
+        CHECK_ERROR(errCode, "Add basic block");
+    }
     pEntryBlock->flowType = VIR_FLOW_TYPE_ENTRY;
 
     /* Then add an exit block which has id == 1 */
     pExitBlock = _AddBasicBlockToCFG(pCFG);
+    if (!pExitBlock)
+    {
+        errCode = VSC_ERR_INVALID_DATA;
+        CHECK_ERROR(errCode, "Add basic block");
+    }
     pExitBlock->flowType = VIR_FLOW_TYPE_EXIT;
 
     /* If no inst in function, just return. So the CFG will only have entry + exit */
     if (VIR_Inst_Count(&pFunc->instList) == 0)
     {
-        return;
+        return errCode;
     }
 
     /* First normal basic block */
     pThisBlock = _AddBasicBlockToCFG(pCFG);
+    if (!pThisBlock)
+    {
+        errCode = VSC_ERR_INVALID_DATA;
+        CHECK_ERROR(errCode, "Add basic block");
+    }
 
     /* Go through all instructions with this function to build basic blocks and add it to CFG */
     VIR_InstIterator_Init(&instIter, &pFunc->instList);
@@ -535,6 +595,11 @@ static void _AddBasicBlocksToCFG(VIR_CONTROL_FLOW_GRAPH* pCFG, VIR_Function* pFu
 
             /* Start a new block */
             pThisBlock = _AddBasicBlockToCFG(pCFG);
+            if (!pThisBlock)
+            {
+                errCode = VSC_ERR_INVALID_DATA;
+                CHECK_ERROR(errCode, "Add basic block");
+            }
             pThisBlock->pStartInst = pThisInst;
         }
 
@@ -546,6 +611,7 @@ static void _AddBasicBlocksToCFG(VIR_CONTROL_FLOW_GRAPH* pCFG, VIR_Function* pFu
     /* The last block must be got an end */
     pThisBlock->pEndInst = pPrevInst;
     pThisBlock->flowType = _GetFlowType(VIR_Inst_GetOpcode(pPrevInst));
+    return errCode;
 }
 
 static VIR_CFG_EDGE* _AddEdgeForCFG(VIR_CONTROL_FLOW_GRAPH* pCfg, VIR_BASIC_BLOCK* pFromBB,
@@ -555,6 +621,8 @@ static VIR_CFG_EDGE* _AddEdgeForCFG(VIR_CONTROL_FLOW_GRAPH* pCfg, VIR_BASIC_BLOC
 
     /* We only consider successor edge */
     pEdge = (VIR_CFG_EDGE*)vscDG_AddEdge(&pCfg->dgGraph, &pFromBB->dgNode, &pToBB->dgNode, gcvNULL);
+    if(!pEdge)
+        return gcvNULL;
     pEdge->type = edgeType;
     (pEdge + 1)->type = edgeType;
     pEdge->dfsType = VIR_CFG_DFS_EDGE_TYPE_NORMAL;
@@ -882,7 +950,8 @@ VSC_ErrCode vscVIR_BuildCFGPerFunc(VSC_MM* pScratchMemPool, VIR_Function* pFunc)
     _IntializeCFG(pCFG, pScratchMemPool, pFunc->pFuncBlock);
 
     /* Try add all basic blocks to CFG */
-    _AddBasicBlocksToCFG(pCFG, pFunc);
+    errCode = _AddBasicBlocksToCFG(pCFG, pFunc);
+    CHECK_ERROR(errCode, "Build CFG per function");
 
     /* Go through all basic blocks in CFG to build topology by branch info */
     _AddEdgesForCFG(pCFG);
@@ -1739,24 +1808,36 @@ VSC_ErrCode vscVIR_BuildDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
 
     /* Get PO of CFG */
     ppBasicBlkPO = (VIR_BASIC_BLOCK**)vscMM_Alloc(pScratchMemPool, sizeof(VIR_BASIC_BLOCK*)*countOfBasicBlk);
-    vscDG_PreOrderTraversal(&pCFG->dgGraph,
+    if (!ppBasicBlkPO)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        CHECK_ERROR(errCode, "Build DOM tree");
+    }
+    errCode = vscDG_PreOrderTraversal(&pCFG->dgGraph,
                             VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                             gcvFALSE,
                             gcvFALSE,
                             (VSC_DG_NODE**)ppBasicBlkPO);
+    CHECK_ERROR(errCode, "Build DOM tree");
 
     /* Allocate workitem array corresponding basic block. Note as iterative analyzer will use id of
        basicblk to index workitem, history node count will be used to allocate these contents */
     pWorkItemArray = (VIR_BB_WORKITEM*)vscMM_Alloc(pScratchMemPool,
                                                    sizeof(VIR_BB_WORKITEM)*
                                                    hisCountOfBasicBlk);
+    if (!pWorkItemArray)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        CHECK_ERROR(errCode, "Build DOM tree");
+    }
 
     BB_WORKLIST_INIT(&workItemList);
 
     /* Initialize workitem list and dom-set of each BB */
     for (bbIdx = 0; bbIdx < countOfBasicBlk; bbIdx ++)
     {
-        vscBV_Initialize(&ppBasicBlkPO[bbIdx]->domSet, pScratchMemPool, hisCountOfBasicBlk);
+        errCode = vscBV_Initialize(&ppBasicBlkPO[bbIdx]->domSet, pScratchMemPool, hisCountOfBasicBlk);
+        CHECK_ERROR(errCode, "Build DOM tree");
 
         /* Initialize each workitem, and add it to workitem list. Note that entry block won't
            be added into workitem list because it won't be changed when iterating */
@@ -1777,7 +1858,8 @@ VSC_ErrCode vscVIR_BuildDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
     }
 
     /* Prepare working set */
-    vscBV_Initialize(&workingSet, pScratchMemPool, hisCountOfBasicBlk);
+    errCode = vscBV_Initialize(&workingSet, pScratchMemPool, hisCountOfBasicBlk);
+    CHECK_ERROR(errCode, "Build DOM tree");
 
     do
     {
@@ -1827,21 +1909,38 @@ VSC_ErrCode vscVIR_BuildDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
     pIdomSetArray = (VSC_BIT_VECTOR*)vscMM_Alloc(pScratchMemPool,
                                                    sizeof(VSC_BIT_VECTOR)*
                                                    hisCountOfBasicBlk);
+    if (!pIdomSetArray)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        CHECK_ERROR(errCode, "Build DOM tree");
+    }
     pDomSetArray = (VSC_BIT_VECTOR*)vscMM_Alloc(pScratchMemPool,
                                                 sizeof(VSC_BIT_VECTOR)*
                                                 hisCountOfBasicBlk);
+    if (!pDomSetArray)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        CHECK_ERROR(errCode, "Build DOM tree");
+    }
     ppHisBlockArray = (VIR_BASIC_BLOCK**)vscMM_Alloc(pScratchMemPool,
                                                      sizeof(VIR_BASIC_BLOCK*)*
                                                      hisCountOfBasicBlk);
+    if (!ppHisBlockArray)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        CHECK_ERROR(errCode, "Build DOM tree");
+    }
 
     /* Initilize idom set with self bit removed */
     for (bbIdx = 0; bbIdx < countOfBasicBlk; bbIdx ++)
     {
-        vscBV_Initialize(&pIdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], pScratchMemPool, hisCountOfBasicBlk);
+        errCode = vscBV_Initialize(&pIdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], pScratchMemPool, hisCountOfBasicBlk);
+        CHECK_ERROR(errCode, "Build DOM tree");
         vscBV_Copy(&pIdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], &ppBasicBlkPO[bbIdx]->domSet);
         vscBV_ClearBit(&pIdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], ppBasicBlkPO[bbIdx]->dgNode.id);
 
-        vscBV_Initialize(&pDomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], pScratchMemPool, hisCountOfBasicBlk);
+        errCode = vscBV_Initialize(&pDomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], pScratchMemPool, hisCountOfBasicBlk);
+        CHECK_ERROR(errCode, "Build DOM tree");
         vscBV_Copy(&pDomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], &pIdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id]);
 
         /* Initialize worklist again for tree build in last stage */
@@ -2016,23 +2115,36 @@ VSC_ErrCode vscVIR_BuildPostDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
 
     /* Get PO of CFG */
     ppBasicBlkPO = (VIR_BASIC_BLOCK**)vscMM_Alloc(pScratchMemPool, sizeof(VIR_BASIC_BLOCK*)*countOfBasicBlk);
-    vscDG_PreOrderTraversal(&pCFG->dgGraph,
+    if (!ppBasicBlkPO)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        CHECK_ERROR(errCode, "Build post DOM tree");
+    }
+
+    errCode = vscDG_PreOrderTraversal(&pCFG->dgGraph,
                             VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                             gcvTRUE,
                             gcvFALSE,
                             (VSC_DG_NODE**)ppBasicBlkPO);
+    CHECK_ERROR(errCode, "Build post DOM tree");
 
     /* Allocate workitem array corresponding basic block. Note as iterative analyzer will use id of
        basicblk to index workitem, history node count will be used to allocate these contents */
     pWorkItemArray = (VIR_BB_WORKITEM*)vscMM_Alloc(pScratchMemPool,
                                                    sizeof(VIR_BB_WORKITEM)*hisCountOfBasicBlk);
+    if (!pWorkItemArray)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        CHECK_ERROR(errCode, "Build post DOM tree");
+    }
 
     BB_WORKLIST_INIT(&workItemList);
 
     /* Initialize workitem list and pdom-set of each BB */
     for (bbIdx = 0; bbIdx < countOfBasicBlk; bbIdx ++)
     {
-        vscBV_Initialize(&ppBasicBlkPO[bbIdx]->postDomSet, pScratchMemPool, hisCountOfBasicBlk);
+        errCode = vscBV_Initialize(&ppBasicBlkPO[bbIdx]->postDomSet, pScratchMemPool, hisCountOfBasicBlk);
+        CHECK_ERROR(errCode, "Build post DOM tree");
 
         /* Initialize each workitem, and add it to workitem list. Note that exit block won't
            be added into workitem list because it won't be changed when iterating */
@@ -2053,7 +2165,8 @@ VSC_ErrCode vscVIR_BuildPostDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
     }
 
     /* Prepare working set */
-    vscBV_Initialize(&workingSet, pScratchMemPool, hisCountOfBasicBlk);
+    errCode = vscBV_Initialize(&workingSet, pScratchMemPool, hisCountOfBasicBlk);
+    CHECK_ERROR(errCode, "Build post DOM tree");
 
     do
     {
@@ -2103,21 +2216,38 @@ VSC_ErrCode vscVIR_BuildPostDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
     pIpdomSetArray = (VSC_BIT_VECTOR*)vscMM_Alloc(pScratchMemPool,
                                                    sizeof(VSC_BIT_VECTOR)*
                                                    hisCountOfBasicBlk);
+    if (!pIpdomSetArray)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        CHECK_ERROR(errCode, "Build post DOM tree");
+    }
     pPdomSetArray = (VSC_BIT_VECTOR*)vscMM_Alloc(pScratchMemPool,
                                                  sizeof(VSC_BIT_VECTOR)*
                                                  hisCountOfBasicBlk);
+    if (!pPdomSetArray)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        CHECK_ERROR(errCode, "Build post DOM tree");
+    }
     ppHisBlockArray = (VIR_BASIC_BLOCK**)vscMM_Alloc(pScratchMemPool,
                                                      sizeof(VIR_BASIC_BLOCK*)*
                                                      hisCountOfBasicBlk);
+    if (!ppHisBlockArray)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        CHECK_ERROR(errCode, "Build post DOM tree");
+    }
 
     /* Initilize ipdom set with self bit removed */
     for (bbIdx = 0; bbIdx < countOfBasicBlk; bbIdx ++)
     {
-        vscBV_Initialize(&pIpdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], pScratchMemPool, hisCountOfBasicBlk);
+        errCode = vscBV_Initialize(&pIpdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], pScratchMemPool, hisCountOfBasicBlk);
+        CHECK_ERROR(errCode, "Build post DOM tree");
         vscBV_Copy(&pIpdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], &ppBasicBlkPO[bbIdx]->postDomSet);
         vscBV_ClearBit(&pIpdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], ppBasicBlkPO[bbIdx]->dgNode.id);
 
-        vscBV_Initialize(&pPdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], pScratchMemPool, hisCountOfBasicBlk);
+        errCode = vscBV_Initialize(&pPdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], pScratchMemPool, hisCountOfBasicBlk);
+        CHECK_ERROR(errCode, "Build post DOM tree");
         vscBV_Copy(&pPdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], &pIpdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id]);
 
         /* Initialize worklist again for tree build in last stage */
@@ -2374,6 +2504,12 @@ VSC_ErrCode vscVIR_BuildControlDepPerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
 
     /* Get PO of postdom-tree */
     ppPostDomTreePO = (VIR_DOM_TREE_NODE**)vscMM_Alloc(pMM, sizeof(VIR_DOM_TREE_NODE*)*countOfPostDomTreeNode);
+    if (!ppPostDomTreePO)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        CHECK_ERROR(errCode, "Build control dependency");
+    }
+
     vscTREE_PstOrderTraversal(&pPostDomTree->tree, (VSC_TREE_NODE**)ppPostDomTreePO);
 
     /* Let's bottom-up to get cd of each bb */
@@ -2382,7 +2518,8 @@ VSC_ErrCode vscVIR_BuildControlDepPerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
         pThisBasicBlk = ppPostDomTreePO[tnIdx]->pOwnerBB;
 
         /* An init of VB has an implicit full clear */
-        vscBV_Initialize(&pThisBasicBlk->cdSet, pMM, hisCountOfBasicBlk);
+        errCode = vscBV_Initialize(&pThisBasicBlk->cdSet, pMM, hisCountOfBasicBlk);
+        CHECK_ERROR(errCode, "Build control dependency");
 
         /* Local cd based cfg */
         VSC_ADJACENT_LIST_ITERATOR_INIT(&predEdgeIter, &pThisBasicBlk->dgNode.predList);
@@ -2462,6 +2599,11 @@ VSC_ErrCode vscVIR_BuildDomFrontierPerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
 
     /* Get PO of dom-tree */
     ppDomTreePO = (VIR_DOM_TREE_NODE**)vscMM_Alloc(pMM, sizeof(VIR_DOM_TREE_NODE*)*countOfDomTreeNode);
+    if (!ppDomTreePO)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        CHECK_ERROR(errCode, "Build dom frontier");
+    }
     vscTREE_PstOrderTraversal(&pDomTree->tree, (VSC_TREE_NODE**)ppDomTreePO);
 
     /* Let's bottom-up to get df of each bb */
@@ -2470,7 +2612,8 @@ VSC_ErrCode vscVIR_BuildDomFrontierPerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
         pThisBasicBlk = ppDomTreePO[tnIdx]->pOwnerBB;
 
         /* An init of VB has an implicit full clear */
-        vscBV_Initialize(&pThisBasicBlk->dfSet, pMM, hisCountOfBasicBlk);
+        errCode = vscBV_Initialize(&pThisBasicBlk->dfSet, pMM, hisCountOfBasicBlk);
+        CHECK_ERROR(errCode, "Build dom frontier");
 
         /* Local df based cfg */
         VSC_ADJACENT_LIST_ITERATOR_INIT(&succEdgeIter, &pThisBasicBlk->dgNode.succList);

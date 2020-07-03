@@ -649,6 +649,8 @@ static VSC_IS_DepDagEdge* _VSC_IS_DepDag_AddEdge(
     gctBOOL is_new_edge = gcvFALSE;
     VSC_IS_DepDagEdge* edge = (VSC_IS_DepDagEdge*)vscDG_AddEdge(VSC_IS_DepDag_GetDGraph(dag),
         VSC_IS_DepDagNode_GetNode(from), VSC_IS_DepDagNode_GetNode(to), &is_new_edge);
+    if (!edge)
+        return gcvNULL;
 
     gcmASSERT(VSC_IS_DepDagNode_GetID(from) != VSC_IS_DepDagNode_GetID(to));
     if(is_new_edge)
@@ -657,6 +659,15 @@ static VSC_IS_DepDagEdge* _VSC_IS_DepDag_AddEdge(
     }
     return edge;
 }
+
+#define VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(DAG, FROM, TO, RET) \
+    RET = _VSC_IS_DepDag_AddEdge(DAG, FROM, TO); \
+    if (!RET)                                    \
+    {                                            \
+        err_code = VSC_ERR_OUT_OF_MEMORY;        \
+        ERR_REPORT(err_code, "Failed to add edge."); \
+        return err_code;                         \
+    }
 
 
 static VSC_IS_DepDagEdge* _VSC_IS_DepDag_ReplaceEdgeToNode(
@@ -1590,6 +1601,8 @@ static gctBOOL _VSC_IS_LooselyBindLdarr(
                     if(VSC_IS_DepDagNode_GetID(dep_node1) < VSC_IS_DepDagNode_GetID(dep_node0))
                     {
                         VSC_IS_DepDagEdge* edge = _VSC_IS_DepDag_AddEdge(dag, dep_node1, dep_node0);
+                        if (!edge)
+                            return set_dodging;
                         VSC_IS_DepDagEdge_AddOCT(edge, VSC_IS_OtherConflictType_DODGING);
                         set_dodging = gcvTRUE;
                     }
@@ -1707,9 +1720,15 @@ static VSC_ErrCode _VSC_IS_BuildDAGForBB_Basic(
     {
         VIR_Instruction* prev;
         gctINT32 j;
-        VSC_IS_DepDagNode* node = _VSC_IS_DepDag_NewNode(dag, inst);
         VSC_IS_RegConflictType excludeRCT;
         VSC_IS_OtherConflictType excludeOCT;
+        VSC_IS_DepDagNode* node = _VSC_IS_DepDag_NewNode(dag, inst);
+
+        if (!node)
+        {
+            err_code = VSC_ERR_OUT_OF_MEMORY;
+            CHECK_ERROR(err_code, "Failed to allocate memory in New DepDag Node.");
+        }
 
         VSC_IS_RegConflictType_Reset(excludeRCT);
         VSC_IS_OtherConflictType_Reset(excludeOCT);
@@ -1739,7 +1758,8 @@ static VSC_ErrCode _VSC_IS_BuildDAGForBB_Basic(
                 VSC_IS_DepDagEdge* edge;
                 gctUINT32 bubble = _VSC_IS_ConflictType_GetBubble(rct, is);
 
-                edge = _VSC_IS_DepDag_AddEdge(dag, prev_node, node);
+                VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, prev_node, node, edge);
+
                 VSC_IS_DepDagEdge_SetRCT(edge, rct);
                 VSC_IS_DepDagEdge_SetOCT(edge, oct);
                 VSC_IS_DepDagEdge_SetBubble(edge, bubble);
@@ -1869,7 +1889,12 @@ static VSC_ErrCode _VSC_IS_BuildDAGForBB(
         /* add the pseudo_end node */
         for(i = 0; i < tail_count; i++)
         {
-            _VSC_IS_DepDag_AddEdge(dag, tail_nodes[i], pseudo_end);
+            if (_VSC_IS_DepDag_AddEdge(dag, tail_nodes[i], pseudo_end) == gcvNULL)
+            {
+                err_code = VSC_ERR_OUT_OF_MEMORY;
+                ERR_REPORT(err_code, "Failed to add edge.");
+                return err_code;
+            }
         }
         gcoOS_Free(gcvNULL, (gctPOINTER)tail_nodes);
 
@@ -4682,6 +4707,7 @@ static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
     gctUINT32 bubble0 = VSC_IS_DepDagEdge_GetBubble(edge0);
     gctUINT32 bubble1 = VSC_IS_DepDagEdge_GetBubble(edge1);
     VSC_IS_DepDagEdge* new_edge;
+    VSC_IS_DepDagEdge* new_edge1;
 
     gcmASSERT(sub_root);
     gcmASSERT(edge0);
@@ -4710,7 +4736,7 @@ static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
         VSC_IS_DepDagEdge* node1_pred_edge;
         _VSC_IS_DepDag_RemoveEdge(dag, node0, sub_root);
         _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(node1, gcvFALSE, gcvNULL, &node1_pred_edge);
-        new_edge = _VSC_IS_DepDag_AddEdge(dag, node0, node1);
+        VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, node0, node1, new_edge)
         VSC_IS_DepDagEdge_SetBubble(new_edge, bubble0 > bubble1 ? bubble0 - bubble1 - 1 : 0);
         if(node1_pred_edge)
         {
@@ -4722,7 +4748,7 @@ static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
         VSC_IS_DepDagEdge* node0_pred_edge;
         _VSC_IS_DepDag_RemoveEdge(dag, node1, sub_root);
         _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(node0, gcvFALSE, gcvNULL, &node0_pred_edge);
-        new_edge = _VSC_IS_DepDag_AddEdge(dag, node1, node0);
+        VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, node1, node0, new_edge)
         VSC_IS_DepDagEdge_SetBubble(new_edge, bubble1 > bubble0 ? bubble1 - bubble0 - 1 : 0);
         if(node0_pred_edge)
         {
@@ -4736,7 +4762,7 @@ static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
             VSC_IS_DepDagEdge* node1_pred_edge;
             _VSC_IS_DepDag_RemoveEdge(dag, node0, sub_root);
             _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(node1, gcvFALSE, gcvNULL, &node1_pred_edge);
-            new_edge = _VSC_IS_DepDag_AddEdge(dag, node0, node1);
+            VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, node0, node1, new_edge)
             VSC_IS_DepDagEdge_SetBubble(new_edge, bubble0 > bubble1 ? bubble0 - bubble1 - 1 : 0);
             if(node1_pred_edge)
             {
@@ -4748,7 +4774,7 @@ static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
             VSC_IS_DepDagEdge* node0_pred_edge;
             _VSC_IS_DepDag_RemoveEdge(dag, node1, sub_root);
             _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(node0, gcvFALSE, gcvNULL, &node0_pred_edge);
-            new_edge = _VSC_IS_DepDag_AddEdge(dag, node1, node0);
+            VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, node1, node0, new_edge)
             VSC_IS_DepDagEdge_SetBubble(new_edge, bubble1 - bubble0 - 1);
             if(node0_pred_edge)
             {
@@ -4783,10 +4809,10 @@ static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
 
                 _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(node0, gcvFALSE, gcvNULL, &node0_pred_edge);
                 _VSC_IS_DepDag_RemoveEdge(dag, node0, sub_root);
-                new_edge = _VSC_IS_DepDag_AddEdge(dag, node0, VSC_IS_DepDagEdge_GetFromNode(end_node1_pred_edge));
+                VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, node0, VSC_IS_DepDagEdge_GetFromNode(end_node1_pred_edge), new_edge)
                 VSC_IS_DepDagEdge_SetBubble(new_edge, bubble0 - final_distance - 1);
                 _VSC_IS_DepDag_RemoveEdge(dag, end_node1, VSC_IS_DepDagEdge_GetFromNode(end_node1_pred_edge));
-                new_edge = _VSC_IS_DepDag_AddEdge(dag, end_node1, node0);
+                VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, end_node1, node0, new_edge)
                 if(node0_pred_edge)
                 {
                     err_code = _VSC_IS_DepDagNode_MergeBranch(is, node0, new_edge + 1, node0_pred_edge, gcvTRUE);
@@ -4797,7 +4823,7 @@ static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
                 VSC_IS_DepDagEdge* end_node1_succ_edge;
                 _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(end_node1, gcvFALSE, gcvNULL, &end_node1_succ_edge);
                 _VSC_IS_DepDag_RemoveEdge(dag, node0, sub_root);
-                new_edge = _VSC_IS_DepDag_AddEdge(dag, node0, end_node1);
+                VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, node0, end_node1, new_edge)
                 VSC_IS_DepDagEdge_SetBubble(new_edge, bubble0 - final_distance - 1);
                 if(end_node1_succ_edge)
                 {
@@ -4830,10 +4856,10 @@ static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
 
                 _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(node1, gcvFALSE, gcvNULL, &node1_pred_edge);
                 _VSC_IS_DepDag_RemoveEdge(dag, node1, sub_root);
-                new_edge = _VSC_IS_DepDag_AddEdge(dag, node1, VSC_IS_DepDagEdge_GetFromNode(end_node0_pred_edge));
+                VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, node1, VSC_IS_DepDagEdge_GetFromNode(end_node0_pred_edge), new_edge)
                 VSC_IS_DepDagEdge_SetBubble(new_edge, bubble1 - final_distance - 1);
                 _VSC_IS_DepDag_RemoveEdge(dag, end_node0, VSC_IS_DepDagEdge_GetFromNode(end_node0_pred_edge));
-                new_edge = _VSC_IS_DepDag_AddEdge(dag, end_node0, node1);
+                VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, end_node0, node1, new_edge)
                 if(node1_pred_edge)
                 {
                     err_code = _VSC_IS_DepDagNode_MergeBranch(is, node1, new_edge + 1, node1_pred_edge, gcvTRUE);
@@ -4844,7 +4870,7 @@ static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
                 VSC_IS_DepDagEdge* end_node0_succ_edge;
                 _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(end_node0, gcvFALSE, gcvNULL, &end_node0_succ_edge);
                 _VSC_IS_DepDag_RemoveEdge(dag, node1, sub_root);
-                new_edge = _VSC_IS_DepDag_AddEdge(dag, node1, end_node0);
+                VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, node1, end_node0, new_edge)
                 VSC_IS_DepDagEdge_SetBubble(new_edge, bubble1 - final_distance - 1);
                 if(end_node0_succ_edge)
                 {
@@ -4894,13 +4920,13 @@ static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
                 if(end_node0_distance < end_node1_distance)
                 {
                     _VSC_IS_DepDag_RemoveEdge(dag, node1, sub_root);
-                    new_edge = _VSC_IS_DepDag_AddEdge(dag, end_node1, VSC_IS_DepDagEdge_GetFromNode(prev_edge0));
+                    VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, end_node1, VSC_IS_DepDagEdge_GetFromNode(prev_edge0), new_edge)
                     err_code = _VSC_IS_DepDagNode_MergeBranch(is, VSC_IS_DepDagEdge_GetFromNode(prev_edge0), new_edge + 1, prev_edge0, gcvTRUE);
                 }
                 else
                 {
                     _VSC_IS_DepDag_RemoveEdge(dag, node0, sub_root);
-                    new_edge = _VSC_IS_DepDag_AddEdge(dag, end_node0, VSC_IS_DepDagEdge_GetFromNode(prev_edge1));
+                    VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, end_node0, VSC_IS_DepDagEdge_GetFromNode(prev_edge1), new_edge)
                     err_code = _VSC_IS_DepDagNode_MergeBranch(is, VSC_IS_DepDagEdge_GetFromNode(prev_edge1), new_edge + 1, prev_edge1, gcvTRUE);
                 }
             }
@@ -4913,7 +4939,7 @@ static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
                     _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(end_node1, gcvFALSE, gcvNULL, &end_node1_succ_edge);
                     gcmASSERT(VSC_IS_DepDagEdge_GetBubble(end_node1_succ_edge));
                     _VSC_IS_DepDag_RemoveEdge(dag, node0, sub_root);
-                    new_edge = _VSC_IS_DepDag_AddEdge(dag, node0, end_node1);
+                    VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, node0, end_node1, new_edge)
                     err_code = _VSC_IS_DepDagNode_MergeBranch(is, end_node1, new_edge + 1, end_node1_succ_edge, gcvTRUE);
                 }
                 else
@@ -4922,13 +4948,13 @@ static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
                     {
                         _VSC_IS_DepDag_RemoveEdge(dag, node1, sub_root);
                         _VSC_IS_DepDag_RemoveEdge(dag, end_node0, VSC_IS_DepDagEdge_GetFromNode(prev_edge0));
-                        _VSC_IS_DepDag_AddEdge(dag, node1, VSC_IS_DepDagEdge_GetFromNode(prev_edge0));
-                        _VSC_IS_DepDag_AddEdge(dag, end_node0, end_node1);
+                        VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, node1, VSC_IS_DepDagEdge_GetFromNode(prev_edge0), new_edge1)
+                        VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, end_node0, end_node1, new_edge1)
                     }
                     else
                     {
                         _VSC_IS_DepDag_RemoveEdge(dag, node0, sub_root);
-                        _VSC_IS_DepDag_AddEdge(dag, node0, end_node1);
+                        VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, node0, end_node1, new_edge1)
                     }
                 }
             }
@@ -4941,7 +4967,7 @@ static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
                     _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(end_node0, gcvFALSE, gcvNULL, &end_node0_succ_edge);
                     gcmASSERT(VSC_IS_DepDagEdge_GetBubble(end_node0_succ_edge));
                     _VSC_IS_DepDag_RemoveEdge(dag, node1, sub_root);
-                    new_edge = _VSC_IS_DepDag_AddEdge(dag, node1, end_node0);
+                    VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, node1, end_node0, new_edge)
                     err_code = _VSC_IS_DepDagNode_MergeBranch(is, end_node0, new_edge + 1, end_node0_succ_edge, gcvTRUE);
                 }
                 else
@@ -4950,13 +4976,13 @@ static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
                     {
                         _VSC_IS_DepDag_RemoveEdge(dag, node0, sub_root);
                         _VSC_IS_DepDag_RemoveEdge(dag, end_node1, VSC_IS_DepDagEdge_GetFromNode(prev_edge1));
-                        _VSC_IS_DepDag_AddEdge(dag, node0, VSC_IS_DepDagEdge_GetFromNode(prev_edge1));
-                        _VSC_IS_DepDag_AddEdge(dag, end_node1, end_node0);
+                        VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, node0, VSC_IS_DepDagEdge_GetFromNode(prev_edge1), new_edge1)
+                        VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, end_node1, end_node0, new_edge1)
                     }
                     else
                     {
                         _VSC_IS_DepDag_RemoveEdge(dag, node1, sub_root);
-                        _VSC_IS_DepDag_AddEdge(dag, node1, end_node0);
+                        VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, node1, end_node0, new_edge1)
                     }
                 }
             }
@@ -4983,12 +5009,12 @@ static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
                     if(end_node0_distance >= end_node1_distance)
                     {
                         _VSC_IS_DepDag_RemoveEdge(dag, node0, sub_root);
-                        _VSC_IS_DepDag_AddEdge(dag, node0, end_node1);
+                        VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, node0, end_node1, new_edge1)
                     }
                     else
                     {
                         _VSC_IS_DepDag_RemoveEdge(dag, node1, sub_root);
-                        _VSC_IS_DepDag_AddEdge(dag, node1, end_node0);
+                        VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, node1, end_node0, new_edge1)
                     }
                 }
                 else
@@ -5037,13 +5063,13 @@ static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
                     if(filled_bubble0 >= filled_bubble1)
                     {
                         _VSC_IS_DepDag_RemoveEdge(dag, node1, sub_root);
-                        new_edge = _VSC_IS_DepDag_AddEdge(dag, node1, end_node0);
+                        VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, node1, end_node0, new_edge)
                         err_code = _VSC_IS_DepDagNode_MergeBranch(is, end_node0, new_edge + 1, bubble0_edge, gcvTRUE);
                     }
                     else
                     {
                         _VSC_IS_DepDag_RemoveEdge(dag, node0, sub_root);
-                        new_edge = _VSC_IS_DepDag_AddEdge(dag, node0, end_node1);
+                        VSC_IS_DEPDAG_ADDEDGE_WITH_CHECK(dag, node0, end_node1, new_edge)
                         err_code = _VSC_IS_DepDagNode_MergeBranch(is, end_node1, new_edge + 1, bubble1_edge, gcvTRUE);
                     }
                 }

@@ -13,14 +13,14 @@
 
 #include "gc_vsc.h"
 
-void vscBM_Initialize(VSC_BIT_MATRIX* pBM, VSC_MM* pMM, gctINT rowSize, gctINT colSize)
+VSC_ErrCode vscBM_Initialize(VSC_BIT_MATRIX* pBM, VSC_MM* pMM, gctINT rowSize, gctINT colSize)
 {
     gctINT   totalNumOfUINT;
 
     if (pMM == gcvNULL && (rowSize <= 0 || colSize <= 0))
     {
         memset(pBM, 0, sizeof(VSC_BIT_MATRIX));
-        return;
+        return VSC_ERR_NONE;
     }
 
     /* Force to safe size */
@@ -49,13 +49,14 @@ void vscBM_Initialize(VSC_BIT_MATRIX* pBM, VSC_MM* pMM, gctINT rowSize, gctINT c
         if (pBM->pBits == gcvNULL)
         {
             gcmASSERT(gcvFALSE);
-            return;
+            return VSC_ERR_OUT_OF_MEMORY;
         }
         else
         {
             memset(pBM->pBits, CLR_VALUE, totalNumOfUINT * sizeof(gctUINT));
         }
     }
+    return VSC_ERR_NONE;
 }
 
 VSC_BIT_MATRIX* vscBM_Create(VSC_MM* pMM, gctINT rowSize, gctINT colSize)
@@ -63,8 +64,11 @@ VSC_BIT_MATRIX* vscBM_Create(VSC_MM* pMM, gctINT rowSize, gctINT colSize)
     VSC_BIT_MATRIX*   pBM = gcvNULL;
 
     pBM = (VSC_BIT_MATRIX*)vscMM_Alloc(pMM, sizeof(VSC_BIT_MATRIX));
+    if (!pBM)
+        return gcvNULL;
 
-    vscBM_Initialize(pBM, pMM, rowSize, colSize);
+    if (vscBM_Initialize(pBM, pMM, rowSize, colSize) != VSC_ERR_NONE)
+        return gcvNULL;
 
     return pBM;
 }

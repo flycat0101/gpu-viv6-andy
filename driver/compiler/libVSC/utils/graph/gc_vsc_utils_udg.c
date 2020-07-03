@@ -50,6 +50,11 @@ VSC_UNDIRECTED_GRAPH* vscUDG_Create(VSC_MM* pMM, gctUINT initNodeCount)
     VSC_UNDIRECTED_GRAPH*   pUDG = gcvNULL;
 
     pUDG = (VSC_UNDIRECTED_GRAPH*)vscMM_Alloc(pMM, sizeof(VSC_UNDIRECTED_GRAPH));
+    if (!pUDG)
+    {
+        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Fail to create UDG");
+        return gcvNULL;
+    }
     vscUDG_Initialize(pUDG, pMM, initNodeCount);
 
     return pUDG;

@@ -113,6 +113,11 @@ VSC_DIRECTED_GRAPH* vscDG_Create(VSC_MM* pMM, gctUINT rootInitAllocCount, gctUIN
     VSC_DIRECTED_GRAPH*   pDG = gcvNULL;
 
     pDG = (VSC_DIRECTED_GRAPH*)vscMM_Alloc(pMM, sizeof(VSC_DIRECTED_GRAPH));
+    if (!pDG)
+    {
+        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Fail to create DG");
+        return gcvNULL;
+    }
     vscDG_Initialize(pDG, pMM, rootInitAllocCount, tailInitAllocCount, edgeAllocSize);
 
     return pDG;
@@ -294,6 +299,11 @@ VSC_DG_EDGE* vscDG_AddEdge(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_
 
     /* Alloc edges and initialize */
     pEdges = (VSC_DG_EDGE*)vscMM_Alloc(pDG->pMM, 2*pDG->edgeAllocSize);
+    if (!pEdges)
+    {
+        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Fail to add edge");
+        return gcvNULL;
+    }
     pSuccEdge = pEdges;
     pPredEdge = (VSC_DG_EDGE*)((gctUINT8*)pEdges + pDG->edgeAllocSize);
     vscDGEG_Initialize(pSuccEdge, pFromNode, pToNode);
@@ -525,23 +535,29 @@ typedef struct _VSC_DG_NODE_WITH_EDGE
     gctUINT         nextEdgeIndex;
 } VSC_DG_NODE_WITH_EDGE;
 
-static void _PushStackWithEdge(VSC_SIMPLE_STACK* pStack, VSC_DG_NODE* pNode, VSC_DG_EDGE* pEdge, gctUINT nextEdgeIndex, VSC_MM* pMM)
+static VSC_ErrCode _PushStackWithEdge(VSC_SIMPLE_STACK* pStack, VSC_DG_NODE* pNode, VSC_DG_EDGE* pEdge, gctUINT nextEdgeIndex, VSC_MM* pMM)
 {
     VSC_QUEUE_STACK_ENTRY* pStackEntry;
     VSC_DG_NODE_WITH_EDGE*  pNodeWithEdge;
 
     /* Allocate the node with edge. */
     pNodeWithEdge = (VSC_DG_NODE_WITH_EDGE*)vscMM_Alloc(pMM, sizeof(VSC_DG_NODE_WITH_EDGE));
+    if (!pNodeWithEdge)
+        return VSC_ERR_OUT_OF_MEMORY;
+
     pNodeWithEdge->pNode = pNode;
     pNodeWithEdge->pEdge = pEdge;
     pNodeWithEdge->nextEdgeIndex = nextEdgeIndex;
 
     /* Allocate the stack entry. */
     pStackEntry = (VSC_QUEUE_STACK_ENTRY*)vscMM_Alloc(pMM, sizeof(VSC_QUEUE_STACK_ENTRY));
+    if (!pStackEntry)
+        return VSC_ERR_OUT_OF_MEMORY;
 
     /* Push the entry. */
     SQE_INITIALIZE(pStackEntry, pNodeWithEdge);
     STACK_PUSH_ENTRY(pStack, pStackEntry);
+    return VSC_ERR_NONE;
 }
 
 static void* _PopStackWithEdge(VSC_SIMPLE_STACK* pStack, VSC_DG_NODE_WITH_EDGE* pNodeWithEdge, VSC_MM* pMM)
@@ -577,13 +593,17 @@ static VSC_DG_NODE_WITH_EDGE* _TopStackWithEdge(VSC_SIMPLE_STACK* pStack)
 }
 
 /* Node stack for DG_NODE. */
-static void _PushStack(VSC_SIMPLE_STACK* pStack, VSC_DG_NODE* pNode, VSC_MM* pMM)
+static VSC_ErrCode _PushStack(VSC_SIMPLE_STACK* pStack, VSC_DG_NODE* pNode, VSC_MM* pMM)
 {
     VSC_QUEUE_STACK_ENTRY* pStackEntry;
 
     pStackEntry = (VSC_QUEUE_STACK_ENTRY*)vscMM_Alloc(pMM, sizeof(VSC_QUEUE_STACK_ENTRY));
+    if (!pStackEntry)
+        return VSC_ERR_OUT_OF_MEMORY;
+
     SQE_INITIALIZE(pStackEntry, pNode);
     STACK_PUSH_ENTRY(pStack, pStackEntry);
+    return VSC_ERR_NONE;
 }
 
 static VSC_DG_NODE* _PopStack(VSC_SIMPLE_STACK* pStack, VSC_MM* pMM)
@@ -598,13 +618,16 @@ static VSC_DG_NODE* _PopStack(VSC_SIMPLE_STACK* pStack, VSC_MM* pMM)
     return pRetNode;
 }
 
-static void _EnQueue(VSC_SIMPLE_QUEUE* pQueue, VSC_DG_NODE* pNode, VSC_MM* pMM)
+static VSC_ErrCode _EnQueue(VSC_SIMPLE_QUEUE* pQueue, VSC_DG_NODE* pNode, VSC_MM* pMM)
 {
     VSC_QUEUE_STACK_ENTRY* pQueueEntry;
 
     pQueueEntry = (VSC_QUEUE_STACK_ENTRY*)vscMM_Alloc(pMM, sizeof(VSC_QUEUE_STACK_ENTRY));
+    if (!pQueueEntry)
+        return VSC_ERR_OUT_OF_MEMORY;
     SQE_INITIALIZE(pQueueEntry, pNode);
     QUEUE_PUT_ENTRY(pQueue, pQueueEntry);
+    return VSC_ERR_NONE;
 }
 
 static VSC_DG_NODE* _DeQueue(VSC_SIMPLE_QUEUE* pQueue, VSC_MM* pMM)
@@ -687,7 +710,7 @@ static VSC_GRAPH_SEARCH_MODE _ChooseImplementSearchMode(VSC_DIRECTED_GRAPH* pDG,
     return searchMode;
 }
 
-static void _DoPreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
+static VSC_ErrCode _DoPreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
                                  VSC_DG_NODE* pNode,
                                  VSC_GRAPH_SEARCH_MODE searchMode,
                                  gctBOOL bFromTail,
@@ -696,6 +719,7 @@ static void _DoPreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
 {
     VSC_DG_EDGE*       pEdge = gcvNULL;
     VSC_ADJACENT_LIST* pAdjList;
+    VSC_ErrCode        errCode = VSC_ERR_NONE;
 
     /* Traversal descendants based on search mode now */
     if (searchMode == VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST_RECURSIVE)
@@ -717,7 +741,8 @@ static void _DoPreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
 
             if (!pEdge->pToNode->bVisited)
             {
-                _DoPreOrderTraversal(pDG, pEdge->pToNode, searchMode, bFromTail, ppRetNodeOrder, pPreOrderIdx);
+                errCode = _DoPreOrderTraversal(pDG, pEdge->pToNode, searchMode, bFromTail, ppRetNodeOrder, pPreOrderIdx);
+                CHECK_ERROR(errCode, "Failed to do pre order traversal");
             }
         }
     }
@@ -728,7 +753,8 @@ static void _DoPreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
 
         STACK_INITIALIZE(&stack);
 
-        _PushStack(&stack, pNode, pDG->pMM);
+        errCode = _PushStack(&stack, pNode, pDG->pMM);
+        CHECK_ERROR(errCode, "Failed to push stack");
 
         while (!STACK_CHECK_EMPTY(&stack))
         {
@@ -756,7 +782,8 @@ static void _DoPreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
 
                 if (!pEdge->pToNode->bVisited)
                 {
-                    _PushStack(&stack, pEdge->pToNode, pDG->pMM);
+                    errCode = _PushStack(&stack, pEdge->pToNode, pDG->pMM);
+                    CHECK_ERROR(errCode, "Failed to push stack");
                 }
             }
 
@@ -798,7 +825,8 @@ static void _DoPreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
         for (i = 0; i < vscSRARR_GetElementCount(&unvisitedDescendantArray); i ++)
         {
             pTmpNode = *(VSC_DG_NODE**)vscSRARR_GetElement(&unvisitedDescendantArray, i);
-            _DoPreOrderTraversal(pDG, pTmpNode, searchMode, bFromTail, ppRetNodeOrder, pPreOrderIdx);
+            errCode = _DoPreOrderTraversal(pDG, pTmpNode, searchMode, bFromTail, ppRetNodeOrder, pPreOrderIdx);
+            CHECK_ERROR(errCode, "Failed to do pre order traversal");
         }
 
         vscSRARR_Finalize(&unvisitedDescendantArray);
@@ -845,9 +873,10 @@ static void _DoPreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
     {
         gcmASSERT(gcvFALSE);
     }
+    return errCode;
 }
 
-void vscDG_PreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
+VSC_ErrCode vscDG_PreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
                              VSC_GRAPH_SEARCH_MODE searchMode,
                              gctBOOL bFromTail,
                              gctBOOL bReverseResult,
@@ -856,6 +885,7 @@ void vscDG_PreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
     gctUINT                     i, preOrderIdx = 0;
     VSC_DG_NODE*                pStartNode;
     VSC_SIMPLE_RESIZABLE_ARRAY* pStartNodeArray;
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
 
     searchMode = _ChooseImplementSearchMode(pDG, searchMode);
 
@@ -874,7 +904,8 @@ void vscDG_PreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
         }
 
         /* Start iterately traversal */
-        _DoPreOrderTraversal(pDG, pStartNode, searchMode, bFromTail, ppRetNodeOrder, &preOrderIdx);
+        errCode = _DoPreOrderTraversal(pDG, pStartNode, searchMode, bFromTail, ppRetNodeOrder, &preOrderIdx);
+        CHECK_ERROR(errCode, "Failed to do pre order traversal");
     }
 
     /* Reverse result if required */
@@ -882,6 +913,7 @@ void vscDG_PreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
     {
         _ReverseResult(pDG, ppRetNodeOrder);
     }
+    return errCode;
 }
 
 static VSC_DG_EDGE* _GetEdgeByIndex(VSC_DIRECTED_GRAPH* pDG,
@@ -908,7 +940,7 @@ static VSC_DG_EDGE* _GetEdgeByIndex(VSC_DIRECTED_GRAPH* pDG,
     return gcvNULL;
 }
 
-static void _DoPostOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
+static VSC_ErrCode _DoPostOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
                                   VSC_DG_NODE* pNode,
                                   VSC_GRAPH_SEARCH_MODE searchMode,
                                   gctBOOL bFromTail,
@@ -917,6 +949,7 @@ static void _DoPostOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
 {
     VSC_DG_EDGE*       pEdge = gcvNULL;
     VSC_ADJACENT_LIST* pAdjList;
+    VSC_ErrCode        errCode = VSC_ERR_NONE;
 
     /* Traversal descendants based on search mode now */
     if (searchMode == VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST_RECURSIVE)
@@ -935,7 +968,8 @@ static void _DoPostOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
 
             if (!pEdge->pToNode->bVisited)
             {
-                _DoPostOrderTraversal(pDG, pEdge->pToNode, searchMode, bFromTail, ppRetNodeOrder, pPostOrderIdx);
+                errCode = _DoPostOrderTraversal(pDG, pEdge->pToNode, searchMode, bFromTail, ppRetNodeOrder, pPostOrderIdx);
+                CHECK_ERROR(errCode, "Failed to do post order traversal");
             }
         }
 
@@ -948,7 +982,8 @@ static void _DoPostOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
 
         STACK_INITIALIZE(&stack);
 
-        _PushStackWithEdge(&stack, pNode, gcvNULL, 0, pDG->pMM);
+        errCode = _PushStackWithEdge(&stack, pNode, gcvNULL, 0, pDG->pMM);
+        CHECK_ERROR(errCode, "Failed to Push stack with edge");
 
         while (!STACK_CHECK_EMPTY(&stack))
         {
@@ -980,7 +1015,8 @@ static void _DoPostOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
                 }
                 else
                 {
-                    _PushStackWithEdge(&stack, pEdge->pToNode, pEdge, 0, pDG->pMM);
+                    errCode = _PushStackWithEdge(&stack, pEdge->pToNode, pEdge, 0, pDG->pMM);
+                    CHECK_ERROR(errCode, "Failed to Push stack with edge");
                     break;
                 }
             };
@@ -1029,7 +1065,8 @@ static void _DoPostOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
         for (i = 0; i < vscSRARR_GetElementCount(&unvisitedDescendantArray); i ++)
         {
             pTmpNode = *(VSC_DG_NODE**)vscSRARR_GetElement(&unvisitedDescendantArray, i);
-            _DoPostOrderTraversal(pDG, pTmpNode, searchMode, bFromTail, ppRetNodeOrder, pPostOrderIdx);
+            errCode = _DoPostOrderTraversal(pDG, pTmpNode, searchMode, bFromTail, ppRetNodeOrder, pPostOrderIdx);
+            CHECK_ERROR(errCode, "Failed to do post order traversal");
         }
 
         vscSRARR_Finalize(&unvisitedDescendantArray);
@@ -1041,9 +1078,10 @@ static void _DoPostOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
     {
         gcmASSERT(gcvFALSE);
     }
+    return errCode;
 }
 
-void vscDG_PstOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
+VSC_ErrCode vscDG_PstOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
                              VSC_GRAPH_SEARCH_MODE searchMode,
                              gctBOOL bFromTail,
                              gctBOOL bReverseResult,
@@ -1052,14 +1090,15 @@ void vscDG_PstOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
     gctUINT                     i, postOrderIdx = 0;
     VSC_DG_NODE*                pStartNode;
     VSC_SIMPLE_RESIZABLE_ARRAY* pStartNodeArray;
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
 
     searchMode = _ChooseImplementSearchMode(pDG, searchMode);
 
     /* For post order with BFS_wide, we just do reversed preorder with BFS_wide */
     if (searchMode == VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_WIDE)
     {
-        vscDG_PreOrderTraversal(pDG, VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_WIDE, bFromTail, !bReverseResult, ppRetNodeOrder);
-        return;
+        errCode = vscDG_PreOrderTraversal(pDG, VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_WIDE, bFromTail, !bReverseResult, ppRetNodeOrder);
+        return errCode;
     }
 
     /* Prepare firstly */
@@ -1076,7 +1115,8 @@ void vscDG_PstOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
         }
 
         /* Start iterately traversal */
-        _DoPostOrderTraversal(pDG, pStartNode, searchMode, bFromTail, ppRetNodeOrder, &postOrderIdx);
+        errCode = _DoPostOrderTraversal(pDG, pStartNode, searchMode, bFromTail, ppRetNodeOrder, &postOrderIdx);
+        CHECK_ERROR(errCode, "Failed to do post order traversal");
 
         if (searchMode == VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_NARROW)
         {
@@ -1089,9 +1129,10 @@ void vscDG_PstOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
     {
         _ReverseResult(pDG, ppRetNodeOrder);
     }
+    return errCode;
 }
 
-static void _DoTraversalCB(VSC_DIRECTED_GRAPH* pDG,
+static VSC_ErrCode _DoTraversalCB(VSC_DIRECTED_GRAPH* pDG,
                            VSC_DG_NODE* pNode,
                            VSC_GRAPH_SEARCH_MODE searchMode,
                            gctBOOL bFromTail,
@@ -1104,6 +1145,7 @@ static void _DoTraversalCB(VSC_DIRECTED_GRAPH* pDG,
 {
     VSC_DG_EDGE*       pEdge = gcvNULL;
     VSC_ADJACENT_LIST* pAdjList;
+    VSC_ErrCode        errCode = VSC_ERR_NONE;
 
     /* Traversal descendants based on search mode now */
     if (searchMode == VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST_RECURSIVE)
@@ -1111,7 +1153,7 @@ static void _DoTraversalCB(VSC_DIRECTED_GRAPH* pDG,
         /* Determine direction */
         pAdjList = (bFromTail) ? &pNode->predList : &pNode->succList;
 
-        SAFE_CALL_DG_NODE_HANDLER_RETURN(pfnHandlerOwnPre, pNode, pParam);
+        SAFE_CALL_DG_NODE_HANDLER_RETURN_WITH_ERRCODE(pfnHandlerOwnPre, pNode, pParam);
 
         pNode->bVisited = gcvTRUE;
 
@@ -1125,7 +1167,7 @@ static void _DoTraversalCB(VSC_DIRECTED_GRAPH* pDG,
             if (!pEdge->pToNode->bVisited)
             {
                 SAFE_CALL_DG_NODE_HANDLER_CONTINUE(pfnHandlerDescendantPre, pEdge->pToNode, pParam);
-                _DoTraversalCB(pDG, pEdge->pToNode,
+                errCode = _DoTraversalCB(pDG, pEdge->pToNode,
                                searchMode, bFromTail,
                                pfnHandlerOwnPre,
                                pfnHandlerOwnPost,
@@ -1133,6 +1175,7 @@ static void _DoTraversalCB(VSC_DIRECTED_GRAPH* pDG,
                                pfnHandlerDescendantPost,
                                pfnHandlerDFSEdgeOnRevisit,
                                pParam);
+                CHECK_ERROR(errCode, "Faild to do traversal CB");
                 SAFE_CALL_DG_NODE_HANDLER_CONTINUE(pfnHandlerDescendantPost, pEdge->pToNode, pParam);
             }
             else
@@ -1141,7 +1184,7 @@ static void _DoTraversalCB(VSC_DIRECTED_GRAPH* pDG,
             }
         }
 
-        SAFE_CALL_DG_NODE_HANDLER_RETURN(pfnHandlerOwnPost, pNode, pParam);
+        SAFE_CALL_DG_NODE_HANDLER_RETURN_WITH_ERRCODE(pfnHandlerOwnPost, pNode, pParam);
     }
     /* We need to use post-order to implement this here so that we can call all node handlers correctly. */
     else if (searchMode == VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST_ITERATIVE)
@@ -1150,7 +1193,8 @@ static void _DoTraversalCB(VSC_DIRECTED_GRAPH* pDG,
 
         STACK_INITIALIZE(&stack);
 
-        _PushStackWithEdge(&stack, pNode, gcvNULL, 0, pDG->pMM);
+        errCode = _PushStackWithEdge(&stack, pNode, gcvNULL, 0, pDG->pMM);
+        CHECK_ERROR(errCode, "Failed to Push stack with edge");
 
         while (!STACK_CHECK_EMPTY(&stack))
         {
@@ -1200,7 +1244,8 @@ static void _DoTraversalCB(VSC_DIRECTED_GRAPH* pDG,
                 }
                 else
                 {
-                    _PushStackWithEdge(&stack, pEdge->pToNode, pEdge, 0, pDG->pMM);
+                    errCode = _PushStackWithEdge(&stack, pEdge->pToNode, pEdge, 0, pDG->pMM);
+                    CHECK_ERROR(errCode, "Failed to Push stack with edge");
                     break;
                 }
             };
@@ -1254,7 +1299,7 @@ static void _DoTraversalCB(VSC_DIRECTED_GRAPH* pDG,
             pTmpNode = *(VSC_DG_NODE**)vscSRARR_GetElement(&unvisitedDescendantArray, i);
 
             SAFE_CALL_DG_NODE_HANDLER_CONTINUE(pfnHandlerDescendantPre, pTmpNode, pParam);
-            _DoTraversalCB(pDG, pTmpNode,
+            errCode = _DoTraversalCB(pDG, pTmpNode,
                            searchMode, bFromTail,
                            pfnHandlerOwnPre,
                            pfnHandlerOwnPost,
@@ -1262,12 +1307,13 @@ static void _DoTraversalCB(VSC_DIRECTED_GRAPH* pDG,
                            pfnHandlerDescendantPost,
                            gcvNULL,
                            pParam);
+            CHECK_ERROR(errCode, "Faild to do traversal CB");
             SAFE_CALL_DG_NODE_HANDLER_CONTINUE(pfnHandlerDescendantPost, pTmpNode, pParam);
         }
 
         vscSRARR_Finalize(&unvisitedDescendantArray);
 
-        SAFE_CALL_DG_NODE_HANDLER_RETURN(pfnHandlerOwnPost, pNode, pParam);
+        SAFE_CALL_DG_NODE_HANDLER_RETURN_WITH_ERRCODE(pfnHandlerOwnPost, pNode, pParam);
     }
     else if (searchMode == VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_WIDE)
     {
@@ -1316,9 +1362,10 @@ static void _DoTraversalCB(VSC_DIRECTED_GRAPH* pDG,
     {
         gcmASSERT(gcvFALSE);
     }
+    return errCode;
 }
 
-void vscDG_TraversalCB(VSC_DIRECTED_GRAPH* pDG,
+VSC_ErrCode vscDG_TraversalCB(VSC_DIRECTED_GRAPH* pDG,
                        VSC_GRAPH_SEARCH_MODE searchMode,
                        gctBOOL bFromTail,
                        PFN_DG_NODE_HANLDER pfnHandlerStarter,
@@ -1332,6 +1379,7 @@ void vscDG_TraversalCB(VSC_DIRECTED_GRAPH* pDG,
     gctUINT                     i;
     VSC_DG_NODE*                pStartNode;
     VSC_SIMPLE_RESIZABLE_ARRAY* pStartNodeArray;
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
 
     searchMode = _ChooseImplementSearchMode(pDG, searchMode);
 
@@ -1352,7 +1400,7 @@ void vscDG_TraversalCB(VSC_DIRECTED_GRAPH* pDG,
         }
 
         /* Start iterately traversal */
-        _DoTraversalCB(pDG, pStartNode,
+        errCode = _DoTraversalCB(pDG, pStartNode,
                        searchMode, bFromTail,
                        pfnHandlerOwnPre,
                        pfnHandlerOwnPost,
@@ -1360,12 +1408,14 @@ void vscDG_TraversalCB(VSC_DIRECTED_GRAPH* pDG,
                        pfnHandlerDescendantPost,
                        pfnHandlerDFSEdgeOnRevisit,
                        pParam);
+        CHECK_ERROR(errCode, "Faild to do traversal CB");
 
         if (searchMode == VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_NARROW)
         {
             SAFE_CALL_DG_NODE_HANDLER_CONTINUE(pfnHandlerOwnPost, pStartNode, pParam);
         }
     }
+    return errCode;
 }
 
 /*
@@ -1379,6 +1429,12 @@ VSC_DG_ITERATOR* vscDG_ITERATOR_Create(VSC_DIRECTED_GRAPH* pDG,
     VSC_DG_ITERATOR*   pDGIterator = gcvNULL;
 
     pDGIterator = (VSC_DG_ITERATOR*)vscMM_Alloc(pDG->pMM, sizeof(VSC_DG_ITERATOR));
+    if (!pDGIterator)
+    {
+        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Fail to create DG iterator");
+        return gcvNULL;
+    }
+
     vscDG_ITERATOR_Initialize(pDGIterator, pDG, searchMode, traversalOrder, bFromTail);
 
     return pDGIterator;
@@ -1493,29 +1549,34 @@ VSC_DG_NODE* vscDG_ITERATOR_Begin(VSC_DG_ITERATOR* pDGIterator)
         gcmASSERT(pDGIterator->nodeTraversalStatus.dgNodeOrder.ppGNodeOrder == gcvNULL);
         pDGIterator->nodeTraversalStatus.dgNodeOrder.ppGNodeOrder = (VSC_DG_NODE**)vscMM_Alloc(pDGIterator->pDG->pMM,
                                           sizeof(VSC_DG_NODE*) * DGNLST_GET_NODE_COUNT(&pDGIterator->pDG->nodeList));
+        if (pDGIterator->nodeTraversalStatus.dgNodeOrder.ppGNodeOrder == gcvNULL)
+            return gcvNULL;
 
         pDGIterator->nodeTraversalStatus.dgNodeOrder.curIndex = 0;
         pDGIterator->nodeTraversalStatus.dgNodeOrder.totalCount = DGNLST_GET_NODE_COUNT(&pDGIterator->pDG->nodeList);
 
         if (pDGIterator->traversalOrder == VSC_GRAPH_TRAVERSAL_ORDER_PREV)
         {
-            vscDG_PreOrderTraversal(pDGIterator->pDG, VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_NARROW, pDGIterator->bFromTail,
-                                    gcvFALSE, pDGIterator->nodeTraversalStatus.dgNodeOrder.ppGNodeOrder);
+            if (vscDG_PreOrderTraversal(pDGIterator->pDG, VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_NARROW, pDGIterator->bFromTail,
+                                    gcvFALSE, pDGIterator->nodeTraversalStatus.dgNodeOrder.ppGNodeOrder) != VSC_ERR_NONE)
+                return gcvNULL;
         }
         else
         {
-            vscDG_PstOrderTraversal(pDGIterator->pDG, VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_NARROW, pDGIterator->bFromTail,
-                                    gcvTRUE, pDGIterator->nodeTraversalStatus.dgNodeOrder.ppGNodeOrder);
+            if (vscDG_PstOrderTraversal(pDGIterator->pDG, VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_NARROW, pDGIterator->bFromTail,
+                                    gcvTRUE, pDGIterator->nodeTraversalStatus.dgNodeOrder.ppGNodeOrder)  != VSC_ERR_NONE)
+                return gcvNULL;
         }
     }
 
     return vscDG_ITERATOR_Next(pDGIterator);
 }
 
-static void _DepthGreedyPushToStack(VSC_DG_ITERATOR* pDGIterator, VSC_DG_NODE* pStartNode)
+static VSC_ErrCode _DepthGreedyPushToStack(VSC_DG_ITERATOR* pDGIterator, VSC_DG_NODE* pStartNode)
 {
     VSC_DG_EDGE*                 pEdge = gcvNULL;
     VSC_ADJACENT_LIST*           pAdjList;
+    VSC_ErrCode                  errCode = VSC_ERR_NONE;
 
     pAdjList = (pDGIterator->bFromTail) ? &pStartNode->predList : &pStartNode->succList;
 
@@ -1530,16 +1591,19 @@ static void _DepthGreedyPushToStack(VSC_DG_ITERATOR* pDGIterator, VSC_DG_NODE* p
         if (!pEdge->pToNode->bVisited)
         {
             pEdge->pToNode->bVisited = gcvTRUE;
-            _PushStack(&pDGIterator->nodeTraversalStatus.dgNodeStack,
+            errCode = _PushStack(&pDGIterator->nodeTraversalStatus.dgNodeStack,
                                 pEdge->pToNode,
                                 pDGIterator->pDG->pMM);
+            CHECK_ERROR(errCode, "Failed to push stack");
 
-            _DepthGreedyPushToStack(pDGIterator, pEdge->pToNode);
+            errCode = _DepthGreedyPushToStack(pDGIterator, pEdge->pToNode);
+            CHECK_ERROR(errCode, "Failed to push stack");
 
             /* Every time, we always greedy push one unvisited node path to stack */
             break;
         }
     }
+    return errCode;
 }
 
 VSC_DG_NODE* vscDG_ITERATOR_Next(VSC_DG_ITERATOR* pDGIterator)
@@ -1566,9 +1630,13 @@ VSC_DG_NODE* vscDG_ITERATOR_Next(VSC_DG_ITERATOR* pDGIterator)
                                                                  pDGIterator->curIndexOfRootTailArray ++);
 
                 pStartNode->bVisited = gcvTRUE;
-                _PushStack(&pDGIterator->nodeTraversalStatus.dgNodeStack,
+                if (_PushStack(&pDGIterator->nodeTraversalStatus.dgNodeStack,
                                    pStartNode,
-                                   pDGIterator->pDG->pMM);
+                                   pDGIterator->pDG->pMM) != VSC_ERR_NONE)
+                {
+                    ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Failed to push stack");
+                    return gcvNULL;
+                }
 
                 /* Preorder just always return current node after it is pushed into stack */
                 if (pDGIterator->traversalOrder == VSC_GRAPH_TRAVERSAL_ORDER_PREV)
@@ -1577,7 +1645,11 @@ VSC_DG_NODE* vscDG_ITERATOR_Next(VSC_DG_ITERATOR* pDGIterator)
                 }
                 else
                 {
-                    _DepthGreedyPushToStack(pDGIterator, pStartNode);
+                    if (_DepthGreedyPushToStack(pDGIterator, pStartNode) != VSC_ERR_NONE)
+                    {
+                        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Failed to push stack");
+                        return gcvNULL;
+                    }
                     return _PopStack(&pDGIterator->nodeTraversalStatus.dgNodeStack,
                                              pDGIterator->pDG->pMM);
                 }
@@ -1599,9 +1671,13 @@ VSC_DG_NODE* vscDG_ITERATOR_Next(VSC_DG_ITERATOR* pDGIterator)
                 if (!pEdge->pToNode->bVisited)
                 {
                     pEdge->pToNode->bVisited = gcvTRUE;
-                    _PushStack(&pDGIterator->nodeTraversalStatus.dgNodeStack,
-                                       pEdge->pToNode,
-                                       pDGIterator->pDG->pMM);
+                    if (_PushStack(&pDGIterator->nodeTraversalStatus.dgNodeStack,
+                                   pEdge->pToNode,
+                                   pDGIterator->pDG->pMM) != VSC_ERR_NONE)
+                    {
+                        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Failed to push stack");
+                        return gcvNULL;
+                    }
 
                     /* Preorder just always return current node after it is pushed into stack */
                     if (pDGIterator->traversalOrder == VSC_GRAPH_TRAVERSAL_ORDER_PREV)
@@ -1610,7 +1686,11 @@ VSC_DG_NODE* vscDG_ITERATOR_Next(VSC_DG_ITERATOR* pDGIterator)
                     }
                     else
                     {
-                        _DepthGreedyPushToStack(pDGIterator, pEdge->pToNode);
+                        if (_DepthGreedyPushToStack(pDGIterator, pEdge->pToNode) != VSC_ERR_NONE)
+                        {
+                            ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Failed to push stack");
+                            return gcvNULL;
+                        }
                         break;
                     }
                 }

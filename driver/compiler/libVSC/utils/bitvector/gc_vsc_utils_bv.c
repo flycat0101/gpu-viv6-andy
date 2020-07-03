@@ -15,12 +15,12 @@
 
 #define VSC_DEBUG_MEM 0
 
-void vscBV_Initialize(VSC_BIT_VECTOR* pBV, VSC_MM* pMM, gctINT bvSize)
+VSC_ErrCode vscBV_Initialize(VSC_BIT_VECTOR* pBV, VSC_MM* pMM, gctINT bvSize)
 {
     if (pMM == gcvNULL && bvSize <= 0)
     {
         memset(pBV, 0, sizeof(VSC_BIT_VECTOR));
-        return;
+        return VSC_ERR_NONE;
     }
 
     /* Force to safe size */
@@ -40,7 +40,7 @@ void vscBV_Initialize(VSC_BIT_VECTOR* pBV, VSC_MM* pMM, gctINT bvSize)
         if (pBV->pBits == gcvNULL)
         {
             gcmASSERT(gcvFALSE);
-            return;
+            return VSC_ERR_OUT_OF_MEMORY;
         }
         else
         {
@@ -53,6 +53,7 @@ void vscBV_Initialize(VSC_BIT_VECTOR* pBV, VSC_MM* pMM, gctINT bvSize)
 #endif
         }
     }
+    return VSC_ERR_NONE;
 }
 
 VSC_BIT_VECTOR* vscBV_Create(VSC_MM* pMM, gctINT bvSize)
@@ -60,8 +61,11 @@ VSC_BIT_VECTOR* vscBV_Create(VSC_MM* pMM, gctINT bvSize)
     VSC_BIT_VECTOR*   pBV = gcvNULL;
 
     pBV = (VSC_BIT_VECTOR*)vscMM_Alloc(pMM, sizeof(VSC_BIT_VECTOR));
+    if (!pBV)
+        return gcvNULL;
 
-    vscBV_Initialize(pBV, pMM, bvSize);
+    if (vscBV_Initialize(pBV, pMM, bvSize) != VSC_ERR_NONE)
+        return gcvNULL;
 
     return pBV;
 }
