@@ -225,17 +225,28 @@ static VSC_ErrCode _InitializeForwardIterativeMsDFAPerFunc(VIR_FUNC_BLOCK* pFunc
 
     /* Get RPO of CFG */
     pppBasicBlkRPO[pFuncBlk->dgNode.id] = (VIR_BASIC_BLOCK**)vscMM_Alloc(pMsDFA->baseDFA.pMM, sizeof(VIR_BASIC_BLOCK*)*countOfBasicBlk);
-    vscDG_PstOrderTraversal(&pCFG->dgGraph,
+    if (pppBasicBlkRPO[pFuncBlk->dgNode.id] == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        CHECK_ERROR(errCode, "Initialize Forward Iterative Ms DFA");
+    }
+    errCode = vscDG_PstOrderTraversal(&pCFG->dgGraph,
                             VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                             gcvFALSE,
                             gcvTRUE,
                             (VSC_DG_NODE**)pppBasicBlkRPO[pFuncBlk->dgNode.id]);
+    CHECK_ERROR(errCode, "Initialize Forward Iterative Ms DFA");
 
     /* Allocate workitem array corresponding basic block. Note as iterative analyzer will use id of
        basicblk to index workitem, history node count will be used to allocate these contents */
     ppWorkItemArray[pFuncBlk->dgNode.id] = (VIR_BB_WORKITEM*)vscMM_Alloc(pMsDFA->baseDFA.pMM,
                                                                          sizeof(VIR_BB_WORKITEM)*
                                                                          vscDG_GetHistNodeCount(&pCFG->dgGraph));
+    if (ppWorkItemArray[pFuncBlk->dgNode.id] == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        CHECK_ERROR(errCode, "Initialize Forward Iterative Ms DFA");
+    }
 
     /* Deference */
     pThisWorkItemArray = ppWorkItemArray[pFuncBlk->dgNode.id];
@@ -481,17 +492,28 @@ static VSC_ErrCode _InitializeBackwardIterativeMsDFAPerFunc(VIR_FUNC_BLOCK* pFun
 
     /* Get RPO of reversed CFG */
     pppBasicBlkRPO[pFuncBlk->dgNode.id] = (VIR_BASIC_BLOCK**)vscMM_Alloc(pMsDFA->baseDFA.pMM, sizeof(VIR_BASIC_BLOCK*)*countOfBasicBlk);
-    vscDG_PstOrderTraversal(&pCFG->dgGraph,
+    if (pppBasicBlkRPO[pFuncBlk->dgNode.id] == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        CHECK_ERROR(errCode, "Initialize Backward Iterative Ms DFA");
+    }
+    errCode = vscDG_PstOrderTraversal(&pCFG->dgGraph,
                             VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                             gcvTRUE,
                             gcvTRUE,
                             (VSC_DG_NODE**)pppBasicBlkRPO[pFuncBlk->dgNode.id]);
+    CHECK_ERROR(errCode, "Initialize Backward Iterative Ms DFA");
 
     /* Allocate workitem array corresponding basic block. Note as iterative analyzer will use id of
        basicblk to index workitem, history node count will be used to allocate these contents */
     ppWorkItemArray[pFuncBlk->dgNode.id] = (VIR_BB_WORKITEM*)vscMM_Alloc(pMsDFA->baseDFA.pMM,
                                                                          sizeof(VIR_BB_WORKITEM)*
                                                                          vscDG_GetHistNodeCount(&pCFG->dgGraph));
+    if (ppWorkItemArray[pFuncBlk->dgNode.id] == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        CHECK_ERROR(errCode, "Initialize Backward Iterative Ms DFA");
+    }
 
     /* Deference */
     pThisWorkItemArray = ppWorkItemArray[pFuncBlk->dgNode.id];
@@ -713,12 +735,12 @@ static void _FinalizeBackwardIterativeMsDFAPerFunc(VIR_FUNC_BLOCK* pFuncBlk,
 VSC_ErrCode vscVIR_DoForwardIterativeMsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_MS_DFA* pMsDFA, gctBOOL bIPA)
 {
     VSC_ErrCode             errCode  = VSC_ERR_NONE;
-    VIR_FUNC_BLOCK**        ppFuncBlkRPO;
+    VIR_FUNC_BLOCK**        ppFuncBlkRPO = gcvNULL;
     gctUINT                 countOfFuncBlk = vscDG_GetNodeCount(&pCg->dgGraph);
     gctUINT                 funcIdx;
-    VIR_BB_WORKITEM**       ppWorkItemArray;
-    VIR_BB_WORKLIST*        pWorkItemList;
-    VIR_BASIC_BLOCK***      pppBasicBlkRPO;
+    VIR_BB_WORKITEM**       ppWorkItemArray = gcvNULL;
+    VIR_BB_WORKLIST*        pWorkItemList = gcvNULL;
+    VIR_BASIC_BLOCK***      pppBasicBlkRPO = gcvNULL;
     gctBOOL                 bFlowChangedInFunc = gcvTRUE;
 
     if (countOfFuncBlk == 0)
@@ -728,19 +750,41 @@ VSC_ErrCode vscVIR_DoForwardIterativeMsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_MS_DFA*
 
     /* Get RPO of call graph */
     ppFuncBlkRPO = (VIR_FUNC_BLOCK**)vscMM_Alloc(pMsDFA->baseDFA.pMM, sizeof(VIR_FUNC_BLOCK*)*countOfFuncBlk);
-    vscDG_PstOrderTraversal(&pCg->dgGraph,
+    if (!ppFuncBlkRPO)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        goto On_Error;
+    }
+    errCode = vscDG_PstOrderTraversal(&pCg->dgGraph,
                             VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                             gcvFALSE,
                             gcvTRUE,
                             (VSC_DG_NODE**)ppFuncBlkRPO);
+    if (errCode != VSC_ERR_NONE)
+        goto On_Error;
 
     /* Create shader-wide working list */
     ppWorkItemArray = (VIR_BB_WORKITEM**)vscMM_Alloc(pMsDFA->baseDFA.pMM, sizeof(VIR_BB_WORKITEM*) *
                                                      vscDG_GetHistNodeCount(&pCg->dgGraph));
+    if (!ppWorkItemArray)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        goto On_Error;
+    }
     pWorkItemList = (VIR_BB_WORKLIST*)vscMM_Alloc(pMsDFA->baseDFA.pMM, sizeof(VIR_BB_WORKLIST) *
                                                      vscDG_GetHistNodeCount(&pCg->dgGraph));
+    if (!pWorkItemList)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        goto On_Error;
+    }
     pppBasicBlkRPO = (VIR_BASIC_BLOCK***)vscMM_Alloc(pMsDFA->baseDFA.pMM, sizeof(VIR_BASIC_BLOCK**) *
                                                      vscDG_GetHistNodeCount(&pCg->dgGraph));
+    if (!pppBasicBlkRPO)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        goto On_Error;
+    }
 
     /* Initialize DFA per func */
     for (funcIdx = 0; funcIdx < countOfFuncBlk; funcIdx ++)
@@ -779,19 +823,24 @@ VSC_ErrCode vscVIR_DoForwardIterativeMsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_MS_DFA*
     };
 
 On_Error:
-
-    /* Finalize DFA per func */
-    for (funcIdx = 0; funcIdx < countOfFuncBlk; funcIdx ++)
+    if (ppFuncBlkRPO)
     {
-        _FinalizeForwardIterativeMsDFAPerFunc(ppFuncBlkRPO[funcIdx], pMsDFA,
-                                              ppWorkItemArray, pWorkItemList,
-                                              pppBasicBlkRPO);
-    }
+        /* Finalize DFA per func */
+        for (funcIdx = 0; funcIdx < countOfFuncBlk; funcIdx ++)
+        {
+            _FinalizeForwardIterativeMsDFAPerFunc(ppFuncBlkRPO[funcIdx], pMsDFA,
+                                                  ppWorkItemArray, pWorkItemList,
+                                                  pppBasicBlkRPO);
+        }
 
-    vscMM_Free(pMsDFA->baseDFA.pMM, ppFuncBlkRPO);
-    vscMM_Free(pMsDFA->baseDFA.pMM, ppWorkItemArray);
-    vscMM_Free(pMsDFA->baseDFA.pMM, pWorkItemList);
-    vscMM_Free(pMsDFA->baseDFA.pMM, pppBasicBlkRPO);
+        vscMM_Free(pMsDFA->baseDFA.pMM, ppFuncBlkRPO);
+    }
+    if (ppWorkItemArray)
+        vscMM_Free(pMsDFA->baseDFA.pMM, ppWorkItemArray);
+    if (pWorkItemList)
+        vscMM_Free(pMsDFA->baseDFA.pMM, pWorkItemList);
+    if (pppBasicBlkRPO)
+        vscMM_Free(pMsDFA->baseDFA.pMM, pppBasicBlkRPO);
 
     return errCode;
 }
@@ -799,12 +848,12 @@ On_Error:
 VSC_ErrCode vscVIR_DoBackwardIterativeMsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_MS_DFA* pMsDFA, gctBOOL bIPA)
 {
     VSC_ErrCode             errCode  = VSC_ERR_NONE;
-    VIR_FUNC_BLOCK**        ppFuncBlkRPO;
+    VIR_FUNC_BLOCK**        ppFuncBlkRPO = gcvNULL;
     gctUINT                 countOfFuncBlk = vscDG_GetNodeCount(&pCg->dgGraph);
     gctUINT                 funcIdx;
-    VIR_BB_WORKITEM**       ppWorkItemArray;
-    VIR_BB_WORKLIST*        pWorkItemList;
-    VIR_BASIC_BLOCK***      pppBasicBlkRPO;
+    VIR_BB_WORKITEM**       ppWorkItemArray = gcvNULL;
+    VIR_BB_WORKLIST*        pWorkItemList = gcvNULL;
+    VIR_BASIC_BLOCK***      pppBasicBlkRPO = gcvNULL;
     gctBOOL                 bFlowChangedInFunc = gcvTRUE;
 
     if (countOfFuncBlk == 0)
@@ -814,19 +863,41 @@ VSC_ErrCode vscVIR_DoBackwardIterativeMsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_MS_DFA
 
     /* Get RPO of reverse call graph */
     ppFuncBlkRPO = (VIR_FUNC_BLOCK**)vscMM_Alloc(pMsDFA->baseDFA.pMM, sizeof(VIR_FUNC_BLOCK*)*countOfFuncBlk);
-    vscDG_PstOrderTraversal(&pCg->dgGraph,
+    if (!ppFuncBlkRPO)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        goto On_Error;
+    }
+    errCode = vscDG_PstOrderTraversal(&pCg->dgGraph,
                             VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                             gcvTRUE,
                             gcvTRUE,
                             (VSC_DG_NODE**)ppFuncBlkRPO);
+    if (errCode != VSC_ERR_NONE)
+        goto On_Error;
 
     /* Create shader-wide working list */
     ppWorkItemArray = (VIR_BB_WORKITEM**)vscMM_Alloc(pMsDFA->baseDFA.pMM, sizeof(VIR_BB_WORKITEM*) *
                                                      vscDG_GetHistNodeCount(&pCg->dgGraph));
+    if (!ppWorkItemArray)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        goto On_Error;
+    }
     pWorkItemList = (VIR_BB_WORKLIST*)vscMM_Alloc(pMsDFA->baseDFA.pMM, sizeof(VIR_BB_WORKLIST) *
                                                      vscDG_GetHistNodeCount(&pCg->dgGraph));
+    if (!pWorkItemList)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        goto On_Error;
+    }
     pppBasicBlkRPO = (VIR_BASIC_BLOCK***)vscMM_Alloc(pMsDFA->baseDFA.pMM, sizeof(VIR_BASIC_BLOCK**) *
                                                      vscDG_GetHistNodeCount(&pCg->dgGraph));
+    if (!pppBasicBlkRPO)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        goto On_Error;
+    }
 
     /* Initialize DFA per func */
     for (funcIdx = 0; funcIdx < countOfFuncBlk; funcIdx ++)
@@ -865,19 +936,24 @@ VSC_ErrCode vscVIR_DoBackwardIterativeMsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_MS_DFA
     };
 
 On_Error:
-
-    /* Finalize DFA per func */
-    for (funcIdx = 0; funcIdx < countOfFuncBlk; funcIdx ++)
+    if (ppFuncBlkRPO)
     {
-        _FinalizeBackwardIterativeMsDFAPerFunc(ppFuncBlkRPO[funcIdx], pMsDFA,
-                                               ppWorkItemArray, pWorkItemList,
-                                               pppBasicBlkRPO);
-    }
+        /* Finalize DFA per func */
+        for (funcIdx = 0; funcIdx < countOfFuncBlk; funcIdx ++)
+        {
+            _FinalizeBackwardIterativeMsDFAPerFunc(ppFuncBlkRPO[funcIdx], pMsDFA,
+                                                   ppWorkItemArray, pWorkItemList,
+                                                   pppBasicBlkRPO);
+        }
 
-    vscMM_Free(pMsDFA->baseDFA.pMM, ppFuncBlkRPO);
-    vscMM_Free(pMsDFA->baseDFA.pMM, ppWorkItemArray);
-    vscMM_Free(pMsDFA->baseDFA.pMM, pWorkItemList);
-    vscMM_Free(pMsDFA->baseDFA.pMM, pppBasicBlkRPO);
+        vscMM_Free(pMsDFA->baseDFA.pMM, ppFuncBlkRPO);
+    }
+    if (ppWorkItemArray)
+        vscMM_Free(pMsDFA->baseDFA.pMM, ppWorkItemArray);
+    if (pWorkItemList)
+        vscMM_Free(pMsDFA->baseDFA.pMM, pWorkItemList);
+    if (pppBasicBlkRPO)
+        vscMM_Free(pMsDFA->baseDFA.pMM, pppBasicBlkRPO);
 
     return errCode;
 }

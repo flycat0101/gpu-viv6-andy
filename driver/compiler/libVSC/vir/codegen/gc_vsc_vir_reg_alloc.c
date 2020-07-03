@@ -6691,12 +6691,12 @@ VSC_ErrCode _VIR_RA_LS_BuildLRTable(
             VIR_RA_LS_GetMM(pRA),
             sizeof(VIR_BASIC_BLOCK*)*countOfBasicBlk);
 
-        vscDG_PstOrderTraversal(&pCfg->dgGraph,
+        retValue = vscDG_PstOrderTraversal(&pCfg->dgGraph,
                                 VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                                 gcvTRUE,
                                 gcvTRUE,
                                 (VSC_DG_NODE**)ppBasicBlkRPO);
-
+        CHECK_ERROR(retValue, "vscDG_PstOrderTraversal");
 
         for (bbIdx = 0; bbIdx < countOfBasicBlk; bbIdx ++)
         {
@@ -13403,11 +13403,12 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
             ppFuncBlkRPO = (VIR_FUNC_BLOCK**)vscMM_Alloc(
                                             VIR_RA_LS_GetMM(&ra),
                                             sizeof(VIR_FUNC_BLOCK*)*countOfFuncBlk);
-            vscDG_PstOrderTraversal(&pCG->dgGraph,
+            retValue = vscDG_PstOrderTraversal(&pCG->dgGraph,
                                     VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                                     gcvFALSE,
                                     gcvTRUE,
                                     (VSC_DG_NODE**)ppFuncBlkRPO);
+            ON_ERROR(retValue, "vscDG_PstOrderTraversal");
 
             /* we have a loop here for serveral rounds of assigning color
                first round - no spill (i.e., no reserved register), if not succeed,

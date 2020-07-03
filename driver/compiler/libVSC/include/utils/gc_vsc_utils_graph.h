@@ -295,6 +295,15 @@ typedef void    (*PFN_DG_EDGE_HANLDER)(VSC_DIRECTED_GRAPH* pDG, VSC_DG_EDGE* pEd
         }                                                                \
     }
 
+#define SAFE_CALL_DG_NODE_HANDLER_RETURN_WITH_ERRCODE(dgNodeHandler, pNode, pParam)   \
+    if ((dgNodeHandler))                                                 \
+    {                                                                    \
+        if ((dgNodeHandler)(pDG, (pNode), (pParam)))                     \
+        {                                                                \
+            return errCode;                                              \
+        }                                                                \
+    }
+
 #define SAFE_CALL_DG_NODE_HANDLER_CONTINUE(dgNodeHandler, pNode, pParam) \
     if ((dgNodeHandler))                                                 \
     {                                                                    \
@@ -375,12 +384,12 @@ gctUINT vscDG_GetTailCount(VSC_DIRECTED_GRAPH* pDG);
 
 /* ppRetNodeOrder must be allocated with node count of graph which can be got from nodeList.info.count.
    This returned node order is what requested order */
-void vscDG_PreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
+VSC_ErrCode vscDG_PreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
                              VSC_GRAPH_SEARCH_MODE searchMode,
                              gctBOOL bFromTail,
                              gctBOOL bReverseResult,
                              VSC_DG_NODE** ppRetNodeOrder);
-void vscDG_PstOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
+VSC_ErrCode vscDG_PstOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
                              VSC_GRAPH_SEARCH_MODE searchMode,
                              gctBOOL bFromTail,
                              gctBOOL bReverseResult,
@@ -388,7 +397,7 @@ void vscDG_PstOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
 
 /* This function won't return node order to user, instead, user can pass into 5 handlers to process
    node when node is accessing */
-void vscDG_TraversalCB(VSC_DIRECTED_GRAPH* pDG,
+VSC_ErrCode vscDG_TraversalCB(VSC_DIRECTED_GRAPH* pDG,
                        VSC_GRAPH_SEARCH_MODE searchMode,
                        gctBOOL bFromTail,
                        PFN_DG_NODE_HANLDER pfnHandlerStarter,

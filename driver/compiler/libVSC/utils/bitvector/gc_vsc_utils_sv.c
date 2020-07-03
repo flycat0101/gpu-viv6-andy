@@ -13,14 +13,14 @@
 
 #include "gc_vsc.h"
 
-void vscSV_Initialize(VSC_STATE_VECTOR* pSV, VSC_MM* pMM, gctINT svSize, gctUINT stateCount)
+VSC_ErrCode vscSV_Initialize(VSC_STATE_VECTOR* pSV, VSC_MM* pMM, gctINT svSize, gctUINT stateCount)
 {
     gctINT bvIdx;
 
     if (pMM == gcvNULL && svSize <= 0)
     {
         memset(pSV, 0, sizeof(VSC_STATE_VECTOR));
-        return;
+        return VSC_ERR_NONE;
     }
 
     /* Force to safe sv size */
@@ -47,7 +47,7 @@ void vscSV_Initialize(VSC_STATE_VECTOR* pSV, VSC_MM* pMM, gctINT svSize, gctUINT
         if (pSV->pBVs == gcvNULL)
         {
             gcmASSERT(gcvFALSE);
-            return;
+            return VSC_ERR_OUT_OF_MEMORY;
         }
         else
         {
@@ -59,6 +59,7 @@ void vscSV_Initialize(VSC_STATE_VECTOR* pSV, VSC_MM* pMM, gctINT svSize, gctUINT
             vscBV_Initialize(&pSV->pBVs[bvIdx], pMM, svSize);
         }
     }
+    return VSC_ERR_NONE;
 }
 
 VSC_STATE_VECTOR* vscSV_Create(VSC_MM* pMM, gctINT svSize, gctUINT stateCount)
@@ -66,8 +67,11 @@ VSC_STATE_VECTOR* vscSV_Create(VSC_MM* pMM, gctINT svSize, gctUINT stateCount)
     VSC_STATE_VECTOR*   pSV = gcvNULL;
 
     pSV = (VSC_STATE_VECTOR*)vscMM_Alloc(pMM, sizeof(VSC_STATE_VECTOR));
+    if (!pSV)
+        return gcvNULL;
 
-    vscSV_Initialize(pSV, pMM, svSize, stateCount);
+    if (vscSV_Initialize(pSV, pMM, svSize, stateCount) != VSC_ERR_NONE)
+        return gcvNULL;
 
     return pSV;
 }

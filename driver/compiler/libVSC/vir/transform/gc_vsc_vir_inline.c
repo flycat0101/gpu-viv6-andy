@@ -952,11 +952,12 @@ VSC_ErrCode VSC_IL_OptimizeCallStackDepth(
         sizeof(VIR_FUNC_BLOCK*)*countOfFuncBlk);
 
     /* bottom up traverse of the call graph */
-    vscDG_PstOrderTraversal(&pCG->dgGraph,
+    CHECK_ERROR0(vscDG_PstOrderTraversal(&pCG->dgGraph,
                             VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                             gcvTRUE,
                             gcvTRUE,
-                            (VSC_DG_NODE**)ppFuncBlkRPO);
+                            (VSC_DG_NODE**)ppFuncBlkRPO));
+
 
     for (funcIdx = 0; funcIdx < countOfFuncBlk; funcIdx ++)
     {
@@ -1036,11 +1037,11 @@ VSC_ErrCode VSC_IL_TopDownInline(
     ppFuncBlkRPO = (VIR_FUNC_BLOCK**)vscMM_Alloc(VSC_IL_GetMM(pInliner),
         sizeof(VIR_FUNC_BLOCK*)*countOfFuncBlk);
 
-    vscDG_PstOrderTraversal(&pCG->dgGraph,
+    CHECK_ERROR0(vscDG_PstOrderTraversal(&pCG->dgGraph,
                             VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                             gcvFALSE,
                             gcvTRUE,
-                            (VSC_DG_NODE**)ppFuncBlkRPO);
+                            (VSC_DG_NODE**)ppFuncBlkRPO));
 
     /* Seperate the hueristic with the transformation */
 
@@ -1120,11 +1121,11 @@ VSC_ErrCode VSC_IL_TopDownInline(
         VIR_CG_EDGE*                 pEdge;
 
         /* from bottom up to perform inline */
-        vscDG_PstOrderTraversal(&pCG->dgGraph,
+        CHECK_ERROR0(vscDG_PstOrderTraversal(&pCG->dgGraph,
                                 VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                                 gcvTRUE,
                                 gcvTRUE,
-                                (VSC_DG_NODE**)ppFuncBlkRPO);
+                                (VSC_DG_NODE**)ppFuncBlkRPO));
 
         /* 1. select the inline candidates into the worklist */
         for (funcIdx = 0; funcIdx < countOfFuncBlk; funcIdx ++)

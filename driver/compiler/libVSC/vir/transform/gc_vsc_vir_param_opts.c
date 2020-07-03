@@ -1309,6 +1309,10 @@ VSC_ErrCode _VSC_SIMP_SelectCandidateFunction(
 
     paramIdList = &function->paramters;
     longSizeParameters = vscSRARR_Create(pPassWorker->basePassWorker.pMM, 0, sizeof(LONG_SIZE_PARAMETER), gcvNULL);
+    if (!longSizeParameters)
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
     candidateFunc.functionBlock = functionBlock;
     candidateFunc.longSizeParams = longSizeParameters;
     /*Iterate through function's parameter list to get parameter size.*/
@@ -1680,11 +1684,13 @@ VSC_ErrCode VIR_PARAM_Optimization_PerformOnShader(
     ppFuncBlkRPO = (VIR_FUNC_BLOCK**)vscMM_Alloc(pPassWorker->basePassWorker.pMM,
         sizeof(VIR_FUNC_BLOCK*)*countOfFuncBlk);
 
-    vscDG_PstOrderTraversal(&pCG->dgGraph,
+    errCode = vscDG_PstOrderTraversal(&pCG->dgGraph,
                             VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                             gcvFALSE,
                             gcvTRUE,
                             (VSC_DG_NODE**)ppFuncBlkRPO);
+    if (errCode != VSC_ERR_NONE)
+        return errCode;
     /*Select all optimizable functions.*/
     for (funcIdx = 0; funcIdx < countOfFuncBlk; funcIdx ++)
     {
@@ -1696,7 +1702,7 @@ VSC_ErrCode VIR_PARAM_Optimization_PerformOnShader(
         if (pEdge != gcvNULL)
         {
             errCode = _VSC_SIMP_SelectCandidateFunction(pPassWorker, shader, SymTable, pFuncBlk, paramOptimizer);
-            if(errCode)
+            if(errCode != VSC_ERR_NONE)
             {
                 return errCode;
             }
@@ -1846,6 +1852,8 @@ VSC_ErrCode VSC_PARAM_Optimization_PerformOnShader(
         vscSRARR_Create(pPassWorker->basePassWorker.pMM, 0, sizeof(CANDIDATE_FUNCTION), gcvNULL);
     VSC_SIMPLE_RESIZABLE_ARRAY *longSizeArguments =
         vscSRARR_Create(pPassWorker->basePassWorker.pMM, 0, sizeof(LONG_SIZE_ARGUMENT), gcvNULL);
+    if (!candidateFuncs || !longSizeArguments)
+        return VSC_ERR_OUT_OF_MEMORY;
 
     if(!VSC_OPTN_InRange(VIR_Shader_GetId(shader), VSC_OPTN_ParamOptOptions_GetBeforeShader(paramOptsOptions),
         VSC_OPTN_ParamOptOptions_GetAfterShader(paramOptsOptions)))
