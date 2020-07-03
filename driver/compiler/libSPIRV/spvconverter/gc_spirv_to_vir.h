@@ -58,6 +58,27 @@
         spvFree(gcvNULL, oldPtr); \
     }
 
+#define SPV_CHECK_DYNAMIC_SIZE1(memPool, ptr, ptrtype, size, testsize, pagesize) \
+    if ((size) <= 0) \
+    { \
+        gctUINT pages = 1 + (testsize) / (pagesize); \
+        (size) = (pages * (pagesize)); \
+        if (gcmIS_ERROR(spvAllocate((memPool), (size) * gcmSIZEOF(ptrtype), (gctPOINTER *)(&(ptr))))) \
+            return gcvSTATUS_OUT_OF_MEMORY; \
+        gcoOS_ZeroMemory((ptr), (size) * gcmSIZEOF(ptrtype)); \
+    } \
+    else if ((testsize) >= (size)) \
+    { \
+        gctUINT pages = 1 + (((testsize) - (size))) / (pagesize); \
+        ptrtype* oldPtr = (ptr); \
+        (size) += (pages * (pagesize)); \
+        if (gcmIS_ERROR(spvAllocate((memPool), (size) * gcmSIZEOF(ptrtype), (gctPOINTER *)(&(ptr))))) \
+            return gcvSTATUS_OUT_OF_MEMORY; \
+        gcoOS_ZeroMemory((ptr), (size) * gcmSIZEOF(ptrtype)); \
+        gcoOS_MemCopy((ptr), oldPtr, ((size) - pages * (pagesize)) * gcmSIZEOF(ptrtype)); \
+        spvFree(gcvNULL, oldPtr); \
+    }
+
 #define SPV_CHECK_FUNC_CALLER(spv, id) \
     { \
         SPV_CHECK_DYNAMIC_SIZE( spv->spvMemPool, \
@@ -283,6 +304,21 @@
             gctUINT i = 0; \
             gctUINT oldSize = spv->idDescSize; \
             SPV_CHECK_DYNAMIC_SIZE(spv->spvMemPool, spv->idDescriptor, SpvCovIDDescriptor, spv->idDescSize, id, SPV_DESCRIPTOR_PAGESIZE); \
+            for (i = oldSize; i < spv->idDescSize; i++) \
+            { \
+                spv->idDescriptor[i].idType = SPV_ID_TYPE_UNKNOWN;\
+                spv->idDescriptor[i].virNameId = VIR_INVALID_ID; \
+                spv->idDescriptor[i].virTypeId = VIR_TYPE_UNKNOWN; \
+                gcoOS_MemFill(&spv->idDescriptor[i].interfaceFlag, 0xFF, gcmSIZEOF(SpvInterfaceFlag)); \
+            } \
+        }
+
+#define SPV_CHECK_IDDESCRIPTOR1(spv, id) \
+        if (id >= spv->idDescSize) \
+        { \
+            gctUINT i = 0; \
+            gctUINT oldSize = spv->idDescSize; \
+            SPV_CHECK_DYNAMIC_SIZE1(spv->spvMemPool, spv->idDescriptor, SpvCovIDDescriptor, spv->idDescSize, id, SPV_DESCRIPTOR_PAGESIZE); \
             for (i = oldSize; i < spv->idDescSize; i++) \
             { \
                 spv->idDescriptor[i].idType = SPV_ID_TYPE_UNKNOWN;\
