@@ -95,7 +95,7 @@ typedef struct __GLimageUserRec
 extern "C" {
 #endif
 
-extern GLuint __glGenerateNames(__GLcontext *gc, __GLsharedObjectMachine *shared, GLsizei range);
+extern GLint __glGenerateNames(__GLcontext *gc, __GLsharedObjectMachine *shared, GLsizei range);
 extern GLboolean __glIsNameDefined(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint id);
 extern GLvoid __glDeleteNamesFrList(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint id, GLsizei n);
 extern __GLobjItem **__glLookupObjectItem(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint id);

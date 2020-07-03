@@ -1159,12 +1159,14 @@ gcChipPatchClaimIndexMemory (
         /* Free previous buffer */
         if (chipCtx->tempIndexBuffer != gcvNULL)
         {
-            (*gc->imports.free)(0, chipCtx->tempIndexBuffer);
+            gcmOS_SAFE_FREE(gcvNULL, chipCtx->tempIndexBuffer);
         }
 
         /* Reallocate buffer */
-        chipCtx->tempIndexBuffer = (*gc->imports.malloc)(gc, size);
-        chipCtx->tempIndexBufferSize = size;
+        if (gcmIS_SUCCESS(gcoOS_Allocate(gcvNULL, size, (gctPOINTER *)&chipCtx->tempIndexBuffer)))
+        {
+            chipCtx->tempIndexBufferSize = size;
+        }
     }
 
     gcmFOOTER_ARG("buffer=0x%x bufferSize=%u", chipCtx->tempIndexBuffer, chipCtx->tempIndexBufferSize);
@@ -3959,6 +3961,7 @@ gcChipPatchFreeTmpAttibMem(
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     gctUINT i;
+    gctPOINTER pointer;
 
     /* Header */
     gcmHEADER_ARG("gc=0x%x", gc);
@@ -3974,7 +3977,8 @@ gcChipPatchFreeTmpAttibMem(
 
         if (attrPtr->tempMemory != gcvNULL)
         {
-            (*gc->imports.free)(0, (gctPOINTER)attrPtr->tempMemory);
+            pointer = (gctPOINTER)attrPtr->tempMemory;
+            gcmOS_SAFE_FREE(gcvNULL, pointer);
             attrPtr->tempMemory = gcvNULL;
         }
     }

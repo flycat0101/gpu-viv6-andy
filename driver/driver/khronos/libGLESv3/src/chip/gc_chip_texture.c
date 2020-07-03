@@ -2792,7 +2792,7 @@ __glChipDeleteTexture(
             mipLevel->astcData = gcvNULL;
         }
     }
-    gc->imports.free(gc, texInfo->mipLevels);
+    gcmOS_SAFE_FREE(gcvNULL, texInfo->mipLevels);
     texInfo->mipLevels = gcvNULL;
 
 
@@ -2847,7 +2847,7 @@ __glChipDeleteTexture(
     }
 #endif
 
-    gc->imports.free(gc, texObj->privateData);
+    gcmOS_SAFE_FREE(gcvNULL, texObj->privateData);
     texObj->privateData = gcvNULL;
 
     gcmFOOTER_NO();
@@ -2912,7 +2912,7 @@ __glChipDetachTexture(
         gcChipDetachSurface(gc, chipCtx, surfList, surfCount);
     }
 
-    (*gc->imports.free)(gc, surfList);
+    gcmOS_SAFE_FREE(gcvNULL, surfList);
 
     gcmFOOTER_NO();
     return;

@@ -299,7 +299,7 @@ __glChipDetachDrawable(
         gcChipDetachSurface(gc, chipCtx, surfList, surfCount);
     }
 
-    (*gc->imports.free)(gc, surfList);
+    gcmOS_SAFE_FREE(gcvNULL, surfList);
 
     gcmFOOTER_NO();
     return;

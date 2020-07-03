@@ -2158,7 +2158,7 @@ __glChipDeleteRenderbuffer(
             chipRBO->shadow.surface  = gcvNULL;
         }
 
-        (gc->imports.free)(NULL, chipRBO);
+        gcmOS_SAFE_FREE(gcvNULL, chipRBO);
         rbo->privateData = NULL;
     }
 

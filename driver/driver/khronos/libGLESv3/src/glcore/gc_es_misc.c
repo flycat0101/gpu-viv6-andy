@@ -619,7 +619,7 @@ GLboolean __glDeleteSyncObj(__GLcontext *gc, __GLsyncObject *syncObj)
 
     if (syncObj->label)
     {
-        gc->imports.free(gc, syncObj->label);
+        gcmOS_SAFE_FREE(gcvNULL, syncObj->label);
     }
 
     retVal = (*gc->dp.deleteSync)(gc, syncObj);
@@ -629,7 +629,7 @@ GLboolean __glDeleteSyncObj(__GLcontext *gc, __GLsyncObject *syncObj)
         __GL_ERROR((*gc->dp.getError)(gc));
     }
 
-    (*gc->imports.free)(gc, syncObj);
+    gcmOS_SAFE_FREE(gcvNULL, syncObj);
 
     return GL_TRUE;
 }
@@ -680,7 +680,7 @@ GLvoid __glFreeSyncState(__GLcontext *gc)
 
 GLsync GL_APIENTRY __gles_FenceSync(__GLcontext *gc, GLenum condition, GLbitfield flags)
 {
-    GLuint sync = 0;
+    GLint sync = 0;
     GLboolean retVal;
     __GLsyncObject *syncObject;
 
@@ -697,7 +697,14 @@ GLsync GL_APIENTRY __gles_FenceSync(__GLcontext *gc, GLenum condition, GLbitfiel
 
     GL_ASSERT(gc->sync.shared);
     sync = __glGenerateNames(gc, gc->sync.shared, 1);
-    __glMarkNameUsed(gc, gc->sync.shared, sync);
+    if (sync < 0)
+    {
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
+    if (__glMarkNameUsed(gc, gc->sync.shared, (GLuint)sync) < 0)
+    {
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
 
     syncObject = (__GLsyncObject *)(*gc->imports.calloc)(gc, 1, sizeof(__GLsyncObject));
     if (!syncObject)
@@ -1006,7 +1013,7 @@ GLvoid __glFreeDebugState(__GLcontext *gc)
                 while (msgCtrl)
                 {
                     __GLdbgMsgCtrl *next = msgCtrl->next;
-                    gc->imports.free(gc, msgCtrl);
+                    gcmOS_SAFE_FREE(gcvNULL, msgCtrl);
                     msgCtrl = next;
                 }
             }
@@ -1014,11 +1021,11 @@ GLvoid __glFreeDebugState(__GLcontext *gc)
 
         if (groupCtrl->message)
         {
-            gc->imports.free(gc, groupCtrl->message);
+            gcmOS_SAFE_FREE(gcvNULL, groupCtrl->message);
         }
-        gc->imports.free(gc, groupCtrl);
+        gcmOS_SAFE_FREE(gcvNULL, groupCtrl);
     }
-    gc->imports.free(gc, dbgMachine->msgCtrlStack);
+    gcmOS_SAFE_FREE(gcvNULL, dbgMachine->msgCtrlStack);
 
 
     while (msgLog)
@@ -1026,9 +1033,9 @@ GLvoid __glFreeDebugState(__GLcontext *gc)
         __GLdbgMsgLog *next = msgLog->next;
         if (msgLog->message)
         {
-            gc->imports.free(gc, msgLog->message);
+            gcmOS_SAFE_FREE(gcvNULL, msgLog->message);
         }
-        gc->imports.free(gc, msgLog);
+        gcmOS_SAFE_FREE(gcvNULL, msgLog);
         msgLog = next;
     }
     dbgMachine->msgLogHead = NULL;
@@ -1173,8 +1180,13 @@ GLboolean __glDebugInsertLogMessage(__GLcontext *gc, GLenum source, GLenum type,
         /* If the message log is not full */
         else if (dbgMachine->loggedMsgs < dbgMachine->maxLogMsgs)
         {
-            __GLdbgMsgLog *msgLog = (__GLdbgMsgLog*)gc->imports.malloc(gc, sizeof(__GLdbgMsgLog));
+            __GLdbgMsgLog *msgLog;
             GLsizei msgLen = (length < 0 || needCopy) ? (GLsizei)strlen(message) : length;
+
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLdbgMsgLog), (gctPOINTER *)&msgLog)))
+            {
+                break;
+            }
 
             msgLen = __GL_MIN(dbgMachine->maxMsgLen - 1, msgLen);
 
@@ -1185,7 +1197,12 @@ GLboolean __glDebugInsertLogMessage(__GLcontext *gc, GLenum source, GLenum type,
             msgLog->length = msgLen + 1;
             if (needCopy)
             {
-                msgLog->message = (GLchar*)gc->imports.malloc(gc, (msgLen + 1) * sizeof(GLchar));
+                if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, (msgLen + 1) * sizeof(GLchar), (gctPOINTER *)&msgLog->message)))
+                {
+                    gcmOS_SAFE_FREE(gcvNULL, msgLog);
+                    break;
+                }
+
                 __GL_MEMCOPY(msgLog->message, message, msgLen * sizeof(GLchar));
                 msgLog->message[msgLen] = '\0';
             }
@@ -1224,17 +1241,20 @@ GLvoid __glDebugPrintLogMessage(__GLcontext *gc, GLenum source, GLenum type, GLu
         GLuint offset = 0;
         gctARGUMENTS args;
 
-        GLchar *message = (GLchar*)gc->imports.malloc(gc, dbgMachine->maxLogMsgs);
+        GLchar *message;
 
-        /* format the message string */
-        gcmARGUMENTS_START(args, format);
-        gcoOS_PrintStrVSafe(message, (gctSIZE_T)dbgMachine->maxLogMsgs, &offset, format, args);
-        gcmARGUMENTS_END(args);
-
-        if (!__glDebugInsertLogMessage(gc, source, type, id, severity, -1, message, GL_FALSE))
+        if (gcmIS_SUCCESS(gcoOS_Allocate(gcvNULL, dbgMachine->maxLogMsgs, (gctPOINTER *)&message)))
         {
-            /* If inserting message to list failed, free it here to avoid memory leak. */
-            gc->imports.free(gc, message);
+            /* format the message string */
+            gcmARGUMENTS_START(args, format);
+            gcoOS_PrintStrVSafe(message, (gctSIZE_T)dbgMachine->maxLogMsgs, &offset, format, args);
+            gcmARGUMENTS_END(args);
+
+            if (!__glDebugInsertLogMessage(gc, source, type, id, severity, -1, message, GL_FALSE))
+            {
+                /* If inserting message to list failed, free it here to avoid memory leak. */
+                gcmOS_SAFE_FREE(gcvNULL, message);
+            }
         }
     }
 }
@@ -1301,8 +1321,10 @@ GLvoid GL_APIENTRY __gles_DebugMessageControl(__GLcontext *gc, GLenum source, GL
 
             if (!msgCtrl)
             {
-                msgCtrl = (__GLdbgMsgCtrl*)gc->imports.malloc(gc, sizeof(__GLdbgMsgCtrl));
-
+                if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLdbgMsgLog), (gctPOINTER *)&msgCtrl)))
+                {
+                    __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+                }
                 msgCtrl->id = ids[i];
                 msgCtrl->src = source;
                 msgCtrl->type = type;
@@ -1477,8 +1499,8 @@ GLuint GL_APIENTRY __gles_GetDebugMessageLog(__GLcontext *gc, GLuint count, GLsi
             dbgMachine->msgLogTail = NULL;
         }
 
-        gc->imports.free(gc, msgLog->message);
-        gc->imports.free(gc, msgLog);
+        gcmOS_SAFE_FREE(gcvNULL, msgLog->message);
+        gcmOS_SAFE_FREE(gcvNULL, msgLog);
         --dbgMachine->loggedMsgs;
 
         msgLog = next;
@@ -1560,7 +1582,12 @@ GLvoid GL_APIENTRY __gles_PushDebugGroup(__GLcontext *gc, GLenum source, GLuint 
 
             while (msgCtrlPrev)
             {
-                __GLdbgMsgCtrl *msgCtrl = (__GLdbgMsgCtrl*)gc->imports.malloc(gc, sizeof(__GLdbgMsgCtrl));
+                __GLdbgMsgCtrl *msgCtrl;
+                 if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLdbgMsgCtrl), (gctPOINTER *)&msgCtrl)))
+                 {
+                     __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+                 }
+
                 __GL_MEMCOPY(msgCtrl, msgCtrlPrev, sizeof(__GLdbgMsgCtrl));
 
                 /* Insert to head of new group */
@@ -1579,7 +1606,11 @@ GLvoid GL_APIENTRY __gles_PushDebugGroup(__GLcontext *gc, GLenum source, GLuint 
     groupCtrl->source = source;
     groupCtrl->id = id;
     msgLen = (length < 0) ? (GLsizei)strlen(message) : length;
-    groupCtrl->message = (GLchar*)gc->imports.malloc(gc, (msgLen + 1) * sizeof(GLchar));
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, (msgLen + 1) * sizeof(GLchar), (gctPOINTER *)&groupCtrl->message)))
+    {
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
+
     __GL_MEMCOPY(groupCtrl->message, message, msgLen);
     groupCtrl->message[msgLen] = '\0';
 
@@ -1616,7 +1647,7 @@ GLvoid GL_APIENTRY __gles_PopDebugGroup(__GLcontext *gc)
             while (msgCtrl)
             {
                 __GLdbgMsgCtrl *next = msgCtrl->next;
-                gc->imports.free(gc, msgCtrl);
+                gcmOS_SAFE_FREE(gcvNULL, msgCtrl);
                 msgCtrl = next;
             }
         }
@@ -1624,9 +1655,9 @@ GLvoid GL_APIENTRY __gles_PopDebugGroup(__GLcontext *gc)
 
     if (groupCtrl->message)
     {
-        gc->imports.free(gc, groupCtrl->message);
+        gcmOS_SAFE_FREE(gcvNULL, groupCtrl->message);
     }
-    gc->imports.free(gc, groupCtrl);
+    gcmOS_SAFE_FREE(gcvNULL, groupCtrl);
 
 OnError:
     __GL_FOOTER();
@@ -1781,7 +1812,7 @@ GLvoid GL_APIENTRY __gles_ObjectLabel(__GLcontext *gc, GLenum identifier, GLuint
 
     if (*pLabel)
     {
-        gc->imports.free(gc, *pLabel);
+        gcmOS_SAFE_FREE(gcvNULL, *pLabel);
         *pLabel = NULL;
     }
 
@@ -1790,7 +1821,10 @@ GLvoid GL_APIENTRY __gles_ObjectLabel(__GLcontext *gc, GLenum identifier, GLuint
         GLsizei msgLen = (length < 0) ? (GLsizei)strlen(label) : length;
         msgLen = __GL_MIN(gc->debug.maxMsgLen - 1, msgLen);
 
-        *pLabel = (GLchar*)gc->imports.malloc(gc, (msgLen + 1) * sizeof(GLchar));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, (msgLen + 1) * sizeof(GLchar), (gctPOINTER *)pLabel)))
+        {
+            __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+        }
         __GL_MEMCOPY(*pLabel, label, msgLen * sizeof(GLchar));
         (*pLabel)[msgLen] = '\0';
     }
@@ -1987,7 +2021,7 @@ GLvoid GL_APIENTRY __gles_ObjectPtrLabel(__GLcontext *gc, const GLvoid* ptr, GLs
 
     if (syncObj->label)
     {
-        gc->imports.free(gc, syncObj->label);
+        gcmOS_SAFE_FREE(gcvNULL, syncObj->label);
         syncObj->label = NULL;
     }
 
@@ -1996,7 +2030,11 @@ GLvoid GL_APIENTRY __gles_ObjectPtrLabel(__GLcontext *gc, const GLvoid* ptr, GLs
         GLsizei msgLen = (length < 0) ? (GLsizei)strlen(label) : length;
         msgLen = __GL_MIN(gc->debug.maxMsgLen - 1, msgLen);
 
-        syncObj->label = (GLchar*)gc->imports.malloc(gc, (msgLen + 1) * sizeof(GLchar));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, (msgLen + 1) * sizeof(GLchar), (gctPOINTER *)&syncObj->label)))
+        {
+            __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+        }
+
         __GL_MEMCOPY(syncObj->label, label, msgLen * sizeof(GLchar));
         syncObj->label[msgLen] = '\0';
     }

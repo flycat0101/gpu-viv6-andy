@@ -1439,7 +1439,7 @@ gcChipProcessUniforms(
                     gcoOS_PrintStrSafe(tmpName, maxLen, &tmpOffset, "[%d]", arrayIndices[j]);
                 }
                 nameLen = (gctUINT)gcoOS_StrLen(tmpName, gcvNULL);
-                gc->imports.free(gc, arrayIndices);
+                gcmOS_SAFE_FREE(gcvNULL, arrayIndices);
             }
 
             switch (usage)
@@ -1946,7 +1946,7 @@ gcChipProcessUniforms(
                 location += arraySize;
             }
         }
-        gc->imports.free(gc, tmpName);
+        gcmOS_SAFE_FREE(gcvNULL, tmpName);
         tmpName = gcvNULL;
     }
 
@@ -1958,7 +1958,7 @@ OnError:
     }
     if (tmpName != gcvNULL)
     {
-        gc->imports.free(gc, tmpName);
+        gcmOS_SAFE_FREE(gcvNULL, tmpName);
     }
     gcmFOOTER();
     return status;
@@ -2158,7 +2158,7 @@ gcChipProcessUniformBlocks(
             if (prevIndexSize)
             {
                 __GL_MEMCOPY(ubSlot->uniformIndices, prevInidces, prevIndexSize * sizeof(GLuint));
-                gc->imports.free(gc, prevInidces);
+                gcmOS_SAFE_FREE(gcvNULL, prevInidces);
             }
         }
 
@@ -2962,7 +2962,7 @@ gcChipProcessStorageBlocks(
                     if (prevBvInfos)
                     {
                         __GL_MEMCOPY(sbSlot->bvInfos, prevBvInfos, prevBvSize * sizeof(__GLchipBVinfo));
-                        gc->imports.free(gc, prevBvInfos);
+                        gcmOS_SAFE_FREE(gcvNULL, prevBvInfos);
                     }
                 }
 
@@ -3031,7 +3031,7 @@ gcChipProcessStorageBlocks(
                             {
                                 gcoOS_PrintStrSafe(tmpName, maxLen, &tmpOffset, "[%d]", arrayIndices[k - startIndex]);
                             }
-                            gc->imports.free(gc, arrayIndices);
+                            gcmOS_SAFE_FREE(gcvNULL, arrayIndices);
                         }
 
                         for (bvIdx = 0; bvIdx < prevActiveBVs; ++bvIdx)
@@ -3063,7 +3063,7 @@ gcChipProcessStorageBlocks(
                         offset += (GetVariableArrayStride(variable) * arraySize);
                     }
 
-                    gc->imports.free(gc, tmpName);
+                    gcmOS_SAFE_FREE(gcvNULL, tmpName);
                     tmpName = gcvNULL;
                 }
             }
@@ -3126,7 +3126,7 @@ gcChipProcessStorageBlocks(
 OnError:
     if (tmpName)
     {
-        gc->imports.free(gc, tmpName);
+        gcmOS_SAFE_FREE(gcvNULL, tmpName);
         tmpName = gcvNULL;
     }
     gcmFOOTER_NO();
@@ -3293,7 +3293,7 @@ gcChipProcessBufferVariables(
             GL_ASSERT(preSbSlot->activeBVs > 0 && preSbSlot->bvInfos);
 
             sbSlot->activeBVs = sbSlot->bvSize = preSbSlot->activeBVs;
-            sbSlot->bvInfos = (__GLchipBVinfo*)gc->imports.malloc(gc, bytes);
+            gcmONERROR(gcoOS_Allocate(gcvNULL, bytes, (gctPOINTER *)&sbSlot->bvInfos));
             __GL_MEMCOPY(sbSlot->bvInfos, preSbSlot->bvInfos, bytes);
         }
     }
@@ -3529,7 +3529,7 @@ gcChipProgramCleanBindingInfo(
 
             if (ub->uniformIndices)
             {
-                gc->imports.free(gc, ub->uniformIndices);
+                gcoOS_Free(gcvNULL, ub->uniformIndices);
             }
 
             if (ub->bufBase)
@@ -3760,17 +3760,18 @@ gcChipProgramBindingRecompiledInfo(
     if (combinedResCount > 0)
     {
         GLint index = 0;
-        gctCONST_STRING *names = (gctCONST_STRING*)gc->imports.malloc(gc, combinedResCount * sizeof(gctCONST_STRING));
+        gctSTRING *names;
+        gcmONERROR(gcoOS_Allocate(gcvNULL, combinedResCount * sizeof(gctSTRING), (gctPOINTER *)&names));
 
         for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
         {
             if (pBinaries[stage] && resCounts[stage])
             {
-                gcChipCountUniforms(gc, program, pBinaries[stage], resCounts[stage], GL_TRUE, &index, names);
+                gcChipCountUniforms(gc, program, pBinaries[stage], resCounts[stage], GL_TRUE, &index, (gctCONST_STRING *)names);
             }
         }
 
-        gc->imports.free(gc, (gctPOINTER)names);
+        gcmOS_SAFE_FREE(gcvNULL, names);
 
         program->activeUniformCount = program->userDefUniformCount + program->builtInUniformCount;
     }
@@ -3832,19 +3833,20 @@ gcChipProgramBindingRecompiledInfo(
     if (combinedResCount > 0)
     {
         GLint ubIndex = 0;
-        gctCONST_STRING *names = (gctCONST_STRING*)gc->imports.malloc(gc, combinedResCount * sizeof(gctCONST_STRING));
+        gctSTRING *names;
+        gcmONERROR(gcoOS_Allocate(gcvNULL, combinedResCount * sizeof(gctSTRING), (gctPOINTER *)&names));
 
         for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
         {
             if (pBinaries[stage] && resCounts[stage])
             {
-                gcChipCountUniformBlocks(program, pBinaries[stage], resCounts[stage], &ubIndex, names);
+                gcChipCountUniformBlocks(program, pBinaries[stage], resCounts[stage], &ubIndex, (gctCONST_STRING *)names);
             }
         }
 
         program->totalUbCount = program->userDefUbCount + program->defaultUbCount;
 
-        gc->imports.free(gc, (gctPOINTER)names);
+        gcmOS_SAFE_FREE(gcvNULL, names);
     }
 
     if (pgInstance->privateUbCount > 0)
@@ -4445,18 +4447,18 @@ gcChipProgramBuildBindingInfo(
 
     if (combinedResCount > 0)
     {
-        gctCONST_STRING *names = (gctCONST_STRING*)gc->imports.calloc(gc, combinedResCount, sizeof(gctCONST_STRING));
+        gctSTRING *names = (gctSTRING*)gc->imports.calloc(gc, combinedResCount, sizeof(gctSTRING));
 
         index = 0;
         for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
         {
             if (pBinaries[stage] && resCounts[stage])
             {
-                gcChipCountUniforms(gc, program, pBinaries[stage], resCounts[stage], GL_FALSE, &index, names);
+                gcChipCountUniforms(gc, program, pBinaries[stage], resCounts[stage], GL_FALSE, &index, (gctCONST_STRING *)names);
             }
         }
 
-        gc->imports.free(gc, (gctPOINTER)names);
+        gcmOS_SAFE_FREE(gcvNULL, names);
 
         /* Calc auxiliary values */
         program->activeUniformCount = program->userDefUniformCount + program->builtInUniformCount;
@@ -4568,20 +4570,20 @@ gcChipProgramBuildBindingInfo(
         GLint ubIndex = 0;
         GLuint combinedUBs = 0;
         GLuint activeUBs[__GLSL_STAGE_LAST] = {0};
-        gctCONST_STRING *names = (gctCONST_STRING*)gc->imports.calloc(gc, combinedResCount, sizeof(gctCONST_STRING));
+        gctSTRING *names = (gctSTRING*)gc->imports.calloc(gc, combinedResCount, sizeof(gctSTRING));
 
         for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
         {
             if (pBinaries[stage] && resCounts[stage])
             {
-                activeUBs[stage] = gcChipCountUniformBlocks(program, pBinaries[stage], resCounts[stage], &ubIndex, names);
+                activeUBs[stage] = gcChipCountUniformBlocks(program, pBinaries[stage], resCounts[stage], &ubIndex, (gctCONST_STRING *)names);
                 combinedUBs += activeUBs[stage];
             }
         }
 
         program->totalUbCount = program->userDefUbCount + program->defaultUbCount;
 
-        gc->imports.free(gc, (gctPOINTER)names);
+        gcmOS_SAFE_FREE(gcvNULL, names);
 
         /* ES30 conform used more than maxVertUniformBlocks/maxFragUniformBlocks/maxCombinedUniformBlocks
         ** and expected compiler pass, while link fail.
@@ -4821,7 +4823,7 @@ gcChipProgramBuildBindingInfo(
     gcmONERROR(gcSHADER_GetOutputCount(pBinaries[lastStage], &resCount));
     if (resCount)
     {
-        gctCONST_STRING *names = (gctCONST_STRING*)gc->imports.calloc(gc, resCount, sizeof(gctCONST_STRING));
+        gctSTRING *names = (gctSTRING*)gc->imports.calloc(gc, resCount, sizeof(gctSTRING));
         for (i = 0; i < resCount; ++i)
         {
             gcOUTPUT output;
@@ -4829,8 +4831,8 @@ gcChipProgramBuildBindingInfo(
             if (output)
             {
                 gctUINT location;
-                gctCONST_STRING outName;
-                gcmONERROR(gcOUTPUT_GetName(pBinaries[lastStage], output, gcvFALSE, gcvNULL, &outName));
+                gctSTRING outName;
+                gcmONERROR(gcOUTPUT_GetName(pBinaries[lastStage], output, gcvFALSE, gcvNULL, (gctCONST_STRING *)&outName));
                 gcmONERROR(gcOUTPUT_GetLocation(output, &location));
 
                 if (location != (gctUINT)-1 && program->maxOutLoc < location + 1)
@@ -4858,7 +4860,7 @@ gcChipProgramBuildBindingInfo(
                 }
             }
         }
-        gc->imports.free(gc, (gctPOINTER)names);
+        gcmOS_SAFE_FREE(gcvNULL, names);
     }
     else
     {
@@ -4981,19 +4983,19 @@ gcChipProgramBuildBindingInfo(
         GLint sbIndex = 0;
         GLuint combinedSBs = 0;
         GLuint activeSBs[__GLSL_STAGE_LAST] = {0};
-        gctCONST_STRING *names = (gctCONST_STRING*)gc->imports.calloc(gc, combinedResCount, sizeof(gctCONST_STRING));
+        gctSTRING *names = (gctSTRING*)gc->imports.calloc(gc, combinedResCount, sizeof(gctSTRING));
 
         for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
         {
             if (pBinaries[stage] && resCounts[stage])
             {
-                activeSBs[stage] = gcChipCountStorageBlocks(program, pBinaries[stage], resCounts[stage], &sbIndex, names);
+                activeSBs[stage] = gcChipCountStorageBlocks(program, pBinaries[stage], resCounts[stage], &sbIndex, (gctCONST_STRING *)names);
                 combinedSBs += activeSBs[stage];
             }
         }
         program->totalSsbCount = program->userDefSsbCount + program->privateSsbCount;
 
-        gc->imports.free(gc, (gctPOINTER)names);
+        gcmOS_SAFE_FREE(gcvNULL, names);
 
         /* ES30 conform used more than maxVertUniformBlocks/maxFragUniformBlocks/maxCombinedUniformBlocks
         ** and expected compiler pass, while link fail.
@@ -5262,7 +5264,7 @@ OnError:
     {
         if (uniformHALIdx2GL[stage])
         {
-            gc->imports.free(gc, uniformHALIdx2GL[stage]);
+            gcmOS_SAFE_FREE(gcvNULL, uniformHALIdx2GL[stage]);
         }
     }
 
@@ -7178,7 +7180,7 @@ gcChipPgInstanceDeinitialize(
 
     gcChipPgStateKeyFree(gc, &pgInstance->pgStateKey);
 
-    (*gc->imports.free)(gc, pgInstance);
+    gcmOS_SAFE_FREE(gcvNULL, pgInstance);
     gcmFOOTER_NO();
 }
 
@@ -7196,7 +7198,7 @@ gcChipProgFreeCmdInstance(
 
         gcFreeProgramState(*stateBuf);
 
-        gc->imports.free(gc, stateBuf);
+        gcmOS_SAFE_FREE(gcvNULL, stateBuf);
     }
 
     gcmFOOTER_NO();
@@ -7355,7 +7357,7 @@ __glChipDeleteProgram(
         }
 
 
-        (*gc->imports.free)(gc, program);
+        gcmOS_SAFE_FREE(gcvNULL, program);
         programObject->privateData = gcvNULL;
     }
     gcmFOOTER_NO();
@@ -8135,7 +8137,8 @@ gcChipProgramBinary_V0(
     /* If some XFB state need to restore. */
     if (nameCount > 0)
     {
-        programObject->ppXfbVaryingNames = (GLchar**)(*gc->imports.malloc)(gc, nameCount*sizeof(GLchar*));
+        gcmONERROR(gcoOS_Allocate(gcvNULL, nameCount*sizeof(GLchar*), (gctPOINTER *)&programObject->ppXfbVaryingNames));
+
         programObject->xfbVaryingNum = nameCount;
 
         nameCount = 0;
@@ -8152,7 +8155,7 @@ gcChipProgramBinary_V0(
                 for (j = 0; j < GetFeedbackVaryingCount(&(masterPgInstance->binaries[i]->transformFeedback)); j++)
                 {
                     gctUINT32 nameLen = (gctUINT32)strlen(&GetFeedbackVaryings(&(masterPgInstance->binaries[i]->transformFeedback))->name[j]) + 1;
-                    programObject->ppXfbVaryingNames[nameCount] = (GLchar*)(*gc->imports.malloc)(gc, nameLen);
+                    gcmONERROR(gcoOS_Allocate(gcvNULL, nameLen, (gctPOINTER *)&programObject->ppXfbVaryingNames[nameCount]));
                     strcpy(programObject->ppXfbVaryingNames[nameCount],&GetFeedbackVaryings(&(masterPgInstance->binaries[i]->transformFeedback))->name[j]);
                     nameCount += 1;
                 }
@@ -8275,6 +8278,7 @@ OnError:
     {
         gcChipPgStateKeyFree(gc, &pgStateKey);
     }
+
     gcChipProgramCleanBindingInfo(gc, programObject);
     gcmFOOTER();
     return status;
@@ -12547,7 +12551,7 @@ gcChipPgStateKeyFree(
 {
     gcmHEADER_ARG("gc=0x%x ppPgStateKey=0x%x", gc, ppPgStateKey);
 
-    (*gc->imports.free)(gc, *ppPgStateKey);
+    gcmOS_SAFE_FREE(gcvNULL, *ppPgStateKey);
 
     *ppPgStateKey = gcvNULL;
 

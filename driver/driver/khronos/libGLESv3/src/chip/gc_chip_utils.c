@@ -167,9 +167,9 @@ gcChipUtilsHashDestory(
     gcmHEADER_ARG("gc=0x%x pHash=0x%x ",gc, pHash);
 
     gcChipUtilsHashDeleteAllObjects(gc, pHash);
-    (*gc->imports.free)(gc, pHash->pEntryCounts);
-    (*gc->imports.free)(gc, pHash->ppHashTable);
-    (*gc->imports.free)(gc, pHash);
+    gcmOS_SAFE_FREE(gcvNULL, pHash->pEntryCounts);
+    gcmOS_SAFE_FREE(gcvNULL, pHash->ppHashTable);
+    gcmOS_SAFE_FREE(gcvNULL, pHash);
 
     gcmFOOTER_NO();
 }
@@ -212,7 +212,7 @@ gcChipUtilsHashDeleteObject(
 
     --pHash->pEntryCounts[entryId];
     pHash->pfnDeleteUserData(gc, pCurObj->pUserData);
-    (*gc->imports.free)(gc, pCurObj);
+    gcmOS_SAFE_FREE(gcvNULL, pCurObj);
 
     gcmFOOTER_NO();
 }

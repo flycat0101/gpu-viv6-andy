@@ -44,7 +44,7 @@ GLvoid __glFreeDefaultTextureObject(__GLcontext *gc, __GLtextureObject *tex)
     /* Free texture unit list */
     __glFreeImageUserList(gc, &tex->texUnitBoundList);
 
-    (*gc->imports.free)(gc, tex->faceMipmap);
+    gcmOS_SAFE_FREE(gcvNULL, tex->faceMipmap);
 }
 
 GLvoid __glInitTextureObject(__GLcontext *gc, __GLtextureObject *tex, GLuint id, GLuint targetIndex)
@@ -1588,7 +1588,11 @@ GLvoid __glBindTexture(__GLcontext *gc, GLuint unitIdx, GLuint targetIndex, GLui
 
         /* Mark the name "texture" used in the texture nameArray.
         */
-        __glMarkNameUsed(gc, gc->texture.shared, texture);
+        if (__glMarkNameUsed(gc, gc->texture.shared, texture) < 0)
+        {
+            __glDeleteObject(gc, gc->texture.shared, texture);
+            __GL_ERROR_RET(GL_OUT_OF_MEMORY);
+        }
     }
     else
     {
@@ -1823,7 +1827,7 @@ GLboolean __glDeleteTextureObject(__GLcontext *gc, __GLtextureObject *tex)
 
     if (tex->label)
     {
-        gc->imports.free(gc, tex->label);
+        gcmOS_SAFE_FREE(gcvNULL, tex->label);
     }
 
     /* Notify Dp that this texture object is deleted.
@@ -1836,7 +1840,7 @@ GLboolean __glDeleteTextureObject(__GLcontext *gc, __GLtextureObject *tex)
     /* Delete the texture object's texture image */
     if (tex->faceMipmap)
     {
-        (*gc->imports.free)(gc, tex->faceMipmap);
+        gcmOS_SAFE_FREE(gcvNULL, tex->faceMipmap);
         tex->faceMipmap = NULL;
     }
 
@@ -1850,7 +1854,7 @@ GLboolean __glDeleteTextureObject(__GLcontext *gc, __GLtextureObject *tex)
     __glFreeImageUserList(gc, &tex->imageList);
 
     /* Delete the texture object structure */
-    (*gc->imports.free)(gc, tex);
+    gcmOS_SAFE_FREE(gcvNULL, tex);
 
     return GL_TRUE;
 }
@@ -1874,6 +1878,10 @@ GLvoid GL_APIENTRY __gles_GenTextures(__GLcontext *gc, GLsizei n, GLuint *textur
     GL_ASSERT(NULL != gc->texture.shared);
 
     start = __glGenerateNames(gc, gc->texture.shared, n);
+    if (start < 0)
+    {
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
 
     for (i = 0; i < n; i++)
     {
@@ -2011,13 +2019,13 @@ GLboolean __glDeleteSamplerObj(__GLcontext *gc, __GLsamplerObject *samplerObj)
 
     if (samplerObj->label)
     {
-        gc->imports.free(gc, samplerObj->label);
+        gcmOS_SAFE_FREE(gcvNULL, samplerObj->label);
     }
 
     /* Free texture unit list */
     __glFreeImageUserList(gc, &samplerObj->texUnitBoundList);
 
-    (*gc->imports.free)(gc, samplerObj);
+    gcmOS_SAFE_FREE(gcvNULL, samplerObj);
 
     return GL_TRUE;
 }
@@ -2338,7 +2346,10 @@ GLvoid GL_APIENTRY __gles_GenSamplers(__GLcontext *gc, GLsizei count, GLuint* sa
     GL_ASSERT(NULL != gc->sampler.shared);
 
     start = __glGenerateNames(gc, gc->sampler.shared, count);
-
+    if (start < 0)
+    {
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
     for (i = 0; i < count; i++)
     {
         samplers[i] = start + i;

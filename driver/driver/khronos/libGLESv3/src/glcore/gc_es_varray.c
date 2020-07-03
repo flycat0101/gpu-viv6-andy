@@ -1717,7 +1717,11 @@ GLvoid __glBindVertexArray(__GLcontext *gc, GLuint array)
 
             __glInitVertexArrayObject(gc,  vertexArrayObj, array);
             __glAddObject(gc, gc->vertexArray.noShare, array, vertexArrayObj);
-            __glMarkNameUsed(gc, gc->vertexArray.noShare, array);
+            if (__glMarkNameUsed(gc, gc->vertexArray.noShare, array) < 0)
+            {
+                __glDeleteObject(gc, gc->vertexArray.noShare, array);
+                __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+            }
         }
     }
     else
@@ -1787,11 +1791,11 @@ GLboolean __glDeleteVertexArrayObject(__GLcontext *gc, __GLvertexArrayObject *ve
 
     if (vertexArrayObj->label)
     {
-        gc->imports.free(gc, vertexArrayObj->label);
+        gcmOS_SAFE_FREE(gcvNULL, vertexArrayObj->label);
     }
 
     /* Delete the vertex array object structure */
-    (*gc->imports.free)(gc, vertexArrayObj);
+    gcmOS_SAFE_FREE(gcvNULL, vertexArrayObj);
 
     __GL_FOOTER();
 
@@ -1916,7 +1920,10 @@ GLvoid GL_APIENTRY __gles_GenVertexArrays(__GLcontext *gc, GLsizei n, GLuint* ar
     GL_ASSERT(gcvNULL != gc->vertexArray.noShare);
 
     start = __glGenerateNames(gc, gc->vertexArray.noShare, n);
-
+    if (start < 0)
+    {
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
     for (i = 0; i < n; i++)
     {
         arrays[i] = start + i;
@@ -2030,11 +2037,17 @@ GLvoid GL_APIENTRY __gles_BindVertexBuffer(__GLcontext *gc, GLuint bindingindex,
             __glAddObject(gc, gc->bufferObject.shared, buffer, bufObj);
 
             /* Mark the name "buffer" used in the buffer object nameArray.*/
-            __glMarkNameUsed(gc, gc->bufferObject.shared, buffer);
-
-            if (!(*gc->dp.bindBuffer)(gc,bufObj,gcvBUFOBJ_TYPE_ARRAY_BUFFER))
+            if (__glMarkNameUsed(gc, gc->bufferObject.shared, buffer) < 0)
             {
-                __GL_ERROR((*gc->dp.getError)(gc));
+                __glDeleteObject(gc, gc->bufferObject.shared, buffer);
+                __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+            }
+            else
+            {
+                if (!(*gc->dp.bindBuffer)(gc,bufObj,gcvBUFOBJ_TYPE_ARRAY_BUFFER))
+                {
+                    __GL_ERROR((*gc->dp.getError)(gc));
+                }
             }
         }
         GL_ASSERT(bufObj);
