@@ -3237,6 +3237,8 @@ gckMMU_SetupSRAM(
                     gcvTRUE,
                     &Device->extSRAMBaseAddresses[i]
                     ));
+
+                Device->extSRAMGPUPhysNames[i] = gckKERNEL_AllocateNameFromPointer(kernel, Device->extSRAMPhysical[i]);
             }
         }
         Mmu->sRAMMapped = gcvTRUE;
@@ -3310,7 +3312,7 @@ gckMMU_SetupSRAM(
             Hardware->options.extSRAMGPUVirtAddrs[i] = Device->extSRAMBaseAddresses[i];
             Hardware->options.extSRAMSizes[i] = Device->extSRAMSizes[i];
             Hardware->options.extSRAMGPUPhysAddrs[i] = Device->extSRAMBases[i];
-            Hardware->options.extSRAMGPUPhysNames[i] = gckKERNEL_AllocateNameFromPointer(kernel, Device->extSRAMPhysical[i]);
+            Hardware->options.extSRAMGPUPhysNames[i] = Device->extSRAMGPUPhysNames[i];
 
             if (Device->showSRAMMapInfo)
             {

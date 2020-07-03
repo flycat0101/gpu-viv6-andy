@@ -1421,6 +1421,8 @@ typedef struct _gcsDEVICE
     gctUINT32                   extSRAMBaseAddresses[gcvSRAM_EXT_COUNT];
     /* MDL. */
     gctPHYS_ADDR                extSRAMPhysical[gcvSRAM_EXT_COUNT];
+    /* IntegerId. */
+    gctUINT32                   extSRAMGPUPhysNames[gcvSRAM_EXT_COUNT];
 
     /* Show SRAM mapping info or not. */
     gctUINT                     showSRAMMapInfo;
