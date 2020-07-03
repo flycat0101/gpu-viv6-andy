@@ -38,7 +38,7 @@ typedef struct _VSC_SIMPLE_RESIZABLE_ARRAY
 
 /* Creation and destroy */
 VSC_SIMPLE_RESIZABLE_ARRAY* vscSRARR_Create(VSC_MM* pMM, gctUINT initAllocEleCount, gctUINT elementSize, PFN_VSC_ARRAY_ELE_CMP pfnEleCmp);
-void vscSRARR_Initialize(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, VSC_MM* pMM, gctUINT initAllocEleCount, gctUINT elementSize, PFN_VSC_ARRAY_ELE_CMP pfnEleCmp);
+VSC_ErrCode vscSRARR_Initialize(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, VSC_MM* pMM, gctUINT initAllocEleCount, gctUINT elementSize, PFN_VSC_ARRAY_ELE_CMP pfnEleCmp);
 void vscSRARR_Finalize(VSC_SIMPLE_RESIZABLE_ARRAY* pArray);
 void vscSRARR_Clear(VSC_SIMPLE_RESIZABLE_ARRAY* pArray);
 void vscSRARR_Destroy(VSC_SIMPLE_RESIZABLE_ARRAY* pArray);

@@ -101,6 +101,10 @@ gctBOOL vscBT_Initialize(
     if (flag & VSC_BLOCK_TABLE_FLAG_HASH_ENTRIES)
     {
         pBT->pHashTable = vscHTBL_Create(pMM, pfnHashFunc, pfnKeyCmp, hashTableSize);
+        if(hashTableSize > 0 && pBT->pHashTable == gcvNULL)
+        {
+            return gcvFALSE;
+        }
     }
     return gcvTRUE;
 }
@@ -423,12 +427,12 @@ void vscBT_RemoveEntryPtr(VSC_BLOCK_TABLE* pBT, void * entryPtr)
 
     return;
 }
-void vscBT_AddToHash(VSC_BLOCK_TABLE* pBT, gctUINT entryId, void* pHashKey)
+VSC_ErrCode vscBT_AddToHash(VSC_BLOCK_TABLE* pBT, gctUINT entryId, void* pHashKey)
 {
     gcmASSERT(BT_HAS_HASHTABLE(pBT));
     gcmASSERT(pBT->pHashTable);
 
-    vscHTBL_DirectSet(pBT->pHashTable, pHashKey, (void*)(gctUINTPTR_T)entryId);
+    return vscHTBL_DirectSet(pBT->pHashTable, pHashKey, (void*)(gctUINTPTR_T)entryId);
 }
 
 gctUINT vscBT_HashSearch(VSC_BLOCK_TABLE* pBT, void* pHashKey)

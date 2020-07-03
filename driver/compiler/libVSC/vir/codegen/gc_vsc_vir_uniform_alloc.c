@@ -3021,7 +3021,8 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                 (VIR_Symbol_GetUniformKind(sym) == VIR_UNIFORM_UNIFORM_BLOCK_ADDRESS ||
                  VIR_Symbol_GetUniformKind(sym) == VIR_UNIFORM_STORAGE_BLOCK_ADDRESS))
             {
-                vscHTBL_DirectSet(pUnbindUniformHash, (void *)sym, gcvNULL);
+                retValue = vscHTBL_DirectSet(pUnbindUniformHash, (void *)sym, gcvNULL);
+                ON_ERROR0(retValue);
 
                 VIR_Symbol_ClrFlag(sym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
                 VIR_Symbol_SetFlag(sym, VIR_SYMFLAG_INACTIVE);
@@ -3270,6 +3271,11 @@ VSC_ErrCode VIR_RA_PerformUniformAlloc(
                 ON_ERROR(retValue, "Collect the sampled image information.");
 
                 pUnbindUniformHash = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 8);
+                if(pUnbindUniformHash == gcvNULL)
+                {
+                    retValue = VSC_ERR_OUT_OF_MEMORY;
+                    ON_ERROR(retValue,"vscHTBL_Create");
+                }
                 retValue = VIR_CG_MapUniformsWithLayout(pShader, pHwCfg, pShResourceLayout, pUnbindUniformHash, pMM);
                 ON_ERROR(retValue, "VIR_CG_MapUniformsWithLayout");
 

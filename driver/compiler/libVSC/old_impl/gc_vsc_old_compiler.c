@@ -5599,6 +5599,7 @@ gcSHADER_MergeKernel(
     OUT gcSHADER *    MergedKernel
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     gceSTATUS   status = gcvSTATUS_OK;
     gcSHADER    mergedKernel = gcvNULL;
     gctUINT32   *compilerVersion = gcvNULL;
@@ -5793,6 +5794,11 @@ gcSHADER_MergeKernel(
                                               vscHFUNC_String,
                                               vcsHKCMP_String,
                                               totalAllFunctionCount);
+            if(externFunctionHT == gcvNULL)
+            {
+                status = gcvSTATUS_OUT_OF_MEMORY;
+                gcmONERROR(status);
+            }
             vscUNILST_Initialize(&functionSymbolList, gcvFALSE);
         }
 
@@ -5802,6 +5808,11 @@ gcSHADER_MergeKernel(
                                               vscHFUNC_String,
                                               vcsHKCMP_String,
                                               totalVariableCount);
+            if(externVariableHT == gcvNULL)
+            {
+                status = gcvSTATUS_OUT_OF_MEMORY;
+                gcmONERROR(status);
+            }
             vscUNILST_Initialize(&variableSymbolList, gcvFALSE);
         }
 
@@ -5867,7 +5878,8 @@ gcSHADER_MergeKernel(
                             builtinIndex.labelMap[labelIndex].tempIndexOffset = tempIndexOffset;
                         }
 
-                        vscHTBL_DirectSet(externFunctionHT, kernelFunction->name, functionSymbolItem);
+                        errCode = vscHTBL_DirectSet(externFunctionHT, kernelFunction->name, functionSymbolItem);
+                        ON_ERROR2STATUS0(errCode);
                         vscUNILST_Append(&functionSymbolList, (VSC_UNI_LIST_NODE*)functionSymbolItem);
                     }
                     labelIndex = (gctUINT32)~0 - kernelFunction->label + currentFunctionCount;
@@ -5920,7 +5932,8 @@ gcSHADER_MergeKernel(
                                 builtinIndex.labelMap[labelIndex].tempIndexOffset = tempIndexOffset;
                             }
 
-                            vscHTBL_DirectSet(externFunctionHT, function->name, functionSymbolItem);
+                            errCode = vscHTBL_DirectSet(externFunctionHT, function->name, functionSymbolItem);
+                            ON_ERROR2STATUS0(errCode);
                             vscUNILST_Append(&functionSymbolList, (VSC_UNI_LIST_NODE*)functionSymbolItem);
                         }
                         newLabel = functionSymbolItem->label;
@@ -5975,7 +5988,8 @@ gcSHADER_MergeKernel(
                             variableSymbolItem->definedKernel = kernel;
                             variableSymbolItem->definedVariable = variable;
 
-                            vscHTBL_DirectSet(externVariableHT, variable->name, variableSymbolItem);
+                            errCode = vscHTBL_DirectSet(externVariableHT, variable->name, variableSymbolItem);
+                            ON_ERROR2STATUS0(errCode);
                             vscUNILST_Append(&variableSymbolList, (VSC_UNI_LIST_NODE*)variableSymbolItem);
                         }
                     }

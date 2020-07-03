@@ -1257,8 +1257,9 @@ static gctBOOL _VIR_RA_LS_Init(
     VIR_CALL_GRAPH      *pCG,
     VSC_MM              *pMM)
 {
-    gctUINT     numWeb = BT_GET_MAX_VALID_ID(&pLvInfo->pDuInfo->webTable);
-    gctUINT     numDef = BT_GET_MAX_VALID_ID(&pLvInfo->pDuInfo->defTable);
+    VSC_ErrCode  errCode = VSC_ERR_NONE;
+    gctUINT      numWeb = BT_GET_MAX_VALID_ID(&pLvInfo->pDuInfo->webTable);
+    gctUINT      numDef = BT_GET_MAX_VALID_ID(&pLvInfo->pDuInfo->defTable);
 
     VIR_RA_LS_Liverange *pLR;
     gctUINT             i;
@@ -1292,12 +1293,17 @@ static gctBOOL _VIR_RA_LS_Init(
         numDef);
 
     /* allocate the live range table */
-    vscSRARR_Initialize(
-        VIR_RA_LS_GetLRTable(pRA),
-        VIR_RA_LS_GetMM(pRA),
-        numWeb,
-        sizeof(VIR_RA_LS_Liverange),
-        gcvNULL);
+    errCode = vscSRARR_Initialize(
+                VIR_RA_LS_GetLRTable(pRA),
+                VIR_RA_LS_GetMM(pRA),
+                numWeb,
+                sizeof(VIR_RA_LS_Liverange),
+                gcvNULL);
+    if (errCode != VSC_ERR_NONE)
+    {
+        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "fail to allocate the live range table");
+        return gcvFALSE;
+    }
     vscSRARR_SetElementCount(VIR_RA_LS_GetLRTable(pRA), numWeb);
 
     /* initialize webIdx/color/channelmask for each LR in LRTable
@@ -1372,6 +1378,7 @@ static gctBOOL _VIR_RA_LS_Init(
                 VIR_RA_LS_GetMM(pRA), sizeof(VIR_RA_LS_Liverange));
     if (pLR == gcvNULL)
     {
+        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "fail to allocate LR sorted list");
         return gcvFALSE;
     }
     VIR_RA_LS_SetSortedLRHead(pRA, pLR);
@@ -1383,6 +1390,7 @@ static gctBOOL _VIR_RA_LS_Init(
                 VIR_RA_LS_GetMM(pRA), sizeof(VIR_RA_LS_Liverange));
     if (pLR == gcvNULL)
     {
+        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "fail to allocate LR active list");
         return gcvFALSE;
     }
     VIR_RA_LS_SetActiveLRHead(pRA, pLR);
@@ -1390,7 +1398,11 @@ static gctBOOL _VIR_RA_LS_Init(
     /* allocate for outputLRTable */
     pRA->outputLRTable = vscHTBL_Create(VIR_RA_LS_GetMM(pRA),
                             _VIR_RA_OutputKey_HFUNC, _VIR_RA_OutputKey_HKCMP, 512);
-
+    if (pRA->outputLRTable == gcvNULL)
+    {
+        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "fail to allocate for outputLRTable");
+        return gcvFALSE;
+    }
     _VIR_RA_Check_SpecialFlags(pRA);
 
     /* make sure that liveness is valid */
@@ -1423,6 +1435,11 @@ static gctBOOL _VIR_RA_LS_Init(
 
         pRA->movaHash = vscHTBL_Create(VIR_RA_LS_GetMM(pRA),
                                        _HFUNC_RA_MOVA_CONSTKEY, _HKCMP_RA_MOVA_CONSTKEY, 64);
+        if (pRA->movaHash == gcvNULL)
+        {
+            ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "fail to allocate for movaHash");
+            return gcvFALSE;
+        }
     }
     else
     {
@@ -1504,25 +1521,35 @@ void VIR_RA_ColorPool_Finalize(
     }
 }
 
-static void _VIR_RA_LS_AddDeadInst(
+static VSC_ErrCode _VIR_RA_LS_AddDeadInst(
     VIR_RA_LS*              pRA,
     VIR_Instruction*        pInst
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_HASH_TABLE*         pDestInstSet = VIR_RA_LS_GetDeadInstSet(pRA);
 
     /* Create the hash table if it is not created before. */
     if (pDestInstSet == gcvNULL)
     {
         pDestInstSet = vscHTBL_Create(VIR_RA_LS_GetMM(pRA), vscHFUNC_Default, vscHKCMP_Default, 8);
+        if(pDestInstSet == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR0(errCode);
+        }
         VIR_RA_LS_SetDeadInstSet(pRA, pDestInstSet);
     }
 
     /* Insert the dead instruction. */
-    vscHTBL_DirectSet(pDestInstSet, (void *)pInst, gcvNULL);
+    errCode = vscHTBL_DirectSet(pDestInstSet, (void *)pInst, gcvNULL);
+    ON_ERROR0(errCode);
 
     /* Mark the dead instruction. */
     VIR_Inst_SetFlag(pInst, VIR_INSTFLAG_DEAD_INST);
+
+OnError:
+    return errCode;
 }
 
 static void _VIR_RA_LS_DeleteDeadInsts(
@@ -2245,6 +2272,7 @@ gctBOOL _VIR_RA_LS_HandleMultiRegLR(
     VIR_Instruction *pInst,
     gctUINT         defIdx)
 {
+    VSC_ErrCode              errCode = VSC_ERR_NONE;
     VIR_LIVENESS_INFO       *pLvInfo = VIR_RA_LS_GetLvInfo(pRA);
     VIR_Shader              *pShader = VIR_RA_LS_GetShader(pRA);
     VIR_RA_LS_Liverange     *pLR = _VIR_RA_LS_Def2LR(pRA, defIdx);
@@ -2287,9 +2315,11 @@ gctBOOL _VIR_RA_LS_HandleMultiRegLR(
 
                     if(!vscHTBL_DirectTestAndGet(pRA->outputLRTable, (void*) outputKey, gcvNULL))
                     {
-                        vscHTBL_DirectSet(pRA->outputLRTable,
-                            (void*)_VIR_RA_NewOutputKey(pRA, varSym->u2.tempIndex, outputInst),
-                            ((void*)(gctSIZE_T) pLR->webIdx));
+                        errCode = vscHTBL_DirectSet(pRA->outputLRTable,
+                                                    (void*)_VIR_RA_NewOutputKey(pRA, varSym->u2.tempIndex, outputInst),
+                                                    ((void*)(gctSIZE_T) pLR->webIdx));
+                        if(errCode != VSC_ERR_NONE)
+                            return gcvFALSE;
                     }
                     vscMM_Free(VIR_RA_LS_GetMM(pRA), outputKey);
 
@@ -8841,7 +8871,8 @@ _VIR_RA_LS_InsertSpillOffset(
                 ERR_REPORT(retErrCode, "Failed to allocate memory for constKey.");
                 return retErrCode;
             }
-            vscHTBL_DirectSet(pRA->movaHash, constKey, (void*)movInst);
+            retErrCode = vscHTBL_DirectSet(pRA->movaHash, constKey, (void*)movInst);
+            CHECK_ERROR0(retErrCode);
         }
     }
     else

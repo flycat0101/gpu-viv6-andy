@@ -5340,6 +5340,7 @@ _AddUserRecusive(
     IN gcOPT_CODE       endCode
     )
 {
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
     gceSTATUS           status = gcvSTATUS_OK;
     gcOPT_CODE          code;
     gcOPT_LIST          preDef;
@@ -5361,7 +5362,8 @@ _AddUserRecusive(
                 }
                 else
                 {
-                    vscHTBL_DirectSet(pCodeSet, (void*)code, gcvNULL);
+                    errCode = vscHTBL_DirectSet(pCodeSet, (void*)code, gcvNULL);
+                    ON_ERROR2STATUS0(errCode);
 
                     gcmERR_BREAK(gcOpt_AddCodeToList(Optimizer, &code->users, Code));
 
@@ -5378,6 +5380,8 @@ _AddUserRecusive(
     }
 
     gcmFOOTER();
+
+OnError:
     return status;
 }
 #endif
@@ -5391,6 +5395,7 @@ _AddUser(
     )
 {
     gceSTATUS           status = gcvSTATUS_OK;
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
     gcOPT_LIST          list;
     gcOPT_CODE          code;
     VSC_HASH_TABLE *    pCodeSet;
@@ -5400,7 +5405,12 @@ _AddUser(
                    Optimizer, InputList, Code);
 
     mp = (VSC_PRIMARY_MEM_POOL *)Optimizer->mp;
-    vscHTBL_CreateOrInitialize(&mp->mmWrapper, (VSC_HASH_TABLE ** )&Optimizer->pCodeSet, vscHFUNC_DefaultPtr, vscHKCMP_Default, 256);
+    errCode = vscHTBL_CreateOrInitialize(&mp->mmWrapper, (VSC_HASH_TABLE ** )&Optimizer->pCodeSet, vscHFUNC_DefaultPtr, vscHKCMP_Default, 256);
+    if(errCode == VSC_ERR_OUT_OF_MEMORY)
+    {
+        status = gcvSTATUS_OUT_OF_MEMORY;
+        return status;
+    }
     pCodeSet = (VSC_HASH_TABLE *)Optimizer->pCodeSet;
 
     /* Add the input list to Root. */
@@ -5455,6 +5465,7 @@ _AddTempDependencyRecusive(
     IN gcOPT_CODE       endCode
     )
 {
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
     gceSTATUS           status = gcvSTATUS_OK;
     gcOPT_LIST          preDef;
     gctINT              index;
@@ -5476,7 +5487,8 @@ _AddTempDependencyRecusive(
                 }
                 else
                 {
-                    vscHTBL_DirectSet(pCodeSet, (void*)code, gcvNULL);
+                    errCode  = vscHTBL_DirectSet(pCodeSet, (void*)code, gcvNULL);
+                    ON_ERROR2STATUS0(errCode);
 
                     if (index < 0)
                     {
@@ -5501,6 +5513,8 @@ _AddTempDependencyRecusive(
     }
 
     gcmFOOTER();
+
+OnError:
     return status;
 }
 #endif
@@ -5514,6 +5528,7 @@ _AddTempDependency(
     )
 {
     gceSTATUS           status = gcvSTATUS_OK;
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
     gcOPT_LIST          list;
     gcOPT_CODE          code;
     VSC_PRIMARY_MEM_POOL *mp;
@@ -5522,7 +5537,12 @@ _AddTempDependency(
     gcmHEADER_ARG("Optimizer=%p SrcList=%p Root=%p", Optimizer, SrcList, Root);
 
     mp = (VSC_PRIMARY_MEM_POOL *)Optimizer->mp;
-    vscHTBL_CreateOrInitialize(&mp->mmWrapper, (VSC_HASH_TABLE ** )&Optimizer->pCodeSet, vscHFUNC_DefaultPtr, vscHKCMP_Default, 256);
+    errCode = vscHTBL_CreateOrInitialize(&mp->mmWrapper, (VSC_HASH_TABLE ** )&Optimizer->pCodeSet, vscHFUNC_DefaultPtr, vscHKCMP_Default, 256);
+    if(errCode == VSC_ERR_OUT_OF_MEMORY)
+    {
+        status = gcvSTATUS_OUT_OF_MEMORY;
+        return status;
+    }
     pCodeSet = (VSC_HASH_TABLE *)Optimizer->pCodeSet;
 
     for (list = SrcList; list; list = list->next)

@@ -131,7 +131,7 @@ typedef gctBOOL (*PFN_TREE_NODE_HANLDER)(VSC_TREE* pTree, VSC_TREE_NODE* pNode, 
 
 /* Creation and destroy */
 VSC_TREE* vscTREE_Create(VSC_MM* pMM, gctUINT leafInitAllocCount);
-void vscTREE_Initialize(VSC_TREE* pTree, VSC_MM* pMM, gctUINT leafInitAllocCount);
+VSC_ErrCode vscTREE_Initialize(VSC_TREE* pTree, VSC_MM* pMM, gctUINT leafInitAllocCount);
 void vscTREE_Finalize(VSC_TREE* pTree);
 void vscTREE_Destroy(VSC_TREE* pTree);
 

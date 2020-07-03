@@ -111,12 +111,13 @@ struct VSC_LCSE_EXPMAP
 #define VSC_LCSE_ExpMap_GetVectorizeAttrLd(em)      ((em)->bVectorizeAttrLd)
 #define VSC_LCSE_ExpMap_SetVectorizeAttrLd(em, l)   ((em)->bVectorizeAttrLd = (l))
 
-static void _VSC_LCSE_ExpMap_Init(
+static VSC_ErrCode _VSC_LCSE_ExpMap_Init(
     IN OUT VSC_LCSE_ExpMap*     expMap,
     IN VSC_LCSE*                lcse,
     IN gctBOOL                  bCreateWorkingInstSet
     )
 {
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
     VSC_HASH_TABLE*             pHT = gcvNULL;
 
     VSC_LCSE_ExpMap_SetLCSE(expMap, lcse);
@@ -128,9 +129,13 @@ static void _VSC_LCSE_ExpMap_Init(
     if (bCreateWorkingInstSet)
     {
         pHT = vscHTBL_Create(lcse->pMM, vscHFUNC_Default, vscHKCMP_Default, 8);
+        if(pHT == gcvNULL)
+            return VSC_ERR_OUT_OF_MEMORY;
     }
 
     VSC_LCSE_ExpMap_SetWorkingInstSet(expMap, pHT);
+
+    return errCode;
 }
 
 static void _VSC_LCSE_ExpMap_Final(
@@ -343,7 +348,7 @@ static VSC_ErrCode _VSC_LCSE_ExpMap_Gen(
         gcmASSERT(pWorkingInstSet != gcvNULL);
 
         /* Insert a NULL key value here. */
-        vscHTBL_DirectSet(pWorkingInstSet, (void *)inst, (void *)gcvNULL);
+        CHECK_ERROR0(vscHTBL_DirectSet(pWorkingInstSet, (void *)inst, (void *)gcvNULL));
     }
     return errCode;
 }
@@ -737,7 +742,7 @@ static VSC_ErrCode _VSC_LCSE_ReplaceInst(
                 }
 
                 /* Set the hash key. */
-                vscHTBL_DirectSet(pWorkingInstSet, (void *)commonEval, (void *)pNewAttrLdInst);
+                CHECK_ERROR0(vscHTBL_DirectSet(pWorkingInstSet, (void *)commonEval, (void *)pNewAttrLdInst));
                 pReplacedInstInHt = pNewAttrLdInst;
 
                 /* Replace the commonEval first. */
@@ -1405,10 +1410,11 @@ static gctBOOL _VSC_CIE_RemovalIntrinsic(
 }
 
 /*go through instruction list and collect intrinsic with only uniform/const/immediate parameters */
-void _VSC_CIE_CollectCands(
+VSC_ErrCode _VSC_CIE_CollectCands(
     IN VSC_CIE* cie,
     IN VSC_SIMPLE_RESIZABLE_ARRAY *intrinsicKeys)
 {
+    VSC_ErrCode          errCode = VSC_ERR_NONE;
     VSC_SIMPLE_RESIZABLE_ARRAY* key;
     VIR_Instruction     *pInst = VSC_CIE_GetCurrFunc(cie)->instList.pHead;
     while(pInst != gcvNULL)
@@ -1429,11 +1435,11 @@ void _VSC_CIE_CollectCands(
                 gctUINT i = vscSRARR_GetElementCount(intrinsicKeys);
                 key = (VSC_SIMPLE_RESIZABLE_ARRAY*)vscSRARR_GetNextEmpty(intrinsicKeys, &i);
 
-                vscSRARR_Initialize(key,
-                                    VSC_CIE_GetMm(cie),
-                                    4,
-                                    sizeof(VIR_Instruction*),
-                                    gcvNULL);
+                CHECK_ERROR0(vscSRARR_Initialize(key,
+                                                 VSC_CIE_GetMm(cie),
+                                                 4,
+                                                 sizeof(VIR_Instruction*),
+                                                 gcvNULL));
                 vscSRARR_AddElement(key, &pInst);
             }
         }
@@ -1444,6 +1450,8 @@ void _VSC_CIE_CollectCands(
     {
         _VSC_CIE_DumpIntrinsicKey(cie, intrinsicKeys);
     }
+
+    return errCode;
 }
 
 static void _VSC_CIE_FINALIZE(
@@ -1625,7 +1633,7 @@ VSC_ErrCode _VSC_CIE_PerformOnFunction(IN VSC_CIE* cie)
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_SIMPLE_RESIZABLE_ARRAY intrinsicKeys;
 
-    vscSRARR_Initialize(&intrinsicKeys, VSC_CIE_GetMm(cie), 4, sizeof(VSC_SIMPLE_RESIZABLE_ARRAY), gcvNULL);
+    CHECK_ERROR0(vscSRARR_Initialize(&intrinsicKeys, VSC_CIE_GetMm(cie), 4, sizeof(VSC_SIMPLE_RESIZABLE_ARRAY), gcvNULL));
 
     _VSC_CIE_CollectCands(cie, &intrinsicKeys);
 

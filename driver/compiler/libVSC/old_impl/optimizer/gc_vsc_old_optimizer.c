@@ -4582,6 +4582,7 @@ _InlineSinglelFunction(
     IN OUT gctUINT * functionRemoved
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     gceSTATUS status = gcvSTATUS_TRUE;
     gctUINT realCallerCount = 0;
     gcOPT_LIST caller;
@@ -4670,6 +4671,11 @@ _InlineSinglelFunction(
     /* Initialize the caller hash table. */
     vscPMP_Intialize(&mp, gcvNULL, 1024, sizeof(void *), gcvTRUE);
     pCallerInstTable = vscHTBL_Create(&mp.mmWrapper, vscHFUNC_Default, vscHKCMP_Default, 32);
+    if(pCallerInstTable == gcvNULL)
+    {
+        status = gcvSTATUS_OUT_OF_MEMORY;
+        gcmONERROR(status);
+    }
 
     do
     {
@@ -4715,7 +4721,8 @@ _InlineSinglelFunction(
                         codeCaller));
 
         /* Insert the caller instruction to the hash table. */
-        vscHTBL_DirectSet(pCallerInstTable, (void*)codeCaller, gcvNULL);
+        errCode = vscHTBL_DirectSet(pCallerInstTable, (void*)codeCaller, gcvNULL);
+        ON_ERROR2STATUS0(errCode);
 
         gcmONERROR(_ExpandOneFunctionCall(Optimizer,
                                           function,

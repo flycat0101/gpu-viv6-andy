@@ -68,18 +68,21 @@ VSC_TREE* vscTREE_Create(VSC_MM* pMM, gctUINT leafInitAllocCount)
     {
         return gcvNULL;
     }
-    vscTREE_Initialize(pTree, pMM, leafInitAllocCount);
+    if (vscTREE_Initialize(pTree, pMM, leafInitAllocCount) != VSC_ERR_NONE)
+        return gcvNULL;
 
     return pTree;
 }
 
-void vscTREE_Initialize(VSC_TREE* pTree, VSC_MM* pMM, gctUINT leafInitAllocCount)
+VSC_ErrCode vscTREE_Initialize(VSC_TREE* pTree, VSC_MM* pMM, gctUINT leafInitAllocCount)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     pTree->pMM = pMM;
     pTree->nextNodeId = 0;
     pTree->pRootNode = gcvNULL;
     TNLST_INITIALIZE(&pTree->nodeList);
-    vscSRARR_Initialize(&pTree->leafNodeArray, pMM, leafInitAllocCount, sizeof(VSC_TREE_NODE*), TREE_NODE_CMP);
+    errCode = vscSRARR_Initialize(&pTree->leafNodeArray, pMM, leafInitAllocCount, sizeof(VSC_TREE_NODE*), TREE_NODE_CMP);
+    return errCode;
 }
 
 void vscTREE_Finalize(VSC_TREE* pTree)

@@ -2997,7 +2997,8 @@ _VIR_LinkIntrinsicLib_AddVregSymbol(
 
         pNewVarSym = VIR_Shader_GetSymFromId(pShader, newVarSymId);
         _VIR_LinkIntrinsicLib_SetNewSymbolPrecision(pNewVarSym, pLibVarSym);
-        vscHTBL_DirectSet(pTempSet, (void*) pLibVarSym, (void*) pNewVarSym);
+        errCode = vscHTBL_DirectSet(pTempSet, (void*) pLibVarSym, (void*) pNewVarSym);
+        ON_ERROR0(errCode);
 
         for (i = 0; i < regCount; i++)
         {
@@ -3023,7 +3024,8 @@ _VIR_LinkIntrinsicLib_AddVregSymbol(
             VIR_Symbol_SetIndexRange(pVirRegSym, *pRegId + regCount);
             VIR_Symbol_SetVregVariable(pVirRegSym, pNewVarSym);
 
-            vscHTBL_DirectSet(pTempSet, (void*) pLibRegSym, (void*) pVirRegSym);
+            errCode = vscHTBL_DirectSet(pTempSet, (void*) pLibRegSym, (void*) pVirRegSym);
+            ON_ERROR0(errCode);
 
             if (i != 0 && errCode != preErrCode)
             {
@@ -3065,7 +3067,8 @@ _VIR_LinkIntrinsicLib_AddVregSymbol(
         _VIR_LinkIntrinsicLib_SetNewSymbolPrecision(pVirRegSym, pLibVirRegSym);
         regCount = VIR_Type_GetRegCount(pShader, VIR_Symbol_GetType(pVirRegSym), gcvFALSE);
 
-        vscHTBL_DirectSet(pTempSet, (void*) pLibVirRegSym, (void*) pVirRegSym);
+        errCode = vscHTBL_DirectSet(pTempSet, (void*) pLibVirRegSym, (void*) pVirRegSym);
+        ON_ERROR0(errCode);
 
         if (pVirRegSymId)
         {
@@ -3545,7 +3548,7 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
                 *tempIndexStart = *tempIndexStart +
                     VIR_Type_GetRegCount(pShader, VIR_Symbol_GetType(newVirRegSym), gcvFALSE);
 
-                vscHTBL_DirectSet(pTempSet, (void*)libSym, (void*)newVirRegSym);
+                CHECK_ERROR0(vscHTBL_DirectSet(pTempSet, (void*)libSym, (void*)newVirRegSym));
             }
             VIR_Operand_SetRelIndex(pOpnd, newVirRegId);
         }
@@ -3603,7 +3606,8 @@ _VIR_LinkIntrinsicLib_CopyInst(
                                                  &pCallee);
                 ON_ERROR(errCode, "_VIR_LinkIntrinsicLib_CopyInst");
 
-                vscHTBL_DirectSet(pAddLibFuncSet, (void*) pCallee, gcvNULL);
+                errCode = vscHTBL_DirectSet(pAddLibFuncSet, (void*) pCallee, gcvNULL);
+                ON_ERROR0(errCode);
                 errCode = VIR_LIB_WorkListQueue(pMM, pWorkList, pCallee);
                 ON_ERROR(errCode, "_VIR_LIB_WorkListQueue");
             }
@@ -3657,7 +3661,8 @@ _VIR_LinkIntrinsicLib_CopyInst(
             newLabel = VIR_GetLabelFromId(pFunc, newLabelId);
             newLabel->defined = newInst;
             VIR_Operand_SetLabel(newInst->dest, newLabel);
-            vscHTBL_DirectSet(pLabelSet, (void*) libLabel, (void*) newLabel);
+            errCode = vscHTBL_DirectSet(pLabelSet, (void*) libLabel, (void*) newLabel);
+            ON_ERROR0(errCode);
 
             vscMM_Free(pMM, labelName);
 
@@ -3685,7 +3690,8 @@ _VIR_LinkIntrinsicLib_CopyInst(
             {
                 /* we need to save the unchanged jmp into a list, its label willl be changed
                     at the end */
-                vscHTBL_DirectSet(pJmpSet, (void*) libInst, (void*) newInst);
+                errCode = vscHTBL_DirectSet(pJmpSet, (void*) libInst, (void*) newInst);
+                ON_ERROR0(errCode);
             }
 
             VIR_Inst_SetConditionOp(newInst, VIR_Inst_GetConditionOp(libInst));
@@ -3763,6 +3769,12 @@ VIR_Lib_LinkFunctions(
 
     /* jmp to be updated at the end of the shader processing */
     pJmpSet = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 64);
+
+    if(pLabelSet == gcvNULL || pJmpSet == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR0(errCode);
+    }
 
     while(!QUEUE_CHECK_EMPTY(pWorkList))
     {
@@ -3861,7 +3873,8 @@ VIR_Lib_LinkFunctions(
                         newVirReg = VIR_Function_GetSymFromId(pFunc, newVirRegId);
 
                         /* save temp to the temp hash table */
-                        vscHTBL_DirectSet(pTempSet, (void*) tmpVirReg, (void*) newVirReg);
+                        errCode = vscHTBL_DirectSet(pTempSet, (void*) tmpVirReg, (void*) newVirReg);
+                        ON_ERROR0(errCode);
 
                         isCreateNewVreg = gcvTRUE;
                     }
@@ -3938,7 +3951,8 @@ VIR_Lib_LinkFunctions(
                 tempIndexStart = tempIndexStart + regCount;
 
                 /* save temp to the temp hash table */
-                vscHTBL_DirectSet(pTempSet, (void*) libVirReg, (void*) newVirReg);
+                errCode = vscHTBL_DirectSet(pTempSet, (void*) libVirReg, (void*) newVirReg);
+                ON_ERROR0(errCode);
             }
         }
 
@@ -7291,6 +7305,11 @@ _LinkLib_Transform(
 
     /* Use it to save the lib function that generates during this transform. */
     VSC_HASH_TABLE      *pAddLibFuncSet = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 64);
+    if(pAddLibFuncSet == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR0(errCode);
+    }
 
     QUEUE_INITIALIZE(&vTranspointslist);
     QUEUE_INITIALIZE(&vFuncList);

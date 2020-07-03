@@ -2556,7 +2556,8 @@ static VSC_ErrCode _VSC_PH_GenerateLValueModifier(
         }
 
         /* all prerequisites are met. add this def_inst to work set */
-        vscHTBL_DirectSet(work_set, (void*)def_inst, gcvNULL);
+        errCode = vscHTBL_DirectSet(work_set, (void*)def_inst, gcvNULL);
+        ON_ERROR0(errCode);
     }
 
     gcmASSERT(invalid_case || HTBL_GET_ITEM_COUNT(work_set));
@@ -2595,7 +2596,8 @@ static VSC_ErrCode _VSC_PH_GenerateLValueModifier(
                         errCode = VSC_ERR_OUT_OF_MEMORY;
                         return errCode;
                     }
-                    vscHTBL_DirectSet(inst_usage_set, (void*)ot, gcvNULL);
+                    errCode = vscHTBL_DirectSet(inst_usage_set, (void*)ot, gcvNULL);
+                    ON_ERROR0(errCode);
                 }
             }
         }
@@ -3000,7 +3002,8 @@ static VSC_ErrCode _VSC_PH_GenerateRValueModifier(
                 errCode = VSC_ERR_OUT_OF_MEMORY;
                 return errCode;
             }
-            vscHTBL_DirectSet(work_set, (void*)ot, gcvNULL);
+            errCode = vscHTBL_DirectSet(work_set, (void*)ot, gcvNULL);
+            ON_ERROR0(errCode);
         }
 
         if(invalid_case)
@@ -3026,7 +3029,8 @@ static VSC_ErrCode _VSC_PH_GenerateRValueModifier(
                 def = vscVIR_GeneralUdIterator_Next(&inst_ud_iter))
             {
                 VIR_Instruction* def_inst = def->defKey.pDefInst;
-                vscHTBL_DirectSet(def_inst_set, (void*)def_inst, gcvNULL);
+                errCode = vscHTBL_DirectSet(def_inst_set, (void*)def_inst, gcvNULL);
+                ON_ERROR0(errCode);
             }
         }
 
@@ -3571,7 +3575,8 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
                 errCode = VSC_ERR_OUT_OF_MEMORY;
                 return errCode;
             }
-            vscHTBL_DirectSet(add_sub_set, (void*)ot, gcvNULL);
+            errCode = vscHTBL_DirectSet(add_sub_set, (void*)ot, gcvNULL);
+            ON_ERROR0(errCode);
         }
 
         if(invalid_case)
@@ -3603,7 +3608,8 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
                 def = vscVIR_GeneralUdIterator_Next(&inst_ud_iter))
             {
                 VIR_Instruction* def_inst = def->defKey.pDefInst;
-                vscHTBL_DirectSet(def_inst_set0, (void*)def_inst, gcvNULL);
+                errCode = vscHTBL_DirectSet(def_inst_set0, (void*)def_inst, gcvNULL);
+                ON_ERROR0(errCode);
             }
 
             vscVIR_InitGeneralUdIterator(&inst_ud_iter, VSC_PH_Peephole_GetDUInfo(ph), mul, mul_src1, gcvFALSE, gcvFALSE);
@@ -3611,7 +3617,8 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
                 def = vscVIR_GeneralUdIterator_Next(&inst_ud_iter))
             {
                 VIR_Instruction* def_inst = def->defKey.pDefInst;
-                vscHTBL_DirectSet(def_inst_set1, (void*)def_inst, gcvNULL);
+                errCode = vscHTBL_DirectSet(def_inst_set1, (void*)def_inst, gcvNULL);
+                ON_ERROR0(errCode);
             }
         }
 
@@ -4043,7 +4050,8 @@ static VSC_ErrCode _VSC_PH_MergeAddSubSameValue(
                 return errCode;
             }
             pOpndTarget->pPrivData = (void*)(gctUINTPTR_T)matchSrcIndex;
-            vscHTBL_DirectSet(pAddSubSet, (void*)pOpndTarget, gcvNULL);
+            errCode = vscHTBL_DirectSet(pAddSubSet, (void*)pOpndTarget, gcvNULL);
+            ON_ERROR0(errCode);
         }
     }
 
@@ -4457,7 +4465,8 @@ static VSC_ErrCode _VSC_PH_GenerateRSQ(
                 errCode = VSC_ERR_OUT_OF_MEMORY;
                 return errCode;
             }
-            vscHTBL_DirectSet(rcp_set, (void*)ot, gcvNULL);
+            errCode = vscHTBL_DirectSet(rcp_set, (void*)ot, gcvNULL);
+            ON_ERROR0(errCode);
         }
 
         if(invalid_case)
@@ -4485,7 +4494,8 @@ static VSC_ErrCode _VSC_PH_GenerateRSQ(
                 def = vscVIR_GeneralUdIterator_Next(&inst_ud_iter))
             {
                 VIR_Instruction* def_inst = def->defKey.pDefInst;
-                vscHTBL_DirectSet(def_inst_set0, (void*)def_inst, gcvNULL);
+                errCode = vscHTBL_DirectSet(def_inst_set0, (void*)def_inst, gcvNULL);
+                ON_ERROR0(errCode);
             }
         }
 
@@ -4845,7 +4855,8 @@ static VSC_ErrCode _VSC_PH_GenerateLShiftedLS(
                 errCode = VSC_ERR_OUT_OF_MEMORY;
                 return errCode;
             }
-            vscHTBL_DirectSet(ls_set, (void*)ot, gcvNULL);
+            errCode = vscHTBL_DirectSet(ls_set, (void*)ot, gcvNULL);
+            ON_ERROR0(errCode);
         }
 
         if(invalid_case)
@@ -4873,7 +4884,8 @@ static VSC_ErrCode _VSC_PH_GenerateLShiftedLS(
                 def = vscVIR_GeneralUdIterator_Next(&inst_ud_iter))
             {
                 VIR_Instruction* def_inst = def->defKey.pDefInst;
-                vscHTBL_DirectSet(def_inst_set0, (void*)def_inst, gcvNULL);
+                errCode = vscHTBL_DirectSet(def_inst_set0, (void*)def_inst, gcvNULL);
+                ON_ERROR0(errCode);
             }
         }
 
@@ -5144,7 +5156,8 @@ static VSC_ErrCode _VSC_PH_GenerateLoadStore(
                 errCode = VSC_ERR_OUT_OF_MEMORY;
                 return errCode;
             }
-            vscHTBL_DirectSet(pWorkingSet, (void*)ot, gcvNULL);
+            errCode = vscHTBL_DirectSet(pWorkingSet, (void*)ot, gcvNULL);
+            ON_ERROR0(errCode);
         }
     }
 
@@ -5326,9 +5339,9 @@ static VSC_ErrCode _VSC_PH_RecordUsages(
                 errCode = VSC_ERR_OUT_OF_MEMORY;
                 return errCode;
             }
-            vscHTBL_DirectSet(usages_set,
-                (void*)ot,
-                gcvNULL);
+            CHECK_ERROR0(vscHTBL_DirectSet(usages_set,
+                                           (void*)ot,
+                                           gcvNULL));
         }
     }
 
@@ -5551,7 +5564,8 @@ static VSC_ErrCode _VSC_PH_VEC_MergeInst(
                     errCode = VSC_ERR_OUT_OF_MEMORY;
                     return errCode;
                 }
-                vscHTBL_DirectSet(vec_def_set, (void*)mergeKey, (void*) currInst);
+                errCode = vscHTBL_DirectSet(vec_def_set, (void*)mergeKey, (void*) currInst);
+                ON_ERROR0(errCode);
                 if (merged_inst == gcvNULL)
                 {
                     merged_inst = currInst;
@@ -5589,7 +5603,8 @@ static VSC_ErrCode _VSC_PH_VEC_MergeInst(
                         errCode = VSC_ERR_OUT_OF_MEMORY;
                         ON_ERROR(errCode, "Fail to add NewMergedInst.");
                     }
-                    vscHTBL_DirectSet(vec_def_set, (void*)(curr_mova), (void*) currInst);
+                    errCode = vscHTBL_DirectSet(vec_def_set, (void*)(curr_mova), (void*) currInst);
+                    ON_ERROR0(errCode);
                     merged_inst = currInst;
                 }
                 found_diff = gcvFALSE;

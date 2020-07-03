@@ -66,7 +66,7 @@ VSC_GlobalUniformItem_Initialize(
     IN VIR_Id id
     );
 
-void
+VSC_ErrCode
 VSC_GlobalUniformItem_Update(
     IN OUT VSC_GlobalUniformItem* item,
     IN VIR_Shader* shader,
@@ -129,7 +129,7 @@ typedef struct VSC_GLOBALUNIFORMTABLE
 #define VSC_GlobalUniformTable_GetMM(gut)                           (&(gut)->mem_pool)
 #define VSC_GlobalUniformTable_SetMM(gut, m)                        ((gut)->mem_pool = *(m))
 
-void
+VSC_ErrCode
 VSC_GlobalUniformTable_Initialize(
     IN OUT VSC_GlobalUniformTable* global_uniform_table,
     IN VSC_AllShaders* all_shaders,

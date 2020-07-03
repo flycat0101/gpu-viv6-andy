@@ -6322,7 +6322,7 @@ gctBOOL VIR_SymAliasTable_IsEmpty(
     IN VIR_SymAliasTable        *Table
     );
 
-void VIR_SymAliasTable_Insert(
+VSC_ErrCode VIR_SymAliasTable_Insert(
     IN OUT VIR_SymAliasTable    *Table,
     IN VIR_Symbol               *Sym,
     IN VIR_Symbol               *Alias

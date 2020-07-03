@@ -143,10 +143,10 @@ void vscERR_ReportWarning(const char* file, gctUINT line, VSC_ErrCode status, co
 
 #define ON_ERROR0(Err)                                        \
     do {                                                      \
-           errCode = (Err);                                   \
-           if (errCode != VSC_ERR_NONE)                       \
+           VSC_ErrCode _errCode = (Err);                                   \
+           if (_errCode != VSC_ERR_NONE)                       \
            {                                                  \
-               ERR_REPORT0(errCode);                          \
+               ERR_REPORT0(_errCode);                          \
                goto OnError;                                  \
            }                                                  \
     } while (0)

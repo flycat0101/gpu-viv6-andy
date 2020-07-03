@@ -2197,18 +2197,21 @@ static VSC_ErrCode _VectorizeVirreg2VirregOpnds(VIR_VECTORIZER_INFO* pVectorizer
     return VSC_ERR_NONE;
 }
 
-static void _UpdateVectorizedVImmHashTable(VIR_VECTORIZER_INFO* pVectorizerInfo,
+static VSC_ErrCode _UpdateVectorizedVImmHashTable(VIR_VECTORIZER_INFO* pVectorizerInfo,
                                            VIR_Operand*  pSeedOpnd,
                                            VIR_Operand*  pOpnd)
 {
+    VSC_ErrCode    errCode = VSC_ERR_NONE;
     gctUINT*       pDummyData = 0;
 
     vscHTBL_DirectRemove(&pVectorizerInfo->vectorizedVImmHashTable, pOpnd);
 
     if (!vscHTBL_DirectTestAndGet(&pVectorizerInfo->vectorizedVImmHashTable, pSeedOpnd, (void**)&pDummyData))
     {
-        vscHTBL_DirectSet(&pVectorizerInfo->vectorizedVImmHashTable, pSeedOpnd, pDummyData);
+        errCode = vscHTBL_DirectSet(&pVectorizerInfo->vectorizedVImmHashTable, pSeedOpnd, pDummyData);
     }
+
+    return errCode;
 }
 
 static VSC_ErrCode _VectorizeSimm2SimmOpnds(VIR_VECTORIZER_INFO* pVectorizerInfo,
@@ -2679,8 +2682,9 @@ static VSC_ErrCode _VectorizeSym2SymOnDst(VIR_Shader* pShader,
         }
     }
 
-    vscHTBL_Initialize(&opndSwizzleHashTable, pMM, vscHFUNC_Default,
+    errCode = vscHTBL_Initialize(&opndSwizzleHashTable, pMM, vscHFUNC_Default,
                        gcvNULL, 32);
+    ON_ERROR0(errCode);
 
     for (channel = VIR_CHANNEL_X; channel < VIR_CHANNEL_NUM; channel ++)
     {
@@ -2757,7 +2761,8 @@ static VSC_ErrCode _VectorizeSym2SymOnDst(VIR_Shader* pShader,
             VIR_Operand_SetSwizzle(pUsageOpnd, newSwizzle);
 
             pChannelMask = (gctUINT*)(gctUINTPTR_T)channelMask;
-            vscHTBL_DirectSet(&opndSwizzleHashTable, pUsageOpnd, pChannelMask);
+            errCode = vscHTBL_DirectSet(&opndSwizzleHashTable, pUsageOpnd, pChannelMask);
+            ON_ERROR0(errCode);
 
             if (VIR_Operand_GetSymbol(pUsageOpnd) != VIR_Operand_GetSymbol(pSeedDst))
             {
@@ -2879,6 +2884,7 @@ static VSC_ErrCode _VectorizeSym2SymOnDst(VIR_Shader* pShader,
     /* OK, we have succefully vectorized sym */
     *pVectorizeSucc = gcvTRUE;
 
+OnError:
     return errCode;
 }
 
@@ -3247,6 +3253,11 @@ static VSC_ErrCode _RemoveRedundantExpressions(VIR_VECTORIZER_INFO* pVectorizerI
             {
                 pVectorizerInfo->pRedundantExpressionHashTable =
                     vscHTBL_Create(pVectorizerInfo->pMM, vscHFUNC_Default, vscHKCMP_Default, 16);
+                if(pVectorizerInfo->pRedundantExpressionHashTable == gcvNULL)
+                {
+                    errCode = VSC_ERR_OUT_OF_MEMORY;
+                    return errCode;
+                }
             }
 
             /*
@@ -3262,7 +3273,7 @@ static VSC_ErrCode _RemoveRedundantExpressions(VIR_VECTORIZER_INFO* pVectorizerI
             else
             {
                 origSwizzle = VIR_Operand_GetSwizzle(pUsageOpnd);
-                vscHTBL_DirectSet(pVectorizerInfo->pRedundantExpressionHashTable, (void *)pUsageOpnd, (void *)(gctUINTPTR_T)origSwizzle);
+                CHECK_ERROR0(vscHTBL_DirectSet(pVectorizerInfo->pRedundantExpressionHashTable, (void *)pUsageOpnd, (void *)(gctUINTPTR_T)origSwizzle));
             }
 
             for (i = 0; i < VIR_CHANNEL_COUNT; i ++)
@@ -3886,11 +3897,12 @@ static VSC_ErrCode _DoVectorizationOnBasicBlock(VIR_VECTORIZER_INFO* pVectorizer
     gctUINT                     i, j, k;
     gctUINT                     vectorizeTimes = 1; /* By default we vectorize only one time. */
 
-    vscSRARR_Initialize(&opArray,
-                        pMM,
-                        5,
-                        sizeof(VSC_SIMPLE_RESIZABLE_ARRAY),
-                        gcvNULL);
+    errCode = vscSRARR_Initialize(&opArray,
+                                  pMM,
+                                  5,
+                                  sizeof(VSC_SIMPLE_RESIZABLE_ARRAY),
+                                  gcvNULL);
+    ON_ERROR0(errCode);
 
     /* Collect potential inst candidates per comp-wised opcode */
     while (pInst)
@@ -3925,11 +3937,12 @@ static VSC_ErrCode _DoVectorizationOnBasicBlock(VIR_VECTORIZER_INFO* pVectorizer
             {
                 pInstArray = (VSC_SIMPLE_RESIZABLE_ARRAY*)vscSRARR_GetNextEmpty(&opArray, &i);
 
-                vscSRARR_Initialize(pInstArray,
-                                    pMM,
-                                    5,
-                                    sizeof(VIR_Instruction*),
-                                    gcvNULL);
+                errCode = vscSRARR_Initialize(pInstArray,
+                                              pMM,
+                                              5,
+                                              sizeof(VIR_Instruction*),
+                                              gcvNULL);
+                ON_ERROR0(errCode);
 
                 vscSRARR_AddElement(pInstArray, &pInst);
             }
@@ -4279,10 +4292,11 @@ VSC_ErrCode vscVIR_DoLocalVectorization(VSC_SH_PASS_WORKER* pPassWorker)
     vectorizerInfo.pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
     vectorizerInfo.bInvalidCfg = gcvFALSE;
     vectorizerInfo.pRedundantExpressionHashTable = gcvNULL;
-    vscHTBL_Initialize(&vectorizerInfo.vectorizedVImmHashTable,
-                       vectorizerInfo.pMM,
-                       vscHFUNC_Default,
-                       gcvNULL, 32);
+    errCode = vscHTBL_Initialize(&vectorizerInfo.vectorizedVImmHashTable,
+                                 vectorizerInfo.pMM,
+                                 vscHFUNC_Default,
+                                 gcvNULL, 32);
+    ON_ERROR0(errCode);
 
     VIR_Shader_RenumberInstId(pShader);
     VIR_Shader_AnalyzeInst(pShader);

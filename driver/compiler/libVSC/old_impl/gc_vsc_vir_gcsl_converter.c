@@ -69,11 +69,12 @@ VIR_Inst_GetRelEnable(
     IN VIR_Operand     *Opnd
     );
 
-static void
+static VSC_ErrCode
 _InitialConverter(
     IN OUT Converter *Converter
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     vscPMP_Intialize(&Converter->MemPool, gcvNULL, 1024, sizeof(void *), gcvTRUE/*pooling*/);
 
     Converter->InstTable = vscHTBL_Create(&Converter->MemPool.mmWrapper,
@@ -82,6 +83,11 @@ _InitialConverter(
         vscHFUNC_Default, vscHKCMP_Default, 32);
     Converter->UniformTable = vscHTBL_Create(&Converter->MemPool.mmWrapper,
         vscHFUNC_Default, vscHKCMP_Default, 32);
+    if(Converter->InstTable == gcvNULL || Converter->FuncTable == gcvNULL || Converter->UniformTable == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        return errCode;
+    }
 #if SAVE_TEMP_REGISTER
     {
         gctSIZE_T i = 0;
@@ -91,6 +97,8 @@ _InitialConverter(
         }
     }
 #endif
+
+    return errCode;
 }
 
 static void
@@ -112,7 +120,7 @@ _FindValue(
     return (gctSIZE_T)vscHTBL_DirectGet(Table, Key);
 }
 
-static void
+static VSC_ErrCode
 _AddValue(
     IN OUT VSC_HASH_TABLE *Table,
     IN void          *Key,
@@ -121,7 +129,7 @@ _AddValue(
 {
     gcmASSERT(Table != gcvNULL);
 
-    vscHTBL_DirectSet(Table, Key, (void *)Value);
+    return vscHTBL_DirectSet(Table, Key, (void *)Value);
 }
 
 static gctBOOL

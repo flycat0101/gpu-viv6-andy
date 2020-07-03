@@ -294,7 +294,7 @@ typedef struct VIR_LOOPINFO
 #define VIR_LoopInfo_GetDumper(l)                   VIR_LoopInfoMgr_GetDumper(VIR_LoopInfo_GetLoopInfoMgr(l))
 #define VIR_LoopInfo_GetMM(l)                       VIR_LoopInfoMgr_GetMM(VIR_LoopInfo_GetLoopInfoMgr(l))
 
-void
+VSC_ErrCode
 VIR_LoopOpts_Init(
     VIR_LoopOpts* loopOpts,
     VIR_DEF_USAGE_INFO* pDuInfo,

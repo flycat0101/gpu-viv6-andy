@@ -887,7 +887,11 @@ static VSC_ErrCode _VIR_MergeICASTP(
         VIR_OPCODE_isVX(VIR_Inst_GetOpcode(usage_inst_of_icast)))
     {
         VSC_HASH_TABLE* def_inst_set0 = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 64);
-
+        if(def_inst_set0 == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            return errCode;
+        }
         /* collect the def of the src0 of the icast inst, and delete the usage between icast's src0's def and icast's src0 */
         {
             VIR_GENERAL_UD_ITERATOR inst_ud_iter;
@@ -898,7 +902,7 @@ static VSC_ErrCode _VIR_MergeICASTP(
                 def = vscVIR_GeneralUdIterator_Next(&inst_ud_iter))
             {
                 VIR_Instruction* def_inst = def->defKey.pDefInst;
-                vscHTBL_DirectSet(def_inst_set0, (void*)def_inst, gcvNULL);
+                CHECK_ERROR0(vscHTBL_DirectSet(def_inst_set0, (void*)def_inst, gcvNULL));
             }
         }
 

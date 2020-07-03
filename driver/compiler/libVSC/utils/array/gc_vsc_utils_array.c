@@ -21,20 +21,31 @@ VSC_SIMPLE_RESIZABLE_ARRAY* vscSRARR_Create(VSC_MM* pMM, gctUINT initAllocEleCou
 
     pArray = (VSC_SIMPLE_RESIZABLE_ARRAY*)vscMM_Alloc(pMM, sizeof(VSC_SIMPLE_RESIZABLE_ARRAY));
     if (pArray == gcvNULL)
+    {
+        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Fail in vscSRARR_Create");
         return pArray;
-    vscSRARR_Initialize(pArray, pMM, initAllocEleCount, elementSize, pfnEleCmp);
+    }
+    if(vscSRARR_Initialize(pArray, pMM, initAllocEleCount, elementSize, pfnEleCmp) != VSC_ERR_NONE)
+        return gcvNULL;
 
     return pArray;
 }
 
-void vscSRARR_Initialize(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, VSC_MM* pMM, gctUINT initAllocEleCount, gctUINT elementSize, PFN_VSC_ARRAY_ELE_CMP pfnEleCmp)
+VSC_ErrCode vscSRARR_Initialize(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, VSC_MM* pMM, gctUINT initAllocEleCount, gctUINT elementSize, PFN_VSC_ARRAY_ELE_CMP pfnEleCmp)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     pArray->pMM = pMM;
     pArray->pfnEleCmp = pfnEleCmp;
     pArray->elementSize = elementSize;
     pArray->elementCount = 0;
     pArray->allocatedCount = initAllocEleCount;
     pArray->pElement = vscMM_Alloc(pMM, elementSize*initAllocEleCount);
+    if(pArray->pElement == gcvNULL)
+    {
+        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Fail in vscSRARR_Initialize");
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+    }
+    return errCode;
 }
 
 void vscSRARR_Finalize(VSC_SIMPLE_RESIZABLE_ARRAY* pArray)

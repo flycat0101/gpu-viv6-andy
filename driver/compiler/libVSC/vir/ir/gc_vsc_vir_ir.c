@@ -2467,11 +2467,11 @@ _VIR_InitVirRegTable(VIR_Shader * Shader)
 {
     VSC_ErrCode errCode   = VSC_ERR_NONE;
     /* initialize hash table */
-    vscHTBL_Initialize(VIR_Shader_GetVirRegTable(Shader),
-        &Shader->pmp.mmWrapper,
-        (PFN_VSC_HASH_FUNC)vscHFUNC_VirReg,
-        (PFN_VSC_KEY_CMP)vcsHKCMP_VirReg,
-        512);
+    errCode = vscHTBL_Initialize(VIR_Shader_GetVirRegTable(Shader),
+                                &Shader->pmp.mmWrapper,
+                                (PFN_VSC_HASH_FUNC)vscHFUNC_VirReg,
+                                (PFN_VSC_KEY_CMP)vcsHKCMP_VirReg,
+                                512);
 
     return errCode;
 }
@@ -5559,7 +5559,10 @@ VIR_Shader_CreateSymAliasTable(
 
     VIR_SymAliasTable_SetMM(table, &Shader->pmp.mmWrapper);
     VIR_SymAliasTable_SetHashTable(table, vscHTBL_Create(&Shader->pmp.mmWrapper, vscHFUNC_Default, vscHKCMP_Default, 512));
-
+    if(table->pHashTable == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+    }
     return errCode;
 }
 
@@ -7011,12 +7014,13 @@ gctBOOL VIR_SymAliasTable_IsEmpty(
     return HTBL_GET_ITEM_COUNT(hashTable) == 0;
 }
 
-void VIR_SymAliasTable_Insert(
+VSC_ErrCode VIR_SymAliasTable_Insert(
     IN OUT VIR_SymAliasTable    *Table,
     IN VIR_Symbol               *Sym,
     IN VIR_Symbol               *Alias
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_HASH_TABLE* hashTable = VIR_SymAliasTable_GetHashTable(Table);
     void* knownAlias = gcvNULL;
 
@@ -7033,8 +7037,9 @@ void VIR_SymAliasTable_Insert(
     }
     else
     {
-        vscHTBL_DirectSet(hashTable, Sym, Alias);
+        CHECK_ERROR0(vscHTBL_DirectSet(hashTable, Sym, Alias));
     }
+    return errCode;
 }
 
 VIR_Symbol* VIR_SymAliasTable_GetAlias(
@@ -9936,8 +9941,9 @@ VIR_Shader_AddSymbolContents(
             {
                 VIR_VirRegId virRegId = VIR_Symbol_GetVregIndex(Sym);
                 /* add <virregId, symId> to shader virreg hash table */
-                vscHTBL_DirectSet(VIR_Shader_GetVirRegTable(Shader),
-                    (void *)(gctUINTPTR_T)virRegId, (void *)(gctUINTPTR_T)symId);
+                errCode = vscHTBL_DirectSet(VIR_Shader_GetVirRegTable(Shader),
+                                            (void *)(gctUINTPTR_T)virRegId, (void *)(gctUINTPTR_T)symId);
+                CHECK_ERROR0(errCode);
 
                 (void)VIR_Shader_UpdateVirRegCount(Shader, virRegId);
                 break;
@@ -10914,9 +10920,15 @@ VIR_Shader_AnalysisCstRegReadPort(
         if (pWorkingUniformSet == gcvNULL)
         {
             pWorkingUniformSet = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 8);
+            if(pWorkingUniformSet == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                return errCode;
+            }
         }
 
-        vscHTBL_DirectSet(pWorkingUniformSet, (void *)pSym, gcvNULL);
+        errCode = vscHTBL_DirectSet(pWorkingUniformSet, (void *)pSym, gcvNULL);
+        CHECK_ERROR0(errCode);
     }
 
     /* Not matched uniform, just bail out. */
@@ -11025,12 +11037,22 @@ VIR_Shader_AnalysisCstRegReadPort(
                     if (pUniformVecSet1 == gcvNULL)
                     {
                         pUniformVecSet1 = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 8);
-                        vscHTBL_DirectSet(pWorkingUniformSet, (void *)pUniformSymbol1, pUniformVecSet1);
+                        if(pUniformVecSet1 == gcvNULL)
+                        {
+                            errCode = VSC_ERR_OUT_OF_MEMORY;
+                            return errCode;
+                        }
+                        CHECK_ERROR0(vscHTBL_DirectSet(pWorkingUniformSet, (void *)pUniformSymbol1, pUniformVecSet1));
                     }
                     if (pUniformVecSet2 == gcvNULL)
                     {
                         pUniformVecSet2 = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 8);
-                        vscHTBL_DirectSet(pWorkingUniformSet, (void *)pUniformSymbol2, pUniformVecSet2);
+                        if(pUniformVecSet2 == gcvNULL)
+                        {
+                            errCode = VSC_ERR_OUT_OF_MEMORY;
+                            return errCode;
+                        }
+                        CHECK_ERROR0(vscHTBL_DirectSet(pWorkingUniformSet, (void *)pUniformSymbol2, pUniformVecSet2));
                     }
 
                     /* Update the uniform symbol 1. */
@@ -11039,7 +11061,7 @@ VIR_Shader_AnalysisCstRegReadPort(
                     {
                         usedInstCount++;
                     }
-                    vscHTBL_DirectSet(pUniformVecSet1, (void *)pUniformSymbol2, (void *)(gctUINTPTR_T)usedInstCount);
+                    CHECK_ERROR0(vscHTBL_DirectSet(pUniformVecSet1, (void *)pUniformSymbol2, (void *)(gctUINTPTR_T)usedInstCount));
 
                     /* Update the uniform symbol 2. */
                     usedInstCount = 1;
@@ -11047,7 +11069,7 @@ VIR_Shader_AnalysisCstRegReadPort(
                     {
                         usedInstCount++;
                     }
-                    vscHTBL_DirectSet(pUniformVecSet2, (void *)pUniformSymbol1, (void *)(gctUINTPTR_T)usedInstCount);
+                    CHECK_ERROR0(vscHTBL_DirectSet(pUniformVecSet2, (void *)pUniformSymbol1, (void *)(gctUINTPTR_T)usedInstCount));
 
                     bFound = gcvTRUE;
                 }
@@ -19875,7 +19897,7 @@ VIR_Inst_Check4Dual16(
 
             if (bMatched)
             {
-                vscHTBL_DirectSet(pWorkingInstSet, (void *)pInst, gcvNULL);
+                CHECK_ERROR0(vscHTBL_DirectSet(pWorkingInstSet, (void *)pInst, gcvNULL));
             }
         }
     }
