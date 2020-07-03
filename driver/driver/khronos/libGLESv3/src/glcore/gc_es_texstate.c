@@ -44,7 +44,10 @@ GLvoid __glFreeDefaultTextureObject(__GLcontext *gc, __GLtextureObject *tex)
     /* Free texture unit list */
     __glFreeImageUserList(gc, &tex->texUnitBoundList);
 
-    gcmOS_SAFE_FREE(gcvNULL, tex->faceMipmap);
+    if (tex->faceMipmap)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, tex->faceMipmap);
+    }
 }
 
 GLvoid __glInitTextureObject(__GLcontext *gc, __GLtextureObject *tex, GLuint id, GLuint targetIndex)
@@ -181,8 +184,15 @@ GLvoid __glInitTextureObject(__GLcontext *gc, __GLtextureObject *tex, GLuint id,
     tex->maxDepths = maxDepths;
     tex->maxSlices = maxSlices;
 
-    pointer = gc->imports.calloc(gc, 1, maxFaces * sizeof(__GLmipMapLevel*) +
-                                        maxFaces * maxLevels * sizeof(__GLmipMapLevel));
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+        maxFaces * sizeof(__GLmipMapLevel*) + maxFaces * maxLevels * sizeof(__GLmipMapLevel),
+        (gctPOINTER*)&pointer)))
+    {
+        return;
+    }
+
+    gcoOS_ZeroMemory(pointer,
+        maxFaces * sizeof(__GLmipMapLevel*) + maxFaces * maxLevels * sizeof(__GLmipMapLevel));
 
     tex->faceMipmap = (__GLmipMapLevel**)pointer;
     mipmaps = (__GLmipMapLevel*)(tex->faceMipmap + maxFaces);
@@ -238,7 +248,14 @@ GLvoid __glInitTextureState(__GLcontext *gc)
         /* Allocate VEGL lock */
         if (gcvNULL == gc->texture.shared->lock)
         {
-            gc->texture.shared->lock = (*gc->imports.calloc)(gc, 1, sizeof(VEGLLock));
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+                sizeof(VEGLLock),
+                (gctPOINTER*)&gc->texture.shared->lock)))
+            {
+                return;
+            }
+            gcoOS_ZeroMemory(gc->texture.shared->lock, sizeof(VEGLLock));
+
             (*gc->imports.createMutex)(gc->texture.shared->lock);
         }
         gcoOS_UnLockPLS();
@@ -247,14 +264,25 @@ GLvoid __glInitTextureState(__GLcontext *gc)
     {
         GL_ASSERT(NULL == gc->texture.shared);
 
-        gc->texture.shared = (__GLsharedObjectMachine*)(*gc->imports.calloc)(gc, 1, sizeof(__GLsharedObjectMachine));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+            sizeof(__GLsharedObjectMachine),
+            (gctPOINTER*)&gc->texture.shared)))
+        {
+            return;
+        }
+        gcoOS_ZeroMemory(gc->texture.shared, sizeof(__GLsharedObjectMachine));
 
         /* Initialize a linear lookup table for texture object */
         gc->texture.shared->maxLinearTableSize = __GL_MAX_TEXOBJ_LINEAR_TABLE_SIZE;
         gc->texture.shared->linearTableSize = __GL_DEFAULT_TEXOBJ_LINEAR_TABLE_SIZE;
-        gc->texture.shared->linearTable = (GLvoid **)
-            (*gc->imports.calloc)(gc, 1, gc->texture.shared->linearTableSize * sizeof(GLvoid *));
-
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+            gc->texture.shared->linearTableSize * sizeof(GLvoid *),
+            (gctPOINTER*)&gc->texture.shared->linearTable)))
+        {
+            gcmOS_SAFE_FREE(gcvNULL, gc->texture.shared);
+            return;
+        }
+        gcoOS_ZeroMemory(gc->texture.shared->linearTable, gc->texture.shared->linearTableSize * sizeof(GLvoid *));
         gc->texture.shared->hashSize = __GL_TEXOBJ_HASH_TABLE_SIZE;
         gc->texture.shared->hashMask = __GL_TEXOBJ_HASH_TABLE_SIZE - 1;
         gc->texture.shared->refcount = 1;
@@ -1579,7 +1607,14 @@ GLvoid __glBindTexture(__GLcontext *gc, GLuint unitIdx, GLuint targetIndex, GLui
         ** If this is the first time this name has been bound,
         ** then create a new texture object and initialize it.
         */
-        texObj = (__GLtextureObject *)(*gc->imports.calloc)(gc, 1, sizeof(__GLtextureObject));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+            sizeof(__GLtextureObject),
+            (gctPOINTER*)&texObj)))
+        {
+            __GL_ERROR_RET(GL_OUT_OF_MEMORY);
+        }
+        gcoOS_ZeroMemory(texObj, sizeof(__GLtextureObject));
+
         __glInitTextureObject(gc, texObj, texture, targetIndex);
 
         /* Add this texture object to the "gc->texture.shared" structure.
@@ -1633,7 +1668,10 @@ GLvoid __glBindTexture(__GLcontext *gc, GLuint unitIdx, GLuint targetIndex, GLui
     __GL_SET_TEX_UNIT_BIT(gc, unitIdx, __GL_TEXPARAMETER_BITS | __GL_TEXIMAGE_BITS);
 
     /* Call the dp interface */
-    (*gc->dp.bindTexture)(gc, texObj);
+    if (!(*gc->dp.bindTexture)(gc, texObj))
+    {
+         __GL_ERROR((*gc->dp.getError)(gc));
+    }
 }
 
 GLvoid GL_APIENTRY __gles_BindTexture(__GLcontext *gc, GLenum target, GLuint texture)
@@ -1917,7 +1955,14 @@ __GL_INLINE __GLsamplerObject* __glGetSamplerObject(__GLcontext *gc, GLuint name
     samplerObj = (__GLsamplerObject *)__glGetObject(gc, gc->sampler.shared, name);
     if (!samplerObj)
     {
-        samplerObj = (__GLsamplerObject *)(*gc->imports.calloc)(gc, 1, sizeof(__GLsamplerObject));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+            sizeof(__GLsamplerObject),
+            (gctPOINTER*)&samplerObj)))
+        {
+            __GL_ERROR_RET_VAL(GL_OUT_OF_MEMORY, NULL);;
+        }
+        gcoOS_ZeroMemory(samplerObj, sizeof(__GLsamplerObject));
+
         __glAddObject(gc, gc->sampler.shared, name, samplerObj);
         samplerObj->name = name;
         samplerObj->bindCount = 0;
@@ -2287,7 +2332,14 @@ GLvoid __glInitSamplerState(__GLcontext *gc)
         /* Allocate VEGL lock */
         if (gcvNULL == gc->sampler.shared->lock)
         {
-            gc->sampler.shared->lock = (*gc->imports.calloc)(gc, 1, sizeof(VEGLLock));
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+                sizeof(VEGLLock),
+                (gctPOINTER*)&gc->sampler.shared->lock)))
+            {
+                return;
+            }
+            gcoOS_ZeroMemory(gc->sampler.shared->lock, sizeof(VEGLLock));
+
             (*gc->imports.createMutex)(gc->sampler.shared->lock);
         }
         gcoOS_UnLockPLS();
@@ -2297,14 +2349,25 @@ GLvoid __glInitSamplerState(__GLcontext *gc)
     {
         GL_ASSERT(NULL == gc->sampler.shared);
 
-        gc->sampler.shared = (__GLsharedObjectMachine*)(*gc->imports.calloc)(gc, 1, sizeof(__GLsharedObjectMachine));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+            sizeof(__GLsharedObjectMachine),
+            (gctPOINTER*)&gc->sampler.shared)))
+        {
+            return;
+        }
+        gcoOS_ZeroMemory(gc->sampler.shared, sizeof(__GLsharedObjectMachine));
 
         /* Initialize a linear lookup table for Sampler object */
         gc->sampler.shared->maxLinearTableSize = __GL_MAX_SAMPLEROBJ_LINEAR_TABLE_SIZE;
         gc->sampler.shared->linearTableSize = __GL_DEFAULT_SAMPLEROBJ_LINEAR_TABLE_SIZE;
-        gc->sampler.shared->linearTable = (GLvoid **)
-            (*gc->imports.calloc)(gc, 1, gc->sampler.shared->linearTableSize * sizeof(GLvoid*));
-
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+            gc->sampler.shared->linearTableSize * sizeof(GLvoid*),
+            (gctPOINTER*)&gc->sampler.shared->linearTable)))
+        {
+            gcmOS_SAFE_FREE(gcvNULL, gc->sampler.shared);
+            return;
+        }
+        gcoOS_ZeroMemory(gc->sampler.shared->linearTable, gc->sampler.shared->linearTableSize * sizeof(GLvoid*));
         gc->sampler.shared->hashSize = __GL_SAMPLER_HASH_TABLE_SIZE;
         gc->sampler.shared->hashMask = __GL_SAMPLER_HASH_TABLE_SIZE - 1;
         gc->sampler.shared->refcount = 1;

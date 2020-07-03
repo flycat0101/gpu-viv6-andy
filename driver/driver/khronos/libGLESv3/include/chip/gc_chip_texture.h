@@ -139,7 +139,7 @@ typedef struct __GLchipTextureRec
     gcsTEXTURE halTexture[__GL_MAX_TEXTURE_UNITS];
 } __GLchipTexture;
 
-extern GLvoid
+extern GLboolean
 __glChipBindTexture(
     __GLcontext* gc,
     __GLtextureObject *texObj

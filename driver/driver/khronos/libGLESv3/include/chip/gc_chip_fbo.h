@@ -38,7 +38,7 @@ gcChipPickDrawBufferForFBO(
     );
 
 /* Declaration for DP interface */
-GLvoid
+GLboolean
 __glChipBindRenderbuffer(
     __GLcontext *gc,
     __GLrenderbufferObject *renderbuf

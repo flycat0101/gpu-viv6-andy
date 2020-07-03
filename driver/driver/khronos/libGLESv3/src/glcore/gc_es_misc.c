@@ -647,7 +647,13 @@ GLvoid __glInitSyncState(__GLcontext *gc)
         /* Allocate VEGL lock */
         if (gcvNULL == gc->sync.shared->lock)
         {
-            gc->sync.shared->lock = (*gc->imports.calloc)(gc, 1, sizeof(VEGLLock));
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(VEGLLock), (gctPOINTER*)&gc->sync.shared->lock)))
+            {
+                return;
+            }
+
+            gcoOS_ZeroMemory(gc->sync.shared->lock, sizeof(VEGLLock));
+
             (*gc->imports.createMutex)(gc->sync.shared->lock);
         }
         gcoOS_UnLockPLS();
@@ -656,13 +662,23 @@ GLvoid __glInitSyncState(__GLcontext *gc)
     {
         GL_ASSERT(gcvNULL == gc->sync.shared);
 
-        gc->sync.shared = (__GLsharedObjectMachine*)(*gc->imports.calloc)(gc, 1, sizeof(__GLsharedObjectMachine));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLsharedObjectMachine), (gctPOINTER*)&gc->sync.shared)))
+        {
+            return;
+        }
+
+        gcoOS_ZeroMemory(gc->sync.shared, sizeof(__GLsharedObjectMachine));
 
         /* Initialize a linear lookup table for sync object */
         gc->sync.shared->maxLinearTableSize = __GL_MAX_SYNCOBJ_LINEAR_TABLE_SIZE;
         gc->sync.shared->linearTableSize = __GL_DEFAULT_SYNCOBJ_LINEAR_TABLE_SIZE;
-        gc->sync.shared->linearTable = (GLvoid **)
-            (*gc->imports.calloc)(gc, 1, gc->sync.shared->linearTableSize * sizeof(GLvoid*));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, gc->sync.shared->linearTableSize * sizeof(GLvoid*), (gctPOINTER*)&gc->sync.shared->linearTable)))
+        {
+            gcmOS_SAFE_FREE(gcvNULL, gc->sync.shared);
+            return;
+        }
+
+        gcoOS_ZeroMemory(gc->sync.shared->linearTable, gc->sync.shared->linearTableSize * sizeof(GLvoid*));
 
         gc->sync.shared->hashSize = __GL_SYNC_HASH_TABLE_SIZE;
         gc->sync.shared->hashMask = __GL_SYNC_HASH_TABLE_SIZE - 1;
@@ -706,12 +722,12 @@ GLsync GL_APIENTRY __gles_FenceSync(__GLcontext *gc, GLenum condition, GLbitfiel
         __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
     }
 
-    syncObject = (__GLsyncObject *)(*gc->imports.calloc)(gc, 1, sizeof(__GLsyncObject));
-    if (!syncObject)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLsyncObject), (gctPOINTER*)&syncObject)))
     {
         sync = 0;
         __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
     }
+    gcoOS_ZeroMemory(syncObject, sizeof(__GLsyncObject));
 
     __glInitSyncObj(gc, syncObject, sync, condition, flags);
     __glAddObject(gc, gc->sync.shared, sync, syncObject);
@@ -974,8 +990,18 @@ GLvoid __glInitDebugState(__GLcontext *gc)
     dbgMachine->userParam = NULL;
 
     dbgMachine->current = 0;
-    dbgMachine->msgCtrlStack = (__GLdbgGroupCtrl**)gc->imports.calloc(gc, dbgMachine->maxStackDepth, sizeof(__GLdbgGroupCtrl*));
-    groupCtrl = (__GLdbgGroupCtrl*)gc->imports.calloc(gc, 1, sizeof(__GLdbgGroupCtrl));
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, dbgMachine->maxStackDepth * sizeof(__GLdbgGroupCtrl*), (gctPOINTER*)&dbgMachine->msgCtrlStack)))
+    {
+        return;
+    }
+    gcoOS_ZeroMemory(dbgMachine->msgCtrlStack, dbgMachine->maxStackDepth * sizeof(__GLdbgGroupCtrl*));
+
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLdbgGroupCtrl), (gctPOINTER*)&groupCtrl)))
+    {
+        gcmOS_SAFE_FREE(gcvNULL, dbgMachine->msgCtrlStack);
+        return;
+    }
+    gcoOS_ZeroMemory(groupCtrl, sizeof(__GLdbgGroupCtrl));
     groupCtrl->message = NULL; /* No message for default group */
 
     for (srcIdx = 0; srcIdx < __GL_DEBUG_SRC_NUM; ++srcIdx)
@@ -1570,9 +1596,12 @@ GLvoid GL_APIENTRY __gles_PushDebugGroup(__GLcontext *gc, GLenum source, GLuint 
     }
 
     groupCtrlPrev = dbgMachine->msgCtrlStack[dbgMachine->current];
-    dbgMachine->msgCtrlStack[++dbgMachine->current] = groupCtrl
-                                                    = (__GLdbgGroupCtrl*)gc->imports.calloc(gc, 1, sizeof(__GLdbgGroupCtrl));
-
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLdbgGroupCtrl), (gctPOINTER*)&groupCtrl)))
+    {
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
+    gcoOS_ZeroMemory(groupCtrl, sizeof(__GLdbgGroupCtrl));
+    dbgMachine->msgCtrlStack[++dbgMachine->current] = groupCtrl;
     /* Inherit the control volume from previous group */
     for (srcIdx = 0; srcIdx < __GL_DEBUG_SRC_NUM; ++srcIdx)
     {

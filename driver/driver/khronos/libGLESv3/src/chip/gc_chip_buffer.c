@@ -752,8 +752,9 @@ __glChipBindBufferObject(
     /* If this is the first time that the buffer object is bound */
     if (bufObj->privateData == gcvNULL)
     {
-        bufInfo = (__GLchipVertexBufferInfo*)gc->imports.calloc(gcvNULL, 1, sizeof(__GLchipVertexBufferInfo));
-        GL_ASSERT(bufInfo);
+        gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLchipVertexBufferInfo), (gctPOINTER*)&bufInfo));
+        gcoOS_ZeroMemory(bufInfo, sizeof(__GLchipVertexBufferInfo));
+
         bufObj->privateData = bufInfo;
     }
     else

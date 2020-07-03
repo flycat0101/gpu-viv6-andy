@@ -94,11 +94,11 @@ __GL_INLINE GLvoid __glBindBufferToGeneralPoint(__GLcontext *gc, GLuint targetIn
 
         if (newBufObj == gcvNULL)
         {
-            newBufObj = (__GLbufferObject*)(*gc->imports.calloc)(gc, 1, sizeof(__GLbufferObject));
-            if (!newBufObj)
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLbufferObject), (gctPOINTER*)&newBufObj)))
             {
                 __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
             }
+            gcoOS_ZeroMemory(newBufObj, sizeof(__GLbufferObject));
 
             __glInitBufferObject(gc, newBufObj, buffer);
 
@@ -262,11 +262,11 @@ __GL_INLINE GLvoid __glBindBufferToXfb(__GLcontext *gc, GLuint buffer)
 
         if (newBufObj == gcvNULL)
         {
-            newBufObj = (__GLbufferObject*)(*gc->imports.calloc)(gc, 1, sizeof(__GLbufferObject));
-            if (!newBufObj)
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLbufferObject), (gctPOINTER*)&newBufObj)))
             {
                 __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
             }
+            gcoOS_ZeroMemory(newBufObj, sizeof(__GLbufferObject));
 
             __glInitBufferObject(gc, newBufObj, buffer);
 
@@ -561,6 +561,7 @@ OnExit:
 GLvoid __glInitBufferObjectState(__GLcontext *gc)
 {
     GLuint bufIdx = 0;
+    GLuint bufIdx1 = 0;
 
     __GL_HEADER();
 
@@ -576,8 +577,19 @@ GLvoid __glInitBufferObjectState(__GLcontext *gc)
     {
         if (gc->bufferObject.maxBufBindings[bufIdx])
         {
-            gc->bufferObject.bindingPoints[bufIdx] =
-                (*gc->imports.calloc)(gc, gc->bufferObject.maxBufBindings[bufIdx], sizeof(__GLBufBindPoint));
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, gc->bufferObject.maxBufBindings[bufIdx] * sizeof(__GLBufBindPoint), (gctPOINTER*)&gc->bufferObject.bindingPoints[bufIdx])))
+            {
+                 for (bufIdx1 = 0; bufIdx1 < bufIdx; bufIdx1++)
+                 {
+                     if (gc->bufferObject.bindingPoints[bufIdx])
+                     {
+                         gcmOS_SAFE_FREE(gcvNULL, gc->bufferObject.bindingPoints[bufIdx1]);
+                     }
+                 }
+                 __GL_FOOTER();
+                 return;
+            }
+            gcoOS_ZeroMemory(gc->bufferObject.bindingPoints[bufIdx], gc->bufferObject.maxBufBindings[bufIdx] * sizeof(__GLBufBindPoint));
         }
         else
         {
@@ -598,7 +610,13 @@ GLvoid __glInitBufferObjectState(__GLcontext *gc)
         /* Allocate VEGL lock */
         if (gcvNULL == gc->bufferObject.shared->lock)
         {
-            gc->bufferObject.shared->lock = (*gc->imports.calloc)(gc, 1, sizeof(VEGLLock));
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(VEGLLock), (gctPOINTER*)&gc->bufferObject.shared->lock)))
+            {
+                __GL_FOOTER();
+                return;
+            }
+            gcoOS_ZeroMemory(gc->bufferObject.shared->lock, sizeof(VEGLLock));
+
             (*gc->imports.createMutex)(gc->bufferObject.shared->lock);
         }
         gcoOS_UnLockPLS();
@@ -607,14 +625,24 @@ GLvoid __glInitBufferObjectState(__GLcontext *gc)
     {
         GL_ASSERT(gcvNULL == gc->bufferObject.shared);
 
-        gc->bufferObject.shared = (__GLsharedObjectMachine*)(*gc->imports.calloc)(gc, 1, sizeof(__GLsharedObjectMachine));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLsharedObjectMachine), (gctPOINTER*)&gc->bufferObject.shared)))
+        {
+            __GL_FOOTER();
+            return;
+        }
+        gcoOS_ZeroMemory(gc->bufferObject.shared, sizeof(__GLsharedObjectMachine));
 
         /* Initialize a linear lookup table for vertex buffer object */
         gc->bufferObject.shared->maxLinearTableSize = __GL_MAX_BUFOBJ_LINEAR_TABLE_SIZE;
         gc->bufferObject.shared->linearTableSize = __GL_DEFAULT_BUFOBJ_LINEAR_TABLE_SIZE;
-        gc->bufferObject.shared->linearTable = (GLvoid **)
-            (*gc->imports.calloc)(gc, 1, gc->bufferObject.shared->linearTableSize * sizeof(GLvoid *));
-
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, gc->bufferObject.shared->linearTableSize * sizeof(GLvoid *),
+            (gctPOINTER*)&gc->bufferObject.shared->linearTable)))
+        {
+            gcmOS_SAFE_FREE(gcvNULL, gc->bufferObject.shared);
+            __GL_FOOTER();
+            return;
+        }
+        gcoOS_ZeroMemory(gc->bufferObject.shared->linearTable, gc->bufferObject.shared->linearTableSize * sizeof(GLvoid *));
         gc->bufferObject.shared->hashSize = __GL_BUFOBJ_HASH_TABLE_SIZE;
         gc->bufferObject.shared->hashMask = __GL_BUFOBJ_HASH_TABLE_SIZE - 1;
         gc->bufferObject.shared->refcount = 1;
@@ -925,7 +953,7 @@ GLvoid GL_APIENTRY __gles_BufferData(__GLcontext *gc, GLenum target, GLsizeiptr 
 
     if (!(*gc->dp.bufferData)(gc, bufObj, targetIndex, data))
     {
-        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+        __GL_ERROR_EXIT((*gc->dp.getError)(gc));
     }
 
     bindUser = bufObj->bindList;

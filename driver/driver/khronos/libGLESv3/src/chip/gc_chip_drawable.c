@@ -270,36 +270,38 @@ __glChipDetachDrawable(
     GLuint surfCount = 0;
     gcmHEADER_ARG("gc=0x%x", gc);
 
-    surfList = (gcoSURF*)(*gc->imports.calloc)(gc, __GL_CHIP_SURF_COUNT, sizeof(GLuint*));
-
-    if (drawable)
+    if (gcmIS_SUCCESS(gcoOS_Allocate(gcvNULL, __GL_CHIP_SURF_COUNT * sizeof(GLuint*), (gctPOINTER*)&surfList)))
     {
-        if (drawable->rtHandles[0])
-            surfList[surfCount++] = (gcoSURF)drawable->rtHandles[0];
-        if (drawable->depthHandle)
-            surfList[surfCount++] = (gcoSURF)drawable->depthHandle;
-        if (drawable->stencilHandle)
-            surfList[surfCount++] = (gcoSURF)drawable->stencilHandle;
+        gcoOS_ZeroMemory(surfList, __GL_CHIP_SURF_COUNT * sizeof(GLuint*));
+
+        if (drawable)
+        {
+            if (drawable->rtHandles[0])
+                surfList[surfCount++] = (gcoSURF)drawable->rtHandles[0];
+            if (drawable->depthHandle)
+                surfList[surfCount++] = (gcoSURF)drawable->depthHandle;
+            if (drawable->stencilHandle)
+                surfList[surfCount++] = (gcoSURF)drawable->stencilHandle;
+        }
+
+        if (readable)
+        {
+            if (readable->rtHandles[0])
+                surfList[surfCount++] = (gcoSURF)readable->rtHandles[0];
+            if (readable->depthHandle)
+                surfList[surfCount++] = (gcoSURF)readable->depthHandle;
+            if (readable->stencilHandle)
+                surfList[surfCount++] = (gcoSURF)readable->stencilHandle;
+        }
+
+        GL_ASSERT(surfCount <= __GL_CHIP_SURF_COUNT);
+
+        if (surfCount)
+        {
+            gcChipDetachSurface(gc, chipCtx, surfList, surfCount);
+        }
+        gcmOS_SAFE_FREE(gcvNULL, surfList);
     }
-
-    if (readable)
-    {
-        if (readable->rtHandles[0])
-            surfList[surfCount++] = (gcoSURF)readable->rtHandles[0];
-        if (readable->depthHandle)
-            surfList[surfCount++] = (gcoSURF)readable->depthHandle;
-        if (readable->stencilHandle)
-            surfList[surfCount++] = (gcoSURF)readable->stencilHandle;
-    }
-
-    GL_ASSERT(surfCount <= __GL_CHIP_SURF_COUNT);
-
-    if (surfCount)
-    {
-        gcChipDetachSurface(gc, chipCtx, surfList, surfCount);
-    }
-
-    gcmOS_SAFE_FREE(gcvNULL, surfList);
 
     gcmFOOTER_NO();
     return;

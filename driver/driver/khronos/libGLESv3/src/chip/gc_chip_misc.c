@@ -39,12 +39,8 @@ __glChipBeginQuery(
     /* Allocate on first use. */
     if (gcvNULL == queryObj->privateData)
     {
-        chipQuery = (__GLchipQueryObject *)(*gc->imports.calloc)(gc, 1, sizeof(__GLchipQueryObject));
-
-        if (!chipQuery)
-        {
-            gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
-        }
+        gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLchipQueryObject), (gctPOINTER*)&chipQuery));
+        gcoOS_ZeroMemory(chipQuery, sizeof(__GLchipQueryObject));
 
         /* Create signal to use for OQ */
         gcmONERROR(gcoOS_CreateSignal(chipCtx->os,
@@ -79,8 +75,9 @@ __glChipBeginQuery(
 
             gcmONERROR(gcoHAL_Query3DCoreCount(chipCtx->hal, &gpuCount));
             gcmONERROR(gcoHAL_QueryCluster(chipCtx->hal, gcvNULL, gcvNULL, gcvNULL, &clusterIDWidth));
+            gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLchipQueryHeader), (gctPOINTER*)&queryHeader));
+            gcoOS_ZeroMemory(queryHeader, sizeof(__GLchipQueryHeader));
 
-            queryHeader = (__GLchipQueryHeader*)(*gc->imports.calloc)(gc, 1, sizeof(__GLchipQueryHeader));
             queryHeader->headerSize = 64 * gpuCount * gcmSIZEOF(gctUINT32) * (gctUINT32)(1<< clusterIDWidth);
             queryHeader->headerIndex = -1;
             queryHeader->headerSurfType = gcvSURF_INDEX;
@@ -103,7 +100,9 @@ __glChipBeginQuery(
 
         if (chipQuery->queryHeader == gcvNULL)
         {
-            queryHeader = (__GLchipQueryHeader*)(*gc->imports.calloc)(gc, 1, sizeof(__GLchipQueryHeader));
+            gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLchipQueryHeader), (gctPOINTER*)&queryHeader));
+            gcoOS_ZeroMemory(queryHeader, sizeof(__GLchipQueryHeader));
+
             queryHeader->headerSize = 64;
             queryHeader->headerIndex = -1;
             queryHeader->headerSurfType = gcvSURF_TFBHEADER;
@@ -618,7 +617,7 @@ __glChipWaitSync(
     }
 }
 
-GLvoid
+GLboolean
 __glChipBindXFB(
     __GLcontext *gc,
     __GLxfbObject *xfbObj
@@ -626,6 +625,7 @@ __glChipBindXFB(
 {
     __GLchipXfbHeader *chipXfb = (__GLchipXfbHeader *)xfbObj->privateData;
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+    gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("gc=0x%x xfbObj=0x%x", gc, xfbObj);
 
@@ -633,24 +633,29 @@ __glChipBindXFB(
     {
         if (chipXfb == NULL)
         {
-            chipXfb = (__GLchipXfbHeader *)(gc->imports.calloc)(gc, 1, sizeof(__GLchipXfbHeader));
+            gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLchipXfbHeader), (gctPOINTER*)&chipXfb));
+            gcoOS_ZeroMemory(chipXfb, sizeof(__GLchipXfbHeader));
 
-            gcsSURF_NODE_Construct(&chipXfb->headerNode, 64, 64, gcvSURF_TFBHEADER, 0, gcvPOOL_DEFAULT);
+            gcmONERROR(gcsSURF_NODE_Construct(&chipXfb->headerNode, 64, 64, gcvSURF_TFBHEADER, 0, gcvPOOL_DEFAULT));
 
-            gcoSURF_LockNode(&chipXfb->headerNode, gcvNULL, &chipXfb->headerLocked);
+            gcmONERROR(gcoSURF_LockNode(&chipXfb->headerNode, gcvNULL, &chipXfb->headerLocked));
 
             gcoOS_ZeroMemory(chipXfb->headerLocked, 64);
 
-            gcoSURF_UnLockNode(&chipXfb->headerNode, gcvSURF_TFBHEADER);
+            gcmONERROR(gcoSURF_UnLockNode(&chipXfb->headerNode, gcvSURF_TFBHEADER));
 
             chipXfb->headerLocked = gcvNULL;
 
             xfbObj->privateData = (GLvoid*) chipXfb;
         }
     }
+    gcmFOOTER();
+    return GL_TRUE;
 
-    gcmFOOTER_NO();
-    return;
+OnError:
+    gcChipSetError(chipCtx, status);
+    gcmFOOTER();
+    return GL_FALSE;
 }
 
 GLvoid

@@ -137,21 +137,37 @@ gcChipUtilsHashCreate(
     gcmHEADER_ARG("gc=0x%x tbEntryNum=%d maxEntryObjs=%d pfnDeleteUserData=0x%x",
                    gc, tbEntryNum, maxEntryObjs, pfnDeleteUserData);
 
-    pHash = (__GLchipUtilsHash*)(*gc->imports.calloc)(gc, 1, sizeof(__GLchipUtilsHash));
-    gcmASSERT(pHash != gcvNULL);
-    if(pHash == gcvNULL)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLchipUtilsHash), (gctPOINTER*)&pHash)))
     {
         gcmFOOTER_ARG("return=0x%x", pHash);
         return gcvNULL;
     }
+    gcoOS_ZeroMemory(pHash, gcmSIZEOF(__GLchipUtilsHash));
 
     pHash->tbEntryNum = tbEntryNum;
     pHash->maxEntryObjs = maxEntryObjs;
     pHash->year = 0;
     pHash->pfnDeleteUserData = pfnDeleteUserData;
 
-    pHash->ppHashTable = (__GLchipUtilsObject**)(*gc->imports.calloc)(gc, tbEntryNum, sizeof(__GLchipUtilsObject*));
-    pHash->pEntryCounts = (GLuint*)(*gc->imports.calloc)(gc, tbEntryNum, sizeof(GLuint));
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, tbEntryNum * sizeof(__GLchipUtilsObject), (gctPOINTER*)&pHash->ppHashTable)))
+    {
+        gcmOS_SAFE_FREE(gcvNULL, pHash);
+        gcmFOOTER_ARG("return=0x%x", pHash);
+        return gcvNULL;
+    }
+
+    gcoOS_ZeroMemory(pHash->ppHashTable, tbEntryNum * sizeof(__GLchipUtilsObject));
+
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, tbEntryNum * sizeof(GLuint), (gctPOINTER*)&pHash->pEntryCounts)))
+    {
+        gcmOS_SAFE_FREE(gcvNULL, pHash->ppHashTable);
+        gcmOS_SAFE_FREE(gcvNULL, pHash);
+        gcmFOOTER_ARG("return=0x%x", pHash);
+        return gcvNULL;
+    }
+
+    gcoOS_ZeroMemory(pHash->pEntryCounts, tbEntryNum * sizeof(GLuint));
+
     gcmASSERT(pHash->ppHashTable && pHash->pEntryCounts);
 
     gcmFOOTER_ARG("return=0x%x", pHash);
@@ -167,9 +183,18 @@ gcChipUtilsHashDestory(
     gcmHEADER_ARG("gc=0x%x pHash=0x%x ",gc, pHash);
 
     gcChipUtilsHashDeleteAllObjects(gc, pHash);
-    gcmOS_SAFE_FREE(gcvNULL, pHash->pEntryCounts);
-    gcmOS_SAFE_FREE(gcvNULL, pHash->ppHashTable);
-    gcmOS_SAFE_FREE(gcvNULL, pHash);
+    if (pHash->pEntryCounts)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, pHash->pEntryCounts);
+    }
+    if (pHash->ppHashTable)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, pHash->ppHashTable);
+    }
+    if (pHash)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, pHash);
+    }
 
     gcmFOOTER_NO();
 }
@@ -250,13 +275,13 @@ gcChipUtilsHashAddObject(
 
     gcmHEADER_ARG("gc=0x%x pHash=0x%x pUserData=0x%x key=%u bPerpetual=%d",gc, pHash, pUserData, key, bPerpetual);
 
-    pNewObj = (__GLchipUtilsObject*)(*gc->imports.calloc)(gc, 1, sizeof(__GLchipUtilsObject));
-    gcmASSERT(pNewObj);
-    if (pNewObj == gcvNULL)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLchipUtilsObject), (gctPOINTER*)&pNewObj)))
     {
         gcmFOOTER_ARG("return=0x%x", gcvNULL);
         return gcvNULL;
     }
+
+    gcoOS_ZeroMemory(pNewObj, sizeof(__GLchipUtilsObject));
 
     pNewObj->pUserData = pUserData;
     pNewObj->key = key;

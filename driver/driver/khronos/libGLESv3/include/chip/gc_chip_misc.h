@@ -101,7 +101,7 @@ gcChipSetImageSrc(
     gcoSURF surface
     );
 
-GLvoid
+GLboolean
 __glChipBindXFB(
     __GLcontext *gc,
     __GLxfbObject   *xfbObj
