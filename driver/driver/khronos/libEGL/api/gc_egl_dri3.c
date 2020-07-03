@@ -768,10 +768,7 @@ dri_CreateContext(IN gctPOINTER localDisplay, IN gctPOINTER Context)
 
     display = (__DRIDisplay*)localDisplay;
 
-    context = (__DRIcontextPriv *)malloc(sizeof(__DRIcontextPriv));
-    if (!context) {
-        gcmONERROR(gcvSTATUS_OUT_OF_RESOURCES);
-    }
+    gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof (__DRIcontextPriv), (gctPOINTER *)&context));
 
     memset(context, 0, sizeof(__DRIcontextPriv));
 
@@ -818,7 +815,7 @@ dri_DestroyContext(IN gctPOINTER localDisplay, IN gctPOINTER Context)
         } else {
             prev->next = cur->next;
         }
-        free(cur);
+        gcmOS_SAFE_FREE(gcvNULL, cur);
     }
     _DestroyOnScreenSurfaceWrapper(display);
 
@@ -890,10 +887,7 @@ dri_CreateDrawable(IN gctPOINTER localDisplay, IN PlatformWindowType Drawable)
 
     display = (__DRIDisplay*)localDisplay;
 
-    drawable = (__DRIdrawablePriv *)malloc(sizeof(__DRIdrawablePriv));
-    if (!drawable) {
-        gcmONERROR(gcvSTATUS_OUT_OF_RESOURCES);
-    }
+    gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof (__DRIdrawablePriv), (gctPOINTER *)&drawable));
 
     memset(drawable, 0, sizeof(__DRIdrawablePriv));
 
@@ -989,7 +983,7 @@ dri_DestroyDrawable(IN gctPOINTER localDisplay, IN PlatformWindowType Drawable)
         } else {
             prev->next = cur->next;
         }
-        free(cur);
+        gcmOS_SAFE_FREE(gcvNULL, cur);
     }
 
 OnError:
@@ -1182,13 +1176,8 @@ dri_InitLocalDisplayInfo(
 
     do
     {
-        display = (__DRIDisplay*) malloc(sizeof(__DRIDisplay));
+        gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof (__DRIDisplay), (gctPOINTER *)&display));
 
-        if (display == gcvNULL)
-        {
-            status = gcvSTATUS_OUT_OF_RESOURCES;
-            break;
-        }
         memset(display, 0, sizeof(__DRIDisplay));
 
         display->dpy = Display;
@@ -1205,6 +1194,7 @@ dri_InitLocalDisplayInfo(
     }
     while (0);
 
+OnError:
     gcmFOOTER();
     return status;
 }
@@ -1221,7 +1211,7 @@ dri_DeinitLocalDisplayInfo(
     if (display != gcvNULL)
     {
         drm_vivante_close(display->drmVIV);
-        free(display);
+        gcmOS_SAFE_FREE(gcvNULL, display);
         *localDisplay = gcvNULL;
     }
     return gcvSTATUS_OK;

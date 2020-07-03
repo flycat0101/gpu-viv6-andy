@@ -436,15 +436,15 @@ static const struct wl_registry_listener __registry_listener = {
 static __WLEGLDisplay
 __wl_egl_display_create(struct wl_display *wl_dpy)
 {
-    __WLEGLDisplay display = malloc(sizeof(*display));
+    __WLEGLDisplay display;
 
-    if (!display)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(*display), (gctPOINTER *)&display)))
     {
         /* Out of memory. */
         return NULL;
     }
 
-    memset(display, 0, sizeof(*display));
+    gcoOS_ZeroMemory(display, sizeof(*display));
 
     display->wl_dpy = wl_dpy;
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
@@ -572,7 +572,7 @@ __wl_egl_display_destroy(__WLEGLDisplay display)
     wl_registry_destroy(display->registry);
     wl_viv_destroy(display->wl_viv);
     wl_event_queue_destroy(display->wl_queue);
-    free(display);
+    gcmOS_SAFE_FREE(gcvNULL, display);
 }
 
 static int
@@ -665,7 +665,7 @@ __buffer_callback_handle_done(void *data, struct wl_callback *callback, uint32_t
     gcoHAL_Commit(gcvNULL, gcvFALSE);
     buffer->info.surface = gcvNULL;
 
-    free(buffer);
+    gcmOS_SAFE_FREE(gcvNULL, buffer);
 
     /* Restore hardware type. */
     gcoHAL_SetHardwareType(gcvNULL, hwType);
@@ -861,17 +861,20 @@ __wl_egl_buffer_destroy(__WLEGLSurface egl_surface, __WLEGLBuffer buffer)
         __WLEGLBuffer wrapper;
 
         /* Use a wrapper struct to allow modifications in original one. */
-        wrapper = malloc(sizeof(*buffer));
-        memcpy(wrapper, buffer, sizeof(*buffer));
 
-        callback = wl_display_sync(display->wrap_dpy);
+        if (gcmIS_SUCCESS(gcoOS_Allocate(gcvNULL, sizeof(*buffer), (gctPOINTER *)&wrapper)))
+        {
+            memcpy(wrapper, buffer, sizeof(*buffer));
+
+            callback = wl_display_sync(display->wrap_dpy);
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
-        buffer->buffer_release = gcvNULL;
+            buffer->buffer_release = gcvNULL;
 #endif
-        wl_proxy_set_queue((struct wl_proxy *)callback, egl_surface->wl_queue);
-        wl_callback_add_listener(callback, &__buffer_callback_listener, wrapper);
-        buffer->info.surface = gcvNULL;
-        done = 1;
+            wl_proxy_set_queue((struct wl_proxy *)callback, egl_surface->wl_queue);
+            wl_callback_add_listener(callback, &__buffer_callback_listener, wrapper);
+            buffer->info.surface = gcvNULL;
+            done = 1;
+        }
 #else
         struct wl_callback *callback;
         struct wl_display *wl_dpy = display->wl_dpy;
@@ -888,18 +891,20 @@ __wl_egl_buffer_destroy(__WLEGLSurface egl_surface, __WLEGLBuffer buffer)
         if (ret >= 0)
         {
             /* Use a wrapper struct to allow modifications in original one. */
-            wrapper = malloc(sizeof(*buffer));
-            memcpy(wrapper, buffer, sizeof(*buffer));
+            if (gcmIS_SUCCESS(gcoOS_Allocate(gcvNULL, sizeof(*buffer), &wrapper)))
+            {
+                memcpy(wrapper, buffer, sizeof(*buffer));
 
-            callback = wl_display_sync(display->wl_dpy);
-            wl_proxy_set_queue((struct wl_proxy *)callback, egl_surface->wl_queue);
-            wl_callback_add_listener(callback, &__buffer_callback_listener, wrapper);
+                callback = wl_display_sync(display->wl_dpy);
+                wl_proxy_set_queue((struct wl_proxy *)callback, egl_surface->wl_queue);
+                wl_callback_add_listener(callback, &__buffer_callback_listener, wrapper);
 
-            wl_display_cancel_read(wl_dpy);
+                wl_display_cancel_read(wl_dpy);
 
-            buffer->info.surface = gcvNULL;
+                buffer->info.surface = gcvNULL;
 
-            done = 1;
+                done = 1;
+            }
         }
 #endif
     }
@@ -1042,7 +1047,7 @@ __wl_egl_surface_destroy(__WLEGLSurface egl_surface)
     }
 #endif
 
-    free(egl_surface->buffers);
+    gcmOS_SAFE_FREE(gcvNULL, egl_surface->buffers);
     egl_surface->buffers   = NULL;
     egl_surface->signature = 0;
     egl_surface->frame_callback = gcvNULL;
@@ -1055,7 +1060,7 @@ __wl_egl_surface_destroy(__WLEGLSurface egl_surface)
 #endif
     pthread_mutex_destroy(&egl_surface->commit_mutex);
 
-    free(egl_surface);
+    gcmOS_SAFE_FREE(gcvNULL, egl_surface);
 }
 
 static void
@@ -1143,13 +1148,12 @@ __wl_egl_surface_create(struct wl_egl_window *window)
     char *p;
     __WLEGLSurface egl_surface = NULL;
 
-    egl_surface = (__WLEGLSurface)malloc(sizeof(*egl_surface));
-    if (!egl_surface)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(*egl_surface), (gctPOINTER *)&egl_surface)))
     {
         return NULL;
     }
 
-    memset(egl_surface, 0, sizeof(*egl_surface));
+    gcoOS_ZeroMemory(egl_surface, sizeof(*egl_surface));
     egl_surface->window = window;
 #if (WAYLAND_VERSION_MAJOR >= 1) && (WAYLAND_VERSION_MINOR >= 13)
     egl_surface->wrap_surface = (struct wl_surface *)wl_proxy_create_wrapper((void*)window->surface);
@@ -1189,18 +1193,28 @@ __wl_egl_surface_create(struct wl_egl_window *window)
         }
     }
 
-    egl_surface->buffers = calloc(egl_surface->nr_buffers, sizeof(struct __WLEGLBufferRec));
-    for (i = 0; i < egl_surface->nr_buffers; ++i)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+        sizeof (struct __WLEGLBufferRec) * egl_surface->nr_buffers,
+        (gctPOINTER *)&egl_surface->buffers)))
     {
-        egl_surface->buffers[i].info.fd = -1;
-        egl_surface->buffers[i].info.ts_fd = -1;
+        gcmOS_SAFE_FREE(gcvNULL, egl_surface);
+        egl_surface = NULL;
     }
+    else
+    {
+        gcoOS_ZeroMemory(egl_surface->buffers, sizeof (struct __WLEGLBufferRec) * egl_surface->nr_buffers);
+        for (i = 0; i < egl_surface->nr_buffers; ++i)
+        {
+            egl_surface->buffers[i].info.fd = -1;
+            egl_surface->buffers[i].info.ts_fd = -1;
+        }
 
-    __wl_egl_surface_register(egl_surface);
+        __wl_egl_surface_register(egl_surface);
 
-    window->driver_private = egl_surface;
-    window->destroy_window_callback = __destroy_window_callback;
-    window->resize_callback = __resize_callback;
+        window->driver_private = egl_surface;
+        window->destroy_window_callback = __destroy_window_callback;
+        window->resize_callback = __resize_callback;
+    }
 
     return egl_surface;
 }
@@ -3184,9 +3198,10 @@ struct wl_egl_pixmap *wl_egl_pixmap_create(int width, int height, int format)
     if (width <= 0 || height <= 0)
         return NULL;
 
-    pixmap = malloc(sizeof *pixmap);
-    if (!pixmap)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof (*pixmap), (gctPOINTER *)&pixmap)))
+    {
         return NULL;
+    }
 
     pixmap->signature = WL_EGL_PIXMAP_SIGNATURE;
     pixmap->width     = width;
@@ -3199,7 +3214,7 @@ struct wl_egl_pixmap *wl_egl_pixmap_create(int width, int height, int format)
 
     if (create_pixmap_content(pixmap) != 0)
     {
-        free(pixmap);
+        gcmOS_SAFE_FREE(gcvNULL, pixmap);
         pixmap = 0;
     }
 
@@ -3233,7 +3248,7 @@ void wl_egl_pixmap_destroy(struct wl_egl_pixmap *pixmap)
     gcoHAL_SetHardwareType(gcvNULL, hwType);
 
     pixmap->signature = 0;
-    free(pixmap);
+    gcmOS_SAFE_FREE(gcvNULL, pixmap);
 }
 
 void wl_egl_pixmap_get_stride(struct wl_egl_pixmap *pixmap, int *stride)
@@ -3271,8 +3286,12 @@ veglCreateWaylandBufferFromImage(
 
     display = (__WLEGLDisplay)Dpy->localInfo;
 
-    buffer = malloc(sizeof(*buffer));
-    memset(buffer, 0, sizeof(*buffer));
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(*buffer), (gctPOINTER *)&buffer)))
+    {
+        return wl_buf;
+    }
+
+    gcoOS_ZeroMemory(buffer, sizeof(*buffer));
 
     /* wlbuffer's width and height and fd got from veglQueryWaylandBuffer */
     buffer->info.width  = Image->image.u.wlbuffer.width;
@@ -3333,7 +3352,7 @@ veglCreateWaylandBufferFromImage(
     wl_proxy_set_queue((struct wl_proxy *)buffer->wl_buf, NULL);
 
     /*buffer is no longer required. wl_buffer will be destoryed by application, look weston nested.c*/
-    free(buffer);
+    gcmOS_SAFE_FREE(gcvNULL, buffer);
     buffer = NULL;
 
     VEGL_UNLOCK_DISPLAY_RESOURCE(Dpy);

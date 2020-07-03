@@ -91,7 +91,7 @@ _FreeDisplays(
             close(fd);
         }
 
-        free(display);
+        gcmOS_SAFE_FREE(gcvNULL, display);
     }
 
     pthread_mutex_unlock(&displayMutex);
@@ -232,9 +232,7 @@ _GetDisplayByIndex(
             return gcvSTATUS_OK;
         }
 
-        display = (struct _GBMDisplay*) malloc(sizeof(struct _GBMDisplay));
-
-        if (display == gcvNULL)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(struct _GBMDisplay), (gctPOINTER *)&display)))
         {
             break;
         }
@@ -300,7 +298,7 @@ _GetDisplayByIndex(
             close(fd);
         }
 
-        free(display);
+        gcmOS_SAFE_FREE(gcvNULL, display);
         display = gcvNULL;
     }
 
@@ -353,9 +351,7 @@ _GetDisplayByDevice(
             return gcvSTATUS_OK;
         }
 
-        display = (struct _GBMDisplay*) malloc(sizeof(struct _GBMDisplay));
-
-        if (display == gcvNULL)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(struct _GBMDisplay), (gctPOINTER *)&display)))
         {
             break;
         }
@@ -387,7 +383,7 @@ _GetDisplayByDevice(
         }
 
 
-        free(display);
+        gcmOS_SAFE_FREE(gcvNULL, display);
         display = gcvNULL;
     }
 
@@ -586,7 +582,7 @@ gbm_DestroyDisplay(
             close(fd);
         }
 
-        free(display);
+        gcmOS_SAFE_FREE(gcvNULL, display);
     }
 
     return gcvSTATUS_OK;

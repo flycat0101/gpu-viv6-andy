@@ -159,7 +159,7 @@ destroyDisplays(
         pthread_mutex_destroy(&(display->condMutex));
         pthread_cond_destroy(&(display->cond));
          */
-        free(display);
+        gcmOS_SAFE_FREE(gcvNULL, display);
     }
 
     pthread_mutex_unlock(&displayMutex);
@@ -230,7 +230,7 @@ onceInit(
     /* Register atexit callback. */
     atexit(halOnExit);
 
-    memset(&newSigHandler, 0, sizeof(newSigHandler));
+    gcoOS_ZeroMemory(&newSigHandler, sizeof(newSigHandler));
     sigemptyset(&newSigHandler.sa_mask);
     newSigHandler.sa_handler = sig_handler;
 
@@ -298,9 +298,7 @@ vxworks_GetDisplayByIndex(
             return gcvSTATUS_OK;
         }
 
-        display = (struct _FBDisplay*) malloc(sizeof(struct _FBDisplay));
-
-        if (display == gcvNULL)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(struct _FBDisplay), (gctPOINTER *)&display)))
         {
             break;
         }
@@ -510,7 +508,7 @@ vxworks_GetDisplayByIndex(
             close(display->file);
         }
 
-        free(display);
+        gcmOS_SAFE_FREE(gcvNULL, display);
         display = gcvNULL;
     }
 
@@ -1094,9 +1092,8 @@ vxworks_DestroyDisplay(
         pthread_mutex_destroy(&(display->condMutex));
         pthread_cond_destroy(&(display->cond));
 
-        free(display);
+        gcmOS_SAFE_FREE(gcvNULL, display);
         display = gcvNULL;
-        Display = gcvNULL;
     }
     return gcvSTATUS_OK;
 }
@@ -1167,8 +1164,8 @@ vxworks_CreateWindow(
 
     do
     {
-        struct _FBWindow *window = (struct _FBWindow *) malloc(gcmSIZEOF(struct _FBWindow));
-        if (window == gcvNULL)
+        struct _FBWindow *window;
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(struct _FBWindow), (gctPOINTER *)&window)))
         {
             status = gcvSTATUS_OUT_OF_RESOURCES;
             break;
@@ -1257,7 +1254,7 @@ vxworks_DestroyWindow(
 {
     if (Window != gcvNULL)
     {
-        free(Window);
+        gcmOS_SAFE_FREE(gcvNULL, Window);
     }
     return gcvSTATUS_OK;
 }
@@ -1383,13 +1380,12 @@ vxworks_CreatePixmap(
 
     do
     {
-        pixmap = (struct _FBPixmap*) malloc(sizeof (struct _FBPixmap));
-        memset(pixmap, 0, sizeof (struct _FBPixmap));
-
-        if (pixmap == gcvNULL)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(struct _FBPixmap), (gctPOINTER *)&pixmap)))
         {
             break;
         }
+        gcoOS_ZeroMemory(pixmap, sizeof (struct _FBPixmap));
+
 #if gcdUSE_PIXMAP_SURFACE
         if (BitsPerPixel <= 16)
         {
@@ -1438,10 +1434,9 @@ vxworks_CreatePixmap(
 #else
         alignedWidth   = (Width + 0x0F) & (~0x0F);
         alignedHeight  = (Height + 0x3) & (~0x03);
-        pixmap->original = malloc(alignedWidth * alignedHeight * (BitsPerPixel + 7) / 8 + 64);
-        if (pixmap->original == gcvNULL)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, alignedWidth * alignedHeight * (BitsPerPixel + 7) / 8 + 64, (gctPOINTER *)&pixmap->original)))
         {
-            free(pixmap);
+            gcmOS_SAFE_FREE(gcvNULL, pixmap);
             pixmap = gcvNULL;
 
             break;
@@ -1473,7 +1468,7 @@ vxworks_CreatePixmap(
         {
             gcoSURF_Destroy(pixmap->surface);
         }
-        free(pixmap);
+        gcmOS_SAFE_FREE(gcvNULL, pixmap);
     }
 #endif
 
@@ -1555,10 +1550,10 @@ vxworks_DestroyPixmap(
 #else
         if (pixmap->original != NULL)
         {
-            free(pixmap->original);
+            gcmOS_SAFE_FREE(gcvNULL, pixmap->original);
         }
 #endif
-        free(pixmap);
+        gcmOS_SAFE_FREE(gcvNULL, pixmap);
         pixmap = gcvNULL;
         Pixmap = gcvNULL;
     }

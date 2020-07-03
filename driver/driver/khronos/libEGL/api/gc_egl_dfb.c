@@ -376,8 +376,17 @@ dfb_GetDisplay(
 
         DirectFBSetOption ("no-sighandler", NULL);
 
-        display = (struct _DFBDisplay*) malloc(sizeof (struct _DFBDisplay));
-        memset(display, 0, sizeof(struct _DFBDisplay));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+                              sizeof (struct _DFBDisplay),
+                              (gctPOINTER *)&display))
+        {
+            gcmFATAL("%s: failed to malloc memory.", __FUNCTION__);
+            status = gcvSTATUS_OUT_OF_RESOURCES;
+            gcmFOOTER();
+            return status;
+        }
+
+        gcoOS_ZeroMemory(display, sizeof(struct _DFBDisplay));
 
         if (DirectFBCreate(&(display->pDirectFB)) != DFB_OK)
         {
@@ -418,7 +427,7 @@ dfb_GetDisplay(
             }
             display->pDirectFB->Release(display->pDirectFB);
         }
-        free(display);
+        gcmOS_SAFE_FREE(gcvNULL, display);
         display = gcvNULL;
     }
     status = gcvSTATUS_OUT_OF_RESOURCES;
@@ -628,7 +637,7 @@ dfb_DestroyDisplay(
         }
         pthread_mutex_destroy(&(Display->condMutex));
         pthread_cond_destroy(&(Display->cond));
-        free(Display);
+        gcmOS_SAFE_FREE(gcvNULL, Display);
     }
     return gcvSTATUS_OK;
 }
@@ -766,10 +775,13 @@ dfb_CreateWindow(
             break;
         Display->pLayer->SetCooperativeLevel( Display->pLayer, DLSCL_ADMINISTRATIVE );
 
-        DFBWindow = (struct _DFBWindow *) malloc(sizeof(struct _DFBWindow));
-        if (DFBWindow == gcvNULL)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+                              sizeof (struct _DFBWindow),
+                              (gctPOINTER *)&DFBWindow))
+        {
             break;
-        memset(DFBWindow, 0, sizeof(struct _DFBWindow));
+        }
+        gcoOS_ZeroMemory(DFBWindow, sizeof(struct _DFBWindow));
 
         desc.flags = ( DWDESC_POSX | DWDESC_POSY);
         if(X < 0)
@@ -900,7 +912,7 @@ dfb_DestroyWindow(
 
     _DestoryBackBuffers(Window);
 
-    free(Window);
+    gcmOS_SAFE_FREE(gcvNULL, Window);
     return gcvSTATUS_OK;
 }
 
@@ -933,19 +945,19 @@ dfb_CreatePixmap(
     {
         alignedWidth   = (Width + 0x0F) & (~0x0F);
         alignedHeight  = (Height + 0x3) & (~0x03);
-        pixmap = (struct _DFBPixmap*) malloc(sizeof (struct _DFBPixmap));
-
-        if (pixmap == gcvNULL)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+                              sizeof (struct _DFBPixmap),
+                              (gctPOINTER *)&pixmap))
         {
             break;
         }
 
-        pixmap->original = malloc(alignedWidth * alignedHeight * (BitsPerPixel + 7) / 8 + 64);
-        if (pixmap->original == gcvNULL)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+                              alignedWidth * alignedHeight * (BitsPerPixel + 7) / 8 + 64,
+                              (gctPOINTER *)&pixmap->original))
         {
-            free(pixmap);
+            gcmOS_SAFE_FREE(gcvNULL, pixmap);
             pixmap = gcvNULL;
-
             break;
         }
         pixmap->bits = (gctPOINTER)(((gctUINT)(gctCHAR*)pixmap->original + 0x3F) & (~0x3F));
@@ -1030,9 +1042,9 @@ dfb_DestroyPixmap(
     {
         if (pixmap->original != NULL)
         {
-            free(pixmap->original);
+            gcmOS_SAFE_FREE(gcvNULL, pixmap->original);
         }
-        free(pixmap);
+        gcmOS_SAFE_FREE(gcvNULL, pixmap);
         pixmap = gcvNULL;
         Pixmap = gcvNULL;
     }

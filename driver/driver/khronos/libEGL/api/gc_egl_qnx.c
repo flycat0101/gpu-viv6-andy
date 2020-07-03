@@ -288,8 +288,7 @@ qnx_GetDisplayInfoEx(
         goto OnError;
     }
 
-    render_bufs = malloc(nbufs * sizeof(screen_buffer_t));
-    if (render_bufs == NULL)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, nbufs * sizeof(screen_buffer_t), (gctPOINTER *)&render_bufs)))
     {
         status = gcvSTATUS_OUT_OF_MEMORY;
         goto OnError;
@@ -299,7 +298,7 @@ qnx_GetDisplayInfoEx(
         rc = screen_get_window_property_pv((screen_window_t)Window, SCREEN_PROPERTY_RENDER_BUFFERS, (void**)render_bufs);
         if (rc)
         {
-            free(render_bufs);
+            gcmOS_SAFE_FREE(gcvNULL, render_bufs);
             render_bufs = NULL;
             status = gcvSTATUS_INTERFACE_ERROR;
             goto OnError;
@@ -307,7 +306,7 @@ qnx_GetDisplayInfoEx(
         else
         {
             buf = render_bufs[0];
-            free(render_bufs);
+            gcmOS_SAFE_FREE(gcvNULL, render_bufs);
             render_bufs = NULL;
         }
     }

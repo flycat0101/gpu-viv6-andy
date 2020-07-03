@@ -102,9 +102,7 @@ viv_handle_create_buffer(struct wl_client *client,
     struct wl_viv_buffer_private * priv = NULL;
     gceHARDWARE_TYPE hwType = gcvHARDWARE_INVALID;
 
-    buffer = malloc(sizeof(*buffer) + sizeof(struct wl_viv_buffer_private));
-
-    if (!buffer)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(*buffer) + sizeof(struct wl_viv_buffer_private), (gctPOINTER *)&buffer)))
     {
         return;
     }

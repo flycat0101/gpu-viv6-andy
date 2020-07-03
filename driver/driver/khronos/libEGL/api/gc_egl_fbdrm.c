@@ -102,7 +102,14 @@ struct connector
             printf("could not get %s %u properties: %s\n", #type, id, strerror(errno)); \
             return -1; \
         } \
-        drm->type.props_info = calloc(drm->type.props->count_props, sizeof(drm->type.props_info)); \
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, \
+            (sizeof (drm->type.props_info) * drm->type.props->count_props), \
+            (gctPOINTER *)&drm->type.props_info))) \
+        { \
+            printf("There is out of memory.\n"); \
+            return -1; \
+        } \
+        gcoOS_ZeroMemory(&drm->type.props_info, sizeof (drm->type.props_info) * drm->type.props->count_props); \
         for (i = 0; i < drm->type.props->count_props; i++) \
         { \
             drm->type.props_info[i] = drmModeGetProperty(drm->fd, drm->type.props->props[i]); \
@@ -743,10 +750,10 @@ _destroy_display(
 
         if (display->drmfbs)
         {
-            free(display->drmfbs);
+            gcmOS_SAFE_FREE(gcvNULL, display->drmfbs);
         }
 
-        free(display);
+        gcmOS_SAFE_FREE(gcvNULL, display);
         display = gcvNULL;
     }
 }
@@ -792,11 +799,7 @@ drmfb_GetDisplayByIndex(
             }
         }
 
-        display = (struct _FBDisplay*)malloc(sizeof(struct _FBDisplay));
-        if (display == gcvNULL)
-        {
-            gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
-        }
+        gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof (struct _FBDisplay), (gctPOINTER *)&display));
 
         display->signature = gcmCC('F', 'B', 'D', 'V');
         display->index    = DisplayIndex;
@@ -880,11 +883,7 @@ drmfb_GetDisplayByIndex(
             gcmONERROR(gcvSTATUS_GENERIC_IO);
         }
 
-        display->drmfbs = malloc(display->multiBuffer * sizeof(struct drm_fb));
-        if (!display->drmfbs)
-        {
-            gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
-        }
+        gcmONERROR(gcoOS_Allocate(gcvNULL, display->multiBuffer * sizeof(struct drm_fb), (gctPOINTER *)&display->drmfbs));
 
         for (i = 0; i < display->multiBuffer; ++i)
         {
@@ -1757,13 +1756,11 @@ drmfb_CreateWindow(
 
     do
     {
-        window = (struct _FBWindow *) malloc(gcmSIZEOF(struct _FBWindow));
-        if (window == gcvNULL)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof (struct _FBWindow), (gctPOINTER *)&window)))
         {
             status = gcvSTATUS_OUT_OF_RESOURCES;
             break;
         }
-
         window->offset = Y * display->stride + X * ((display->bpp + 7) / 8);
 
         window->display = display;
@@ -1847,7 +1844,7 @@ drmfb_DestroyWindow(
 {
     if (Window != gcvNULL)
     {
-        free(Window);
+        gcmOS_SAFE_FREE(gcvNULL, Window);
     }
     return gcvSTATUS_OK;
 }
@@ -1973,13 +1970,11 @@ drmfb_CreatePixmap(
 
     do
     {
-        pixmap = (struct _FBPixmap*) malloc(sizeof (struct _FBPixmap));
-        memset(pixmap, 0, sizeof (struct _FBPixmap));
-
-        if (pixmap == gcvNULL)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof (struct _FBPixmap), (gctPOINTER *)&pixmap)))
         {
             break;
         }
+        gcoOS_ZeroMemory(pixmap, sizeof (struct _FBPixmap));
 #if gcdUSE_PIXMAP_SURFACE
         if (BitsPerPixel <= 16)
         {
@@ -2028,10 +2023,9 @@ drmfb_CreatePixmap(
 #else
         alignedWidth   = (Width + 0x0F) & (~0x0F);
         alignedHeight  = (Height + 0x3) & (~0x03);
-        pixmap->original = malloc(alignedWidth * alignedHeight * (BitsPerPixel + 7) / 8 + 64);
-        if (pixmap->original == gcvNULL)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, alignedWidth * alignedHeight * (BitsPerPixel + 7) / 8 + 64, (gctPOINTER *)&pixmap->original)))
         {
-            free(pixmap);
+            gcmOS_SAFE_FREE(gcvNULL, pixmap);
             pixmap = gcvNULL;
 
             break;
@@ -2063,7 +2057,7 @@ drmfb_CreatePixmap(
         {
             gcoSURF_Destroy(pixmap->surface);
         }
-        free(pixmap);
+        gcmOS_SAFE_FREE(gcvNULL, pixmap);
     }
 #endif
 
@@ -2145,12 +2139,11 @@ drmfb_DestroyPixmap(
 #else
         if (pixmap->original != NULL)
         {
-            free(pixmap->original);
+            gcmOS_SAFE_FREE(gcvNULL, pixmap->original);
         }
 #endif
-        free(pixmap);
+        gcmOS_SAFE_FREE(gcvNULL, pixmap);
         pixmap = gcvNULL;
-        Pixmap = gcvNULL;
     }
     return gcvSTATUS_OK;
 }

@@ -306,6 +306,10 @@ eglQueryContext(
 
     if (value != gcvNULL)
     {
+#if gcdENABLE_SW_PREEMPTION
+        gctUINT32 priorityID = 0;
+#endif
+
         switch (attribute)
         {
        /* EGL_KHR_no_config_context
@@ -345,6 +349,29 @@ eglQueryContext(
             }
             break;
 
+#if gcdENABLE_SW_PREEMPTION
+        case EGL_CONTEXT_PRIORITY_LEVEL_IMG:
+            gcmONERROR(gcoHAL_GetPriority(gcvNULL, &priorityID));
+
+            if (priorityID == 1)
+            {
+                *value = EGL_CONTEXT_PRIORITY_MEDIUM_IMG;
+            }
+            else if (priorityID == 2)
+            {
+                *value = EGL_CONTEXT_PRIORITY_HIGH_IMG;
+            }
+            else if (priorityID == 0)
+            {
+                *value = EGL_CONTEXT_PRIORITY_LOW_IMG;
+            }
+            else
+            {
+                gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+            }
+            break;
+
+#endif
         case EGL_PROTECTED_CONTENT_EXT:
             *value = context->protectedContent;
             break;

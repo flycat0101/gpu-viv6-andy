@@ -1863,7 +1863,12 @@ eglInitialize(
     }
 
     /* Hardware relevant thread data initialization. */
-    veglInitDeviceThreadData(thread);
+    if (!veglInitDeviceThreadData(thread))
+    {
+        /* Not initialized */
+        veglSetEGLerror(thread, EGL_NOT_INITIALIZED);
+        return EGL_FALSE;
+    }
 
     VEGL_LOCK_DISPLAY(dpy);
 

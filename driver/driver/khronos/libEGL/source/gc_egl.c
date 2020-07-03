@@ -385,11 +385,12 @@ veglInitDeviceThreadData(
 
     for (i = 0; i < Thread->chipCount; i++)
     {
-        if (gcvSTATUS_OK != gcoHAL_QueryChipLimits(gcvNULL, i, &Thread->chipLimits[i]))
+        if (gcmIS_ERROR(gcoHAL_QueryChipLimits(gcvNULL, i, &Thread->chipLimits[i])))
         {
             Thread->chipLimits[i].maxWidth = 0;
             Thread->chipLimits[i].maxHeight = 0;
             Thread->chipLimits[i].maxSamples = 0;
+            return EGL_FALSE;
         }
     }
 
