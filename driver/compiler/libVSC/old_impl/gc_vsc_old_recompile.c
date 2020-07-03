@@ -1789,33 +1789,6 @@ OnError:
 }
 #endif
 
-gceSTATUS
-gcGetReadImageWithTexlduFunctionName(
-    IN gcsPatchReadImage *  ReadImage,
-    IN gcSL_FORMAT          DataType,
-    IN gcSL_FORMAT          CoordType,
-    OUT gctSTRING *         ConvertFuncName
-    )
-{
-    gceSTATUS               status = gcvSTATUS_OK;
-    gctCHAR                 name[128] = "_read_image_with_texldu";
-
-    static const gctSTRING  dataTypeName[] = {"_float4", "_int4", "_b", "_uint4"};
-    static const gctSTRING  coordTypeName[] = {"_float3", "_int3"};
-
-    gcmASSERT(DataType <= gcSL_UINT32);
-    gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), dataTypeName[DataType]));
-
-    gcmASSERT(CoordType <= gcSL_INT32);
-    gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), coordTypeName[CoordType]));
-
-    /* dup the name to ConvertFuncName */
-    gcmONERROR(gcoOS_StrDup(gcvNULL, name, ConvertFuncName));
-
-OnError:
-    /* Return the status. */
-    return status;
-}
 
 gceSTATUS
 gcGetReadImageWithImgldFunctionName(
@@ -1955,25 +1928,14 @@ _createReadImageFunction(
     gceSTATUS       status          = gcvSTATUS_OK;
     gctSTRING       convertFuncName = gcvNULL;
     gcFUNCTION      convertFunction = gcvNULL;
-    gctBOOL         computeOnlyGpu = gcHWCaps.hwFeatureFlags.computeOnly;
     gctBOOL         halti5 = gcHWCaps.hwFeatureFlags.hasHalti5;
 
     if(halti5 && NEW_READ_WRITE_IMAGE)
     {
-        if(computeOnlyGpu && 0)
-        {
-            gcmONERROR(gcGetReadImageWithTexlduFunctionName(ReadImage,
-                                                   DataType,
-                                                   CoordType,
-                                                   &convertFuncName));
-        }
-        else
-        {
-            gcmONERROR(gcGetReadImageWithImgldFunctionName(ReadImage,
-                                                   DataType,
-                                                   CoordType,
-                                                   &convertFuncName));
-        }
+        gcmONERROR(gcGetReadImageWithImgldFunctionName(ReadImage,
+                                                       DataType,
+                                                       CoordType,
+                                                       &convertFuncName));
     }
     else
     {
