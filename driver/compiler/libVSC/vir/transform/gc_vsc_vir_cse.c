@@ -40,10 +40,14 @@ static void _VSC_LCSE_Key_Init(
     VSC_LCSE_Key_SetFirstEval(key, firstEval);
 }
 
+/*Expression mapping related functions. */
+typedef struct VSC_LCSE_EXPMAP VSC_LCSE_ExpMap;
+
 typedef struct VSC_LCSE
 {
     VIR_Shader*             shader;
     VIR_Function*           currFunc;
+    VSC_LCSE_ExpMap*        pFunctionExpMap;
     VIR_BASIC_BLOCK*        currBB;
     VSC_OPTN_LCSEOptions*   options;
     VIR_Dumper*             dumper;
@@ -55,6 +59,8 @@ typedef struct VSC_LCSE
 #define VSC_LCSE_SetShader(l, s)        ((l)->shader = (s))
 #define VSC_LCSE_GetCurrFunc(l)         ((l)->currFunc)
 #define VSC_LCSE_SetCurrFunc(l, f)      ((l)->currFunc = (f))
+#define VSC_LCSE_GetFuncExpMap(l)       ((l)->pFunctionExpMap)
+#define VSC_LCSE_SetFuncExpMap(l, b)    ((l)->pFunctionExpMap = (b))
 #define VSC_LCSE_GetCurrBB(l)           ((l)->currBB)
 #define VSC_LCSE_SetCurrBB(l, b)        ((l)->currBB = (b))
 #define VSC_LCSE_GetOptions(l)          ((l)->options)
@@ -84,235 +90,71 @@ static void _VSC_LCSE_Init(
     lcse->pMM = pMM;
 }
 
-static VSC_ErrCode _VSC_LCSE_ReplaceUses(
-    IN OUT VSC_LCSE             *lcse,
-    IN VIR_Instruction          *replacedInst,
-    IN VIR_Instruction          *commonInst
-    )
-{
-    VSC_ErrCode errCode = VSC_ERR_NONE;
-    VSC_OPTN_LCSEOptions* options = VSC_LCSE_GetOptions(lcse);
-    VIR_Dumper* dumper = VSC_LCSE_GetDumper(lcse);
-    VIR_BASIC_BLOCK* bb = VSC_LCSE_GetCurrBB(lcse);
-    VIR_Instruction *instIter;
-    gctBOOL    findInst = gcvFALSE;
-
-    gcmASSERT(BB_GET_LENGTH(bb) != 0);
-
-
-    if (VIR_Operand_GetModifier(VIR_Inst_GetDest(replacedInst)))
-    {
-        return errCode;
-    }
-
-    for(instIter = BB_GET_START_INST(bb); instIter != BB_GET_END_INST(bb); instIter = VIR_Inst_GetNext(instIter))
-    {
-        if (!findInst)
-        {
-            if (instIter != replacedInst)
-            {
-                continue;
-            }
-            else
-            {
-                findInst = gcvTRUE;
-            }
-        }
-        else
-        {
-            gctUINT    i, channel;
-            VIR_Operand *newDstOpnd, *srcOpnd;
-            VIR_OperandInfo srcInfo;
-
-            VIR_Function_DupOperand(VSC_LCSE_GetCurrFunc(lcse), VIR_Inst_GetDest(replacedInst), &newDstOpnd);
-            VIR_Operand_Change2Src(newDstOpnd);
-
-            /* use of dest of replacedInst*/
-            for(i = 0; i < VIR_Inst_GetSrcNum(instIter); i++)
-            {
-                srcOpnd = VIR_Inst_GetSource(instIter, i);
-
-                if (VIR_Operand_GetLShift(srcOpnd) > 0 ||
-                    VIR_Operand_GetModifier(srcOpnd) != VIR_MOD_NONE)
-                {
-                    continue;
-                }
-
-                VIR_Operand_GetOperandInfo(instIter, srcOpnd, &srcInfo);
-
-                if (VIR_Operand_Identical(srcOpnd, newDstOpnd, VSC_LCSE_GetShader(lcse), gcvFALSE))
-                {
-                    VIR_TypeId srcOpndTypeId = VIR_Operand_GetTypeId(srcOpnd);
-
-                    if(VSC_UTILS_MASK(VSC_OPTN_LCSEOptions_GetTrace(options), VSC_OPTN_LCSEOptions_TRACE_REPLACING))
-                    {
-                        VIR_LOG(dumper, "change the use instruction:\n");
-                        VIR_Inst_Dump(dumper, instIter);
-                    }
-
-                    vscVIR_DeleteUsage(VSC_LCSE_GetDuInfo(lcse),
-                        VIR_ANY_DEF_INST,
-                        instIter,
-                        srcOpnd,
-                        gcvFALSE,
-                        srcInfo.u1.virRegInfo.virReg,
-                        1,
-                        VIR_Operand_GetEnable(VIR_Inst_GetDest(replacedInst)),
-                        VIR_HALF_CHANNEL_MASK_FULL,
-                        gcvNULL);
-
-                    VIR_Operand_Copy(srcOpnd, VIR_Inst_GetSource(replacedInst, 0));
-                    VIR_Operand_SetTypeId(srcOpnd, srcOpndTypeId);
-
-                    VIR_Operand_GetOperandInfo(instIter, srcOpnd, &srcInfo);
-
-                    for (channel = 0; channel < VIR_CHANNEL_COUNT; channel++)
-                    {
-                        vscVIR_AddNewUsageToDef(VSC_LCSE_GetDuInfo(lcse),
-                            commonInst,
-                            instIter,
-                            srcOpnd,
-                            gcvFALSE,
-                            srcInfo.u1.virRegInfo.virReg,
-                            1,
-                            (1 << channel),
-                            VIR_HALF_CHANNEL_MASK_FULL,
-                            gcvNULL);
-                    }
-
-                    if(VSC_UTILS_MASK(VSC_OPTN_LCSEOptions_GetTrace(options), VSC_OPTN_LCSEOptions_TRACE_REPLACING))
-                    {
-                        VIR_LOG(dumper, "to:\n");
-                        VIR_Inst_Dump(dumper, instIter);
-                        VIR_LOG(dumper, "\n");
-                    }
-                }
-            }
-
-            VIR_Function_FreeOperand(VSC_LCSE_GetCurrFunc(lcse), newDstOpnd);
-
-            /* redefine of any part of dest of replacedInst */
-            if (VIR_Operand_SameLocation(instIter, VIR_Inst_GetDest(instIter), replacedInst, VIR_Inst_GetDest(replacedInst)) ||
-                VIR_Operand_SameLocation(instIter, VIR_Inst_GetDest(instIter), replacedInst, VIR_Inst_GetSource(replacedInst, 0)))
-            {
-                break;
-            }
-        }
-    }
-
-    return errCode;
-}
-
-static VSC_ErrCode _VSC_LCSE_ReplaceInst(
-    IN OUT VSC_LCSE* lcse,
-    IN VIR_Instruction*         commonEval,
-    IN VIR_Instruction*         toBeReplaced
-    )
-{
-    VSC_ErrCode errCode;
-    gctUINT srcIdx, channel;
-    VIR_Operand     *srcOpnd;
-    VIR_OperandInfo srcInfo, dstInfo;
-    VIR_Swizzle     srcSwizzle;
-
-    do
-    {
-        VSC_OPTN_LCSEOptions* options = VSC_LCSE_GetOptions(lcse);
-        VIR_Dumper* dumper = VSC_LCSE_GetDumper(lcse);
-        VIR_Operand* commonInstDest = VIR_Inst_GetDest(commonEval);
-        VIR_Operand* toBeReplacedOperand = VIR_Inst_GetSource(toBeReplaced, 0);
-        VIR_Operand_GetOperandInfo(commonEval, commonInstDest, &dstInfo);
-
-        /* to be replaced instruction */
-        if(VSC_UTILS_MASK(VSC_OPTN_LCSEOptions_GetTrace(options), VSC_OPTN_LCSEOptions_TRACE_REPLACING))
-        {
-            VIR_LOG(dumper, "To be replaced instruction:\n");
-            VIR_Inst_Dump(dumper, toBeReplaced);
-        }
-
-        /* du update */
-        for (srcIdx = 0; srcIdx < VIR_Inst_GetSrcNum(toBeReplaced); srcIdx++)
-        {
-            srcOpnd = VIR_Inst_GetSource(toBeReplaced, srcIdx);
-            srcSwizzle = VIR_Operand_GetSwizzle(srcOpnd);
-            VIR_Operand_GetOperandInfo(toBeReplaced, srcOpnd, &srcInfo);
-
-            vscVIR_DeleteUsage(VSC_LCSE_GetDuInfo(lcse),
-                VIR_ANY_DEF_INST,
-                toBeReplaced,
-                srcOpnd,
-                gcvFALSE,
-                srcInfo.u1.virRegInfo.virReg,
-                1,
-                VIR_Swizzle_2_Enable(srcSwizzle),
-                VIR_HALF_CHANNEL_MASK_FULL,
-                gcvNULL);
-        }
-
-        VIR_Operand_Copy(toBeReplacedOperand, commonInstDest);
-        VIR_Operand_Change2Src(toBeReplacedOperand);
-        /* clear destination's modifier */
-        VIR_Operand_SetModifier(toBeReplacedOperand, VIR_MOD_NONE);
-        VIR_Operand_SetSwizzle(toBeReplacedOperand, VIR_Enable_2_Swizzle_WShift(VIR_Operand_GetEnable(commonInstDest)));
-
-        VIR_Inst_SetOpcode(toBeReplaced, VIR_OP_MOV);
-        VIR_Inst_SetSrcNum(toBeReplaced, 1);
-
-        for (channel = VIR_CHANNEL_X; channel < VIR_CHANNEL_NUM; channel++)
-        {
-            if (VIR_Operand_GetEnable(commonInstDest) & (1 << channel))
-            {
-                vscVIR_AddNewUsageToDef(VSC_LCSE_GetDuInfo(lcse),
-                    commonEval,
-                    toBeReplaced,
-                    toBeReplacedOperand,
-                    gcvFALSE,
-                    dstInfo.u1.virRegInfo.virReg,
-                    1,
-                    (1 << channel),
-                    VIR_HALF_CHANNEL_MASK_FULL,
-                    gcvNULL);
-            }
-        }
-
-        /* replaced instruction */
-        if(VSC_UTILS_MASK(VSC_OPTN_LCSEOptions_GetTrace(options), VSC_OPTN_LCSEOptions_TRACE_REPLACING))
-        {
-            VIR_LOG(dumper, "Replaced instruction:\n");
-            VIR_Inst_Dump(dumper, toBeReplaced);
-        }
-
-        /* we replace the uses of the def of toBeReplaced to expose more LCSE opportunities */
-        errCode = _VSC_LCSE_ReplaceUses(lcse, toBeReplaced, commonEval);
-
-    } while(gcvFALSE);
-
-    return errCode;
-}
-
-typedef struct VSC_LCSE_EXPMAP
+struct VSC_LCSE_EXPMAP
 {
     VSC_LCSE*               lcse;
     VSC_UNI_LIST            keyList;
+    VSC_HASH_TABLE*         pWorkingInstSet;
     VSC_MM*                 pMM;
-} VSC_LCSE_ExpMap;
+    gctBOOL                 bVectorizeAttrLd;
+};
 
-#define VSC_LCSE_ExpMap_GetLCSE(em)         ((em)->lcse)
-#define VSC_LCSE_ExpMap_SetLCSE(em, l)      ((em)->lcse = (l))
-#define VSC_LCSE_ExpMap_GetShader(em)       ((em)->lcse->shader)
-#define VSC_LCSE_ExpMap_GetOptions(em)      ((em)->lcse->options)
-#define VSC_LCSE_ExpMap_GetDumper(em)       ((em)->lcse->dumper)
-#define VSC_LCSE_ExpMap_GetKeyList(em)      (&(em)->keyList)
-#define VSC_LCSE_ExpMap_GetMM(em)           ((em)->lcse->pMM)
+#define VSC_LCSE_ExpMap_GetLCSE(em)                 ((em)->lcse)
+#define VSC_LCSE_ExpMap_SetLCSE(em, l)              ((em)->lcse = (l))
+#define VSC_LCSE_ExpMap_GetShader(em)               ((em)->lcse->shader)
+#define VSC_LCSE_ExpMap_GetOptions(em)              ((em)->lcse->options)
+#define VSC_LCSE_ExpMap_GetDumper(em)               ((em)->lcse->dumper)
+#define VSC_LCSE_ExpMap_GetKeyList(em)              (&(em)->keyList)
+#define VSC_LCSE_ExpMap_GetWorkingInstSet(em)       ((em)->pWorkingInstSet)
+#define VSC_LCSE_ExpMap_SetWorkingInstSet(em, l)    ((em)->pWorkingInstSet = (l))
+#define VSC_LCSE_ExpMap_GetMM(em)                   ((em)->lcse->pMM)
+#define VSC_LCSE_ExpMap_GetVectorizeAttrLd(em)      ((em)->bVectorizeAttrLd)
+#define VSC_LCSE_ExpMap_SetVectorizeAttrLd(em, l)   ((em)->bVectorizeAttrLd = (l))
 
 static void _VSC_LCSE_ExpMap_Init(
     IN OUT VSC_LCSE_ExpMap*     expMap,
-    IN VSC_LCSE*                lcse
+    IN VSC_LCSE*                lcse,
+    IN gctBOOL                  bCreateWorkingInstSet
     )
 {
+    VSC_HASH_TABLE*             pHT = gcvNULL;
+
     VSC_LCSE_ExpMap_SetLCSE(expMap, lcse);
     vscUNILST_Initialize(VSC_LCSE_ExpMap_GetKeyList(expMap), gcvFALSE);
     expMap->pMM = lcse->pMM;
+
+    VSC_LCSE_ExpMap_SetVectorizeAttrLd(expMap, gcvFALSE);
+
+    if (bCreateWorkingInstSet)
+    {
+        pHT = vscHTBL_Create(lcse->pMM, vscHFUNC_Default, vscHKCMP_Default, 8);
+    }
+
+    VSC_LCSE_ExpMap_SetWorkingInstSet(expMap, pHT);
+}
+
+static void _VSC_LCSE_ExpMap_Final(
+    IN OUT VSC_LCSE_ExpMap*     expMap,
+    IN gctBOOL                  bResetHashTableOnly
+    )
+{
+    VSC_HASH_TABLE*             pHT = VSC_LCSE_ExpMap_GetWorkingInstSet(expMap);
+
+    vscUNILST_Finalize(VSC_LCSE_ExpMap_GetKeyList(expMap));
+    VSC_LCSE_ExpMap_SetVectorizeAttrLd(expMap, gcvFALSE);
+
+    if (pHT != gcvNULL)
+    {
+        if (bResetHashTableOnly)
+        {
+            vscHTBL_Reset(pHT);
+        }
+        else
+        {
+            vscHTBL_Destroy(pHT);
+            VSC_LCSE_ExpMap_SetWorkingInstSet(expMap, gcvNULL);
+        }
+    }
 }
 
 static VSC_LCSE_Key* _VSC_LCSE_ExpMap_NewKey(
@@ -333,18 +175,38 @@ static VSC_LCSE_Key* _VSC_LCSE_ExpMap_FindSameExpKey(
     IN VIR_Instruction*         inst
     )
 {
-    VSC_UNI_LIST* keyList = VSC_LCSE_ExpMap_GetKeyList(expMap);
-    VSC_UL_ITERATOR iter;
-    VSC_LCSE_Key* key;
+    VSC_UNI_LIST*               keyList = VSC_LCSE_ExpMap_GetKeyList(expMap);
+    gctBOOL                     bVectorizeAttrLd = VSC_LCSE_ExpMap_GetVectorizeAttrLd(expMap);
+    gctBOOL                     bFound = gcvFALSE;
+    VSC_UL_ITERATOR             iter;
+    VSC_LCSE_Key*               key;
+    VSC_LCSE_Key*               pMatchKey = gcvNULL;
+    VIR_Operand*                pInstSrc0 = VIR_Inst_GetSource(inst, 0);
+    VIR_Swizzle                 origInstSrc0Swizzle = VIR_Operand_GetSwizzle(pInstSrc0);
+    VIR_Swizzle                 defaultSwizzle = VIR_SWIZZLE_XYZW;
+
+    /* If we are vectorizing ATTR_LD, then we don't need to care about the swizzle of source0. */
+    if (bVectorizeAttrLd)
+    {
+        VIR_Operand_SetSwizzle(pInstSrc0, defaultSwizzle);
+    }
 
     vscULIterator_Init(&iter, keyList);
-    for(key = (VSC_LCSE_Key*)vscULIterator_First(&iter);
-        key != gcvNULL; key = (VSC_LCSE_Key*)vscULIterator_Next(&iter))
+    for (key = (VSC_LCSE_Key*)vscULIterator_First(&iter);
+         key != gcvNULL;
+         key = (VSC_LCSE_Key*)vscULIterator_Next(&iter))
     {
-        VIR_Instruction* keyInst = VSC_LCSE_Key_GetInst(key);
-        VIR_OpCode      keyOpcode = VIR_Inst_GetOpcode(keyInst);
+        VIR_Instruction*        keyInst = VSC_LCSE_Key_GetInst(key);
+        VIR_OpCode              keyOpcode = VIR_Inst_GetOpcode(keyInst);
+        VIR_Operand*            pKeyInstSrc0 = VIR_Inst_GetSource(keyInst, 0);
+        VIR_Swizzle             origKeyInstSrc0Swizzle = VIR_Operand_GetSwizzle(pKeyInstSrc0);
 
-        if(VIR_Inst_IdenticalExpression(keyInst, inst, VSC_LCSE_ExpMap_GetShader(expMap), gcvTRUE, gcvTRUE, gcvFALSE))
+        if (bVectorizeAttrLd)
+        {
+            VIR_Operand_SetSwizzle(pKeyInstSrc0, defaultSwizzle);
+        }
+
+        if (VIR_Inst_IdenticalExpression(keyInst, inst, VSC_LCSE_ExpMap_GetShader(expMap), gcvTRUE, gcvTRUE, gcvFALSE))
         {
             /* load r1.xy, base, offset
                load r1.yz, base, offset
@@ -352,10 +214,12 @@ static VSC_LCSE_Key* _VSC_LCSE_ExpMap_FindSameExpKey(
             if (VIR_OPCODE_isMemLd(keyOpcode))
             {
                 if ((VIR_Enable_Channel_Count(VIR_Inst_GetEnable(keyInst)) == 1 &&
-                     VIR_Enable_Channel_Count(VIR_Inst_GetEnable(inst))    == 1) ||
+                     VIR_Enable_Channel_Count(VIR_Inst_GetEnable(inst))    == 1)
+                    ||
                     VIR_Inst_GetEnable(keyInst) == VIR_Inst_GetEnable(inst))
                 {
-                    return key;
+                    pMatchKey = key;
+                    bFound = gcvTRUE;
                 }
             }
             /* load_attr r1.x, base, regmap_index, attr_index
@@ -363,20 +227,51 @@ static VSC_LCSE_Key* _VSC_LCSE_ExpMap_FindSameExpKey(
                the two load_attrs are loading x and y components */
             else if (VIR_OPCODE_isAttrLd(VIR_Inst_GetOpcode(keyInst)))
             {
-                if (VIR_Inst_GetEnable(keyInst) == VIR_Inst_GetEnable(inst))
+                if (VIR_Inst_GetEnable(keyInst) == VIR_Inst_GetEnable(inst)
+                    ||
+                    /* We don't need to check enable here. */
+                    bVectorizeAttrLd)
                 {
-                    return key;
+                    pMatchKey = key;
+                    bFound = gcvTRUE;
                 }
             }
             else
             {
                 if (VIR_Inst_GetEnable(keyInst) == VIR_Inst_GetEnable(inst))
                 {
-                    return key;
+                    pMatchKey = key;
+                    bFound = gcvTRUE;
                 }
             }
         }
+
+        /* Reset the swizzle. */
+        if (bVectorizeAttrLd)
+        {
+            VIR_Operand_SetSwizzle(pKeyInstSrc0, origKeyInstSrc0Swizzle);
+        }
+
+        /* Find a matched key. */
+        if (bFound)
+        {
+            break;
+        }
     }
+
+    /* Reset the swizzle. */
+    if (bVectorizeAttrLd)
+    {
+        VIR_Operand_SetSwizzle(pInstSrc0, origInstSrc0Swizzle);
+    }
+
+    if (bFound)
+    {
+        gcmASSERT(pMatchKey != gcvNULL);
+
+        return pMatchKey;
+    }
+
     return gcvNULL;
 }
 
@@ -394,13 +289,6 @@ static void _VSC_LCSE_ExpMap_RemoveKey(
     )
 {
     vscUNILST_Remove(VSC_LCSE_ExpMap_GetKeyList(expMap), (VSC_UNI_LIST_NODE*)key);
-}
-
-static void _VSC_LCSE_ExpMap_Final(
-    IN OUT VSC_LCSE_ExpMap*    expMap
-    )
-{
-    vscUNILST_Finalize(VSC_LCSE_ExpMap_GetKeyList(expMap));
 }
 
 static gctBOOL _VSC_LCSE_ExpMap_FindExp(
@@ -427,8 +315,10 @@ static void _VSC_LCSE_ExpMap_Gen(
     IN VIR_Instruction*     inst
     )
 {
-    VSC_OPTN_LCSEOptions* options = VSC_LCSE_ExpMap_GetOptions(expMap);
-    VIR_Dumper* dumper = VSC_LCSE_ExpMap_GetDumper(expMap);
+    VSC_OPTN_LCSEOptions*   options = VSC_LCSE_ExpMap_GetOptions(expMap);
+    VIR_Dumper*             dumper = VSC_LCSE_ExpMap_GetDumper(expMap);
+    gctBOOL                 bVectorizeAttrLd = VSC_LCSE_ExpMap_GetVectorizeAttrLd(expMap);
+    VSC_HASH_TABLE*         pWorkingInstSet = VSC_LCSE_ExpMap_GetWorkingInstSet(expMap);
 
     /* generated new expression */
     if(VSC_UTILS_MASK(VSC_OPTN_LCSEOptions_GetTrace(options), VSC_OPTN_LCSEOptions_TRACE_GENERATING))
@@ -438,6 +328,14 @@ static void _VSC_LCSE_ExpMap_Gen(
     }
 
     _VSC_LCSE_ExpMap_InsertKey(expMap, _VSC_LCSE_ExpMap_NewKey(expMap, inst, gcvNULL, inst));
+
+    if (bVectorizeAttrLd)
+    {
+        gcmASSERT(pWorkingInstSet != gcvNULL);
+
+        /* Insert a NULL key value here. */
+        vscHTBL_DirectSet(pWorkingInstSet, (void *)inst, (void *)gcvNULL);
+    }
 }
 
 static void _VSC_LCSE_ExpMap_Update(
@@ -598,6 +496,444 @@ static void _VSC_LCSE_ExpMap_MultiKill(
     }
 }
 
+/* Replace the usage instruction. */
+static VSC_ErrCode _VSC_LCSE_ReplaceUses(
+    IN OUT VSC_LCSE             *lcse,
+    IN VIR_Instruction          *replacedInst,
+    IN VIR_Instruction          *commonInst
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VSC_OPTN_LCSEOptions* options = VSC_LCSE_GetOptions(lcse);
+    VIR_Dumper* dumper = VSC_LCSE_GetDumper(lcse);
+    VIR_BASIC_BLOCK* bb = VSC_LCSE_GetCurrBB(lcse);
+    VIR_Instruction *instIter;
+    gctBOOL    findInst = gcvFALSE;
+
+    gcmASSERT(BB_GET_LENGTH(bb) != 0);
+
+
+    if (VIR_Operand_GetModifier(VIR_Inst_GetDest(replacedInst)))
+    {
+        return errCode;
+    }
+
+    for(instIter = BB_GET_START_INST(bb); instIter != BB_GET_END_INST(bb); instIter = VIR_Inst_GetNext(instIter))
+    {
+        if (!findInst)
+        {
+            if (instIter != replacedInst)
+            {
+                continue;
+            }
+            else
+            {
+                findInst = gcvTRUE;
+            }
+        }
+        else
+        {
+            gctUINT    i, channel;
+            VIR_Operand *newDstOpnd, *srcOpnd;
+            VIR_OperandInfo srcInfo;
+
+            VIR_Function_DupOperand(VSC_LCSE_GetCurrFunc(lcse), VIR_Inst_GetDest(replacedInst), &newDstOpnd);
+            VIR_Operand_Change2Src(newDstOpnd);
+
+            /* use of dest of replacedInst*/
+            for(i = 0; i < VIR_Inst_GetSrcNum(instIter); i++)
+            {
+                srcOpnd = VIR_Inst_GetSource(instIter, i);
+
+                if (VIR_Operand_GetLShift(srcOpnd) > 0 ||
+                    VIR_Operand_GetModifier(srcOpnd) != VIR_MOD_NONE)
+                {
+                    continue;
+                }
+
+                VIR_Operand_GetOperandInfo(instIter, srcOpnd, &srcInfo);
+
+                if (VIR_Operand_Identical(srcOpnd, newDstOpnd, VSC_LCSE_GetShader(lcse), gcvFALSE))
+                {
+                    VIR_TypeId srcOpndTypeId = VIR_Operand_GetTypeId(srcOpnd);
+
+                    if(VSC_UTILS_MASK(VSC_OPTN_LCSEOptions_GetTrace(options), VSC_OPTN_LCSEOptions_TRACE_REPLACING))
+                    {
+                        VIR_LOG(dumper, "change the use instruction:\n");
+                        VIR_Inst_Dump(dumper, instIter);
+                    }
+
+                    vscVIR_DeleteUsage(VSC_LCSE_GetDuInfo(lcse),
+                        VIR_ANY_DEF_INST,
+                        instIter,
+                        srcOpnd,
+                        gcvFALSE,
+                        srcInfo.u1.virRegInfo.virReg,
+                        1,
+                        VIR_Operand_GetEnable(VIR_Inst_GetDest(replacedInst)),
+                        VIR_HALF_CHANNEL_MASK_FULL,
+                        gcvNULL);
+
+                    VIR_Operand_Copy(srcOpnd, VIR_Inst_GetSource(replacedInst, 0));
+                    VIR_Operand_SetTypeId(srcOpnd, srcOpndTypeId);
+
+                    VIR_Operand_GetOperandInfo(instIter, srcOpnd, &srcInfo);
+
+                    for (channel = 0; channel < VIR_CHANNEL_COUNT; channel++)
+                    {
+                        vscVIR_AddNewUsageToDef(VSC_LCSE_GetDuInfo(lcse),
+                            commonInst,
+                            instIter,
+                            srcOpnd,
+                            gcvFALSE,
+                            srcInfo.u1.virRegInfo.virReg,
+                            1,
+                            (1 << channel),
+                            VIR_HALF_CHANNEL_MASK_FULL,
+                            gcvNULL);
+                    }
+
+                    if(VSC_UTILS_MASK(VSC_OPTN_LCSEOptions_GetTrace(options), VSC_OPTN_LCSEOptions_TRACE_REPLACING))
+                    {
+                        VIR_LOG(dumper, "to:\n");
+                        VIR_Inst_Dump(dumper, instIter);
+                        VIR_LOG(dumper, "\n");
+                    }
+                }
+            }
+
+            VIR_Function_FreeOperand(VSC_LCSE_GetCurrFunc(lcse), newDstOpnd);
+
+            /* redefine of any part of dest of replacedInst */
+            if (VIR_Operand_SameLocation(instIter, VIR_Inst_GetDest(instIter), replacedInst, VIR_Inst_GetDest(replacedInst)) ||
+                VIR_Operand_SameLocation(instIter, VIR_Inst_GetDest(instIter), replacedInst, VIR_Inst_GetSource(replacedInst, 0)))
+            {
+                break;
+            }
+        }
+    }
+
+    return errCode;
+}
+
+static VSC_ErrCode _VSC_LCSE_ReplaceInst(
+    IN OUT VSC_LCSE*            lcse,
+    IN VSC_LCSE_ExpMap*         expMap,
+    IN VIR_Instruction*         commonEval,
+    IN VIR_Instruction*         toBeReplaced
+    )
+{
+    VSC_ErrCode                 errCode;
+    VIR_Shader*                 pShader = VSC_LCSE_GetShader(lcse);
+    VIR_DEF_USAGE_INFO*         pDuInfo = VSC_LCSE_GetDuInfo(lcse);
+    VIR_Instruction*            pReplacedInst = commonEval;
+    gctUINT                     srcIdx, channel;
+    VIR_Operand *               srcOpnd;
+    VIR_OperandInfo             srcInfo, dstInfo;
+    VIR_Swizzle                 srcSwizzle;
+    gctBOOL                     bVectorizeAttrLd = VSC_LCSE_ExpMap_GetVectorizeAttrLd(expMap);
+    VSC_HASH_TABLE*             pWorkingInstSet = VSC_LCSE_ExpMap_GetWorkingInstSet(expMap);
+    VIR_Instruction*            pReplacedInstInHt = gcvNULL;
+
+    if (bVectorizeAttrLd)
+    {
+        gcmASSERT(pWorkingInstSet);
+
+        if (vscHTBL_DirectTestAndGet(pWorkingInstSet, (void *)commonEval, (void **)&pReplacedInstInHt))
+        {
+            /* First time to process this instruction, insert a new ATTR_LD first. */
+            if (pReplacedInstInHt == gcvNULL)
+            {
+                VIR_Symbol*     pBaseSym = VIR_Operand_GetUnderlyingSymbol(VIR_Inst_GetSource(commonEval, 0));
+                VIR_SymId       pReplacedSymId = VIR_INVALID_ID;
+                VIR_Type*       pSymType;
+                VIR_VirRegId    virRegId = VIR_Shader_NewVirRegId(pShader, 1);
+                VIR_Function*   pWorkingFunc = VIR_Inst_GetFunction(commonEval);
+                VIR_Instruction*pNewAttrLdInst = gcvNULL;
+                VIR_Operand*    pNewOpnd = gcvNULL;
+                VIR_Enable      newEnable;
+
+                /* Get the base type. */
+                pSymType = VIR_Symbol_GetType(pBaseSym);
+                while (VIR_Type_isArray(pSymType))
+                {
+                    pSymType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetIndex(pSymType));
+                }
+
+                /* Add a new temp register to save the full components of this variable. */
+                errCode = VIR_Shader_AddSymbol(pShader,
+                                               VIR_SYM_VIRREG,
+                                               virRegId,
+                                               pSymType,
+                                               VIR_STORAGE_UNKNOWN,
+                                               &pReplacedSymId);
+                ON_ERROR(errCode, "Fail to add a new vir reg symbol.");
+
+                /* Insert a new ATTR_LD. */
+                errCode = VIR_Function_AddCopiedInstructionBefore(pWorkingFunc,
+                                                                  commonEval,
+                                                                  commonEval,
+                                                                  gcvTRUE,
+                                                                  &pNewAttrLdInst);
+                ON_ERROR(errCode, "Fail to insert a copied instruction.");
+
+                /* Set the DEST. */
+                pNewOpnd = VIR_Inst_GetDest(pNewAttrLdInst);
+                VIR_Operand_SetSymbol(pNewOpnd, pWorkingFunc, pReplacedSymId);
+                newEnable = VIR_Type_Conv2Enable(pSymType);
+                VIR_Operand_SetEnable(pNewOpnd, newEnable);
+
+                /* Update the swizzle of SRC0. */
+                pNewOpnd = VIR_Inst_GetSource(pNewAttrLdInst, 0);
+                VIR_Operand_SetSwizzle(pNewOpnd, VIR_Enable_2_Swizzle_WShift(newEnable));
+
+                /* Update the DU. */
+                vscVIR_AddNewDef(pDuInfo,
+                                 pNewAttrLdInst,
+                                 virRegId,
+                                 1,
+                                 newEnable,
+                                 VIR_HALF_CHANNEL_MASK_FULL,
+                                 gcvNULL,
+                                 gcvNULL);
+
+                for (srcIdx = 0; srcIdx < VIR_Inst_GetSrcNum(pNewAttrLdInst); srcIdx++)
+                {
+                    srcOpnd = VIR_Inst_GetSource(pNewAttrLdInst, srcIdx);
+                    srcSwizzle = VIR_Operand_GetSwizzle(srcOpnd);
+                    VIR_Operand_GetOperandInfo(pNewAttrLdInst, srcOpnd, &srcInfo);
+
+                    if (!srcInfo.isVreg)
+                    {
+                        continue;
+                    }
+
+                    vscVIR_AddNewUsageToDef(pDuInfo,
+                                            VIR_ANY_DEF_INST,
+                                            pNewAttrLdInst,
+                                            srcOpnd,
+                                            gcvFALSE,
+                                            srcInfo.u1.virRegInfo.virReg,
+                                            1,
+                                            VIR_Swizzle_2_Enable(srcSwizzle),
+                                            VIR_HALF_CHANNEL_MASK_FULL,
+                                            gcvNULL);
+                }
+
+                /* Set the hash key. */
+                vscHTBL_DirectSet(pWorkingInstSet, (void *)commonEval, (void *)pNewAttrLdInst);
+                pReplacedInstInHt = pNewAttrLdInst;
+
+                /* Replace the commonEval first. */
+                _VSC_LCSE_ReplaceInst(lcse, expMap, pReplacedInstInHt, commonEval);
+            }
+
+            pReplacedInst = pReplacedInstInHt;
+        }
+    }
+
+    do
+    {
+        VSC_OPTN_LCSEOptions*   options = VSC_LCSE_GetOptions(lcse);
+        VIR_Dumper*             dumper = VSC_LCSE_GetDumper(lcse);
+        VIR_Operand*            commonInstDest = VIR_Inst_GetDest(pReplacedInst);
+        VIR_Operand*            toBeReplacedOperand = VIR_Inst_GetSource(toBeReplaced, 0);
+        VIR_Swizzle             origSrc0Swizzle = VIR_Operand_GetSwizzle(toBeReplacedOperand);
+
+        VIR_Operand_GetOperandInfo(pReplacedInst, commonInstDest, &dstInfo);
+
+        /* to be replaced instruction */
+        if(VSC_UTILS_MASK(VSC_OPTN_LCSEOptions_GetTrace(options), VSC_OPTN_LCSEOptions_TRACE_REPLACING))
+        {
+            VIR_LOG(dumper, "To be replaced instruction:\n");
+            VIR_Inst_Dump(dumper, toBeReplaced);
+        }
+
+        /* du update */
+        for (srcIdx = 0; srcIdx < VIR_Inst_GetSrcNum(toBeReplaced); srcIdx++)
+        {
+            srcOpnd = VIR_Inst_GetSource(toBeReplaced, srcIdx);
+            srcSwizzle = VIR_Operand_GetSwizzle(srcOpnd);
+            VIR_Operand_GetOperandInfo(toBeReplaced, srcOpnd, &srcInfo);
+
+            if (!srcInfo.isVreg)
+            {
+                continue;
+            }
+
+            vscVIR_DeleteUsage(pDuInfo,
+                               VIR_ANY_DEF_INST,
+                               toBeReplaced,
+                               srcOpnd,
+                               gcvFALSE,
+                               srcInfo.u1.virRegInfo.virReg,
+                               1,
+                               VIR_Swizzle_2_Enable(srcSwizzle),
+                               VIR_HALF_CHANNEL_MASK_FULL,
+                               gcvNULL);
+        }
+
+        VIR_Operand_Copy(toBeReplacedOperand, commonInstDest);
+        VIR_Operand_Change2Src(toBeReplacedOperand);
+        /* clear destination's modifier */
+        VIR_Operand_SetModifier(toBeReplacedOperand, VIR_MOD_NONE);
+        if (bVectorizeAttrLd)
+        {
+            VIR_Operand_SetSwizzle(toBeReplacedOperand, origSrc0Swizzle);
+        }
+        else
+        {
+            VIR_Operand_SetSwizzle(toBeReplacedOperand, VIR_Enable_2_Swizzle_WShift(VIR_Operand_GetEnable(commonInstDest)));
+        }
+
+
+        VIR_Inst_SetOpcode(toBeReplaced, VIR_OP_MOV);
+        VIR_Inst_SetSrcNum(toBeReplaced, 1);
+
+        for (channel = VIR_CHANNEL_X; channel < VIR_CHANNEL_NUM; channel++)
+        {
+            if (VIR_Operand_GetEnable(commonInstDest) & (1 << channel))
+            {
+                vscVIR_AddNewUsageToDef(pDuInfo,
+                                        pReplacedInst,
+                                        toBeReplaced,
+                                        toBeReplacedOperand,
+                                        gcvFALSE,
+                                        dstInfo.u1.virRegInfo.virReg,
+                                        1,
+                                        (1 << channel),
+                                        VIR_HALF_CHANNEL_MASK_FULL,
+                                        gcvNULL);
+            }
+        }
+
+        /* replaced instruction */
+        if(VSC_UTILS_MASK(VSC_OPTN_LCSEOptions_GetTrace(options), VSC_OPTN_LCSEOptions_TRACE_REPLACING))
+        {
+            VIR_LOG(dumper, "Replaced instruction:\n");
+            VIR_Inst_Dump(dumper, toBeReplaced);
+        }
+
+        /* we replace the uses of the def of toBeReplaced to expose more LCSE opportunities */
+        errCode = _VSC_LCSE_ReplaceUses(lcse, toBeReplaced, pReplacedInst);
+        ON_ERROR(errCode, "Fail to replace the uses.");
+
+    } while(gcvFALSE);
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode _VSC_LCSE_PerformOnBBForAttrLd(
+    IN VSC_LCSE*                pLcse
+    )
+{
+    VSC_ErrCode                 errCode  = VSC_ERR_NONE;
+    VIR_Shader*                 pShader = VSC_LCSE_GetShader(pLcse);
+    VIR_BASIC_BLOCK*            pBB = VSC_LCSE_GetCurrBB(pLcse);
+    VSC_LCSE_ExpMap*            pFuncExpMap = VSC_LCSE_GetFuncExpMap(pLcse);
+    VIR_Instruction*            pInstIter;
+    gctBOOL                     bCheckInputOnly = gcvTRUE;
+    VSC_HASH_TABLE*             pWorkingInstSet = VSC_LCSE_ExpMap_GetWorkingInstSet(pFuncExpMap);
+    gctINT                      maxInstCount = 4;
+
+    VSC_LCSE_ExpMap_SetVectorizeAttrLd(pFuncExpMap, gcvTRUE);
+
+    /*
+        Do the following optimization:
+
+            001: ATTR_LD            mp temp(623).mp.x, hp  gl_in.gl_Position.hp.x, int 0, int 0
+            002: ATTR_LD            mp temp(627).mp.x, hp  gl_in.gl_Position.hp.y, int 0, int 0
+            003: ATTR_LD            mp temp(631).mp.x, hp  gl_in.gl_Position.hp.z, int 0, int 0
+            004: ATTR_LD            hp temp(635).hp.x, hp  gl_in.gl_Position.hp.w, int 0, int 0
+        -->
+            005: ATTR_LD            hp temp(600).hp, hp  gl_in.gl_Position.hp, int 0, int 0
+            001: MOV                mp temp(623).mp.x, hp temp(600).hp.x
+            002: MOV                mp temp(627).mp.x, hp temp(600).hp.y
+            003: MOV                mp temp(631).mp.x, hp temp(600).hp.z
+            004: MOV                mp temp(635).mp.x, hp temp(600).hp.w
+
+        There are some rules for this optimization:
+            1) So far check ATTR_LD for the attributes only, we can handle the outputs in further by checking the DU.
+            2) So far the working range is function scope so we won't use too many temp registers.
+            3) Only check those variables with more than one component.
+    */
+
+    /* Go through all instructions. */
+    for (pInstIter = BB_GET_START_INST(pBB); pInstIter != BB_GET_END_INST(pBB); pInstIter = VIR_Inst_GetNext(pInstIter))
+    {
+        VIR_Instruction*        pCommonEval = gcvNULL;
+        VIR_Instruction*        pFirstEval = gcvNULL;
+        VIR_OpCode              instOpcode = VIR_Inst_GetOpcode(pInstIter);
+        VIR_Symbol*             pBaseSym = gcvNULL;
+        VIR_Type*               pSymType = gcvNULL;
+
+        /* work on ATTR_LD */
+        while (instOpcode == VIR_OP_ATTR_LD)
+        {
+            /* Get the base symbol. */
+            pBaseSym = VIR_Operand_GetUnderlyingSymbol(VIR_Inst_GetSource(pInstIter, 0));
+
+            /* Check inputs only. */
+            if (bCheckInputOnly
+                &&
+                !(pBaseSym && (VIR_Symbol_isInput(pBaseSym) || VIR_Symbol_isPerPatchInput(pBaseSym))))
+            {
+                break;
+            }
+
+            /* Get the base type. */
+            pSymType = VIR_Symbol_GetType(pBaseSym);
+            while (VIR_Type_isArray(pSymType))
+            {
+                pSymType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetIndex(pSymType));
+            }
+
+            /* Check those variables with more than one component. */
+            if (VIR_GetTypeComponents(VIR_Type_GetIndex(pSymType)) == 1)
+            {
+                break;
+            }
+
+            if (_VSC_LCSE_ExpMap_FindExp(pFuncExpMap, pInstIter, &pCommonEval, &pFirstEval))
+            {
+                if (pCommonEval)
+                {
+                    _VSC_LCSE_ReplaceInst(pLcse, pFuncExpMap, pCommonEval, pInstIter);
+                }
+                else
+                {
+                    _VSC_LCSE_ExpMap_Update(pFuncExpMap, pFirstEval, pFirstEval);
+                    _VSC_LCSE_ReplaceInst(pLcse, pFuncExpMap, pFirstEval, pInstIter);
+                }
+            }
+            else
+            {
+                if (vscHTBL_CountItems(pWorkingInstSet) <= maxInstCount)
+                {
+                    _VSC_LCSE_ExpMap_Gen(pFuncExpMap, pInstIter);
+                }
+            }
+
+            break;
+        };
+
+        /* Kill redefined expression, we don't need to do this if we only check inputs here. */
+        if (!bCheckInputOnly
+            &&
+            (VIR_OPCODE_isAttrSt(instOpcode) ||
+             instOpcode == VIR_OP_EMIT0      ||
+             instOpcode == VIR_OP_EMIT))
+        {
+            _VSC_LCSE_ExpMap_MultiKill(pFuncExpMap, pInstIter);
+        }
+    }
+
+    VSC_LCSE_ExpMap_SetVectorizeAttrLd(pFuncExpMap, gcvFALSE);
+
+    return errCode;
+}
+
 static VSC_ErrCode _VSC_LCSE_PerformOnBB(
     IN VSC_LCSE*                lcse
     )
@@ -609,11 +945,6 @@ static VSC_ErrCode _VSC_LCSE_PerformOnBB(
     VSC_LCSE_ExpMap expMap;
     VIR_Instruction* instIter;
 
-    if(BB_GET_LENGTH(bb) == 0)
-    {
-        return errCode;
-    }
-
     /* dump input bb */
     if(VSC_UTILS_MASK(VSC_OPTN_LCSEOptions_GetTrace(options), VSC_OPTN_LCSEOptions_TRACE_INPUT_BB))
     {
@@ -622,7 +953,7 @@ static VSC_ErrCode _VSC_LCSE_PerformOnBB(
         VIR_BasicBlock_Dump(dumper, bb, gcvTRUE);
     }
 
-    _VSC_LCSE_ExpMap_Init(&expMap, lcse);
+    _VSC_LCSE_ExpMap_Init(&expMap, lcse, gcvFALSE);
     for(instIter = BB_GET_START_INST(bb); instIter != BB_GET_END_INST(bb); instIter = VIR_Inst_GetNext(instIter))
     {
         VIR_Instruction* commonEval = gcvNULL;
@@ -699,7 +1030,7 @@ static VSC_ErrCode _VSC_LCSE_PerformOnBB(
             {
                 if(commonEval)
                 {
-                    _VSC_LCSE_ReplaceInst(lcse, commonEval, instIter);
+                    _VSC_LCSE_ReplaceInst(lcse, &expMap, commonEval, instIter);
                 }
                 else
                 {
@@ -711,7 +1042,7 @@ static VSC_ErrCode _VSC_LCSE_PerformOnBB(
                     }
 
                     _VSC_LCSE_ExpMap_Update(&expMap, firstEval, firstEval);
-                    _VSC_LCSE_ReplaceInst(lcse, firstEval, instIter);
+                    _VSC_LCSE_ReplaceInst(lcse, &expMap, firstEval, instIter);
                 }
             }
             else
@@ -730,7 +1061,7 @@ static VSC_ErrCode _VSC_LCSE_PerformOnBB(
             _VSC_LCSE_ExpMap_MultiKill(&expMap, instIter);
         }
     }
-    _VSC_LCSE_ExpMap_Final(&expMap);
+    _VSC_LCSE_ExpMap_Final(&expMap, gcvFALSE);
 
     /* dump output bb */
     if(VSC_UTILS_MASK(VSC_OPTN_LCSEOptions_GetTrace(options), VSC_OPTN_LCSEOptions_TRACE_OUTPUT_BB))
@@ -747,13 +1078,15 @@ static VSC_ErrCode _VSC_LCSE_PerformOnFunction(
     IN VSC_LCSE*                lcse
     )
 {
-    VSC_ErrCode errCode  = VSC_ERR_NONE;
-    VIR_Function* func = VSC_LCSE_GetCurrFunc(lcse);
-    VSC_OPTN_LCSEOptions* options = VSC_LCSE_GetOptions(lcse);
-    VIR_Dumper* dumper = VSC_LCSE_GetDumper(lcse);
-    VIR_CONTROL_FLOW_GRAPH* cfg;
-    CFG_ITERATOR cfg_iter;
-    VIR_BASIC_BLOCK* bb;
+    VSC_ErrCode                 errCode  = VSC_ERR_NONE;
+    VIR_Shader*                 pShader = VSC_LCSE_GetShader(lcse);
+    VIR_Function*               func = VSC_LCSE_GetCurrFunc(lcse);
+    VSC_OPTN_LCSEOptions*       options = VSC_LCSE_GetOptions(lcse);
+    VIR_Dumper*                 dumper = VSC_LCSE_GetDumper(lcse);
+    VIR_CONTROL_FLOW_GRAPH*     cfg;
+    CFG_ITERATOR                cfg_iter;
+    VIR_BASIC_BLOCK*            bb;
+    VSC_LCSE_ExpMap             funcExpMap;
 
     if(VIR_Function_GetInstCount(func) == 0)
     {
@@ -778,17 +1111,42 @@ static VSC_ErrCode _VSC_LCSE_PerformOnFunction(
         VIR_CFG_Dump(dumper, cfg, gcvTRUE);
     }
 
+    /* Initialize a expression mapping for the entire function. */
+    _VSC_LCSE_ExpMap_Init(&funcExpMap, lcse, gcvTRUE);
+    VSC_LCSE_SetFuncExpMap(lcse, &funcExpMap);
 
     CFG_ITERATOR_INIT(&cfg_iter, cfg);
     for(bb = CFG_ITERATOR_FIRST(&cfg_iter); bb != gcvNULL; bb = CFG_ITERATOR_NEXT(&cfg_iter))
     {
         VSC_LCSE_SetCurrBB(lcse, bb);
+
+        if (BB_GET_LENGTH(bb) == 0)
+        {
+            continue;
+        }
+
+        /* Vectorize ATTR_LD first. */
+        if (VSC_UTILS_MASK(VSC_OPTN_LCSEOptions_GetOpts(options), VSC_OPTN_LCSEOptions_OPT_VECTORIZE_ATTR_LD)
+            &&
+            (VIR_Shader_IsTCS(pShader) || VIR_Shader_IsTES(pShader)))
+        {
+            errCode = _VSC_LCSE_PerformOnBBForAttrLd(lcse);
+            if (errCode)
+            {
+                return errCode;
+            }
+
+            _VSC_LCSE_ExpMap_Final(&funcExpMap, gcvTRUE);
+        }
+
         errCode = _VSC_LCSE_PerformOnBB(lcse);
         if(errCode)
         {
             return errCode;
         }
     }
+
+    _VSC_LCSE_ExpMap_Final(&funcExpMap, gcvFALSE);
 
     /* dump output cfg */
     if(VSC_UTILS_MASK(VSC_OPTN_LCSEOptions_GetTrace(options), VSC_OPTN_LCSEOptions_TRACE_OUTPUT_CFG))

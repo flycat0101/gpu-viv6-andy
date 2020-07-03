@@ -32,6 +32,10 @@ static VSC_BUDDY_MEM_BLOCK_NODE* _AllocInUnderlyingMem(VSC_BUDDY_MEM_SYS* pBMS, 
 
     /* Allocate block */
     pRet = (VSC_BUDDY_MEM_BLOCK_NODE*)vscPMP_Alloc(pBMS->pPriMemPool, reqBlockSize);
+    if (pRet == gcvNULL)
+    {
+        return gcvNULL;
+    }
 
     /* If this allocation is a huge allocation, track it */
     if (reqBlockSize > vscPMP_GetLowLimitOfChunkSize(pBMS->pPriMemPool))
@@ -40,6 +44,10 @@ static VSC_BUDDY_MEM_BLOCK_NODE* _AllocInUnderlyingMem(VSC_BUDDY_MEM_SYS* pBMS, 
 
         pHugeAllocNode = (VSC_BUDDY_MEM_HUGE_ALLOC_IN_PMP*)vscPMP_Alloc(pBMS->pPriMemPool,
                                                           sizeof(VSC_BUDDY_MEM_HUGE_ALLOC_IN_PMP));
+        if (pHugeAllocNode == gcvNULL)
+        {
+            return gcvNULL;
+        }
 
         pHugeAllocNode->pBase = pRet;
         vscULNDEXT_Initialize(&pHugeAllocNode->uniHugeAllocNode, pHugeAllocNode);
@@ -74,7 +82,7 @@ static VSC_BUDDY_MEM_BLOCK_NODE* _ReallocInUnderlyingMem(VSC_BUDDY_MEM_SYS* pBMS
     return pNewRet;
 }
 
-static void _DeleteHugeUnderlyingMem(VSC_BUDDY_MEM_SYS* pBMS)
+static gctBOOL _DeleteHugeUnderlyingMem(VSC_BUDDY_MEM_SYS* pBMS)
 {
     VSC_BUDDY_MEM_HUGE_ALLOC_IN_PMP*  pHugeAlloc;
     VSC_UNI_LIST_NODE_EXT*            pThisHugeAllocNode;
@@ -86,10 +94,15 @@ static void _DeleteHugeUnderlyingMem(VSC_BUDDY_MEM_SYS* pBMS)
         pHugeAlloc = (VSC_BUDDY_MEM_HUGE_ALLOC_IN_PMP*)vscULNDEXT_GetContainedUserData((pThisHugeAllocNode));
         vscUNILST_Remove(&pBMS->hugeAllocList, CAST_ULEN_2_ULN(&pHugeAlloc->uniHugeAllocNode));
         vscULNDEXT_Finalize(&pHugeAlloc->uniHugeAllocNode);
-        vscPMP_ForceFreeChunk(pBMS->pPriMemPool, pHugeAlloc->pBase);
+        if (vscPMP_ForceFreeChunk(pBMS->pPriMemPool, pHugeAlloc->pBase) == gcvFALSE)
+        {
+            return gcvFALSE;
+        }
     }
 
     vscUNILST_Finalize(&pBMS->hugeAllocList);
+
+    return gcvTRUE;
 }
 
 static void _RemoveBlockFromFreeAvailList(VSC_BUDDY_MEM_SYS* pBMS, gctINT log2Size, VSC_BUDDY_MEM_BLOCK_NODE* pBlockToRemove)
@@ -326,6 +339,10 @@ static VSC_BUDDY_MEM_BLOCK_NODE* _AllocInternal(VSC_BUDDY_MEM_SYS* pBMS, gctINT 
 
         /* Now call underlying PMP to allocate the block */
         pResBlock = _AllocInUnderlyingMem(pBMS, blkSize);
+        if (pResBlock == gcvNULL)
+        {
+            return gcvNULL;
+        }
 
         pResBlock->blkHeader.bAllocated = 0; /* Only PMP allocate it, BMS has not finished allocating it */
         pResBlock->blkHeader.log2CurSize = log2Size;
@@ -453,6 +470,10 @@ void* vscBMS_Alloc(VSC_BUDDY_MEM_SYS* pBMS, gctUINT reqSize)
 
         /* Do true allocation with buddy algorithm */
         pResBlock = _AllocInternal(pBMS, log2Size);
+        if (pResBlock == gcvNULL)
+        {
+            return gcvNULL;
+        }
 
         pBMS->bytesInUse += (1 << log2Size);
         pBMS->bytesAvailable -= (1 << log2Size);
@@ -466,6 +487,10 @@ void* vscBMS_Alloc(VSC_BUDDY_MEM_SYS* pBMS, gctUINT reqSize)
     {
         /* Directly allocate by PMP */
         pResBlock = _AllocInUnderlyingMem(pBMS, reqSizeWithHeader);
+        if (pResBlock == gcvNULL)
+        {
+            return gcvNULL;
+        }
 
         pResBlock->blkHeader.bAllocated = 0;
         pResBlock->blkHeader.highHalf = 0;

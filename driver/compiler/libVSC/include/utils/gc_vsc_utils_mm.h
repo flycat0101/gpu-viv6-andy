@@ -161,12 +161,12 @@ void vscPMP_Free(VSC_PRIMARY_MEM_POOL* pPMP, void *pData);
 /* DONT RASHLY CALL IT!!!!! It is originally designed to release whole chunk if the chunk requested by
    BMS is larger than lowLimitOfChunkSize. See vscBMS_Finalize. If other users try to use it, they must
    assure all contents in chunk won't be used anymore */
-void  vscPMP_ForceFreeChunk(VSC_PRIMARY_MEM_POOL* pPMP, void *pChunkValidBase);
+gctBOOL  vscPMP_ForceFreeChunk(VSC_PRIMARY_MEM_POOL* pPMP, void *pChunkValidBase);
 
 /* DONT RASHLY CALL IT!!!!! Huge chunk here is the chunk whose size is GE lowLimitOfChunkSize and whole
    chunk is allocated by user to use. If other users try to use it, they must assure these huge chunks
    won't be used anymore */
-void  vscPMP_ForceFreeAllHugeChunks(VSC_PRIMARY_MEM_POOL* pPMP);
+gctBOOL  vscPMP_ForceFreeAllHugeChunks(VSC_PRIMARY_MEM_POOL* pPMP);
 
 /* Finalize PMP, all chunks will be deleted at once */
 void  vscPMP_Finalize(VSC_PRIMARY_MEM_POOL* pPMP);

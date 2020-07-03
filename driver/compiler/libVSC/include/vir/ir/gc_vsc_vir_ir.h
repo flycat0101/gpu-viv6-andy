@@ -862,6 +862,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 
 #define VIR_Operand_SetRoundMode(Opnd, Round)   do { (Opnd)->header._roundMode = (gctUINT)(Round); } while (0)
 #define VIR_Operand_SetModifier(Opnd, Val)      do { (Opnd)->header._modifier = (gctUINT)(Val); } while (0)
+/* Note that please use VIR_Operand_NegateOperand to set the modifier NEG. */
 #define VIR_Operand_SetOneModifier(Opnd, Val)   do { (Opnd)->header._modifier |= (gctUINT)(Val); } while (0)
 #define VIR_Operand_ClrOneModifier(Opnd, Val)   do { (Opnd)->header._modifier &= (gctUINT)(~Val); } while (0)
 #define VIR_Operand_SetTexModifierFlag(Opnd, F) do { ((VIR_Operand_Header_TM *)&((Opnd)->header))->_texmodifiers |= (F); } while (0)

@@ -3845,11 +3845,6 @@ static slsBUILT_IN_VARIABLE VSBuiltInVariables[] =
     {{slvEXTENSION1_HALTI}, "gl_VertexID",              "#VertexID",         slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VERTEX_ID,    T_INT,      0,    slvSTORAGE_QUALIFIER_VERTEX_ID, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_HALTI}, "gl_InstanceID",            "#InstanceID",       slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_INSTANCE_ID,  T_INT,      0,    slvSTORAGE_QUALIFIER_INSTANCE_ID, gcvNULL, gcvNULL, 0, gcvFALSE},
 
-    {{slvEXTENSION1_NONE},  "gl_DepthRange.near",       "#DepthRange.near",  slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_UNIFORM,      T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},  "gl_DepthRange.far",        "#DepthRange.far",   slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_UNIFORM,      T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},  "gl_DepthRange.diff",       "#DepthRange.diff",  slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_UNIFORM,      T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},  "gl_DepthRange",            "#DepthRange",       slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_UNIFORM,      T_STRUCT,   (gctUINT)-1,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
-
     {{slvEXTENSION1_NONE},  "gl_ModelViewProjectionMatrix",             "#ff_MVP_Matrix",      slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_UNIFORM,      T_MAT4,     0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_NONE},  "gl_Color",                 "#AttrColor",        slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_ATTRIBUTE,    T_VEC4,     0,    slvSTORAGE_QUALIFIER_ATTRIBUTE, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_NONE},  "gl_SecondaryColor",        "#AttrSecondaryColor",slvPRECISION_QUALIFIER_HIGH,   slvSTORAGE_QUALIFIER_ATTRIBUTE,    T_VEC4,     0,    slvSTORAGE_QUALIFIER_ATTRIBUTE, gcvNULL, gcvNULL, 0, gcvFALSE},
@@ -3871,6 +3866,7 @@ static slsBUILT_IN_VARIABLE VSBuiltInVariables[] =
     {{slvEXTENSION1_NONE},  "gl_BackSecondaryColor",  "#BackSecondaryColor", slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_NONE},  "gl_TexCoord",            "#TexCoord",           slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     8,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE, updateForTexCoord},
     {{slvEXTENSION1_NONE},  "gl_FogFragCoord",        "#FogFragCoord",       slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
+#include "builtin_def/gc_glsl_general_vars.def.h"
 };
 
 static gctUINT VSBuiltInVariableCount =
@@ -3887,11 +3883,6 @@ static slsBUILT_IN_VARIABLE FSBuiltInVariables[] =
     {{slvEXTENSION1_NONE},      "gl_PointCoord",       "#PointCoord",  slvPRECISION_QUALIFIER_MEDIUM,   slvSTORAGE_QUALIFIER_VARYING_IN,    T_VEC2,     0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_FRAG_DEPTH},"gl_FragDepthEXT",     "#Depth",       slvPRECISION_QUALIFIER_HIGH,     slvSTORAGE_QUALIFIER_FRAGMENT_OUT,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_FRAGMENT_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_HALTI | slvEXTENSION1_SUPPORT_OGL},     "gl_FragDepth",        "#Depth",       slvPRECISION_QUALIFIER_HIGH,     slvSTORAGE_QUALIFIER_FRAGMENT_OUT,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_FRAGMENT_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
-
-    {{slvEXTENSION1_NONE},      "gl_DepthRange.near",  "#DepthRange.near",slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},      "gl_DepthRange.far",   "#DepthRange.far", slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},      "gl_DepthRange.diff",  "#DepthRange.diff",slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},      "gl_DepthRange",       "#DepthRange",     slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_STRUCT,   (gctUINT)-1,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
 
     {{slvEXTENSION1_NONE},      "gl_LightSource",      "#LightSource", slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,          T_STRUCT,   8,    slvSTORAGE_QUALIFIER_UNIFORM, LightSourceParameters, "gl_LightSourceParameters", 12, gcvFALSE},
     {{slvEXTENSION1_NONE},      "gl_FrontColor",       "#FrontColor",  slvPRECISION_QUALIFIER_HIGH,     slvSTORAGE_QUALIFIER_VARYING_IN,    T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
@@ -3913,6 +3904,7 @@ static slsBUILT_IN_VARIABLE FSBuiltInVariables[] =
 
     {{slvEXTENSION1_EXT_GEOMETRY_SHADER},  "gl_PrimitiveID",           "#PrimitiveID",        slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_IN,  T_INT,      0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_EXT_GEOMETRY_SHADER},  "gl_Layer",                 "#Layer",              slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_IN,  T_INT,      0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
+#include "builtin_def/gc_glsl_general_vars.def.h"
 };
 
 static gctUINT FSBuiltInVariableCount =
@@ -3976,23 +3968,8 @@ static gctUINT TESBuiltInVariableCount =
 
 static slsBUILT_IN_VARIABLE GSBuiltInVariables[] =
 {
-    /* input. */
-    {{slvEXTENSION1_NONE},  "gl_in",                    "#In",                 slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK,   T_IO_BLOCK,   -1,   slvSTORAGE_QUALIFIER_IN_IO_BLOCK, PerVertexVariables, "gl_PerVertex", 2, gcvFALSE},
-    {{slvEXTENSION1_NONE},  "gl_in.gl_Position",        "#In_Position",        slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER,   T_VEC4,   0,   slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},  "gl_in.gl_PointSize",       "#In_PointSize",       slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER,   T_FLOAT,   0,   slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},  "gl_PrimitiveIDIn",         "#PrimitiveIDIn",      slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_IN,   T_INT,      0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},  "gl_InvocationID",          "#InvocationID",       slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_IN,   T_INT,      0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
-    /* output. */
-    {{slvEXTENSION1_NONE},  gcvNULL,                    "#Out",                slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_OUT_IO_BLOCK,   T_IO_BLOCK,   0,   slvSTORAGE_QUALIFIER_OUT_IO_BLOCK, PerVertexVariables, "gl_PerVertex", 2, gcvFALSE},
-    {{slvEXTENSION1_NONE},  "gl_Position",              "#Position",           slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},  "gl_PointSize",             "#PointSize",          slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},  "gl_PrimitiveID",           "#PrimitiveID",        slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_INT,      0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},  "gl_Layer",                 "#Layer",              slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_INT,      0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
-    /* uniform state */
-    {{slvEXTENSION1_NONE},  "gl_DepthRange.near",       "#DepthRange.near",  slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_UNIFORM,      T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},  "gl_DepthRange.far",        "#DepthRange.far",   slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_UNIFORM,      T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},  "gl_DepthRange.diff",       "#DepthRange.diff",  slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_UNIFORM,      T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},  "gl_DepthRange",            "#DepthRange",       slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_UNIFORM,      T_STRUCT,   (gctUINT)-1,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+#include "builtin_def/gc_glsl_gs_vars.def.h"
+#include "builtin_def/gc_glsl_general_vars.def.h"
 };
 
 static gctUINT GSBuiltInVariableCount =

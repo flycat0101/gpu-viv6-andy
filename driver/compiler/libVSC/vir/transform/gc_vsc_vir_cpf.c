@@ -1340,6 +1340,8 @@ _VSC_CPF_FoldConst(
 
         VIR_Operand_SetOpKind(srcOpnd, VIR_OPND_IMMEDIATE);
         VIR_Operand_SetTypeId(srcOpnd, dstType);
+        VIR_Operand_ClrOneModifier(srcOpnd, VIR_MOD_ABS);
+        VIR_Operand_ClrOneModifier(srcOpnd, VIR_MOD_NEG);
         VIR_Operand_SetMatrixConstIndex(srcOpnd, 0); /* reset matrixConstIndex for vector/matrix type*/
         VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
         VIR_Inst_SetConditionOp(pInst, VIR_COP_ALWAYS);
@@ -1433,14 +1435,21 @@ _VSC_CPF_FoldConst(
         VIR_Operand_SetMatrixConstIndex(srcOpnd, 0); /* reset matrixConstIndex for srcOpnd's type which is vector or matrix */
         VIR_Operand_SetSwizzle(srcOpnd, new_swizzle);
         VIR_Operand_SetTypeId(srcOpnd, new_const->type);
+        VIR_Operand_ClrOneModifier(srcOpnd, VIR_MOD_ABS);
+        VIR_Operand_ClrOneModifier(srcOpnd, VIR_MOD_NEG);
         VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
         VIR_Inst_SetConditionOp(pInst, VIR_COP_ALWAYS);
         VIR_Inst_SetSrcNum(pInst, 1);
         folded = gcvTRUE;
     }
 
-    if(folded && VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
-                                VSC_OPTN_CPFOptions_TRACE_ALGORITHM) && VSC_CPF_GetDumper(pCPF))
+    if (folded)
+    {
+        VSC_CPF_SetCodeChange(pCPF, gcvTRUE);
+    }
+
+    if (folded &&
+        VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions), VSC_OPTN_CPFOptions_TRACE_ALGORITHM) && VSC_CPF_GetDumper(pCPF))
     {
         VIR_Dumper *pDumper = VSC_CPF_GetDumper(pCPF);
         VIR_LOG(pDumper, "[CPF] to instruction\n");
@@ -1450,10 +1459,6 @@ _VSC_CPF_FoldConst(
         VIR_LOG_FLUSH(pDumper);
     }
 
-    if (folded)
-    {
-        VSC_CPF_SetCodeChange(pCPF, gcvTRUE);
-    }
     return gcvTRUE;
 }
 
@@ -2562,11 +2567,17 @@ _VSC_CPF_PerformOnInst(
             if (_VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, src1Opnd, channel, 0, tmpFlow, &vecVal[1], &srcLattic[1]))
             {
                 validIndex = gcvTRUE;
+
                 if ((_VSC_CPF_isTypeINT(vecVal[1].type) && ((gctINT)(vecVal[1].value) < 0))
                     ||
                     (vecVal[1].type == VIR_TYPE_FLOAT32 && (*(gctFLOAT*) &(vecVal[1].value) < 0)))
                 {
                     validIndex = gcvFALSE;
+                }
+
+                if (validIndex)
+                {
+                    _VSC_CPF_ProcessSrcModifier(pInst, 1, vecVal[1].type, &vecVal[1]);
                 }
             }
 
@@ -2595,6 +2606,7 @@ _VSC_CPF_PerformOnInst(
 
                     if (_VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, src0Opnd, channel, opndOffset, tmpFlow, &vecVal[0], &srcLattic[0]))
                     {
+                        _VSC_CPF_ProcessSrcModifier(pInst, 0, vecVal[0].type, &vecVal[0]);
                         _VSC_CPF_SetDestConst(pCPF, srcBBId, pInst, channel, 0, tmpFlow, &vecVal[0]);
                     }
                     else
@@ -2653,11 +2665,17 @@ _VSC_CPF_PerformOnInst(
             if (_VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, src0Opnd, channel, 0, tmpFlow, &vecVal[0], &srcLattic[0]))
             {
                 validIndex = gcvTRUE;
+
                 if ((_VSC_CPF_isTypeINT(vecVal[0].type) && ((gctINT)(vecVal[0].value) < 0))
                     ||
                     (vecVal[0].type == VIR_TYPE_FLOAT32 && (*(gctFLOAT*) &(vecVal[0].value) < 0)))
                 {
                     validIndex = gcvFALSE;
+                }
+
+                if (validIndex)
+                {
+                    _VSC_CPF_ProcessSrcModifier(pInst, 0, vecVal[0].type, &vecVal[0]);
                 }
             }
 
@@ -2682,6 +2700,7 @@ _VSC_CPF_PerformOnInst(
 
                     if (_VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, src1Opnd, channel, 0, tmpFlow, &vecVal[1], &srcLattic[1]))
                     {
+                        _VSC_CPF_ProcessSrcModifier(pInst, 1, vecVal[1].type, &vecVal[1]);
                         _VSC_CPF_SetDestConst(pCPF, srcBBId, pInst, channel, opndOffset, tmpFlow, &vecVal[1]);
                     }
                     else
@@ -2725,6 +2744,9 @@ _VSC_CPF_PerformOnInst(
         if (_VSC_CPF_GetVRegNo(pInst, dstOpnd) != VIR_INVALID_ID)
         {
             VSC_CPF_Const resultVal[VIR_CHANNEL_NUM];
+            VIR_PrimitiveTypeId dstType = VIR_TYPE_VOID;
+
+            _VSC_CPF_typeToChannelType(VIR_Operand_GetTypeId(VIR_Inst_GetDest(pInst)), &dstType);
 
             /* for each channel, check whether all src is constant.
                if yes, then set the dst's corresponding channel to be constant */
@@ -2752,6 +2774,16 @@ _VSC_CPF_PerformOnInst(
                     {
                         break;
                     }
+                }
+
+                for (i = 0; i < VIR_Inst_GetSrcNum(pInst); i++)
+                {
+                    if (srcLattic[i] != VSC_CPF_CONSTANT)
+                    {
+                        continue;
+                    }
+
+                    _VSC_CPF_ProcessSrcModifier(pInst, i, dstType, &vecVal[i]);
                 }
 
                 if((singleCond && srcLattic[0] == VSC_CPF_CONSTANT) ||
