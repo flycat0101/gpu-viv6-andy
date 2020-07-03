@@ -7072,27 +7072,40 @@ _LinkLibContext_Initialize(
 
 static void
 _GenGLInvocationIndexForAtomicPatch(
-    IN VIR_Shader *pShader,
-    IN VIR_Function *pFunc)
+    IN VIR_Shader*      pShader,
+    IN VIR_Function*    pFunc
+    )
 {
-    VIR_Instruction     *pInst;
+    VIR_Symbol*         pLocalInvocationIndexSym = gcvNULL;
+    VIR_Instruction*    pInst;
     VIR_InstIterator    instIter;
-    gctSTRING            glLocalInvIndexStrName = "glLocalinvocationIndex";
+    gctSTRING           glLocalInvIndexStrName = "glLocalinvocationIndex";
+
+    pLocalInvocationIndexSym = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_LOCAL_INVOCATION_INDEX);
+    if (pLocalInvocationIndexSym == gcvNULL)
+    {
+        pLocalInvocationIndexSym = VIR_Shader_AddBuiltinAttribute(pShader, VIR_TYPE_UINT32, gcvFALSE, VIR_NAME_LOCAL_INVOCATION_INDEX);
+    }
 
     VIR_InstIterator_Init(&instIter, &pFunc->instList);
-    pInst = (VIR_Instruction *)VIR_InstIterator_First(&instIter);
-    for (; pInst != gcvNULL;
-           pInst = (VIR_Instruction *)VIR_InstIterator_Next(&instIter))
+    for (pInst = (VIR_Instruction *)VIR_InstIterator_First(&instIter);
+         pInst != gcvNULL;
+         pInst = (VIR_Instruction *)VIR_InstIterator_Next(&instIter))
     {
         if (VIR_Inst_GetOpcode(pInst) == VIR_OP_MOV)
         {
             VIR_Operand *src0 = VIR_Inst_GetSource(pInst, 0);
             VIR_Symbol *sym = gcvNULL;
-            gcmASSERT(VIR_Operand_isSymbol(src0));
+
+            if (!VIR_Operand_isSymbol(src0))
+            {
+                continue;
+            }
             sym = VIR_Operand_GetSymbol(src0);
+
             if (gcoOS_StrCmp(VIR_Shader_GetSymNameString(pShader, sym), glLocalInvIndexStrName) == gcvSTATUS_OK)
             {
-                VIR_Shader_GenInvocationIndex(pShader, pFunc, sym, pInst, gcvFALSE);
+                VIR_Operand_SetSymbol(src0, pFunc, VIR_Symbol_GetIndex(pLocalInvocationIndexSym));
                 break;
             }
 
@@ -7941,6 +7954,7 @@ VIR_LinkInternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker)
                 if (curFuncName && (gcoOS_StrCmp(curFuncName, glLocalIdFuncName) == gcvSTATUS_OK))
                 {
                     _GenGLInvocationIndexForAtomicPatch(pShader, func_node->function);
+
                     if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader),
                         VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
                     {

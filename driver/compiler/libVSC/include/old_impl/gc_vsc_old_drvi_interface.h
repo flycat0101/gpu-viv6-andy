@@ -53,12 +53,17 @@ BEGIN_EXTERN_C()
 #define __INIT_VALUE_FOR_WORK_GROUP_INDEX__ 0x1234
 
 /* For OCL. */
+#define _sldLocalSizeName                   "#local_size"
+#define _sldGlobalSizeName                  "#global_size"
+#define _sldGlobalOffsetName                "#global_offset"
+#define _sldEnqueuedLocalSizeName           "#enqueued_local_size"
 #define _sldLocalStorageAddressName         "#sh_local_address"
 #define _sldWorkGroupCountName              "#workGroupCount"
 #define _sldWorkGroupIdOffsetName           "#workGroupIdOffset"
 #define _sldGlobalIdOffsetName              "#globalIdOffset"
 
 /* Shared use. */
+#define _sldLocalInvocationIndexName        "#local_invocation_index"
 #define _sldLocalMemoryAddressName          "#sh_localMemoryAddress"
 #define _sldThreadIdMemoryAddressName       "#sh_threadIdMemAddr"
 #define _sldWorkThreadCountName             "#sh_workThreadCount"

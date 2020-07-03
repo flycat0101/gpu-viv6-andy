@@ -2193,13 +2193,7 @@ static VSC_ErrCode _VIR_HL_Reg_Alloc(
 
         location = VIR_Symbol_GetLocation(symbol);
 
-        /* need to generate LocatInvocationIndex */
-        if (VIR_Symbol_GetName(symbol) == VIR_NAME_LOCALINVOCATIONINDEX)
-        {
-            errCode = VIR_Shader_GenInvocationIndex(Shader, VIR_Shader_GetMainFunction(Shader), symbol, gcvNULL, gcvFALSE);
-            CHECK_ERROR(errCode, "_GenInvocationIndex failed.");
-        }
-        else if (VIR_Symbol_GetName(symbol) == VIR_NAME_WORK_GROUP_INDEX)
+        if (VIR_Symbol_GetName(symbol) == VIR_NAME_WORK_GROUP_INDEX)
         {
             errCode = _GenWorkGroupIndex(Shader, symbol);
             CHECK_ERROR(errCode, "_GenWorkGroupIndex failed.");
@@ -2245,13 +2239,7 @@ static VSC_ErrCode _VIR_HL_Reg_Alloc(
 
         location = VIR_Symbol_GetLocation(symbol);
 
-        /* need to generate LocatInvocationIndex */
-        if (VIR_Symbol_GetName(symbol) == VIR_NAME_LOCALINVOCATIONINDEX)
-        {
-            errCode = VIR_Shader_GenInvocationIndex(Shader, VIR_Shader_GetMainFunction(Shader), symbol, gcvNULL, gcvFALSE);
-            CHECK_ERROR(errCode, "_GenInvocationIndex failed.");
-        }
-        else if (VIR_Symbol_GetName(symbol) == VIR_NAME_WORK_GROUP_INDEX)
+        if (VIR_Symbol_GetName(symbol) == VIR_NAME_WORK_GROUP_INDEX)
         {
             errCode = _GenWorkGroupIndex(Shader, symbol);
             CHECK_ERROR(errCode, "_GenWorkGroupIndex failed.");

@@ -147,7 +147,8 @@ VIR_NameId  VIR_NAME_UNKNOWN,
     VIR_NAME_WORK_GROUP_INDEX,
     VIR_NAME_LOCAL_INVOCATION_ID,
     VIR_NAME_GLOBAL_INVOCATION_ID,
-    VIR_NAME_LOCALINVOCATIONINDEX,
+    VIR_NAME_LOCAL_INVOCATION_INDEX,
+    VIR_NAME_GLOBAL_INVOCATION_INDEX,
     VIR_NAME_HELPER_INVOCATION,
     VIR_NAME_SUBSAMPLE_DEPTH,
     VIR_NAME_PERVERTEX, /* gl_PerVertex */
@@ -2212,7 +2213,8 @@ static void
     _add_name(VIR_NAME_WORK_GROUP_ID, "gl_WorkGroupID");
     _add_name(VIR_NAME_LOCAL_INVOCATION_ID, "gl_LocalInvocationID");
     _add_name(VIR_NAME_GLOBAL_INVOCATION_ID, "gl_GlobalInvocationID");
-    _add_name(VIR_NAME_LOCALINVOCATIONINDEX, "gl_LocalInvocationIndex");
+    _add_name(VIR_NAME_LOCAL_INVOCATION_INDEX, "gl_LocalInvocationIndex");
+    _add_name(VIR_NAME_GLOBAL_INVOCATION_INDEX, "gl_GlobalInvocationIndex");
     _add_name(VIR_NAME_CLUSTER_ID, "#cluster_id");
     _add_name(VIR_NAME_SUBGROUP_NUM, "gl_NumSubgroups");
     _add_name(VIR_NAME_SUBGROUP_SIZE, "gl_SubgroupSize");
@@ -2253,7 +2255,8 @@ _initOpenGLBuiltinNames(VIR_Shader * Shader, VIR_StringTable *StrTable)
     _add_name(VIR_NAME_WORK_GROUP_INDEX, "gl_WorkGroupIndex");
     _add_name(VIR_NAME_LOCAL_INVOCATION_ID, "gl_LocalInvocationID");
     _add_name(VIR_NAME_GLOBAL_INVOCATION_ID, "gl_GlobalInvocationID");
-    _add_name(VIR_NAME_LOCALINVOCATIONINDEX, "gl_LocalInvocationIndex");
+    _add_name(VIR_NAME_LOCAL_INVOCATION_INDEX, "gl_LocalInvocationIndex");
+    _add_name(VIR_NAME_GLOBAL_INVOCATION_INDEX, "gl_GlobalInvocationIndex");
     _add_name(VIR_NAME_HELPER_INVOCATION, "gl_HelperInvocation");
     _add_name(VIR_NAME_SUBSAMPLE_DEPTH, "#Subsample_Depth");
     _add_name(VIR_NAME_PERVERTEX, "gl_PerVertex");
@@ -6726,10 +6729,9 @@ VIR_Symbol_NeedReplaceSymWithReg(
 
     /* we don't need to replace with vreg for uniform/sampler/image/
     attribute (except:
-               1) locaInvcationIndex, since it is changed to computation on localInvocationId.
-               2) instance index, since it is changed to "instanceID + offset".
-               3) vertex index, since it is changed to "vertexID + offset".
-               4) work group index.
+               1) instance index, since it is changed to "instanceID + offset".
+               2) vertex index, since it is changed to "vertexID + offset".
+               3) work group index.
                )
     combinedSampler symbol, since it is similar to sampler */
     if (symKind == VIR_SYM_UNIFORM ||
@@ -6739,7 +6741,6 @@ VIR_Symbol_NeedReplaceSymWithReg(
         symKind == VIR_SYM_IMAGE_T ||
         VIR_Symbol_isPerPatchInput(Symbol) ||
         (VIR_Symbol_isAttribute(Symbol) &&
-        VIR_Symbol_GetName(Symbol) != VIR_NAME_LOCALINVOCATIONINDEX &&
         VIR_Symbol_GetName(Symbol) != VIR_NAME_INSTANCE_INDEX &&
         VIR_Symbol_GetName(Symbol) != VIR_NAME_VERTEX_INDEX &&
         VIR_Symbol_GetName(Symbol) != VIR_NAME_WORK_GROUP_INDEX) ||
@@ -19926,284 +19927,404 @@ gctBOOL VirSHADER_DumpCodeGenVerbose(void * Shader)
 }
 
 VSC_ErrCode
-VIR_Shader_GenInvocationIndex(
-    IN  VIR_Shader              *Shader,
-    IN  VIR_Function            *pFunc,
-    IN  VIR_Symbol              *VariableSym,
-    IN  VIR_Instruction         *insertBeforeInst,
+VIR_Shader_GenLocalInvocationIndex(
+    IN  VIR_Shader*             pShader,
+    IN  VIR_Function*           pFunc,
+    IN  VIR_Symbol*             pLocalInvocationIndexSym,
+    IN  VIR_Instruction*        pInsertBeforeInst,
     IN  gctBOOL                 bUpdateSlot
     )
 {
-    VSC_ErrCode     errCode  = VSC_ERR_NONE;
-    VIR_Instruction *mul1Inst = gcvNULL, *mul2Inst = gcvNULL;
-    VIR_Instruction *add1Inst = gcvNULL, *add2Inst = gcvNULL;
-    VIR_Operand     *src = gcvNULL;
-    VIR_SymId        newVarSymId, tmpSymId1, tmpSymId2, tmpSymId3;
-    VIR_SymId        tmpSymId = VIR_INVALID_ID, IndexSymId = VIR_INVALID_ID;
-    VIR_Symbol       *newVarSym = gcvNULL;
-    VIR_VirRegId     regId = VIR_INVALID_ID;
-#if gcmIS_DEBUG(gcdDEBUG_ASSERT)
-    gctSTRING        glLocalInvIndexStrName = "glLocalinvocationIndex";
-#endif
-    gctUINT         i;
-    VIR_AttributeIdList *attIdList = VIR_Shader_GetAttributes(Shader);
-    VIR_StorageClass     storageClass = VIR_Symbol_GetStorageClass(VariableSym);
+    VSC_ErrCode                 errCode  = VSC_ERR_NONE;
+    VIR_Instruction*            pMadInst = gcvNULL;
+    VIR_Operand*                pNewOpnd = gcvNULL;
+    VIR_SymId                   tmpSymId = VIR_INVALID_ID;
+    VIR_Symbol*                 pLocIdSym = gcvNULL;
+    VIR_VirRegId                regId = VIR_INVALID_ID;
+    VIR_Symbol*                 pVregSym;
+    VIR_Symbol*                 pLocalSizeUniformSym = gcvNULL;
+    VIR_AttributeIdList*        attIdList = VIR_Shader_GetAttributes(pShader);
+    VIR_VariableIdList*         variableList = VIR_Shader_GetVaribles(pShader);
+    gctBOOL                     bUseLocalSizeUniform = !VIR_Shader_IsWorkGroupSizeFixed(pShader);
+    gctUINT                     componentLocalSize = 0;
+    gctUINT                     nextAttrLlSlot = 0;
 
-    gcmASSERT(VIR_Symbol_GetName(VariableSym) == VIR_NAME_LOCALINVOCATIONINDEX ||
-              (gcoOS_StrCmp(VIR_Shader_GetSymNameString(Shader, VariableSym), glLocalInvIndexStrName) == gcvSTATUS_OK));
-
-    /* VIR_Shader_GenInvocationIndex also be called for atomic patch function,
-     * temp varialbe "glLocalinvocationIndex" which storageClass is VIR_STORAGE_UNKNOWN
-     * is used to represent gl_LocalInvocationIndex
-     */
-    gcmASSERT(storageClass == VIR_STORAGE_INPUT || storageClass == VIR_STORAGE_UNKNOWN);
-
-    if (storageClass == VIR_STORAGE_UNKNOWN)
+    if (bUseLocalSizeUniform)
     {
-        storageClass = VIR_STORAGE_INPUT;
+        /* For a compute shader, the local size must be fixed. */
+        gcmASSERT(!VIR_Shader_IsGlCompute(pShader));
     }
 
-    if (bUpdateSlot)
-    {
-        VIR_Symbol  *pVregSym = VIR_Shader_FindSymbolByTempIndex(Shader, VIR_Symbol_GetVariableVregIndex(VariableSym));
-        VIR_SymId  newSymId;
-        IndexSymId = VIR_Symbol_GetIndex(pVregSym);
-        /* original pVregSym will be used as a temp variable while VariableSym "gl_LocalInvocationIndex" will be tagged with UNUSED
-         * create a temp for invocation index for VariableSym */
-        regId = VIR_Shader_NewVirRegId(Shader, 1);
-        errCode = VIR_Shader_AddSymbol(Shader,
-                    VIR_SYM_VIRREG,
-                    regId,
-                    VIR_Shader_GetTypeFromId(Shader, VIR_TYPE_UINT32),
-                    VIR_STORAGE_UNKNOWN,
-                    &newSymId);
-        VIR_Symbol_SetVariableVregIndex(VariableSym, regId);
-        VIR_Symbol_SetVregVarSymId(pVregSym, VIR_INVALID_ID); /* VregSym is no attribute anymore */
-    }
-    else
-    {
-        /* create a temp for invocation index */
-        regId = VIR_Shader_NewVirRegId(Shader, 1);
-        errCode = VIR_Shader_AddSymbol(Shader,
-                    VIR_SYM_VIRREG,
-                    regId,
-                    VIR_Shader_GetTypeFromId(Shader, VIR_TYPE_UINT32),
-                    VIR_STORAGE_UNKNOWN,
-                    &IndexSymId);
-        VIR_Symbol_SetVariableVregIndex(VariableSym, regId);
-    }
+    /* Get the temp symbol of localInvocationIndex. */
+    pVregSym = VIR_Shader_FindSymbolByTempIndex(pShader, VIR_Symbol_GetVariableVregIndex(pLocalInvocationIndexSym));
 
-    VIR_Symbol_ClrFlag(VariableSym, VIR_SYMFLAG_ENABLED | VIR_SYMFLAG_STATICALLY_USED);
-    VIR_Symbol_SetFlag(VariableSym, VIR_SYMFLAG_UNUSED);
+    /* localInvocationIndex is no longer a attribute, just a global variable. */
+    VIR_IdList_DeleteByValue(attIdList, VIR_Symbol_GetIndex(pLocalInvocationIndexSym));
+    VIR_Symbol_SetStorageClass(pLocalInvocationIndexSym, VIR_STORAGE_GLOBAL);
+    VIR_IdList_Add(variableList, VIR_Symbol_GetIndex(pLocalInvocationIndexSym));
 
-    /* add an attribute if not found - LocalInvocationID */
-    for (i = 0;  i< VIR_IdList_Count(attIdList); i++)
+    /* Get localInvocationId, if not exist, create one. */
+    pLocIdSym = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_LOCAL_INVOCATION_ID);
+    if (pLocIdSym == gcvNULL)
     {
-        VIR_Symbol*attr = VIR_Shader_GetSymFromId(Shader, VIR_IdList_GetId(attIdList, i));
-        if (VIR_Symbol_GetName(attr) == VIR_NAME_LOCAL_INVOCATION_ID)
+        if (bUpdateSlot)
         {
-            newVarSym = attr;
-            break;
+            nextAttrLlSlot = VIR_Shader_GetNextLlSlot(pShader, VIR_Shader_GetAttributes(pShader));
+        }
+
+        pLocIdSym = VIR_Shader_AddBuiltinAttribute(pShader, VIR_TYPE_UINT_X4, gcvFALSE, VIR_NAME_LOCAL_INVOCATION_ID);
+        VIR_Symbol_SetFlag(pLocIdSym, VIR_SYMFLAG_ENABLED | VIR_SYMFLAG_STATICALLY_USED);
+
+        /* create a temp for invocation id */
+        regId = VIR_Shader_NewVirRegId(pShader, 1);
+        errCode = VIR_Shader_AddSymbol(pShader,
+                                       VIR_SYM_VIRREG,
+                                       regId,
+                                       VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT_X3),
+                                       VIR_STORAGE_UNKNOWN,
+                                       &tmpSymId);
+
+        VIR_Symbol_SetVariableVregIndex(pLocIdSym, regId);
+        VIR_Symbol_SetIndexRange(pLocIdSym, regId + 1);
+        VIR_Symbol_SetVregVariable(VIR_Shader_GetSymFromId(pShader, tmpSymId), pLocIdSym);
+        VIR_Symbol_SetIndexRange(VIR_Shader_GetSymFromId(pShader, tmpSymId), regId + 1);
+
+        if (bUpdateSlot)
+        {
+            VIR_Symbol_SetFirstSlot(pLocIdSym, nextAttrLlSlot);
         }
     }
 
-    if (i == VIR_IdList_Count(attIdList))
+    /* Check if we need to add the local size uniform. */
+    if (bUseLocalSizeUniform)
+    {
+        pLocalSizeUniformSym = VIR_Shader_FindSymbolByName(pShader,
+                                                           VIR_SYM_UNIFORM,
+                                                           _sldLocalSizeName);
+        if (pLocalSizeUniformSym == gcvNULL)
+        {
+            errCode = VIR_Shader_AddNamedUniform(pShader,
+                                                 _sldLocalSizeName,
+                                                 VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT_X4),
+                                                 &pLocalSizeUniformSym);
+            CHECK_ERROR(errCode, "Add local size uniform failed.");
+        }
+        gcmASSERT(pLocalSizeUniformSym != gcvNULL);
+
+        VIR_Symbol_SetPrecision(pLocalSizeUniformSym, VIR_PRECISION_HIGH);
+        VIR_Symbol_SetUniformKind(pLocalSizeUniformSym, VIR_UNIFORM_LOCAL_SIZE);
+        VIR_Symbol_SetAddrSpace(pLocalSizeUniformSym, VIR_AS_CONSTANT);
+        VIR_Symbol_SetTyQualifier(pLocalSizeUniformSym, VIR_TYQUAL_CONST);
+    }
+
+    /* Compute local invocation index :
+           Z * I * J + Y * I + X = (Z * J + Y) * I + X
+           where local Id = (X, Y, Z) and
+                 work group size = (I, J, K)  */
+
+    /* localInvocationIndex = Z * J + Y */
+    if (pInsertBeforeInst)
+    {
+        errCode = VIR_Function_AddInstructionBefore(pFunc,
+                                                    VIR_OP_IMADLO0,
+                                                    VIR_TYPE_UINT32,
+                                                    pInsertBeforeInst,
+                                                    gcvTRUE,
+                                                    &pMadInst);
+    }
+    else
+    {
+        errCode = VIR_Function_PrependInstruction(pFunc,
+                                                  VIR_OP_IMADLO0,
+                                                  VIR_TYPE_UINT32,
+                                                  &pMadInst);
+    }
+    CHECK_ERROR(errCode, "Insert MAD failed.");
+
+    pNewOpnd = VIR_Inst_GetDest(pMadInst);
+    VIR_Operand_SetSymbol(pNewOpnd, pFunc, VIR_Symbol_GetIndex(pVregSym));
+    VIR_Operand_SetEnable(pNewOpnd, VIR_ENABLE_X);
+
+    pNewOpnd = VIR_Inst_GetSource(pMadInst, 0);
+    VIR_Operand_SetSymbol(pNewOpnd, pFunc, VIR_Symbol_GetIndex(pLocIdSym));
+    VIR_Operand_SetTypeId(pNewOpnd, VIR_TYPE_UINT32);
+    VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_ZZZZ);
+
+    pNewOpnd = VIR_Inst_GetSource(pMadInst, 1);
+    if (bUseLocalSizeUniform)
+    {
+        VIR_Operand_SetSymbol(pNewOpnd, pFunc, VIR_Symbol_GetIndex(pLocalSizeUniformSym));
+        VIR_Operand_SetTypeId(pNewOpnd, VIR_TYPE_UINT32);
+        VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_YYYY);
+    }
+    else
+    {
+        componentLocalSize = pShader->shaderLayout.compute.workGroupSize[1];
+        if (componentLocalSize == 0)
+        {
+            WARNING_REPORT(VSC_ERR_INVALID_DATA, "Invalid local size.");
+            componentLocalSize = 1;
+        }
+        VIR_Operand_SetImmediateUint(pNewOpnd, componentLocalSize);
+    }
+
+    pNewOpnd = VIR_Inst_GetSource(pMadInst, 2);
+    VIR_Operand_SetSymbol(pNewOpnd, pFunc, VIR_Symbol_GetIndex(pLocIdSym));
+    VIR_Operand_SetTypeId(pNewOpnd, VIR_TYPE_UINT32);
+    VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_YYYY);
+
+    /* localInvocationIndex = localInvocationIndex * I + X*/
+    errCode = VIR_Function_AddInstructionAfter(pFunc,
+                                               VIR_OP_IMADLO0,
+                                               VIR_TYPE_UINT32,
+                                               pMadInst,
+                                               gcvTRUE,
+                                               &pMadInst);
+    CHECK_ERROR(errCode, "Insert MAD failed.");
+
+    pNewOpnd = VIR_Inst_GetDest(pMadInst);
+    VIR_Operand_SetSymbol(pNewOpnd, pFunc, VIR_Symbol_GetIndex(pVregSym));
+    VIR_Operand_SetEnable(pNewOpnd, VIR_ENABLE_X);
+
+    pNewOpnd = VIR_Inst_GetSource(pMadInst, 0);
+    VIR_Operand_SetSymbol(pNewOpnd, pFunc, VIR_Symbol_GetIndex(pVregSym));
+    VIR_Operand_SetTypeId(pNewOpnd, VIR_TYPE_UINT32);
+    VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XXXX);
+
+    pNewOpnd = VIR_Inst_GetSource(pMadInst, 1);
+    if (bUseLocalSizeUniform)
+    {
+        VIR_Operand_SetSymbol(pNewOpnd, pFunc, VIR_Symbol_GetIndex(pLocalSizeUniformSym));
+        VIR_Operand_SetTypeId(pNewOpnd, VIR_TYPE_UINT32);
+        VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XXXX);
+    }
+    else
+    {
+        componentLocalSize = pShader->shaderLayout.compute.workGroupSize[0];
+        if (componentLocalSize == 0)
+        {
+            WARNING_REPORT(VSC_ERR_INVALID_DATA, "Invalid local size.");
+            componentLocalSize = 1;
+        }
+        VIR_Operand_SetImmediateUint(pNewOpnd, componentLocalSize);
+    }
+
+    pNewOpnd = VIR_Inst_GetSource(pMadInst, 2);
+    VIR_Operand_SetSymbol(pNewOpnd, pFunc, VIR_Symbol_GetIndex(pLocIdSym));
+    VIR_Operand_SetTypeId(pNewOpnd, VIR_TYPE_UINT32);
+    VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XXXX);
+
+    return errCode;
+}
+
+VSC_ErrCode
+VIR_Shader_GenGlobalInvocationIndex(
+    IN  VIR_Shader*             pShader,
+    IN  VIR_Function*           pFunc,
+    IN  VIR_Symbol*             pGlobalInvocationIndexSym,
+    IN  VIR_Instruction*        pInsertBeforeInst,
+    IN  gctBOOL                 bUpdateSlot
+    )
+{
+    VSC_ErrCode                 errCode  = VSC_ERR_NONE;
+    VIR_Instruction*            pMadInst = gcvNULL;
+    VIR_Instruction*            pSubInst = gcvNULL;
+    VIR_Operand*                pNewOpnd = gcvNULL;
+    VIR_SymId                   tmpSymId = VIR_INVALID_ID;
+    VIR_Symbol*                 pGlobalIdSym = gcvNULL;
+    VIR_VirRegId                regId = VIR_INVALID_ID;
+    VIR_Symbol*                 pVregSym;
+    VIR_Symbol*                 pGlobalSizeUniformSym = gcvNULL;
+    VIR_Symbol*                 pGlobalOffsetUniformSym = gcvNULL;
+    VIR_AttributeIdList*        attIdList = VIR_Shader_GetAttributes(pShader);
+    VIR_VariableIdList*         variableList = VIR_Shader_GetVaribles(pShader);
+
+    /* Get the temp symbol of globalInvocationIndex. */
+    pVregSym = VIR_Shader_FindSymbolByTempIndex(pShader, VIR_Symbol_GetVariableVregIndex(pGlobalInvocationIndexSym));
+
+    /* globalInvocationIndex is no longer a attribute, just a global variable. */
+    VIR_IdList_DeleteByValue(attIdList, VIR_Symbol_GetIndex(pGlobalInvocationIndexSym));
+    VIR_Symbol_SetStorageClass(pGlobalInvocationIndexSym, VIR_STORAGE_GLOBAL);
+    VIR_IdList_Add(variableList, VIR_Symbol_GetIndex(pGlobalInvocationIndexSym));
+
+    /* Get globalInvocationId, if not exist, create one. */
+    pGlobalIdSym = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_GLOBAL_INVOCATION_ID);
+    if (pGlobalIdSym == gcvNULL)
     {
         gctUINT                     nextAttrLlSlot = 0;
 
         if (bUpdateSlot)
         {
-            nextAttrLlSlot = VIR_Shader_GetNextLlSlot(Shader, VIR_Shader_GetAttributes(Shader));
+            nextAttrLlSlot = VIR_Shader_GetNextLlSlot(pShader, VIR_Shader_GetAttributes(pShader));
         }
 
-        errCode = VIR_Shader_AddSymbol(Shader,
-                                       VIR_SYM_VARIABLE,
-                                       VIR_NAME_LOCAL_INVOCATION_ID,
-                                       VIR_Shader_GetTypeFromId(Shader, VIR_TYPE_UINT_X4),
-                                       storageClass,
-                                       &newVarSymId);
-        CHECK_ERROR(errCode, "VIR_Shader_AddSymbol failed.");
-        newVarSym = VIR_Shader_GetSymFromId(Shader, newVarSymId);
-        VIR_Symbol_SetFlag(newVarSym, VIR_SYMFLAG_ENABLED | VIR_SYMFLAG_STATICALLY_USED);
+        pGlobalIdSym = VIR_Shader_AddBuiltinAttribute(pShader, VIR_TYPE_UINT_X4, gcvFALSE, VIR_NAME_GLOBAL_INVOCATION_ID);
+        VIR_Symbol_SetFlag(pGlobalIdSym, VIR_SYMFLAG_ENABLED | VIR_SYMFLAG_STATICALLY_USED);
 
         /* create a temp for invocation id */
-        regId = VIR_Shader_NewVirRegId(Shader, 1);
-        errCode = VIR_Shader_AddSymbol(Shader,
-                    VIR_SYM_VIRREG,
-                    regId,
-                    VIR_Shader_GetTypeFromId(Shader, VIR_TYPE_UINT_X3),
-                    VIR_STORAGE_UNKNOWN,
-                    &tmpSymId);
+        regId = VIR_Shader_NewVirRegId(pShader, 1);
+        errCode = VIR_Shader_AddSymbol(pShader,
+                                       VIR_SYM_VIRREG,
+                                       regId,
+                                       VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT_X3),
+                                       VIR_STORAGE_UNKNOWN,
+                                       &tmpSymId);
 
-        VIR_Symbol_SetVariableVregIndex(newVarSym, regId);
-        VIR_Symbol_SetIndexRange(newVarSym, regId + 1);
-        VIR_Symbol_SetVregVariable(VIR_Shader_GetSymFromId(Shader, tmpSymId), newVarSym);
-        VIR_Symbol_SetIndexRange(VIR_Shader_GetSymFromId(Shader, tmpSymId), regId + 1);
+        VIR_Symbol_SetVariableVregIndex(pGlobalIdSym, regId);
+        VIR_Symbol_SetIndexRange(pGlobalIdSym, regId + 1);
+        VIR_Symbol_SetVregVariable(VIR_Shader_GetSymFromId(pShader, tmpSymId), pGlobalIdSym);
+        VIR_Symbol_SetIndexRange(VIR_Shader_GetSymFromId(pShader, tmpSymId), regId + 1);
 
         if (bUpdateSlot)
         {
-            VIR_Symbol_SetFirstSlot(newVarSym, nextAttrLlSlot);
+            VIR_Symbol_SetFirstSlot(pGlobalIdSym, nextAttrLlSlot);
         }
     }
 
-    /* Compute local invocation index :
-           Z * I * J + Y * I + X
-           where local Id = (X, Y, Z) and
-                 work group size = (I, J, K)  */
+    /* Check if we need to add the global size uniform. */
+    pGlobalSizeUniformSym = VIR_Shader_FindSymbolByName(pShader,
+                                                        VIR_SYM_UNIFORM,
+                                                        "#global_size");
+    if (pGlobalSizeUniformSym == gcvNULL)
+    {
+        errCode = VIR_Shader_AddNamedUniform(pShader,
+                                                "#global_size",
+                                                VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT_X4),
+                                                &pGlobalSizeUniformSym);
+        CHECK_ERROR(errCode, "Add global size uniform failed.");
+    }
+    gcmASSERT(pGlobalSizeUniformSym != gcvNULL);
 
-    /* (Y, Z) * I */
-    if (insertBeforeInst)
+    VIR_Symbol_SetPrecision(pGlobalSizeUniformSym, VIR_PRECISION_HIGH);
+    VIR_Symbol_SetUniformKind(pGlobalSizeUniformSym, VIR_UNIFORM_GLOBAL_SIZE);
+    VIR_Symbol_SetAddrSpace(pGlobalSizeUniformSym, VIR_AS_CONSTANT);
+    VIR_Symbol_SetTyQualifier(pGlobalSizeUniformSym, VIR_TYQUAL_CONST);
+
+    /* Check if we need to add the global offset uniform. */
+    pGlobalOffsetUniformSym = VIR_Shader_FindSymbolByName(pShader,
+                                                        VIR_SYM_UNIFORM,
+                                                        "#global_offset");
+    if (pGlobalOffsetUniformSym == gcvNULL)
+    {
+        errCode = VIR_Shader_AddNamedUniform(pShader,
+                                                "#global_offset",
+                                                VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT_X4),
+                                                &pGlobalOffsetUniformSym);
+        CHECK_ERROR(errCode, "Add global offset uniform failed.");
+    }
+    gcmASSERT(pGlobalOffsetUniformSym != gcvNULL);
+
+    VIR_Symbol_SetPrecision(pGlobalOffsetUniformSym, VIR_PRECISION_HIGH);
+    VIR_Symbol_SetUniformKind(pGlobalOffsetUniformSym, VIR_UNIFORM_GLOBAL_OFFSET);
+    VIR_Symbol_SetAddrSpace(pGlobalOffsetUniformSym, VIR_AS_CONSTANT);
+    VIR_Symbol_SetTyQualifier(pGlobalOffsetUniformSym, VIR_TYQUAL_CONST);
+
+    /* Compute global invocation index :
+           (Z - L) * I * J + (Y - M) * I + X - N
+           where global Id = (X, Y, Z),
+                 size = (I, J, K),
+                 offset = (L, M, N) */
+
+    /* X' = X - N; */
+    /* Z' = Z - L; */
+    /* Y' = Y - M; */
+    if (pInsertBeforeInst)
     {
         errCode = VIR_Function_AddInstructionBefore(pFunc,
-                        VIR_OP_MUL,
-                        VIR_TYPE_UINT_X2,
-                        insertBeforeInst,
-                        gcvTRUE,
-                        &mul1Inst);
+                                                    VIR_OP_SUB,
+                                                    VIR_TYPE_UINT32,
+                                                    pInsertBeforeInst,
+                                                    gcvTRUE,
+                                                    &pSubInst);
     }
     else
     {
         errCode = VIR_Function_PrependInstruction(pFunc,
-                        VIR_OP_MUL,
-                        VIR_TYPE_UINT_X2,
-                        &mul1Inst);
+                                                  VIR_OP_SUB,
+                                                  VIR_TYPE_UINT32,
+                                                  &pSubInst);
     }
+    CHECK_ERROR(errCode, "Insert SUB failed.");
 
-    CHECK_ERROR(errCode, "VIR_Function_PrependInstruction failed.");
+    regId = VIR_Shader_NewVirRegId(pShader, 1);
+    errCode = VIR_Shader_AddSymbol(pShader,
+                                   VIR_SYM_VIRREG,
+                                   regId,
+                                   VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT_X3),
+                                   VIR_STORAGE_UNKNOWN,
+                                   &tmpSymId);
+    VIR_Symbol_SetIndexRange(VIR_Shader_GetSymFromId(pShader, tmpSymId), regId + 1);
 
-    /* src0 - (Y, Z) */
-    src = VIR_Inst_GetSource(mul1Inst, 0);
-    VIR_Operand_SetOpKind(src, VIR_OPND_SYMBOL);
-    VIR_Operand_SetTypeId(src, VIR_TYPE_UINT_X2);
-    VIR_Operand_SetSym(src, newVarSym);
-    VIR_Operand_SetSwizzle(src, VIR_SWIZZLE_YZZZ);
+    pNewOpnd = VIR_Inst_GetDest(pSubInst);
+    VIR_Operand_SetSymbol(pNewOpnd, pFunc, tmpSymId);
+    VIR_Operand_SetEnable(pNewOpnd, VIR_ENABLE_XYZ);
 
-    /* src1 - workGroupSize[0] */
-    src = VIR_Inst_GetSource(mul1Inst, 1);
-    VIR_Operand_SetImmediateUint(src, Shader->shaderLayout.compute.workGroupSize[0]);
+    pNewOpnd = VIR_Inst_GetSource(pSubInst, 0);
+    VIR_Operand_SetSymbol(pNewOpnd, pFunc, VIR_Symbol_GetIndex(pGlobalIdSym));
+    VIR_Operand_SetTypeId(pNewOpnd, VIR_TYPE_UINT32);
+    VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XYZZ);
 
-    /* dest */
-    errCode = VIR_Shader_AddSymbol(Shader,
-            VIR_SYM_VIRREG,
-            VIR_Shader_NewVirRegId(Shader, 1),
-            VIR_Shader_GetTypeFromId(Shader, VIR_TYPE_UINT_X2),
-            VIR_STORAGE_UNKNOWN,
-            &tmpSymId1);
+    pNewOpnd = VIR_Inst_GetSource(pSubInst, 1);
+    VIR_Operand_SetSymbol(pNewOpnd, pFunc, VIR_Symbol_GetIndex(pGlobalOffsetUniformSym));
+    VIR_Operand_SetTypeId(pNewOpnd, VIR_TYPE_UINT32);
+    VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XYZZ);
 
-    VIR_Operand_SetTempRegister(VIR_Inst_GetDest(mul1Inst),
-                                pFunc,
-                                tmpSymId1,
-                                VIR_TYPE_UINT_X2);
-    VIR_Operand_SetEnable(VIR_Inst_GetDest(mul1Inst), VIR_ENABLE_XY);
-
-    /* (Z * I) * J */
+    /* globalInvocationIndex = Z' * J + Y' */
     errCode = VIR_Function_AddInstructionAfter(pFunc,
-                        VIR_OP_MUL,
-                        VIR_TYPE_UINT32,
-                        mul1Inst,
-                        gcvTRUE,
-                        &mul2Inst);
+                                               VIR_OP_IMADLO0,
+                                               VIR_TYPE_UINT32,
+                                               pSubInst,
+                                               gcvTRUE,
+                                               &pMadInst);
+    CHECK_ERROR(errCode, "Insert MAD failed.");
 
-    CHECK_ERROR(errCode, "VIR_Function_PrependInstruction failed.");
+    pNewOpnd = VIR_Inst_GetDest(pMadInst);
+    VIR_Operand_SetSymbol(pNewOpnd, pFunc, VIR_Symbol_GetIndex(pVregSym));
+    VIR_Operand_SetEnable(pNewOpnd, VIR_ENABLE_X);
 
-    /* src0 */
-    src = VIR_Inst_GetSource(mul2Inst, 0);
-    VIR_Operand_SetTempRegister(src,
-                                pFunc,
-                                tmpSymId1,
-                                VIR_TYPE_UINT32);
-    VIR_Operand_SetSwizzle(src, VIR_SWIZZLE_YYYY);
+    pNewOpnd = VIR_Inst_GetSource(pMadInst, 0);
+    VIR_Operand_SetSymbol(pNewOpnd, pFunc, tmpSymId);
+    VIR_Operand_SetTypeId(pNewOpnd, VIR_TYPE_UINT32);
+    VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_ZZZZ);
 
-    /* src1 - workGroupSize[1] */
-    src = VIR_Inst_GetSource(mul2Inst, 1);
-    VIR_Operand_SetImmediateUint(src, Shader->shaderLayout.compute.workGroupSize[1]);
+    pNewOpnd = VIR_Inst_GetSource(pMadInst, 1);
+    VIR_Operand_SetSymbol(pNewOpnd, pFunc, VIR_Symbol_GetIndex(pGlobalSizeUniformSym));
+    VIR_Operand_SetTypeId(pNewOpnd, VIR_TYPE_UINT32);
+    VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_YYYY);
 
-    /* dest */
-    errCode = VIR_Shader_AddSymbol(Shader,
-            VIR_SYM_VIRREG,
-            VIR_Shader_NewVirRegId(Shader, 1),
-            VIR_Shader_GetTypeFromId(Shader, VIR_TYPE_UINT32),
-            VIR_STORAGE_UNKNOWN,
-            &tmpSymId2);
+    pNewOpnd = VIR_Inst_GetSource(pMadInst, 2);
+    VIR_Operand_SetSymbol(pNewOpnd, pFunc, tmpSymId);
+    VIR_Operand_SetTypeId(pNewOpnd, VIR_TYPE_UINT32);
+    VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_YYYY);
 
-    VIR_Operand_SetTempRegister(VIR_Inst_GetDest(mul2Inst),
-                                pFunc,
-                                tmpSymId2,
-                                VIR_TYPE_UINT32);
-    VIR_Operand_SetEnable(VIR_Inst_GetDest(mul2Inst), VIR_ENABLE_X);
+    /* globalInvocationIndex = globalInvocationIndex * I + X' */
 
-    /* (Z * I) * J + (Y * I) */
     errCode = VIR_Function_AddInstructionAfter(pFunc,
-                        VIR_OP_ADD,
-                        VIR_TYPE_UINT32,
-                        mul2Inst,
-                        gcvTRUE,
-                        &add1Inst);
+                                               VIR_OP_IMADLO0,
+                                               VIR_TYPE_UINT32,
+                                               pMadInst,
+                                               gcvTRUE,
+                                               &pMadInst);
+    CHECK_ERROR(errCode, "Insert MAD failed.");
 
-    CHECK_ERROR(errCode, "VIR_Function_PrependInstruction failed.");
+    pNewOpnd = VIR_Inst_GetDest(pMadInst);
+    VIR_Operand_SetSymbol(pNewOpnd, pFunc, VIR_Symbol_GetIndex(pVregSym));
+    VIR_Operand_SetEnable(pNewOpnd, VIR_ENABLE_X);
 
-    /* src0 */
-    src = VIR_Inst_GetSource(add1Inst, 0);
-    VIR_Operand_SetTempRegister(src,
-                                pFunc,
-                                tmpSymId2,
-                                VIR_TYPE_UINT32);
-    VIR_Operand_SetSwizzle(src, VIR_SWIZZLE_XXXX);
+    pNewOpnd = VIR_Inst_GetSource(pMadInst, 0);
+    VIR_Operand_SetSymbol(pNewOpnd, pFunc, VIR_Symbol_GetIndex(pVregSym));
+    VIR_Operand_SetTypeId(pNewOpnd, VIR_TYPE_UINT32);
+    VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XXXX);
 
-    /* src1 */
-    src = VIR_Inst_GetSource(add1Inst, 1);
-    VIR_Operand_SetTempRegister(src,
-                                pFunc,
-                                tmpSymId1,
-                                VIR_TYPE_UINT32);
-    VIR_Operand_SetSwizzle(src, VIR_SWIZZLE_XXXX);
+    pNewOpnd = VIR_Inst_GetSource(pMadInst, 1);
+    VIR_Operand_SetSymbol(pNewOpnd, pFunc, VIR_Symbol_GetIndex(pGlobalSizeUniformSym));
+    VIR_Operand_SetTypeId(pNewOpnd, VIR_TYPE_UINT32);
+    VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XXXX);
 
-    /* dest */
-    errCode = VIR_Shader_AddSymbol(Shader,
-            VIR_SYM_VIRREG,
-            VIR_Shader_NewVirRegId(Shader, 1),
-            VIR_Shader_GetTypeFromId(Shader, VIR_TYPE_UINT32),
-            VIR_STORAGE_UNKNOWN,
-            &tmpSymId3);
-
-    VIR_Operand_SetTempRegister(VIR_Inst_GetDest(add1Inst),
-                                pFunc,
-                                tmpSymId3,
-                                VIR_TYPE_UINT32);
-    VIR_Operand_SetEnable(VIR_Inst_GetDest(add1Inst), VIR_ENABLE_X);
-
-    /* (Z * I) * J + (Y * I)  + X*/
-    errCode = VIR_Function_AddInstructionAfter(pFunc,
-                        VIR_OP_ADD,
-                        VIR_TYPE_UINT32,
-                        add1Inst,
-                        gcvTRUE,
-                        &add2Inst);
-
-    CHECK_ERROR(errCode, "VIR_Function_PrependInstruction failed.");
-
-    /* src0 */
-    src = VIR_Inst_GetSource(add2Inst, 0);
-    VIR_Operand_SetTempRegister(src,
-                                pFunc,
-                                tmpSymId3,
-                                VIR_TYPE_UINT32);
-    VIR_Operand_SetSwizzle(src, VIR_SWIZZLE_XXXX);
-
-    /* src1 */
-    src = VIR_Inst_GetSource(add2Inst, 1);
-    VIR_Operand_SetOpKind(src, VIR_OPND_SYMBOL);
-    VIR_Operand_SetTypeId(src, VIR_TYPE_UINT32);
-    VIR_Operand_SetSym(src, newVarSym);
-    VIR_Operand_SetSwizzle(src, VIR_SWIZZLE_XXXX);
-
-    /* dest */
-    VIR_Operand_SetTempRegister(VIR_Inst_GetDest(add2Inst),
-                                pFunc,
-                                IndexSymId,
-                                VIR_TYPE_UINT32);
-    VIR_Operand_SetEnable(VIR_Inst_GetDest(add2Inst), VIR_ENABLE_X);
-
+    pNewOpnd = VIR_Inst_GetSource(pMadInst, 2);
+    VIR_Operand_SetSymbol(pNewOpnd, pFunc, tmpSymId);
+    VIR_Operand_SetTypeId(pNewOpnd, VIR_TYPE_UINT32);
+    VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XXXX);
     return errCode;
 }
 

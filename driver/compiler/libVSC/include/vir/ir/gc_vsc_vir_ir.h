@@ -2424,7 +2424,8 @@ extern VIR_NameId   VIR_NAME_UNKNOWN,
                     VIR_NAME_WORK_GROUP_INDEX,
                     VIR_NAME_LOCAL_INVOCATION_ID,
                     VIR_NAME_GLOBAL_INVOCATION_ID,
-                    VIR_NAME_LOCALINVOCATIONINDEX,
+                    VIR_NAME_LOCAL_INVOCATION_INDEX,
+                    VIR_NAME_GLOBAL_INVOCATION_INDEX,
                     VIR_NAME_HELPER_INVOCATION,
                     VIR_NAME_SUBSAMPLE_DEPTH,
                     VIR_NAME_PERVERTEX, /* gl_PerVertex */
@@ -4982,7 +4983,6 @@ typedef enum _VIR_SHADERFLAGS_EXT1
 #define VIR_Shader_DisableIRDump(Shader)            (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_DISABLE_IR_DUMP) != 0)
 #define VIR_Shader_hasDsyBeforeLowering(Shader)     (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_HAS_DSY_BEFORE_LOWERING) != 0)
 #define VIR_Shader_IsEnableRobustCheck(Shader)      (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_ENABLE_ROBUST_CHECK) != 0)
-#define VIR_Shader_CalcLocalInvocationIndex(Shader) (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_CALC_LOCAL_INVOCATION_INDEX) != 0)
 #define VIR_Shader_CapabilityFP16(Shader)           (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_CAPABILITY_FP16) != 0)
 #define VIR_Shader_HasImageFormatMismatch(Shader)   (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_IMAGE_FORMAT_MISMATCH) != 0)
 #define VIR_Shader_UseEvisInst(Shader)              (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_USE_EVIS_INST) != 0)
@@ -7966,6 +7966,24 @@ VIR_Shader_CanRemoveUnusedFunctions(
     IN  VIR_Shader*         pShader
     );
 
+VSC_ErrCode
+VIR_Shader_GenLocalInvocationIndex(
+    IN  VIR_Shader*         pShader,
+    IN  VIR_Function*       pFunc,
+    IN  VIR_Symbol*         pLocalInvocationIndexSym,
+    IN  VIR_Instruction*    pInsertBeforeInst,
+    IN  gctBOOL             bUpdateSlot
+    );
+
+VSC_ErrCode
+VIR_Shader_GenGlobalInvocationIndex(
+    IN  VIR_Shader*         pShader,
+    IN  VIR_Function*       pFunc,
+    IN  VIR_Symbol*         pGlobalInvocationIndexSym,
+    IN  VIR_Instruction*    pInsertBeforeInst,
+    IN  gctBOOL             bUpdateSlot
+    );
+
 gctBOOL
 VIR_Shader_NeedPutImmValue2Uniform(
     IN  VIR_Shader*         pShader,
@@ -8349,15 +8367,6 @@ VIR_Copy_FixSymbol(VIR_CopyContext * Ctx, VIR_Symbol* pSymbol);
 
 VSC_ErrCode
 VIR_Copy_FixOperand(VIR_CopyContext *Ctx, VIR_Operand* pOperand);
-
-VSC_ErrCode
-VIR_Shader_GenInvocationIndex(
-    IN  VIR_Shader              *Shader,
-    IN  VIR_Function            *pFunc,
-    IN  VIR_Symbol              *VariableSym,
-    IN  VIR_Instruction         *insertBeforeInst,
-    IN  gctBOOL                 bUpdateSlot
-    );
 
 #define SHDR_SIG    gcmCC('S', 'H', 'D', 'R')
 #define ENDS_SIG    gcmCC('E', 'N', 'D', 'S')
