@@ -205,7 +205,7 @@ reserved_mem_attach(
 
     Mdl->priv = res;
 
-    if (res->start < 0xFFFFFFFF)
+    if ((res->start + res->size) < 0xFFFFFFFF)
     {
         Allocator->capability |= gcvALLOC_FLAG_4GB_ADDR;
     }
