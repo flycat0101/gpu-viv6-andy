@@ -2425,7 +2425,7 @@ GLvoid GLAPIENTRY __glProfile_ShaderSource(__GLcontext *gc, GLuint shader, GLsiz
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glShaderSource %u %d 0x%p 0x%08X \n",
+        __GL_LOG_API("(gc=%p, tid=%p): glShaderSource %u %d %p 0x%08X \n",
                         gc, tid, shader, count, __GL_PTR2UINT(string), __GL_PTRVALUE(length));
 
         __glLogSourceStrings(gc, count, string);
@@ -8357,7 +8357,7 @@ GLvoid GL_APIENTRY __glProfile_Bitmap(__GLcontext *gc, GLsizei width, GLsizei he
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glBitmap(width=%d, height=%d, xorig=%f, yorig=%f, xmove=%f, ymove=%f, bitmap=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glBitmap(width=%d, height=%d, xorig=%f, yorig=%f, xmove=%f, ymove=%f, bitmap=%p)\n",
                      gc, tid, width, height, xorig, yorig, xmove, ymove, bitmap);
     }
 
@@ -8397,7 +8397,7 @@ GLvoid GL_APIENTRY __glProfile_Color3bv(__GLcontext *gc, const GLbyte *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glColor3bv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glColor3bv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -8437,7 +8437,7 @@ GLvoid GL_APIENTRY __glProfile_Color3dv(__GLcontext *gc, const GLdouble *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glColor3dv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glColor3dv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -8477,7 +8477,7 @@ GLvoid GL_APIENTRY __glProfile_Color3fv(__GLcontext *gc, const GLfloat *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glColor3fv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glColor3fv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -8517,7 +8517,7 @@ GLvoid GL_APIENTRY __glProfile_Color3iv(__GLcontext *gc, const GLint *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glColor3iv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glColor3iv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -8557,7 +8557,7 @@ GLvoid GL_APIENTRY __glProfile_Color3sv(__GLcontext *gc, const GLshort *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glColor3sv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glColor3sv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -8597,7 +8597,7 @@ GLvoid GL_APIENTRY __glProfile_Color3ubv(__GLcontext *gc, const GLubyte *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glColor3ubv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glColor3ubv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -8637,7 +8637,7 @@ GLvoid GL_APIENTRY __glProfile_Color3uiv(__GLcontext *gc, const GLuint *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glColor3uiv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glColor3uiv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -8677,7 +8677,7 @@ GLvoid GL_APIENTRY __glProfile_Color3usv(__GLcontext *gc, const GLushort *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glColor3usv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glColor3usv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -8717,7 +8717,7 @@ GLvoid GL_APIENTRY __glProfile_Color4bv(__GLcontext *gc, const GLbyte *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glColor4bv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glColor4bv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -8757,7 +8757,7 @@ GLvoid GL_APIENTRY __glProfile_Color4dv(__GLcontext *gc, const GLdouble *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glColor4dv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glColor4dv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -8797,7 +8797,7 @@ GLvoid GL_APIENTRY __glProfile_Color4fv(__GLcontext *gc, const GLfloat *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glColor4fv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glColor4fv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -8837,7 +8837,7 @@ GLvoid GL_APIENTRY __glProfile_Color4iv(__GLcontext *gc, const GLint *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glColor4iv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glColor4iv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -8877,7 +8877,7 @@ GLvoid GL_APIENTRY __glProfile_Color4sv(__GLcontext *gc, const GLshort *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glColor4sv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glColor4sv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -8917,7 +8917,7 @@ GLvoid GL_APIENTRY __glProfile_Color4ubv(__GLcontext *gc, const GLubyte *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glColor4ubv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glColor4ubv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -8957,7 +8957,7 @@ GLvoid GL_APIENTRY __glProfile_Color4uiv(__GLcontext *gc, const GLuint *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glColor4uiv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glColor4uiv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -8997,7 +8997,7 @@ GLvoid GL_APIENTRY __glProfile_Color4usv(__GLcontext *gc, const GLushort *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glColor4usv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glColor4usv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -9037,7 +9037,7 @@ GLvoid GL_APIENTRY __glProfile_EdgeFlagv(__GLcontext *gc, const GLboolean *flag)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glEdgeFlagv(flag=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glEdgeFlagv(flag=%p)\n",
                      gc, tid, flag);
     }
 
@@ -9097,7 +9097,7 @@ GLvoid GL_APIENTRY __glProfile_Indexdv(__GLcontext *gc, const GLdouble *c)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glIndexdv(c=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glIndexdv(c=%p)\n",
                      gc, tid, c);
     }
 
@@ -9137,7 +9137,7 @@ GLvoid GL_APIENTRY __glProfile_Indexfv(__GLcontext *gc, const GLfloat *c)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glIndexfv(c=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glIndexfv(c=%p)\n",
                      gc, tid, c);
     }
 
@@ -9177,7 +9177,7 @@ GLvoid GL_APIENTRY __glProfile_Indexiv(__GLcontext *gc, const GLint *c)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glIndexiv(c=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glIndexiv(c=%p)\n",
                      gc, tid, c);
     }
 
@@ -9217,7 +9217,7 @@ GLvoid GL_APIENTRY __glProfile_Indexsv(__GLcontext *gc, const GLshort *c)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glIndexsv(c=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glIndexsv(c=%p)\n",
                      gc, tid, c);
     }
 
@@ -9257,7 +9257,7 @@ GLvoid GL_APIENTRY __glProfile_Normal3bv(__GLcontext *gc, const GLbyte *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glNormal3bv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glNormal3bv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -9297,7 +9297,7 @@ GLvoid GL_APIENTRY __glProfile_Normal3dv(__GLcontext *gc, const GLdouble *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glNormal3dv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glNormal3dv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -9337,7 +9337,7 @@ GLvoid GL_APIENTRY __glProfile_Normal3fv(__GLcontext *gc, const GLfloat *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glNormal3fv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glNormal3fv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -9377,7 +9377,7 @@ GLvoid GL_APIENTRY __glProfile_Normal3iv(__GLcontext *gc, const GLint *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glNormal3iv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glNormal3iv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -9417,7 +9417,7 @@ GLvoid GL_APIENTRY __glProfile_Normal3sv(__GLcontext *gc, const GLshort *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glNormal3sv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glNormal3sv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -9457,7 +9457,7 @@ GLvoid GL_APIENTRY __glProfile_RasterPos2dv(__GLcontext *gc, const GLdouble *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos2dv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos2dv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -9497,7 +9497,7 @@ GLvoid GL_APIENTRY __glProfile_RasterPos2fv(__GLcontext *gc, const GLfloat *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos2fv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos2fv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -9537,7 +9537,7 @@ GLvoid GL_APIENTRY __glProfile_RasterPos2iv(__GLcontext *gc, const GLint *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos2iv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos2iv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -9577,7 +9577,7 @@ GLvoid GL_APIENTRY __glProfile_RasterPos2sv(__GLcontext *gc, const GLshort *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos2sv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos2sv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -9617,7 +9617,7 @@ GLvoid GL_APIENTRY __glProfile_RasterPos3dv(__GLcontext *gc, const GLdouble *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos3dv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos3dv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -9657,7 +9657,7 @@ GLvoid GL_APIENTRY __glProfile_RasterPos3fv(__GLcontext *gc, const GLfloat *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos3fv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos3fv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -9697,7 +9697,7 @@ GLvoid GL_APIENTRY __glProfile_RasterPos3iv(__GLcontext *gc, const GLint *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos3iv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos3iv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -9737,7 +9737,7 @@ GLvoid GL_APIENTRY __glProfile_RasterPos3sv(__GLcontext *gc, const GLshort *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos3sv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos3sv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -9777,7 +9777,7 @@ GLvoid GL_APIENTRY __glProfile_RasterPos4dv(__GLcontext *gc, const GLdouble *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos4dv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos4dv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -9817,7 +9817,7 @@ GLvoid GL_APIENTRY __glProfile_RasterPos4fv(__GLcontext *gc, const GLfloat *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos4fv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos4fv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -9857,7 +9857,7 @@ GLvoid GL_APIENTRY __glProfile_RasterPos4iv(__GLcontext *gc, const GLint *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos4iv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos4iv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -9897,7 +9897,7 @@ GLvoid GL_APIENTRY __glProfile_RasterPos4sv(__GLcontext *gc, const GLshort *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos4sv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glRasterPos4sv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -9937,7 +9937,7 @@ GLvoid GL_APIENTRY __glProfile_Rectdv(__GLcontext *gc, const GLdouble *v1, const
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glRectdv(v1=0x%p, v2=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glRectdv(v1=%p, v2=%p)\n",
                      gc, tid, v1, v2);
     }
 
@@ -9977,7 +9977,7 @@ GLvoid GL_APIENTRY __glProfile_Rectfv(__GLcontext *gc, const GLfloat *v1, const 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glRectfv(v1=0x%p, v2=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glRectfv(v1=%p, v2=%p)\n",
                      gc, tid, v1, v2);
     }
 
@@ -10017,7 +10017,7 @@ GLvoid GL_APIENTRY __glProfile_Rectiv(__GLcontext *gc, const GLint *v1, const GL
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glRectiv(v1=0x%p, v2=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glRectiv(v1=%p, v2=%p)\n",
                      gc, tid, v1, v2);
     }
 
@@ -10057,7 +10057,7 @@ GLvoid GL_APIENTRY __glProfile_Rectsv(__GLcontext *gc, const GLshort *v1, const 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glRectsv(v1=0x%p, v2=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glRectsv(v1=%p, v2=%p)\n",
                      gc, tid, v1, v2);
     }
 
@@ -10097,7 +10097,7 @@ GLvoid GL_APIENTRY __glProfile_TexCoord1dv(__GLcontext *gc, const GLdouble *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord1dv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord1dv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -10137,7 +10137,7 @@ GLvoid GL_APIENTRY __glProfile_TexCoord1fv(__GLcontext *gc, const GLfloat *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord1fv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord1fv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -10177,7 +10177,7 @@ GLvoid GL_APIENTRY __glProfile_TexCoord1iv(__GLcontext *gc, const GLint *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord1iv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord1iv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -10217,7 +10217,7 @@ GLvoid GL_APIENTRY __glProfile_TexCoord1sv(__GLcontext *gc, const GLshort *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord1sv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord1sv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -10257,7 +10257,7 @@ GLvoid GL_APIENTRY __glProfile_TexCoord2dv(__GLcontext *gc, const GLdouble *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord2dv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord2dv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -10297,7 +10297,7 @@ GLvoid GL_APIENTRY __glProfile_TexCoord2fv(__GLcontext *gc, const GLfloat *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord2fv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord2fv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -10337,7 +10337,7 @@ GLvoid GL_APIENTRY __glProfile_TexCoord2iv(__GLcontext *gc, const GLint *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord2iv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord2iv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -10377,7 +10377,7 @@ GLvoid GL_APIENTRY __glProfile_TexCoord2sv(__GLcontext *gc, const GLshort *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord2sv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord2sv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -10417,7 +10417,7 @@ GLvoid GL_APIENTRY __glProfile_TexCoord3dv(__GLcontext *gc, const GLdouble *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord3dv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord3dv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -10457,7 +10457,7 @@ GLvoid GL_APIENTRY __glProfile_TexCoord3fv(__GLcontext *gc, const GLfloat *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord3fv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord3fv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -10497,7 +10497,7 @@ GLvoid GL_APIENTRY __glProfile_TexCoord3iv(__GLcontext *gc, const GLint *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord3iv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord3iv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -10537,7 +10537,7 @@ GLvoid GL_APIENTRY __glProfile_TexCoord3sv(__GLcontext *gc, const GLshort *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord3sv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord3sv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -10577,7 +10577,7 @@ GLvoid GL_APIENTRY __glProfile_TexCoord4dv(__GLcontext *gc, const GLdouble *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord4dv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord4dv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -10617,7 +10617,7 @@ GLvoid GL_APIENTRY __glProfile_TexCoord4fv(__GLcontext *gc, const GLfloat *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord4fv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord4fv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -10657,7 +10657,7 @@ GLvoid GL_APIENTRY __glProfile_TexCoord4iv(__GLcontext *gc, const GLint *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord4iv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord4iv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -10697,7 +10697,7 @@ GLvoid GL_APIENTRY __glProfile_TexCoord4sv(__GLcontext *gc, const GLshort *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord4sv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexCoord4sv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -10737,7 +10737,7 @@ GLvoid GL_APIENTRY __glProfile_Vertex2dv(__GLcontext *gc, const GLdouble *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertex2dv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertex2dv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -10777,7 +10777,7 @@ GLvoid GL_APIENTRY __glProfile_Vertex2fv(__GLcontext *gc, const GLfloat *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertex2fv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertex2fv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -10817,7 +10817,7 @@ GLvoid GL_APIENTRY __glProfile_Vertex2iv(__GLcontext *gc, const GLint *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertex2iv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertex2iv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -10857,7 +10857,7 @@ GLvoid GL_APIENTRY __glProfile_Vertex2sv(__GLcontext *gc, const GLshort *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertex2sv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertex2sv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -10897,7 +10897,7 @@ GLvoid GL_APIENTRY __glProfile_Vertex3dv(__GLcontext *gc, const GLdouble *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertex3dv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertex3dv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -10937,7 +10937,7 @@ GLvoid GL_APIENTRY __glProfile_Vertex3fv(__GLcontext *gc, const GLfloat *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertex3fv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertex3fv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -10977,7 +10977,7 @@ GLvoid GL_APIENTRY __glProfile_Vertex3iv(__GLcontext *gc, const GLint *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertex3iv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertex3iv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -11017,7 +11017,7 @@ GLvoid GL_APIENTRY __glProfile_Vertex3sv(__GLcontext *gc, const GLshort *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertex3sv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertex3sv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -11057,7 +11057,7 @@ GLvoid GL_APIENTRY __glProfile_Vertex4dv(__GLcontext *gc, const GLdouble *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertex4dv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertex4dv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -11097,7 +11097,7 @@ GLvoid GL_APIENTRY __glProfile_Vertex4fv(__GLcontext *gc, const GLfloat *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertex4fv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertex4fv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -11137,7 +11137,7 @@ GLvoid GL_APIENTRY __glProfile_Vertex4iv(__GLcontext *gc, const GLint *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertex4iv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertex4iv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -11177,7 +11177,7 @@ GLvoid GL_APIENTRY __glProfile_Vertex4sv(__GLcontext *gc, const GLshort *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertex4sv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertex4sv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -11197,7 +11197,7 @@ GLvoid GL_APIENTRY __glProfile_ClipPlane(__GLcontext *gc, GLenum plane, const GL
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glClipPlane(plane=0x%04X, equation=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glClipPlane(plane=0x%04X, equation=%p)\n",
                      gc, tid, plane, equation);
     }
 
@@ -11257,7 +11257,7 @@ GLvoid GL_APIENTRY __glProfile_Fogfv(__GLcontext *gc, GLenum pname, const GLfloa
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glFogfv(pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glFogfv(pname=0x%04X, params=%p)\n",
                      gc, tid, pname, params);
     }
 
@@ -11297,7 +11297,7 @@ GLvoid GL_APIENTRY __glProfile_Fogiv(__GLcontext *gc, GLenum pname, const GLint 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glFogiv(pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glFogiv(pname=0x%04X, params=%p)\n",
                      gc, tid, pname, params);
     }
 
@@ -11337,7 +11337,7 @@ GLvoid GL_APIENTRY __glProfile_Lightfv(__GLcontext *gc, GLenum light, GLenum pna
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glLightfv(light=0x%04X, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glLightfv(light=0x%04X, pname=0x%04X, params=%p)\n",
                      gc, tid, light, pname, params);
     }
 
@@ -11377,7 +11377,7 @@ GLvoid GL_APIENTRY __glProfile_Lightiv(__GLcontext *gc, GLenum light, GLenum pna
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glLightiv(light=0x%04X, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glLightiv(light=0x%04X, pname=0x%04X, params=%p)\n",
                      gc, tid, light, pname, params);
     }
 
@@ -11417,7 +11417,7 @@ GLvoid GL_APIENTRY __glProfile_LightModelfv(__GLcontext *gc, GLenum pname, const
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glLightModelfv(pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glLightModelfv(pname=0x%04X, params=%p)\n",
                      gc, tid, pname, params);
     }
 
@@ -11457,7 +11457,7 @@ GLvoid GL_APIENTRY __glProfile_LightModeliv(__GLcontext *gc, GLenum pname, const
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glLightModeliv(pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glLightModeliv(pname=0x%04X, params=%p)\n",
                      gc, tid, pname, params);
     }
 
@@ -11517,7 +11517,7 @@ GLvoid GL_APIENTRY __glProfile_Materialfv(__GLcontext *gc, GLenum face, GLenum p
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMaterialfv(face=0x%04X, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMaterialfv(face=0x%04X, pname=0x%04X, params=%p)\n",
                      gc, tid, face, pname, params);
     }
 
@@ -11557,7 +11557,7 @@ GLvoid GL_APIENTRY __glProfile_Materialiv(__GLcontext *gc, GLenum face, GLenum p
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMaterialiv(face=0x%04X, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMaterialiv(face=0x%04X, pname=0x%04X, params=%p)\n",
                      gc, tid, face, pname, params);
     }
 
@@ -11617,7 +11617,7 @@ GLvoid GL_APIENTRY __glProfile_PolygonStipple(__GLcontext *gc, const GLubyte *ma
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glPolygonStipple(mask=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glPolygonStipple(mask=%p)\n",
                      gc, tid, mask);
     }
 
@@ -11697,7 +11697,7 @@ GLvoid GL_APIENTRY __glProfile_TexEnvfv(__GLcontext *gc, GLenum target, GLenum p
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexEnvfv(target=0x%04X, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexEnvfv(target=0x%04X, pname=0x%04X, params=%p)\n",
                      gc, tid, target, pname, params);
     }
 
@@ -11737,7 +11737,7 @@ GLvoid GL_APIENTRY __glProfile_TexEnviv(__GLcontext *gc, GLenum target, GLenum p
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexEnviv(target=0x%04X, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexEnviv(target=0x%04X, pname=0x%04X, params=%p)\n",
                      gc, tid, target, pname, params);
     }
 
@@ -11777,7 +11777,7 @@ GLvoid GL_APIENTRY __glProfile_TexGendv(__GLcontext *gc, GLenum coord, GLenum pn
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexGendv(coord=0x%04X, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexGendv(coord=0x%04X, pname=0x%04X, params=%p)\n",
                      gc, tid, coord, pname, params);
     }
 
@@ -11817,7 +11817,7 @@ GLvoid GL_APIENTRY __glProfile_TexGenfv(__GLcontext *gc, GLenum coord, GLenum pn
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexGenfv(coord=0x%04X, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexGenfv(coord=0x%04X, pname=0x%04X, params=%p)\n",
                      gc, tid, coord, pname, params);
     }
 
@@ -11857,7 +11857,7 @@ GLvoid GL_APIENTRY __glProfile_TexGeniv(__GLcontext *gc, GLenum coord, GLenum pn
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexGeniv(coord=0x%04X, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexGeniv(coord=0x%04X, pname=0x%04X, params=%p)\n",
                      gc, tid, coord, pname, params);
     }
 
@@ -11877,7 +11877,7 @@ GLvoid GL_APIENTRY __glProfile_FeedbackBuffer(__GLcontext *gc, GLsizei size, GLe
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glFeedbackBuffer(size=0x%08X, type=0x%04X, buffer=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glFeedbackBuffer(size=0x%08X, type=0x%04X, buffer=%p)\n",
                      gc, tid, size, type, buffer);
     }
 
@@ -11897,7 +11897,7 @@ GLvoid GL_APIENTRY __glProfile_SelectBuffer(__GLcontext *gc, GLsizei size, GLuin
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glSelectBuffer(size=0x%08X, buffer=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glSelectBuffer(size=0x%08X, buffer=%p)\n",
                      gc, tid, size, buffer);
     }
 
@@ -12205,7 +12205,7 @@ GLvoid GL_APIENTRY __glProfile_Map1d(__GLcontext *gc, GLenum target, GLdouble u1
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMap1d(target=0x%04X, u1=%lf, u2=%lf, stride=%d, order=%d, points=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMap1d(target=0x%04X, u1=%lf, u2=%lf, stride=%d, order=%d, points=%p)\n",
                      gc, tid, target, u1, u2, stride, order, points);
     }
 
@@ -12225,7 +12225,7 @@ GLvoid GL_APIENTRY __glProfile_Map1f(__GLcontext *gc, GLenum target, GLfloat u1,
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMap1f(target=0x%04X, u1=%f, u2=%f, stride=%d, order=%d, points=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMap1f(target=0x%04X, u1=%f, u2=%f, stride=%d, order=%d, points=%p)\n",
                      gc, tid, target, u1, u2, stride, order, points);
     }
 
@@ -12245,7 +12245,7 @@ GLvoid GL_APIENTRY __glProfile_Map2d(__GLcontext *gc, GLenum target, GLdouble u1
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMap2d(target=0x%04X, u1=%lf, u2=%lf, ustride=%d, uorder=%d, v1=%lf, v2=%lf, vstride=%d, vorder=%d, points=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMap2d(target=0x%04X, u1=%lf, u2=%lf, ustride=%d, uorder=%d, v1=%lf, v2=%lf, vstride=%d, vorder=%d, points=%p)\n",
                      gc, tid, target, u1, u2, ustride, uorder, v1, v2, vstride, vorder, points);
     }
 
@@ -12265,7 +12265,7 @@ GLvoid GL_APIENTRY __glProfile_Map2f(__GLcontext *gc, GLenum target, GLfloat u1,
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMap2f(target=0x%04X, u1=%f, u2=%f, ustride=%d, uorder=%d, v1=%f, v2=%f, vstride=%d, vorder=%d, points=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMap2f(target=0x%04X, u1=%f, u2=%f, ustride=%d, uorder=%d, v1=%f, v2=%f, vstride=%d, vorder=%d, points=%p)\n",
                      gc, tid, target, u1, u2, ustride, uorder, v1, v2, vstride, vorder, points);
     }
 
@@ -12385,7 +12385,7 @@ GLvoid GL_APIENTRY __glProfile_EvalCoord1dv(__GLcontext *gc, const GLdouble *u)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glEvalCoord1dv(u=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glEvalCoord1dv(u=%p)\n",
                      gc, tid, u);
     }
 
@@ -12425,7 +12425,7 @@ GLvoid GL_APIENTRY __glProfile_EvalCoord1fv(__GLcontext *gc, const GLfloat *u)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glEvalCoord1fv(u=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glEvalCoord1fv(u=%p)\n",
                      gc, tid, u);
     }
 
@@ -12465,7 +12465,7 @@ GLvoid GL_APIENTRY __glProfile_EvalCoord2dv(__GLcontext *gc, const GLdouble *u)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glEvalCoord2dv(u=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glEvalCoord2dv(u=%p)\n",
                      gc, tid, u);
     }
 
@@ -12505,7 +12505,7 @@ GLvoid GL_APIENTRY __glProfile_EvalCoord2fv(__GLcontext *gc, const GLfloat *u)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glEvalCoord2fv(u=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glEvalCoord2fv(u=%p)\n",
                      gc, tid, u);
     }
 
@@ -12725,7 +12725,7 @@ GLvoid GL_APIENTRY __glProfile_PixelMapfv(__GLcontext *gc, GLenum map, GLsizei m
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glPixelMapfv(map=0x%04X, mapsize=%d, values=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glPixelMapfv(map=0x%04X, mapsize=%d, values=%p)\n",
                      gc, tid, map, mapsize, values);
     }
 
@@ -12745,7 +12745,7 @@ GLvoid GL_APIENTRY __glProfile_PixelMapuiv(__GLcontext *gc, GLenum map, GLsizei 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glPixelMapuiv(map=0x%04X, mapsize=%d, values=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glPixelMapuiv(map=0x%04X, mapsize=%d, values=%p)\n",
                      gc, tid, map, mapsize, values);
     }
 
@@ -12765,7 +12765,7 @@ GLvoid GL_APIENTRY __glProfile_PixelMapusv(__GLcontext *gc, GLenum map, GLsizei 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glPixelMapusv(map=0x%04X, mapsize=%d values=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glPixelMapusv(map=0x%04X, mapsize=%d values=%p)\n",
                      gc, tid, map, mapsize, values);
     }
 
@@ -12805,7 +12805,7 @@ GLvoid GL_APIENTRY __glProfile_DrawPixels(__GLcontext *gc, GLsizei width, GLsize
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glDrawPixels(width=%d, height=%d, format=0x%04X, type=0x%04X, pixels=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glDrawPixels(width=%d, height=%d, format=0x%04X, type=0x%04X, pixels=%p)\n",
                      gc, tid, width, height, format, type, pixels);
     }
 
@@ -12825,7 +12825,7 @@ GLvoid GL_APIENTRY __glProfile_GetClipPlane(__GLcontext *gc, GLenum plane, GLdou
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetClipPlane(plane=0x%04X, equation=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetClipPlane(plane=0x%04X, equation=%p)\n",
                      gc, tid, plane, equation);
     }
 
@@ -12845,7 +12845,7 @@ GLvoid GL_APIENTRY __glProfile_GetDoublev(__GLcontext *gc, GLenum pname, GLdoubl
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetDoublev(pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetDoublev(pname=0x%04X, params=%p)\n",
                      gc, tid, pname, params);
     }
 
@@ -12865,7 +12865,7 @@ GLvoid GL_APIENTRY __glProfile_GetLightfv(__GLcontext *gc, GLenum light, GLenum 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetLightfv(light=0x%04X, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetLightfv(light=0x%04X, pname=0x%04X, params=%p)\n",
                      gc, tid, light, pname, params);
     }
 
@@ -12885,7 +12885,7 @@ GLvoid GL_APIENTRY __glProfile_GetLightiv(__GLcontext *gc, GLenum light, GLenum 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetLightiv(light=0x%04X, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetLightiv(light=0x%04X, pname=0x%04X, params=%p)\n",
                      gc, tid, light, pname, params);
     }
 
@@ -12905,7 +12905,7 @@ GLvoid GL_APIENTRY __glProfile_GetMapdv(__GLcontext *gc, GLenum target, GLenum q
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetMapdv(target=0x%04X, query=0x%04X, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetMapdv(target=0x%04X, query=0x%04X, v=%p)\n",
                      gc, tid, target, query, v);
     }
 
@@ -12925,7 +12925,7 @@ GLvoid GL_APIENTRY __glProfile_GetMapfv(__GLcontext *gc, GLenum target, GLenum q
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetMapfv(target=0x%04X, query=0x%04X, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetMapfv(target=0x%04X, query=0x%04X, v=%p)\n",
                      gc, tid, target, query, v);
     }
 
@@ -12945,7 +12945,7 @@ GLvoid GL_APIENTRY __glProfile_GetMapiv(__GLcontext *gc, GLenum target, GLenum q
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetMapiv(target=0x%04X, query=0x%04X, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetMapiv(target=0x%04X, query=0x%04X, v=%p)\n",
                      gc, tid, target, query, v);
     }
 
@@ -12965,7 +12965,7 @@ GLvoid GL_APIENTRY __glProfile_GetMaterialfv(__GLcontext *gc, GLenum face, GLenu
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetMaterialfv(face=0x%04X, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetMaterialfv(face=0x%04X, pname=0x%04X, params=%p)\n",
                      gc, tid, face, pname, params);
     }
 
@@ -12985,7 +12985,7 @@ GLvoid GL_APIENTRY __glProfile_GetMaterialiv(__GLcontext *gc, GLenum face, GLenu
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetMaterialiv(face=0x%04X, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetMaterialiv(face=0x%04X, pname=0x%04X, params=%p)\n",
                      gc, tid, face, pname, params);
     }
 
@@ -13005,7 +13005,7 @@ GLvoid GL_APIENTRY __glProfile_GetPixelMapfv(__GLcontext *gc, GLenum map, GLfloa
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetPixelMapfv(map=0x%04X, values=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetPixelMapfv(map=0x%04X, values=%p)\n",
                      gc, tid, map, values);
     }
 
@@ -13025,7 +13025,7 @@ GLvoid GL_APIENTRY __glProfile_GetPixelMapuiv(__GLcontext *gc, GLenum map, GLuin
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetPixelMapuiv(map=0x%04X, values=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetPixelMapuiv(map=0x%04X, values=%p)\n",
                      gc, tid, map, values);
     }
 
@@ -13045,7 +13045,7 @@ GLvoid GL_APIENTRY __glProfile_GetPixelMapusv(__GLcontext *gc, GLenum map, GLush
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetPixelMapusv(map=0x%04X, values=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetPixelMapusv(map=0x%04X, values=%p)\n",
                      gc, tid, map, values);
     }
 
@@ -13065,7 +13065,7 @@ GLvoid GL_APIENTRY __glProfile_GetPolygonStipple(__GLcontext *gc, GLubyte *mask)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetPolygonStipple(mask=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetPolygonStipple(mask=%p)\n",
                      gc, tid, mask);
     }
 
@@ -13085,7 +13085,7 @@ GLvoid GL_APIENTRY __glProfile_GetTexEnvfv(__GLcontext *gc, GLenum target, GLenu
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetTexEnvfv(target=0x%04X, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetTexEnvfv(target=0x%04X, pname=0x%04X, params=%p)\n",
                      gc, tid, target, pname, params);
     }
 
@@ -13105,7 +13105,7 @@ GLvoid GL_APIENTRY __glProfile_GetTexEnviv(__GLcontext *gc, GLenum target, GLenu
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetTexEnviv(target=0x%04X, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetTexEnviv(target=0x%04X, pname=0x%04X, params=%p)\n",
                      gc, tid, target, pname, params);
     }
 
@@ -13125,7 +13125,7 @@ GLvoid GL_APIENTRY __glProfile_GetTexGendv(__GLcontext *gc, GLenum coord, GLenum
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetTexGendv(coord=0x%04X, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetTexGendv(coord=0x%04X, pname=0x%04X, params=%p)\n",
                      gc, tid, coord, pname, params);
     }
 
@@ -13145,7 +13145,7 @@ GLvoid GL_APIENTRY __glProfile_GetTexGenfv(__GLcontext *gc, GLenum coord, GLenum
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetTexGenfv(coord=0x%04X, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetTexGenfv(coord=0x%04X, pname=0x%04X, params=%p)\n",
                      gc, tid, coord, pname, params);
     }
 
@@ -13165,7 +13165,7 @@ GLvoid GL_APIENTRY __glProfile_GetTexGeniv(__GLcontext *gc, GLenum coord, GLenum
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetTexGeniv(coord=0x%04X, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetTexGeniv(coord=0x%04X, pname=0x%04X, params=%p)\n",
                      gc, tid, coord, pname, params);
     }
 
@@ -13273,7 +13273,7 @@ GLvoid GL_APIENTRY __glProfile_LoadMatrixf(__GLcontext *gc, const GLfloat *m)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glLoadMatrixf(m=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glLoadMatrixf(m=%p)\n",
                      gc, tid, m);
     }
 
@@ -13293,7 +13293,7 @@ GLvoid GL_APIENTRY __glProfile_LoadMatrixd(__GLcontext *gc, const GLdouble *m)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glLoadMatrixd(m=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glLoadMatrixd(m=%p)\n",
                      gc, tid, m);
     }
 
@@ -13333,7 +13333,7 @@ GLvoid GL_APIENTRY __glProfile_MultMatrixf(__GLcontext *gc, const GLfloat *m)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMultMatrixf(m=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMultMatrixf(m=%p)\n",
                      gc, tid, m);
     }
 
@@ -13353,7 +13353,7 @@ GLvoid GL_APIENTRY __glProfile_MultMatrixd(__GLcontext *gc, const GLdouble *m)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMultMatrixd(m=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMultMatrixd(m=%p)\n",
                      gc, tid, m);
     }
 
@@ -13575,7 +13575,7 @@ GLvoid GL_APIENTRY __glProfile_ColorPointer(__GLcontext *gc, GLint size, GLenum 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glColorPointer(size=%d, type=0x%04X, stride=%d, ptr=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glColorPointer(size=%d, type=0x%04X, stride=%d, ptr=%p)\n",
                      gc, tid, size, type, stride, ptr);
     }
 
@@ -13615,7 +13615,7 @@ GLvoid GL_APIENTRY __glProfile_EdgeFlagPointer(__GLcontext *gc, GLsizei stride, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glEdgeFlagPointer(stride=0x%08X, ptr=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glEdgeFlagPointer(stride=0x%08X, ptr=%p)\n",
                      gc, tid, stride, ptr);
     }
 
@@ -13655,7 +13655,7 @@ GLvoid GL_APIENTRY __glProfile_IndexPointer(__GLcontext *gc, GLenum type, GLsize
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glIndexPointer(type=0x%04X, stride=%d, ptr=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glIndexPointer(type=0x%04X, stride=%d, ptr=%p)\n",
                      gc, tid, type, stride, ptr);
     }
 
@@ -13695,7 +13695,7 @@ GLvoid GL_APIENTRY __glProfile_Indexubv(__GLcontext *gc, const GLubyte *c)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glIndexubv(c=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glIndexubv(c=%p)\n",
                      gc, tid, c);
     }
 
@@ -13715,7 +13715,7 @@ GLvoid GL_APIENTRY __glProfile_InterleavedArrays(__GLcontext *gc, GLenum format,
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glInterleavedArrays(format=0x%04X, stride=%d, pointer=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glInterleavedArrays(format=0x%04X, stride=%d, pointer=%p)\n",
                      gc, tid, format, stride, pointer);
     }
 
@@ -13735,7 +13735,7 @@ GLvoid GL_APIENTRY __glProfile_NormalPointer(__GLcontext *gc, GLenum type, GLsiz
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glNormalPointer(type=0x%04X, stride=%d, ptr=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glNormalPointer(type=0x%04X, stride=%d, ptr=%p)\n",
                      gc, tid, type, stride, ptr);
     }
 
@@ -13755,7 +13755,7 @@ GLvoid GL_APIENTRY __glProfile_TexCoordPointer(__GLcontext *gc, GLint size, GLen
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexCoordPointer(size=%d, type=0x%04X, stride=%d, ptr=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexCoordPointer(size=%d, type=0x%04X, stride=%d, ptr=%p)\n",
                      gc, tid, size, type, stride, ptr);
     }
 
@@ -13775,7 +13775,7 @@ GLvoid GL_APIENTRY __glProfile_VertexPointer(__GLcontext *gc, GLint size, GLenum
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexPointer(size=%d, type=0x%04X, stride=%d, ptr=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexPointer(size=%d, type=0x%04X, stride=%d, ptr=%p)\n",
                      gc, tid, size, type, stride, ptr);
     }
 
@@ -13796,7 +13796,7 @@ GLboolean GL_APIENTRY __glProfile_AreTexturesResident(__GLcontext *gc, GLsizei n
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glAreTexturesResident(n=0x%08X, textures=0x%p, residences=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glAreTexturesResident(n=0x%08X, textures=%p, residences=%p)\n",
                      gc, tid, n, textures, residences);
     }
 
@@ -13863,7 +13863,7 @@ GLvoid GL_APIENTRY __glProfile_PrioritizeTextures(__GLcontext *gc, GLsizei n, co
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glPrioritizeTextures(n=0x%08X, textures=0x%p, priorities=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glPrioritizeTextures(n=0x%08X, textures=%p, priorities=%p)\n",
                      gc, tid, n, textures, priorities);
     }
 
@@ -13883,7 +13883,7 @@ GLvoid GL_APIENTRY __glProfile_TexSubImage1D(__GLcontext *gc, GLenum target, GLi
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexSubImage1D(target=0x%04X, level=%d, xoffset=%d, width=%d, format=0x%04X, type=0x%04X, pixels=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexSubImage1D(target=0x%04X, level=%d, xoffset=%d, width=%d, format=0x%04X, type=0x%04X, pixels=%p)\n",
                      gc, tid, target, level, xoffset, width, format, type, pixels);
     }
 
@@ -13947,7 +13947,7 @@ GLvoid GL_APIENTRY __glProfile_CompressedTexImage1D(__GLcontext *gc, GLenum targ
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glCompressedTexImage1D(target=0x%04X, level=%d, internalformat=0x%04X, width=%d, border=%d, imageSize=%d, data=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glCompressedTexImage1D(target=0x%04X, level=%d, internalformat=0x%04X, width=%d, border=%d, imageSize=%d, data=%p)\n",
                      gc, tid, target, level, internalformat, width, border, imageSize, data);
     }
 
@@ -13967,7 +13967,7 @@ GLvoid GL_APIENTRY __glProfile_CompressedTexSubImage1D(__GLcontext *gc, GLenum t
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glCompressedTexSubImage1D(target=0x%04X, level=%d, xoffset=%d, width=%d, format=0x%04X, imageSize=%d, data=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glCompressedTexSubImage1D(target=0x%04X, level=%d, xoffset=%d, width=%d, format=0x%04X, imageSize=%d, data=%p)\n",
                      gc, tid, target, level, xoffset, width, format, imageSize, data);
     }
 
@@ -13987,7 +13987,7 @@ GLvoid GL_APIENTRY __glProfile_GetCompressedTexImage(__GLcontext *gc, GLenum tar
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetCompressedTexImage(target=0x%04X, lod=%d, img=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetCompressedTexImage(target=0x%04X, lod=%d, img=%p)\n",
                      gc, tid, target, lod, img);
     }
 
@@ -14047,7 +14047,7 @@ GLvoid GL_APIENTRY __glProfile_MultiTexCoord1dv(__GLcontext *gc, GLenum target, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord1dv(target=0x%04X, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord1dv(target=0x%04X, v=%p)\n",
                      gc, tid, target, v);
     }
 
@@ -14087,7 +14087,7 @@ GLvoid GL_APIENTRY __glProfile_MultiTexCoord1fv(__GLcontext *gc, GLenum target, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord1fv(target=0x%04X, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord1fv(target=0x%04X, v=%p)\n",
                      gc, tid, target, v);
     }
 
@@ -14127,7 +14127,7 @@ GLvoid GL_APIENTRY __glProfile_MultiTexCoord1iv(__GLcontext *gc, GLenum target, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord1iv(target=0x%04X, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord1iv(target=0x%04X, v=%p)\n",
                      gc, tid, target, v);
     }
 
@@ -14167,7 +14167,7 @@ GLvoid GL_APIENTRY __glProfile_MultiTexCoord1sv(__GLcontext *gc, GLenum target, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord1sv(target=0x%04X, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord1sv(target=0x%04X, v=%p)\n",
                      gc, tid, target, v);
     }
 
@@ -14207,7 +14207,7 @@ GLvoid GL_APIENTRY __glProfile_MultiTexCoord2dv(__GLcontext *gc, GLenum target, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord2dv(target=0x%04X, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord2dv(target=0x%04X, v=%p)\n",
                      gc, tid, target, v);
     }
 
@@ -14247,7 +14247,7 @@ GLvoid GL_APIENTRY __glProfile_MultiTexCoord2fv(__GLcontext *gc, GLenum target, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord2fv(target=0x%04X, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord2fv(target=0x%04X, v=%p)\n",
                      gc, tid, target, v);
     }
 
@@ -14287,7 +14287,7 @@ GLvoid GL_APIENTRY __glProfile_MultiTexCoord2iv(__GLcontext *gc, GLenum target, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord2iv(target=0x%04X, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord2iv(target=0x%04X, v=%p)\n",
                      gc, tid, target, v);
     }
 
@@ -14327,7 +14327,7 @@ GLvoid GL_APIENTRY __glProfile_MultiTexCoord2sv(__GLcontext *gc, GLenum target, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord2sv(target=0x%04X, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord2sv(target=0x%04X, v=%p)\n",
                      gc, tid, target, v);
     }
 
@@ -14367,7 +14367,7 @@ GLvoid GL_APIENTRY __glProfile_MultiTexCoord3dv(__GLcontext *gc, GLenum target, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord3dv(target=0x%04X, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord3dv(target=0x%04X, v=%p)\n",
                      gc, tid, target, v);
     }
 
@@ -14407,7 +14407,7 @@ GLvoid GL_APIENTRY __glProfile_MultiTexCoord3fv(__GLcontext *gc, GLenum target, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord3fv(target=0x%04X, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord3fv(target=0x%04X, v=%p)\n",
                      gc, tid, target, v);
     }
 
@@ -14447,7 +14447,7 @@ GLvoid GL_APIENTRY __glProfile_MultiTexCoord3iv(__GLcontext *gc, GLenum target, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord3iv(target=0x%04X, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord3iv(target=0x%04X, v=%p)\n",
                      gc, tid, target, v);
     }
 
@@ -14487,7 +14487,7 @@ GLvoid GL_APIENTRY __glProfile_MultiTexCoord3sv(__GLcontext *gc, GLenum target, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord3sv(target=0x%04X, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord3sv(target=0x%04X, v=%p)\n",
                      gc, tid, target, v);
     }
 
@@ -14527,7 +14527,7 @@ GLvoid GL_APIENTRY __glProfile_MultiTexCoord4dv(__GLcontext *gc, GLenum target, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord4dv(target=0x%04X, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord4dv(target=0x%04X, v=%p)\n",
                      gc, tid, target, v);
     }
 
@@ -14567,7 +14567,7 @@ GLvoid GL_APIENTRY __glProfile_MultiTexCoord4fv(__GLcontext *gc, GLenum target, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord4fv(target=0x%04X, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord4fv(target=0x%04X, v=%p)\n",
                      gc, tid, target, v);
     }
 
@@ -14607,7 +14607,7 @@ GLvoid GL_APIENTRY __glProfile_MultiTexCoord4iv(__GLcontext *gc, GLenum target, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord4iv(target=0x%04X, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord4iv(target=0x%04X, v=%p)\n",
                      gc, tid, target, v);
     }
 
@@ -14647,7 +14647,7 @@ GLvoid GL_APIENTRY __glProfile_MultiTexCoord4sv(__GLcontext *gc, GLenum target, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord4sv(target=0x%04X, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoord4sv(target=0x%04X, v=%p)\n",
                      gc, tid, target, v);
     }
 
@@ -14769,7 +14769,7 @@ GLvoid GL_APIENTRY __glProfile_PointParameterfv(__GLcontext *gc, GLenum pname, c
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glPointParameterfv(pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glPointParameterfv(pname=0x%04X, params=%p)\n",
                      gc, tid, pname, params);
     }
 
@@ -14809,7 +14809,7 @@ GLvoid GL_APIENTRY __glProfile_PointParameteriv(__GLcontext *gc, GLenum pname, c
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glPointParameteriv(pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glPointParameteriv(pname=0x%04X, params=%p)\n",
                      gc, tid, pname, params);
     }
 
@@ -14849,7 +14849,7 @@ GLvoid GL_APIENTRY __glProfile_FogCoordfv(__GLcontext *gc, const GLfloat *coord)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glFogCoordfv(coord=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glFogCoordfv(coord=%p)\n",
                      gc, tid, coord);
     }
 
@@ -14889,7 +14889,7 @@ GLvoid GL_APIENTRY __glProfile_FogCoorddv(__GLcontext *gc, const GLdouble *coord
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glFogCoorddv(coord=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glFogCoorddv(coord=%p)\n",
                      gc, tid, coord);
     }
 
@@ -14909,7 +14909,7 @@ GLvoid GL_APIENTRY __glProfile_FogCoordPointer(__GLcontext *gc, GLenum type, GLs
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glFogCoordPointer(type=0x%04X, stride=%d, pointer=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glFogCoordPointer(type=0x%04X, stride=%d, pointer=%p)\n",
                      gc, tid, type, stride, pointer);
     }
 
@@ -14949,7 +14949,7 @@ GLvoid GL_APIENTRY __glProfile_SecondaryColor3bv(__GLcontext *gc, const GLbyte *
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glSecondaryColor3bv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glSecondaryColor3bv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -14989,7 +14989,7 @@ GLvoid GL_APIENTRY __glProfile_SecondaryColor3dv(__GLcontext *gc, const GLdouble
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glSecondaryColor3dv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glSecondaryColor3dv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -15029,7 +15029,7 @@ GLvoid GL_APIENTRY __glProfile_SecondaryColor3fv(__GLcontext *gc, const GLfloat 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glSecondaryColor3fv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glSecondaryColor3fv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -15069,7 +15069,7 @@ GLvoid GL_APIENTRY __glProfile_SecondaryColor3iv(__GLcontext *gc, const GLint *v
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glSecondaryColor3iv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glSecondaryColor3iv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -15109,7 +15109,7 @@ GLvoid GL_APIENTRY __glProfile_SecondaryColor3sv(__GLcontext *gc, const GLshort 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glSecondaryColor3sv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glSecondaryColor3sv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -15149,7 +15149,7 @@ GLvoid GL_APIENTRY __glProfile_SecondaryColor3ubv(__GLcontext *gc, const GLubyte
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glSecondaryColor3ubv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glSecondaryColor3ubv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -15189,7 +15189,7 @@ GLvoid GL_APIENTRY __glProfile_SecondaryColor3uiv(__GLcontext *gc, const GLuint 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glSecondaryColor3uiv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glSecondaryColor3uiv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -15229,7 +15229,7 @@ GLvoid GL_APIENTRY __glProfile_SecondaryColor3usv(__GLcontext *gc, const GLushor
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glSecondaryColor3usv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glSecondaryColor3usv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -15249,7 +15249,7 @@ GLvoid GL_APIENTRY __glProfile_SecondaryColorPointer(__GLcontext *gc, GLint size
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glSecondaryColorPointer(size=%d, type=0x%04X, stride=%d, pointer=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glSecondaryColorPointer(size=%d, type=0x%04X, stride=%d, pointer=%p)\n",
                      gc, tid, size, type, stride, pointer);
     }
 
@@ -15289,7 +15289,7 @@ GLvoid GL_APIENTRY __glProfile_WindowPos2dv(__GLcontext *gc, const GLdouble *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glWindowPos2dv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glWindowPos2dv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -15329,7 +15329,7 @@ GLvoid GL_APIENTRY __glProfile_WindowPos2fv(__GLcontext *gc, const GLfloat *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glWindowPos2fv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glWindowPos2fv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -15369,7 +15369,7 @@ GLvoid GL_APIENTRY __glProfile_WindowPos2iv(__GLcontext *gc, const GLint *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glWindowPos2iv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glWindowPos2iv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -15409,7 +15409,7 @@ GLvoid GL_APIENTRY __glProfile_WindowPos2sv(__GLcontext *gc, const GLshort *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glWindowPos2sv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glWindowPos2sv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -15449,7 +15449,7 @@ GLvoid GL_APIENTRY __glProfile_WindowPos3dv(__GLcontext *gc, const GLdouble *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glWindowPos3dv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glWindowPos3dv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -15489,7 +15489,7 @@ GLvoid GL_APIENTRY __glProfile_WindowPos3fv(__GLcontext *gc, const GLfloat *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glWindowPos3fv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glWindowPos3fv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -15529,7 +15529,7 @@ GLvoid GL_APIENTRY __glProfile_WindowPos3iv(__GLcontext *gc, const GLint *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glWindowPos3iv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glWindowPos3iv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -15569,7 +15569,7 @@ GLvoid GL_APIENTRY __glProfile_WindowPos3sv(__GLcontext *gc, const GLshort *v)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glWindowPos3sv(v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glWindowPos3sv(v=%p)\n",
                      gc, tid, v);
     }
 
@@ -15591,7 +15591,7 @@ GLvoid GL_APIENTRY __glProfile_GetQueryObjectiv(__GLcontext *gc, GLuint id, GLen
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetQueryObjectiv(id=%u, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetQueryObjectiv(id=%u, pname=0x%04X, params=%p)\n",
                      gc, tid, id, pname, params);
     }
 
@@ -15611,7 +15611,7 @@ GLvoid GL_APIENTRY __glProfile_GetBufferSubData(__GLcontext *gc, GLenum target, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetBufferSubData(target=0x%04X, offset=0x%p, size=0x%08X, data=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetBufferSubData(target=0x%04X, offset=%p, size=0x%08X, data=%p)\n",
                      gc, tid, target, offset, size, data);
     }
 
@@ -15633,7 +15633,7 @@ GLvoid GL_APIENTRY __glProfile_GetVertexAttribdv(__GLcontext *gc, GLuint index, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetVertexAttribdv(index=%u, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetVertexAttribdv(index=%u, pname=0x%04X, params=%p)\n",
                      gc, tid, index, pname, params);
     }
 
@@ -15673,7 +15673,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttrib1dv(__GLcontext *gc, GLuint index, co
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib1dv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib1dv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -15713,7 +15713,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttrib1sv(__GLcontext *gc, GLuint index, co
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib1sv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib1sv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -15753,7 +15753,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttrib2dv(__GLcontext *gc, GLuint index, co
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib2dv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib2dv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -15793,7 +15793,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttrib2sv(__GLcontext *gc, GLuint index, co
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib2sv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib2sv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -15833,7 +15833,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttrib3dv(__GLcontext *gc, GLuint index, co
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib3dv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib3dv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -15873,7 +15873,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttrib3sv(__GLcontext *gc, GLuint index, co
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib3sv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib3sv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -15893,7 +15893,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttrib4Nbv(__GLcontext *gc, GLuint index, c
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4Nbv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4Nbv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -15913,7 +15913,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttrib4Niv(__GLcontext *gc, GLuint index, c
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4Niv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4Niv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -15933,7 +15933,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttrib4Nsv(__GLcontext *gc, GLuint index, c
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4Nsv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4Nsv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -15973,7 +15973,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttrib4Nubv(__GLcontext *gc, GLuint index, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4Nubv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4Nubv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -15993,7 +15993,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttrib4Nuiv(__GLcontext *gc, GLuint index, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4Nuiv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4Nuiv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -16013,7 +16013,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttrib4Nusv(__GLcontext *gc, GLuint index, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4Nusv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4Nusv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -16033,7 +16033,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttrib4bv(__GLcontext *gc, GLuint index, co
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4bv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4bv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -16073,7 +16073,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttrib4dv(__GLcontext *gc, GLuint index, co
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4dv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4dv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -16093,7 +16093,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttrib4iv(__GLcontext *gc, GLuint index, co
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4iv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4iv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -16133,7 +16133,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttrib4sv(__GLcontext *gc, GLuint index, co
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4sv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4sv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -16153,7 +16153,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttrib4ubv(__GLcontext *gc, GLuint index, c
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4ubv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4ubv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -16173,7 +16173,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttrib4uiv(__GLcontext *gc, GLuint index, c
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4uiv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4uiv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -16193,7 +16193,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttrib4usv(__GLcontext *gc, GLuint index, c
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4usv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttrib4usv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -16397,7 +16397,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttribI1iv(__GLcontext *gc, GLuint index, c
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribI1iv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribI1iv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -16417,7 +16417,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttribI2iv(__GLcontext *gc, GLuint index, c
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribI2iv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribI2iv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -16437,7 +16437,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttribI3iv(__GLcontext *gc, GLuint index, c
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribI3iv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribI3iv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -16457,7 +16457,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttribI1uiv(__GLcontext *gc, GLuint index, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribI1uiv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribI1uiv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -16477,7 +16477,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttribI2uiv(__GLcontext *gc, GLuint index, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribI2uiv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribI2uiv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -16497,7 +16497,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttribI3uiv(__GLcontext *gc, GLuint index, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribI3uiv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribI3uiv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -16517,7 +16517,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttribI4bv(__GLcontext *gc, GLuint index, c
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribI4bv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribI4bv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -16537,7 +16537,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttribI4sv(__GLcontext *gc, GLuint index, c
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribI4sv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribI4sv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -16557,7 +16557,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttribI4ubv(__GLcontext *gc, GLuint index, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribI4ubv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribI4ubv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -16577,7 +16577,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttribI4usv(__GLcontext *gc, GLuint index, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribI4usv(index=%u, v=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribI4usv(index=%u, v=%p)\n",
                      gc, tid, index, v);
     }
 
@@ -16597,7 +16597,7 @@ GLvoid GL_APIENTRY __glProfile_BindFragDataLocation(__GLcontext *gc, GLuint prog
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glBindFragDataLocation(program=%u, color=%u, name=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glBindFragDataLocation(program=%u, color=%u, name=%p)\n",
                      gc, tid, program, color, name);
     }
 
@@ -16679,7 +16679,7 @@ GLvoid GL_APIENTRY __glProfile_GetActiveUniformName(__GLcontext *gc, GLuint prog
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetActiveUniformName(program=%u, uniformIndex=%u, bufSize=%d, length=0x%p, uniformName=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetActiveUniformName(program=%u, uniformIndex=%u, bufSize=%d, length=%p, uniformName=%p)\n",
                      gc, tid, program, uniformIndex, bufSize, length, uniformName);
     }
 
@@ -16763,7 +16763,7 @@ GLvoid GL_APIENTRY __glProfile_BindFragDataLocationIndexed(__GLcontext *gc, GLui
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glBindFragDataLocationIndexed(program=%u, colorNumber=%u, index=%u, name=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glBindFragDataLocationIndexed(program=%u, colorNumber=%u, index=%u, name=%p)\n",
                      gc, tid, program, colorNumber, index, name);
     }
 
@@ -16784,7 +16784,7 @@ GLint GL_APIENTRY __glProfile_GetFragDataIndex(__GLcontext *gc, GLuint program, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetFragDataIndex(program=%u, name=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetFragDataIndex(program=%u, name=%p)\n",
                      gc, tid, program, name);
     }
 
@@ -16831,7 +16831,7 @@ GLvoid GL_APIENTRY __glProfile_GetQueryObjecti64v(__GLcontext *gc, GLuint id, GL
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetQueryObjecti64v(id=%u, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetQueryObjecti64v(id=%u, pname=0x%04X, params=%p)\n",
                      gc, tid, id, pname, params);
     }
 
@@ -16851,7 +16851,7 @@ GLvoid GL_APIENTRY __glProfile_GetQueryObjectui64v(__GLcontext *gc, GLuint id, G
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetQueryObjectui64v(id=%u, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetQueryObjectui64v(id=%u, pname=0x%04X, params=%p)\n",
                      gc, tid, id, pname, params);
     }
 
@@ -16891,7 +16891,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttribP1uiv(__GLcontext *gc, GLuint index, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribP1uiv(index=%u, type=0x%04X, normalized=%hhu, value=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribP1uiv(index=%u, type=0x%04X, normalized=%hhu, value=%p)\n",
                      gc, tid, index, type, normalized, value);
     }
 
@@ -16931,7 +16931,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttribP2uiv(__GLcontext *gc, GLuint index, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribP2uiv(index=%u, type=0x%04X, normalized=%hhu, value=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribP2uiv(index=%u, type=0x%04X, normalized=%hhu, value=%p)\n",
                      gc, tid, index, type, normalized, value);
     }
 
@@ -16971,7 +16971,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttribP3uiv(__GLcontext *gc, GLuint index, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribP3uiv(index=%u, type=0x%04X, normalized=%hhu, value=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribP3uiv(index=%u, type=0x%04X, normalized=%hhu, value=%p)\n",
                      gc, tid, index, type, normalized, value);
     }
 
@@ -17011,7 +17011,7 @@ GLvoid GL_APIENTRY __glProfile_VertexAttribP4uiv(__GLcontext *gc, GLuint index, 
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribP4uiv(index=%u, type=0x%04X, normalized=%hhu, value=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexAttribP4uiv(index=%u, type=0x%04X, normalized=%hhu, value=%p)\n",
                      gc, tid, index, type, normalized, value);
     }
 
@@ -17051,7 +17051,7 @@ GLvoid GL_APIENTRY __glProfile_VertexP2uiv(__GLcontext *gc, GLenum type, const G
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexP2uiv(type=0x%04X, value=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexP2uiv(type=0x%04X, value=%p)\n",
                      gc, tid, type, value);
     }
 
@@ -17091,7 +17091,7 @@ GLvoid GL_APIENTRY __glProfile_VertexP3uiv(__GLcontext *gc, GLenum type, const G
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexP3uiv(type=0x%04X, value=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexP3uiv(type=0x%04X, value=%p)\n",
                      gc, tid, type, value);
     }
 
@@ -17131,7 +17131,7 @@ GLvoid GL_APIENTRY __glProfile_VertexP4uiv(__GLcontext *gc, GLenum type, const G
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glVertexP4uiv(type=0x%04X, value=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glVertexP4uiv(type=0x%04X, value=%p)\n",
                      gc, tid, type, value);
     }
 
@@ -17171,7 +17171,7 @@ GLvoid GL_APIENTRY __glProfile_TexCoordP1uiv(__GLcontext *gc, GLenum type, const
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexCoordP1uiv(type=0x%04X, coords=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexCoordP1uiv(type=0x%04X, coords=%p)\n",
                      gc, tid, type, coords);
     }
 
@@ -17211,7 +17211,7 @@ GLvoid GL_APIENTRY __glProfile_TexCoordP2uiv(__GLcontext *gc, GLenum type, const
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexCoordP2uiv(type=0x%04X, coords=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexCoordP2uiv(type=0x%04X, coords=%p)\n",
                      gc, tid, type, coords);
     }
 
@@ -17251,7 +17251,7 @@ GLvoid GL_APIENTRY __glProfile_TexCoordP3uiv(__GLcontext *gc, GLenum type, const
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexCoordP3uiv(type=0x%04X, coords=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexCoordP3uiv(type=0x%04X, coords=%p)\n",
                      gc, tid, type, coords);
     }
 
@@ -17291,7 +17291,7 @@ GLvoid GL_APIENTRY __glProfile_TexCoordP4uiv(__GLcontext *gc, GLenum type, const
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glTexCoordP4uiv(type=0x%04X, coords=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glTexCoordP4uiv(type=0x%04X, coords=%p)\n",
                      gc, tid, type, coords);
     }
 
@@ -17331,7 +17331,7 @@ GLvoid GL_APIENTRY __glProfile_MultiTexCoordP1uiv(__GLcontext *gc, GLenum textur
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoordP1uiv(texture=0x%04X, type=0x%04X, coords=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoordP1uiv(texture=0x%04X, type=0x%04X, coords=%p)\n",
                      gc, tid, texture, type, coords);
     }
 
@@ -17371,7 +17371,7 @@ GLvoid GL_APIENTRY __glProfile_MultiTexCoordP2uiv(__GLcontext *gc, GLenum textur
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoordP2uiv(texture=0x%04X, type=0x%04X, coords=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoordP2uiv(texture=0x%04X, type=0x%04X, coords=%p)\n",
                      gc, tid, texture, type, coords);
     }
 
@@ -17411,7 +17411,7 @@ GLvoid GL_APIENTRY __glProfile_MultiTexCoordP3uiv(__GLcontext *gc, GLenum textur
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoordP3uiv(texture=0x%04X, type=0x%04X, coords=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoordP3uiv(texture=0x%04X, type=0x%04X, coords=%p)\n",
                      gc, tid, texture, type, coords);
     }
 
@@ -17451,7 +17451,7 @@ GLvoid GL_APIENTRY __glProfile_MultiTexCoordP4uiv(__GLcontext *gc, GLenum textur
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoordP4uiv(texture=0x%04X, type=0x%04X, coords=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glMultiTexCoordP4uiv(texture=0x%04X, type=0x%04X, coords=%p)\n",
                      gc, tid, texture, type, coords);
     }
 
@@ -17491,7 +17491,7 @@ GLvoid GL_APIENTRY __glProfile_NormalP3uiv(__GLcontext *gc, GLenum type, const G
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glNormalP3uiv(type=0x%04X, coords=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glNormalP3uiv(type=0x%04X, coords=%p)\n",
                      gc, tid, type, coords);
     }
 
@@ -17531,7 +17531,7 @@ GLvoid GL_APIENTRY __glProfile_ColorP3uiv(__GLcontext *gc, GLenum type, const GL
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glColorP3uiv(type=0x%04X, color=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glColorP3uiv(type=0x%04X, color=%p)\n",
                      gc, tid, type, color);
     }
 
@@ -17571,7 +17571,7 @@ GLvoid GL_APIENTRY __glProfile_ColorP4uiv(__GLcontext *gc, GLenum type, const GL
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glColorP4uiv(type=0x%04X, color=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glColorP4uiv(type=0x%04X, color=%p)\n",
                      gc, tid, type, color);
     }
 
@@ -17611,7 +17611,7 @@ GLvoid GL_APIENTRY __glProfile_SecondaryColorP3uiv(__GLcontext *gc, GLenum type,
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glSecondaryColorP3uiv(type=0x%04X, color=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glSecondaryColorP3uiv(type=0x%04X, color=%p)\n",
                      gc, tid, type, color);
     }
 
@@ -17713,7 +17713,7 @@ GLvoid GL_APIENTRY __glProfile_Uniform1dv(__GLcontext *gc, GLint location, GLsiz
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glUniform1dv(location=%d, count=%d, value=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glUniform1dv(location=%d, count=%d, value=%p)\n",
                      gc, tid, location, count, value);
     }
 
@@ -17733,7 +17733,7 @@ GLvoid GL_APIENTRY __glProfile_Uniform2dv(__GLcontext *gc, GLint location, GLsiz
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glUniform2dv(location=%d, count=%d, value=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glUniform2dv(location=%d, count=%d, value=%p)\n",
                      gc, tid, location, count, value);
     }
 
@@ -17753,7 +17753,7 @@ GLvoid GL_APIENTRY __glProfile_Uniform3dv(__GLcontext *gc, GLint location, GLsiz
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glUniform3dv(location=%d, count=%d, value=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glUniform3dv(location=%d, count=%d, value=%p)\n",
                      gc, tid, location, count, value);
     }
 
@@ -17773,7 +17773,7 @@ GLvoid GL_APIENTRY __glProfile_Uniform4dv(__GLcontext *gc, GLint location, GLsiz
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glUniform4dv(location=%d, count=%d, value=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glUniform4dv(location=%d, count=%d, value=%p)\n",
                      gc, tid, location, count, value);
     }
 
@@ -17793,7 +17793,7 @@ GLvoid GL_APIENTRY __glProfile_UniformMatrix2dv(__GLcontext *gc, GLint location,
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glUniformMatrix2dv(location=%d, count=%d, transpose=%hhu, value=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glUniformMatrix2dv(location=%d, count=%d, transpose=%hhu, value=%p)\n",
                      gc, tid, location, count, transpose, value);
     }
 
@@ -17813,7 +17813,7 @@ GLvoid GL_APIENTRY __glProfile_UniformMatrix3dv(__GLcontext *gc, GLint location,
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glUniformMatrix3dv(location=%d, count=%d, transpose=%hhu, value=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glUniformMatrix3dv(location=%d, count=%d, transpose=%hhu, value=%p)\n",
                      gc, tid, location, count, transpose, value);
     }
 
@@ -17833,7 +17833,7 @@ GLvoid GL_APIENTRY __glProfile_UniformMatrix4dv(__GLcontext *gc, GLint location,
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glUniformMatrix4dv(location=%d, count=%d, transpose=%hhu, value=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glUniformMatrix4dv(location=%d, count=%d, transpose=%hhu, value=%p)\n",
                      gc, tid, location, count, transpose, value);
     }
 
@@ -17853,7 +17853,7 @@ GLvoid GL_APIENTRY __glProfile_UniformMatrix2x3dv(__GLcontext *gc, GLint locatio
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glUniformMatrix2x3dv(location=%d, count=%d, transpose=%hhu, value=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glUniformMatrix2x3dv(location=%d, count=%d, transpose=%hhu, value=%p)\n",
                      gc, tid, location, count, transpose, value);
     }
 
@@ -17873,7 +17873,7 @@ GLvoid GL_APIENTRY __glProfile_UniformMatrix2x4dv(__GLcontext *gc, GLint locatio
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glUniformMatrix2x4dv(location=%d, count=%d, transpose=%hhu, value=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glUniformMatrix2x4dv(location=%d, count=%d, transpose=%hhu, value=%p)\n",
                      gc, tid, location, count, transpose, value);
     }
 
@@ -17893,7 +17893,7 @@ GLvoid GL_APIENTRY __glProfile_UniformMatrix3x2dv(__GLcontext *gc, GLint locatio
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glUniformMatrix3x2dv(location=%d, count=%d, transpose=%hhu, value=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glUniformMatrix3x2dv(location=%d, count=%d, transpose=%hhu, value=%p)\n",
                      gc, tid, location, count, transpose, value);
     }
 
@@ -17913,7 +17913,7 @@ GLvoid GL_APIENTRY __glProfile_UniformMatrix3x4dv(__GLcontext *gc, GLint locatio
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glUniformMatrix3x4dv(location=%d, count=%d, transpose=%hhu, value=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glUniformMatrix3x4dv(location=%d, count=%d, transpose=%hhu, value=%p)\n",
                      gc, tid, location, count, transpose, value);
     }
 
@@ -17933,7 +17933,7 @@ GLvoid GL_APIENTRY __glProfile_UniformMatrix4x2dv(__GLcontext *gc, GLint locatio
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glUniformMatrix4x2dv(location=%d, count=%d, transpose=%hhu, value=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glUniformMatrix4x2dv(location=%d, count=%d, transpose=%hhu, value=%p)\n",
                      gc, tid, location, count, transpose, value);
     }
 
@@ -17953,7 +17953,7 @@ GLvoid GL_APIENTRY __glProfile_UniformMatrix4x3dv(__GLcontext *gc, GLint locatio
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glUniformMatrix4x3dv(location=%d, count=%d, transpose=%hhu, value=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glUniformMatrix4x3dv(location=%d, count=%d, transpose=%hhu, value=%p)\n",
                      gc, tid, location, count, transpose, value);
     }
 
@@ -17973,7 +17973,7 @@ GLvoid GL_APIENTRY __glProfile_GetUniformdv(__GLcontext *gc, GLuint program, GLi
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetUniformdv(program=%u, location=%d, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetUniformdv(program=%u, location=%d, params=%p)\n",
                      gc, tid, program, location, params);
     }
 
@@ -17994,7 +17994,7 @@ GLint GL_APIENTRY __glProfile_GetSubroutineUniformLocation(__GLcontext *gc, GLui
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetSubroutineUniformLocation(program=%u, shadertype=0x%04X, name=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetSubroutineUniformLocation(program=%u, shadertype=0x%04X, name=%p)\n",
                      gc, tid, program, shadertype, name);
     }
 
@@ -18022,7 +18022,7 @@ GLuint GL_APIENTRY __glProfile_GetSubroutineIndex(__GLcontext *gc, GLuint progra
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetSubroutineIndex(program=%u, shadertype=0x%04X, name=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetSubroutineIndex(program=%u, shadertype=0x%04X, name=%p)\n",
                      gc, tid, program, shadertype, name);
     }
 
@@ -18049,7 +18049,7 @@ GLvoid GL_APIENTRY __glProfile_GetActiveSubroutineUniformiv(__GLcontext *gc, GLu
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetActiveSubroutineUniformiv(program=%u, shadertype=0x%04X, index=%u, pname=0x%04X, values=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetActiveSubroutineUniformiv(program=%u, shadertype=0x%04X, index=%u, pname=0x%04X, values=%p)\n",
                      gc, tid, program, shadertype, index, pname, values);
     }
 
@@ -18069,7 +18069,7 @@ GLvoid GL_APIENTRY __glProfile_GetActiveSubroutineUniformName(__GLcontext *gc, G
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetActiveSubroutineUniformName(program=%u, shadertype=0x%04X, index=%u, bufsize=%d, length=0x%p, name=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetActiveSubroutineUniformName(program=%u, shadertype=0x%04X, index=%u, bufsize=%d, length=%p, name=%p)\n",
                      gc, tid, program, shadertype, index, bufsize, length, name);
     }
 
@@ -18089,7 +18089,7 @@ GLvoid GL_APIENTRY __glProfile_GetActiveSubroutineName(__GLcontext *gc, GLuint p
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetActiveSubroutineName(program=%u, shadertype=0x%04X, index=%u, bufsize=%d, length=0x%p, name=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetActiveSubroutineName(program=%u, shadertype=0x%04X, index=%u, bufsize=%d, length=%p, name=%p)\n",
                      gc, tid, program, shadertype, index, bufsize, length, name);
     }
 
@@ -18109,7 +18109,7 @@ GLvoid GL_APIENTRY __glProfile_UniformSubroutinesuiv(__GLcontext *gc, GLenum sha
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glUniformSubroutinesuiv(shadertype=0x%04X, count=%d, indices=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glUniformSubroutinesuiv(shadertype=0x%04X, count=%d, indices=%p)\n",
                      gc, tid, shadertype, count, indices);
     }
 
@@ -18129,7 +18129,7 @@ GLvoid GL_APIENTRY __glProfile_GetUniformSubroutineuiv(__GLcontext *gc, GLenum s
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetUniformSubroutineuiv(shadertype=0x%04X, location=%d, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetUniformSubroutineuiv(shadertype=0x%04X, location=%d, params=%p)\n",
                      gc, tid, shadertype, location, params);
     }
 
@@ -18149,7 +18149,7 @@ GLvoid GL_APIENTRY __glProfile_GetProgramStageiv(__GLcontext *gc, GLuint program
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetProgramStageiv(program=%u, shadertype=0x%04X, pname=0x%04X, values=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetProgramStageiv(program=%u, shadertype=0x%04X, pname=0x%04X, values=%p)\n",
                      gc, tid, program, shadertype, pname, values);
     }
 
@@ -18169,7 +18169,7 @@ GLvoid GL_APIENTRY __glProfile_PatchParameterfv(__GLcontext *gc, GLenum pname, c
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glPatchParameterfv(pname=0x%04X, values=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glPatchParameterfv(pname=0x%04X, values=%p)\n",
                      gc, tid, pname, values);
     }
 
@@ -18269,7 +18269,7 @@ GLvoid GL_APIENTRY __glProfile_GetQueryIndexediv(__GLcontext *gc, GLenum target,
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetQueryIndexediv(target=0x%04X, index=%u, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetQueryIndexediv(target=0x%04X, index=%u, pname=0x%04X, params=%p)\n",
                      gc, tid, target, index, pname, params);
     }
 
@@ -18292,7 +18292,7 @@ GLvoid GL_APIENTRY __glProfile_DeleteObjectARB(__GLcontext *gc, GLhandleARB obj)
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glDeleteObjectARB(obj=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glDeleteObjectARB(obj=%p)\n",
                      gc, tid, obj);
     }
 
@@ -18312,7 +18312,7 @@ GLvoid GL_APIENTRY __glProfile_GetObjectParameterivARB(__GLcontext *gc, GLhandle
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetObjectParameterivARB(obj=0x%p, pname=0x%04X, params=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetObjectParameterivARB(obj=%p, pname=0x%04X, params=%p)\n",
                      gc, tid, obj, pname, params);
     }
 
@@ -18332,7 +18332,7 @@ GLvoid GL_APIENTRY __glProfile_GetInfoLogARB(__GLcontext *gc, GLhandleARB obj, G
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glGetInfoLogARB(obj=0x%p, maxLength=%d, length=0x%p, infoLog=0x%p)\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glGetInfoLogARB(obj=%p, maxLength=%d, length=%p, infoLog=%p)\n",
                      gc, tid, obj, maxLength, length, infoLog);
     }
 
