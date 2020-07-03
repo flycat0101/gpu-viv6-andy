@@ -5727,8 +5727,11 @@ _VIR_MaxInvariantCodeMotionCount(
             if (!VIR_Shader_IsWorkGroupSizeAdjusted(pShader) &&
                 !VIR_Shader_IsWorkGroupSizeFixed(pShader))
             {
+                gctUINT         initWorkGroupSize = 1;
+                VIR_Shader_GetWorkGroupSizeInfo(pShader, pHwCfg, gcvNULL, gcvNULL, &initWorkGroupSize);
+
                 VIR_Shader_SetWorkGroupSizeAdjusted(pShader, gcvTRUE);
-                VIR_Shader_SetAdjustedWorkGroupSize(pShader, GetHWInitWorkGroupSizeToCalcRegCount());
+                VIR_Shader_SetAdjustedWorkGroupSize(pShader, initWorkGroupSize);
             }
             workGroupSize = (gctFLOAT)VIR_Shader_GetWorkGroupSize(pShader);
             maxFreeReg = maxFreeReg / (gctUINT)(ceil(workGroupSize / threadCount));

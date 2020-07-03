@@ -1125,7 +1125,9 @@ _GenVertexIndex(
     VIR_SymId        newVarSymId;
     VIR_SymId        tmpSymId = VIR_INVALID_ID, IndexSymId = VIR_INVALID_ID;
     VIR_Symbol       *newVarSym = gcvNULL;
+    VIR_Symbol      *tempSym = gcvNULL;
     VIR_VirRegId     regId = VIR_INVALID_ID;
+    VIR_Precision   vertexIndexPrecision = VIR_Symbol_GetPrecision(VariableSym);
     gctUINT         i;
     VIR_AttributeIdList *attIdList = VIR_Shader_GetAttributes(Shader);
 
@@ -1144,9 +1146,13 @@ _GenVertexIndex(
                                    VIR_Shader_GetTypeFromId(Shader, VIR_TYPE_INT32),
                                    VIR_STORAGE_UNKNOWN,
                                    &IndexSymId);
+    CHECK_ERROR(errCode, "VIR_Shader_AddSymbol failed.");
+
+    tempSym = VIR_Shader_GetSymFromId(Shader, IndexSymId);
     VIR_Symbol_ClrFlag(VariableSym, VIR_SYMFLAG_ENABLED | VIR_SYMFLAG_STATICALLY_USED);
     VIR_Symbol_SetFlag(VariableSym, VIR_SYMFLAG_UNUSED);
     VIR_Symbol_SetVariableVregIndex(VariableSym, regId);
+    VIR_Symbol_SetPrecision(tempSym, vertexIndexPrecision);
 
     /* add an attribute if not found - vertexID */
     for (i = 0;  i< VIR_IdList_Count(attIdList); i++)
@@ -1168,8 +1174,10 @@ _GenVertexIndex(
                                        VIR_Symbol_GetStorageClass(VariableSym),
                                        &newVarSymId);
         CHECK_ERROR(errCode, "VIR_Shader_AddSymbol failed.");
+
         newVarSym = VIR_Shader_GetSymFromId(Shader, newVarSymId);
         VIR_Symbol_SetFlag(newVarSym, VIR_SYMFLAG_ENABLED | VIR_SYMFLAG_STATICALLY_USED);
+        VIR_Symbol_SetPrecision(newVarSym, vertexIndexPrecision);
 
         /* create a temp for vertex id */
         regId = VIR_Shader_NewVirRegId(Shader, 1);
@@ -1179,9 +1187,12 @@ _GenVertexIndex(
                                        VIR_Shader_GetTypeFromId(Shader, VIR_TYPE_INT32),
                                        VIR_STORAGE_UNKNOWN,
                                        &tmpSymId);
+        CHECK_ERROR(errCode, "VIR_Shader_AddSymbol failed.");
 
+        tempSym = VIR_Shader_GetSymFromId(Shader, tmpSymId);
+        VIR_Symbol_SetPrecision(tempSym, vertexIndexPrecision);
         VIR_Symbol_SetVariableVregIndex(newVarSym, regId);
-        VIR_Symbol_SetVregVariable(VIR_Shader_GetSymFromId(Shader, tmpSymId), newVarSym);
+        VIR_Symbol_SetVregVariable(tempSym, newVarSym);
     }
 
     /* vertexIndex = vertexID + offset. */

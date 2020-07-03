@@ -1381,7 +1381,7 @@
     VIR_OPINFO(LOAD_ATTR_O, 3, HasDest|Loads|Expr, 1, LM), /* LOAD_ATTR_O  dest, Remap.xyzw, RemapIndex, AttributeIndex
                                                                       Only for TCS to load attribute from output */
     VIR_OPINFO(ATTR_ST, 3, HasDest|Src2Componentwise|Stores, 1, HM), /* ATTR_ST  Output, InvocationIndex, offset, value */
-    VIR_OPINFO(ATTR_LD, 3, HasDest|Src0Componentwise|Loads|Expr, 1, HM), /* ATTR_LD  dest, Attribute, InvocationIndex, offset */
+    VIR_OPINFO(ATTR_LD, 3, HasDest|Src0Componentwise|Loads|Expr, 1, HM), /* ATTR_LD  dest, Attribute/Output, InvocationIndex, offset */
 
     VIR_OPINFO(SELECT_MAP, 4, HasDest, 1, LM), /* SELECT_MAP dest, RangeSourceComponent, src1, src2, samperSwizzle */
     VIR_OPINFO(EMIT0, 0, NoDest, 0, AL),

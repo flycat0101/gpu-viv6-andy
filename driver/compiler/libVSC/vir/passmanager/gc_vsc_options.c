@@ -2325,7 +2325,11 @@ void VSC_OPTN_LCSEOptions_SetDefault(
     IN gctUINT optLevel
     )
 {
-    if(optLevel >= 2)
+    gctUINT option = VSC_OPTN_LCSEOptions_OPT_LOAD      |
+                     /*VSC_OPTN_LCSEOptions_OPT_ATTR_LD   |*/
+                     VSC_OPTN_LCSEOptions_OPT_OTHERS;
+
+    if (optLevel >= 2)
     {
         VSC_OPTN_LCSEOptions_SetSwitchOn(options, gcvTRUE);
     }
@@ -2333,7 +2337,7 @@ void VSC_OPTN_LCSEOptions_SetDefault(
     {
         VSC_OPTN_LCSEOptions_SetSwitchOn(options, gcvFALSE);
     }
-    VSC_OPTN_LCSEOptions_SetOpts(options, VSC_OPTN_LCSEOptions_OPT_LOAD | VSC_OPTN_LCSEOptions_OPT_OTHERS);
+    VSC_OPTN_LCSEOptions_SetOpts(options, option);
     VSC_OPTN_LCSEOptions_SetBeforeShader(options, gcvMAXUINT32);
     VSC_OPTN_LCSEOptions_SetAfterShader(options, gcvMAXUINT32);
     VSC_OPTN_LCSEOptions_SetBeforeFunc(options, gcvMAXUINT32);

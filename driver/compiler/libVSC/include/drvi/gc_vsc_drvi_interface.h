@@ -66,8 +66,9 @@
 /* 0.0.1.43 Add a data precision in VIR_Symbol 05/14/2020 */
 /* 0.0.1.44 Add VIR_ModifierOrder in VIR_Operand on 05/14/2020 */
 /* 0.0.1.45 Add a new enumeration for VIR_SymFlagExt 05/15/2020 */
-#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 45)
-#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 45)
+/* 0.0.1.46 Add a minimum workGroupSize in VIR_ComputeLayout 05/19/2020 */
+#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 46)
+#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 46)
 
 #if !defined(gcdTARGETHOST_BIGENDIAN)
 #define gcdTARGETHOST_BIGENDIAN 0  /* default host little endian, to change the
