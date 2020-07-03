@@ -89,6 +89,124 @@ OnError:
     return status;
 }
 
+gceSTATUS
+gcoCL_ForceSetHardwareType(
+    IN gceHARDWARE_TYPE Type,
+    OUT gceHARDWARE_TYPE *savedType
+    )
+{
+    gctUINT chipIDs[32];
+    gctUINT coreCount = 0;
+    static gceHARDWARE_TYPE type = gcvHARDWARE_INVALID;
+    gcsTLS_PTR tls;
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Type=%d", Type);
+
+    gcmONERROR(gcoOS_GetTLS(&tls));
+
+    if (tls->targetType != gcvHARDWARE_INVALID && tls->targetType == Type)
+    {
+        if (savedType)
+            *savedType = Type;
+
+        gcoHAL_SetHardwareType(gcvNULL, tls->targetType);
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+    }
+
+    if (savedType)
+        *savedType = tls->currentType;
+
+    tls->targetType = Type;
+    gcoHAL_SetHardwareType(gcvNULL, Type);
+
+    gcmONERROR(gcoHAL_QueryCoreCount(gcvNULL, Type, &coreCount, chipIDs));
+    if (coreCount)
+    {
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+    }
+    else if (type == gcvHARDWARE_INVALID)
+    {
+        gceHARDWARE_TYPE hwType[] = {gcvHARDWARE_3D, gcvHARDWARE_3D2D, gcvHARDWARE_VIP};
+        gctUINT i;
+
+        for (i = 0; i < gcmCOUNTOF(hwType); i++)
+        {
+            gcmONERROR(gcoHAL_QueryCoreCount(gcvNULL, hwType[i], &coreCount, chipIDs));
+            if (coreCount)
+            {
+                type = hwType[i];
+                break;
+            }
+        }
+    }
+
+    gcoHAL_SetHardwareType(gcvNULL, type);
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcoCL_ForceRestoreHardwareType(
+    IN gceHARDWARE_TYPE savedType
+    )
+{
+    gctUINT chipIDs[32];
+    gctUINT coreCount = 0;
+    /*static gceHARDWARE_TYPE type = gcvHARDWARE_INVALID;*/
+    gcsTLS_PTR tls;
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Type=%d", savedType);
+
+    if (savedType != gcvHARDWARE_3D && savedType != gcvHARDWARE_3D2D && savedType != gcvHARDWARE_VIP)
+        return status;
+
+    gcmONERROR(gcoOS_GetTLS(&tls));
+
+    if (tls->targetType != gcvHARDWARE_INVALID && tls->targetType == savedType)
+    {
+        gcoHAL_SetHardwareType(gcvNULL, tls->targetType);
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+    }
+
+    tls->targetType = savedType;
+    gcoHAL_SetHardwareType(gcvNULL, savedType);
+
+    gcmONERROR(gcoHAL_QueryCoreCount(gcvNULL, savedType, &coreCount, chipIDs));
+    if (coreCount)
+    {
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+    }
+    else if (savedType == gcvHARDWARE_INVALID)
+    {
+        gceHARDWARE_TYPE hwType[] = {gcvHARDWARE_3D, gcvHARDWARE_3D2D, gcvHARDWARE_VIP};
+        gctUINT i;
+
+        for (i = 0; i < gcmCOUNTOF(hwType); i++)
+        {
+            gcmONERROR(gcoHAL_QueryCoreCount(gcvNULL, hwType[i], &coreCount, chipIDs));
+            if (coreCount)
+            {
+                savedType = hwType[i];
+                break;
+            }
+        }
+    }
+
+    gcoHAL_SetHardwareType(gcvNULL, savedType);
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
 /*******************************************************************************
 **
 **  gcoCL_InitializeHardware
@@ -188,8 +306,6 @@ OnError:
     gcmFOOTER();
     return status;
 }
-
-
 
 /**********************************************************************
 **
@@ -1749,6 +1865,296 @@ OnSuccess:
     return gcvSTATUS_OK;
 }
 
+gceSTATUS
+gcoCL_QueryDeviceCountWithGPUType(
+    OUT gctUINT32 * DeviceCount,
+    OUT gctUINT32 * GPUCountPerDevice
+    )
+{
+    gctUINT chipIDs[32];
+    gceMULTI_GPU_MODE mode;
+    gctUINT coreIndex;
+    gctSTRING attr;
+    gctUINT32 coreCount;
+    static gctUINT coreCountPerDevice = 1, deviceCount = 1;
+    static gctBOOL queried = gcvFALSE;
+
+    if (queried)
+    {
+        goto OnSuccess;
+    }
+
+    queried = gcvTRUE;
+
+    gcoHAL_QueryCoreCount(gcvNULL, gcvHARDWARE_3D, &coreCount, chipIDs);
+
+    if (coreCount == 0)
+    {
+        coreCountPerDevice = 0;
+        deviceCount = 0;
+        goto OnSuccess;
+    }
+
+    gcoHAL_QueryMultiGPUAffinityConfig(gcvHARDWARE_3D, &mode, &coreIndex);
+
+    if (mode == gcvMULTI_GPU_MODE_COMBINED)      /*Combined Mode*/
+    {
+        if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_USE_MULTI_DEVICES))
+        {
+            gcmPRINT("VIV Warning : VIV_OCL_USE_MULTI_DEVICES=1 only for INDEPENDENT mode");
+            return gcvSTATUS_INVALID_ARGUMENT;
+        }
+
+        coreCountPerDevice = coreCount;
+        deviceCount = 1;
+    }
+    else    /* Indepedent mode*/
+    {
+        if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_USE_MULTI_DEVICES))  /*multi-device mode is enable */
+        {
+            gcoOS_GetEnv(gcvNULL, "VIV_OCL_USE_MULTI_DEVICE", &attr);
+
+            if (attr && attr[0] == '1')
+            {
+                coreCountPerDevice = 1;
+
+                if (attr[1] == ':' && ( attr[2] == '2' || attr[2] == '4' || attr[2] =='1' ))
+                {
+                    coreCountPerDevice = attr[2] - '0';
+                }
+                else if (attr[1] != '\0')
+                {
+                    gcmPRINT("VIV Warning : VIV_OCL_USE_MULIT_DEVICES only supporte 1 | 1:1 | 1:2 | 1:4");
+                }
+            }
+
+            if ((coreCount % coreCountPerDevice != 0) || (coreCountPerDevice > coreCount))
+            {
+                gcmPRINT("VIV Warning: Invalid VIV_OCL_USE_MULIT_DEVICES Env vars PerDevivceGPUCount is invalid");
+                return gcvSTATUS_INVALID_ARGUMENT;
+            }
+
+            deviceCount = coreCount / coreCountPerDevice;
+        }
+        else    /* Independent mode , one device and device has only one gpucore */
+        {
+            coreCountPerDevice = 1;
+            deviceCount = 1;
+
+            if (coreIndex >= coreCount) /*coreIndex need small than maxCoreCount*/
+            {
+                return gcvSTATUS_INVALID_ARGUMENT;
+            }
+        }
+    }
+
+OnSuccess:
+    if (DeviceCount)
+    {
+        *DeviceCount = deviceCount;
+    }
+
+    if (GPUCountPerDevice)
+    {
+        *GPUCountPerDevice = coreCountPerDevice;
+    }
+
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcoCL_QueryDeviceCountWithVIPType(
+    OUT gctUINT32 * DeviceCount,
+    OUT gctUINT32 * GPUCountPerDevice
+    )
+{
+    gctUINT chipIDs[32];
+    gceMULTI_GPU_MODE mode;
+    gctUINT coreIndex;
+    gctSTRING attr;
+    gctUINT32 coreCount;
+    static gctUINT coreCountPerDevice = 1, deviceCount = 1;
+    static gctBOOL queried = gcvFALSE;
+
+    if (queried)
+    {
+        goto OnSuccess;
+    }
+
+    queried = gcvTRUE;
+
+    gcoHAL_QueryCoreCount(gcvNULL, gcvHARDWARE_VIP, &coreCount, chipIDs);
+
+    if (coreCount == 0)
+    {
+        coreCountPerDevice = 0;
+        deviceCount = 0;
+        goto OnSuccess;
+    }
+
+    gcoHAL_QueryMultiGPUAffinityConfig(gcvHARDWARE_VIP, &mode, &coreIndex);
+
+    if (mode == gcvMULTI_GPU_MODE_COMBINED)      /*Combined Mode*/
+    {
+        if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_USE_MULTI_DEVICES))
+        {
+            gcmPRINT("VIV Warning : VIV_OCL_USE_MULTI_DEVICES=1 only for INDEPENDENT mode");
+            return gcvSTATUS_INVALID_ARGUMENT;
+        }
+
+        coreCountPerDevice = coreCount;
+        deviceCount = 1;
+    }
+    else    /* Indepedent mode*/
+    {
+        if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_USE_MULTI_DEVICES))  /*multi-device mode is enable */
+        {
+            gcoOS_GetEnv(gcvNULL, "VIV_OCL_USE_MULTI_DEVICE", &attr);
+
+            if (attr && attr[0] == '1')
+            {
+                coreCountPerDevice = 1;
+
+                if (attr[1] == ':' && ( attr[2] == '2' || attr[2] == '4' || attr[2] =='1' ))
+                {
+                    coreCountPerDevice = attr[2] - '0';
+                }
+                else if (attr[1] != '\0')
+                {
+                    gcmPRINT("VIV Warning : VIV_OCL_USE_MULIT_DEVICES only supporte 1 | 1:1 | 1:2 | 1:4");
+                }
+            }
+
+            if ((coreCount % coreCountPerDevice != 0) || (coreCountPerDevice > coreCount))
+            {
+                gcmPRINT("VIV Warning: Invalid VIV_OCL_USE_MULIT_DEVICES Env vars PerDevivceGPUCount is invalid");
+                return gcvSTATUS_INVALID_ARGUMENT;
+            }
+
+            deviceCount = coreCount / coreCountPerDevice;
+        }
+        else    /* Independent mode , one device and device has only one gpucore */
+        {
+            coreCountPerDevice = 1;
+            deviceCount = 1;
+
+            if (coreIndex >= coreCount) /*coreIndex need small than maxCoreCount*/
+            {
+                return gcvSTATUS_INVALID_ARGUMENT;
+            }
+        }
+    }
+
+OnSuccess:
+    if (DeviceCount)
+    {
+        *DeviceCount = deviceCount;
+    }
+
+    if (GPUCountPerDevice)
+    {
+        *GPUCountPerDevice = coreCountPerDevice;
+    }
+
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcoCL_QueryDeviceCountWith3D2DType(
+    OUT gctUINT32 * DeviceCount,
+    OUT gctUINT32 * GPUCountPerDevice
+    )
+{
+    gctUINT chipIDs[32];
+    gceMULTI_GPU_MODE mode;
+    gctUINT coreIndex;
+    gctSTRING attr;
+    gctUINT32 coreCount;
+    static gctUINT coreCountPerDevice = 1, deviceCount = 1;
+    static gctBOOL queried = gcvFALSE;
+
+    if (queried)
+    {
+        goto OnSuccess;
+    }
+
+    queried = gcvTRUE;
+
+    gcoHAL_QueryCoreCount(gcvNULL, gcvHARDWARE_3D2D, &coreCount, chipIDs);
+
+    if (coreCount == 0)
+    {
+        coreCountPerDevice = 0;
+        deviceCount = 0;
+        goto OnSuccess;
+    }
+
+    gcoHAL_QueryMultiGPUAffinityConfig(gcvHARDWARE_3D2D, &mode, &coreIndex);
+
+    if (mode == gcvMULTI_GPU_MODE_COMBINED)      /*Combined Mode*/
+    {
+        if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_USE_MULTI_DEVICES))
+        {
+            gcmPRINT("VIV Warning : VIV_OCL_USE_MULTI_DEVICES=1 only for INDEPENDENT mode");
+            return gcvSTATUS_INVALID_ARGUMENT;
+        }
+
+        coreCountPerDevice = coreCount;
+        deviceCount = 1;
+    }
+    else    /* Indepedent mode*/
+    {
+        if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_USE_MULTI_DEVICES))  /*multi-device mode is enable */
+        {
+            gcoOS_GetEnv(gcvNULL, "VIV_OCL_USE_MULTI_DEVICE", &attr);
+
+            if (attr && attr[0] == '1')
+            {
+                coreCountPerDevice = 1;
+
+                if (attr[1] == ':' && ( attr[2] == '2' || attr[2] == '4' || attr[2] =='1' ))
+                {
+                    coreCountPerDevice = attr[2] - '0';
+                }
+                else if (attr[1] != '\0')
+                {
+                    gcmPRINT("VIV Warning : VIV_OCL_USE_MULIT_DEVICES only supporte 1 | 1:1 | 1:2 | 1:4");
+                }
+            }
+
+            if ((coreCount % coreCountPerDevice != 0) || (coreCountPerDevice > coreCount))
+            {
+                gcmPRINT("VIV Warning: Invalid VIV_OCL_USE_MULIT_DEVICES Env vars PerDevivceGPUCount is invalid");
+                return gcvSTATUS_INVALID_ARGUMENT;
+            }
+
+            deviceCount = coreCount / coreCountPerDevice;
+        }
+        else    /* Independent mode , one device and device has only one gpucore */
+        {
+            coreCountPerDevice = 1;
+            deviceCount = 1;
+
+            if (coreIndex >= coreCount) /*coreIndex need small than maxCoreCount*/
+            {
+                return gcvSTATUS_INVALID_ARGUMENT;
+            }
+        }
+    }
+
+OnSuccess:
+    if (DeviceCount)
+    {
+        *DeviceCount = deviceCount;
+    }
+
+    if (GPUCountPerDevice)
+    {
+        *GPUCountPerDevice = coreCountPerDevice;
+    }
+
+    return gcvSTATUS_OK;
+}
 
 /*
  Example 2, a client wants to use 3D GPU0 and 3D GPU1 separately, it should do like this:
@@ -1852,6 +2258,114 @@ OnError:
     return status;
 }
 
+/*
+ Example 2, a client wants to use 3D GPU0 and 3D GPU1 separately, it should do like this:
+**      a) gcoHAL_SetHardwareType(gcvHARDWARE_3D)
+**      b) gcoHAL_SetCurrentCoreIndex(0)
+**      c) hardware0 = gcoHARDWARE_Construct()
+**      d) gcoHARDWARE_SetMultiGPUMode(hardware0, gcvMULTI_GPU_MODE_INDEPENENT)
+**      e) gcoHAL_SetCurrentCoreIndex(1)
+**      f) hardware1 = gcoHARDWARE_Construct()
+**      g) gcoHARDWARE_SetMultiGPUMode(hardware1, gcvMULTI_GPU_MODE_INDEPENENT)
+**      h) gcoHAL_SetCurrentCoreIndex(0)
+**      i) submit hardware0 related command to kernel
+**      j) gcoHAL_SetCurrentCoreIndex(1)
+**      k) submit hardware1 related command to kernel
+*/
+
+gceSTATUS
+gcoCL_CreateHWWithType(
+    IN gceHARDWARE_TYPE hwType,
+    IN gctUINT32    DeviceId,
+    OUT gcoHARDWARE * Hardware
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcoHARDWARE  hardware = gcvNULL;
+    gctUINT      coreCountPerDevice, deviceCount;
+    gctUINT32    localCoreIndexs[gcdMAX_MAJOR_CORE_COUNT] = {0, 1, 2, 3, 4, 5, 6, 7};
+    gctUINT32    coreIndexs[gcdMAX_MAJOR_CORE_COUNT];
+    gceMULTI_GPU_MODE  mode;
+    gctUINT32 mainCoreIndex;
+    gceHARDWARE_TYPE curType = hwType;/*gcvHARDWARE_INVALID ;*/
+
+    gcmDECLARE_SWITCHVARS;
+    gcmHEADER_ARG("DeviceId=%d", DeviceId);
+    gcmSWITCH_TO_DEFAULT();
+    gcmONERROR(gcoCL_SetHardwareType(hwType));
+
+    /*gcmONERROR(gcoCL_QueryDeviceCount(&deviceCount, &coreCountPerDevice));*/
+
+    /*gcmGETCURRENTHARDWARE(curType);*/
+    if (curType == gcvHARDWARE_3D)
+        gcmONERROR(gcoCL_QueryDeviceCountWithGPUType(&deviceCount, &coreCountPerDevice));
+    else if (curType == gcvHARDWARE_VIP)
+        gcmONERROR(gcoCL_QueryDeviceCountWithVIPType(&deviceCount, &coreCountPerDevice));
+    else
+        gcmONERROR(gcoCL_QueryDeviceCountWith3D2DType(&deviceCount, &coreCountPerDevice));
+
+    if (deviceCount == 1 && coreCountPerDevice == 1) /*Special deal with independent mode*/
+    {
+         gcoHAL_QueryMultiGPUAffinityConfig(curType, &mode, &mainCoreIndex);
+
+         localCoreIndexs[0] = mainCoreIndex;
+    }
+
+    gcmONERROR(gcoHAL_ConvertCoreIndexGlobal(gcPLS.hal,
+                                             curType,
+                                             coreCountPerDevice,
+                                             &localCoreIndexs[DeviceId * coreCountPerDevice],
+                                             coreIndexs));
+
+
+    gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, coreIndexs[0]));
+
+    gcmONERROR(gcoHARDWARE_ConstructEx(gcPLS.hal,
+                                       gcvFALSE,
+                                       gcvFALSE,
+                                       curType,
+                                       coreCountPerDevice,
+                                       &localCoreIndexs[DeviceId * coreCountPerDevice],
+                                       coreIndexs,
+                                       &hardware));
+
+    if (gcoHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_MCFE))
+    {
+        gcoHARDWARE_SelectChannel(hardware, 0, 1);
+    }
+    /* Switch to the 3D pipe. */
+    gcmONERROR(gcoHARDWARE_SelectPipe(hardware, gcvPIPE_3D, gcvNULL));
+
+    /* Set HAL API to OpenCL only when there is API is not set. */
+    gcmVERIFY_OK(gcoHARDWARE_SetAPI(hardware, gcvAPI_OPENCL));
+
+    if (!gcoHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_PIPE_CL))
+    {
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+    }
+
+    /* Set rounding mode */
+    if (gcoHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_SHADER_HAS_RTNE))
+    {
+        gcmVERIFY_OK(gcoHARDWARE_SetRTNERounding(hardware, gcvTRUE));
+    }
+    gcmONERROR(gcoHARDWARE_SetFenceEnabled(hardware, gcvTRUE));
+    gcoHARDWARE_InitializeCL(hardware);
+    gcmRESTORE_HW();
+    *Hardware = hardware;
+     gcmFOOTER();
+    return status;
+
+OnError:
+    gcmRESTORE_HW();
+    if(hardware)
+    {
+        gcoHARDWARE_Destroy(hardware, gcvFALSE);
+    }
+
+    gcmFOOTER();
+    return status;
+}
 
 gceSTATUS
     gcoCL_DestroyHW(
