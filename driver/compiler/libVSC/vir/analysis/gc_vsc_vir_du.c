@@ -1010,7 +1010,7 @@ static VSC_ErrCode _BuildDefTable(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuIn
                         duHTSize);
 
     /* Initialize def table with hash enabled due to we want to get def index with def content */
-    vscBT_Initialize(&pDuInfo->defTable,
+    if (vscBT_Initialize(&pDuInfo->defTable,
                      &pDuInfo->pmp.mmWrapper,
                      VSC_BLOCK_TABLE_FLAG_HASH_ENTRIES,
                      sizeof(VIR_DEF),
@@ -1019,7 +1019,12 @@ static VSC_ErrCode _BuildDefTable(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuIn
                      gcvNULL,
                      pDuInfo->bHashRegNoInst ? _HFUNC_DefPassThroughRegNoInst : _HFUNC_DefPassThroughRegNo,
                      pDuInfo->bHashRegNoInst ? _HKCMP_DefKeyInstEqual : _HKCMP_DefKeyEqual,
-                     duHTSize);
+                     duHTSize) == gcvFALSE)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ERR_REPORT(errCode, "Failed to allocate memory for BT.");
+        return errCode;
+    }
 
     pDuInfo->maxVirRegNo = 0;
     pDuInfo->bHashRegNoInst = gcvFALSE;
@@ -2565,7 +2570,7 @@ static VSC_ErrCode _BuildDUUDChain(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuI
     VIR_TS_FUNC_FLOW*      pMainFuncFlow;
     VSC_BIT_VECTOR*        pMainFlowOut;
 
-    vscBT_Initialize(&pDuInfo->usageTable,
+    if (vscBT_Initialize(&pDuInfo->usageTable,
                      &pDuInfo->pmp.mmWrapper,
                      VSC_BLOCK_TABLE_FLAG_HASH_ENTRIES,
                      sizeof(VIR_USAGE),
@@ -2574,7 +2579,12 @@ static VSC_ErrCode _BuildDUUDChain(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuI
                      gcvNULL,
                      _HFUNC_UsageInstLSB8,
                      _HKCMP_UsageKeyEqual,
-                     estimateDUHashTableSize(pCg->pOwnerShader));
+                     estimateDUHashTableSize(pCg->pOwnerShader)) == gcvFALSE)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ERR_REPORT(errCode, "Failed to allocate memory for BT.");
+        return errCode;
+    }
 
     /* Go through whole shader func by func */
     CG_ITERATOR_INIT(&funcBlkIter, pCg);
@@ -3166,16 +3176,21 @@ static VSC_ErrCode _BuildWebs(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuInfo)
     gctUINT                defIdx, globalsearchStartDefIdx = 0;
     VIR_DEF*               pDef;
 
-    vscBT_Initialize(&pDuInfo->webTable,
-                     &pDuInfo->pmp.mmWrapper,
-                     0,
-                     sizeof(VIR_WEB),
-                     (defCount)*sizeof(VIR_WEB),
-                     1,
-                     gcvNULL,
-                     gcvNULL,
-                     gcvNULL,
-                     0);
+    if (vscBT_Initialize(&pDuInfo->webTable,
+                         &pDuInfo->pmp.mmWrapper,
+                         0,
+                         sizeof(VIR_WEB),
+                         (defCount)*sizeof(VIR_WEB),
+                         1,
+                         gcvNULL,
+                         gcvNULL,
+                         gcvNULL,
+                         0) == gcvFALSE)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ERR_REPORT(errCode, "Failed to allocate memory for BT.");
+        return errCode;
+    }
 
     /* Mark web has been built */
     pDuInfo->bWebTableBuilt = gcvTRUE;

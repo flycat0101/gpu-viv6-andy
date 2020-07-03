@@ -319,6 +319,10 @@ void* vscPMP_Realloc(VSC_PRIMARY_MEM_POOL* pPMP, void* pOrgAddress, gctUINT newR
 
     /* Then just call alloc to alloc a new one, and copy original data to new place */
     pNewAddress = vscPMP_Alloc(pPMP, newReqSize);
+    if (pNewAddress == gcvNULL)
+    {
+        return gcvNULL;
+    }
     memcpy(pNewAddress, pOrgAddress, pOrgCmnBlkHeader->userReqSize);
 
     return pNewAddress;

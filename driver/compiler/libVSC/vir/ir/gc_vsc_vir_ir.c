@@ -2392,7 +2392,7 @@ _VIR_InitStringTable(VIR_Shader * Shader)
 {
     VSC_ErrCode errCode   = VSC_ERR_NONE;
     /* initialize block table */
-    vscBT_Initialize(&Shader->stringTable,
+    if (vscBT_Initialize(&Shader->stringTable,
         &Shader->pmp.mmWrapper,
         VSC_BLOCK_TABLE_FLAG_HASH_ENTRIES | VSC_BLOCK_TABLE_FLAG_AUTO_HASH,
         sizeof(char),
@@ -2401,7 +2401,12 @@ _VIR_InitStringTable(VIR_Shader * Shader)
         gcvNULL,
         (PFN_VSC_HASH_FUNC)vscHFUNC_String,
         (PFN_VSC_KEY_CMP)vcsHKCMP_String,
-        1024);
+        1024) == gcvFALSE)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ERR_REPORT(errCode, "Failed to allocate memory for BT.");
+        return errCode;
+    }
 
     /* initialize builtin names */
     _initBuiltinNames(Shader);
@@ -2414,7 +2419,7 @@ _VIR_InitSymbolTable(VIR_Shader * Shader)
 {
     VSC_ErrCode errCode   = VSC_ERR_NONE;
     /* initialize block table */
-    vscBT_Initialize(&Shader->symTable,
+    if (vscBT_Initialize(&Shader->symTable,
         &Shader->pmp.mmWrapper,
         VSC_BLOCK_TABLE_FLAG_HASH_ENTRIES | VSC_BLOCK_TABLE_FLAG_AUTO_HASH,
         sizeof(VIR_Symbol),
@@ -2423,7 +2428,12 @@ _VIR_InitSymbolTable(VIR_Shader * Shader)
         gcvNULL,
         (PFN_VSC_HASH_FUNC)vscHFUNC_Symbol,
         (PFN_VSC_KEY_CMP)vcsHKCMP_Symbol,
-        1024);
+        1024) == gcvFALSE)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ERR_REPORT(errCode, "Failed to allocate memory for BT.");
+        return errCode;
+    }
 
     return errCode;
 }
@@ -2433,7 +2443,7 @@ _VIR_InitConstTable(VIR_Shader * Shader)
 {
     VSC_ErrCode errCode   = VSC_ERR_NONE;
     /* initialize block table */
-    vscBT_Initialize(&Shader->constTable,
+    if (vscBT_Initialize(&Shader->constTable,
         &Shader->pmp.mmWrapper,
         VSC_BLOCK_TABLE_FLAG_HASH_ENTRIES | VSC_BLOCK_TABLE_FLAG_AUTO_HASH,
         sizeof(VIR_Const),
@@ -2442,7 +2452,12 @@ _VIR_InitConstTable(VIR_Shader * Shader)
         gcvNULL,
         (PFN_VSC_HASH_FUNC)vscHFUNC_Const,
         (PFN_VSC_KEY_CMP)vcsHKCMP_Const,
-        256);
+        256) == gcvFALSE)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ERR_REPORT(errCode, "Failed to allocate memory for BT.");
+        return errCode;
+    }
 
     return errCode;
 }
@@ -2466,7 +2481,7 @@ _VIR_InitInstTable(VIR_Shader * Shader)
 {
     VSC_ErrCode errCode   = VSC_ERR_NONE;
     /* initialize block table */
-    vscBT_Initialize(&Shader->instTable,
+    if (vscBT_Initialize(&Shader->instTable,
         &Shader->pmp.mmWrapper,
         VSC_BLOCK_TABLE_FLAG_FREE_ENTRY_LIST | VSC_BLOCK_TABLE_FLAG_FREE_ENTRY_USE_PTR,
         sizeof(VIR_Instruction),
@@ -2475,7 +2490,12 @@ _VIR_InitInstTable(VIR_Shader * Shader)
         gcvNULL,
         gcvNULL,
         gcvNULL,
-        0);
+        0) == gcvFALSE)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ERR_REPORT(errCode, "Failed to allocate memory for BT.");
+        return errCode;
+    }
 
     return errCode;
 }
@@ -2486,7 +2506,7 @@ _VIR_Shader_InitTypeTable(VIR_Shader *    Shader)
     VSC_ErrCode errCode   = VSC_ERR_NONE;
     gctUINT      i;
     /* initialize block table */
-    vscBT_Initialize(&Shader->typeTable,
+    if (vscBT_Initialize(&Shader->typeTable,
         &Shader->pmp.mmWrapper,
         (VSC_BLOCK_TABLE_FLAG_HASH_ENTRIES
         | VSC_BLOCK_TABLE_FLAG_AUTO_HASH
@@ -2497,7 +2517,12 @@ _VIR_Shader_InitTypeTable(VIR_Shader *    Shader)
         gcvNULL,
         (PFN_VSC_HASH_FUNC)vscHFUNC_Type,
         (PFN_VSC_KEY_CMP)vcsHKCMP_Type,
-        512);
+        512) == gcvFALSE)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ERR_REPORT(errCode, "Failed to allocate memory for BT.");
+        return errCode;
+    }
 
     /* initialize builtin types */
     for (i=0; i < sizeof(VIR_builtinTypes)/sizeof(VIR_builtinTypes[0]);  i++)
@@ -3064,7 +3089,7 @@ VIR_Shader_AddFunctionContent(
     if (Init)
     {
         /* initialize symbol table */
-        vscBT_Initialize(&func->symTable,
+        if (vscBT_Initialize(&func->symTable,
             memPool,
             (VSC_BLOCK_TABLE_FLAG_HASH_ENTRIES
             | VSC_BLOCK_TABLE_FLAG_AUTO_HASH
@@ -3075,10 +3100,15 @@ VIR_Shader_AddFunctionContent(
             gcvNULL,
             (PFN_VSC_HASH_FUNC)vscHFUNC_Symbol,
             (PFN_VSC_KEY_CMP)vcsHKCMP_Symbol,
-            VIR_FUNC_SYMHSHTBL_SZ);
+            VIR_FUNC_SYMHSHTBL_SZ) == gcvFALSE)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ERR_REPORT(errCode, "Failed to allocate memory for BT.");
+        return errCode;
+    }
 
         /* initialize label table */
-        vscBT_Initialize(&func->labelTable,
+        if (vscBT_Initialize(&func->labelTable,
             memPool,
             (VSC_BLOCK_TABLE_FLAG_FREE_ENTRY_LIST
             | VSC_BLOCK_TABLE_FLAG_HASH_ENTRIES
@@ -3089,10 +3119,15 @@ VIR_Shader_AddFunctionContent(
             gcvNULL,
             (PFN_VSC_HASH_FUNC)vscHFUNC_Label,
             (PFN_VSC_KEY_CMP)vcsHKCMP_Label,
-            VIR_FUNC_LBLHSHTBL_SZ);
+            VIR_FUNC_LBLHSHTBL_SZ) == gcvFALSE)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ERR_REPORT(errCode, "Failed to allocate memory for BT.");
+        return errCode;
+    }
 
         /* initialize operands table */
-        vscBT_Initialize(&func->operandTable,
+        if (vscBT_Initialize(&func->operandTable,
             memPool,
             VSC_BLOCK_TABLE_FLAG_FREE_ENTRY_LIST,
             sizeof(VIR_Operand),
@@ -3101,7 +3136,12 @@ VIR_Shader_AddFunctionContent(
             (PFN_VSC_GET_FREE_ENTRY)VIR_Operand_GetFreeEntry,
             gcvNULL,
             gcvNULL,
-            0);
+            0) == gcvFALSE)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ERR_REPORT(errCode, "Failed to allocate memory for BT.");
+        return errCode;
+    }
 
         /* init id lists */
         idList = &func->localVariables;
