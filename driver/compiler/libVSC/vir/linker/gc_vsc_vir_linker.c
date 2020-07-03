@@ -6772,10 +6772,10 @@ _AddYcbcrPlanesToSampler(
     )
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
-    VIR_SymId           *pPlaneSymId;
+    VIR_SymId           *pPlaneSymId = gcvNULL;
     gctUINT             i;
 
-    if(pSamplerUniform->u.samplerOrImageAttr.pYcbcrPlaneSymId == gcvNULL)
+    if (pSamplerUniform->u.samplerOrImageAttr.pYcbcrPlaneSymId == gcvNULL)
     {
         VIR_Type *samplerSymType;
         gctUINT i, samplerArrSize = 1;
@@ -6785,20 +6785,19 @@ _AddYcbcrPlanesToSampler(
         if (VIR_Type_isArray(samplerSymType))
         {
             samplerArrSize = VIR_Type_GetArrayLength(samplerSymType);
-            samplerArrSize *= __YCBCR_PLANE_COUNT__;
         }
+        samplerArrSize *= __YCBCR_PLANE_COUNT__;
 
         ptr = (gctUINT32*)vscMM_Alloc(&pShader->pmp.mmWrapper, sizeof(VIR_SymId) * samplerArrSize);
         pSamplerUniform->u.samplerOrImageAttr.pYcbcrPlaneSymId = ptr;
-        for(i = 0; i < samplerArrSize; i++)
+        for (i = 0; i < samplerArrSize; i++)
         {
            pSamplerUniform->u.samplerOrImageAttr.pYcbcrPlaneSymId[i] = VIR_INVALID_ID;
         }
         gcmASSERT(arrayIndex < samplerArrSize);
     }
 
-    pPlaneSymId = pSamplerUniform->u.samplerOrImageAttr.pYcbcrPlaneSymId +
-                      (arrayIndex * __YCBCR_PLANE_COUNT__);
+    pPlaneSymId = pSamplerUniform->u.samplerOrImageAttr.pYcbcrPlaneSymId + (arrayIndex * __YCBCR_PLANE_COUNT__);
     if (pPlaneSymId[0] == VIR_INVALID_ID)
     {
         VIR_Symbol*     pPlanesImageSym = gcvNULL;

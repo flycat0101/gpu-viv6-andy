@@ -4216,18 +4216,24 @@ static VSC_ErrCode _AddExtraSamplerArray(SHADER_PRIV_SAMPLER_ENTRY*** pppExtraSa
     return errCode;
 }
 
-static VSC_ErrCode _AddTextureSizeAndLodMinMax(SHADER_PRIV_CONSTANT_ENTRY**     ppTextureSize,
+static VSC_ErrCode _AddTextureSizeAndLodMinMax(SHADER_EXECUTABLE_PROFILE*       pSep,
+                                               VIR_Shader*                      pShader,
+                                               gctBOOL                          bCheckSeparateImage,
+                                               gctBOOL                          bCheckSeparateSampler,
+                                               SHADER_PRIV_CONSTANT_ENTRY**     ppTextureSize,
                                                SHADER_PRIV_CONSTANT_ENTRY**     ppLodMinMax,
                                                SHADER_PRIV_CONSTANT_ENTRY**     ppLevelsSamples,
-                                               VSC_SHADER_RESOURCE_BINDING*     pBinding,
-                                               SHADER_EXECUTABLE_PROFILE*       pSep)
+                                               VSC_SHADER_RESOURCE_BINDING*     pBinding)
 {
     VSC_ErrCode                     errCode = VSC_ERR_NONE;
     SHADER_PRIV_CONSTANT_ENTRY*     pPrivCnstEntry;
-    gctUINT                         resArraySize;
+    gctUINT                         resArrayLength;
     VIR_Symbol*                     pTextureSym;
     VIR_Type*                       pSymType;
     gctUINT                         i;
+    gctBOOL                         bMatch = gcvFALSE;
+    VIR_Symbol*                     pSparateImageSym = gcvNULL;
+    VIR_Symbol*                     pSeparateSamplerSym = gcvNULL;
 
     if (ppTextureSize == gcvNULL && ppLodMinMax == gcvNULL && ppLevelsSamples == gcvNULL)
     {
@@ -4238,76 +4244,129 @@ static VSC_ErrCode _AddTextureSizeAndLodMinMax(SHADER_PRIV_CONSTANT_ENTRY**     
     {
         pPrivCnstEntry = &pSep->staticPrivMapping.privConstantMapping.pPrivmConstantEntries[i];
 
-        if (pPrivCnstEntry->commonPrivm.privmKind == SHS_PRIV_CONSTANT_KIND_TEXTURE_SIZE    ||
-            pPrivCnstEntry->commonPrivm.privmKind == SHS_PRIV_CONSTANT_KIND_LOD_MIN_MAX     ||
-            pPrivCnstEntry->commonPrivm.privmKind == SHS_PRIV_CONSTANT_KIND_LEVELS_SAMPLES)
+        /* Check TextureSize/LodMinMax/LevelsSamples*/
+        if (pPrivCnstEntry->commonPrivm.privmKind != SHS_PRIV_CONSTANT_KIND_TEXTURE_SIZE    &&
+            pPrivCnstEntry->commonPrivm.privmKind != SHS_PRIV_CONSTANT_KIND_LOD_MIN_MAX     &&
+            pPrivCnstEntry->commonPrivm.privmKind != SHS_PRIV_CONSTANT_KIND_LEVELS_SAMPLES)
         {
-            pTextureSym = (VIR_Symbol*)pPrivCnstEntry->commonPrivm.pPrivateData;
+            continue;
+        }
 
-            gcmASSERT(pTextureSym);
+        /* Get the corresponding texture symbol. */
+        pTextureSym = (VIR_Symbol*)pPrivCnstEntry->commonPrivm.pPrivateData;
+        if (pTextureSym == gcvNULL)
+        {
+            gcmASSERT(gcvFALSE);
+            continue;
+        }
 
-            pSymType = VIR_Symbol_GetType(pTextureSym);
-            if (VIR_Type_GetKind(pSymType) == VIR_TY_ARRAY)
-            {
-                resArraySize = VIR_Type_GetArrayLength(pSymType);
-            }
-            else
-            {
-                resArraySize = 1;
-            }
+        /* Get the array length. */
+        pSymType = VIR_Symbol_GetType(pTextureSym);
+        if (VIR_Type_GetKind(pSymType) == VIR_TY_ARRAY)
+        {
+            resArrayLength = VIR_Type_GetArrayLength(pSymType);
+        }
+        else
+        {
+            resArrayLength = 1;
+        }
 
-            if (VIR_Symbol_GetDescriptorSet(pTextureSym) == pBinding->set &&
-                VIR_Symbol_GetBinding(pTextureSym) == pBinding->binding &&
-                resArraySize == pBinding->arraySize)
+        /* Check the binding information. */
+        if (VIR_Symbol_GetDescriptorSet(pTextureSym) == pBinding->set &&
+            VIR_Symbol_GetBinding(pTextureSym) == pBinding->binding &&
+            resArrayLength == pBinding->arraySize)
+        {
+            bMatch = gcvTRUE;
+        }
+        /* For a sampled image, we need to check the separate sampler. */
+        else if ((bCheckSeparateImage || bCheckSeparateSampler)
+                 &&
+                 (VIR_Symbol_GetUniformKind(pTextureSym) == VIR_UNIFORM_SAMPLED_IMAGE))
+        {
+            if (bCheckSeparateImage)
             {
-                if (pPrivCnstEntry->commonPrivm.privmKind == SHS_PRIV_CONSTANT_KIND_TEXTURE_SIZE)
+                pSparateImageSym = VIR_Symbol_GetSeparateImage(pShader, pTextureSym);
+                if (pSparateImageSym != gcvNULL)
                 {
-                    if (ppTextureSize)
+                    if (VIR_Symbol_GetDescriptorSet(pSparateImageSym) == pBinding->set &&
+                        VIR_Symbol_GetBinding(pSparateImageSym) == pBinding->binding &&
+                        resArrayLength == pBinding->arraySize)
                     {
-                        if ((ppTextureSize)[0] == gcvNULL)
-                        {
-                            (ppTextureSize)[0] = pPrivCnstEntry;
-                        }
-                        else
-                        {
-                            gcmASSERT((ppTextureSize)[1] == gcvNULL);
-                            (ppTextureSize)[1] = pPrivCnstEntry;
-                        }
+                        bMatch = gcvTRUE;
                     }
                 }
-                else if (pPrivCnstEntry->commonPrivm.privmKind == SHS_PRIV_CONSTANT_KIND_LOD_MIN_MAX)
+            }
+            else if (!bMatch && bCheckSeparateSampler)
+            {
+                pSeparateSamplerSym = VIR_Symbol_GetHwMappingSeparateSampler(pShader, pTextureSym);
+                if (pSeparateSamplerSym != gcvNULL)
                 {
-                    if (ppLodMinMax)
+                    if (VIR_Symbol_GetDescriptorSet(pSeparateSamplerSym) == pBinding->set &&
+                        VIR_Symbol_GetBinding(pSeparateSamplerSym) == pBinding->binding &&
+                        resArrayLength == pBinding->arraySize)
                     {
-                        if ((ppLodMinMax)[0] == gcvNULL)
-                        {
-                            (ppLodMinMax)[0] = pPrivCnstEntry;
-                        }
-                        else
-                        {
-                            gcmASSERT((ppLodMinMax)[1] == gcvNULL);
-                            (ppLodMinMax)[1] = pPrivCnstEntry;
-                        }
+                        bMatch = gcvTRUE;
                     }
+                }
+            }
+        }
+
+        /* No found. */
+        if (!bMatch)
+        {
+            continue;
+        }
+
+        switch (pPrivCnstEntry->commonPrivm.privmKind)
+        {
+        case SHS_PRIV_CONSTANT_KIND_TEXTURE_SIZE:
+            if (ppTextureSize)
+            {
+                if ((ppTextureSize)[0] == gcvNULL)
+                {
+                    (ppTextureSize)[0] = pPrivCnstEntry;
                 }
                 else
                 {
-                    gcmASSERT(pPrivCnstEntry->commonPrivm.privmKind == SHS_PRIV_CONSTANT_KIND_LEVELS_SAMPLES);
-
-                    if (ppLevelsSamples)
-                    {
-                        if ((ppLevelsSamples)[0] == gcvNULL)
-                        {
-                            (ppLevelsSamples)[0] = pPrivCnstEntry;
-                        }
-                        else
-                        {
-                            gcmASSERT((ppLevelsSamples)[1] == gcvNULL);
-                            (ppLevelsSamples)[1] = pPrivCnstEntry;
-                        }
-                    }
+                    gcmASSERT((ppTextureSize)[1] == gcvNULL);
+                    (ppTextureSize)[1] = pPrivCnstEntry;
                 }
             }
+            break;
+
+        case SHS_PRIV_CONSTANT_KIND_LOD_MIN_MAX:
+            if (ppLodMinMax)
+            {
+                if ((ppLodMinMax)[0] == gcvNULL)
+                {
+                    (ppLodMinMax)[0] = pPrivCnstEntry;
+                }
+                else
+                {
+                    gcmASSERT((ppLodMinMax)[1] == gcvNULL);
+                    (ppLodMinMax)[1] = pPrivCnstEntry;
+                }
+            }
+            break;
+
+        case SHS_PRIV_CONSTANT_KIND_LEVELS_SAMPLES:
+            if (ppLevelsSamples)
+            {
+                if ((ppLevelsSamples)[0] == gcvNULL)
+                {
+                    (ppLevelsSamples)[0] = pPrivCnstEntry;
+                }
+                else
+                {
+                    gcmASSERT((ppLevelsSamples)[1] == gcvNULL);
+                    (ppLevelsSamples)[1] = pPrivCnstEntry;
+                }
+            }
+            break;
+
+        default:
+            gcmASSERT(gcvFALSE);
+            break;
         }
     }
 
@@ -4476,6 +4535,26 @@ static VSC_ErrCode _FillImageDerivedInfo(VIR_Shader* pShader,
                             SHS_PRIV_MEM_KIND_EXTRA_UAV_LAYER,
                             gcvFALSE,
                             0);
+
+    return VSC_ERR_NONE;
+}
+
+static VSC_ErrCode _FillSamplerDerivedInfo(VIR_Shader* pShader,
+                                           VSC_SHADER_RESOURCE_BINDING* pBinding,
+                                           SHADER_EXECUTABLE_PROFILE* pSep,
+                                           PROG_VK_SAMPLER_DERIVED_INFO* pSamplerDerivedInfo,
+                                           gctBOOL bCheckSeparateImage,
+                                           gctBOOL bCheckSeparateSampler)
+{
+    /* Set textureSize/lodMinMax/levelsSamples */
+    _AddTextureSizeAndLodMinMax(pSep,
+                                pShader,
+                                bCheckSeparateImage,
+                                bCheckSeparateSampler,
+                                pSamplerDerivedInfo->pTextureSize,
+                                pSamplerDerivedInfo->pLodMinMax,
+                                pSamplerDerivedInfo->pLevelsSamples,
+                                pBinding);
 
     return VSC_ERR_NONE;
 }
@@ -4814,11 +4893,13 @@ static VSC_ErrCode _AddVkUtbEntryToUniformTexBufTableOfPEP(VSC_PEP_GEN_HELPER* p
     /* Set texture size */
     if (!(pResAllocEntry->resFlag & VIR_SRE_FLAG_TEXELBUFFER_AN_IMAGE_NATIVELY))
     {
-        _AddTextureSizeAndLodMinMax(pUtbEntry->pTextureSize[stageIdx],
-                                    gcvNULL,
-                                    gcvNULL,
-                                    &pUtbEntry->utbBinding,
-                                    pSep);
+        /* Fill the sampler derived information. */
+        _FillSamplerDerivedInfo(pShader,
+                                &pUtbEntry->utbBinding,
+                                pSep,
+                                &pUtbEntry->samplerDerivedInfo[stageIdx],
+                                gcvFALSE,
+                                gcvFALSE);
     }
     else
     {
@@ -4953,12 +5034,13 @@ static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHe
                               1,
                               0);
 
-        /* Set textureSize/lodMinMax */
-        _AddTextureSizeAndLodMinMax(pIaEntry->pTextureSize[stageIdx],
-                                    pIaEntry->pLodMinMax[stageIdx],
-                                    pIaEntry->pLevelsSamples[stageIdx],
-                                    &pIaEntry->iaBinding,
-                                    pSep);
+        /* Fill the sampler derived information. */
+        _FillSamplerDerivedInfo(pShader,
+                                &pIaEntry->iaBinding,
+                                pSep,
+                                &pIaEntry->samplerDerivedInfo[stageIdx],
+                                gcvFALSE,
+                                gcvFALSE);
     }
     else
     {
@@ -5286,12 +5368,13 @@ static VSC_ErrCode _AddVkCombStEntryToCombStTableOfPEP(VSC_PEP_GEN_HELPER* pPepG
         }
     }
 
-    /* Set textureSize/lodMinMax */
-    _AddTextureSizeAndLodMinMax(pCombTsEntry->pTextureSize[stageIdx],
-                                pCombTsEntry->pLodMinMax[stageIdx],
-                                pCombTsEntry->pLevelsSamples[stageIdx],
-                                &pCombTsEntry->combTsBinding,
-                                pSep);
+    /* Fill the sampler derived information. */
+    _FillSamplerDerivedInfo(pShader,
+                            &pCombTsEntry->combTsBinding,
+                            pSep,
+                            &pCombTsEntry->samplerDerivedInfo[stageIdx],
+                            gcvFALSE,
+                            gcvFALSE);
 
     /*
     ** pSampledImage is not empty means that this combined image sampler is accessed via separate sampler and sampled image shader variables,
@@ -5657,6 +5740,13 @@ static VSC_ErrCode _CollectCompilerGeneatedCombinedSampler(VSC_PEP_GEN_HELPER* p
                                               0
                                               );
 
+                        _FillSamplerDerivedInfo(pShader,
+                                                &pSeparatedSamplerEntry->samplerBinding,
+                                                &pOutPEP->seps[stageIdx],
+                                                &pPctsHwMapping->samplerDerivedInfo,
+                                                gcvFALSE,
+                                                gcvTRUE);
+
                         pSeparatedSamplerEntry->activeStageMask |= 1 << stageIdx;
                         pSeparatedSamplerEntry->bUsingHwMppingList = gcvTRUE;
                         pSeparatedSamplerEntry->stageBits |= VSC_SHADER_STAGE_2_STAGE_BIT(stageIdx);
@@ -5716,13 +5806,72 @@ static VSC_ErrCode _PostProcessImageDerivedInfo(PROG_VK_IMAGE_DERIVED_INFO* pIma
     return errCode;
 }
 
+static VSC_ErrCode _PostProcessSamplerDerivedInfo(PROG_VK_SAMPLER_DERIVED_INFO* pSamplerDerivedInfo,
+                                                  VSC_SHADER_RESOURCE_BINDING* pResBinding,
+                                                  gctUINT entryIndex,
+                                                  gctBOOL bAllocate)
+{
+    VSC_ErrCode                                   errCode = VSC_ERR_NONE;
+    gctUINT                                       layerIdx;
+    SHADER_PRIV_CONSTANT_ENTRY*                   pPrivCnstEntry;
+
+    for (layerIdx = 0; layerIdx < 2; layerIdx++)
+    {
+        /* Texture size */
+        pPrivCnstEntry = pSamplerDerivedInfo->pTextureSize[layerIdx];
+        if (pPrivCnstEntry)
+        {
+            if (bAllocate)
+            {
+                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
+                *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = entryIndex;
+            }
+            else
+            {
+                pPrivCnstEntry->commonPrivm.pPrivateData = gcvNULL;
+            }
+        }
+
+        /* lodMinMax */
+        pPrivCnstEntry = pSamplerDerivedInfo->pLodMinMax[layerIdx];
+        if (pPrivCnstEntry)
+        {
+            if (bAllocate)
+            {
+                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
+                *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = entryIndex;
+            }
+            else
+            {
+                pPrivCnstEntry->commonPrivm.pPrivateData = gcvNULL;
+            }
+        }
+
+        /* levelsSamples */
+        pPrivCnstEntry = pSamplerDerivedInfo->pLevelsSamples[layerIdx];
+        if (pPrivCnstEntry)
+        {
+            if (bAllocate)
+            {
+                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
+                *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = entryIndex;
+            }
+            else
+            {
+                pPrivCnstEntry->commonPrivm.pPrivateData = gcvNULL;
+            }
+        }
+    }
+
+    return errCode;
+}
+
 static VSC_ErrCode _PostProcessVkCombStTable(VSC_PEP_GEN_HELPER* pPepGenHelper, PROG_VK_COMBINED_TEXTURE_SAMPLER_TABLE* pCombinedSampTexTable, gctUINT stageIdx)
 {
     VSC_ErrCode                                errCode = VSC_ERR_NONE;
     PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY*  pComTsEntry = gcvNULL;
-    gctUINT                                    i, j, k, layerIdx;
+    gctUINT                                    i, j, k;
     SHADER_PRIV_SAMPLER_ENTRY*                 pPrivSamplerEntry;
-    SHADER_PRIV_CONSTANT_ENTRY*                pPrivCnstEntry;
     SHADER_PRIV_UAV_ENTRY*                     pPrivUavEntry;
 
     for (i = 0; i < pCombinedSampTexTable->countOfEntries; i ++)
@@ -5757,32 +5906,11 @@ static VSC_ErrCode _PostProcessVkCombStTable(VSC_PEP_GEN_HELPER* pPepGenHelper, 
             }
         }
 
-        for (layerIdx = 0; layerIdx < 2; layerIdx++)
-        {
-            /* Texture size */
-            pPrivCnstEntry = pComTsEntry->pTextureSize[stageIdx][layerIdx];
-            if (pPrivCnstEntry)
-            {
-                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
-                *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pComTsEntry->combTsEntryIndex;
-            }
-
-            /* lodMinMax */
-            pPrivCnstEntry = pComTsEntry->pLodMinMax[stageIdx][layerIdx];
-            if (pPrivCnstEntry)
-            {
-                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
-                *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pComTsEntry->combTsEntryIndex;
-            }
-
-            /* levelsSamples */
-            pPrivCnstEntry = pComTsEntry->pLevelsSamples[stageIdx][layerIdx];
-            if (pPrivCnstEntry)
-            {
-                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
-                *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pComTsEntry->combTsEntryIndex;
-            }
-        }
+        /* Process the sampler derived information. */
+        _PostProcessSamplerDerivedInfo(&pComTsEntry->samplerDerivedInfo[stageIdx],
+                                       &pComTsEntry->combTsBinding,
+                                       pComTsEntry->combTsEntryIndex,
+                                       gcvFALSE);
     }
 
     return errCode;
@@ -5813,28 +5941,22 @@ static VSC_ErrCode _PostProcessVkUtbEntryTable(VSC_PEP_GEN_HELPER* pPepGenHelper
 {
     VSC_ErrCode                               errCode = VSC_ERR_NONE;
     PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE_ENTRY* pUtbEntry = gcvNULL;
-    gctUINT                                   i, layerIdx;
-    SHADER_PRIV_CONSTANT_ENTRY*               pPrivCnstEntry;
+    gctUINT                                   i;
 
     for (i = 0; i < pUniformTexBufTable->countOfEntries; i ++)
     {
         pUtbEntry = &pUniformTexBufTable->pUtbEntries[i];
 
-        for (layerIdx = 0; layerIdx < 2; layerIdx++)
-        {
-            /* Texture size */
-            pPrivCnstEntry = pUtbEntry->pTextureSize[stageIdx][layerIdx];
-            if (pPrivCnstEntry)
-            {
-                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
-                *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pUtbEntry->utbEntryIndex;
-            }
+        /* Process the image derived information. */
+        _PostProcessImageDerivedInfo(&pUtbEntry->imageDerivedInfo[stageIdx],
+                                     &pUtbEntry->utbBinding,
+                                     pUtbEntry->utbEntryIndex);
 
-            /* Process the image derived information. */
-            _PostProcessImageDerivedInfo(&pUtbEntry->imageDerivedInfo[stageIdx],
-                                         &pUtbEntry->utbBinding,
-                                         pUtbEntry->utbEntryIndex);
-        }
+        /* Process the sampler derived information. */
+        _PostProcessSamplerDerivedInfo(&pUtbEntry->samplerDerivedInfo[stageIdx],
+                                       &pUtbEntry->utbBinding,
+                                       pUtbEntry->utbEntryIndex,
+                                       gcvFALSE);
     }
 
     return errCode;
@@ -5863,8 +5985,7 @@ static VSC_ErrCode _PostProcessVkInputAttachmentTable(VSC_PEP_GEN_HELPER* pPepGe
 {
     VSC_ErrCode                          errCode = VSC_ERR_NONE;
     PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY*pIaEntries;
-    gctUINT                              i, j, layerIdx;
-    SHADER_PRIV_CONSTANT_ENTRY*          pPrivCnstEntry;
+    gctUINT                              i, j;
     SHADER_PRIV_SAMPLER_ENTRY*           pPrivSamplerEntry;
     gctBOOL                              bIsSampler = gcvFALSE;
 
@@ -5890,32 +6011,11 @@ static VSC_ErrCode _PostProcessVkInputAttachmentTable(VSC_PEP_GEN_HELPER* pPepGe
                 }
             }
 
-            for (layerIdx = 0; layerIdx < 2; layerIdx++)
-            {
-                /* Texture size */
-                pPrivCnstEntry = pIaEntries->pTextureSize[stageIdx][layerIdx];
-                if (pPrivCnstEntry)
-                {
-                    gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
-                    *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pIaEntries->iaEntryIndex;
-                }
-
-                /* lodMinMax */
-                pPrivCnstEntry = pIaEntries->pLodMinMax[stageIdx][layerIdx];
-                if (pPrivCnstEntry)
-                {
-                    gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
-                    *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pIaEntries->iaEntryIndex;
-                }
-
-                /* levelsSamples */
-                pPrivCnstEntry = pIaEntries->pLevelsSamples[stageIdx][layerIdx];
-                if (pPrivCnstEntry)
-                {
-                    gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
-                    *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pIaEntries->iaEntryIndex;
-                }
-            }
+            /* Process the sampler derived information. */
+            _PostProcessSamplerDerivedInfo(&pIaEntries->samplerDerivedInfo[stageIdx],
+                                           &pIaEntries->iaBinding,
+                                           pIaEntries->iaEntryIndex,
+                                           gcvFALSE);
         }
         else
         {
@@ -5981,6 +6081,11 @@ static VSC_ErrCode _PostProcessPrivateCombTsHwMapping(PROGRAM_EXECUTABLE_PROFILE
                 }
             }
         }
+
+        _PostProcessSamplerDerivedInfo(&pPrivCombTsHwMappingEntry->samplerDerivedInfo,
+                                       pPrivCombTsHwMappingEntry->samplerSubBinding.pResBinding,
+                                       0,
+                                       gcvTRUE);
     }
 
     return errCode;

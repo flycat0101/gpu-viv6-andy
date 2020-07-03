@@ -11175,6 +11175,30 @@ VIR_Symbol_GetUniformPointer(
     return pUniform;
 }
 
+gctBOOL
+VIR_Symbol_IsSymbolUnsupport(
+    IN VIR_Shader*          pShader,
+    IN VIR_Symbol*          pSym
+    )
+{
+    VIR_SpirvInfo*          pSpirvCapa = &(VIR_Shader_GetSpirvInfo(pShader));
+    VIR_NameId              symbolNameId = VIR_Symbol_GetName(pSym);
+
+    /* Check the capability for a SPIR-V binary. */
+    if (VIR_Shader_IsGeneratedFromSpirv(pShader))
+    {
+        /* ClipDistance and CullDistance are supported when the corresponding capability is set. */
+        if ((symbolNameId == VIR_NAME_CLIP_DISTANCE && !VIR_SprivInfo_HasClipDistance(pSpirvCapa))
+            ||
+            (symbolNameId == VIR_NAME_CULL_DISTANCE && !VIR_SprivInfo_HasCullDistance(pSpirvCapa)))
+        {
+            return gcvTRUE;
+        }
+    }
+
+    return gcvFALSE;
+}
+
 /* functions */
 VSC_ErrCode
 VIR_Function_AddSymbol(

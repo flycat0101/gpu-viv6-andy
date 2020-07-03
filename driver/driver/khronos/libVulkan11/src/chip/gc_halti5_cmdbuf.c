@@ -8326,6 +8326,90 @@ void halti5_helper_setSamplerStates(
 
 }
 
+static VkResult halti5_helper_setSamplerDerivedInfo(
+    uint32_t **commandBuffer,
+    gcsHINT *hints,
+    __vkSampler *sampler,
+    __vkImageView *imgv,
+    uint32_t stageIdx,
+    uint32_t arrayIdx,
+    PROG_VK_SAMPLER_DERIVED_INFO* samplerDerivedInfo
+    )
+{
+    uint32_t layerIdx = 0;
+    SHADER_PRIV_CONSTANT_ENTRY *privEntry;
+    __vkImage *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, imgv->createInfo.image);
+    halti5_imageView *chipImgv = (halti5_imageView *)imgv->chipPriv;
+
+    for (layerIdx = 0; layerIdx < 2; layerIdx++)
+    {
+        /* Program textureSize. */
+        privEntry = samplerDerivedInfo->pTextureSize[layerIdx];
+        if (privEntry)
+        {
+            if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
+            {
+                uint32_t data[4] = {0};
+                uint32_t hwConstRegNoForSize = privEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.constReg.hwRegNo;
+                uint32_t hwConstRegAddr = (hints->hwConstRegBases[stageIdx] >> 2) + (hwConstRegNoForSize * 4)
+                                        + privEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
+
+                __VK_ASSERT(privEntry->commonPrivm.privmKind == SHS_PRIV_CONSTANT_KIND_TEXTURE_SIZE);
+
+                data[0] = chipImgv->txDesc[0].baseWidth;
+                data[1] = chipImgv->txDesc[0].baseHeight;
+                data[2] = chipImgv->txDesc[0].baseDepth;
+                data[3] = chipImgv->txDesc[0].baseSlice;
+                __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4, data);
+            }
+        }
+
+        /* Program lodMinMax. */
+        privEntry = samplerDerivedInfo->pLodMinMax[layerIdx];
+        if (privEntry)
+        {
+            if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
+            {
+                uint32_t data[4] = {0};
+                uint32_t hwConstRegNoForSize = privEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.constReg.hwRegNo;
+                uint32_t hwConstRegAddr = (hints->hwConstRegBases[stageIdx] >> 2) + (hwConstRegNoForSize * 4)
+                                        + privEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
+
+                __VK_ASSERT(privEntry->commonPrivm.privmKind == SHS_PRIV_CONSTANT_KIND_LOD_MIN_MAX);
+
+                data[0] = (gctINT)sampler->createInfo.minLod;
+                data[1] = (gctINT)sampler->createInfo.maxLod;
+                data[2] = (sampler->createInfo.minFilter == VK_FILTER_NEAREST) ? 0 : 1;
+                data[3] = 0;
+                __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4, data);
+            }
+        }
+
+        /* Program levelsSamples. */
+        privEntry = samplerDerivedInfo->pLevelsSamples[layerIdx];
+        if (privEntry)
+        {
+            if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
+            {
+                uint32_t data[4] = {0};
+                uint32_t hwConstRegNoForSize = privEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.constReg.hwRegNo;
+                uint32_t hwConstRegAddr = (hints->hwConstRegBases[stageIdx] >> 2) + (hwConstRegNoForSize * 4)
+                                        + privEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
+
+                __VK_ASSERT(privEntry->commonPrivm.privmKind == SHS_PRIV_CONSTANT_KIND_LEVELS_SAMPLES);
+
+                data[0] = (gctINT)imgv->createInfo.subresourceRange.levelCount;
+                data[1] = (gctINT)img->sampleInfo.product;
+                data[2] = 0;
+                data[3] = 0;
+                __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4, data);
+            }
+        }
+    }
+
+    return VK_SUCCESS;
+}
+
 static VkResult halti5_helper_setDescSetSeperateImage(
     __vkCommandBuffer *cmdBuf,
     __vkDevContext *devCtx,
@@ -8474,8 +8558,16 @@ static VkResult halti5_helper_setDescSetSeperateImage(
                                                                                   extraSamplerNo,
                                                                                   hints->shaderConfigData);
                             }
-                            hwSamplerSlotIdx++;
 
+                            halti5_helper_setSamplerDerivedInfo(commandBuffer,
+                                                                hints,
+                                                                sampler,
+                                                                imgv,
+                                                                stageIdx,
+                                                                0,
+                                                                &privCombinedMapping->samplerDerivedInfo);
+
+                            hwSamplerSlotIdx++;
                         }
                     }
 
@@ -8744,6 +8836,15 @@ static VkResult halti5_helper_setDescSetSeperateSampler(
                                                                                   extraSamplerNo,
                                                                                   hints->shaderConfigData);
                             }
+
+                            halti5_helper_setSamplerDerivedInfo(commandBuffer,
+                                                                hints,
+                                                                sampler,
+                                                                imgv,
+                                                                stageIdx,
+                                                                0,
+                                                                &privCombinedMapping->samplerDerivedInfo);
+
                             hwSamplerSlotIdx++;
                         }
                     }
@@ -8826,7 +8927,6 @@ static VkResult halti5_helper_setDescSetCombinedImageSampler(
                 __vkSampler *sampler;
                 halti5_sampler *chipSampler;
                 halti5_imageView *chipImgv;
-                uint32_t layerIdx = 0;
 
                 __vk_utils_region_mad(&curDescRegion, &descriptorBinding->perElementSize, arrayIdx, &descriptorBinding->offset);
                 resInfo = (__vkDescriptorResourceInfo *)((uint8_t*)descSet->resInfos + curDescRegion.resource);
@@ -8914,69 +9014,13 @@ static VkResult halti5_helper_setDescSetCombinedImageSampler(
                     }
                 }
 
-                for (layerIdx = 0; layerIdx < 2; layerIdx++)
-                {
-                    SHADER_PRIV_CONSTANT_ENTRY *privEntry = samplerEntry->pTextureSize[stageIdx][layerIdx];
-
-                    if (privEntry)
-                    {
-                        if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
-                        {
-                            uint32_t data[4] = {0};
-                            uint32_t hwConstRegNoForSize = privEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.constReg.hwRegNo;
-                            uint32_t hwConstRegAddr = (hints->hwConstRegBases[stageIdx] >> 2) + (hwConstRegNoForSize * 4)
-                                                    + privEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
-
-                            __VK_ASSERT(privEntry->commonPrivm.privmKind == SHS_PRIV_CONSTANT_KIND_TEXTURE_SIZE);
-
-                            data[0] = chipImgv->txDesc[0].baseWidth;
-                            data[1] = chipImgv->txDesc[0].baseHeight;
-                            data[2] = chipImgv->txDesc[0].baseDepth;
-                            data[3] = chipImgv->txDesc[0].baseSlice;
-                            __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4, data);
-                        }
-                    }
-
-                    privEntry = samplerEntry->pLodMinMax[stageIdx][layerIdx];
-                    if (privEntry)
-                    {
-                        if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
-                        {
-                            uint32_t data[4] = {0};
-                            uint32_t hwConstRegNoForSize = privEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.constReg.hwRegNo;
-                            uint32_t hwConstRegAddr = (hints->hwConstRegBases[stageIdx] >> 2) + (hwConstRegNoForSize * 4)
-                                                    + privEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
-
-                            __VK_ASSERT(privEntry->commonPrivm.privmKind == SHS_PRIV_CONSTANT_KIND_LOD_MIN_MAX);
-
-                            data[0] = (gctINT)sampler->createInfo.minLod;
-                            data[1] = (gctINT)sampler->createInfo.maxLod;
-                            data[2] = (sampler->createInfo.minFilter == VK_FILTER_NEAREST) ? 0 : 1;
-                            data[3] = 0;
-                            __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4, data);
-                        }
-                    }
-
-                    privEntry = samplerEntry->pLevelsSamples[stageIdx][layerIdx];
-                    if (privEntry)
-                    {
-                        if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
-                        {
-                            uint32_t data[4] = {0};
-                            uint32_t hwConstRegNoForSize = privEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.constReg.hwRegNo;
-                            uint32_t hwConstRegAddr = (hints->hwConstRegBases[stageIdx] >> 2) + (hwConstRegNoForSize * 4)
-                                                    + privEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
-
-                            __VK_ASSERT(privEntry->commonPrivm.privmKind == SHS_PRIV_CONSTANT_KIND_LEVELS_SAMPLES);
-
-                            data[0] = (gctINT)imgv->createInfo.subresourceRange.levelCount;
-                            data[1] = (gctINT)img->sampleInfo.product;
-                            data[2] = 0;
-                            data[3] = 0;
-                            __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4, data);
-                        }
-                    }
-                }
+                halti5_helper_setSamplerDerivedInfo(commandBuffer,
+                                                    hints,
+                                                    sampler,
+                                                    imgv,
+                                                    stageIdx,
+                                                    arrayIdx,
+                                                    &samplerEntry->samplerDerivedInfo[stageIdx]);
             }
 
             /* Program the combinded image. */
@@ -9228,7 +9272,8 @@ static VkResult halti5_helper_setDescSetUniformTexelBuffer(
                     for (layerIdx = 0; layerIdx < 2; layerIdx++)
                     {
                         /* Set the texture size. */
-                        SHADER_PRIV_CONSTANT_ENTRY *privEntry = samplerBufEntry->pTextureSize[stageIdx][layerIdx];
+                        PROG_VK_SAMPLER_DERIVED_INFO* pSamplerDerivedInfo = &samplerBufEntry->samplerDerivedInfo[stageIdx];
+                        SHADER_PRIV_CONSTANT_ENTRY *privEntry = pSamplerDerivedInfo->pTextureSize[layerIdx];
 
                         if (privEntry)
                         {

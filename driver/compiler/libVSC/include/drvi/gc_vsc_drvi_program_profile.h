@@ -498,6 +498,25 @@ typedef struct PROG_VK_IMAGE_DERIVED_INFO
 }
 PROG_VK_IMAGE_DERIVED_INFO;
 
+typedef struct PROG_VK_SAMPLER_DERIVED_INFO
+{
+    /* For a sampler, it might need a texture-size attached. As each sampler in
+       arraySize array has texture-size, so this is the first entry
+       of texture-size array. */
+    SHADER_PRIV_CONSTANT_ENTRY*                 pTextureSize[2];
+
+    /* For a sampler, it might need a lodMinMax attached. As each sampler in
+       arraySize array has lodMinMax, so this is the first entry
+       of lodMinMax array. */
+    SHADER_PRIV_CONSTANT_ENTRY*                 pLodMinMax[2];
+
+    /* For a sampler, it might need a levelsSamples attached. As each sampler in
+       rraySize array has levelsSamples, so this is the first entry
+       of levelsSamples array. */
+    SHADER_PRIV_CONSTANT_ENTRY*                 pLevelsSamples[2];
+}
+PROG_VK_SAMPLER_DERIVED_INFO;
+
 typedef struct PROG_VK_SUB_RESOURCE_BINDING
 {
     /* Pointer to original API resource binding */
@@ -532,6 +551,9 @@ typedef struct PROG_VK_PRIV_COMB_TEX_SAMP_HW_MAPPING
 
     /* The array size is ((sub-array-size m of sampler) * (sub-array-size n of tex)) */
     SHADER_PRIV_SAMPLER_ENTRY**                 ppExtraSamplerArray;
+
+    /*----------------------------------Sampler-related----------------------------------*/
+    PROG_VK_SAMPLER_DERIVED_INFO                samplerDerivedInfo;
 }
 PROG_VK_PRIV_COMB_TEX_SAMP_HW_MAPPING;
 
@@ -598,20 +620,8 @@ typedef struct PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY
     /* Is this entry really used by shader */
     gctUINT                                     activeStageMask;
 
-    /* For texel buffer, it might need a texture-size attached. As each texel buffer in
-       combTsBinding::arraySize array has texture-size, so this is the first entry
-       of texture-size array. */
-    SHADER_PRIV_CONSTANT_ENTRY*                 pTextureSize[VSC_MAX_SHADER_STAGE_COUNT][2];
-
-    /* For texel buffer, it might need a lodMinMax attached. As each texel buffer in
-       combTsBinding::arraySize array has lodMinMax, so this is the first entry
-       of lodMinMax array. */
-    SHADER_PRIV_CONSTANT_ENTRY*                 pLodMinMax[VSC_MAX_SHADER_STAGE_COUNT][2];
-
-    /* For texel buffer, it might need a levelsSamples attached. As each texel buffer in
-       combTsBinding::arraySize array has levelsSamples, so this is the first entry
-       of lodMinMax array. */
-    SHADER_PRIV_CONSTANT_ENTRY*                 pLevelsSamples[VSC_MAX_SHADER_STAGE_COUNT][2];
+    /*----------------------------------Sampler-related----------------------------------*/
+    PROG_VK_SAMPLER_DERIVED_INFO                samplerDerivedInfo[VSC_MAX_SHADER_STAGE_COUNT];
 
     /* Which kinds of inst operation acting on sampler (texture part). The count of
        this resOpBit is same as combTsBinding::arraySize */
@@ -798,10 +808,7 @@ typedef struct PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE_ENTRY
     PROG_VK_UNIFORM_TEXEL_BUFFER_ENTRY_FLAG     utbEntryFlag;
 
     /*----------------------------------Sampler-related----------------------------------*/
-    /* For texel buffer, it might need a texture-size attached. As each texel buffer in
-       utbBinding::arraySize array has texture-size, so this is the first entry
-       of texture-size array. */
-    SHADER_PRIV_CONSTANT_ENTRY*                 pTextureSize[VSC_MAX_SHADER_STAGE_COUNT][2];
+    PROG_VK_SAMPLER_DERIVED_INFO                samplerDerivedInfo[VSC_MAX_SHADER_STAGE_COUNT];
 
     /*----------------------------------Image-related----------------------------------*/
     PROG_VK_IMAGE_DERIVED_INFO                  imageDerivedInfo[VSC_MAX_SHADER_STAGE_COUNT];
@@ -863,20 +870,7 @@ typedef struct PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY
     PROG_VK_IMAGE_DERIVED_INFO                  imageDerivedInfo[VSC_MAX_SHADER_STAGE_COUNT];
 
     /*----------------------------------Sampler-related----------------------------------*/
-    /* For texel buffer, it might need a texture-size attached. As each texel buffer in
-       iaBinding::arraySize array has texture-size, so this is the first entry
-       of texture-size array. */
-    SHADER_PRIV_CONSTANT_ENTRY*                 pTextureSize[VSC_MAX_SHADER_STAGE_COUNT][2];
-
-    /* For texel buffer, it might need a lodMinMax attached. As each texel buffer in
-       iaBinding::arraySize array has lodMinMax, so this is the first entry
-       of lodMinMax array. */
-    SHADER_PRIV_CONSTANT_ENTRY*                 pLodMinMax[VSC_MAX_SHADER_STAGE_COUNT][2];
-
-    /* For texel buffer, it might need a levelsSamples attached. As each texel buffer in
-       iaBinding::arraySize array has levelsSamples, so this is the first entry
-       of lodMinMax array. */
-    SHADER_PRIV_CONSTANT_ENTRY*                 pLevelsSamples[VSC_MAX_SHADER_STAGE_COUNT][2];
+    PROG_VK_SAMPLER_DERIVED_INFO                samplerDerivedInfo[VSC_MAX_SHADER_STAGE_COUNT];
 
     /* Which kinds of inst operation acting on sampler (has flag VIR_SRE_FLAG_TREAT_IA_AS_SAMPLER). The count of
        this resOpBit is same as iaBinding::arraySize */

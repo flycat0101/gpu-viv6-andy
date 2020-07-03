@@ -2166,7 +2166,7 @@ _VIR_LoopInfo_IdentifyBasicIVs(
 
                 if(vscHTBL_DirectTestAndGet(&definedSymbols, destSym, &definedEnableFromHT))
                 {
-                    definedEnable = (VIR_Enable)definedEnableFromHT;
+                    definedEnable = (VIR_Enable)(gctUINTPTR_T)definedEnableFromHT;
                     possibleNewIVEnable = (VIR_Enable)((gctUINT)possibleNewIVEnable & ~(gctUINT)definedEnable);
 
                     if(definedEnable != enable)

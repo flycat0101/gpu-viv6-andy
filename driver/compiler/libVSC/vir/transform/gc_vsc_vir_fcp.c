@@ -1425,6 +1425,161 @@ OnError:
     return errCode;
 }
 
+/***************************Update the global invocation ID***************************/
+static VSC_ErrCode
+_UpdateGlobalInvocationId(
+    VSC_SH_PASS_WORKER* pPassWorker,
+    gctBOOL*            bChanged
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VIR_Shader*             pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_DEF_USAGE_INFO*     pDuInfo = pPassWorker->pDuInfo;
+    VIR_GENERAL_DU_ITERATOR duIter;
+    VIR_USAGE*              pUsage = gcvNULL;
+    VIR_Instruction*        pUsageInst = gcvNULL;
+    VIR_Operand*            pUsageOpnd = gcvNULL;
+    VIR_Function*           pMainFunc = VIR_Shader_GetMainFunction(pShader);
+    VIR_Instruction*        pNewAddInst = gcvNULL;
+    VIR_Operand*            pNewOpnd = gcvNULL;
+    VIR_Symbol*             pGlobalInvocationIdSym = gcvNULL;
+    VIR_Symbol*             pGlobalInvocationIdRegSym = gcvNULL;
+    VIR_Symbol*             pGlobalOffsetUniformSym = gcvNULL;
+    gctUINT                 defIdx = 0;
+    VIR_DEF*                pDef;
+
+    if (!VIR_Shader_IsCL(pShader) && !VIR_Shader_IsGlCompute(pShader))
+    {
+        WARNING_REPORT(VSC_ERR_INVALID_DATA, "Only CS and CL have GlobalInvocationId.");
+        return errCode;
+    }
+
+    /* Get GlobalInvocationId. */
+    pGlobalInvocationIdSym = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_GLOBAL_INVOCATION_ID);
+
+    /* We need to make sure that if GlobalInvocationId is not used before, it can't be used in the following passes. */
+    if (pGlobalInvocationIdSym == gcvNULL || isSymUnused(pGlobalInvocationIdSym))
+    {
+        return errCode;
+    }
+
+    /* Get the reg symbol. */
+    pGlobalInvocationIdRegSym = VIR_Shader_FindSymbolByTempIndex(pShader, VIR_Symbol_GetVariableVregIndex(pGlobalInvocationIdSym));
+    gcmASSERT(pGlobalInvocationIdRegSym != gcvNULL);
+
+    /* Check if we need to add the global offset uniform. */
+    pGlobalOffsetUniformSym = VIR_Shader_FindSymbolByName(pShader, VIR_SYM_UNIFORM, _sldGlobalOffsetName);
+    if (pGlobalOffsetUniformSym == gcvNULL)
+    {
+        errCode = VIR_Shader_AddNamedUniform(pShader,
+                                             _sldGlobalOffsetName,
+                                             VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT_X4),
+                                             &pGlobalOffsetUniformSym);
+        CHECK_ERROR(errCode, "Add global offset uniform failed.");
+    }
+    gcmASSERT(pGlobalOffsetUniformSym != gcvNULL);
+
+    /* GlobalInvocationId = GlobalInvocationId + GlobalOffset. */
+    errCode = VIR_Function_PrependInstruction(pMainFunc,
+                                              VIR_OP_ADD,
+                                              VIR_TYPE_UINT_X3,
+                                              &pNewAddInst);
+    ON_ERROR(errCode, "Insert a ADD instruction.");
+
+    /* Set Dest. */
+    pNewOpnd = VIR_Inst_GetDest(pNewAddInst);
+    VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, VIR_Symbol_GetIndex(pGlobalInvocationIdRegSym));
+    VIR_Operand_SetEnable(pNewOpnd, VIR_ENABLE_XYZ);
+    VIR_Operand_SetTypeId(pNewOpnd, VIR_TYPE_UINT_X3);
+
+    /* Set SRC0. */
+    pNewOpnd = VIR_Inst_GetSource(pNewAddInst, 0);
+    VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, VIR_Symbol_GetIndex(pGlobalInvocationIdRegSym));
+    VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XYZZ);
+    VIR_Operand_SetTypeId(pNewOpnd, VIR_TYPE_UINT_X3);
+
+    /* Set SRC1. */
+    pNewOpnd = VIR_Inst_GetSource(pNewAddInst, 1);
+    VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, VIR_Symbol_GetIndex(pGlobalOffsetUniformSym));
+    VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XYZZ);
+    VIR_Operand_SetTypeId(pNewOpnd, VIR_TYPE_UINT_X3);
+
+    if (pDuInfo == gcvNULL)
+    {
+        return errCode;
+    }
+    /* Start to update the DU. */
+    /* Add a new def. */
+    vscVIR_AddNewDef(pDuInfo,
+                     pNewAddInst,
+                     VIR_Symbol_GetVregIndex(pGlobalInvocationIdRegSym),
+                     1,
+                     VIR_ENABLE_XYZ,
+                     VIR_HALF_CHANNEL_MASK_FULL,
+                     gcvNULL,
+                     gcvNULL);
+
+    /* Add source0 usage. */
+    vscVIR_AddNewUsageToDef(pDuInfo,
+                            VIR_INPUT_DEF_INST,
+                            pNewAddInst,
+                            VIR_Inst_GetSource(pNewAddInst, 0),
+                            gcvFALSE,
+                            VIR_Symbol_GetVregIndex(pGlobalInvocationIdRegSym),
+                            1,
+                            VIR_ENABLE_XYZ,
+                            VIR_HALF_CHANNEL_MASK_FULL,
+                            gcvNULL);
+
+    /* Add a new def for all its usages(channel XYZ). */
+    defIdx = vscVIR_FindFirstDefIndex(pDuInfo, VIR_Symbol_GetVregIndex(pGlobalInvocationIdRegSym));
+    while (VIR_INVALID_DEF_INDEX != defIdx)
+    {
+        pDef = GET_DEF_BY_IDX(&pDuInfo->defTable, defIdx);
+        gcmASSERT(pDef);
+
+        if (pDef->defKey.channel < VIR_CHANNEL_W && pDef->defKey.pDefInst == VIR_INPUT_DEF_INST)
+        {
+            duIter.pDuInfo = pDuInfo;
+            duIter.bSameBBOnly = gcvFALSE;
+            duIter.defKey.pDefInst = pDef->defKey.pDefInst;
+            duIter.defKey.regNo = VIR_Symbol_GetVregIndex(pGlobalInvocationIdRegSym);
+            duIter.defKey.channel = pDef->defKey.channel;
+            VSC_DU_ITERATOR_INIT(&(duIter.duIter), &pDef->duChain);
+
+            for (pUsage = vscVIR_GeneralDuIterator_First(&duIter);
+                 pUsage != gcvNULL;
+                 pUsage = vscVIR_GeneralDuIterator_Next(&duIter))
+            {
+                pUsageInst = pUsage->usageKey.pUsageInst;
+                pUsageOpnd = pUsage->usageKey.pOperand;
+
+                vscVIR_AddNewUsageToDef(pDuInfo,
+                                        pNewAddInst,
+                                        pUsageInst,
+                                        pUsageOpnd,
+                                        gcvFALSE,
+                                        VIR_Symbol_GetVregIndex(pGlobalInvocationIdRegSym),
+                                        1,
+                                        (VIR_Enable)(VIR_ENABLE_X << pDef->defKey.channel),
+                                        VIR_HALF_CHANNEL_MASK_FULL,
+                                        gcvNULL);
+            }
+        }
+
+        /* Get next def with same regNo */
+        defIdx = pDef->nextDefIdxOfSameRegNo;
+    }
+
+    if (bChanged)
+    {
+        *bChanged = gcvTRUE;
+    }
+
+OnError:
+    return errCode;
+}
+
 static VSC_ErrCode
 _ConvSingleTemp256Src(
     VIR_DEF_USAGE_INFO* pDuInfo,
@@ -1923,6 +2078,7 @@ VSC_ErrCode vscVIR_PostMCCleanup(
     VSC_HW_CONFIG       *pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
     gctBOOL             bInvalidCfg = gcvFALSE;
     gctBOOL             bInvalidDu = gcvFALSE;
+    gctBOOL             bChanged = gcvFALSE;
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (func_node = VIR_FuncIterator_First(&func_iter);
@@ -2014,6 +2170,15 @@ VSC_ErrCode vscVIR_PostMCCleanup(
     /* Use gl_globalInvocationID to calculate the gl_globalInvocationIndex. */
     errCode = _CalculateGlobalInvocationIndex(pShader, &bInvalidDu);
     ON_ERROR(errCode, "Calculate global invocation index. ");
+
+    /*
+    ** Generate the following instruction: gl_GlobalInvocationID = gl_GlobalInvocationID + #global_offset.
+    */
+    if (pPassWorker->pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_ADD_GLOBAL_OFFSET)
+    {
+        errCode = _UpdateGlobalInvocationId(pPassWorker, &bChanged);
+        ON_ERROR(errCode, "Update global invocation ID.");
+    }
 
     if (VirSHADER_DumpCodeGenVerbose(pShader))
     {
