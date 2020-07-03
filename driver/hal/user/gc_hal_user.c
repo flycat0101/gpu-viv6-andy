@@ -1168,7 +1168,7 @@ gcoHAL_Commit(
     {
         gctBOOL fenceEnable;
 
-        gcoHARDWARE_GetFenceEnabled(gcvNULL, &fenceEnable);
+        gcmONERROR(gcoHARDWARE_GetFenceEnabled(gcvNULL, &fenceEnable));
 
         /*only send rlv fence here before commit as hw fence will be send when commit*/
         if (fenceEnable && !gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE_32BIT)
