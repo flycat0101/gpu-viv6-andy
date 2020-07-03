@@ -3308,12 +3308,16 @@ _SynchronousPost(
         }
 
         /*
-         * Force synchronous flip for android compositor.
-         * Notice that it is only when ANDROID_native_fence_sync disabled.
+         * Force synchronous flip only when ANDROID_native_fence_sync is disabled.
+         * ANDROID_native_fence_sync has been enabled by default since Android 9.
          */
         else if (patchId == gcvPATCH_ANDROID_COMPOSITOR)
         {
+#if ANDROID_SDK_VERSION >= 27
+            sync = EGL_FALSE;
+#else
             sync = EGL_TRUE;
+#endif
             break;
         }
 
@@ -3344,7 +3348,11 @@ _SynchronousPost(
         /* Synchronous for the compositor. */
         if (!info->queuesToComposer)
         {
+#if ANDROID_SDK_VERSION >= 27
+            sync = EGL_FALSE;
+#else
             sync = EGL_TRUE;
+#endif
             break;
         }
     }
