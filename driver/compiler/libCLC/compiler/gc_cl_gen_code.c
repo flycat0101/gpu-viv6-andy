@@ -5870,6 +5870,27 @@ OUT clsCOMPONENT_SELECTION *Dest
 }
 
 static void
+_ReverseRegDataTypeComponentSelection(
+IN clsGEN_CODE_DATA_TYPE DataType,
+IN clsCOMPONENT_SELECTION *Source,
+OUT clsCOMPONENT_SELECTION *Dest
+)
+{
+    gctUINT8 i;
+    gctUINT8 components;
+
+    components = gcGetDataTypeComponentCount(DataType);
+
+    *Dest = (components < 5) ? ComponentSelection_XYZW
+                             : ((components < 9)  ? ComponentSelection_VECTOR8
+                                                  : ComponentSelection_VECTOR16);
+    gcmASSERT(Source->components <= cldMaxComponentCount);
+    for(i = 0; i < Source->components; i++) {
+        Dest->selection[Source->selection[i]] = i;
+    }
+}
+
+static void
 _ReverseComponents(
 IN gctUINT8 StartComponent,
 IN gctUINT8 NumComponent,
@@ -30947,8 +30968,9 @@ _ComputeReverseComponentSelection(
 
                 currentComponentSelection = _SwizzleComponentSelection(&currentComponentSelection,
                                                                        &Operand->u.reg.componentSelection);
-                _ReverseComponentSelection(&currentComponentSelection,
-                                           ComponentSelection);
+                _ReverseRegDataTypeComponentSelection(Operand->u.reg.dataType,
+                                                      &currentComponentSelection,
+                                                      ComponentSelection);
                 break;
 
             default:
@@ -30958,8 +30980,9 @@ _ComputeReverseComponentSelection(
         }
     }
     else if (gcIsVectorDataType(Operand->dataType)) {
-        _ReverseComponentSelection(&Operand->u.reg.componentSelection,
-                                   ComponentSelection);
+        _ReverseRegDataTypeComponentSelection(Operand->u.reg.dataType,
+                                              &Operand->u.reg.componentSelection,
+                                              ComponentSelection);
     }
     return gcvSTATUS_OK;
 }
