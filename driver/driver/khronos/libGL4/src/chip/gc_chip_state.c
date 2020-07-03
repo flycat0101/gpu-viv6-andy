@@ -2583,7 +2583,7 @@ gcChipValidateGL4FixState(
     if (localMask)
     {
          /* set fog key for shaders */
-        if (localMask & (__GL_FOGMODE_BIT | __GL_FOG_ENDISABLE_BIT) ) {
+        if (localMask & (__GL_FOGMODE_BIT | __GL_FOG_ENDISABLE_BIT | __GL_FOGCOORDSRC_BIT) ) {
             if (localMask & __GL_FOGMODE_BIT) {
                 GLenum mode = glvLINEARFOG;
                 switch (gc->state.fog.mode) {
@@ -2607,6 +2607,10 @@ gcChipValidateGL4FixState(
                 glmSETHASH_1BIT(hashFogEnabled,
                     gc->state.enables.fog,
                     0);
+            }
+            if (localMask & __GL_FOGCOORDSRC_BIT)
+            {
+                chipCtx->hashKey.hashFogCoordSource = (GL_FOG_COORD == gc->state.fog.coordSource) ? 0 : 1;
             }
         }
 
