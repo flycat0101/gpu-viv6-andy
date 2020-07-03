@@ -2058,8 +2058,12 @@ typedef struct _gcsGLSLCaps
     gcePROVOKING_VERTEX_CONVENSION provokingVertex;
     gctUINT maxGsInvocationCount;
 
-    /* Desktop GL limits */
+    /* Primitive Clipling limits */
     gctUINT maxClipDistances;
+    gctUINT maxCullDistances;
+    gctUINT maxCombinedClipAndCullDistances;
+
+    /* Desktop GL limits */
     gctUINT maxLights;
     gctUINT maxClipPlanes;
     gctUINT maxFragmentUniformComponents;
@@ -2219,8 +2223,11 @@ extern gceSTATUS gcInitGLSLCaps(
 #define GetGLMaxGSUniformBufferBindings()     (gcGetGLSLCaps()->maxGsUniformBlocks)
 #define GetGLMaxGSShaderStorageBufferBindings()     (gcGetGLSLCaps()->maxGsShaderStorageBlocks)
 
-/* Desktop GL constants */
 #define GetGLMaxClipDistances()               (gcGetGLSLCaps()->maxClipDistances)
+#define GetGLMaxCullDistances()               (gcGetGLSLCaps()->maxCullDistances)
+#define GetGLMaxCombinedClipCullDistances()   (gcGetGLSLCaps()->maxCombinedClipAndCullDistances)
+
+/* Desktop GL constants */
 #define GetGLMaxLights()                      (gcGetGLSLCaps()->maxLights)
 #define GetGLMaxClipPlanes()                  (gcGetGLSLCaps()->maxClipPlanes)
 #define GetGLMaxFragmentUniformComponents()   (gcGetGLSLCaps()->maxFragmentUniformComponents)

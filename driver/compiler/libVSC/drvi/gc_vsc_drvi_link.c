@@ -780,8 +780,10 @@ static gctBOOL _IsFakeSGV(VIR_Shader* pUpperShader, VIR_Shader* pLowerShader,
         (attrBuiltinName == VIR_NAME_CULL_DISTANCE || attrBuiltinName == VIR_NAME_IN_CULL_DISTANCE)
         )
     {
-        /* All OGL that before GL4.00 need ClipDistance/CullDistance have the same size for all stages. */
-        if (VIR_Shader_IsDesktopGL(pLowerShader) && !VIR_Shader_IsGL40(pLowerShader))
+        /* All OGL that before GL4.00 and vulkan need ClipDistance/CullDistance have the same size for all stages. */
+        if ((VIR_Shader_IsDesktopGL(pLowerShader) && !VIR_Shader_IsGL40(pLowerShader))
+            ||
+            VIR_Shader_IsVulkan(pLowerShader))
         {
             return gcvTRUE;
         }
@@ -856,8 +858,10 @@ static gctBOOL _IsFakeSIV(VIR_Shader* pUpperShader, VIR_Shader* pLowerShader,
         (outputBuiltinName == VIR_NAME_CULL_DISTANCE || outputBuiltinName == VIR_NAME_IN_CULL_DISTANCE)
         )
     {
-        /* All OGL that before GL4.00 need ClipDistance/CullDistance have the same size for all stages. */
-        if (VIR_Shader_IsDesktopGL(pLowerShader) && !VIR_Shader_IsGL40(pLowerShader))
+        /* All OGL that before GL4.00 and vulkan need ClipDistance/CullDistance have the same size for all stages. */
+        if ((VIR_Shader_IsDesktopGL(pLowerShader) && !VIR_Shader_IsGL40(pLowerShader))
+            ||
+            VIR_Shader_IsVulkan(pLowerShader))
         {
             return gcvTRUE;
         }
@@ -1473,7 +1477,7 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
         /* Only consider used one */
         if (fslStage == FSL_STAGE_API_SPEC_CHECK)
         {
-            if (!VIR_Symbol_HasFlag(pAttrSym, VIR_SYMFLAG_STATICALLY_USED))
+            if (!isSymStaticallyUsed(pAttrSym))
             {
                 continue;
             }
@@ -1695,7 +1699,7 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
         {
             pOutputSym = VIR_Shader_GetSymFromId(pUpperShader, VIR_IdList_GetId(pOutputIdLstsOfUpperShader, outputIdx));
 
-            if (!VIR_Symbol_HasFlag(pOutputSym, VIR_SYMFLAG_STATICALLY_USED))
+            if (!isSymStaticallyUsed(pOutputSym))
             {
                 continue;
             }
@@ -3237,6 +3241,59 @@ static void _CollectVectorizableIoPacketsFromNormalPairs(VSC_BASE_LINKER_HELPER*
     }
 }
 
+static gctBOOL _CanCollectIoPairsBaseOnSO(VIR_Shader*           pUpperShader,
+                                          VIR_Shader*           pLowerShader,
+                                          VIR_AttributeIdList*  pAttrIdLstsOfLowerShader,
+                                          VIR_Symbol*           pOutputSym,
+                                          VIR_Symbol*           pSoSym,
+                                          VIR_Type*             pOutputSymType)
+{
+    VIR_NameId outputNameId = VIR_Symbol_GetName(pOutputSym);
+
+    if ((VIR_Shader_IsNameBuiltIn(pUpperShader, outputNameId) && !_IsFakeSIV(pUpperShader, pLowerShader, pOutputSym, gcvTRUE))
+        ||
+        pSoSym != pOutputSym
+        ||
+        /*TODO: if output is matrix and used in lower shader, the layout is different */
+        /* For SIV/partial SO/multi-regs SO, add break-pair */
+        (VIR_Symbol_GetVirIoRegCount(pUpperShader, pOutputSym) > 1 && VIR_Type_isMatrix(pOutputSymType) && VIR_IdList_Count(pAttrIdLstsOfLowerShader) > 0))
+    {
+        return gcvFALSE;
+    }
+
+    /* Do not vectorize ClipDistance/CullDistance. */
+    if ((outputNameId == VIR_NAME_CLIP_DISTANCE || outputNameId == VIR_NAME_IN_CLIP_DISTANCE)
+        ||
+        (outputNameId == VIR_NAME_CULL_DISTANCE || outputNameId == VIR_NAME_IN_CULL_DISTANCE))
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
+static gctBOOL _CanCollectIoPairsBaseOnIO(VIR_Shader*           pUpperShader,
+                                          VIR_Shader*           pLowerShader,
+                                          VIR_Symbol*           pAttrSym)
+{
+    VIR_NameId attrNameId = VIR_Symbol_GetName(pAttrSym);
+
+    if (VIR_Shader_IsNameBuiltIn(pLowerShader, attrNameId) && !_IsFakeSGV(pUpperShader, pLowerShader, attrNameId, gcvTRUE))
+    {
+        return gcvFALSE;
+    }
+
+    /* Do not vectorize ClipDistance/CullDistance. */
+    if ((attrNameId == VIR_NAME_CLIP_DISTANCE || attrNameId == VIR_NAME_IN_CLIP_DISTANCE)
+        ||
+        (attrNameId == VIR_NAME_CULL_DISTANCE || attrNameId == VIR_NAME_IN_CULL_DISTANCE))
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
 static void _CollectVectorizableIoPairs(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
                                         VIR_Shader* pUpperShader,
                                         VIR_Shader* pLowerShader,
@@ -3285,17 +3342,12 @@ static void _CollectVectorizableIoPairs(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
 
                 pSoIoPairArray[*pSoPairArraySize].pAttrSym = gcvNULL;
 
-                if ((VIR_Shader_IsNameBuiltIn(pUpperShader, VIR_Symbol_GetName(pOutputSym)) &&
-                     !_IsFakeSIV(pUpperShader, pLowerShader, pOutputSym, gcvTRUE)) ||
-                     pSoSym != pOutputSym ||
-                     /*TODO: if output is matrix and used in lower shader, the layout is different */
-                     (VIR_Symbol_GetVirIoRegCount(pUpperShader, pOutputSym) > 1 &&
-                      VIR_Type_isMatrix(pOutputSymType) && VIR_IdList_Count(pAttrIdLstsOfLowerShader) > 0))
-                {
-                    /* For SIV/partial SO/multi-regs SO, add break-pair */
-                    pSoIoPairArray[*pSoPairArraySize].pOutputSym = gcvNULL;
-                }
-                else
+                if (_CanCollectIoPairsBaseOnSO(pUpperShader,
+                                               pLowerShader,
+                                               pAttrIdLstsOfLowerShader,
+                                               pOutputSym,
+                                               pSoSym,
+                                               pOutputSymType))
                 {
                     /* For normal full output SO */
                     compCount = VIR_GetTypeComponents(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(pOutputSym)));
@@ -3303,6 +3355,10 @@ static void _CollectVectorizableIoPairs(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
                     pSoIoPairArray[*pSoPairArraySize].pOutputSym = compCount < CHANNEL_NUM ? pOutputSym : gcvNULL;
                     pSoIoPairArray[*pSoPairArraySize].pOutputSymShader = (pSoIoPairArray[*pSoPairArraySize].pOutputSym != gcvNULL) ?
                                                                          pUpperShader : gcvNULL;
+                }
+                else
+                {
+                    pSoIoPairArray[*pSoPairArraySize].pOutputSym = gcvNULL;
                 }
 
                 (*pSoPairArraySize) ++;
@@ -3331,8 +3387,7 @@ static void _CollectVectorizableIoPairs(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
         }
 
         /* Don't consider SGV */
-        if (VIR_Shader_IsNameBuiltIn(pLowerShader, VIR_Symbol_GetName(pAttrSym)) &&
-            !_IsFakeSGV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pAttrSym), gcvTRUE))
+        if (!_CanCollectIoPairsBaseOnIO(pUpperShader, pLowerShader, pAttrSym))
         {
             continue;
         }
@@ -4007,6 +4062,234 @@ OnError:
     return errCode;
 }
 
+static VSC_ErrCode _DoClipAndCullDistanceCheck(VSC_PROGRAM_LINKER_HELPER* pPgLinkHelper)
+{
+    VSC_ErrCode                     errCode = VSC_ERR_NONE;
+    VIR_Shader*                     pPreStage = gcvNULL;
+    VIR_Shader*                     pCurStage;
+    gctUINT                         stageIdx;
+    gctUINT                         maxClipDistances = GetGLMaxClipDistances();
+    gctUINT                         maxCullDistances = GetGLMaxCullDistances();
+    gctUINT                         maxCombinedClipAndCullDistances = GetGLMaxCombinedClipCullDistances();
+
+    for (stageIdx = 0; stageIdx < VSC_MAX_GFX_SHADER_STAGE_COUNT; stageIdx++)
+    {
+        VIR_OutputIdList*           pOutputIdLsts;
+        VIR_AttributeIdList*        pAttrIdLists;
+        VIR_Symbol*                 pSym = gcvNULL;
+        VIR_Type*                   pType = gcvNULL;
+        VIR_SymId                   psClipDistanceSymId = VIR_INVALID_ID, psCullDistanceSymId = VIR_INVALID_ID, psVariableSymId = VIR_INVALID_ID;
+        VIR_NameId                  psVariableNameId = VIR_INVALID_ID;
+        gctUINT                     clipDistanceLength = 0, cullDistanceLength = 0;
+        VIR_TypeId                  typeId = VIR_TYPE_UNKNOWN;
+        gctBOOL                     bNeedToPatchClipDistance = gcvFALSE, bNeedToPatchCullDistance = gcvFALSE;
+        gctUINT                     i, j, length;
+        VIR_SymId                   symId, regId, regSymId;
+        VIR_Symbol*                 pVirRegSym;
+        VIR_Instruction*            pNewInst = gcvNULL;
+        VIR_Operand*                pNewOpnd = gcvNULL;
+        VIR_Function*               pFunc;
+
+        pCurStage = (VIR_Shader*)pPgLinkHelper->pgPassMnger.pPgmLinkerParam->hShaderArray[stageIdx];
+
+        if (pCurStage == gcvNULL)
+        {
+            continue;
+        }
+
+        if (!VIR_Shader_IsFS(pCurStage) || pPreStage == gcvNULL)
+        {
+            pPreStage = pCurStage;
+            continue;
+        }
+
+        /* Check if the last vertex stage has ClipDistance/CullDistance output. */
+        pOutputIdLsts = VIR_Shader_GetOutputs(pPreStage);
+        for (i = 0; i < VIR_IdList_Count(pOutputIdLsts); i ++)
+        {
+            pSym = VIR_Shader_GetSymFromId(pPreStage, VIR_IdList_GetId(pOutputIdLsts, i));
+
+            /* Skip if it is not statically used. */
+            if (!isSymStaticallyUsed(pSym))
+            {
+                continue;
+            }
+
+            if (VIR_Symbol_GetName(pSym) == VIR_NAME_CLIP_DISTANCE)
+            {
+                bNeedToPatchClipDistance = gcvTRUE;
+
+                VIR_Symbol_SetFlag(pSym, VIR_SYMFLAG_ENABLED);
+                VIR_Symbol_ClrFlag(pSym, VIR_SYMFLAG_UNUSED | VIR_SYMFLAG_INACTIVE);
+
+                pType = VIR_Symbol_GetType(pSym);
+                if (VIR_Type_isArray(pType))
+                {
+                    clipDistanceLength = VIR_Type_GetArrayLength(pType);
+                    if (clipDistanceLength > maxClipDistances)
+                    {
+                        ON_ERROR(VSC_ERR_INVALID_ARGUMENT,
+                                 "The array length of ClipDistance %d is larger than the maximum value.",
+                                 clipDistanceLength,
+                                 maxClipDistances);
+                    }
+                }
+                else
+                {
+                    clipDistanceLength = 1;
+                }
+            }
+            else if (VIR_Symbol_GetName(pSym) == VIR_NAME_CULL_DISTANCE)
+            {
+                bNeedToPatchCullDistance = gcvTRUE;
+
+                VIR_Symbol_SetFlag(pSym, VIR_SYMFLAG_ENABLED);
+                VIR_Symbol_ClrFlag(pSym, VIR_SYMFLAG_UNUSED | VIR_SYMFLAG_INACTIVE);
+
+                pType = VIR_Symbol_GetType(pSym);
+                if (VIR_Type_isArray(pType))
+                {
+                    cullDistanceLength = VIR_Type_GetArrayLength(pType);
+                    if (cullDistanceLength > maxCullDistances)
+                    {
+                        ON_ERROR(VSC_ERR_INVALID_ARGUMENT,
+                                 "The array length of CullDistance %d is larger than the maximum value.",
+                                 cullDistanceLength,
+                                 maxCullDistances);
+                    }
+                }
+                else
+                {
+                    cullDistanceLength = 1;
+                }
+            }
+        }
+
+        /* Check the maximum cap. */
+        if (clipDistanceLength + cullDistanceLength > maxCombinedClipAndCullDistances)
+        {
+            ON_ERROR(VSC_ERR_INVALID_ARGUMENT,
+                     "The array length of ClipDistance and CullDistance %d is larger than the maximum value.",
+                     clipDistanceLength + cullDistanceLength,
+                     maxCombinedClipAndCullDistances);
+        }
+
+        if (!bNeedToPatchClipDistance && !bNeedToPatchCullDistance)
+        {
+            break;
+        }
+
+        /* Check if the fragment shader have these attributes. */
+        pAttrIdLists = VIR_Shader_GetAttributes(pCurStage);
+        for (i = 0; i < VIR_IdList_Count(pAttrIdLists); i++)
+        {
+            pSym = VIR_Shader_GetSymFromId(pCurStage, VIR_IdList_GetId(pAttrIdLists, i));
+            if (VIR_Symbol_GetName(pSym) == VIR_NAME_CLIP_DISTANCE)
+            {
+                psClipDistanceSymId = VIR_Symbol_GetIndex(pSym);
+            }
+            else if (VIR_Symbol_GetName(pSym) == VIR_NAME_CULL_DISTANCE)
+            {
+                psCullDistanceSymId = VIR_Symbol_GetIndex(pSym);
+            }
+        }
+
+        /* Start to add KILL in the fragment shader. */
+        pFunc = VIR_Shader_GetMainFunction(pCurStage);
+        for (i = 0; i < 2; i++)
+        {
+            if ((i == 0 && !bNeedToPatchClipDistance)
+                ||
+                (i == 1 && !bNeedToPatchCullDistance))
+            {
+                continue;
+            }
+
+            length = (i == 0 ? clipDistanceLength : cullDistanceLength);
+            psVariableSymId = (i == 0 ? psClipDistanceSymId : psCullDistanceSymId);
+            psVariableNameId = (i == 0 ? VIR_NAME_CLIP_DISTANCE : VIR_NAME_CULL_DISTANCE);
+
+            /* add a same type attribute in fragment shader */
+            if (psVariableSymId == VIR_INVALID_ID)
+            {
+                errCode = VIR_Shader_AddArrayType(pCurStage,
+                                                  VIR_TYPE_FLOAT32,
+                                                  length,
+                                                  0,
+                                                  &typeId);
+                ON_ERROR(errCode, "Fail to add an array type.");
+
+                errCode = VIR_Shader_AddSymbol(pCurStage,
+                                               VIR_SYM_VARIABLE,
+                                               psVariableNameId,
+                                               VIR_Shader_GetTypeFromId(pCurStage, typeId),
+                                               VIR_STORAGE_INPUT,
+                                               &symId);
+                ON_ERROR(errCode, "Fail to add a symbol.");
+
+                psVariableSymId = symId;
+
+                pSym = VIR_Shader_GetSymFromId(pCurStage, symId);
+                VIR_Symbol_SetPrecision(pSym, VIR_PRECISION_HIGH);
+                VIR_Symbol_SetTyQualifier(pSym, VIR_TYQUAL_CONST);
+                VIR_Symbol_SetFlag(pSym, VIR_SYMFLAG_ENABLED | VIR_SYMFLAG_STATICALLY_USED);
+                VIR_Symbol_SetLayoutQualifier(pSym, VIR_LAYQUAL_NONE);
+
+                regId = VIR_Shader_NewVirRegId(pCurStage, length);
+                VIR_Symbol_SetVariableVregIndex(pSym, regId);
+                VIR_Symbol_SetIndexRange(pSym, regId + length);
+
+                /* add vreg */
+                for (j = 0; j < length; j++)
+                {
+                    errCode = VIR_Shader_AddSymbol(pCurStage,
+                                                   VIR_SYM_VIRREG,
+                                                   regId + j,
+                                                   VIR_Shader_GetTypeFromId(pCurStage, VIR_TYPE_FLOAT32),
+                                                   VIR_STORAGE_UNKNOWN,
+                                                   &regSymId);
+                    ON_ERROR(errCode, "Fail to add a symbol.");
+
+                    pVirRegSym = VIR_Shader_GetSymFromId(pCurStage, regSymId);
+                    VIR_Symbol_SetVregVariable(pVirRegSym, pSym);
+                }
+            }
+            else
+            {
+                pSym = VIR_Shader_GetSymFromId(pCurStage, psVariableSymId);
+                VIR_Symbol_SetFlag(pSym, VIR_SYMFLAG_ENABLED | VIR_SYMFLAG_STATICALLY_USED);
+                VIR_Symbol_ClrFlag(pSym, VIR_SYMFLAG_UNUSED | VIR_SYMFLAG_INACTIVE);
+            }
+
+            for (j = 0; j < length; j++)
+            {
+                errCode = VIR_Function_PrependInstruction(pFunc,
+                                                          VIR_OP_KILL,
+                                                          VIR_TYPE_FLOAT32,
+                                                          &pNewInst);
+                ON_ERROR(errCode, "Fail to prepend a instruction.");
+
+                /* Set the condition. */
+                VIR_Inst_SetConditionOp(pNewInst, VIR_COP_LESS);
+
+                /* Set SOUREC0. */
+                pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
+                VIR_Operand_SetSymbol(pNewOpnd, pFunc, psVariableSymId);
+                VIR_Operand_SetRelIndexingImmed(pNewOpnd, j);
+                VIR_Operand_SetTypeId(pNewOpnd, VIR_TYPE_FLOAT32);
+                VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XXXX);
+
+                /* Set SOUREC1. */
+                pNewOpnd = VIR_Inst_GetSource(pNewInst, 1);
+                VIR_Operand_SetImmediateFloat(pNewOpnd, 0.0f);
+            }
+        }
+    }
+
+OnError:
+    return errCode;
+}
+
 /* Allocate some IOs due to some HW limitations. */
 static VSC_ErrCode _DoIoAllocationAmongShaderStages(VSC_PROGRAM_LINKER_HELPER* pPgLinkHelper)
 {
@@ -4014,10 +4297,23 @@ static VSC_ErrCode _DoIoAllocationAmongShaderStages(VSC_PROGRAM_LINKER_HELPER* p
     VIR_Shader*  pPreStage = gcvNULL;
     VIR_Shader*  pCurStage;
     gctUINT      stageIdx;
+    gceAPI       clientAPI = pPgLinkHelper->pgPassMnger.pPgmLinkerParam->cfg.ctx.clientAPI;
 
-    /* only support clipDistance in desktop GL */
-    if (pPgLinkHelper->pgPassMnger.pPgmLinkerParam->cfg.ctx.clientAPI != gcvAPI_OPENGL)
+    /*
+    ** 1) Desktop GL and Vulkan supports ClipDistance and CullDistance.
+    ** 2) Only checks ClipDistance for Desktop GL.
+    */
+    if (clientAPI != gcvAPI_OPENGL && clientAPI != gcvAPI_OPENVK)
+    {
         return errCode;
+    }
+
+    if (clientAPI == gcvAPI_OPENVK)
+    {
+        errCode = _DoClipAndCullDistanceCheck(pPgLinkHelper);
+
+        return errCode;
+    }
 
     for (stageIdx = 0; stageIdx < VSC_MAX_GFX_SHADER_STAGE_COUNT; stageIdx ++)
     {
@@ -4047,6 +4343,12 @@ static VSC_ErrCode _DoIoAllocationAmongShaderStages(VSC_PROGRAM_LINKER_HELPER* p
                 for (outputIdx = 0; outputIdx < VIR_IdList_Count(pOutputIdLsts); outputIdx ++)
                 {
                     pOutputSym = VIR_Shader_GetSymFromId(pPreStage, VIR_IdList_GetId(pOutputIdLsts, outputIdx));
+
+                    /* Skip if it is not statically used. */
+                    if (!isSymStaticallyUsed(pOutputSym))
+                    {
+                        continue;
+                    }
 
                     if (VIR_Symbol_GetName(pOutputSym) == VIR_NAME_CLIP_DISTANCE)
                     {
@@ -4716,7 +5018,7 @@ static VSC_ErrCode _CalcIoHwCompIndexBetweenTwoShaderStagesPerExeObj(VSC_BASE_LI
                 continue;
             }
 
-            if (!VIR_Symbol_HasFlag(pOutputSym, VIR_SYMFLAG_STATICALLY_USED))
+            if (!isSymStaticallyUsed(pOutputSym))
             {
                 continue;
             }

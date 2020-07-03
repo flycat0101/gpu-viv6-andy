@@ -6490,6 +6490,43 @@ VIR_Type_IsBaseTypeStruct(
     }
 }
 
+gctBOOL
+VIR_Type_IsBaseTypeArrayOrContainArrayField(
+    IN  VIR_Shader         *Shader,
+    IN  VIR_Type           *Type
+    )
+{
+    switch (VIR_Type_GetKind(Type))
+    {
+    case VIR_TY_ARRAY:
+        return gcvTRUE;
+
+    case VIR_TY_STRUCT:
+        {
+            VIR_SymIdList  *fields = VIR_Type_GetFields(Type);
+            gctUINT         i;
+
+            for (i = 0; i < VIR_IdList_Count(fields); i++)
+            {
+                VIR_Id      id       = VIR_IdList_GetId(VIR_Type_GetFields(Type), i);
+                VIR_Type   *fieldType = VIR_Symbol_GetType(VIR_Shader_GetSymFromId(Shader, id));
+
+                if (VIR_Type_IsBaseTypeArrayOrContainArrayField(Shader, fieldType))
+                {
+                    return gcvTRUE;
+                }
+            }
+
+            return gcvFALSE;
+        }
+
+    default:
+        break;
+    }
+
+    return gcvFALSE;
+}
+
 /*
 ** Slice type: array->base type, matrix->vector, vector->scalar.
 */

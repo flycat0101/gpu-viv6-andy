@@ -7282,13 +7282,17 @@ _CheckOperandForVarUsage(
     )
 {
     VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    VIR_OpCode                  opCode = VIR_Inst_GetOpcode(pInst);
     VIR_OperandInfo             opndInfo;
     VIR_Symbol                 *opndSym;
-    VIR_VirRegId                regId;
+    VIR_VirRegId                regId, endRegId;
     gctUINT                     i;
+    gctBOOL                     bCheckIndexRange = gcvFALSE;
 
     if (pOpnd == gcvNULL)
+    {
         return errCode;
+    }
 
     /* Check texld parm if needed. */
     if (VIR_Operand_isTexldParm(pOpnd))
@@ -7313,6 +7317,26 @@ _CheckOperandForVarUsage(
         }
     }
 
+    /* Check if it is a normal dynamic indexing. */
+    if ((opCode == VIR_OP_STARR && pOpnd == VIR_Inst_GetDest(pInst))
+        ||
+        (opCode == VIR_OP_LDARR && pOpnd == VIR_Inst_GetSource(pInst, 0)))
+    {
+        bCheckIndexRange = gcvTRUE;
+    }
+    /* Check attribute load/store. */
+    else if ((opCode == VIR_OP_ATTR_ST && pOpnd == VIR_Inst_GetDest(pInst))
+             ||
+             (opCode == VIR_OP_ATTR_LD && pOpnd == VIR_Inst_GetSource(pInst, 0)))
+    {
+        VIR_Operand*        pOffsetOpnd = (opCode == VIR_OP_ATTR_ST) ? VIR_Inst_GetSource(pInst, 1) : VIR_Inst_GetSource(pInst, 2);
+
+        if (!(VIR_Operand_isImm(pOffsetOpnd) || VIR_Operand_isConst(pOffsetOpnd)))
+        {
+            bCheckIndexRange = gcvTRUE;
+        }
+    }
+
     /* Check operand ifself. */
     VIR_Operand_GetOperandInfo(pInst, pOpnd, &opndInfo);
 
@@ -7328,15 +7352,35 @@ _CheckOperandForVarUsage(
             regId += VIR_Operand_GetConstIndexingImmed(pOpnd);
         }
 
-        /* Clear the UNUSED flag. */
-        opndSym = VIR_Shader_FindSymbolByTempIndex(pShader, regId);
-        opndSym = VIR_Symbol_GetVregVariable(opndSym);
-        /* it is possible that the underlying symbol is NULL, like invocationIndex and workgroupIndex,
-           since they are replaced by invocationID and workgroupID */
-        if (opndSym)
+        if (bCheckIndexRange)
         {
-            VIR_Symbol_ClrFlag(opndSym, VIR_SYMFLAG_UNUSED);
+            endRegId = opndInfo.u1.virRegInfo.startVirReg + opndInfo.u1.virRegInfo.virRegCount;
         }
+        else
+        {
+            endRegId = opndInfo.u1.virRegInfo.startVirReg + 1;
+        }
+
+        do
+        {
+            /* Clear the UNUSED flag. */
+            opndSym = VIR_Shader_FindSymbolByTempIndex(pShader, regId);
+            regId++;
+
+            if (opndSym == gcvNULL)
+            {
+                continue;
+            }
+            opndSym = VIR_Symbol_GetVregVariable(opndSym);
+
+            /* it is possible that the underlying symbol is NULL, like invocationIndex and workgroupIndex,
+               since they are replaced by invocationID and workgroupID */
+            if (opndSym)
+            {
+                VIR_Symbol_ClrFlag(opndSym, VIR_SYMFLAG_UNUSED);
+                VIR_Symbol_SetFlag(opndSym, VIR_SYMFLAG_STATICALLY_USED);
+            }
+        } while (regId < endRegId);
     }
 
     return errCode;
@@ -7436,13 +7480,29 @@ VSC_ErrCode vscVIR_CheckVariableUsage(VSC_SH_PASS_WORKER* pPassWorker)
         for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
              inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
         {
+            /* Mark all outputs as used when meet a EMIT instruction. */
+            if (VIR_OPCODE_isEmit(VIR_Inst_GetOpcode(inst)) && checkVarUsage->checkOutput)
+            {
+                VIR_OutputIdList*       pOutputIdLsts = VIR_Shader_GetOutputs(pShader);
+                VIR_Symbol*             pOutputSym = gcvNULL;
+                gctUINT                 outputIdx = 0;
+
+                for (outputIdx = 0; outputIdx < VIR_IdList_Count(pOutputIdLsts); outputIdx++)
+                {
+                    pOutputSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pOutputIdLsts, outputIdx));
+
+                    VIR_Symbol_ClrFlag(pOutputSym, VIR_SYMFLAG_UNUSED);
+                    VIR_Symbol_SetFlag(pOutputSym, VIR_SYMFLAG_STATICALLY_USED);
+                }
+            }
+
             errCode = _CheckOperandForVarUsage(pShader, inst, checkVarUsage, VIR_Inst_GetDest(inst));
-            CHECK_ERROR(errCode, "_CheckOperandForVarUsage failed.");
+            CHECK_ERROR(errCode, "Check operand failed.");
 
             for (i = 0; i < VIR_Inst_GetSrcNum(inst); i++)
             {
                 errCode = _CheckOperandForVarUsage(pShader, inst, checkVarUsage, VIR_Inst_GetSource(inst, i));
-                CHECK_ERROR(errCode, "_CheckOperandForVarUsage failed.");
+                CHECK_ERROR(errCode, "Check operand failed.");
             }
         }
     }

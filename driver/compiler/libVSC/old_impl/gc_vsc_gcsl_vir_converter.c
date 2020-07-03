@@ -4834,7 +4834,7 @@ _ConvShaderAttribute2Vir(
     }
 
     if ((nameId == VIR_NAME_SAMPLE_ID || nameId == VIR_NAME_SAMPLE_POSITION) &&
-        VIR_Symbol_HasFlag(sym, VIR_SYMFLAG_STATICALLY_USED) &&
+        isSymStaticallyUsed(sym) &&
         !VIR_Symbol_HasFlag(sym, VIR_SYMFLAG_COMPILER_GEN))
     {
         VIR_Shader_SetFlag(VirShader, VIR_SHFLAG_PS_SAMPLE_SHADING);

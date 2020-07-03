@@ -565,6 +565,11 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
         (Opcode == VIR_OP_IMG_STORE_3D)   || \
         (Opcode == VIR_OP_VX_IMG_STORE_3D))
 
+#define VIR_OPCODE_isEmit(Opcode)               \
+    ((Opcode) == VIR_OP_EMIT            ||      \
+     (Opcode) == VIR_OP_EMIT0           ||      \
+     (Opcode) == VIR_OP_EMIT_STREAM)
+
 #define VIR_OPCODE_isNonUniform(Opcode)         \
     ((Opcode) == VIR_OP_NONUNIFORM_ELECT)
 
@@ -6240,6 +6245,12 @@ VIR_Type_GetRegCount(
 
 gctBOOL
 VIR_Type_IsBaseTypeStruct(
+    IN  VIR_Shader         *Shader,
+    IN  VIR_Type           *Type
+    );
+
+gctBOOL
+VIR_Type_IsBaseTypeArrayOrContainArrayField(
     IN  VIR_Shader         *Shader,
     IN  VIR_Type           *Type
     );

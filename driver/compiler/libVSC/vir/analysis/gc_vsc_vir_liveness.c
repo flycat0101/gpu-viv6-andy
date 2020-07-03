@@ -519,9 +519,7 @@ static void _Liveness_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS
                                     pInst);
 
          /* Emit has implicit usage for all outputs, so we also gen these */
-        if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0   ||
-            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT    ||
-            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT_STREAM)
+        if (VIR_OPCODE_isEmit(VIR_Inst_GetOpcode(pInst)))
         {
             gctBOOL     bCheckAllOutput = gcvTRUE;
             gctINT      streamNumber = 0;

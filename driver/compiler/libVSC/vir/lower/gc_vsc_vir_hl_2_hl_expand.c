@@ -553,7 +553,7 @@ _SplitStructVariable(
                                       (location == NOT_ASSIGNED) ? Location : &location,
                                       &symId,
                                       IdList);
-        CHECK_ERROR(errCode, "_AddGeneralVariable failed.");
+        CHECK_ERROR(errCode, "Fail to add a general variable.");
 
         if (firstElementId == VIR_INVALID_ID)
         {
@@ -693,7 +693,7 @@ _SplitArrayVariable(
                                               Location,
                                               &symId,
                                               IdList);
-                CHECK_ERROR(errCode, "_AddGeneralVariable failed.");
+                CHECK_ERROR(errCode, "Fail to add a general variable.");
 
                 if (firstElementId == VIR_INVALID_ID)
                 {
@@ -734,7 +734,7 @@ _SplitArrayVariable(
                                       Location,
                                       &symId,
                                       IdList);
-        CHECK_ERROR(errCode, "_AddGeneralVariable failed.");
+        CHECK_ERROR(errCode, "Fail to add a general variable.");
 
         if (firstElementId == VIR_INVALID_ID)
         {
@@ -1405,7 +1405,7 @@ _SplitVariables(
                                       Location,
                                       &symId,
                                       gcvNULL);
-        CHECK_ERROR(errCode, "_AddGeneralVariable failed.");
+        CHECK_ERROR(errCode, "Fail to add a general variable.");
     }
 
     gcmASSERT(upcomingRegCount == 0);
@@ -1501,7 +1501,7 @@ _SplitOutputs(
                                       Location,
                                       &symId,
                                       gcvNULL);
-        CHECK_ERROR(errCode, "_AddGeneralVariable failed.");
+        CHECK_ERROR(errCode, "Fail to add a general variable.");
     }
 
     gcmASSERT(upcomingRegCount == 0);
@@ -1653,14 +1653,15 @@ _AllocateInterfaceBlock(
     if (VIR_Type_isArray(type))
     {
         arrayLength = VIR_Type_GetArrayLength(type);
-        if(AllocMemberReg)
-        {
-            upcomingRegCount = VIR_Type_GetVirRegCount(Shader, type, -1);
-        }
     }
     else
     {
         arrayLength = 1;
+    }
+
+    if (AllocMemberReg && VIR_Type_IsBaseTypeArrayOrContainArrayField(Shader, type))
+    {
+        upcomingRegCount = VIR_Type_GetVirRegCount(Shader, type, -1);
     }
 
     gcmASSERT(arrayLength > 0);

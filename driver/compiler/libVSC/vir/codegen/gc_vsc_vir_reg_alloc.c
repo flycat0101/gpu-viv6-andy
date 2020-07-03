@@ -2260,7 +2260,7 @@ void _VIR_RA_LS_HandleMultiRegLR(
                     the matrix/vec is assigned to consective registers. This is
                     required because of the current driver's limitation. Maybe relax
                     after driver change. */
-                    pLR->regNoRange = VIR_Type_GetVirRegCount(pShader, VIR_Symbol_GetType(varSym), -1);
+                    pLR->regNoRange = vscMAX(pLR->regNoRange, VIR_Type_GetVirRegCount(pShader, VIR_Symbol_GetType(varSym), -1));
 
                     VIR_RA_LR_ClrFlag(pLR, VIR_RA_LRFLAG_INVALID);
                 }
@@ -3691,9 +3691,7 @@ void _VIR_RA_LS_Mark_Outputs(
     gctUINT             i, j, defIdx;
     VIR_Enable          outEnable;
 
-    gcmASSERT(VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0 ||
-              VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT  ||
-              VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT_STREAM);
+    gcmASSERT(VIR_OPCODE_isEmit(VIR_Inst_GetOpcode(pInst)));
 
     for (outputIdx = 0;
          outputIdx < VIR_IdList_Count(VIR_Shader_GetOutputs(pShader));
@@ -5929,7 +5927,7 @@ VSC_ErrCode _VIR_RA_LS_AssignAttributes(
             webIdx = _VIR_RA_LS_Def2Web(pRA, defIdx);
             pLR = _VIR_RA_LS_Web2LR(pRA, webIdx);
             gcmASSERT(pLR);
-            pLR->regNoRange = VIR_Type_GetVirRegCount(pShader, attrType, -1);
+            pLR->regNoRange = vscMAX(pLR->regNoRange, VIR_Type_GetVirRegCount(pShader, attrType, -1));
 
             /* It has been assigned by other aliased attribute. */
             if (!_VIR_RA_LS_IsInvalidLOWColor(_VIR_RA_GetLRColor(pLR)) || isLRSpilled(pLR))
@@ -6603,9 +6601,7 @@ VSC_ErrCode _VIR_RA_LS_BuildLRTableBB(
         }
 
         /* Emit has implicit usage for all outputs, so we also gen these */
-        if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0   ||
-            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT    ||
-            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT_STREAM)
+        if (VIR_OPCODE_isEmit(VIR_Inst_GetOpcode(pInst)))
         {
             gctBOOL     bCheckAllOutput = gcvTRUE;
             gctINT      streamNumber = 0;
@@ -7738,44 +7734,54 @@ void _VIR_RA_LS_SetSymbolHwRegInfo(
     }
 }
 
-void    _VIR_RA_LS_ComputeAttrIndexEnable(
-    VIR_Instruction *pInst,
-    VIR_Operand     *pOpnd,
-    VIR_Symbol      *Sym,
-    gctINT          *attrIndex,
-    VIR_Enable      *enable)
+void _VIR_RA_LS_ComputeAttrIndexEnable(
+    VIR_Instruction*        pInst,
+    VIR_Operand*            pOpnd,
+    VIR_Symbol*             pSym,
+    gctINT*                 pAttrIndex,
+    VIR_Enable*             pEnable
+    )
 {
-    VIR_OperandInfo operandInfo;
-    VIR_Symbol      *varSym = gcvNULL;
-    VIR_Enable      firstChannelEnable;
+    VIR_OperandInfo         operandInfo;
+    VIR_Symbol*             pVarSym = gcvNULL;
+    VIR_VirRegId            varVirRegId;
+    VIR_Enable              firstChannelEnable, newEnable;
+    gctINT                  attrIndex = 0;
+    gctBOOL                 bFromOpnd = gcvFALSE;
 
-    if (!Sym)
+    /* Get the variable from symbol first, if it is NULL, then try to get it from the operand. */
+    pVarSym = pSym;
+    if (pVarSym == gcvNULL)
     {
         gcmASSERT(pInst && pOpnd);
-
-        varSym = VIR_Operand_GetUnderlyingSymbol(pOpnd);
+        pVarSym = VIR_Operand_GetUnderlyingSymbol(pOpnd);
+        bFromOpnd = gcvTRUE;
     }
-    else
+    gcmASSERT(pVarSym);
+    gcmASSERT(VIR_Symbol_GetHwFirstCompIndex(pVarSym) != NOT_ASSIGNED);
+
+    /* Get the register index. */
+    varVirRegId = VIR_Symbol_GetVariableVregIndex(pVarSym);
+
+    /* Get the attribute index. */
+    attrIndex = (VIR_Symbol_GetHwFirstCompIndex(pVarSym) / CHANNEL_NUM);
+    if (bFromOpnd && VIR_Operand_GetIsConstIndexing(pOpnd))
     {
-        varSym = Sym;
+        attrIndex += VIR_Operand_GetConstIndexingImmed(pOpnd);
     }
-
-    gcmASSERT(varSym);
-    gcmASSERT(VIR_Symbol_GetHwFirstCompIndex(varSym) != NOT_ASSIGNED);
-
-    if (attrIndex)
-    {
-        *attrIndex = (VIR_Symbol_GetHwFirstCompIndex(varSym) / CHANNEL_NUM);
-    }
-
-    firstChannelEnable = (1 << (VIR_Symbol_GetHwFirstCompIndex(varSym) % CHANNEL_NUM));
 
     /* Currently, we don't support packed memory, otherwise, we need split several load_attr
        or store_attr with different enables. We will consider packed memory later when calc
        hwFirstCompIndex in linker */
-    if (enable)
+    if (pEnable)
     {
-        if (pOpnd)
+        /* Get the original enable. */
+        newEnable = *pEnable;
+
+        /* Get first enable channel. */
+        firstChannelEnable = (VIR_Enable)(1 << (VIR_Symbol_GetHwFirstCompIndex(pVarSym) % CHANNEL_NUM));
+
+        if (bFromOpnd)
         {
             gctUINT immIdxNo = VIR_Operand_GetMatrixConstIndex(pOpnd);
 
@@ -7783,33 +7789,39 @@ void    _VIR_RA_LS_ComputeAttrIndexEnable(
                                        pOpnd,
                                        &operandInfo);
 
-            if (VIR_Symbol_GetName(varSym) == VIR_NAME_TESS_LEVEL_OUTER ||
-                VIR_Symbol_GetName(varSym) == VIR_NAME_TESS_LEVEL_INNER)
+            if (VIR_Symbol_GetName(pVarSym) == VIR_NAME_TESS_LEVEL_OUTER || VIR_Symbol_GetName(pVarSym) == VIR_NAME_TESS_LEVEL_INNER)
             {
                 /* packed mode, change the enable */
                 gcmASSERT(!VIR_Operand_GetIsConstIndexing(pOpnd));
                 gcmASSERT(firstChannelEnable == VIR_ENABLE_X);
-                gcmASSERT(operandInfo.u1.virRegInfo.virReg + immIdxNo - varSym->u2.tempIndex <= 3);
-                *enable = (firstChannelEnable << (gctINT)(operandInfo.u1.virRegInfo.virReg + immIdxNo - varSym->u2.tempIndex));
+                gcmASSERT(operandInfo.u1.virRegInfo.virReg + immIdxNo - varVirRegId <= 3);
+                newEnable = (VIR_Enable)(firstChannelEnable << (gctINT)(operandInfo.u1.virRegInfo.virReg + immIdxNo - varVirRegId));
             }
             else
             {
                 /* not packed mode, change the attrIndex */
-                *attrIndex = *attrIndex + (operandInfo.u1.virRegInfo.virReg + immIdxNo - varSym->u2.tempIndex);
+                attrIndex += (operandInfo.u1.virRegInfo.virReg + immIdxNo - varVirRegId);
             }
         }
         else
         {
-            if (VIR_Symbol_GetName(varSym) == VIR_NAME_PRIMITIVE_ID)
+            if (VIR_Symbol_GetName(pVarSym) == VIR_NAME_PRIMITIVE_ID)
             {
-                *enable = firstChannelEnable;
+                newEnable = firstChannelEnable;
             }
             else
             {
                 gcmASSERT(firstChannelEnable == VIR_ENABLE_X);
-                *enable = VIR_ENABLE_XYZW;
+                newEnable = VIR_ENABLE_XYZW;
             }
         }
+
+        *pEnable = newEnable;
+    }
+
+    if (pAttrIndex)
+    {
+        *pAttrIndex = attrIndex;
     }
 }
 
@@ -10018,6 +10030,50 @@ VSC_ErrCode _VIR_RA_LS_InsertMOD(
     return retValue;
 }
 
+void
+_VIR_RA_LS_SetLoadStoreAttr(
+    VIR_RA_LS*              pRA,
+    VIR_Shader*             pShader,
+    VIR_Instruction*        pSymFromInst,
+    VIR_Symbol*             pSym
+    )
+{
+    VIR_Symbol_SetFlag(pSym, VIR_SYMFLAG_LOAD_STORE_ATTR);
+
+    /* If it is from a dynamic indexing instruction, we need to mark all variables within the index range. */
+    if (pSymFromInst != gcvNULL)
+    {
+        VIR_OpCode          opCode = VIR_Inst_GetOpcode(pSymFromInst);
+        VIR_Operand*        pOffsetOpnd = gcvNULL;
+        VIR_Symbol*         pFollowingSym = gcvNULL;
+        VIR_VirRegId        regId, symRegId = VIR_Symbol_GetVregIndex(pSym);
+
+        gcmASSERT(opCode == VIR_OP_ATTR_LD || opCode == VIR_OP_ATTR_ST);
+
+        pOffsetOpnd = (opCode == VIR_OP_ATTR_ST) ? VIR_Inst_GetSource(pSymFromInst, 1) : VIR_Inst_GetSource(pSymFromInst, 2);
+
+        if (!(VIR_Operand_isImm(pOffsetOpnd) || VIR_Operand_isConst(pOffsetOpnd)))
+        {
+            for (regId = symRegId + 1; regId < (gctUINT)VIR_Symbol_GetIndexRange(pSym); regId++)
+            {
+                pFollowingSym = VIR_Shader_FindSymbolByTempIndex(pShader, regId);
+                if (pFollowingSym == gcvNULL)
+                {
+                    continue;
+                }
+
+                pFollowingSym = VIR_Symbol_GetVregVariable(pFollowingSym);
+                if (pFollowingSym == gcvNULL)
+                {
+                    continue;
+                }
+
+                VIR_Symbol_SetFlag(pFollowingSym, VIR_SYMFLAG_LOAD_STORE_ATTR);
+            }
+        }
+    }
+}
+
 void _VIR_RA_LS_GenLoadAttr_SetEnable(
     VIR_RA_LS       *pRA,
     VIR_Instruction *pInst,
@@ -10212,8 +10268,7 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Vertex(
 
     gcmASSERT(VIR_Inst_GetOpcode(pInst) == VIR_OP_ATTR_LD);
 
-    /* set VIR_SYMFLAG_LOAD_STORE_ATTR for attribute */
-    VIR_Symbol_SetFlag(src0Sym, VIR_SYMFLAG_LOAD_STORE_ATTR);
+    _VIR_RA_LS_SetLoadStoreAttr(pRA, pShader, pInst, src0Sym);
 
     if (pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL)
     {
@@ -10712,8 +10767,7 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Patch(
 
     perPatchOutput = VIR_Symbol_isPerPatchOutput(sym);
 
-    /* set VIR_SYMFLAG_LOAD_STORE_ATTR flag */
-    VIR_Symbol_SetFlag(sym, VIR_SYMFLAG_LOAD_STORE_ATTR);
+    _VIR_RA_LS_SetLoadStoreAttr(pRA, pShader, pInst, sym);
 
     if (pShader->shaderKind == VIR_SHADER_TESSELLATION_EVALUATION)
     {
@@ -10861,7 +10915,7 @@ VSC_ErrCode _VIR_RA_LS_GenStoreAttr_Output(
     VIR_Instruction *pInst,
     VIR_Symbol      *pSym,
     gctUINT         attrOffset,
-    VIR_HwRegId     hwStartReg,
+    VIR_HwRegId     hwRegId,
     gctUINT         hwShift
     )
 {
@@ -10879,19 +10933,17 @@ VSC_ErrCode _VIR_RA_LS_GenStoreAttr_Output(
 
     gcmASSERT(VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0 || VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT_STREAM);
 
-    /* set VIR_SYMFLAG_LOAD_STORE_ATTR flag */
-    VIR_Symbol_SetFlag(pSym, VIR_SYMFLAG_LOAD_STORE_ATTR);
+    _VIR_RA_LS_SetLoadStoreAttr(pRA, pShader, gcvNULL, pSym);
 
     _VIR_RA_LS_GetSym_Enable_Swizzle(pSym, gcvNULL, &valSwizzle);
 
-
     /* STORE_ATTR output, r0.x, attributeIndex, rx */
     retValue = VIR_Function_AddInstructionBefore(pFunc,
-                VIR_OP_STORE_ATTR,
-                VIR_TYPE_UINT16,
-                pInst,
-                gcvTRUE,
-                &newInst);
+                                                 VIR_OP_STORE_ATTR,
+                                                 VIR_TYPE_UINT16,
+                                                 pInst,
+                                                 gcvTRUE,
+                                                 &newInst);
     if (retValue != VSC_ERR_NONE) return retValue;
 
     /* the base is in r0.x */
@@ -10910,10 +10962,10 @@ VSC_ErrCode _VIR_RA_LS_GenStoreAttr_Output(
 
     /* set attributeIndex */
     _VIR_RA_LS_ComputeAttrIndexEnable(pInst,
-                                        gcvNULL,
-                                        pSym,
-                                        &attrIndex,
-                                        gcvNULL);
+                                      gcvNULL,
+                                      pSym,
+                                      &attrIndex,
+                                      gcvNULL);
 
     VIR_Operand_SetImmediateInt(newInst->src[VIR_Operand_Src1], attrIndex + attrOffset);
 
@@ -10923,7 +10975,7 @@ VSC_ErrCode _VIR_RA_LS_GenStoreAttr_Output(
                                 pFunc,
                                 symId,
                                 elementTypeId);
-    _VIR_RA_MakeColor(hwStartReg, hwShift, &curColor);
+    _VIR_RA_MakeColor(hwRegId, hwShift, &curColor);
     _VIR_RA_LS_SetOperandHwRegInfo(pRA, newInst->src[VIR_Operand_Src2], curColor);
     VIR_Operand_SetSwizzle(newInst->src[VIR_Operand_Src2], valSwizzle);
 
@@ -10938,6 +10990,104 @@ VSC_ErrCode _VIR_RA_LS_GenStoreAttr_Output(
     VIR_Operand_SetEnable(newInst->dest, VIR_Swizzle_2_Enable(valSwizzle));
 
     return retValue;
+}
+
+/* generating a sequence of store_attr for all GS outputs. */
+VSC_ErrCode _VIR_RA_LS_GenStoreAttr_AllOutputs(
+    VIR_RA_LS*              pRA,
+    VIR_Shader*             pShader,
+    VIR_LIVENESS_INFO*      pLvInfo,
+    VIR_Instruction*        pInst,
+    gctBOOL                 bCheckAllOutput,
+    gctINT                  streamNumber
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    gctUINT                 outputIdx, usageIdx, i, virRegCount;
+    VIR_USAGE_KEY           usageKey;
+    VIR_OutputIdList*       pOutputIdLsts = VIR_Shader_GetOutputs(pShader);
+    VIR_Symbol*             pOutputSym = gcvNULL;
+    VIR_USAGE*              pUse = gcvNULL;
+    VIR_RA_LS_Liverange*    pLR = gcvNULL;
+    VIR_RA_LS_Liverange*    pStartLR = gcvNULL;
+    VIR_VirRegId            currentRegId = VIR_INVALID_ID, startRegId = VIR_INVALID_ID;
+    VIR_HwRegId             lrHwRegId = VIR_RA_INVALID_REG;
+
+    for (outputIdx = 0; outputIdx < VIR_IdList_Count(pOutputIdLsts); outputIdx++)
+    {
+        pOutputSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pOutputIdLsts, outputIdx));
+
+        if (isSymVectorizedOut(pOutputSym))
+        {
+            continue;
+        }
+
+        if (!bCheckAllOutput && VIR_Symbol_GetStreamNumber(pOutputSym) != streamNumber)
+        {
+            continue;
+        }
+
+        virRegCount = VIR_Type_GetVirRegCount(pShader, VIR_Symbol_GetType(pOutputSym), -1);
+        startRegId = VIR_Symbol_GetVariableVregIndex(pOutputSym);
+
+        /* Find the start LR. */
+        usageKey.pUsageInst = pInst;
+        usageKey.pOperand = (VIR_Operand*)(gctUINTPTR_T)(startRegId);
+        usageKey.bIsIndexingRegUsage = gcvFALSE;
+        usageIdx = vscBT_HashSearch(&pLvInfo->pDuInfo->usageTable, &usageKey);
+
+        if (usageIdx != VIR_INVALID_USAGE_INDEX)
+        {
+            pUse = GET_USAGE_BY_IDX(&pLvInfo->pDuInfo->usageTable, usageIdx);
+            pStartLR = _VIR_RA_LS_Web2ColorLR(pRA, pUse->webIdx);
+        }
+        else
+        {
+            pStartLR = gcvNULL;
+        }
+
+        /*
+        ** For a output with multi-regs(an array or a matrix),
+        **  1) It may have multiple LRs: multiple assignments for more than one element.
+        **  2) It may have only one LR: dynamic indexing for all elements.
+        ** So we need to get the correct hw reg id.
+        */
+        for (i = 0; i < virRegCount; i++)
+        {
+            currentRegId = startRegId + i;
+
+            usageKey.pUsageInst = pInst;
+            usageKey.pOperand = (VIR_Operand*)(gctUINTPTR_T)(currentRegId);
+            usageKey.bIsIndexingRegUsage = gcvFALSE;
+            usageIdx = vscBT_HashSearch(&pLvInfo->pDuInfo->usageTable, &usageKey);
+
+            if (usageIdx == VIR_INVALID_USAGE_INDEX)
+            {
+                continue;
+            }
+
+            pUse = GET_USAGE_BY_IDX(&pLvInfo->pDuInfo->usageTable, usageIdx);
+            pLR = _VIR_RA_LS_Web2ColorLR(pRA, pUse->webIdx);
+
+            lrHwRegId = _VIR_RA_Color_RegNo(_VIR_RA_GetLRColor(pLR));
+
+            if (pLR == pStartLR)
+            {
+                lrHwRegId += (currentRegId - pLR->firstRegNo);
+            }
+
+            errCode = _VIR_RA_LS_GenStoreAttr_Output(pRA,
+                                                     pInst,
+                                                     pOutputSym,
+                                                     i,
+                                                     lrHwRegId,
+                                                     _VIR_RA_Color_Shift(_VIR_RA_GetLRColor(pLR)));
+            ON_ERROR(errCode, "Fail to gen STORE_ATTR for an output. ");
+        }
+    }
+
+OnError:
+    return errCode;
 }
 
 /* generate store_attr for per-vertex/per-patch data */
@@ -10972,8 +11122,7 @@ VSC_ErrCode _VIR_RA_LS_GenStoreAttr(
         gcmASSERT(gcvFALSE);
     }
 
-    /* set VIR_SYMFLAG_LOAD_STORE_ATTR flag */
-    VIR_Symbol_SetFlag(sym, VIR_SYMFLAG_LOAD_STORE_ATTR);
+    _VIR_RA_LS_SetLoadStoreAttr(pRA, pShader, pInst, sym);
 
     /* ATTR_ST output, invocationId, offset, value ==>
        STORE_ATTR output, r0.x/r0.w, attributeIndex, value */
@@ -11160,7 +11309,7 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Patch_r0(
     _VIR_RA_MakeColor(hwRegNo, 0, &curColor);
     _VIR_RA_LS_SetOperandHwRegInfo(pRA, newInst->dest, curColor);
 
-    VIR_Symbol_SetFlag(primitiveIdSym, VIR_SYMFLAG_LOAD_STORE_ATTR);
+    _VIR_RA_LS_SetLoadStoreAttr(pRA, pShader, gcvNULL, primitiveIdSym);
 
     return retValue;
 }
@@ -11282,44 +11431,13 @@ VSC_ErrCode _VIR_RA_LS_GenEmitRestart(
     if (isEmit)
     {
         /* generating a sequence of store_attr */
-        gctUINT         outputIdx, usageIdx;
-        VIR_USAGE_KEY   usageKey;
-        gctUINT         i=0;
-        for (outputIdx = 0;
-             outputIdx < VIR_IdList_Count(VIR_Shader_GetOutputs(pShader));
-             outputIdx ++)
-        {
-            VIR_Symbol* pOutputSym = VIR_Shader_GetSymFromId(pShader,
-                                VIR_IdList_GetId(VIR_Shader_GetOutputs(pShader), outputIdx));
-
-            if (isSymVectorizedOut(pOutputSym))
-            {
-                continue;
-            }
-
-            if (!bCheckAllOutput && VIR_Symbol_GetStreamNumber(pOutputSym) != streamNumber)
-            {
-                continue;
-            }
-
-            /* Find the usage, the matrix output could be in non-consecutive registers,
-               thus need to find corresponding usages */
-            for (i = 0; i < VIR_Type_GetVirRegCount(pShader, VIR_Symbol_GetType(pOutputSym), -1); i++)
-            {
-                usageKey.pUsageInst = pInst;
-                usageKey.pOperand = (VIR_Operand*)(gctUINTPTR_T) (pOutputSym->u2.tempIndex + i);
-                usageKey.bIsIndexingRegUsage = gcvFALSE;
-                usageIdx = vscBT_HashSearch(&pLvInfo->pDuInfo->usageTable, &usageKey);
-                if (VIR_INVALID_USAGE_INDEX != usageIdx)
-                {
-                    VIR_USAGE   *pUse = GET_USAGE_BY_IDX(&pLvInfo->pDuInfo->usageTable, usageIdx);
-                    VIR_RA_LS_Liverange *pLR = _VIR_RA_LS_Web2ColorLR(pRA, pUse->webIdx);
-                    _VIR_RA_LS_GenStoreAttr_Output(pRA, pInst, pOutputSym, i,
-                        _VIR_RA_Color_RegNo(_VIR_RA_GetLRColor(pLR)),
-                        _VIR_RA_Color_Shift(_VIR_RA_GetLRColor(pLR)));
-                }
-            }
-        }
+        retValue = _VIR_RA_LS_GenStoreAttr_AllOutputs(pRA,
+                                                      pShader,
+                                                      pLvInfo,
+                                                      pInst,
+                                                      bCheckAllOutput,
+                                                      streamNumber);
+        if (retValue != VSC_ERR_NONE) return retValue;
     }
 
     /* generate aq_emit */
