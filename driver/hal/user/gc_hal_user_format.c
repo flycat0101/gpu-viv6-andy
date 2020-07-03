@@ -1754,6 +1754,9 @@ void _ReadPixelFrom_S8D32F_2_A8R8G8B8(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcs
 
 _PFNreadPixel gcoSURF_GetReadPixelFunc(gcoSURF surf)
 {
+    gceAPI currentApi;
+    gcmVERIFY_OK(gcoHARDWARE_GetAPI(gcvNULL, &currentApi, gcvNULL));
+
     switch (surf->format)
     {
     case gcvSURF_A8:
@@ -1807,7 +1810,9 @@ _PFNreadPixel gcoSURF_GetReadPixelFunc(gcoSURF surf)
     case gcvSURF_R8_1_X8R8G8B8:
         return _ReadPixelFrom_R8_1_X8R8G8B8;
     case gcvSURF_R8_SNORM:
-        return _ReadPixelFrom_R8_SNORM;
+        return ((currentApi == gcvAPI_OPENGL) && (surf->type == gcvSURF_RENDER_TARGET)
+            && (surf->flags & gcvSURF_FLAG_CONTENT_UPDATED))
+            ? _ReadPixelFrom_R8 : _ReadPixelFrom_R8_SNORM;
     case gcvSURF_R16:
         return _ReadPixelFrom_R16;
 
