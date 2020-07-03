@@ -1022,7 +1022,7 @@ typedef struct __GLexportsRec
 
 } __GLexports;
 
-#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(OPENGL40) && defined(GL4_DRI_BUILD)
 /*
 ** This must be the first member of a __GLcontext structure.  This is the
 ** only part of a context that is exposed to the outside world; everything
@@ -1324,7 +1324,7 @@ __GL_INLINE GLvoid __glSetGLcontext(GLvoid *context)
 }
 
 extern GLvoid __glEvaluateFramebufferChange(__GLcontext *gc, GLbitfield flags);
-#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(OPENGL40) && defined(GL4_DRI_BUILD)
 extern GLvoid __glDispatchDrawableChange(__GLcontext *gc);
 #endif
 __GL_INLINE GLvoid __glEvaluateDrawableChange(__GLcontext *gc, GLbitfield flags)
@@ -1350,7 +1350,7 @@ __GL_INLINE GLvoid __glEvaluateDrawableChange(__GLcontext *gc, GLbitfield flags)
         gc->drawableDirtyMask &= ~__GL_BUFFER_READ_BIT;
     }
 
-#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(OPENGL40) && defined(GL4_DRI_BUILD)
     if (gc->imports.conformGLSpec && !gc->imports.fromEGL)
     {
         /* Get the latest drawable information */

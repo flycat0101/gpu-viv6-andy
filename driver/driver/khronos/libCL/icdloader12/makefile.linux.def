@@ -33,7 +33,7 @@ ifeq ($(ANDROID),1)
     INCLUDE += -I$(ANDROID_HOME)/hardware/libhardware/include
 else
     ifeq ($(EGL_API_FB), 0)
-        INCLUDE += -I$(X11_ARM_DIR)/include
+        INCLUDE += -I$(ROOTFS)/usr/include
     endif
 endif
 

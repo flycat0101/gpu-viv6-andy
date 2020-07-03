@@ -1412,7 +1412,7 @@ OnError:
 }
 
 
-#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(OPENGL40) && defined(GL4_DRI_BUILD)
 
 extern __GLchipGlobal dpGlobalInfo;
 gceSURF_FORMAT getHWFormat(GLuint devFmt)

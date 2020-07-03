@@ -2779,7 +2779,7 @@ __glChipProfile_BlendBarrier(
 }
 
 
-#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(OPENGL40) && defined(GL4_DRI_BUILD)
 
 extern GLvoid __glChipNotifyChangeBufferSize(__GLcontext * gc);
 extern GLvoid __glChipNotifyDestroyBuffers(__GLcontext *gc);
@@ -3014,7 +3014,7 @@ gcChipInitProfileDevicePipeline(
 
     gc->dp.blendBarrier = __glChipProfile_BlendBarrier;
 
-#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(OPENGL40) && defined(GL4_DRI_BUILD)
     /* Initialize dp.ctx drawable notification functions*/
     gc->dp.ctx.notifyChangeBufferSize = __glChipProfile_NotifyChangeBufferSize;
     gc->dp.ctx.notifyDrawableSwitch = __glChipProfile_NotifyDrawableSwitch;

@@ -61,16 +61,8 @@ ifneq ($(USE_ARMCC), 1)
   ifeq ($(EGL_API_DFB), 1)
     CFLAGS += -pipe -fPIC
   else
-    ifeq ($(EGL_API_WL), 1)
-      CFLAGS += -fPIC -Werror
-    else
-      CFLAGS += -fPIC -Werror -ansi
-    endif
+    CFLAGS += -fPIC -Werror -Wno-psabi
   endif
-endif
-
-ifeq ($(EGL_API_DFB), 1)
-  CFLAGS += -DPIC
 endif
 
 ################################################################################

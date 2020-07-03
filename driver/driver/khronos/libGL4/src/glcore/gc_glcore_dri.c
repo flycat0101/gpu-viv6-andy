@@ -11,7 +11,7 @@
 *****************************************************************************/
 
 
-#if defined(_LINUX_) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(_LINUX_) && defined(GL4_DRI_BUILD)
 
 #include <stdio.h>
 #include <dlfcn.h>

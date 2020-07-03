@@ -60,7 +60,7 @@ INCLUDE += -I$(AQROOT)/sdk/inc \
            -I$(AQROOT)/hal/inc
 
 ifeq ($(EGL_API_X),1)
-  INCLUDE += -I$(X11_ARM_DIR)/include
+  INCLUDE += -I$(ROOTFS)/usr/include
 endif
 
 ifeq ($(EGL_API_WL),1)
@@ -69,16 +69,17 @@ ifeq ($(EGL_API_WL),1)
              -I$(WAYLAND_DIR)/include/wayland-viv
 else
   ifeq ($(EGL_API_DRI),1)
-  INCLUDE += -I$(X11_ARM_DIR)/include \
-             -I$(X11_ARM_DIR)/include/X11/extensions \
-             -I$(X11_ARM_DIR)/include/libdrm \
-             -I$(AQROOT)/driver/X/DRI/src
+  INCLUDE += -I$(ROOTFS)/usr/include \
+             -I$(ROOTFS)/usr/include/X11/extensions \
+             -I$(ROOTFS)/usr/include/libdrm \
+             -I$(AQROOT)/driver/X/DRI/src \
+             -I$(LIBDRM_DIR)/include/drm
   endif
   ifeq ($(X11_DRI3),1)
-  INCLUDE += -I$(X11_ARM_DIR)/include \
-             -I$(X11_ARM_DIR)/include/X11/extensions \
-             -I$(X11_ARM_DIR)/include/libdrm \
-             -I$(X11_ARM_DIR)/include/drm
+  INCLUDE += -I$(ROOTFS)/usr/include \
+             -I$(ROOTFS)/usr/include/X11/extensions \
+             -I$(ROOTFS)/usr/include/libdrm \
+             -I$(ROOTFS)/usr/include/drm
   endif
 endif
 
@@ -139,16 +140,16 @@ ifeq ($(EGL_API_WL),1)
   LDLIBS += -L$(WAYLAND_DIR)/lib -lwayland-client -lwayland-cursor -lpthread
 else
   ifeq ($(EGL_API_DRI), 1)
-    LDLIBS += -L$(X11_ARM_DIR)/lib -lXdamage -lXfixes -lXext -lXau -lXdmcp -lX11
+    LDLIBS += -L$(ROOTFS)/usr/lib -lXdamage -lXfixes -lXext -lXau -lXdmcp -lX11
   endif
 
   ifeq ($(X11_DRI3), 1)
-    LDLIBS += -L$(X11_ARM_DIR)/lib -lXdamage -lXfixes -lXext -lXau -lXdmcp -lX11 -lX11-xcb -lxcb -lxcb-dri3
+    LDLIBS += -L$(ROOTFS)/usr/lib -lXdamage -lXfixes -lXext -lXau -lXdmcp -lX11 -lX11-xcb -lxcb -lxcb-dri3
   endif
 endif
 
 ifeq ($(EGL_API_X),1)
-  LDLIBS += -L$(X11_ARM_DIR)/lib -lXau -lXdmcp -lX11
+  LDLIBS += -L$(ROOTFS)/usr/lib -lXau -lXdmcp -lX11
 endif
 
 ifeq ($(EGL_API_GBM),1)

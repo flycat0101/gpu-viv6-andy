@@ -88,7 +88,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 extern Bool __glXDisplayIsClosed;
 
-#if defined(X11_DRI3) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(X11_DRI3) && defined(GL4_DRI_BUILD)
 
 extern GLvoid __glContextModesDestroy( __GLcontextModes * modes );
 

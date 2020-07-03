@@ -26,7 +26,7 @@ extern GLvoid initLineStipplePatch(__GLcontext *gc, __GLchipContext *chipCtx);
 extern GLvoid freePolygonStipplePatch(__GLcontext *gc,  __GLchipContext *chipCtx);
 extern GLvoid freeLineStipplePatch(__GLcontext *gc,  __GLchipContext *chipCtx);
 
-#if defined(DRI_PIXMAPRENDER_GL)
+#if defined(GL4_DRI_BUILD)
 extern GLvoid __glChipNotifyChangeBufferSize(__GLcontext * gc);
 extern GLvoid __glChipNotifyDestroyBuffers(__GLcontext *gc);
 extern GLvoid __glChipNotifyDrawableSwitch(__GLcontext *gc);
@@ -413,7 +413,7 @@ gcChipInitDevicePipeline(
     gc->dp.bindFragDataLocation = __glChipBindFragDataLocation;
     gc->dp.accum = __glChipAccum;
     gc->dp.getCompressedTexImage = __glChipGetCompressedTexImage;
-#if defined(DRI_PIXMAPRENDER_GL)
+#if defined(GL4_DRI_BUILD)
     /* Initialize dp.ctx drawable notification functions*/
     gc->dp.ctx.notifyChangeBufferSize = __glChipNotifyChangeBufferSize;
     gc->dp.ctx.notifyDrawableSwitch = __glChipNotifyDrawableSwitch;
@@ -2138,7 +2138,7 @@ __glChipCreateContext(
     }
     gc->dp.privateData = chipCtx;
 
-#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(OPENGL40) && defined(GL4_DRI_BUILD)
     gc->dp.ctx.privateData = chipCtx;
 #endif
 

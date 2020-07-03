@@ -17,7 +17,7 @@
 
 #define _GC_OBJ_ZONE    gcdZONE_GL40_TRACE
 
-#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(OPENGL40) && defined(GL4_DRI_BUILD)
 #include "viv_lock.h"
 extern __GLformatInfo* __glGetFormatInfo(GLenum internalFormat);
 extern GLboolean  createRenderBuffer(__GLcontext *gc, glsCHIPBUFFERCREATE * chipCreateInfo, gcoSURF *retSurf);
@@ -526,7 +526,7 @@ __glChipDestroyDrawable(
     __GLchipDrawable *chipDrawable = (__GLchipDrawable*)drawable->privateData;
     gcmHEADER_ARG("drawable=0x%x", drawable);
 
-#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(OPENGL40) && defined(GL4_DRI_BUILD)
     if (drawable->dp.privateData)
     {
         (*drawable->free)(drawable->dp.privateData);
@@ -549,7 +549,7 @@ __glChipDestroyDrawable(
     gcmFOOTER_NO();
 }
 
-#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(OPENGL40) && defined(GL4_DRI_BUILD)
 GLvoid __glChipCreatePbuffer(__GLcontext *gc, __GLdrawablePrivate * draw)
 {
 

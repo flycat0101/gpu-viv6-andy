@@ -68,7 +68,7 @@ INCLUDE := -I$(AQROOT)/hal/inc \
            -I$(AQROOT)/driver/khronos/libEGL/inc
 
 ifneq ($(filter 1,$(EGL_API_X) $(EGL_API_DRI)),)
-  INCLUDE += -I$(X11_ARM_DIR)/include
+  INCLUDE += -I$(ROOTFS)/usr/include
 endif
 
 CFLAGS += $(INCLUDE)

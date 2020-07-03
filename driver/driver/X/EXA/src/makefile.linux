@@ -34,9 +34,8 @@ target := vivante_drv.so
 ifeq ($(X11_DRI3),1)
 
 KMS_DISPLAY_OBJ := viv_drm/dumb_bo.o \
-					viv_drm/drmmode_display.o \
- 					viv_drm/viv_drm_driver.o
-
+	viv_drm/drmmode_display.o \
+ 	viv_drm/viv_drm_driver.o
 
 OBJS := vivante_gal/vivante_gal_blit.o \
 	vivante_gal/vivante_gal_gpu.o \
@@ -86,8 +85,8 @@ endif
 CFLAGS += -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast -Wno-maybe-uninitialized -Wno-unused-function -Wno-unused-variable -Wno-return-type
 CFLAGS += -DSMALL_THRESHOLD -DADD_FSL_XRANDR
 CFLAGS += -fvisibility=hidden -fPIC -DPIC
-CFLAGS += -I. -I.. -I$(ROOTFS_USR)/include -I$(ROOTFS_USR)/include/xorg \
-          -I$(ROOTFS_USR)/include/X11/dri -I$(ROOTFS_USR)/include/$(PIXMAN)
+CFLAGS += -I. -I.. -I$(ROOTFS)/usr/include -I$(ROOTFS)/usr/include/xorg \
+          -I$(ROOTFS)/usr/include/X11/dri -I$(ROOTFS)/usr/include/$(PIXMAN)
 
 ifeq ($(X11_DRI3),1)
 CFLAGS += -I./viv_drm -I./vivante_gal -I./vivante_ext -I./vivante_fbdev -I./vivante_util -I./vivante_exa -I$(AQROOT)/hal/kernel/inc
@@ -98,10 +97,10 @@ endif
 LDFLAGS += -L$(SDK_DIR)/drivers -lGAL -lm -ldl -Wl,-soname -Wl,vivante_drv.so
 
 ifeq ($(X11_DRI3),1)
-CFLAGS += -I$(ROOTFS_USR)/include/libdrm
+CFLAGS += -I$(LIBDRM_DIR)/include/drm -I$(LIBDRM_DIR)/vivante
 LDFLAGS += -ldrm -ldrm_vivante
 else
-CFLAGS += -I$(ROOTFS_USR)/include/libdrm
+CFLAGS += -I$(ROOTFS)/usr/include/libdrm
 endif
 
 all: .libs/$(target)

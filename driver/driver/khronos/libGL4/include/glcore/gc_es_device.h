@@ -64,7 +64,7 @@ typedef struct __GLdeviceStructRec
 
     GLboolean (*devGetConstants)(__GLcontext *gc, struct __GLdeviceConstantsRec *constants);
 
-#if defined(_LINUX_) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(_LINUX_) && defined(GL4_DRI_BUILD)
     /* Create a HW specific drawable structure that is attached to drawInfo->private */
     GLvoid (*devCreateDrawable)(struct __GLdrawablePrivateRec *drawInfo, GLvoid *window);
     /* Initialize/Deinitialize device */

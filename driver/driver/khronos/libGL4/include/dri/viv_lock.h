@@ -29,7 +29,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #ifndef __VIV_LOCK_H__
 #define __VIV_LOCK_H__
 
-#if defined(_LINUX_) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(_LINUX_) && defined(GL4_DRI_BUILD)
 
 #include "dri_util.h"
 extern GLvoid vivGetLock( __GLcontext *gc, GLuint flags );

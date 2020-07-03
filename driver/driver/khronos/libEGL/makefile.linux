@@ -54,7 +54,7 @@ INCLUDE := \
     -I$(AQROOT)/driver/khronos/libEGL/inc
 
 ifeq ($(EGL_API_X),1)
-  INCLUDE += -I$(X11_ARM_DIR)/include
+  INCLUDE += -I$(ROOTFS)/usr/include
 endif
 
 ifeq ($(EGL_API_WL),1)
@@ -63,21 +63,20 @@ ifeq ($(EGL_API_WL),1)
              -I$(ROOTFS)/usr/include/libdrm
 else
   ifeq ($(EGL_API_DRI),1)
-    INCLUDE += -I$(X11_ARM_DIR)/include \
-             -I$(X11_ARM_DIR)/include/X11/extensions \
-             -I$(X11_ARM_DIR)/include/libdrm \
-             -I$(AQROOT)/driver/X/DRI/src
+    INCLUDE += -I$(ROOTFS)/usr/include \
+             -I$(ROOTFS)/usr/include/X11/extensions \
+             -I$(ROOTFS)/usr/include/libdrm \
+             -I$(AQROOT)/driver/X/DRI/src \
+             -I$(LIBDRM_DIR)/include/drm
   endif
 
   ifeq ($(X11_DRI3),1)
-    INCLUDE += -I$(X11_ARM_DIR)/include \
-             -I$(X11_ARM_DIR)/include/X11/extensions \
-             -I${ROOTFS_USR}/include/libdrm
+    INCLUDE += -I$(ROOTFS)/usr/include \
+             -I$(ROOTFS)/usr/include/X11/extensions \
+             -I$(ROOTFS)/usr/include/libdrm \
+             -I$(LIBDRM_DIR)/include/drm \
+             -I$(LIBDRM_DIR)/vivante
   endif
-endif
-
-ifeq ($(EGL_API_FB),1)
-  INCLUDE += -I$(ROOTFS_USR)/include/libdrm
 endif
 
 ifeq ($(EGL_API_GBM),1)
@@ -97,7 +96,7 @@ ifeq ($(EGL_API_DFB),1)
 endif
 
 ifeq ($(USE_KMS),1)
-  CFLAGS += $(INCLUDE) -DgcdUSE_KMS=$(USE_KMS)
+  CFLAGS += $(INCLUDE) -I$(ROOTFS)/usr/include/libdrm -DgcdUSE_KMS=$(USE_KMS)
 else
   CFLAGS += $(INCLUDE) -DgcdUSE_KMS=0
 endif
@@ -155,18 +154,18 @@ endif
 LDLIBS := -L$(SDK_DIR)/drivers -L$(AQROOT)/hal/user/$(OBJ_DIR) -lGAL -ldl
 
 ifeq ($(EGL_API_X),1)
-  LDLIBS += -L$(X11_ARM_DIR)/lib -lX11
+  LDLIBS += -L$(ROOTFS)/usr/lib -lX11
 endif
 
 ifeq ($(EGL_API_WL),1)
   LDLIBS += -L$(WAYLAND_DIR)/lib -lwayland-server -lwayland-client
 else
   ifeq ($(EGL_API_DRI),1)
-    LDLIBS += -L$(X11_ARM_DIR)/lib -lX11 -lXext -ldrm
+    LDLIBS += -L$(ROOTFS)/usr/lib -lX11 -lXext -ldrm
   endif
 
   ifeq ($(X11_DRI3),1)
-    LDLIBS += -L$(X11_ARM_DIR)/lib -lX11 -lX11-xcb -lXext -lxcb -lxcb-shm -lxcb-dri3 -lxcb-present -lxshmfence -lxcb-sync -ldrm_vivante
+    LDLIBS += -L$(ROOTFS)/usr/lib -lX11 -lX11-xcb -lXext -lxcb -lxcb-dri3 -lxcb-present -lxshmfence -lxcb-sync -ldrm_vivante
   endif
 endif
 
@@ -233,7 +232,7 @@ ifeq ($(EGL_API_FB),1)
   OBJECTS += $(OBJ_DIR)/gc_egl_fbdev.o
   ifeq ($(USE_KMS),1)
     OBJECTS += $(OBJ_DIR)/gc_egl_fbdrm.o
-    LDLIBS += -L$(X11_ARM_DIR)/lib -ldrm
+    LDLIBS += -L$(ROOTFS)/usr/lib -ldrm
   endif
 endif
 

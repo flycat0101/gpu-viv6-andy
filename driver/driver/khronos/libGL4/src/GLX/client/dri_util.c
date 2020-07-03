@@ -60,8 +60,8 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <assert.h>
 #include <unistd.h>
 #include <X11/Xlibint.h>
-#include <Xext.h>
-#include <extutil.h>
+#include <X11/extensions/Xext.h>
+#include <X11/extensions/extutil.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -772,7 +772,7 @@ static gceSTATUS _FreeVideoNode(
 }
 
 
-#if defined(DRI_PIXMAPRENDER_GL)
+#if defined(GL4_DRI_BUILD)
 
 typedef struct _wrapPixData{
     Pixmap backPixmap;
@@ -1035,7 +1035,7 @@ GLvoid __driUtilUpdateExtraDrawableInfo(__DRIdrawablePrivate *pdp)
     drm_clip_rect_t *pbackrects = NULL;
     gctUINT32 directPix = 0;
 
-#if defined(DRI_PIXMAPRENDER_GL)
+#if defined(GL4_DRI_BUILD)
     wPixData *pPixdata = NULL;
     gceSURF_FORMAT hwFormat;
     vvtDeviceInfo *pDevInfo;
@@ -1119,7 +1119,7 @@ GLvoid __driUtilUpdateExtraDrawableInfo(__DRIdrawablePrivate *pdp)
     else
     pdp->backNode = 0;
 
-#if defined(DRI_PIXMAPRENDER_GL)
+#if defined(GL4_DRI_BUILD)
     pPixdata= (wPixData *)pdp->wrapPixData;
     if (pPixdata && pPixdata->backPixmap )
     {
@@ -1281,7 +1281,7 @@ static GLvoid *driCreateNewDrawable(Display *dpy,
         pdraw->private = NULL;
     }
 
-#if defined(DRI_PIXMAPRENDER_GL)
+#if defined(GL4_DRI_BUILD)
     if (pdp)
     {
         pdp->wrapPixData = NULL;
@@ -1311,13 +1311,13 @@ static GLvoid driDestroyDrawable(Display *dpy, GLvoid *drawablePrivate)
     __DRIscreenPrivate *psp = pdp->driScreenPriv;
     int scrn = psp->myNum;
 
-#if defined(DRI_PIXMAPRENDER_GL)
+#if defined(GL4_DRI_BUILD)
     wPixData *pPixdata = NULL;
 #endif
 
     if (pdp) {
 
-#if defined(DRI_PIXMAPRENDER_GL)
+#if defined(GL4_DRI_BUILD)
 
         pPixdata = (wPixData *)pdp->wrapPixData;
 

@@ -36,7 +36,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <unistd.h>
 #include <X11/Xlibint.h>
 #include <X11/extensions/Xext.h>
-
+#include <X11/extensions/extutil.h>
 #ifdef X11_DRI3
 #include <X11/Xlib-xcb.h>
 #include <X11/xshmfence.h>
@@ -44,8 +44,6 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <xcb/dri3.h>
 #include <xcb/present.h>
 #endif
-
-#include "extutil.h"
 #include "glxclient.h"
 #include "xf86dri.h"
 #include "sarea.h"

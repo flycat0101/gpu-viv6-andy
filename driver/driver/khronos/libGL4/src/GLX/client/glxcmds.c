@@ -36,10 +36,10 @@
 
 #include "packsingle.h"
 #include "glxclient.h"
-#include <extutil.h>
-#include <Xext.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/extensions/Xext.h>
+#include <X11/extensions/extutil.h>
 #include <X11/extensions/Xdamage.h>
 #include <string.h>
 #include <assert.h>
