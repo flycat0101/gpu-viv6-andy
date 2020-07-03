@@ -1451,9 +1451,12 @@ SHADER_COMPILE_TIME_CONSTANT* _EnlargeCTCRoom(SHADER_CONSTANT_MAPPING* pCnstMapp
     pOldCTCSet = pCnstMapping->pCompileTimeConstant;
     oldCTCCount = pCnstMapping->countOfCompileTimeConstant;
     newCTCCount = oldCTCCount + enlargeCTCCount;
-    gcoOS_Allocate(gcvNULL,
+    if (gcoOS_Allocate(gcvNULL,
                    sizeof(SHADER_COMPILE_TIME_CONSTANT) * newCTCCount,
-                   (gctPOINTER*)&pCnstMapping->pCompileTimeConstant);
+                   (gctPOINTER*)&pCnstMapping->pCompileTimeConstant) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     if (pOldCTCSet)
     {
@@ -1485,8 +1488,11 @@ static SHADER_CONSTANT_ARRAY_MAPPING* _GetConstantArrayMappingByArrayIdx(SHADER_
         oldCountOfConstantArrayMapping = pCnstMapping->countOfConstantArrayMapping;
 
         newCountOfConstantArrayMapping = constantArrayIndex + 1;
-        gcoOS_Allocate(gcvNULL, newCountOfConstantArrayMapping * sizeof(SHADER_CONSTANT_ARRAY_MAPPING),
-                       (gctPOINTER*)&pCnstMapping->pConstantArrayMapping);
+        if (gcoOS_Allocate(gcvNULL, newCountOfConstantArrayMapping * sizeof(SHADER_CONSTANT_ARRAY_MAPPING),
+                       (gctPOINTER*)&pCnstMapping->pConstantArrayMapping) != gcvSTATUS_OK)
+        {
+            return gcvNULL;
+        }
         pCnstMapping->countOfConstantArrayMapping = newCountOfConstantArrayMapping;
 
         if (pOldCnstArrayMapping)
@@ -1515,9 +1521,12 @@ static SHADER_CONSTANT_SUB_ARRAY_MAPPING* _enlargeCnstSubArrayMappingRoom(SHADER
     pOldCSAM = pConstantArrayMapping->pSubConstantArrays;
     oldCSAMCount = pConstantArrayMapping->countOfSubConstantArray;
     newCSAMCount = oldCSAMCount + enlargeCSAMCount;
-    gcoOS_Allocate(gcvNULL,
+    if (gcoOS_Allocate(gcvNULL,
                    sizeof(SHADER_CONSTANT_SUB_ARRAY_MAPPING) * newCSAMCount,
-                   (gctPOINTER*)&pConstantArrayMapping->pSubConstantArrays);
+                   (gctPOINTER*)&pConstantArrayMapping->pSubConstantArrays) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     if (pOldCSAM)
     {
@@ -1706,6 +1715,10 @@ static VSC_ErrCode _CollectConstantMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelpe
                         if (pThisCTC == gcvNULL)
                         {
                             pThisCTC = _EnlargeCTCRoom(pCnstMapping, 1, &ctcSlot);
+                            if (pThisCTC == gcvNULL)
+                            {
+                                return VSC_ERR_OUT_OF_MEMORY;
+                            }
                             vscInitializeCTC(pThisCTC);
                             _SetUniformHwCnstReg(thisSubUniformPhysicalAddr, 1, &pThisCTC->hwConstantLocation);
                         }
@@ -1746,7 +1759,10 @@ static VSC_ErrCode _CollectConstantMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelpe
                 {
                     thisConstantArrayIndex = 0;
                     pThisConstantArrayMapping = _GetConstantArrayMappingByArrayIdx(pCnstMapping, thisConstantArrayIndex);
-
+                    if (pThisConstantArrayMapping == gcvNULL)
+                    {
+                        return VSC_ERR_OUT_OF_MEMORY;
+                    }
                     pCnstMapping->arrayIndexMask |= (1 << thisConstantArrayIndex);
                     pThisConstantArrayMapping->constantArrayIndex = thisConstantArrayIndex;
 
@@ -1758,6 +1774,10 @@ static VSC_ErrCode _CollectConstantMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelpe
                     }
 
                     pThisCnstSubArrayMapping = _enlargeCnstSubArrayMappingRoom(pThisConstantArrayMapping, 1, &tartCSAMIdx);
+                    if (pThisCnstSubArrayMapping == gcvNULL)
+                    {
+                        return VSC_ERR_OUT_OF_MEMORY;
+                    }
                     vscInitializeCnstSubArrayMapping(pThisCnstSubArrayMapping);
                     if (pShader->clientApiVersion == gcvAPI_D3D)
                     {
@@ -1843,6 +1863,10 @@ static VSC_ErrCode _CollectConstantMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelpe
 
                                 /* Enlarge CTC set to make room for current CTC */
                                 pThisCTC = _EnlargeCTCRoom(pCnstMapping, 1, &ctcSlot);
+                                if (pThisCTC == gcvNULL)
+                                {
+                                    return VSC_ERR_OUT_OF_MEMORY;
+                                }
                                 vscInitializeCTC(pThisCTC);
                                 pThisCTC->hwConstantLocation.hwAccessMode = SHADER_HW_ACCESS_MODE_MEMORY;
                                 pThisCTC->hwConstantLocation.hwLoc.memAddr.hwMemAccessMode = SHADER_HW_MEM_ACCESS_MODE_UAV;
@@ -1900,9 +1924,12 @@ static SHADER_SAMPLER_SLOT_MAPPING* _enlargeSamplerSlotMappingRoom(SHADER_SAMPLE
     pOldSamplerSlot = pSamplerMapping->pSampler;
     oldSamplerSlotCount = pSamplerMapping->countOfSamplers;
     newSamplerSlotCount = oldSamplerSlotCount + enlargeSamplerSlotCount;
-    gcoOS_Allocate(gcvNULL,
+    if (gcoOS_Allocate(gcvNULL,
                    sizeof(SHADER_SAMPLER_SLOT_MAPPING) * newSamplerSlotCount,
-                   (gctPOINTER*)&pSamplerMapping->pSampler);
+                   (gctPOINTER*)&pSamplerMapping->pSampler) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     if (pOldSamplerSlot)
     {
@@ -1967,6 +1994,10 @@ static VSC_ErrCode _CollectSamplerMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelper
         pBaseSamplerSlotMapping = _enlargeSamplerSlotMappingRoom(pSamplerMapping,
                                                                  pVirUniformSampler->realUseArraySize,
                                                                  &startSamplerSlotIdx);
+        if(pBaseSamplerSlotMapping == gcvNULL)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         for (subUniformIdx = 0; subUniformIdx < (gctUINT)pVirUniformSampler->realUseArraySize; subUniformIdx ++)
         {
             thisSamplerSlotIndex = startSamplerSlotIdx + subUniformIdx;
@@ -2015,9 +2046,12 @@ static SHADER_UAV_SLOT_MAPPING* _enlargeUavSlotMappingRoom(SHADER_UAV_MAPPING* p
     pOldUavSlot = pUavMapping->pUAV;
     oldUavSlotCount = pUavMapping->countOfUAVs;
     newUavSlotCount = oldUavSlotCount + enlargeUavSlotCount;
-    gcoOS_Allocate(gcvNULL,
+    if (gcoOS_Allocate(gcvNULL,
                    sizeof(SHADER_UAV_SLOT_MAPPING) * newUavSlotCount,
-                   (gctPOINTER*)&pUavMapping->pUAV);
+                   (gctPOINTER*)&pUavMapping->pUAV) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     if (pOldUavSlot)
     {
@@ -2079,6 +2113,10 @@ static VSC_ErrCode _CollectUavMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelper,
                 if (!bPostCollection)
                 {
                     pThisUavSlotMapping = _enlargeUavSlotMappingRoom(pUavMapping, 1, &startUavSlotIdx);
+                    if (pThisUavSlotMapping == gcvNULL)
+                    {
+                        return VSC_ERR_OUT_OF_MEMORY;
+                    }
                     vscInitializeUavSlotMapping(pThisUavSlotMapping);
 
                     pUavMapping->uavSlotMask |= (1 << startUavSlotIdx);
@@ -2116,6 +2154,10 @@ static VSC_ErrCode _CollectUavMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelper,
         if (!bPostCollection)
         {
             pThisUavSlotMapping = _enlargeUavSlotMappingRoom(pUavMapping, 1, &startUavSlotIdx);
+            if (pThisUavSlotMapping == gcvNULL)
+            {
+                return VSC_ERR_OUT_OF_MEMORY;
+            }
             vscInitializeUavSlotMapping(pThisUavSlotMapping);
 
             pUavMapping->uavSlotMask |= (1 << startUavSlotIdx);
@@ -2166,6 +2208,10 @@ static VSC_ErrCode _CollectUavMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelper,
                 if (!bPostCollection)
                 {
                     pThisUavSlotMapping = _enlargeUavSlotMappingRoom(pUavMapping, 1, &startUavSlotIdx);
+                    if (pThisUavSlotMapping == gcvNULL)
+                    {
+                        return VSC_ERR_OUT_OF_MEMORY;
+                    }
                     vscInitializeUavSlotMapping(pThisUavSlotMapping);
 
                     pUavMapping->uavSlotMask |= (1 << startUavSlotIdx);
@@ -2225,6 +2271,10 @@ static VSC_ErrCode _CollectUavMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelper,
             if (!bPostCollection)
             {
                 pThisUavSlotMapping = _enlargeUavSlotMappingRoom(pUavMapping, 1, &startUavSlotIdx);
+                if (pThisUavSlotMapping == gcvNULL)
+                {
+                    return VSC_ERR_OUT_OF_MEMORY;
+                }
                 vscInitializeUavSlotMapping(pThisUavSlotMapping);
 
                 pUavMapping->uavSlotMask |= (1 << startUavSlotIdx);
@@ -2278,6 +2328,10 @@ static VSC_ErrCode _CollectUavMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelper,
             if (!bPostCollection)
             {
                 pThisUavSlotMapping = _enlargeUavSlotMappingRoom(pUavMapping, 1, &startUavSlotIdx);
+                if (pThisUavSlotMapping == gcvNULL)
+                {
+                    return VSC_ERR_OUT_OF_MEMORY;
+                }
                 vscInitializeUavSlotMapping(pThisUavSlotMapping);
 
                 pUavMapping->uavSlotMask |= (1 << startUavSlotIdx);
@@ -2311,6 +2365,10 @@ static VSC_ErrCode _CollectUavMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelper,
             if (!bPostCollection)
             {
                 pThisUavSlotMapping = _enlargeUavSlotMappingRoom(pUavMapping, 1, &startUavSlotIdx);
+                if (pThisUavSlotMapping == gcvNULL)
+                {
+                    return VSC_ERR_OUT_OF_MEMORY;
+                }
                 vscInitializeUavSlotMapping(pThisUavSlotMapping);
 
                 pUavMapping->uavSlotMask |= (1 << startUavSlotIdx);
@@ -2705,9 +2763,12 @@ static SHADER_PRIV_UAV_ENTRY* _enlargePrivUavMappingRoom(SHADER_PRIV_UAV_MAPPING
     pOldPrivUavEntry = pPrivUavMapping->pPrivUavEntries;
     oldPrivUavEntryCount = pPrivUavMapping->countOfEntries;
     newPrivUavEntryCount = oldPrivUavEntryCount + enlargePrivUavEntryCount;
-    gcoOS_Allocate(gcvNULL,
+    if (gcoOS_Allocate(gcvNULL,
                    sizeof(SHADER_PRIV_UAV_ENTRY) * newPrivUavEntryCount,
-                   (gctPOINTER*)&pPrivUavMapping->pPrivUavEntries);
+                   (gctPOINTER*)&pPrivUavMapping->pPrivUavEntries) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     if (pOldPrivUavEntry)
     {
@@ -2737,9 +2798,12 @@ static SHADER_PRIV_CONSTANT_ENTRY* _enlargePrivCnstMappingRoom(SHADER_PRIV_CONST
     pOldPrivCnstEntry = pPrivCnstMapping->pPrivmConstantEntries;
     oldPrivCnstEntryCount = pPrivCnstMapping->countOfEntries;
     newPrivCnstEntryCount = oldPrivCnstEntryCount + enlargePrivCnstEntryCount;
-    gcoOS_Allocate(gcvNULL,
+    if (gcoOS_Allocate(gcvNULL,
                    sizeof(SHADER_PRIV_CONSTANT_ENTRY) * newPrivCnstEntryCount,
-                   (gctPOINTER*)&pPrivCnstMapping->pPrivmConstantEntries);
+                   (gctPOINTER*)&pPrivCnstMapping->pPrivmConstantEntries) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     memset(pPrivCnstMapping->pPrivmConstantEntries, 0, sizeof(SHADER_PRIV_CONSTANT_ENTRY) * newPrivCnstEntryCount);
 
@@ -2772,9 +2836,12 @@ static SHADER_COMPILE_TIME_CONSTANT** _enlargePrivCTCMemDataMappingRoom(SHADER_P
     pOldPrivCTCMemDataEntry = pPrivCTCMemDataMapping->ppCTC;
     oldPrivCTCMemDataEntryCount = pPrivCTCMemDataMapping->ctcCount;
     newPrivCTCMemDataEntryCount = oldPrivCTCMemDataEntryCount + enlargePrivCTCMemDataEntryCount;
-    gcoOS_Allocate(gcvNULL,
+    if (gcoOS_Allocate(gcvNULL,
                    sizeof(SHADER_COMPILE_TIME_CONSTANT*) * newPrivCTCMemDataEntryCount,
-                   (gctPOINTER*)&pPrivCTCMemDataMapping->ppCTC);
+                   (gctPOINTER*)&pPrivCTCMemDataMapping->ppCTC) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     if (pOldPrivCTCMemDataEntry)
     {
@@ -2956,9 +3023,12 @@ static SHADER_DEFAULT_UBO_MEMBER_ENTRY* _enlargeDefaultUboMappingRoom(SHADER_DEF
     pOldDuboEntry = pDuboMapping->pDefaultUboMemberEntries;
     oldDuboEntryCount = pDuboMapping->countOfEntries;
     newDuboEntryCount = oldDuboEntryCount + enlargeDuboEntryCount;
-    gcoOS_Allocate(gcvNULL,
+    if (gcoOS_Allocate(gcvNULL,
                    sizeof(SHADER_DEFAULT_UBO_MEMBER_ENTRY) * newDuboEntryCount,
-                   (gctPOINTER*)&pDuboMapping->pDefaultUboMemberEntries);
+                   (gctPOINTER*)&pDuboMapping->pDefaultUboMemberEntries) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     if (pOldDuboEntry)
     {
@@ -3037,6 +3107,10 @@ static VSC_ErrCode _AllocateDefaultUboToSEP(VSC_SEP_GEN_HELPER* pSepGenHelper,
 
     /* Creata a new private constant entry. */
     pPrivCnstEntry = _enlargePrivCnstMappingRoom(&pOutSEP->staticPrivMapping.privConstantMapping, 1, &pDuboMapping->baseAddressIndexInPrivConstTable);
+    if (pPrivCnstEntry == gcvNULL)
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
     pPrivCnstEntry->commonPrivm.privmKind = SHS_PRIV_CONSTANT_KIND_DEFAULT_UBO_ADDRESS;
     pPrivCnstEntry->commonPrivm.privmKindIndex = 0;
     pPrivCnstEntry->commonPrivm.pPrivateData = gcvNULL;
@@ -3076,6 +3150,10 @@ static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGen
         gcmASSERT(pShader->vidmemSizeOfSpill > 0);
 
         pPrivUavEntry = _enlargePrivUavMappingRoom(&pOutSEP->staticPrivMapping.privUavMapping, 1);
+        if (pPrivUavEntry == gcvNULL)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
 
         pPrivUavEntry->commonPrivm.privmKind = SHS_PRIV_MEM_KIND_GPR_SPILLED_MEMORY;
         pPrivUavEntry->commonPrivm.privmKindIndex = 0;
@@ -3094,7 +3172,10 @@ static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGen
             if (pVirUniformBlock->flags & VIR_IB_WITH_CUBO)
             {
                 pPrivUavEntry = _enlargePrivUavMappingRoom(&pOutSEP->staticPrivMapping.privUavMapping, 1);
-
+                if (pPrivUavEntry == gcvNULL)
+                {
+                    return VSC_ERR_OUT_OF_MEMORY;
+                }
                 llSlot = VIR_Symbol_GetFirstSlot(pVirUniformBlockSym);
                 gcmASSERT(llSlot != NOT_ASSIGNED);
 
@@ -3115,6 +3196,10 @@ static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGen
                         ctcSlot = VIR_Symbol_GetFirstSlot(pVirUniformSym);
 
                         ppCTC = _enlargePrivCTCMemDataMappingRoom(&pPrivUavEntry->memData, 1, gcvNULL);
+                        if (ppCTC == gcvNULL)
+                        {
+                            return VSC_ERR_OUT_OF_MEMORY;
+                        }
                         *ppCTC = &pOutSEP->constantMapping.pCompileTimeConstant[ctcSlot];
                         if (VIR_Type_isArray(pVirUniformType))
                         {
@@ -3123,6 +3208,10 @@ static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGen
                             for (i = 1; i < pVirUniform->realUseArraySize; i++)
                             {
                                  ppCTC = _enlargePrivCTCMemDataMappingRoom(&pPrivUavEntry->memData, 1, gcvNULL);
+                                 if (ppCTC == gcvNULL)
+                                 {
+                                     return VSC_ERR_OUT_OF_MEMORY;
+                                 }
                                  *ppCTC = &pOutSEP->constantMapping.pCompileTimeConstant[ctcSlot+i];
                             }
                         }
@@ -3158,7 +3247,10 @@ static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGen
             }
 
             pPrivUavEntry = _enlargePrivUavMappingRoom(&pOutSEP->staticPrivMapping.privUavMapping, 1);
-
+            if (pPrivUavEntry == gcvNULL)
+            {
+                return VSC_ERR_OUT_OF_MEMORY;
+            }
             llSlot = VIR_Symbol_GetFirstSlot(pVirStorageBlockSym);
             gcmASSERT(llSlot != NOT_ASSIGNED);
 
@@ -3190,7 +3282,10 @@ static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGen
         if (strcmp(VIR_Shader_GetSymNameString(pShader, pVirUniformSym), _sldLocalStorageAddressName) == 0)
         {
             pPrivUavEntry = _enlargePrivUavMappingRoom(&pOutSEP->staticPrivMapping.privUavMapping, 1);
-
+            if (pPrivUavEntry == gcvNULL)
+            {
+                return VSC_ERR_OUT_OF_MEMORY;
+            }
             llSlot = VIR_Symbol_GetLlResSlot(pVirUniformSym);
             gcmASSERT(llSlot != NOT_ASSIGNED);
 
@@ -3202,7 +3297,10 @@ static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGen
         else if (VIR_Symbol_GetUniformKind(pVirUniformSym) == VIR_UNIFORM_THREAD_ID_MEM_ADDR)
         {
             pPrivUavEntry = _enlargePrivUavMappingRoom(&pOutSEP->staticPrivMapping.privUavMapping, 1);
-
+            if (pPrivUavEntry == gcvNULL)
+            {
+                return VSC_ERR_OUT_OF_MEMORY;
+            }
             llSlot = VIR_Symbol_GetLlResSlot(pVirUniformSym);
             gcmASSERT(llSlot != NOT_ASSIGNED);
 
@@ -3279,7 +3377,10 @@ static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGen
             for (i = 0; i < thisUniformRegCount; i ++)
             {
                 pPrivUavEntry = _enlargePrivUavMappingRoom(&pOutSEP->staticPrivMapping.privUavMapping, 1);
-
+                if (pPrivUavEntry == gcvNULL)
+                {
+                    return VSC_ERR_OUT_OF_MEMORY;
+                }
                 pPrivUavEntry->commonPrivm.privmKind = privMemKind;
 
                 if (bSpecifiedPrivmKindIndex)
@@ -3361,6 +3462,10 @@ static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGen
 
         /* Creata a new private constant entry. */
         pPrivCnstEntry = _enlargePrivCnstMappingRoom(&pOutSEP->staticPrivMapping.privConstantMapping, 1, &privConstIndex);
+        if (pPrivCnstEntry == gcvNULL)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         pPrivCnstEntry->commonPrivm.privmKind = privConstKind;
         pPrivCnstEntry->commonPrivm.privmKindIndex = 0;
         pPrivCnstEntry->commonPrivm.pPrivateData = gcvNULL;
@@ -3387,6 +3492,10 @@ static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGen
             gctUINT                             duboEntryIndex = 0;
 
             pDuboMemberEntry = _enlargeDefaultUboMappingRoom(&pOutSEP->defaultUboMapping, 1, &duboEntryIndex);
+            if (pDuboMemberEntry == gcvNULL)
+            {
+                return VSC_ERR_OUT_OF_MEMORY;
+            }
             pDuboMemberEntry->memberIndexInOtherEntryTable = privConstIndex;
             pDuboMemberEntry->memberKind = SHS_DEFAULT_UBO_MEMBER_PRIV_CONST;
             pDuboMemberEntry->offsetInByte = VIR_Uniform_GetOffset(pVirUniform);
@@ -3418,9 +3527,12 @@ static SHADER_PRIV_OUTPUT_ENTRY* _enlargePrivOutputMappingRoom(SHADER_PRIV_OUTPU
     pOldPrivOutputEntry = pPrivOutputMapping->pPrivOutputEntries;
     oldPrivOutputEntryCount = pPrivOutputMapping->countOfEntries;
     newPrivOutputEntryCount = oldPrivOutputEntryCount + enlargePrivOutputEntryCount;
-    gcoOS_Allocate(gcvNULL,
+    if (gcoOS_Allocate(gcvNULL,
                    sizeof(SHADER_PRIV_OUTPUT_ENTRY) * newPrivOutputEntryCount,
-                   (gctPOINTER*)&pPrivOutputMapping->pPrivOutputEntries);
+                   (gctPOINTER*)&pPrivOutputMapping->pPrivOutputEntries) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     if (pOldPrivOutputEntry)
     {
@@ -3451,9 +3563,12 @@ static SHADER_PRIV_SAMPLER_ENTRY* _enlargePrivSamplerMappingRoom(SHADER_PRIV_SAM
     pOldPrivSamplerEntry = pPrivSamplerMapping->pPrivSamplerEntries;
     oldPrivSamplerEntryCount = pPrivSamplerMapping->countOfEntries;
     newPrivSamplerEntryCount = oldPrivSamplerEntryCount + enlargePrivSamplerEntryCount;
-    gcoOS_Allocate(gcvNULL,
+    if (gcoOS_Allocate(gcvNULL,
                    sizeof(SHADER_PRIV_SAMPLER_ENTRY) * newPrivSamplerEntryCount,
-                   (gctPOINTER*)&pPrivSamplerMapping->pPrivSamplerEntries);
+                   (gctPOINTER*)&pPrivSamplerMapping->pPrivSamplerEntries) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     if (pOldPrivSamplerEntry)
     {
@@ -3498,14 +3613,20 @@ static VSC_ErrCode _CollectDynamicPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGe
             if (!isSymUnused(pVirIoSym) && !isSymVectorizedOut(pVirIoSym) && isSymCompilerGen(pVirIoSym))
             {
                 pPrivOutputEntry = _enlargePrivOutputMappingRoom(&pOutSEP->dynamicPrivMapping.privOutputMapping, 1, gcvNULL);
-
+                if (pPrivOutputEntry == gcvNULL)
+                {
+                    return VSC_ERR_OUT_OF_MEMORY;
+                }
                 pPrivOutputEntry->commonPrivm.privmKind = VSC_LIB_LINK_TYPE_COLOR_OUTPUT;
                 pPrivOutputEntry->commonPrivm.privmKindIndex = VIR_Symbol_GetFirstSlot(pVirIoSym);
 
                 /* For vulkan, set private data to master output's location */
                 if (VIR_Shader_IsVulkan(pShader) && !pSepGenHelper->bSkipPepGen)
                 {
-                    gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivOutputEntry->commonPrivm.pPrivateData);
+                    if (gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivOutputEntry->commonPrivm.pPrivateData) != gcvSTATUS_OK)
+                    {
+                        return VSC_ERR_OUT_OF_MEMORY;
+                    }
                     *(gctUINT*)pPrivOutputEntry->commonPrivm.pPrivateData = VIR_Symbol_GetMasterLocation(pVirIoSym);
                 }
                 else
@@ -3536,7 +3657,10 @@ static VSC_ErrCode _CollectDynamicPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGe
             for (subUniformIdx = 0; subUniformIdx < (gctUINT)pVirUniform->realUseArraySize; subUniformIdx ++)
             {
                 pPrivSamplerEntry = _enlargePrivSamplerMappingRoom(&pOutSEP->dynamicPrivMapping.privSamplerMapping, 1, gcvNULL);
-
+                if (pPrivSamplerEntry == gcvNULL)
+                {
+                    return VSC_ERR_OUT_OF_MEMORY;
+                }
                 pPrivSamplerEntry->commonPrivm.privmKind = VSC_LIB_LINK_TYPE_RESOURCE;
                 pPrivSamplerEntry->commonPrivm.privmKindIndex = VIR_Symbol_GetFirstSlot(VIR_Shader_GetSymFromId(pShader,
                                                                                 pVirUniform->u.samplerOrImageAttr.parentSamplerSymId)) + subUniformIdx;
@@ -3593,9 +3717,12 @@ static VSC_ErrCode _CollectAttrTableToPEP(VSC_PEP_GEN_HELPER* pPepGenHelper,
     /* Allocate entries if needed */
     if (attrTableEntryCount > 0)
     {
-        gcoOS_Allocate(gcvNULL,
+        if (gcoOS_Allocate(gcvNULL,
                        sizeof(PROG_ATTRIBUTE_TABLE_ENTRY) * attrTableEntryCount,
-                       (gctPOINTER*)&pAttrTable->pAttribEntries);
+                       (gctPOINTER*)&pAttrTable->pAttribEntries) != gcvSTATUS_OK)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
 
         memset(pAttrTable->pAttribEntries, 0, sizeof(PROG_ATTRIBUTE_TABLE_ENTRY) * attrTableEntryCount);
 
@@ -3665,7 +3792,10 @@ static VSC_ErrCode _CollectAttrTableToPEP(VSC_PEP_GEN_HELPER* pPepGenHelper,
             {
                 maxLengthOfName = lengthOfName;
             }
-            gcoOS_Allocate(gcvNULL, lengthOfName + 1, (gctPOINTER*)&pAttrEntry->name);
+            if (gcoOS_Allocate(gcvNULL, lengthOfName + 1, (gctPOINTER*)&pAttrEntry->name) != gcvSTATUS_OK)
+            {
+                return VSC_ERR_OUT_OF_MEMORY;
+            }
             memcpy((gctPOINTER)pAttrEntry->name, name, lengthOfName + 1);
             pAttrEntry->nameLength = lengthOfName;
 
@@ -3676,7 +3806,10 @@ static VSC_ErrCode _CollectAttrTableToPEP(VSC_PEP_GEN_HELPER* pPepGenHelper,
             /* Location */
             locationCount = VIR_Symbol_GetVirIoRegCount(pShader, pVirIoSym);
             pAttrEntry->locationCount = locationCount;
-            gcoOS_Allocate(gcvNULL, locationCount * sizeof(gctUINT), (gctPOINTER*)&pAttrEntry->pLocation);
+            if (gcoOS_Allocate(gcvNULL, locationCount * sizeof(gctUINT), (gctPOINTER*)&pAttrEntry->pLocation)!= gcvSTATUS_OK)
+            {
+                return VSC_ERR_OUT_OF_MEMORY;
+            }
             for (i = 0; i < locationCount; i ++)
             {
                 pAttrEntry->pLocation[i] = VIR_Symbol_GetLocation(pVirIoSym) + i;
@@ -3732,9 +3865,12 @@ static VSC_ErrCode _CollectFragOutTableToPEP(VSC_PEP_GEN_HELPER* pPepGenHelper,
     /* Allocate entries if needed */
     if (foTableEntryCount > 0)
     {
-        gcoOS_Allocate(gcvNULL,
+        if (gcoOS_Allocate(gcvNULL,
                        sizeof(PROG_FRAGOUT_TABLE_ENTRY) * foTableEntryCount,
-                       (gctPOINTER*)&pFoTable->pFragOutEntries);
+                       (gctPOINTER*)&pFoTable->pFragOutEntries) != gcvSTATUS_OK)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
 
         memset(pFoTable->pFragOutEntries, 0, sizeof(PROG_FRAGOUT_TABLE_ENTRY) * foTableEntryCount);
 
@@ -3783,7 +3919,10 @@ static VSC_ErrCode _CollectFragOutTableToPEP(VSC_PEP_GEN_HELPER* pPepGenHelper,
             /* Name */
             name = VIR_Shader_GetSymNameString(pShader, pVirIoSym);
             lengthOfName = gcoOS_StrLen(name, gcvNULL);
-            gcoOS_Allocate(gcvNULL, lengthOfName + 1, (gctPOINTER*)&pFoEntry->name);
+            if (gcoOS_Allocate(gcvNULL, lengthOfName + 1, (gctPOINTER*)&pFoEntry->name) != gcvSTATUS_OK)
+            {
+                return VSC_ERR_OUT_OF_MEMORY;
+            }
             memcpy((gctPOINTER)pFoEntry->name, name, lengthOfName + 1);
             pFoEntry->nameLength = lengthOfName;
 
@@ -3794,7 +3933,10 @@ static VSC_ErrCode _CollectFragOutTableToPEP(VSC_PEP_GEN_HELPER* pPepGenHelper,
             /* Location */
             locationCount = VIR_Symbol_GetVirIoRegCount(pShader, pVirIoSym);
             pFoEntry->locationCount = locationCount;
-            gcoOS_Allocate(gcvNULL, locationCount * sizeof(gctUINT), (gctPOINTER*)&pFoEntry->pLocation);
+            if (gcoOS_Allocate(gcvNULL, locationCount * sizeof(gctUINT), (gctPOINTER*)&pFoEntry->pLocation) != gcvSTATUS_OK)
+            {
+                return VSC_ERR_OUT_OF_MEMORY;
+            }
             for (i = 0; i < locationCount; i ++)
             {
                 pFoEntry->pLocation[i] = VIR_Symbol_GetLocation(pVirIoSym) + i;
@@ -3902,7 +4044,7 @@ static VSC_RES_OP_BIT _TranslateResOpBits(gctUINT32 resOpBitsInUniform)
     return resultResOpBits;
 }
 
-static void _SetResOpBits(VIR_Shader* pShader,
+static gctBOOL _SetResOpBits(VIR_Shader* pShader,
                           VSC_SHADER_RESOURCE_BINDING* pResBinding,
                           VSC_RES_OP_BIT** ppResOpBits)
 {
@@ -3916,7 +4058,10 @@ static void _SetResOpBits(VIR_Shader* pShader,
 
     if (pResOpBits == gcvNULL)
     {
-        gcoOS_Allocate(gcvNULL, sizeof(VSC_RES_OP_BIT) * pResBinding->arraySize, (gctPOINTER*)&pResOpBits);
+        if (gcoOS_Allocate(gcvNULL, sizeof(VSC_RES_OP_BIT) * pResBinding->arraySize, (gctPOINTER*)&pResOpBits) != gcvSTATUS_OK)
+        {
+            return gcvFALSE;
+        }
         memset(pResOpBits, 0, sizeof(VSC_RES_OP_BIT) * pResBinding->arraySize);
     }
 
@@ -3958,6 +4103,7 @@ static void _SetResOpBits(VIR_Shader* pShader,
     {
         *ppResOpBits = pResOpBits;
     }
+    return gcvTRUE;
 }
 
 static void _GetImageFormat(VIR_Shader* pShader,
@@ -4075,9 +4221,12 @@ static PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY* _enlargeVkCombTsEntryRoom(PROG_
     pOldCombTsEntry = pCombinedSampTexTable->pCombTsEntries;
     oldCombTsEntryCount = pCombinedSampTexTable->countOfEntries;
     newCombTsEntryCount = oldCombTsEntryCount + enlargeCount;
-    gcoOS_Allocate(gcvNULL,
+    if (gcoOS_Allocate(gcvNULL,
                    sizeof(PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY) * newCombTsEntryCount,
-                   (gctPOINTER*)&pCombinedSampTexTable->pCombTsEntries);
+                   (gctPOINTER*)&pCombinedSampTexTable->pCombTsEntries) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     if (pOldCombTsEntry)
     {
@@ -4195,8 +4344,11 @@ static VSC_ErrCode _AddExtraSamplerArray(SHADER_PRIV_SAMPLER_ENTRY*** pppExtraSa
 
                 if (ppExtraSamplerArray == gcvNULL)
                 {
-                    gcoOS_Allocate(gcvNULL, sizeof(SHADER_PRIV_SAMPLER_ENTRY*) * resArraySize,
-                                    (gctPOINTER*)&ppExtraSamplerArray);
+                    if (gcoOS_Allocate(gcvNULL, sizeof(SHADER_PRIV_SAMPLER_ENTRY*) * resArraySize,
+                        (gctPOINTER*)&ppExtraSamplerArray) != gcvSTATUS_OK)
+                    {
+                        return VSC_ERR_OUT_OF_MEMORY;
+                    }
                     memset(ppExtraSamplerArray, 0,
                             sizeof(SHADER_PRIV_SAMPLER_ENTRY*) * resArraySize);
                 }
@@ -4573,9 +4725,12 @@ static PROG_VK_SEPARATED_SAMPLER_TABLE_ENTRY* _enlargeVkSeparatedSamplerEntryRoo
     pOldSamplerEntry = pSeparatedSamplerTable->pSamplerEntries;
     oldSamplerEntryCount = pSeparatedSamplerTable->countOfEntries;
     newSamplerEntryCount = oldSamplerEntryCount + enlargeCount;
-    gcoOS_Allocate(gcvNULL,
+    if (gcoOS_Allocate(gcvNULL,
                    sizeof(PROG_VK_SEPARATED_SAMPLER_TABLE_ENTRY) * newSamplerEntryCount,
-                   (gctPOINTER*)&pSeparatedSamplerTable->pSamplerEntries);
+                   (gctPOINTER*)&pSeparatedSamplerTable->pSamplerEntries) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     if (pOldSamplerEntry)
     {
@@ -4619,6 +4774,10 @@ static VSC_ErrCode _AddVkSeparatedSamplerEntryToSeparatedSamplerTableOfPEP(VSC_P
     if (pSamplerEntry == gcvNULL)
     {
         pSamplerEntry = _enlargeVkSeparatedSamplerEntryRoom(pSeparatedSamplerTable, 1, &SamplerEntryIndex);
+        if (pSamplerEntry == gcvNULL)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         memset(pSamplerEntry, 0, sizeof(PROG_VK_SEPARATED_SAMPLER_TABLE_ENTRY));
         pSamplerEntry->samplerEntryIndex = SamplerEntryIndex;
         memcpy(&pSamplerEntry->samplerBinding, &pResAllocEntry->resBinding, sizeof(VSC_SHADER_RESOURCE_BINDING));
@@ -4637,7 +4796,10 @@ static VSC_ErrCode _AddVkSeparatedSamplerEntryToSeparatedSamplerTableOfPEP(VSC_P
 
     pSamplerEntry->bUsingHwMppingList = gcvFALSE;
 
-    _SetResOpBits(pShader, &pSamplerEntry->samplerBinding, &pSamplerEntry->pResOpBits);
+    if (_SetResOpBits(pShader, &pSamplerEntry->samplerBinding, &pSamplerEntry->pResOpBits) == gcvFALSE)
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
 
     return VSC_ERR_NONE;
 }
@@ -4652,9 +4814,12 @@ static PROG_VK_SEPARATED_TEXTURE_TABLE_ENTRY* _enlargeVkSeparatedTexEntryRoom(PR
     pOldTextureEntry = pSeparatedTexTable->pTextureEntries;
     oldTextureEntryCount = pSeparatedTexTable->countOfEntries;
     newTextureEntryCount = oldTextureEntryCount + enlargeCount;
-    gcoOS_Allocate(gcvNULL,
+    if (gcoOS_Allocate(gcvNULL,
                    sizeof(PROG_VK_SEPARATED_TEXTURE_TABLE_ENTRY) * newTextureEntryCount,
-                   (gctPOINTER*)&pSeparatedTexTable->pTextureEntries);
+                   (gctPOINTER*)&pSeparatedTexTable->pTextureEntries) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     if (pOldTextureEntry)
     {
@@ -4698,6 +4863,10 @@ static VSC_ErrCode _AddVkSeparatedTexEntryToSeparatedTexTableOfPEP(VSC_PEP_GEN_H
     if (pTextureEntry == gcvNULL)
     {
         pTextureEntry = _enlargeVkSeparatedTexEntryRoom(pSeparatedTexTable, 1, &textureEntryIndex);
+        if (pTextureEntry == gcvNULL)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         memset(pTextureEntry, 0, sizeof(PROG_VK_SEPARATED_TEXTURE_TABLE_ENTRY));
         pTextureEntry->textureEntryIndex = textureEntryIndex;
         memcpy(&pTextureEntry->texBinding, &pResAllocEntry->resBinding, sizeof(VSC_SHADER_RESOURCE_BINDING));
@@ -4776,7 +4945,10 @@ static VSC_ErrCode _AddVkSeparatedTexEntryToSeparatedTexTableOfPEP(VSC_PEP_GEN_H
                               &pTextureEntry->hwMappings[stageIdx].s.imageDerivedInfo);
     }
 
-    _SetResOpBits(pShader, &pTextureEntry->texBinding, &pTextureEntry->pResOpBits);
+    if (_SetResOpBits(pShader, &pTextureEntry->texBinding, &pTextureEntry->pResOpBits) == gcvFALSE)
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
 
     return VSC_ERR_NONE;
 }
@@ -4791,9 +4963,12 @@ static PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE_ENTRY* _enlargeVkUniformTexBufferEntry
     pOldUtbEntry = pUtbTable->pUtbEntries;
     oldUtbEntryCount = pUtbTable->countOfEntries;
     newUtbEntryCount = oldUtbEntryCount + enlargeCount;
-    gcoOS_Allocate(gcvNULL,
+    if (gcoOS_Allocate(gcvNULL,
                    sizeof(PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE_ENTRY) * newUtbEntryCount,
-                   (gctPOINTER*)&pUtbTable->pUtbEntries);
+                   (gctPOINTER*)&pUtbTable->pUtbEntries) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     if (pOldUtbEntry)
     {
@@ -4839,6 +5014,10 @@ static VSC_ErrCode _AddVkUtbEntryToUniformTexBufTableOfPEP(VSC_PEP_GEN_HELPER* p
     if (pUtbEntry == gcvNULL)
     {
         pUtbEntry = _enlargeVkUniformTexBufferEntryRoom(pUtbTable, 1, &utbEntryIndex);
+        if (pUtbEntry == gcvNULL)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         memset(pUtbEntry, 0, sizeof(PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE_ENTRY));
         pUtbEntry->utbEntryIndex = utbEntryIndex;
         memcpy(&pUtbEntry->utbBinding, &pResAllocEntry->resBinding, sizeof(VSC_SHADER_RESOURCE_BINDING));
@@ -4917,7 +5096,10 @@ static VSC_ErrCode _AddVkUtbEntryToUniformTexBufTableOfPEP(VSC_PEP_GEN_HELPER* p
     pUtbEntry->activeStageMask |= pResAllocEntry->bUse ? (1 << stageIdx) : 0;
     pUtbEntry->stageBits |= VSC_SHADER_STAGE_2_STAGE_BIT(stageIdx);
 
-    _SetResOpBits(pShader, &pUtbEntry->utbBinding, &pUtbEntry->pResOpBits);
+    if (_SetResOpBits(pShader, &pUtbEntry->utbBinding, &pUtbEntry->pResOpBits) == gcvFALSE)
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
 
     return VSC_ERR_NONE;
 }
@@ -4932,9 +5114,12 @@ static PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY* _enlargeInputAttachmentEntryRoom(PR
     pOldIaEntry = pIaTable->pIaEntries;
     oldIaEntryCount = pIaTable->countOfEntries;
     newIaEntryCount = oldIaEntryCount + enlargeCount;
-    gcoOS_Allocate(gcvNULL,
+    if (gcoOS_Allocate(gcvNULL,
                    sizeof(PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY) * newIaEntryCount,
-                   (gctPOINTER*)&pIaTable->pIaEntries);
+                   (gctPOINTER*)&pIaTable->pIaEntries) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     if (pOldIaEntry)
     {
@@ -4980,6 +5165,10 @@ static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHe
     if (pIaEntry == gcvNULL)
     {
         pIaEntry = _enlargeInputAttachmentEntryRoom(pIaTable, 1, &iaEntryIndex);
+        if (pIaEntry == gcvNULL)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         memset(pIaEntry, 0, sizeof(PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY));
         pIaEntry->iaEntryIndex = iaEntryIndex;
         memcpy(&pIaEntry->iaBinding, &pResAllocEntry->resBinding, sizeof(VSC_SHADER_RESOURCE_BINDING));
@@ -5055,7 +5244,10 @@ static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHe
                               &pIaEntry->imageDerivedInfo[stageIdx]);
     }
 
-    _SetResOpBits(pShader, &pIaEntry->iaBinding, &pIaEntry->pResOpBits);
+    if (_SetResOpBits(pShader, &pIaEntry->iaBinding, &pIaEntry->pResOpBits) == gcvFALSE)
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
 
     return VSC_ERR_NONE;
 }
@@ -5070,9 +5262,12 @@ static PROG_VK_STORAGE_TABLE_ENTRY* _enlargeVkStorageEntryRoom(PROG_VK_STORAGE_T
     pOldStorageEntry = pStorageTable->pStorageEntries;
     oldStorageEntryCount = pStorageTable->countOfEntries;
     newStorageEntryCount = oldStorageEntryCount + enlargeCount;
-    gcoOS_Allocate(gcvNULL,
+    if (gcoOS_Allocate(gcvNULL,
                    sizeof(PROG_VK_STORAGE_TABLE_ENTRY) * newStorageEntryCount,
-                   (gctPOINTER*)&pStorageTable->pStorageEntries);
+                   (gctPOINTER*)&pStorageTable->pStorageEntries) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     if (pOldStorageEntry)
     {
@@ -5117,6 +5312,10 @@ static VSC_ErrCode _AddVkStorageEntryToStorageTableOfPEP(VSC_PEP_GEN_HELPER* pPe
     if (pStorageEntry == gcvNULL)
     {
         pStorageEntry = _enlargeVkStorageEntryRoom(pStorageTable, 1, &StorageEntryIndex);
+        if (pStorageEntry == gcvNULL)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         memset(pStorageEntry, 0, sizeof(PROG_VK_STORAGE_TABLE_ENTRY));
         pStorageEntry->storageEntryIndex = StorageEntryIndex;
         memcpy(&pStorageEntry->storageBinding, &pResAllocEntry->resBinding, sizeof(VSC_SHADER_RESOURCE_BINDING));
@@ -5175,7 +5374,10 @@ static VSC_ErrCode _AddVkStorageEntryToStorageTableOfPEP(VSC_PEP_GEN_HELPER* pPe
                           pSep,
                           &pStorageEntry->imageDerivedInfo[stageIdx]);
 
-    _SetResOpBits(pShader, &pStorageEntry->storageBinding, &pStorageEntry->pResOpBits);
+    if (_SetResOpBits(pShader, &pStorageEntry->storageBinding, &pStorageEntry->pResOpBits) == gcvFALSE)
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
 
     return VSC_ERR_NONE;
 }
@@ -5190,9 +5392,12 @@ static PROG_VK_UNIFORM_BUFFER_TABLE_ENTRY* _enlargeVkUbEntryRoom(PROG_VK_UNIFORM
     pOldUbEntry = pUbTable->pUniformBufferEntries;
     oldUbEntryCount = pUbTable->countOfEntries;
     newUbEntryCount = oldUbEntryCount + enlargeCount;
-    gcoOS_Allocate(gcvNULL,
+    if (gcoOS_Allocate(gcvNULL,
                    sizeof(PROG_VK_UNIFORM_BUFFER_TABLE_ENTRY) * newUbEntryCount,
-                   (gctPOINTER*)&pUbTable->pUniformBufferEntries);
+                   (gctPOINTER*)&pUbTable->pUniformBufferEntries) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     if (pOldUbEntry)
     {
@@ -5238,6 +5443,10 @@ static VSC_ErrCode _AddVkUbEntryToUbTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHelper
     if (pUbEntry == gcvNULL)
     {
         pUbEntry = _enlargeVkUbEntryRoom(pUbTable, 1, &ubEntryIndex);
+        if (pUbEntry == gcvNULL)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         memset(pUbEntry, 0, sizeof(PROG_VK_UNIFORM_BUFFER_TABLE_ENTRY));
         pUbEntry->ubEntryIndex = ubEntryIndex;
         memcpy(&pUbEntry->ubBinding, &pResAllocEntry->resBinding, sizeof(VSC_SHADER_RESOURCE_BINDING));
@@ -5317,6 +5526,10 @@ static VSC_ErrCode _AddVkCombStEntryToCombStTableOfPEP(VSC_PEP_GEN_HELPER* pPepG
     if (pCombTsEntry == gcvNULL)
     {
         pCombTsEntry = _enlargeVkCombTsEntryRoom(pCombinedSampTexTable, 1, &combTsEntryIndex);
+        if (pCombTsEntry == gcvNULL)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         memset(pCombTsEntry, 0, sizeof(PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY));
         pCombTsEntry->combTsEntryIndex = combTsEntryIndex;
         memcpy(&pCombTsEntry->combTsBinding, &pResAllocEntry->resBinding, sizeof(VSC_SHADER_RESOURCE_BINDING));
@@ -5333,7 +5546,10 @@ static VSC_ErrCode _AddVkCombStEntryToCombStTableOfPEP(VSC_PEP_GEN_HELPER* pPepG
         pCombTsEntry->hwMappings[stageIdx].samplerMapping.hwSamplerSlot = NOT_ASSIGNED;
     }
 
-    _SetResOpBits(pShader, &pCombTsEntry->combTsBinding, &pCombTsEntry->pResOpBits);
+    if (_SetResOpBits(pShader, &pCombTsEntry->combTsBinding, &pCombTsEntry->pResOpBits) == gcvFALSE)
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
 
     /* Extra samplers for VSC_LIB_LINK_TYPE_RESOURCE */
     if (pResAllocEntry->hwRegNo != NOT_ASSIGNED)
@@ -5355,8 +5571,11 @@ static VSC_ErrCode _AddVkCombStEntryToCombStTableOfPEP(VSC_PEP_GEN_HELPER* pPepG
         {
             gctPOINTER ptr;
 
-            gcoOS_Allocate(gcvNULL, sizeof(SHADER_PRIV_UAV_ENTRY*) * planes,
-                           (gctPOINTER *) &ptr);
+            if (gcoOS_Allocate(gcvNULL, sizeof(SHADER_PRIV_UAV_ENTRY*) * planes,
+                (gctPOINTER *) &ptr) != gcvSTATUS_OK)
+            {
+                return VSC_ERR_OUT_OF_MEMORY;
+            }
 
             pCombTsEntry->hwMappings[stageIdx].ppYcbcrPlanes = ptr;
             memset(ptr, 0, sizeof(SHADER_PRIV_UAV_ENTRY*) * planes);
@@ -5437,9 +5656,12 @@ static PROG_VK_PUSH_CONSTANT_TABLE_ENTRY* _enlargeVkPushCnstEntryRoom(PROG_VK_PU
     pOldPushCnstEntry = pPushCnstTable->pPushConstantEntries;
     oldPushCnstEntryCount = pPushCnstTable->countOfEntries;
     newPushCnstEntryCount = oldPushCnstEntryCount + enlargeCount;
-    gcoOS_Allocate(gcvNULL,
+    if (gcoOS_Allocate(gcvNULL,
                    sizeof(PROG_VK_PUSH_CONSTANT_TABLE_ENTRY) * newPushCnstEntryCount,
-                   (gctPOINTER*)&pPushCnstTable->pPushConstantEntries);
+                   (gctPOINTER*)&pPushCnstTable->pPushConstantEntries) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     if (pOldPushCnstEntry)
     {
@@ -5481,6 +5703,10 @@ static VSC_ErrCode _AddVkPushCnstEntryToPushCnstTableOfPEP(VSC_PEP_GEN_HELPER* p
     if (pPushCnstEntry == gcvNULL)
     {
         pPushCnstEntry = _enlargeVkPushCnstEntryRoom(pPushCnstTable, 1, &pushCnstEntryIndex);
+        if (pPushCnstEntry == gcvNULL)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         memset(pPushCnstEntry, 0, sizeof(PROG_VK_PUSH_CONSTANT_TABLE_ENTRY));
         memcpy(&pPushCnstEntry->pushConstRange, &pPushCnstAllocEntry->pushCnstRange, sizeof(VSC_SHADER_PUSH_CONSTANT_RANGE));
     }
@@ -5542,9 +5768,12 @@ static PROG_VK_PRIV_COMB_TEX_SAMP_HW_MAPPING* _enlargeVkPctsHwMappingEntryRoom(P
     pOldPctsHwMappingEntry = pPctsHwMappingTable->pPrivCombTsHwMappingArray;
     oldPctsHwMappingEntryCount = pPctsHwMappingTable->countOfArray;
     newPctsHwMappingEntryCount = oldPctsHwMappingEntryCount + enlargeCount;
-    gcoOS_Allocate(gcvNULL,
+    if (gcoOS_Allocate(gcvNULL,
                    sizeof(PROG_VK_PRIV_COMB_TEX_SAMP_HW_MAPPING) * newPctsHwMappingEntryCount,
-                   (gctPOINTER*)&pPctsHwMappingTable->pPrivCombTsHwMappingArray);
+                   (gctPOINTER*)&pPctsHwMappingTable->pPrivCombTsHwMappingArray) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     if (pOldPctsHwMappingEntry)
     {
@@ -5575,9 +5804,12 @@ static gctUINT* _enlargeVkPctsHwMappingEntryIdxListRoom(PROG_VK_PRIV_COMB_TEX_SA
     pOldPctsHwMappingEntryIdx = pPctsHwMappingList->pPctsHmEntryIdxArray;
     oldPctsHwMappingEntryIdxCount = pPctsHwMappingList->arraySize;
     newPctsHwMappingEntryIdxCount = oldPctsHwMappingEntryIdxCount + enlargeCount;
-    gcoOS_Allocate(gcvNULL,
+    if (gcoOS_Allocate(gcvNULL,
                    sizeof(gctUINT) * newPctsHwMappingEntryIdxCount,
-                   (gctPOINTER*)&pPctsHwMappingList->pPctsHmEntryIdxArray);
+                   (gctPOINTER*)&pPctsHwMappingList->pPctsHmEntryIdxArray) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     if (pOldPctsHwMappingEntryIdx)
     {
@@ -5672,6 +5904,10 @@ static VSC_ErrCode _CollectCompilerGeneatedCombinedSampler(VSC_PEP_GEN_HELPER* p
                         pPctsHwMapping = _enlargeVkPctsHwMappingEntryRoom(&pOutPEP->u.vk.privateCombTsHwMappingPool,
                                                                           1,
                                                                           &pctsHmEntryIndex);
+                        if (pPctsHwMapping == gcvNULL)
+                        {
+                            return VSC_ERR_OUT_OF_MEMORY;
+                        }
                         memset(pPctsHwMapping, 0, sizeof(PROG_VK_PRIV_COMB_TEX_SAMP_HW_MAPPING));
 
                         pPctsHwMapping->pctsHmEntryIndex = pctsHmEntryIndex;
@@ -5689,6 +5925,10 @@ static VSC_ErrCode _CollectCompilerGeneatedCombinedSampler(VSC_PEP_GEN_HELPER* p
                         pPctsHwMappingListIdx = _enlargeVkPctsHwMappingEntryIdxListRoom(&pSeparatedTexEntry->hwMappings[stageIdx].s.texHwMappingList,
                                                                                        1,
                                                                                        gcvNULL);
+                        if (pPctsHwMappingListIdx == gcvNULL)
+                        {
+                            return VSC_ERR_OUT_OF_MEMORY;
+                        }
                         *pPctsHwMappingListIdx = pctsHmEntryIndex;
 
                         break;
@@ -5757,6 +5997,10 @@ static VSC_ErrCode _CollectCompilerGeneatedCombinedSampler(VSC_PEP_GEN_HELPER* p
                         pPctsHwMappingListIdx = _enlargeVkPctsHwMappingEntryIdxListRoom(&pSeparatedSamplerEntry->hwMappings[stageIdx].samplerHwMappingList,
                                                                                         1,
                                                                                         gcvNULL);
+                        if (pPctsHwMappingListIdx == gcvNULL)
+                        {
+                            return VSC_ERR_OUT_OF_MEMORY;
+                        }
                         *pPctsHwMappingListIdx = pctsHmEntryIndex;
 
                         break;
@@ -5782,7 +6026,10 @@ static VSC_ErrCode _PostProcessImageDerivedInfo(PROG_VK_IMAGE_DERIVED_INFO* pIma
     pPrivCnstEntry = pImageDerivedInfo->pImageSize;
     if (pPrivCnstEntry)
     {
-        gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
+        if (gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData) != gcvSTATUS_OK)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = entryIndex;
     }
 
@@ -5790,7 +6037,10 @@ static VSC_ErrCode _PostProcessImageDerivedInfo(PROG_VK_IMAGE_DERIVED_INFO* pIma
     pPrivCnstEntry = pImageDerivedInfo->pMipLevel;
     if (pPrivCnstEntry)
     {
-        gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
+        if (gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData) != gcvSTATUS_OK)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = entryIndex;
     }
 
@@ -5800,7 +6050,10 @@ static VSC_ErrCode _PostProcessImageDerivedInfo(PROG_VK_IMAGE_DERIVED_INFO* pIma
     {
         for (i = 0; i < pResBinding->arraySize; i++)
         {
-            gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivUavEntry->commonPrivm.pPrivateData);
+            if (gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivUavEntry->commonPrivm.pPrivateData) != gcvSTATUS_OK)
+            {
+                return VSC_ERR_OUT_OF_MEMORY;
+            }
             *(gctUINT*)pPrivUavEntry->commonPrivm.pPrivateData = entryIndex;
 
             pPrivUavEntry++;
@@ -5827,7 +6080,10 @@ static VSC_ErrCode _PostProcessSamplerDerivedInfo(PROG_VK_SAMPLER_DERIVED_INFO* 
         {
             if (bAllocate)
             {
-                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
+                if (gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData) != gcvSTATUS_OK)
+                {
+                    return VSC_ERR_OUT_OF_MEMORY;
+                }
                 *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = entryIndex;
             }
             else
@@ -5842,7 +6098,10 @@ static VSC_ErrCode _PostProcessSamplerDerivedInfo(PROG_VK_SAMPLER_DERIVED_INFO* 
         {
             if (bAllocate)
             {
-                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
+                if (gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData) != gcvSTATUS_OK)
+                {
+                    return VSC_ERR_OUT_OF_MEMORY;
+                }
                 *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = entryIndex;
             }
             else
@@ -5857,7 +6116,10 @@ static VSC_ErrCode _PostProcessSamplerDerivedInfo(PROG_VK_SAMPLER_DERIVED_INFO* 
         {
             if (bAllocate)
             {
-                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
+                if (gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData) != gcvSTATUS_OK)
+                {
+                    return VSC_ERR_OUT_OF_MEMORY;
+                }
                 *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = entryIndex;
             }
             else
@@ -5890,7 +6152,10 @@ static VSC_ErrCode _PostProcessVkCombStTable(VSC_PEP_GEN_HELPER* pPepGenHelper, 
                 pPrivSamplerEntry = pComTsEntry->hwMappings[stageIdx].ppExtraSamplerArray[j];
                 if (pPrivSamplerEntry)
                 {
-                    gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivSamplerEntry->commonPrivm.pPrivateData);
+                    if (gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivSamplerEntry->commonPrivm.pPrivateData) != gcvSTATUS_OK)
+                    {
+                        return VSC_ERR_OUT_OF_MEMORY;
+                    }
                     *(gctUINT*)pPrivSamplerEntry->commonPrivm.pPrivateData = pComTsEntry->combTsEntryIndex;
                 }
             }
@@ -5904,7 +6169,10 @@ static VSC_ErrCode _PostProcessVkCombStTable(VSC_PEP_GEN_HELPER* pPepGenHelper, 
                 pPrivUavEntry = pComTsEntry->hwMappings[stageIdx].ppYcbcrPlanes[k];
                 if (pPrivUavEntry)
                 {
-                    gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivUavEntry->commonPrivm.pPrivateData);
+                    if (gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivUavEntry->commonPrivm.pPrivateData) != gcvSTATUS_OK)
+                    {
+                        return VSC_ERR_OUT_OF_MEMORY;
+                    }
                     *(gctUINT*)pPrivUavEntry->commonPrivm.pPrivateData = pComTsEntry->combTsEntryIndex;
                 }
             }
@@ -6009,7 +6277,10 @@ static VSC_ErrCode _PostProcessVkInputAttachmentTable(VSC_PEP_GEN_HELPER* pPepGe
                     pPrivSamplerEntry = pIaEntries->hwMappings[stageIdx].ppExtraSamplerArray[j];
                     if (pPrivSamplerEntry)
                     {
-                        gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivSamplerEntry->commonPrivm.pPrivateData);
+                        if (gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivSamplerEntry->commonPrivm.pPrivateData) != gcvSTATUS_OK)
+                        {
+                            return VSC_ERR_OUT_OF_MEMORY;
+                        }
                         *(gctUINT*)pPrivSamplerEntry->commonPrivm.pPrivateData = pIaEntries->iaEntryIndex;
                     }
                 }
@@ -6501,9 +6772,12 @@ static PROG_CL_IMAGE_TABLE_ENTRY* _enlargeCLImageTEntryRoom(PROG_CL_IMAGE_TABLE*
     oldImageTEntryCount = pImageTable->countOfEntries;
     newImageTEntryCount = oldImageTEntryCount + enlargeCount;
 
-    gcoOS_Allocate(gcvNULL,
+    if (gcoOS_Allocate(gcvNULL,
                    sizeof(PROG_CL_IMAGE_TABLE_ENTRY) * newImageTEntryCount,
-                   (gctPOINTER*)&pImageTable->pImageEntries);
+                   (gctPOINTER*)&pImageTable->pImageEntries) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     if (pOldImageTEntry)
     {
@@ -6535,9 +6809,12 @@ static PROG_CL_UNIFORM_TABLE_ENTRY* _enlargeCLUniformTEntryRoom(PROG_CL_UNIFORM_
     oldImageTEntryCount = pUniformTable->countOfEntries;
     newImageTEntryCount = oldImageTEntryCount + enlargeCount;
 
-    gcoOS_Allocate(gcvNULL,
+    if (gcoOS_Allocate(gcvNULL,
                    sizeof(PROG_CL_UNIFORM_TABLE_ENTRY) * newImageTEntryCount,
-                   (gctPOINTER*)&pUniformTable->pUniformEntries);
+                   (gctPOINTER*)&pUniformTable->pUniformEntries) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     if (pOldImageTEntry)
     {
@@ -6569,9 +6846,13 @@ static PROG_CL_ARG_ENTRY* _enlargeCLArgEntryRoom(PROG_CL_ARG_TABLE* pArgTable,
     oldEntryCount = pArgTable->countOfEntries;
     newEntryCount = oldEntryCount + enlargeCount;
 
-    gcoOS_Allocate(gcvNULL,
+    if (gcoOS_Allocate(gcvNULL,
                    sizeof(PROG_CL_ARG_ENTRY) * newEntryCount,
-                   (gctPOINTER*)&pArgTable->pArgsEntries);
+                   (gctPOINTER*)&pArgTable->pArgsEntries) != gcvSTATUS_OK)
+    {
+        gcmPRINT("Failed to allocate memory for enlargeCLArgEntryRoom.");
+        return gcvNULL;
+    }
 
     if (pOldEntry)
     {
@@ -6592,15 +6873,16 @@ static PROG_CL_ARG_ENTRY* _enlargeCLArgEntryRoom(PROG_CL_ARG_TABLE* pArgTable,
     return &pArgTable->pArgsEntries[oldEntryCount];
 }
 
-static PROG_CL_ARG_ENTRY * _CollectKernelArg(VIR_Symbol*  symbol,
-                                             VIR_Shader*  pShader,
-                                     KERNEL_EXECUTABLE_PROFILE* pOutKEP)
+static VSC_ErrCode _CollectKernelArg(VIR_Symbol*  symbol,
+                                     VIR_Shader*  pShader,
+                                     KERNEL_EXECUTABLE_PROFILE* pOutKEP,
+                                     PROG_CL_ARG_ENTRY ** pArgsEntry)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     gctUINT argIndex;
     VIR_Uniform * uniform;
     gctBOOL bIsSampler = gcvFALSE;
     gctBOOL bIsImage = gcvFALSE;
-    PROG_CL_ARG_ENTRY * pArgsEntry;
 
     uniform = VIR_Symbol_GetUniformPointer(pShader, symbol);
     bIsSampler = VIR_Symbol_isSampler(symbol) || VIR_Symbol_isSamplerT(symbol);
@@ -6616,23 +6898,26 @@ static PROG_CL_ARG_ENTRY * _CollectKernelArg(VIR_Symbol*  symbol,
 
         if (argIndex >= pOutKEP->argTable.countOfEntries)
         {
-            _enlargeCLArgEntryRoom(&pOutKEP->argTable,
-                argIndex - pOutKEP->argTable.countOfEntries + 1, gcvNULL);
+            if (_enlargeCLArgEntryRoom(&pOutKEP->argTable,
+                argIndex - pOutKEP->argTable.countOfEntries + 1, gcvNULL) == gcvNULL)
+            {
+                return VSC_ERR_OUT_OF_MEMORY;
+            }
         }
 
-        pArgsEntry = &pOutKEP->argTable.pArgsEntries[argIndex];
+        *pArgsEntry = &pOutKEP->argTable.pArgsEntries[argIndex];
 
-        pArgsEntry->argIndex = argIndex;
-        pArgsEntry->isSampler = bIsSampler;
-        pArgsEntry->isImage = bIsImage;
-        pArgsEntry->isPointer = VIR_Uniform_isPointer(uniform);
-        pArgsEntry->typeQualifier = VIR_Symbol_GetTyQualifier(symbol);
-        pArgsEntry->accessQualifier = VIR_Symbol_GetTyQualifier(symbol);
-        pArgsEntry->addressQualifier= VIR_Symbol_GetAddrSpace(symbol);
+        (*pArgsEntry)->argIndex = argIndex;
+        (*pArgsEntry)->isSampler = bIsSampler;
+        (*pArgsEntry)->isImage = bIsImage;
+        (*pArgsEntry)->isPointer = VIR_Uniform_isPointer(uniform);
+        (*pArgsEntry)->typeQualifier = VIR_Symbol_GetTyQualifier(symbol);
+        (*pArgsEntry)->accessQualifier = VIR_Symbol_GetTyQualifier(symbol);
+        (*pArgsEntry)->addressQualifier= VIR_Symbol_GetAddrSpace(symbol);
         gcmASSERT(VIR_TypeId_isPrimitive(VIR_Symbol_GetTypeId(symbol)));
-        pArgsEntry->type = (VSC_SHADER_DATA_TYPE)VIR_Symbol_GetTypeId(symbol);
+        (*pArgsEntry)->type = (VSC_SHADER_DATA_TYPE)VIR_Symbol_GetTypeId(symbol);
         name = VIR_Shader_GetStringFromId(VIR_Symbol_GetShader(symbol), VIR_Symbol_GetName(symbol));
-        gcmVERIFY_OK(gcoOS_StrDup(gcvNULL, name, &pArgsEntry->argName));
+        gcmVERIFY_OK(gcoOS_StrDup(gcvNULL, name, &(*pArgsEntry)->argName));
 
         typeId = (VIR_Uniform_GetDerivedType(uniform) != VIR_TYPE_UNKNOWN) ?
                       VIR_Uniform_GetDerivedType(uniform) : VIR_Symbol_GetTypeId(symbol);
@@ -6645,8 +6930,8 @@ static PROG_CL_ARG_ENTRY * _CollectKernelArg(VIR_Symbol*  symbol,
                                       typeId,
                                       buffer,
                                       sizeof(buffer)),
-                "dump type name");
-        gcmVERIFY_OK(gcoOS_StrDup(gcvNULL, buffer, &pArgsEntry->argTypeName));
+                                      "dump type name");
+        gcmVERIFY_OK(gcoOS_StrDup(gcvNULL, buffer, &(*pArgsEntry)->argTypeName));
 
         if (bIsSampler)
         {
@@ -6658,11 +6943,12 @@ static PROG_CL_ARG_ENTRY * _CollectKernelArg(VIR_Symbol*  symbol,
             pOutKEP->kernelHints.imageCount ++;
         }
 
-        return pArgsEntry;
+        return errCode;
     }
 
-    OnError:
-    return gcvNULL;
+OnError:
+    (*pArgsEntry) = gcvNULL;
+    return errCode;
 }
 
 static VSC_ErrCode _GetImageSamplerPairs(VIR_Shader* pShader,
@@ -6714,6 +7000,7 @@ static VSC_ErrCode _GetImageSamplerPairs(VIR_Shader* pShader,
 static VSC_ErrCode _CollectConstantMappingToKEP(VIR_Shader* pShader,
                                                 KERNEL_EXECUTABLE_PROFILE* pOutKEP)
 {
+    VSC_ErrCode                        errCode = VSC_ERR_NONE;
     VIR_UniformIdList*                 pVirUniformLsts = VIR_Shader_GetUniforms(pShader);
     VIR_Symbol*                        pVirUniformSym;
     SHADER_CONSTANT_MAPPING*           pCnstMapping = &pOutKEP->sep.constantMapping;
@@ -6729,7 +7016,8 @@ static VSC_ErrCode _CollectConstantMappingToKEP(VIR_Shader* pShader,
     {
         pVirUniformSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pVirUniformLsts, virUniformIdx));
 
-        pArgEntry = _CollectKernelArg(pVirUniformSym, pShader, pOutKEP);
+        errCode = _CollectKernelArg(pVirUniformSym, pShader, pOutKEP, &pArgEntry);
+        ON_ERROR(errCode, "Failed to collect kernel argument.");
 
         arraySlot = VIR_Symbol_GetArraySlot(pVirUniformSym);
         firstSlot = VIR_Symbol_GetFirstSlot(pVirUniformSym);
@@ -6741,6 +7029,10 @@ static VSC_ErrCode _CollectConstantMappingToKEP(VIR_Shader* pShader,
                 VIR_Symbol_isImage(pVirUniformSym))
             {
                 imageEntry = _enlargeCLImageTEntryRoom(&pOutKEP->resourceTable.imageTable, 1, &entryIdx);
+                if (imageEntry == gcvNULL)
+                {
+                    return VSC_ERR_OUT_OF_MEMORY;
+                }
 
                 _GetImageSamplerPairs(pShader, pVirUniformSym, imageEntry);
 
@@ -6749,6 +7041,10 @@ static VSC_ErrCode _CollectConstantMappingToKEP(VIR_Shader* pShader,
             else if (pArgEntry)
             {
                 uniformEntry = _enlargeCLUniformTEntryRoom(&pOutKEP->resourceTable.uniformTable, 1, &entryIdx);
+                if (uniformEntry == gcvNULL)
+                {
+                    return VSC_ERR_OUT_OF_MEMORY;
+                }
                 uniformEntry->argIndex = pArgEntry->argIndex;
                 uniformEntry->common.hwMapping = &pCnstMapping->pConstantArrayMapping[arraySlot].pSubConstantArrays[firstSlot];
             }
@@ -6774,8 +7070,8 @@ static VSC_ErrCode _CollectConstantMappingToKEP(VIR_Shader* pShader,
     }
 
     /* loop private table to collect skipped uniforms */
-
-    return VSC_ERR_NONE;
+OnError:
+    return errCode;
 }
 
 static VSC_ErrCode _CollectResourceTablesToKEP(VIR_Shader* pShader,
@@ -6856,9 +7152,12 @@ vscVIR_GenerateKEP(
                   gcmOS_SAFE_FREE(gcvNULL, pOutKEP->kernelHints.constantMemBuffer);
                }
                /* Allocate a new buffer to store the constants */
-               gcoOS_Allocate(gcvNULL,
+               if (gcoOS_Allocate(gcvNULL,
                             gcmSIZEOF(gctCHAR) * pShader->constantMemorySize,
-                            &pointer);
+                            &pointer) != gcvSTATUS_OK)
+               {
+                   return VSC_ERR_OUT_OF_MEMORY;
+               }
 
                pOutKEP->kernelHints.constantMemBuffer = (gctCHAR *)pointer;
                gcoOS_MemCopy(pOutKEP->kernelHints.constantMemBuffer,

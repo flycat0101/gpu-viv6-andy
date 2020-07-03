@@ -3001,7 +3001,7 @@ _MarkFunctionFlag(
     return gcvSTATUS_OK;
 }
 
-static void
+static gctBOOL
 _SortFunctions(
     IN VIR_Shader*      pShader
     )
@@ -3014,7 +3014,7 @@ _SortFunctions(
 
     if (VIR_Shader_GetFunctionCount(pShader) == 1)
     {
-        return;
+        return gcvTRUE;
     }
 
     vscBILST_Initialize(&newFunctionList, gcvFALSE);
@@ -3041,6 +3041,10 @@ _SortFunctions(
         /* add function to functionList */
         pNewFuncNode = (VIR_FunctionNode *)vscMM_Alloc(pMM, sizeof(VIR_FunctionNode));
         gcmASSERT(pNewFuncNode != gcvNULL);
+        if (pNewFuncNode == gcvNULL)
+        {
+            return gcvFALSE;
+        }
         pNewFuncNode->function = pVirFunc;
         vscBILST_Append(&newFunctionList, (VSC_BI_LIST_NODE*)pNewFuncNode);
     }
@@ -3064,6 +3068,10 @@ _SortFunctions(
         /* add function to functionList */
         pNewFuncNode = (VIR_FunctionNode *)vscMM_Alloc(pMM, sizeof(VIR_FunctionNode));
         gcmASSERT(pNewFuncNode != gcvNULL);
+        if (pNewFuncNode == gcvNULL)
+        {
+            return gcvFALSE;
+        }
         pNewFuncNode->function = pVirFunc;
         vscBILST_Append(&newFunctionList, (VSC_BI_LIST_NODE*)pNewFuncNode);
     }
@@ -3071,6 +3079,10 @@ _SortFunctions(
     /* III: add the main function. */
     pNewFuncNode = (VIR_FunctionNode *)vscMM_Alloc(pMM, sizeof(VIR_FunctionNode));
     gcmASSERT(pNewFuncNode != gcvNULL);
+    if (pNewFuncNode == gcvNULL)
+    {
+        return gcvFALSE;
+    }
     pNewFuncNode->function = VIR_Shader_GetMainFunction(pShader);
     vscBILST_Append(&newFunctionList, (VSC_BI_LIST_NODE*)pNewFuncNode);
 
@@ -3079,6 +3091,7 @@ _SortFunctions(
 
     /* Update the function list. */
     pShader->functions = newFunctionList;
+    return gcvTRUE;
 }
 
 /*
@@ -4044,7 +4057,10 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
     {
         /* Sort the function list first. */
         _MarkFunctionFlag(VirShader);
-        _SortFunctions(VirShader);
+        if (_SortFunctions(VirShader) == gcvFALSE)
+        {
+            return gcvSTATUS_OUT_OF_MEMORY;
+        }
 
         if(VIR_Shader_isRegAllocated(VirShader))
         {

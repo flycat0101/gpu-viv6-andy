@@ -5851,6 +5851,10 @@ gcSHADER_MergeKernel(
                     {
                         functionSymbolItem = (_gcsExternFunctionItem *)vscMM_Alloc(&externSymbolPmp.mmWrapper,
                                                                          sizeof(_gcsExternFunctionItem));
+                        if (functionSymbolItem == gcvNULL)
+                        {
+                            return gcvSTATUS_OUT_OF_MEMORY;
+                        }
 
                         functionSymbolItem->externSymbol = kernelFunction->name;
                         functionSymbolItem->isKernelFunction = gcvTRUE;
@@ -5901,7 +5905,10 @@ gcSHADER_MergeKernel(
                         {
                             functionSymbolItem = (_gcsExternFunctionItem *)vscMM_Alloc(&externSymbolPmp.mmWrapper,
                                                                                        sizeof(_gcsExternFunctionItem));
-
+                            if (functionSymbolItem == gcvNULL)
+                            {
+                                return gcvSTATUS_OUT_OF_MEMORY;
+                            }
                             functionSymbolItem->externSymbol = function->name;
                             functionSymbolItem->isKernelFunction = gcvFALSE;
                             functionSymbolItem->defined = !(GetFunctionFlags(function) & gcvFUNC_EXTERN);
@@ -5958,6 +5965,10 @@ gcSHADER_MergeKernel(
                         {
                             variableSymbolItem = (_gcsExternVariableItem *)vscMM_Alloc(&externSymbolPmp.mmWrapper,
                                                                                        sizeof(_gcsExternVariableItem));
+                            if (variableSymbolItem == gcvNULL)
+                            {
+                                return gcvSTATUS_OUT_OF_MEMORY;
+                            }
 
                             variableSymbolItem->externSymbol = variable->name;
                             variableSymbolItem->redefined = gcvFALSE;
@@ -7147,7 +7158,7 @@ gcSHADER_LinkExternFunction(
     if (Shader->variableCount > 0)
     {
         /* change arguments according to the map */
-        gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, Shader->variableCount * gcmSIZEOF(gctBOOL), &pointer));
+        gcmONERROR(gcoOS_Allocate(gcvNULL, Shader->variableCount * gcmSIZEOF(gctBOOL), &pointer));
         gcoOS_ZeroMemory(pointer, Shader->variableCount * gcmSIZEOF(gctBOOL));
         checkVariable = (gctBOOL *)pointer;
     }
@@ -27791,20 +27802,23 @@ gcSHADER_GetFunctionByFuncHead(
 }
 
 #if (!VSC_LITE_BUILD)
-void
+gceSTATUS
 gcSHADER_SetBuildOptions(
     IN gcSHADER             Shader,
     IN gctSTRING            Options
     )
 {
+    gceSTATUS status = gcvSTATUS_OK;
     Shader->optionsLen = gcoOS_StrLen(Options, NULL) + 1;
-    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL,
+    gcmONERROR(gcoOS_Allocate(gcvNULL,
                                 Shader->optionsLen,
                                 (gctPOINTER *)&Shader->buildOptions));
 
     gcmVERIFY_OK(gcoOS_StrCopySafe(Shader->buildOptions,
                                    Shader->optionsLen,
                                    Options));
+OnError:
+    return status;
 }
 
 

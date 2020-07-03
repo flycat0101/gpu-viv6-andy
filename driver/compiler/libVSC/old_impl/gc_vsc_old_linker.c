@@ -11027,11 +11027,12 @@ _TraceWChannelEqualToZ(
     }
 }
 
-void
+gceSTATUS
 gcLINKTREE_FindModelViewProjection(
     gcLINKTREE VertexTree
     )
 {
+    gceSTATUS status = gcvSTATUS_OK;
     gctSIZE_T i, bytes;
     gctSIZE_T count = 0;
     gctBOOL_PTR tempArray = gcvNULL;
@@ -11045,7 +11046,7 @@ gcLINKTREE_FindModelViewProjection(
     /* Skip this for recompile. */
     if (VertexTree->flags & gcvSHADER_RECOMPILER)
     {
-        return;
+        return status;
     }
 
     /* Find the output position. */
@@ -11062,7 +11063,7 @@ gcLINKTREE_FindModelViewProjection(
 
     if (positionOutput == gcvNULL)
     {
-        return;
+        return status;
     }
 
 #if gcdUSE_WCLIP_PATCH
@@ -11109,15 +11110,15 @@ gcLINKTREE_FindModelViewProjection(
     }
     if (count == 0)
     {
-        return;
+        return status;
     }
 
     bytes = VertexTree->tempCount * gcmSIZEOF(gctBOOL);
 
-    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, bytes, (gctPOINTER *) &tempArray));
+    status = gcoOS_Allocate(gcvNULL, bytes, (gctPOINTER *) &tempArray);
 
     if (tempArray == gcvNULL)
-        return;
+        return status;
 
     gcoOS_ZeroMemory(tempArray, bytes);
 
@@ -11138,6 +11139,7 @@ gcLINKTREE_FindModelViewProjection(
     _TraceModelViewProjection(VertexTree, tempArray, positionTempHolding, 0);
 
     gcoOS_Free(gcvNULL, tempArray);
+    return status;
 }
 
 gceSTATUS
@@ -17359,7 +17361,12 @@ gcLinkShaders(
                 _DumpLinkTree("Incoming vertex shader", vertexTree, gcvFALSE);
 
             /* Find model view project matrix for w-clip. */
-            gcLINKTREE_FindModelViewProjection(vertexTree);
+            status = gcLINKTREE_FindModelViewProjection(vertexTree);
+            if (gcmIS_ERROR(status))
+            {
+                /* Return on error. */
+                return status;
+            }
         }
 
         if (FragmentShader)
@@ -18129,7 +18136,12 @@ _gcLinkFullGraphicsShaders(
             if (i == gceSGSK_VERTEX_SHADER)
             {
                 /* Find model view project matrix for w-clip. */
-                gcLINKTREE_FindModelViewProjection(shaderTrees[i]);
+                status = gcLINKTREE_FindModelViewProjection(shaderTrees[i]);
+                if (gcmIS_ERROR(status))
+                {
+                    /* Return on error. */
+                    return status;
+                }
             }
 
             if (i != gceSGSK_VERTEX_SHADER)
@@ -19612,7 +19624,12 @@ _LinkProgramPipeline(
 
         gcmERR_BREAK(gcLINKTREE_Construct(gcvNULL, &vertexTree));
         gcmERR_BREAK(gcLINKTREE_Build(vertexTree, vsTemp, Flags));
-        gcLINKTREE_FindModelViewProjection(vertexTree);
+        status = gcLINKTREE_FindModelViewProjection(vertexTree);
+        if (gcmIS_ERROR(status))
+        {
+            /* Return on error. */
+            return status;
+        }
         if (gcShaderHwRegAllocated(vsTemp))
         {
             gcmERR_BREAK(gcLINKTREE_MarkAllAsUsedwithRA(vertexTree));
@@ -19898,7 +19915,7 @@ _LinkFullGraphicsProgramPipeline(
         {
             gcmONERROR(gcLINKTREE_Construct(gcvNULL, &shaderTrees[i]));
             gcmONERROR(gcLINKTREE_Build(shaderTrees[i], tempShaders[i], Flags));
-            gcLINKTREE_FindModelViewProjection(shaderTrees[i]);
+            gcmONERROR(gcLINKTREE_FindModelViewProjection(shaderTrees[i]));
             if (gcShaderHwRegAllocated(tempShaders[i]))
             {
                 gcmONERROR(gcLINKTREE_MarkAllAsUsedwithRA(shaderTrees[i]));

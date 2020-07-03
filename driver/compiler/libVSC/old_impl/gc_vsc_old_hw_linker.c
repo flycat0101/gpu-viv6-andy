@@ -83,7 +83,7 @@ gcLINKTREE_Construct(
     OUT gcLINKTREE * Tree
     );
 
-void
+gceSTATUS
 gcLINKTREE_FindModelViewProjection(
     gcLINKTREE VertexTree
     );
