@@ -2876,6 +2876,24 @@ _IntrinsicOrExtFuncName(
     }
 }
 
+static void
+_VIR_LinkIntrinsicLib_SetNewSymbolPrecision(
+    IN VIR_Symbol*              pNewSymbol,
+    IN VIR_Symbol*              plibSymbol
+    )
+{
+    VIR_Precision               libSymbolPrecision = VIR_Symbol_GetPrecision(plibSymbol);
+
+    if (libSymbolPrecision != VIR_PRECISION_DEFAULT)
+    {
+        VIR_Symbol_SetPrecision(pNewSymbol, libSymbolPrecision);
+    }
+    else
+    {
+        VIR_Symbol_SetPrecision(pNewSymbol, VIR_PRECISION_ANY);
+    }
+}
+
 VSC_ErrCode
 _VIR_LinkIntrinsicLib_AddVregSymbol(
     IN VIR_Shader               *pShader,
@@ -2978,6 +2996,7 @@ _VIR_LinkIntrinsicLib_AddVregSymbol(
         }
 
         pNewVarSym = VIR_Shader_GetSymFromId(pShader, newVarSymId);
+        _VIR_LinkIntrinsicLib_SetNewSymbolPrecision(pNewVarSym, pLibVarSym);
         vscHTBL_DirectSet(pTempSet, (void*) pLibVarSym, (void*) pNewVarSym);
 
         for (i = 0; i < regCount; i++)
@@ -3000,6 +3019,7 @@ _VIR_LinkIntrinsicLib_AddVregSymbol(
             pVirRegSym = VIR_Function_GetSymFromId(pFunc, virRegSymId);
             pLibRegSym = VIR_Shader_FindSymbolByTempIndex(pLibShader, libVarStartVirRegIndex + i);
 
+            _VIR_LinkIntrinsicLib_SetNewSymbolPrecision(pVirRegSym, pLibRegSym);
             VIR_Symbol_SetIndexRange(pVirRegSym, *pRegId + regCount);
             VIR_Symbol_SetVregVariable(pVirRegSym, pNewVarSym);
 
@@ -3042,6 +3062,7 @@ _VIR_LinkIntrinsicLib_AddVregSymbol(
         }
 
         pVirRegSym = VIR_Function_GetSymFromId(pFunc, virRegSymId);
+        _VIR_LinkIntrinsicLib_SetNewSymbolPrecision(pVirRegSym, pLibVirRegSym);
         regCount = VIR_Type_GetRegCount(pShader, VIR_Symbol_GetType(pVirRegSym), gcvFALSE);
 
         vscHTBL_DirectSet(pTempSet, (void*) pLibVirRegSym, (void*) pVirRegSym);
@@ -3180,6 +3201,7 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
                                      &newVarId);
 
                 newVarSym = VIR_Function_GetSymFromId(pFunc, newVarId);
+                _VIR_LinkIntrinsicLib_SetNewSymbolPrecision(newVarSym, libSym);
 
                 if (VIR_Symbol_GetIndex(libSym) == VIR_Shader_GetBaseSamplerId(pLibShader))
                 {
@@ -3518,6 +3540,7 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
                     &newVirRegId);
 
                 newVirRegSym = VIR_Function_GetSymFromId(pFunc, newVirRegId);
+                _VIR_LinkIntrinsicLib_SetNewSymbolPrecision(newVirRegSym, libSym);
 
                 *tempIndexStart = *tempIndexStart +
                     VIR_Type_GetRegCount(pShader, VIR_Symbol_GetType(newVirRegSym), gcvFALSE);
@@ -3793,6 +3816,7 @@ VIR_Lib_LinkFunctions(
                                                     &newParamId);
 
                 newParam = VIR_Function_GetSymFromId(pFunc, newParamId);
+                _VIR_LinkIntrinsicLib_SetNewSymbolPrecision(newParam, libParam);
 
                 /* Copy the flag. */
                 if (isSymFunctionReturnVariable(libParam))
@@ -3842,6 +3866,7 @@ VIR_Lib_LinkFunctions(
                         isCreateNewVreg = gcvTRUE;
                     }
 
+                    _VIR_LinkIntrinsicLib_SetNewSymbolPrecision(newVirReg, newParam);
                     VIR_Symbol_SetVregVariable(newVirReg, newParam);
                     VIR_Symbol_SetStorageClass(newVirReg, VIR_Symbol_GetStorageClass(libParam));
                     VIR_Symbol_SetParamFuncSymId(newVirReg, VIR_Function_GetSymId(pFunc));
@@ -3892,6 +3917,7 @@ VIR_Lib_LinkFunctions(
                 ON_ERROR(errCode, "VIR_Lib_LinkFunctions");
 
                 newVar = VIR_Function_GetSymFromId(pFunc, newVarId);
+                _VIR_LinkIntrinsicLib_SetNewSymbolPrecision(newVar, libVar);
 
                 /* add local variable virreg */
                 errCode = VIR_Shader_AddSymbol(pShader,
@@ -3904,6 +3930,7 @@ VIR_Lib_LinkFunctions(
 
                 newVirReg = VIR_Function_GetSymFromId(pFunc, newVirRegId);
 
+                _VIR_LinkIntrinsicLib_SetNewSymbolPrecision(newVirReg, newVar);
                 VIR_Symbol_SetVregVariable(newVirReg, newVar);
 
                 newVar->u2.tempIndex = tempIndexStart;
@@ -4672,7 +4699,7 @@ VIR_Lib_UpdateCallSites(
     VIR_Operand         *destOpnd = gcvNULL;
     VIR_Operand         *opnd = gcvNULL;
     VIR_Operand         *newOpnd = gcvNULL;
-    VIR_Operand *texldOperand = gcvNULL;
+    VIR_Operand         *texldOperand = gcvNULL;
     VIR_Function        *func;
     VIR_OpCode          opcode;
     VIR_Enable          movEnable = VIR_ENABLE_NONE;

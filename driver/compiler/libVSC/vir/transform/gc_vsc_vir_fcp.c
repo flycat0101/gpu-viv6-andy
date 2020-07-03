@@ -2200,53 +2200,50 @@ OnError:
     return errCode;
 }
 
-void _VIR_FCP_ReplaceDUAL32(
-    VIR_Shader          *pShader,
-    VIR_Function        *pFunc,
-    VIR_Instruction     *pInst)
+static VSC_ErrCode _VIR_FCP_ReplaceDUAL32(
+    VIR_Shader*         pShader,
+    VIR_Function*       pFunc,
+    VIR_Instruction*    pInst
+    )
 {
-    VIR_Instruction     *newInst = gcvNULL;
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Instruction*    pNewInst = gcvNULL;
+    VIR_Operand*        pOpnd = gcvNULL;
+    VIR_Operand*        pNewOpnd = gcvNULL;
     gctUINT             i;
 
-    VIR_Function_AddInstructionAfter(pFunc,
-                VIR_Inst_GetOpcode(pInst),
-                VIR_TYPE_UINT16,
-                pInst,
-                gcvTRUE,
-                &newInst);
-    VIR_Inst_SetConditionOp(newInst, VIR_Inst_GetConditionOp(pInst));
+    errCode = VIR_Function_AddCopiedInstructionAfter(pFunc,
+                                                     pInst,
+                                                     pInst,
+                                                     gcvTRUE,
+                                                     &pNewInst);
+    ON_ERROR(errCode, "Fail to insert a copied instruction.");
 
-    if (pInst->_parentUseBB)
-    {
-        VIR_Inst_SetBasicBlock(newInst, VIR_Inst_GetBasicBlock(pInst));
-    }
-    else
-    {
-        VIR_Inst_SetFunction(newInst, VIR_Inst_GetFunction(pInst));
-    }
+    VIR_Inst_SetInstType(pNewInst, VIR_TYPE_UINT16);
 
     /* copy source */
     for (i = 0; i < VIR_Inst_GetSrcNum(pInst); i++)
     {
-        VIR_Operand_Copy(newInst->src[i], pInst->src[i]);
+        pOpnd = VIR_Inst_GetSource(pInst, i);
+        pNewOpnd = VIR_Inst_GetSource(pNewInst, i);
 
-        if (VIR_Operand_GetPrecision(pInst->src[i]) == VIR_PRECISION_HIGH)
+        if (VIR_Operand_GetPrecision(pOpnd) == VIR_PRECISION_HIGH)
         {
-            gcmASSERT(VIR_Operand_GetHIHwRegId(pInst->src[i]) != VIR_FCP_INVALID_REG);
-            VIR_Operand_SetHwRegId(newInst->src[i], VIR_Operand_GetHIHwRegId(pInst->src[i]));
-            VIR_Operand_SetHwShift(newInst->src[i], VIR_Operand_GetHIHwShift(pInst->src[i]));
+            gcmASSERT(VIR_Operand_GetHIHwRegId(pOpnd) != VIR_FCP_INVALID_REG);
+            VIR_Operand_SetHwRegId(pNewOpnd, VIR_Operand_GetHIHwRegId(pOpnd));
+            VIR_Operand_SetHwShift(pNewOpnd, VIR_Operand_GetHIHwShift(pOpnd));
         }
-        if (VIR_Operand_GetRelAddrMode(newInst->src[i]) != VIR_INDEXED_NONE)
+        if (VIR_Operand_GetRelAddrMode(pNewOpnd) != VIR_INDEXED_NONE)
         {
-            VIR_Symbol  *sym = VIR_Shader_GetSymFromId(pShader, VIR_Operand_GetRelIndexing(newInst->src[i]));
+            VIR_Symbol  *sym = VIR_Shader_GetSymFromId(pShader, VIR_Operand_GetRelIndexing(pNewOpnd));
             gcmASSERT(sym);
             if (VIR_Symbol_GetPrecision(sym) == VIR_PRECISION_HIGH)
             {
                 /* newOpnd's relAddrMode saves the low shift, add the difference of
                    high shift and low shift */
-                gctUINT relMode = VIR_Operand_GetRelAddrMode(newInst->src[i]);
+                gctUINT relMode = VIR_Operand_GetRelAddrMode(pNewOpnd);
                 relMode = relMode + VIR_Symbol_GetHIHwShift(sym) - VIR_Symbol_GetHwShift(sym);
-                VIR_Operand_SetRelAddrMode(newInst->src[i], relMode);
+                VIR_Operand_SetRelAddrMode(pNewOpnd, relMode);
             }
         }
     }
@@ -2254,32 +2251,36 @@ void _VIR_FCP_ReplaceDUAL32(
     /* duplicate dest and copy dest */
     if (pInst->dest)
     {
-        VIR_Operand_Copy(newInst->dest, pInst->dest);
+        pOpnd = VIR_Inst_GetDest(pInst);
+        pNewOpnd = VIR_Inst_GetDest(pNewInst);
 
-        if (VIR_Operand_GetPrecision(pInst->dest) == VIR_PRECISION_HIGH)
+        if (VIR_Operand_GetPrecision(pOpnd) == VIR_PRECISION_HIGH)
         {
-            gcmASSERT(VIR_Operand_GetHIHwRegId(pInst->dest) != VIR_FCP_INVALID_REG);
-            VIR_Operand_SetHwRegId(newInst->dest, VIR_Operand_GetHIHwRegId(pInst->dest));
-            VIR_Operand_SetHwShift(newInst->dest, VIR_Operand_GetHIHwShift(pInst->dest));
+            gcmASSERT(VIR_Operand_GetHIHwRegId(pOpnd) != VIR_FCP_INVALID_REG);
+            VIR_Operand_SetHwRegId(pNewOpnd, VIR_Operand_GetHIHwRegId(pOpnd));
+            VIR_Operand_SetHwShift(pNewOpnd, VIR_Operand_GetHIHwShift(pOpnd));
         }
-        if (VIR_Operand_GetRelAddrMode(newInst->dest) != VIR_INDEXED_NONE)
+        if (VIR_Operand_GetRelAddrMode(pNewOpnd) != VIR_INDEXED_NONE)
         {
-            VIR_Symbol  *sym = VIR_Shader_GetSymFromId(pShader, VIR_Operand_GetRelIndexing(newInst->dest));
+            VIR_Symbol  *sym = VIR_Shader_GetSymFromId(pShader, VIR_Operand_GetRelIndexing(pNewOpnd));
             gcmASSERT(sym);
             if (VIR_Symbol_GetPrecision(sym) == VIR_PRECISION_HIGH)
             {
                 /* newOpnd's relAddrMode saves the low shift, add the difference of
                    high shift and low shift */
-                gctUINT relMode = VIR_Operand_GetRelAddrMode(newInst->dest);
+                gctUINT relMode = VIR_Operand_GetRelAddrMode(pNewOpnd);
                 relMode = relMode + VIR_Symbol_GetHIHwShift(sym) - VIR_Symbol_GetHwShift(sym);
-                VIR_Operand_SetRelAddrMode(newInst->dest, relMode);
+                VIR_Operand_SetRelAddrMode(pNewOpnd, relMode);
             }
         }
     }
 
-    /* set thread mode*/
+    /* Update thread mode*/
     VIR_Inst_SetThreadMode(pInst, VIR_THREAD_D16_SINGLE_T0);
-    VIR_Inst_SetThreadMode(newInst, VIR_THREAD_D16_SINGLE_T1);
+    VIR_Inst_SetThreadMode(pNewInst, VIR_THREAD_D16_SINGLE_T1);
+
+OnError:
+    return errCode;
 }
 
 static void

@@ -413,17 +413,32 @@ _VIR_RA_MakeColorHI(
     color->_HIhwShift = shift;
 }
 
+static gctBOOL
+_VIR_RA_NeedAllocateHighRegForSymbol(
+    VIR_Symbol*             pSymbol
+    )
+{
+    gctBOOL                 bNeedAlloc = gcvFALSE;
+    VIR_Precision           symPrecision = VIR_Symbol_GetRealPrecision(pSymbol);
+
+    if (symPrecision == VIR_PRECISION_HIGH)
+    {
+        bNeedAlloc = gcvTRUE;
+    }
+
+    return bNeedAlloc;
+}
+
 static gctUINT
 _VIR_RA_LS_GetDefPrecison(
     VIR_RA_LS       *pRA,
     gctUINT         defIdx)
 {
-    VIR_Shader  *pShader = VIR_RA_LS_GetShader(pRA);
-    VIR_Symbol  *pSym = gcvNULL;
+    VIR_Shader      *pShader = VIR_RA_LS_GetShader(pRA);
+    VIR_Symbol      *pSym = gcvNULL;
+    VIR_DEF         *pDef = GET_DEF_BY_IDX(&pRA->pLvInfo->pDuInfo->defTable, defIdx);
 
-
-    VIR_DEF *pDef = GET_DEF_BY_IDX(&pRA->pLvInfo->pDuInfo->defTable, defIdx);
-    if(pDef->defKey.pDefInst == VIR_INPUT_DEF_INST)
+    if (pDef->defKey.pDefInst == VIR_INPUT_DEF_INST)
     {
         VIR_AttributeIdList     *pAttrs = VIR_Shader_GetAttributes(pShader);
         gctUINT                 currAttr;
@@ -444,7 +459,8 @@ _VIR_RA_LS_GetDefPrecison(
         pSym = VIR_Operand_GetSymbol(pDef->defKey.pDefInst->dest);
         gcmASSERT(pSym);
     }
-    return VIR_Symbol_GetPrecision(pSym);
+
+    return VIR_Symbol_GetRealPrecision(pSym);
 }
 
 static gctUINT
@@ -5895,8 +5911,7 @@ VSC_ErrCode _VIR_RA_LS_AssignAttributes(
             continue;
         }
 
-        if (VIR_Shader_isDual16Mode(pShader) &&
-            VIR_Symbol_GetPrecision(attribute) == VIR_PRECISION_HIGH)
+        if (VIR_Shader_isDual16Mode(pShader) && _VIR_RA_NeedAllocateHighRegForSymbol(attribute))
         {
             if (VIR_RA_LS_GetHwCfg(pRA)->hwFeatureFlags.highpVaryingShift)
             {
@@ -6045,7 +6060,7 @@ VSC_ErrCode _VIR_RA_LS_AssignAttributes(
                  VIR_Symbol_GetName(attribute) == VIR_NAME_INSTANCE_ID) &&
                 VIR_RA_LS_GetHwCfg(pRA)->hwFeatureFlags.vtxInstanceIdAsAttr == gcvFALSE)
             {
-                /* gcmASSERT(VIR_Symbol_GetPrecision(attribute) != VIR_PRECISION_HIGH); */
+                /* gcmASSERT(!_VIR_RA_NeedAllocateHighRegForSymbol(attribute)); */
 
                 /* if vtxInstanceIdAsAttr is not enabled, assign a special regNo
                     to the web, otherwise, assign as the last attribute  */
@@ -6200,8 +6215,7 @@ VSC_ErrCode _VIR_RA_LS_AssignAttributes(
                     }
 
                     _VIR_RA_MakeColor(curReg, shift, &LRColor);
-                    if (VIR_Shader_isDual16Mode(pShader) &&
-                        VIR_Symbol_GetPrecision(attribute) == VIR_PRECISION_HIGH)
+                    if (VIR_Shader_isDual16Mode(pShader) && _VIR_RA_NeedAllocateHighRegForSymbol(attribute))
                     {
                         switch (components)
                         {
@@ -6245,8 +6259,7 @@ VSC_ErrCode _VIR_RA_LS_AssignAttributes(
             {
                 VIR_Symbol_SetHwRegId(attribute, LRColor._hwRegId);
                 VIR_Symbol_SetHwShift(attribute, LRColor._hwShift);
-                if (VIR_Shader_isDual16Mode(pShader) &&
-                    VIR_Symbol_GetPrecision(attribute) == VIR_PRECISION_HIGH)
+                if (VIR_Shader_isDual16Mode(pShader) && _VIR_RA_NeedAllocateHighRegForSymbol(attribute))
                 {
                     VIR_Symbol_SetHIHwRegId(attribute, LRColor._HIhwRegId);
                     VIR_Symbol_SetHIHwShift(attribute, LRColor._HIhwShift);
@@ -6311,8 +6324,7 @@ VSC_ErrCode _VIR_RA_LS_AssignAttributes(
                     {
                         pCP->colorMap[VIR_RA_HWREG_GR].maxAllocReg = curReg;
                     }
-                    if (VIR_Shader_isDual16Mode(pShader) &&
-                        VIR_Symbol_GetPrecision(attribute) == VIR_PRECISION_HIGH)
+                    if (VIR_Shader_isDual16Mode(pShader) && _VIR_RA_NeedAllocateHighRegForSymbol(attribute))
                     {
                         VIR_Symbol_SetHIHwRegId(attribute, curReg + 1);
                         if (curReg + 1 > pCP->colorMap[VIR_RA_HWREG_GR].maxAllocReg)
@@ -6346,7 +6358,7 @@ VSC_ErrCode _VIR_RA_LS_AssignAttributes(
             LRColor,
             VIR_RA_LS_ATTRIBUTE_FUNC);
         gcmASSERT(ptCoordAttr != gcvNULL);
-        gcmASSERT(VIR_Symbol_GetPrecision(ptCoordAttr) != VIR_PRECISION_HIGH);
+        gcmASSERT(!_VIR_RA_NeedAllocateHighRegForSymbol(ptCoordAttr));
         VIR_Symbol_SetHwRegId(ptCoordAttr, reg);
         VIR_Symbol_SetHwShift(ptCoordAttr, 0);
         reg ++;
@@ -6411,7 +6423,7 @@ VSC_ErrCode _VIR_RA_LS_AssignAttributes(
             LRColor,
             VIR_RA_LS_ATTRIBUTE_FUNC);
         gcmASSERT(primIdAttr != gcvNULL);
-        gcmASSERT(VIR_Symbol_GetPrecision(primIdAttr) != VIR_PRECISION_HIGH);
+        gcmASSERT(!_VIR_RA_NeedAllocateHighRegForSymbol(primIdAttr));
         VIR_Symbol_SetHwRegId(primIdAttr, reg);
         reg ++;
     }
@@ -7570,7 +7582,7 @@ void _VIR_RA_LS_SetSymbolHwRegInfo(
             _VIR_RA_SetLRColor(pLR, 0, 3);
             if (VIR_Shader_isDual16Mode(pShader))
             {
-                gcmASSERT(VIR_Symbol_GetPrecision(pSym) == VIR_PRECISION_HIGH);
+                gcmASSERT(_VIR_RA_NeedAllocateHighRegForSymbol(pSym));
                 /* r1.w is not allocated */
                 gcmASSERT(_VIR_RA_LS_TestUsedColor(pRA, VIR_RA_HWREG_GR, 1, 0x8) == gcvFALSE);
                 VIR_Symbol_SetHIHwRegId(pSym, 1);
@@ -7595,8 +7607,7 @@ void _VIR_RA_LS_SetSymbolHwRegInfo(
                 VIR_Symbol_SetHwRegId(pSym, _VIR_RA_Color_RegNo(_VIR_RA_GetLRColor(pLR)) + diffReg);
                 VIR_Symbol_SetHwShift(pSym, _VIR_RA_Color_Shift(_VIR_RA_GetLRColor(pLR)));
 
-                if (VIR_Shader_isDual16Mode(pShader) &&
-                    VIR_Symbol_GetPrecision(pSym) == VIR_PRECISION_HIGH)
+                if (VIR_Shader_isDual16Mode(pShader) && _VIR_RA_NeedAllocateHighRegForSymbol(pSym))
                 {
                     gcmASSERT(!_VIR_RA_LS_IsInvalidHIColor(_VIR_RA_GetLRColor(pLR)));
                     VIR_Symbol_SetHIHwRegId(pSym, _VIR_RA_Color_HIRegNo(_VIR_RA_GetLRColor(pLR)) + diffReg);
@@ -7611,8 +7622,7 @@ void _VIR_RA_LS_SetSymbolHwRegInfo(
 
                         VIR_Symbol_SetHwRegId(pSym, _VIR_RA_Color_RegNo(_VIR_RA_GetLRColor(pLR)) + i);
                         VIR_Symbol_SetHwShift(pSym, _VIR_RA_Color_Shift(_VIR_RA_GetLRColor(pLR)));
-                        if (VIR_Shader_isDual16Mode(pShader) &&
-                            VIR_Symbol_GetPrecision(pSym) == VIR_PRECISION_HIGH)
+                        if (VIR_Shader_isDual16Mode(pShader) && _VIR_RA_NeedAllocateHighRegForSymbol(pSym))
                         {
                             gcmASSERT(!_VIR_RA_LS_IsInvalidHIColor(_VIR_RA_GetLRColor(pLR)));
                             VIR_Symbol_SetHIHwRegId(pSym, _VIR_RA_Color_HIRegNo(_VIR_RA_GetLRColor(pLR)) + i);
@@ -7625,8 +7635,7 @@ void _VIR_RA_LS_SetSymbolHwRegInfo(
                     pSym = VIR_Shader_FindSymbolByTempIndex(pShader, pLR->firstRegNo);
                     VIR_Symbol_SetHwRegId(pSym, _VIR_RA_Color_RegNo(_VIR_RA_GetLRColor(pLR)) + diffReg);
                     VIR_Symbol_SetHwShift(pSym, _VIR_RA_Color_Shift(_VIR_RA_GetLRColor(pLR)));
-                    if (VIR_Shader_isDual16Mode(pShader) &&
-                        VIR_Symbol_GetPrecision(pSym) == VIR_PRECISION_HIGH)
+                    if (VIR_Shader_isDual16Mode(pShader) && _VIR_RA_NeedAllocateHighRegForSymbol(pSym))
                     {
                         gcmASSERT(!_VIR_RA_LS_IsInvalidHIColor(_VIR_RA_GetLRColor(pLR)));
                         VIR_Symbol_SetHIHwRegId(pSym, _VIR_RA_Color_HIRegNo(_VIR_RA_GetLRColor(pLR)) + diffReg);
@@ -7650,7 +7659,8 @@ void _VIR_RA_LS_SetSymbolHwRegInfo(
                 VIR_Symbol_SetHwRegId(varSym, 0);
                 VIR_Symbol_SetHwShift(varSym, 3);
                 _VIR_RA_SetLRColor(pLR, 0, 3);
-                gcmASSERT(VIR_Symbol_GetPrecision(varSym) == VIR_PRECISION_HIGH);
+
+                gcmASSERT(_VIR_RA_NeedAllocateHighRegForSymbol(varSym));
                 if (VIR_Shader_isDual16Mode(pShader))
                 {
                     gcmASSERT(_VIR_RA_LS_TestUsedColor(pRA, VIR_RA_HWREG_GR, 1, 0x8) == gcvFALSE);
@@ -7676,8 +7686,7 @@ void _VIR_RA_LS_SetSymbolHwRegInfo(
                     VIR_Symbol_SetHwRegId(varSym, _VIR_RA_Color_RegNo(_VIR_RA_GetLRColor(pLR)));
                     VIR_Symbol_SetHwShift(varSym, _VIR_RA_Color_Shift(_VIR_RA_GetLRColor(pLR)));
 
-                    if (VIR_Shader_isDual16Mode(pShader) &&
-                        VIR_Symbol_GetPrecision(varSym) == VIR_PRECISION_HIGH)
+                    if (VIR_Shader_isDual16Mode(pShader) && _VIR_RA_NeedAllocateHighRegForSymbol(varSym))
                     {
                         gcmASSERT(!_VIR_RA_LS_IsInvalidHIColor(_VIR_RA_GetLRColor(pLR)));
                         VIR_Symbol_SetHIHwRegId(varSym, _VIR_RA_Color_HIRegNo(_VIR_RA_GetLRColor(pLR)));
@@ -7692,8 +7701,7 @@ void _VIR_RA_LS_SetSymbolHwRegInfo(
 
                             VIR_Symbol_SetHwRegId(pSym, _VIR_RA_Color_RegNo(_VIR_RA_GetLRColor(pLR)) + i);
                             VIR_Symbol_SetHwShift(pSym, _VIR_RA_Color_Shift(_VIR_RA_GetLRColor(pLR)));
-                            if (VIR_Shader_isDual16Mode(pShader) &&
-                                VIR_Symbol_GetPrecision(pSym) == VIR_PRECISION_HIGH)
+                            if (VIR_Shader_isDual16Mode(pShader) && _VIR_RA_NeedAllocateHighRegForSymbol(pSym))
                             {
                                 gcmASSERT(!_VIR_RA_LS_IsInvalidHIColor(_VIR_RA_GetLRColor(pLR)));
                                 VIR_Symbol_SetHIHwRegId(pSym, _VIR_RA_Color_HIRegNo(_VIR_RA_GetLRColor(pLR)) + i);
@@ -7705,8 +7713,7 @@ void _VIR_RA_LS_SetSymbolHwRegInfo(
                     {
                         VIR_Symbol_SetHwRegId(pSym, _VIR_RA_Color_RegNo(_VIR_RA_GetLRColor(pLR)) + diffReg);
                         VIR_Symbol_SetHwShift(pSym, _VIR_RA_Color_Shift(_VIR_RA_GetLRColor(pLR)));
-                        if (VIR_Shader_isDual16Mode(pShader) &&
-                            VIR_Symbol_GetPrecision(pSym) == VIR_PRECISION_HIGH)
+                        if (VIR_Shader_isDual16Mode(pShader) && _VIR_RA_NeedAllocateHighRegForSymbol(pSym))
                         {
                             gcmASSERT(!_VIR_RA_LS_IsInvalidHIColor(_VIR_RA_GetLRColor(pLR)));
                             VIR_Symbol_SetHIHwRegId(pSym, _VIR_RA_Color_HIRegNo(_VIR_RA_GetLRColor(pLR)) + diffReg);
@@ -7722,8 +7729,7 @@ void _VIR_RA_LS_SetSymbolHwRegInfo(
             {
                 VIR_Symbol_SetHwRegId(pSym, _VIR_RA_Color_RegNo(_VIR_RA_GetLRColor(pLR)) + diffReg);
                 VIR_Symbol_SetHwShift(pSym, _VIR_RA_Color_Shift(_VIR_RA_GetLRColor(pLR)));
-                if (VIR_Shader_isDual16Mode(pShader) &&
-                    VIR_Symbol_GetPrecision(pSym) == VIR_PRECISION_HIGH)
+                if (VIR_Shader_isDual16Mode(pShader) && _VIR_RA_NeedAllocateHighRegForSymbol(pSym))
                 {
                     gcmASSERT(!_VIR_RA_LS_IsInvalidHIColor(_VIR_RA_GetLRColor(pLR)));
                     VIR_Symbol_SetHIHwRegId(pSym, _VIR_RA_Color_HIRegNo(_VIR_RA_GetLRColor(pLR)) + diffReg);

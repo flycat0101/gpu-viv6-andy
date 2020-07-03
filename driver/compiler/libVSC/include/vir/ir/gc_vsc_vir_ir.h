@@ -549,7 +549,7 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
      (Opcode) == VIR_OP_IMADLO1)
 
 /* opcode with SkipHelper flag by default
- * load need extra check instructionflag hasSkHp and use VIR_Inst_HasSkHp() */
+ * load need extra check instructionflag hasSkHp and use VIR_Inst_IsSkipHelper() */
 #define VIR_OPCODE_NeedSkHpFlag(Opcode) \
      ((VIR_OPCODE_isAtom(Opcode))         ||  \
         (Opcode == VIR_OP_IMG_LOAD)       || \
@@ -1248,6 +1248,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Symbol_GetStorageClass(Sym) ((VIR_StorageClass)(Sym)->_storageClass)
 #define VIR_Symbol_GetAddrSpace(Sym)    ((VIR_AddrSpace)(Sym)->_addrSpace)
 #define VIR_Symbol_GetPrecision(Sym)    ((VIR_Precision)(Sym)->_precision)
+#define VIR_Symbol_GetDataPrecision(Sym)((VIR_Precision)(Sym)->_dataPrecision)
 #define VIR_Symbol_GetCurrPrecision(Sym) ((VIR_Precision)(Sym)->_currPrecision)
 #define VIR_Symbol_GetTyQualifier(Sym)  ((VIR_TyQualifier)(Sym)->_qualifier)
 #define VIR_Symbol_GetLinkage(Sym)      ((VIR_Linkage)(Sym)->_linkage)
@@ -1421,6 +1422,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Symbol_SetStorageClass(Sym, SC) do {(Sym)->_storageClass = SC; } while (0)
 #define VIR_Symbol_SetAddrSpace(Sym, AS)    do {(Sym)->_addrSpace = (gctUINT)AS; } while (0)
 #define VIR_Symbol_SetPrecision(Sym, Val)   do {(Sym)->_precision = (gctUINT)Val; } while (0)
+#define VIR_Symbol_SetDataPrecision(Sym, Val)   do {(Sym)->_dataPrecision = (gctUINT)Val; } while (0)
 #define VIR_Symbol_SetCurrPrecision(Sym, Val)   do {(Sym)->_currPrecision = (gctUINT)Val; } while (0)
 #define VIR_Symbol_SetHwRegId(Sym, Val)     do {(Sym)->_hwRegId = (gctUINT)(Val); } while (0)
 #define VIR_Symbol_SetHwShift(Sym, Val)     do {(Sym)->_hwShift = (gctUINT)(Val); } while (0)
@@ -3141,6 +3143,7 @@ typedef enum VIR_SYMFLAGEXT
     VIR_SYMFLAGEXT_NONE                         = 0x00000000, /* no flag */
     VIR_SYMFLAGEXT_NOPERSPECTIVE                = 0x00000001, /* noperspective */
     VIR_SYMFLAGEXT_FUNCTION_RET_VARIABLE        = 0x00000002, /* The return value of a function. */
+    VIR_SYMFLAGEXT_USED_BY_HIGHP_OPND           = 0x00000004, /* This symbol is used by a HIGHP operand. */
 
     /* TransformFeedback next buffer flag */
     VIR_SYMFLAGEXT_ENDOFINTERLEAVEDBUF          = 0x00001000,
@@ -3171,6 +3174,7 @@ typedef enum VIR_SYMFLAGEXT
 #define isSymNoperspective(sym)                 (((sym)->flagsExt & VIR_SYMFLAGEXT_NOPERSPECTIVE) != 0)
 #define isSymbeBeEndOfInterleavedBuffer(sym)    (((sym)->flagsExt & VIR_SYMFLAGEXT_ENDOFINTERLEAVEDBUF) != 0)
 #define isSymFunctionReturnVariable(sym)        (((sym)->flagsExt & VIR_SYMFLAGEXT_FUNCTION_RET_VARIABLE) != 0)
+#define isSymUsedByHighpOpnd(sym)               (((sym)->flagsExt & VIR_SYMFLAGEXT_USED_BY_HIGHP_OPND) != 0)
 
 #define isSymUBODUBO(sym)                       (VIR_Symbol_isUBO(sym) && ((sym)->flags & VIR_SYMUBOFLAG_IS_DUBO) != 0)
 #define isSymUBOCUBO(sym)                       (VIR_Symbol_isUBO(sym) && ((sym)->flags & VIR_SYMUBOFLAG_IS_CUBO) != 0)
@@ -3234,26 +3238,25 @@ typedef enum _VIR_LINKAGE
 
 struct _VIR_SYMBOL
 {
+    /* Word 1. */
     VIR_SymbolKind      _kind           : 6;
-    gctUINT             _storageClass   : 6;    /* storage class for variables
-                                                 or uniform Kind for uniform */
+    gctUINT             _storageClass   : 6;  /* storage class for variables or uniform Kind for uniform */
     gctUINT             _addrSpace      : 2;
     gctUINT             _precision      : 3;
-    gctUINT             _currPrecision  : 3;  /* symbol's current updated precision,
-                                               * can be used for future precision update */
+    gctUINT             _dataPrecision  : 3;  /* Save the precision for a buffer data, only use for a buffer address symbol, e.g, uniform/sbo/image. */
+    gctUINT             _currPrecision  : 3;  /* symbol's current updated precision, * can be used for future precision update */
     gctUINT             _qualifier      : 9;
+
+    /* Word 2. */
     gctUINT             _linkage        : 2;  /* 0: no-linkage, 1: import, 2: export */
     gctUINT             _componentShift : 2;  /* SPIRV component decoration */
     gctUINT             _cannotShift    : 1;  /* the symbol must allocated start from channel 0 */
     gctUINT             _bigEndian      : 1;  /* bigEndian attribute, Vivante GPU is always little endian  */
-    gctUINT             _reserved1      : 4;  /* unused bits */
-
-    VIR_HwRegId         _hwRegId      : 10;   /* allocated HW register for the temp or attribute */
-    gctUINT             _hwShift      : 2;    /* shift for HW register */
-    VIR_HwRegId         _HIhwRegId    : 10;   /* in dual16, we need to assign a register pair
-                                               * to high precison attribute */
-    gctUINT             _HIhwShift    : 2;    /* shift for HW register */
-    gctUINT             _reserved2    : 1;    /* unused bits */
+    VIR_HwRegId         _hwRegId        : 10; /* allocated HW register for the temp or attribute */
+    gctUINT             _hwShift        : 2;  /* shift for HW register */
+    VIR_HwRegId         _HIhwRegId      : 10; /* in dual16, we need to assign a register pair to high precison attribute */
+    gctUINT             _HIhwShift      : 2;  /* shift for HW register */
+    gctUINT             _reserved1      : 2;  /* unused bits */
 
     VIR_TypeId          typeId;               /* the typeId of the symbol */
     VIR_TypeId          fixedTypeId;          /* The fixed typeId of the symbol, for the output variable only. */
@@ -4258,7 +4261,6 @@ struct _VIR_INSTRUCTION
 
     /* Word 3. */
     gctUINT                 _condOp     : 5;
-    VIR_InstFlag            _instFlags  : 5;  /* VL concept, etc */
     gctUINT                 _srcOpndNum : 3;  /* number of source operands */
     gctUINT                 _threadMode : 3;
     gctUINT                 _parentUseBB: 1;  /* parent union uses BB */
@@ -4267,6 +4269,7 @@ struct _VIR_INSTRUCTION
     gctUINT                 _isLoopInvariant: 1;
     gctUINT                 _endOfBB    : 1;  /* End Of Basic Block Bit for non-control-flow inst */
     gctUINT                 _USCUnallocate: 1; /* USC Unallocate Bit for global memory load/store  */
+    VIR_InstFlag            _instFlags  : 5;  /* VL concept, etc */
     gctUINT                 _reserved1  : 5;
 
     gctUINT                 _dual16ExpandSeq;
@@ -6783,6 +6786,11 @@ VIR_Symbol_GetUniformPointer(
     IN VIR_Symbol*          pSym
     );
 
+VIR_Precision
+VIR_Symbol_GetRealPrecision(
+    IN VIR_Symbol*          pSym
+    );
+
 gctBOOL
 VIR_Symbol_IsSymbolUnsupport(
     IN VIR_Shader*          pShader,
@@ -7109,7 +7117,8 @@ VIR_Inst_GetExpressionTypeID(
 
 VIR_Precision
 VIR_Inst_GetExpectedResultPrecision(
-    IN VIR_Instruction  *Inst
+    IN VIR_Instruction  *Inst,
+    IN gctBOOL          bSkipSpecificClientDriver
     );
 
 VSC_ErrCode

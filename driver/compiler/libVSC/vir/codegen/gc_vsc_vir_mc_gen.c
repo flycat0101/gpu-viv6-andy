@@ -1931,7 +1931,7 @@ _VSC_MC_GEN_GenDstType(
     )
 {
     VIR_SymbolKind kind = VIR_Symbol_GetKind(Symbol);
-    VIR_Precision  precision = VIR_Symbol_GetPrecision(Symbol);
+    VIR_Precision  precision = VIR_Symbol_GetRealPrecision(Symbol);
 
     if(kind == VIR_SYM_VIRREG || kind == VIR_SYM_VARIABLE)
     {
