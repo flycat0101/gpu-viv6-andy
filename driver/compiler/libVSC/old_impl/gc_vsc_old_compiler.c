@@ -4632,7 +4632,7 @@ _MergeUniforms(
                           uniform->arrayLengthCount * gcmSIZEOF(gctINT));
         }
 
-        if(gcmType_Kind(uniform->u.type) == gceTK_SAMPLER)
+        if(isUniformBasicType(uniform) && gcmType_Kind(uniform->u.type) == gceTK_SAMPLER)
         {
            uniform->physical += (To->samplerIndex > fragmentBase) ? To->samplerIndex - fragmentBase
                                                                   : 0;
@@ -19885,7 +19885,7 @@ gcSHADER_GetSamplerCount(
     {
         uniform = Shader->uniforms[i];
 
-        if(gcmType_Kind(uniform->u.type) == gceTK_SAMPLER)
+        if(isUniformBasicType(uniform) && gcmType_Kind(uniform->u.type) == gceTK_SAMPLER)
         {
             count += uniform->arraySize;
         }
@@ -35743,6 +35743,7 @@ gcSHADER_CheckUniformUsage(
         ** including UBO and atomic uniforms, so we don't clean usage for such uniforms.
         */
         if (uniform != gcvNULL &&
+            isUniformBasicType(uniform) &&
             gcmType_Kind(uniform->u.type) != gceTK_ATOMIC &&
             !isUniformBlockAddress(uniform))
         {
