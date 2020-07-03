@@ -1301,10 +1301,16 @@ static gctBOOL _VIR_RA_LS_Init(
                 gcvNULL);
     if (errCode != VSC_ERR_NONE)
     {
-        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "fail to allocate the live range table");
+        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Failed to allocate the live range table");
         return gcvFALSE;
     }
-    vscSRARR_SetElementCount(VIR_RA_LS_GetLRTable(pRA), numWeb);
+
+    errCode = vscSRARR_SetElementCount(VIR_RA_LS_GetLRTable(pRA), numWeb);
+    if (errCode != VSC_ERR_NONE)
+    {
+        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Failed in vscSRARR_SetElementCount.");
+        return gcvFALSE;
+    }
 
     /* initialize webIdx/color/channelmask for each LR in LRTable
        other parts of LR will be initialized inside
@@ -1378,7 +1384,7 @@ static gctBOOL _VIR_RA_LS_Init(
                 VIR_RA_LS_GetMM(pRA), sizeof(VIR_RA_LS_Liverange));
     if (pLR == gcvNULL)
     {
-        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "fail to allocate LR sorted list");
+        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Failed to allocate LR sorted list");
         return gcvFALSE;
     }
     VIR_RA_LS_SetSortedLRHead(pRA, pLR);
@@ -1390,7 +1396,7 @@ static gctBOOL _VIR_RA_LS_Init(
                 VIR_RA_LS_GetMM(pRA), sizeof(VIR_RA_LS_Liverange));
     if (pLR == gcvNULL)
     {
-        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "fail to allocate LR active list");
+        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Failed to allocate LR active list");
         return gcvFALSE;
     }
     VIR_RA_LS_SetActiveLRHead(pRA, pLR);
@@ -1400,7 +1406,7 @@ static gctBOOL _VIR_RA_LS_Init(
                             _VIR_RA_OutputKey_HFUNC, _VIR_RA_OutputKey_HKCMP, 512);
     if (pRA->outputLRTable == gcvNULL)
     {
-        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "fail to allocate for outputLRTable");
+        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Failed to allocate for outputLRTable");
         return gcvFALSE;
     }
     _VIR_RA_Check_SpecialFlags(pRA);
@@ -1437,7 +1443,7 @@ static gctBOOL _VIR_RA_LS_Init(
                                        _HFUNC_RA_MOVA_CONSTKEY, _HKCMP_RA_MOVA_CONSTKEY, 64);
         if (pRA->movaHash == gcvNULL)
         {
-            ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "fail to allocate for movaHash");
+            ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Failed to allocate for movaHash");
             return gcvFALSE;
         }
     }
@@ -2459,7 +2465,7 @@ _VIR_RA_LS_SetMasterLR(
     return gcvTRUE;
 }
 
-void _VIR_RS_LS_MarkLRLive(
+VSC_ErrCode _VIR_RS_LS_MarkLRLive(
     VIR_RA_LS   *pRA,
     gctUINT     defIdx,
     VIR_Enable  enable,
@@ -2467,6 +2473,7 @@ void _VIR_RS_LS_MarkLRLive(
     gctINT      newPos
     )
 {
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
     VIR_Shader          *pShader = VIR_RA_LS_GetShader(pRA);
     VIR_Function        *pFunc = VIR_Shader_GetCurrentFunction(pShader);
     VSC_OPTN_RAOptions  *pOption = VIR_RA_LS_GetOptions(pRA);
@@ -2497,8 +2504,12 @@ void _VIR_RS_LS_MarkLRLive(
            we need to add a new dead interval */
         if (pLR->startPoint != 0)
         {
-            pInterval = (VIR_RA_LS_Interval*)vscMM_Alloc(
-                VIR_RA_LS_GetMM(pRA), sizeof(VIR_RA_LS_Interval));
+            pInterval = (VIR_RA_LS_Interval*)vscMM_Alloc(VIR_RA_LS_GetMM(pRA), sizeof(VIR_RA_LS_Interval));
+            if (pInterval == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                ON_ERROR(errCode, "Failed to allocate memory for interval.");
+            }
             if (posAfter)
             {
                 pInterval->startPoint = positionIndex + 1;
@@ -2549,6 +2560,9 @@ void _VIR_RS_LS_MarkLRLive(
         extendedEndPoint = vscMAX(extendedEndPoint, pLR->endPoint);
         pLR->endPoint = extendedEndPoint;
     }
+
+OnError:
+    return errCode;
 }
 
 void _VIR_RS_LS_MarkLRDead(
@@ -2778,11 +2792,14 @@ void _VIR_RS_LS_UnsetOtherLiveLRVec(
 
 /* return true if the LDARR will be removed and
    the use of its def will be replaced with indexing */
-gctBOOL _VIR_RA_LS_removableLDARR(
-    VIR_RA_LS           *pRA,
-    VIR_Instruction     *pInst,
-    gctBOOL             bAnalyzeOnly)
+VSC_ErrCode _VIR_RA_LS_removableLDARR(
+        VIR_RA_LS           *pRA,
+        VIR_Instruction     *pInst,
+        gctBOOL             bAnalyzeOnly,
+        gctBOOL             *beRemoved
+        )
 {
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
     VIR_Shader          *pShader = VIR_RA_LS_GetShader(pRA);
     VIR_LIVENESS_INFO   *pLvInfo = VIR_RA_LS_GetLvInfo(pRA);
 
@@ -2813,13 +2830,15 @@ gctBOOL _VIR_RA_LS_removableLDARR(
     if (VIR_Shader_isDual16Mode(pShader) &&
         !VIR_TypeId_isSamplerOrImage(VIR_Operand_GetTypeId(pDest)))
     {
-        return gcvFALSE;
+        *beRemoved = gcvFALSE;
+        return errCode;
     }
 
     if (pRA->pHwCfg->hwFeatureFlags.hasUniformB0 &&
         VIR_Symbol_isUniform(VIR_Operand_GetSymbol(pBaseOpnd)))
     {
-        return gcvFALSE;
+        *beRemoved = gcvFALSE;
+        return errCode;
     }
 
     /* we should not replace for a0.w or LR whose color has been valid,
@@ -2832,7 +2851,8 @@ gctBOOL _VIR_RA_LS_removableLDARR(
              isLRA0B0Invalid(pLR)) &&
             !VIR_Symbol_isSampler(VIR_Operand_GetSymbol(pBaseOpnd)))
         {
-            return gcvFALSE;
+            *beRemoved = gcvFALSE;
+            return errCode;
         }
     }
 
@@ -2962,7 +2982,8 @@ gctBOOL _VIR_RA_LS_removableLDARR(
                         }
 
                         defIdx = _VIR_RA_LS_InstFirstDefIdx(pRA, pDef->defKey.pDefInst);
-                        _VIR_RS_LS_MarkLRLive(pRA, defIdx, pDef->OrgEnableMask, gcvTRUE, VIR_Inst_GetId(pUseInst));
+                        errCode = _VIR_RS_LS_MarkLRLive(pRA, defIdx, pDef->OrgEnableMask, gcvTRUE, VIR_Inst_GetId(pUseInst));
+                        ON_ERROR(errCode, "Failed in _VIR_RS_LS_MarkLRLive");
                     }
                 }
             }
@@ -3013,7 +3034,10 @@ gctBOOL _VIR_RA_LS_removableLDARR(
         defIdx = pDef->nextDefIdxOfSameRegNo;
     }
 
-    return retValue;
+    *beRemoved = retValue;
+
+OnError:
+    return errCode;
 }
 
 #if gcmIS_DEBUG(gcdDEBUG_ASSERT)
@@ -3073,12 +3097,14 @@ gctBOOL _VIR_RA_LS_MarkDef(
     gctBOOL         bDstIndexing,
     VIR_TS_BLOCK_FLOW   *pBlkFlow)
 {
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
     VIR_LIVENESS_INFO   *pLvInfo = VIR_RA_LS_GetLvInfo(pRA);
     gctUINT             regNo, defIdx;
     gctUINT8            channel;
     VIR_DEF             *pDef;
     gctBOOL             removableLDARR = gcvFALSE;
     VIR_OpCode          instOpcode = VIR_Inst_GetOpcode(pInst);
+    gctBOOL             beRemoved = gcvFALSE;
 
     if (_VIR_RA_LS_IsInstExcludedLR(pRA, pInst))
     {
@@ -3088,9 +3114,18 @@ gctBOOL _VIR_RA_LS_MarkDef(
         return gcvTRUE;
     }
 
-    if (instOpcode == VIR_OP_LDARR && _VIR_RA_LS_removableLDARR(pRA, pInst, gcvTRUE))
+    if (instOpcode == VIR_OP_LDARR)
     {
-        removableLDARR = gcvTRUE;
+        errCode = _VIR_RA_LS_removableLDARR(pRA, pInst, gcvTRUE, &beRemoved);
+        if (errCode == VSC_ERR_OUT_OF_MEMORY)
+        {
+            return gcvFALSE;
+        }
+
+        if (beRemoved)
+        {
+            removableLDARR = gcvTRUE;
+        }
     }
 
     for (regNo = firstRegNo; regNo < firstRegNo + regNoRange; regNo++)
@@ -3319,7 +3354,7 @@ gctBOOL _VIR_RA_LS_isUseCrossInst(
     return gcvFALSE;
 }
 
-void _VIR_RA_LS_MarkUse(
+VSC_ErrCode _VIR_RA_LS_MarkUse(
     VIR_RA_LS       *pRA,
     VIR_Instruction *pInst,
     VIR_Operand     *pOperand,
@@ -3327,6 +3362,7 @@ void _VIR_RA_LS_MarkUse(
     gctUINT         regNoRange,
     VIR_Enable      defEnableMask)
 {
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
     VIR_LIVENESS_INFO       *pLvInfo = VIR_RA_LS_GetLvInfo(pRA);
     gctUINT                 usageIdx, defIdx, i;
     VIR_USAGE_KEY           usageKey;
@@ -3387,7 +3423,8 @@ void _VIR_RA_LS_MarkUse(
             }
 
             _VIR_RA_LS_SetRegNoRange(pRA, defIdx, firstRegNo, regNoRange, gcvFALSE);
-            _VIR_RS_LS_MarkLRLive(pRA, defIdx, defEnableMask, posAfter, -1);
+            errCode = _VIR_RS_LS_MarkLRLive(pRA, defIdx, defEnableMask, posAfter, -1);
+            ON_ERROR(errCode, "Failed in _VIR_RS_LS_MarkLRLive");
             _VIR_RS_LS_SetLiveLRVec(pRA, defIdx);
 
             pLR->channelMask &= ~(1 << pDef->defKey.channel);
@@ -3433,17 +3470,21 @@ void _VIR_RA_LS_MarkUse(
                     {
                         defEnableMask1 = VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pDef->defKey.pDefInst->src[VIR_Operand_Src0]));
 
-                        _VIR_RA_LS_MarkUse(pRA,
-                                           pDef->defKey.pDefInst,
-                                           pDef->defKey.pDefInst->src[VIR_Operand_Src0],
-                                           firstRegNo1,
-                                           regNoRange1,
-                                           defEnableMask1);
+                        errCode = _VIR_RA_LS_MarkUse(pRA,
+                                                     pDef->defKey.pDefInst,
+                                                     pDef->defKey.pDefInst->src[VIR_Operand_Src0],
+                                                     firstRegNo1,
+                                                     regNoRange1,
+                                                     defEnableMask1);
+                        ON_ERROR(errCode, "Failed at _VIR_RA_LS_MarkUse.");
                     }
                 }
             }
         }
     }
+
+OnError:
+    return errCode;
 }
 
 /* extend the liverange of src0 of MOVA conservatively for correctness
@@ -3552,10 +3593,11 @@ static void _VIR_RA_LS_ExtendLRofMOVASrc0(
     }
 }
 
-void _VIR_RA_LS_MarkUses(
+VSC_ErrCode _VIR_RA_LS_MarkUses(
     VIR_RA_LS       *pRA,
     VIR_Instruction *pInst)
 {
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
     gctUINT                 firstRegNo, regNoRange;
     VIR_Enable              defEnableMask;
     VIR_OperandInfo         operandInfo, operandInfo1;
@@ -3587,12 +3629,13 @@ void _VIR_RA_LS_MarkUses(
                 defEnableMask = VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(
                     pInst->src[VIR_Operand_Src1]));
 
-                _VIR_RA_LS_MarkUse(pRA,
-                                   pInst,
-                                   pInst->src[VIR_Operand_Src1],
-                                   operandInfo1.u1.virRegInfo.virReg,
-                                   1,
-                                   defEnableMask);
+                errCode = _VIR_RA_LS_MarkUse(pRA,
+                                             pInst,
+                                             pInst->src[VIR_Operand_Src1],
+                                             operandInfo1.u1.virRegInfo.virReg,
+                                             1,
+                                             defEnableMask);
+                ON_ERROR(errCode, "Failed at _VIR_RA_LS_MarkUse.");
             }
 
             firstRegNo = operandInfo.u1.virRegInfo.startVirReg;
@@ -3604,12 +3647,13 @@ void _VIR_RA_LS_MarkUses(
             defEnableMask = VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(
                 pInst->src[VIR_Operand_Src0]));
 
-            _VIR_RA_LS_MarkUse(pRA,
-                               pInst,
-                               pInst->src[VIR_Operand_Src0],
-                               firstRegNo,
-                               regNoRange,
-                               defEnableMask);
+            errCode = _VIR_RA_LS_MarkUse(pRA,
+                                         pInst,
+                                         pInst->src[VIR_Operand_Src0],
+                                         firstRegNo,
+                                         regNoRange,
+                                         defEnableMask);
+            ON_ERROR(errCode, "Failed at _VIR_RA_LS_MarkUse.");
         }
     }
     else
@@ -3629,12 +3673,13 @@ void _VIR_RA_LS_MarkUses(
                 regNoRange = operandInfo.u1.virRegInfo.virRegCount;
                 defEnableMask = VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pOpnd));
 
-                _VIR_RA_LS_MarkUse(pRA,
-                                   pInst,
-                                   pOpnd,
-                                   firstRegNo,
-                                   regNoRange,
-                                   defEnableMask);
+                errCode = _VIR_RA_LS_MarkUse(pRA,
+                                             pInst,
+                                             pOpnd,
+                                             firstRegNo,
+                                             regNoRange,
+                                             defEnableMask);
+                ON_ERROR(errCode, "Failed at _VIR_RA_LS_MarkUse.");
             }
         }
     }
@@ -3685,6 +3730,9 @@ void _VIR_RA_LS_MarkUses(
             gcmASSERT(gcvFALSE);
         }
     }
+
+OnError:
+    return errCode;
 }
 
 void _VIR_RA_LS_GetSym_Enable_Swizzle(
@@ -3753,12 +3801,13 @@ void _VIR_RA_LS_GetSym_Enable_Swizzle(
 }
 
 /* mark the use of outputs in EMIT instruction */
-void _VIR_RA_LS_Mark_Outputs(
+VSC_ErrCode _VIR_RA_LS_Mark_Outputs(
     VIR_RA_LS       *pRA,
     VIR_Instruction *pInst,
     gctBOOL         bCheckAllOutput,
     gctINT          streamNumber)
 {
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
     VIR_Shader          *pShader = VIR_RA_LS_GetShader(pRA);
     VIR_LIVENESS_INFO   *pLvInfo = VIR_RA_LS_GetLvInfo(pRA);
     gctUINT             outputIdx, usageIdx;
@@ -3801,12 +3850,16 @@ void _VIR_RA_LS_Mark_Outputs(
                     gcmASSERT(VIR_INVALID_DEF_INDEX != defIdx);
 
                     _VIR_RA_LS_GetSym_Enable_Swizzle(pOutputSym, &outEnable, gcvNULL);
-                    _VIR_RS_LS_MarkLRLive(pRA, defIdx, outEnable, gcvFALSE, -1);
+                    errCode = _VIR_RS_LS_MarkLRLive(pRA, defIdx, outEnable, gcvFALSE, -1);
+                    ON_ERROR(errCode, "Failed at _VIR_RS_LS_MarkLRLive.");
                     _VIR_RS_LS_SetLiveLRVec(pRA, defIdx);
                 }
             }
         }
     }
+
+OnError:
+    return errCode;
 }
 
 /* ===========================================================================
@@ -6603,7 +6656,8 @@ VSC_ErrCode _VIR_RA_LS_BuildLRTableBB(
 
         if (vscBV_TestBit(&pBlkFlow->outFlow, thisDefId))
         {
-            _VIR_RS_LS_MarkLRLive(pRA, thisDefId, (0x1 << pDef->defKey.channel), gcvTRUE, -1);
+            retValue = _VIR_RS_LS_MarkLRLive(pRA, thisDefId, (0x1 << pDef->defKey.channel), gcvTRUE, -1);
+            ON_ERROR(retValue, "Failed at _VIR_RS_LS_MarkLRLive.");
             _VIR_RS_LS_SetLiveLRVec(pRA, thisDefId);
         }
         else
@@ -6646,7 +6700,8 @@ VSC_ErrCode _VIR_RA_LS_BuildLRTableBB(
         }
 
         /* mark live for all uses */
-        _VIR_RA_LS_MarkUses(pRA, pInst);
+        retValue = _VIR_RA_LS_MarkUses(pRA, pInst);
+        ON_ERROR(retValue, "Failed at _VIR_RA_LS_MarkUses.");
 
         if (VIR_OPCODE_hasStoreOperation(VIR_Inst_GetOpcode(pInst)))
         {
@@ -6684,7 +6739,8 @@ VSC_ErrCode _VIR_RA_LS_BuildLRTableBB(
                 streamNumber = VIR_Operand_GetImmediateInt(VIR_Inst_GetSource(pInst, 0));
             }
 
-            _VIR_RA_LS_Mark_Outputs(pRA, pInst, bCheckAllOutput, streamNumber);
+            retValue = _VIR_RA_LS_Mark_Outputs(pRA, pInst, bCheckAllOutput, streamNumber);
+            ON_ERROR(retValue, "Failed in _VIR_RA_LS_Mark_Outputs.");
         }
 
         curPos = VIR_RA_LS_GetCurrPos(pRA);
@@ -6705,6 +6761,7 @@ VSC_ErrCode _VIR_RA_LS_BuildLRTableBB(
         pInst = VIR_Inst_GetPrev(pInst);
     }
 
+OnError:
     return retValue;
 }
 
@@ -11630,6 +11687,7 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
 
     gctUINT             defIdx, webIdx = 0;
     VIR_OpCode          opcode    = VIR_OP_NOP;
+    gctBOOL             beRemoved = gcvFALSE;
 
     retValue = _VIR_RA_LS_InvalidDataRegisterUsedMask(pRA, pInst);
     if(retValue != VSC_ERR_NONE) return retValue;
@@ -11699,8 +11757,9 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
             {
                 /* color the base opnd */
                 _VIR_RA_LS_RewriteColor_Src(pRA, pInst, pSrcOpnd, pInst, pSrcOpnd);
-
-                if (!_VIR_RA_LS_removableLDARR(pRA, pInst, gcvFALSE))
+                retValue = _VIR_RA_LS_removableLDARR(pRA, pInst, gcvFALSE, &beRemoved);
+                ON_ERROR(retValue, "Failed in _VIR_RA_LS_removableLDARR.");
+                if (!beRemoved)
                 {
                     /* change the ldarr to mov instruction if could not be deleted */
                     VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
@@ -11905,6 +11964,7 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
         break;
     }
 
+OnError:
     return retValue;
 }
 
@@ -12645,6 +12705,7 @@ static VSC_ErrCode _VIR_RA_LS_PerformOnFunction_Pre(
 
     /* build live ranges in LRTable for pFunc */
     retValue = _VIR_RA_LS_BuildLRTable(pRA, pFunc);
+    CHECK_ERROR(retValue, "_VIR_RA_LS_BuildLRTable");
 
     if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption),
         VSC_OPTN_RAOptions_TRACE))

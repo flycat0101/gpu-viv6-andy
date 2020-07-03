@@ -1732,6 +1732,10 @@ static VIR_DOM_TREE_NODE* _AddDomNodeToDomTree(VIR_DOM_TREE* pDomTree, VIR_DOM_T
 
     pDomTreeNode = (VIR_DOM_TREE_NODE*)vscMM_Alloc(&pDomTree->pOwnerCFG->pmp.mmWrapper,
                                                    sizeof(VIR_DOM_TREE_NODE));
+    if (pDomTreeNode == gcvNULL)
+    {
+        return gcvNULL;
+    }
 
     vscTREEND_Initialize(&pDomTreeNode->treeNode);
     pDomTreeNode->pOwnerBB = pBasicBlock;
@@ -2015,7 +2019,11 @@ VSC_ErrCode vscVIR_BuildDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
         if (pThisBasicBlk->flowType == VIR_FLOW_TYPE_ENTRY)
         {
             /* Entry is always the root */
-            _AddDomNodeToDomTree(&pCFG->domTree, gcvNULL, pThisBasicBlk, gcvFALSE);
+            if (_AddDomNodeToDomTree(&pCFG->domTree, gcvNULL, pThisBasicBlk, gcvFALSE) == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                CHECK_ERROR(errCode, "Failed in AddDomNodeToDomTree.");
+            }
         }
         else
         {
@@ -2023,7 +2031,11 @@ VSC_ErrCode vscVIR_BuildDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
             idomBBIdx = vscBV_FindSetBitForward(&pIdomSetArray[pThisBasicBlk->dgNode.id], 0);
             if (ppHisBlockArray[idomBBIdx]->pDomTreeNode)
             {
-                _AddDomNodeToDomTree(&pCFG->domTree, ppHisBlockArray[idomBBIdx]->pDomTreeNode, pThisBasicBlk, gcvFALSE);
+                if (_AddDomNodeToDomTree(&pCFG->domTree, ppHisBlockArray[idomBBIdx]->pDomTreeNode, pThisBasicBlk, gcvFALSE) == gcvNULL)
+                {
+                    errCode = VSC_ERR_OUT_OF_MEMORY;
+                    CHECK_ERROR(errCode, "Failed in AddDomNodeToDomTree.");
+                }
             }
             else
             {
@@ -2322,7 +2334,11 @@ VSC_ErrCode vscVIR_BuildPostDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
         if (pThisBasicBlk->flowType == VIR_FLOW_TYPE_EXIT)
         {
             /* Exit is always the root */
-            _AddDomNodeToDomTree(&pCFG->postDomTree, gcvNULL, pThisBasicBlk, gcvTRUE);
+            if (_AddDomNodeToDomTree(&pCFG->postDomTree, gcvNULL, pThisBasicBlk, gcvTRUE) == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                CHECK_ERROR(errCode, "Failed in AddDomNodeToDomTree.");
+            }
         }
         else
         {
@@ -2330,7 +2346,11 @@ VSC_ErrCode vscVIR_BuildPostDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
             ipdomBBIdx = vscBV_FindSetBitForward(&pIpdomSetArray[pThisBasicBlk->dgNode.id], 0);
             if (ppHisBlockArray[ipdomBBIdx]->pPostDomTreeNode)
             {
-                _AddDomNodeToDomTree(&pCFG->postDomTree, ppHisBlockArray[ipdomBBIdx]->pPostDomTreeNode, pThisBasicBlk, gcvTRUE);
+                if (_AddDomNodeToDomTree(&pCFG->postDomTree, ppHisBlockArray[ipdomBBIdx]->pPostDomTreeNode, pThisBasicBlk, gcvTRUE) == gcvNULL)
+                {
+                    errCode = VSC_ERR_OUT_OF_MEMORY;
+                    CHECK_ERROR(errCode, "Failed in AddDomNodeToDomTree.");
+                }
             }
             else
             {
