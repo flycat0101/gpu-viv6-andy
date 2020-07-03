@@ -48,9 +48,10 @@ __glGetObject(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint id)
     return result;
 }
 
-__GL_INLINE GLvoid
+__GL_INLINE GLboolean
 __glAddObject(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint id, GLvoid *obj)
 {
+    GLboolean ret = gcvTRUE;
     if (shared->lock)
     {
         (*gc->imports.lockMutex)(shared->lock);
@@ -58,26 +59,31 @@ __glAddObject(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint id, GLvoi
 
     if (shared->linearTable)
     {
-        __glCheckLinearTableSize(gc, shared, (id == ~0u) ? id : (id + 1));
+        ret = __glCheckLinearTableSize(gc, shared, (id == ~0u) ? id : (id + 1));
     }
 
-    if (shared->linearTable)
+    if (ret)
     {
-        /* Save object pointer to the linear table */
-        shared->linearTable[id] = obj;
-    }
-    else
-    {
-        /* Insert object to the hash table */
-        __GLobjItem *item = __glFindObjItemNode(gc, shared, id);
-        if(item != gcvNULL)
-            item->obj = obj;
+        if (shared->linearTable)
+        {
+            /* Save object pointer to the linear table */
+            shared->linearTable[id] = obj;
+        }
+        else
+        {
+            /* Insert object to the hash table */
+            __GLobjItem *item = __glFindObjItemNode(gc, shared, id);
+            if(item != gcvNULL)
+                item->obj = obj;
+        }
     }
 
     if (shared->lock)
     {
         (*gc->imports.unlockMutex)(shared->lock);
     }
+
+    return ret;
 }
 
 __GL_INLINE GLvoid

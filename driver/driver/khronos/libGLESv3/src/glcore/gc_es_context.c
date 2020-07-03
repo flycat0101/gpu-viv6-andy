@@ -38,31 +38,31 @@ extern GLboolean __glDpInitialize(__GLdeviceStruct deviceEntry[]);
 
 extern GLvoid __glInitPixelState(__GLcontext *gc);
 
-extern GLvoid __glInitBufferObjectState(__GLcontext *gc);
+extern GLboolean __glInitBufferObjectState(__GLcontext *gc);
 extern GLvoid __glFreeBufferObjectState(__GLcontext *gc);
 
-extern GLvoid __glInitTextureState(__GLcontext *gc);
+extern GLboolean __glInitTextureState(__GLcontext *gc);
 extern GLvoid __glFreeTextureState(__GLcontext *gc);
 
-extern GLvoid __glInitSamplerState(__GLcontext *gc);
+extern GLboolean __glInitSamplerState(__GLcontext *gc);
 extern GLvoid __glFreeSamplerState(__GLcontext *gc);
 
-extern GLvoid __glInitShaderProgramState(__GLcontext *gc);
+extern GLboolean __glInitShaderProgramState(__GLcontext *gc);
 extern GLvoid __glFreeShaderProgramState(__GLcontext * gc);
 
-extern GLvoid __glInitFramebufferStates(__GLcontext *gc);
+extern GLboolean __glInitFramebufferStates(__GLcontext *gc);
 extern GLvoid __glFreeFramebufferStates(__GLcontext *gc);
 
-extern GLvoid __glInitSyncState(__GLcontext *gc);
+extern GLboolean __glInitSyncState(__GLcontext *gc);
 extern GLvoid __glFreeSyncState(__GLcontext *gc);
 
-extern GLvoid __glInitXfbState(__GLcontext *gc);
+extern GLboolean __glInitXfbState(__GLcontext *gc);
 extern GLvoid __glFreeXfbState(__GLcontext *gc);
 
-extern GLvoid __glInitQueryState(__GLcontext *gc);
+extern GLboolean __glInitQueryState(__GLcontext *gc);
 extern GLvoid __glFreeQueryState(__GLcontext *gc);
 
-extern GLvoid __glInitVertexArrayState(__GLcontext *gc);
+extern GLboolean __glInitVertexArrayState(__GLcontext *gc);
 extern GLvoid __glFreeVertexArrayState(__GLcontext * gc);
 
 extern GLvoid __glUpdateViewport(__GLcontext *gc, GLint x, GLint y, GLsizei w, GLsizei h);
@@ -739,8 +739,9 @@ GLvoid __glEvaluateSystemDrawableChange(__GLcontext *gc, GLbitfield flags)
     }
 }
 
-GLvoid __glInitContextState(__GLcontext *gc)
+GLboolean __glInitContextState(__GLcontext *gc)
 {
+    GLboolean initOK = gcvTRUE;
     gc->flags = __GL_CONTEXT_UNINITIALIZED;
     gc->invalidCommonCommit = gcvTRUE;
     gc->invalidDrawCommit = gcvTRUE;
@@ -755,15 +756,15 @@ GLvoid __glInitContextState(__GLcontext *gc)
     __glInitPixelState(gc);
     __glInitMultisampleState(gc);
 
-    __glInitVertexArrayState(gc);
-    __glInitFramebufferStates(gc);
-    __glInitTextureState(gc);
-    __glInitBufferObjectState(gc);
-    __glInitShaderProgramState(gc);
-    __glInitSamplerState(gc);
-    __glInitXfbState(gc);
-    __glInitQueryState(gc);
-    __glInitSyncState(gc);
+    initOK = __glInitVertexArrayState(gc);
+    initOK = initOK && __glInitFramebufferStates(gc);
+    initOK = initOK &&__glInitTextureState(gc);
+    initOK = initOK && __glInitBufferObjectState(gc);
+    initOK = initOK && __glInitShaderProgramState(gc);
+    initOK = initOK && __glInitSamplerState(gc);
+    initOK = initOK && __glInitXfbState(gc);
+    initOK = initOK && __glInitQueryState(gc);
+    initOK = initOK && __glInitSyncState(gc);
 
     __glInitEnableState(gc);
     __glInitImageState(gc);
@@ -775,6 +776,7 @@ GLvoid __glInitContextState(__GLcontext *gc)
     __glBitmaskInitAllOne(&gc->imageUnitDirtyMask, gc->constants.shaderCaps.maxImageUnit);
 
     __glSetAttributeStatesDirty(gc);
+    return initOK;
 }
 
 GLvoid __glOverturnCommitStates(__GLcontext *gc)
@@ -1135,7 +1137,10 @@ GLvoid *__glCreateContext(GLint clientVersion, VEGLimports *imports, GLvoid* sha
 
     /* Initialize the core GL context states.
     */
-    __glInitContextState(gc);
+    if (__glInitContextState(gc) == gcvFALSE)
+    {
+        __GL_ERROR_EXIT2();
+    }
 
     /* Initialize DP context function pointers with default Noop functions.
     */
@@ -1182,6 +1187,7 @@ GLvoid *__glCreateContext(GLint clientVersion, VEGLimports *imports, GLvoid* sha
 OnError:
     if (gc)
     {
+        __glDestroyContext(gc);
         gcmOS_SAFE_FREE(gcvNULL, gc);
         gc = gcvNULL;
     }

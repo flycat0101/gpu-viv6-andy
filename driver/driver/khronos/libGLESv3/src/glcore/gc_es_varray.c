@@ -1720,7 +1720,11 @@ GLvoid __glBindVertexArray(__GLcontext *gc, GLuint array)
             gcoOS_ZeroMemory(vertexArrayObj, sizeof(__GLvertexArrayObject));
 
             __glInitVertexArrayObject(gc,  vertexArrayObj, array);
-            __glAddObject(gc, gc->vertexArray.noShare, array, vertexArrayObj);
+            if (__glAddObject(gc, gc->vertexArray.noShare, array, vertexArrayObj) == gcvFALSE)
+            {
+                gcmOS_SAFE_FREE(gcvNULL, vertexArrayObj);
+                __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);;
+            }
             if (__glMarkNameUsed(gc, gc->vertexArray.noShare, array) < 0)
             {
                 __glDeleteObject(gc, gc->vertexArray.noShare, array);
@@ -1806,7 +1810,7 @@ GLboolean __glDeleteVertexArrayObject(__GLcontext *gc, __GLvertexArrayObject *ve
     return GL_TRUE;
 }
 
-void __glInitVertexArrayState(__GLcontext *gc)
+GLboolean __glInitVertexArrayState(__GLcontext *gc)
 {
     __GL_HEADER();
 
@@ -1815,7 +1819,7 @@ void __glInitVertexArrayState(__GLcontext *gc)
     {
         if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLsharedObjectMachine), (gctPOINTER*)&gc->vertexArray.noShare)))
         {
-            return;
+            return gcvFALSE;
         }
         gcoOS_ZeroMemory(gc->vertexArray.noShare, sizeof(__GLsharedObjectMachine));
 
@@ -1826,7 +1830,7 @@ void __glInitVertexArrayState(__GLcontext *gc)
             (gctPOINTER*)&gc->vertexArray.noShare->linearTable)))
         {
             gcmOS_SAFE_FREE(gcvNULL, gc->vertexArray.noShare);
-            return;
+            return gcvFALSE;
         }
         gcoOS_ZeroMemory(gc->vertexArray.noShare->linearTable, gc->vertexArray.noShare->linearTableSize * sizeof(GLvoid *));
 
@@ -1834,7 +1838,7 @@ void __glInitVertexArrayState(__GLcontext *gc)
         gc->vertexArray.noShare->hashMask = __GL_VAO_HASH_TABLE_SIZE - 1;
         gc->vertexArray.noShare->refcount = 1;
         gc->vertexArray.noShare->deleteObject = (__GLdeleteObjectFunc)__glDeleteVertexArrayObject;
-        gc->vertexArray.noShare->immediateInvalid = GL_FALSE;
+        gc->vertexArray.noShare->immediateInvalid = gcvFALSE;
     }
 
     __glInitVertexArrayObject(gc, &gc->vertexArray.defaultVAO, 0);
@@ -1850,6 +1854,8 @@ void __glInitVertexArrayState(__GLcontext *gc)
     gc->vertexArray.varrayDirty = (GLbitfield)(-1);
 
     __GL_FOOTER();
+
+    return gcvTRUE;
 }
 
 void __glFreeVertexArrayState(__GLcontext *gc)
@@ -2047,8 +2053,11 @@ GLvoid GL_APIENTRY __gles_BindVertexBuffer(__GLcontext *gc, GLuint bindingindex,
             __glInitBufferObject(gc, bufObj, buffer);
 
             /* Add this buffer object to the "gc->bufferObject.shared" structure. */
-            __glAddObject(gc, gc->bufferObject.shared, buffer, bufObj);
-
+            if (__glAddObject(gc, gc->bufferObject.shared, buffer, bufObj) == gcvFALSE)
+            {
+                gcmOS_SAFE_FREE(gcvNULL, bufObj);
+                __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);;
+            }
             /* Mark the name "buffer" used in the buffer object nameArray.*/
             if (__glMarkNameUsed(gc, gc->bufferObject.shared, buffer) < 0)
             {

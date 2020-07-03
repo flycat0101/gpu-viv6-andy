@@ -1947,7 +1947,11 @@ GLvoid GL_APIENTRY __gles_BeginQuery(__GLcontext *gc, GLenum target, GLuint id)
         queryObj->name = id;
 
         /* Add this __GLoccluQueryObject to the "gc->occluQuery.noShare" structure. */
-        __glAddObject(gc, gc->query.noShare, id, queryObj);
+        if (__glAddObject(gc, gc->query.noShare, id, queryObj) == gcvFALSE)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, queryObj);
+            __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+        }
     }
 
     /* If id refers to an existing query object whose type does not match target. */
@@ -2162,14 +2166,14 @@ GLboolean __glDeleteQueryObj(__GLcontext *gc, __GLqueryObject *queryObj)
     return GL_TRUE;
 }
 
-GLvoid __glInitQueryState(__GLcontext *gc)
+GLboolean __glInitQueryState(__GLcontext *gc)
 {
     /* Query object cannot be shared between contexts */
     if (gc->query.noShare == gcvNULL)
     {
         if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLsharedObjectMachine), (gctPOINTER*)&gc->query.noShare)))
         {
-            return;
+            return gcvFALSE;
         }
 
         gcoOS_ZeroMemory(gc->query.noShare, sizeof(__GLsharedObjectMachine));
@@ -2181,7 +2185,7 @@ GLvoid __glInitQueryState(__GLcontext *gc)
             (gctPOINTER*)&gc->query.noShare->linearTable)))
         {
             gcmOS_SAFE_FREE(gcvNULL, gc->query.noShare);
-            return;
+            return gcvFALSE;
         }
         gcoOS_ZeroMemory(gc->query.noShare->linearTable, gc->query.noShare->linearTableSize * sizeof(GLvoid *));
 
@@ -2191,6 +2195,7 @@ GLvoid __glInitQueryState(__GLcontext *gc)
         gc->query.noShare->deleteObject = (__GLdeleteObjectFunc)__glDeleteQueryObj;
         gc->query.noShare->immediateInvalid = GL_TRUE;
     }
+    return gcvTRUE;
 }
 
 GLvoid __glFreeQueryState(__GLcontext *gc)

@@ -230,7 +230,7 @@ GLvoid __glFreeTextureState(__GLcontext *gc)
     __glFreeSharedObjectState(gc, gc->texture.shared);
 }
 
-GLvoid __glInitTextureState(__GLcontext *gc)
+GLboolean __glInitTextureState(__GLcontext *gc)
 {
     __GLtextureObject *tex;
     GLint i, j;
@@ -252,7 +252,7 @@ GLvoid __glInitTextureState(__GLcontext *gc)
                 sizeof(VEGLLock),
                 (gctPOINTER*)&gc->texture.shared->lock)))
             {
-                return;
+                return gcvFALSE;
             }
             gcoOS_ZeroMemory(gc->texture.shared->lock, sizeof(VEGLLock));
 
@@ -268,7 +268,7 @@ GLvoid __glInitTextureState(__GLcontext *gc)
             sizeof(__GLsharedObjectMachine),
             (gctPOINTER*)&gc->texture.shared)))
         {
-            return;
+            return gcvFALSE;
         }
         gcoOS_ZeroMemory(gc->texture.shared, sizeof(__GLsharedObjectMachine));
 
@@ -280,7 +280,7 @@ GLvoid __glInitTextureState(__GLcontext *gc)
             (gctPOINTER*)&gc->texture.shared->linearTable)))
         {
             gcmOS_SAFE_FREE(gcvNULL, gc->texture.shared);
-            return;
+            return gcvFALSE;
         }
         gcoOS_ZeroMemory(gc->texture.shared->linearTable, gc->texture.shared->linearTableSize * sizeof(GLvoid *));
         gc->texture.shared->hashSize = __GL_TEXOBJ_HASH_TABLE_SIZE;
@@ -317,6 +317,7 @@ GLvoid __glInitTextureState(__GLcontext *gc)
     __glBitmaskInitAllZero(&gc->texture.currentEnableMask, gc->constants.shaderCaps.maxCombinedTextureImageUnits);
     __glBitmaskInitAllZero(&gc->texture.texConflict, gc->constants.shaderCaps.maxCombinedTextureImageUnits);
 
+    return gcvTRUE;
 }
 
 GLboolean __glIsTextureComplete(__GLcontext *gc, __GLtextureObject *texObj, GLenum minFilter,
@@ -1619,7 +1620,11 @@ GLvoid __glBindTexture(__GLcontext *gc, GLuint unitIdx, GLuint targetIndex, GLui
 
         /* Add this texture object to the "gc->texture.shared" structure.
         */
-        __glAddObject(gc, gc->texture.shared, texture, texObj);
+        if (__glAddObject(gc, gc->texture.shared, texture, texObj) == gcvFALSE)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, texObj);
+            __GL_ERROR_RET(GL_OUT_OF_MEMORY);
+        }
 
         /* Mark the name "texture" used in the texture nameArray.
         */
@@ -1963,7 +1968,11 @@ __GL_INLINE __GLsamplerObject* __glGetSamplerObject(__GLcontext *gc, GLuint name
         }
         gcoOS_ZeroMemory(samplerObj, sizeof(__GLsamplerObject));
 
-        __glAddObject(gc, gc->sampler.shared, name, samplerObj);
+        if (__glAddObject(gc, gc->sampler.shared, name, samplerObj) == gcvFALSE)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, samplerObj);
+            __GL_ERROR_RET_VAL(GL_OUT_OF_MEMORY, NULL);;
+        }
         samplerObj->name = name;
         samplerObj->bindCount = 0;
         samplerObj->flags = 0;
@@ -2319,7 +2328,7 @@ __GL_INLINE GLvoid __glGetSamplerParameterfv(__GLcontext *gc, __GLsamplerObject 
     }
 }
 
-GLvoid __glInitSamplerState(__GLcontext *gc)
+GLboolean __glInitSamplerState(__GLcontext *gc)
 {
     /* Sampler objects can be shared across contexts */
     if (gc->shareCtx)
@@ -2336,7 +2345,7 @@ GLvoid __glInitSamplerState(__GLcontext *gc)
                 sizeof(VEGLLock),
                 (gctPOINTER*)&gc->sampler.shared->lock)))
             {
-                return;
+                return gcvFALSE;
             }
             gcoOS_ZeroMemory(gc->sampler.shared->lock, sizeof(VEGLLock));
 
@@ -2353,7 +2362,7 @@ GLvoid __glInitSamplerState(__GLcontext *gc)
             sizeof(__GLsharedObjectMachine),
             (gctPOINTER*)&gc->sampler.shared)))
         {
-            return;
+            return gcvFALSE;
         }
         gcoOS_ZeroMemory(gc->sampler.shared, sizeof(__GLsharedObjectMachine));
 
@@ -2365,7 +2374,7 @@ GLvoid __glInitSamplerState(__GLcontext *gc)
             (gctPOINTER*)&gc->sampler.shared->linearTable)))
         {
             gcmOS_SAFE_FREE(gcvNULL, gc->sampler.shared);
-            return;
+            return gcvFALSE;
         }
         gcoOS_ZeroMemory(gc->sampler.shared->linearTable, gc->sampler.shared->linearTableSize * sizeof(GLvoid*));
         gc->sampler.shared->hashSize = __GL_SAMPLER_HASH_TABLE_SIZE;
@@ -2374,6 +2383,7 @@ GLvoid __glInitSamplerState(__GLcontext *gc)
         gc->sampler.shared->deleteObject = (__GLdeleteObjectFunc)__glDeleteSamplerObj;
         gc->sampler.shared->immediateInvalid = GL_TRUE;
     }
+    return gcvTRUE;
 }
 
 GLvoid __glFreeSamplerState(__GLcontext *gc)
