@@ -1128,7 +1128,7 @@ struct _gcoHARDWARE
 
     gctBOOL                     notAdjustRotation;
 
-#if gcdDUMP
+#if gcdDUMP || gcdCAPTURE_ONLY_MODE
     gctPOINTER                  contextLogical[gcdCONTEXT_BUFFER_COUNT];
     gctUINT32                   contextBytes;
     gctUINT8                    currentContext;

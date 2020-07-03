@@ -4637,7 +4637,7 @@ gceSTATUS gcoSTREAM_Destroy(
 gceSTATUS gcoSTREAM_Upload(
     IN gcoSTREAM Stream,
     IN gctCONST_POINTER Buffer,
-    IN gctUINT32 Offset,
+    IN gctSIZE_T Offset,
     IN gctSIZE_T Bytes,
     IN gctBOOL Dynamic
     )

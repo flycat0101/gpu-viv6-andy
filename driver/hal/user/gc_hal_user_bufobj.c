@@ -1715,7 +1715,8 @@ gcoBUFOBJ_CPUCacheOperation_Range(
 
 gceSTATUS
 gcoBUFOBJ_SetCPUWrite(
-    gcoBUFOBJ BufObj
+    gcoBUFOBJ BufObj,
+    gctBOOL Value
     )
 {
     return gcvSTATUS_OK;

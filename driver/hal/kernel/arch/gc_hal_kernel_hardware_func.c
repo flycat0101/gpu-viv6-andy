@@ -3724,7 +3724,12 @@ _FuncInit_MMU(IN gcsFUNCTION_EXECUTION_PTR Execution)
     flags |= gcvALLOC_FLAG_CACHEABLE;
 #endif
 
+#if !gcdCAPTURE_ONLY_MODE
     pool = gcvPOOL_DEFAULT;
+#else
+    pool = gcvPOOL_VIRTUAL;
+#endif
+
     Execution->funcCmdCount = 1;
 
     /* Allocate the gcsFUNCTION_COMMAND buffer */
@@ -4130,7 +4135,11 @@ _FuncInit_Flush(IN gcsFUNCTION_EXECUTION_PTR Execution)
     gckHARDWARE hardware = (gckHARDWARE)Execution->hardware;
     gctPOINTER pointer = gcvNULL;
 
+#if !gcdCAPTURE_ONLY_MODE
     pool = gcvPOOL_DEFAULT;
+#else
+    pool = gcvPOOL_VIRTUAL;
+#endif
 
 #if gcdENABLE_CACHEABLE_COMMAND_BUFFER
     allocFlag = gcvALLOC_FLAG_CACHEABLE;

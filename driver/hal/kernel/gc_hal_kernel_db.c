@@ -1138,6 +1138,10 @@ gckKERNEL_DestroyProcessDB(
         gcmkONERROR(gcvSTATUS_NOT_FOUND);
     }
 
+#if gcdCAPTURE_ONLY_MODE
+    gcmkPRINT("Capture only mode: The max allocation from System Pool is %llu bytes", database->vidMemPool[gcvPOOL_SYSTEM].maxBytes);
+#endif
+
     /* Cannot remove the database from the hash list
     ** since later records deinit need to access from the hash
     */

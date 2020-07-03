@@ -1454,7 +1454,7 @@ gckEVENT_Submit(
                 gcmkONERROR(gckCOMMAND_ExecuteMultiChannel(command, 0, 0, executeBytes));
             }
 
-#if gcdNULL_DRIVER
+#if gcdNULL_DRIVER || gcdCAPTURE_ONLY_MODE
             /* Notify immediately on infinite hardware. */
             gcmkONERROR(gckEVENT_Interrupt(Event, 1 << id));
 

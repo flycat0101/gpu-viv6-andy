@@ -1889,10 +1889,15 @@ gckVIDMEM_Free(
 
         if (Node->VidMem.kvaddr)
         {
+#if gcdCAPTURE_ONLY_MODE
+            gcmkVERIFY_OK(gcmkOS_SAFE_FREE(Kernel->os, Node->VidMem.kvaddr));
+#else
+
             gcmkONERROR(
                 gckOS_DestroyKernelMapping(Kernel->os,
                                            Node->VidMem.parent->physical,
                                            Node->VidMem.kvaddr));
+#endif
 
             Node->VidMem.kvaddr = gcvNULL;
         }
@@ -3594,6 +3599,9 @@ gckVIDMEM_NODE_LockCPU(
 
         if (FromUser)
         {
+#if gcdCAPTURE_ONLY_MODE
+            node->VidMem.logical = NodeObject->captureLogical;
+#else
             /* Map video memory pool to user space. */
             gcmkONERROR(
                 gckKERNEL_MapVideoMemory(Kernel,
@@ -3603,6 +3611,7 @@ gckVIDMEM_NODE_LockCPU(
                                          (gctUINT32)node->VidMem.offset,
                                          (gctUINT32)node->VidMem.bytes,
                                          &node->VidMem.logical));
+#endif
 
             logical = node->VidMem.logical;
         }
@@ -3611,12 +3620,18 @@ gckVIDMEM_NODE_LockCPU(
             /* Map video memory pool to kernel space. */
             if (!node->VidMem.kvaddr)
             {
+#if gcdCAPTURE_ONLY_MODE
+                gcmkONERROR(gckOS_Allocate(os,
+                                           node->VidMem.bytes,
+                                           &node->VidMem.kvaddr));
+#else
                 gcmkONERROR(
                     gckOS_CreateKernelMapping(os,
                                               node->VidMem.parent->physical,
                                               node->VidMem.offset,
                                               node->VidMem.bytes,
                                               &node->VidMem.kvaddr));
+#endif
             }
 
             logical = node->VidMem.kvaddr;
@@ -3728,7 +3743,7 @@ gckVIDMEM_NODE_UnlockCPU(
     {
         if (FromUser)
         {
-#ifdef __QNXNTO__
+#if gcdCAPTURE_ONLY_MODE || defined __QNXNTO__
             /* Do nothing here. */
 #else
             if (!Defer)

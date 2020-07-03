@@ -90,6 +90,10 @@ typedef struct _gcsCONTEXT
     /* Video memory of the context buffer. */
     gckVIDMEM_NODE              videoMem;
 
+#if gcdCAPTURE_ONLY_MODE
+    gctUINT32                   handle;
+#endif
+
     /* Logical address of the context buffer. */
     gctUINT32_PTR               logical;
 
