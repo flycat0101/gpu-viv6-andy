@@ -134,9 +134,10 @@ BEGIN_EXTERN_C()
 /* bump up version to 1.45 for saving cl_program_binary_type for gcSHADER on 03/12/2020 */
 #define gcdSL_SHADER_BINARY_BEFORE_SAVING_CL_PROGRAM_BINARY_TYPE gcmCC(0, 0, 1, 45)
 
+/* bump up version to 1.46 for supporting textureSize function for more sampler type 6/15/2020 */
 /* current version */
-#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 46)
-#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 46)
+#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 47)
+#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 47)
 
 typedef union _gcsValue
 {
