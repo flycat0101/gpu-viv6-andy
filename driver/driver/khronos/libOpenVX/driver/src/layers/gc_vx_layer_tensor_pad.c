@@ -13,7 +13,7 @@
 
 #include <gc_vx_common.h>
 #include <layers/gc_vx_layer_tensor_pad.h>
-
+#include <gc_vx_nn_util.h>
 
 vx_status vxnneExecuteSWTensorPad(struct _vxnne_operation_s *operation)
 {
@@ -1023,8 +1023,9 @@ VX_PRIVATE_API vx_bool vxoNNTensorPad2_SH_EVIS_Support(vx_node node, const vx_re
     vx_int32 outWidth = 0, outHeight = 0, outDepth = 0, outBatch = 0;
     vx_bool shader_flag = vx_false_e;
     vx_bool dataFormatFlag = vx_false_e;
-    vx_bool pad_flag = vx_false_e;
-    vx_bool whc_flag = vx_false_e;
+    vx_bool fp2bfp16Flag = vx_false_e;
+    /*vx_bool pad_flag = vx_false_e;*/
+    /*vx_bool whc_flag = vx_false_e;*/
     vx_int32_ptr pad_base = VX_NULL;
     vx_enum pad_mode = padMode->value->e;
 
@@ -1039,6 +1040,7 @@ VX_PRIVATE_API vx_bool vxoNNTensorPad2_SH_EVIS_Support(vx_node node, const vx_re
     vx_float32 outputScale             = TENSOR_TF_SCALE(dst);
 
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+    support = support && node->base.context->evisNoInst.supportEVIS;
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
@@ -1055,10 +1057,13 @@ VX_PRIVATE_API vx_bool vxoNNTensorPad2_SH_EVIS_Support(vx_node node, const vx_re
     dataFormatFlag = (vx_bool)((inputFormat == outputFormat) && (inputElementSize & 3) && (inputFixPointPos == outputFixPointPos)
             && (inputZeroPoint == outputZeroPoint) && (inputScale == outputScale));
 
+    fp2bfp16Flag = (vx_bool)(inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_BFLOAT16
+                                && (pad_mode == VX_PAD_MIRROR_REFLECT || pad_mode == VX_PAD_MIRROR_SYMMETRIC));
+
     if(outDepth == inDepth && outBatch == inBatch)
     {
-        pad_flag = vx_true_e;
-        shader_flag = vx_true_e;
+        /*pad_flag = vx_true_e;
+        shader_flag = vx_true_e;*/
     }
     else if(outWidth == inWidth && outHeight == inHeight && pad_mode == VX_PAD_CONSTANT
         && ((outDepth != inDepth && outBatch == inBatch) || (outDepth == inDepth && outBatch != inBatch)))
@@ -1089,10 +1094,15 @@ VX_PRIVATE_API vx_bool vxoNNTensorPad2_SH_EVIS_Support(vx_node node, const vx_re
     else if(pad_mode == VX_PAD_CONSTANT && outBatch < 2)
     {
         shader_flag = vx_true_e;
-        whc_flag = vx_true_e;
+        /*whc_flag = vx_true_e;*/
+    }
+    else if(pad_mode == VX_PAD_MIRROR_SYMMETRIC
+        || pad_mode == VX_PAD_MIRROR_REFLECT)
+    {
+        shader_flag = vx_true_e;
     }
 
-    support = support && shader_flag && dataFormatFlag;
+    support = support && shader_flag && (dataFormatFlag || fp2bfp16Flag);
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
@@ -1126,7 +1136,8 @@ VX_PRIVATE_API vx_bool vxoNNTensorPad2_GPU_Support(vx_node node, const vx_refere
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
-    dataFormatFlag = (vx_bool)((pad_mode == VX_PAD_CONSTANT) && (inputFormat == outputFormat) && (inputFormat == VX_TYPE_FLOAT32));
+    dataFormatFlag = (vx_bool)((pad_mode == VX_PAD_CONSTANT) && (inputFormat == outputFormat) &&
+                            (inputFormat == VX_TYPE_FLOAT32 || inputFormat == VX_TYPE_UINT8 || inputFormat == VX_TYPE_FLOAT16));
 
 
     dataFormatFlag2 = (vx_bool)((inputFormat == outputFormat) && ((inputFormat == VX_TYPE_FLOAT32 || inputFormat == VX_TYPE_FLOAT16) ||
@@ -1164,7 +1175,7 @@ VX_PRIVATE_API vx_status vxoNNTensorPad2_SH_EVIS_Initialize(vxnne_layer ops_laye
 
     vx_int32 inWidth = 0, inHeight = 0, inDepth = 0, inBatch = 0;
     vx_int32 outWidth = 0, outHeight = 0, outDepth = 0, outBatch = 0;
-    vx_bool shader_flag = vx_false_e;
+    /*vx_bool shader_flag = vx_false_e;*/
     vx_bool pad_flag = vx_false_e;
     vx_bool whc_flag = vx_false_e;
     vx_int32_ptr pad_base = VX_NULL;
@@ -1185,42 +1196,38 @@ VX_PRIVATE_API vx_status vxoNNTensorPad2_SH_EVIS_Initialize(vxnne_layer ops_laye
     if(outDepth == inDepth && outBatch == inBatch)
     {
         pad_flag = vx_true_e;
-        shader_flag = vx_true_e;
+        /*shader_flag = vx_true_e;*/
     }
     else if(outWidth == inWidth && outHeight == inHeight && pad_mode == VX_PAD_CONSTANT
         && ((outDepth != inDepth && outBatch == inBatch) || (outDepth == inDepth && outBatch != inBatch)))
     {
-        shader_flag = vx_true_e;
-
-        if(outBatch > 1)
-        {
-            if(outDepth != inDepth)
-            {
-                if(outWidth * outHeight < 65536
-                    || outDepth * outBatch < 65536)
-                    shader_flag = vx_true_e;
-                else
-                    shader_flag = vx_false_e;
-            }
-            else
-            {
-                if(outWidth * outHeight < 65536
-                    || outHeight * outDepth < 65536
-                    || outDepth * outBatch < 65536)
-                    shader_flag = vx_true_e;
-                else
-                    shader_flag = vx_false_e;
-            }
-        }
     }
     else if(pad_mode == VX_PAD_CONSTANT && outBatch < 2)
     {
-        shader_flag = vx_true_e;
+        //shader_flag = vx_true_e;
         whc_flag = vx_true_e;
     }
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
-    if(pad_flag)
+    if(pad_mode == VX_PAD_MIRROR_SYMMETRIC)
+    {
+        shaderExecutable = vxnneGetTensorPadSymShaderExecutable(ops_layer->node->base.context,
+            VXNNE_KERNEL_TENSOR_PAD,
+            &ops_layer->node->kernelAttributes.borderMode,
+            src,
+            dst,
+            pad_base);
+    }
+    else if(pad_mode == VX_PAD_MIRROR_REFLECT)
+    {
+        shaderExecutable = vxnneGetTensorPadRefShaderExecutable(ops_layer->node->base.context,
+            VXNNE_KERNEL_TENSOR_PAD,
+            &ops_layer->node->kernelAttributes.borderMode,
+            src,
+            dst,
+            pad_base);
+    }
+    else if(pad_flag)
     {
         vx_scalar padLeft = vxCreateScalar(ops_layer->node->base.context, VX_TYPE_FLOAT32, &pad_base[0]);
         vx_scalar padRight = vxCreateScalar(ops_layer->node->base.context, VX_TYPE_FLOAT32, &pad_base[1]);
