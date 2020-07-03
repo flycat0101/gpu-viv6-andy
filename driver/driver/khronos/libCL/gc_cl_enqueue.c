@@ -825,7 +825,7 @@ DoReLink:
 
     if(reLinkNeed == gcvFALSE)
     {
-        clmONERROR(gcoOS_Allocate(gcvNULL,  numToUpdate * gcmSIZEOF(clsArgument), &orgArgs), CL_OUT_OF_HOST_MEMORY);
+        gcmONERROR(gcoOS_Allocate(gcvNULL,  numToUpdate * gcmSIZEOF(clsArgument), &orgArgs));
         gcoOS_MemCopy(orgArgs, *Args, numToUpdate * gcmSIZEOF(clsArgument));
     }
 
