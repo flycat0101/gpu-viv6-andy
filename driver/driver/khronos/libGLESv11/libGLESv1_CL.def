@@ -263,5 +263,6 @@ EXPORTS
 	glTexDirectTiledMapVIV
 	glTexDirectVIV
 	glTexDirectVIVMap
+	glTexDirectMapVIV
 
 
