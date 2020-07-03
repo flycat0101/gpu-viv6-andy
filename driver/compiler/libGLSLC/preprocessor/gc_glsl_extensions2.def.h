@@ -80,3 +80,14 @@
         _SHADER_GL14_VERSION,
         gcvNULL
     },
+    {
+        "GL_ARB_compatibility",
+        slvEXTENSION2_GL_ARB_COMPATIBILITY,
+        gcvTRUE,
+        gcvTRUE,
+        gcvTRUE,
+        gcvTRUE,
+        _SHADER_GL14_VERSION,
+        0xFFFFFFFF,
+        gcvNULL
+    },

@@ -921,7 +921,7 @@ _IsGLShaderSupportCompatibilityBuiltins(
            sloCOMPILER_IsOGL12Version(Compiler) ||
            sloCOMPILER_IsOGL13Version(Compiler))
             isSupport = gcvTRUE;
-        else if(sloCOMPILER_IsOGL14Version(Compiler) /* TODO: && extension GL_ARB_compatibility is enable */ )
+        else if(sloCOMPILER_IsOGL14Version(Compiler) && sloCOMPILER_Extension2Enabled(Compiler, slvEXTENSION2_GL_ARB_COMPATIBILITY))
             isSupport = gcvTRUE;
         else if((sloCOMPILER_IsOGL15VersionOrAbove(Compiler, gcvTRUE)) &&
                  slsCOMPILER_HasCompatibilityProfile(Compiler->context.compilerFlags))
