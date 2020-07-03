@@ -356,6 +356,10 @@ gceSTATUS slsHTBL_Set(
     gcmFOOTER();
     return status;
 OnError:
+    if (hashNodeExt != gcvNULL)
+    {
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, hashNodeExt));
+    }
     gcmFOOTER();
     return status;
 }
