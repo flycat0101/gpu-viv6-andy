@@ -27,7 +27,7 @@ __glChipBeginQuery(
     )
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
-    __GLchipQueryObject *chipQuery;
+    __GLchipQueryObject *chipQuery = gcvNULL;
     __GLchipQueryHeader *queryHeader = gcvNULL;
     gceSTATUS status = gcvSTATUS_OK;
     __GLprogramObject *fsProgObj = __glGetCurrentStageProgram(gc, __GLSL_STAGE_FS);
@@ -152,6 +152,10 @@ __glChipBeginQuery(
     return GL_TRUE;
 
 OnError:
+    if (chipQuery)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, chipQuery);
+    }
     gcChipSetError(chipCtx, status);
     gcmFOOTER_ARG("return=%d", GL_FALSE);
     return GL_FALSE;
