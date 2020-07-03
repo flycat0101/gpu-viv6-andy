@@ -401,10 +401,10 @@ GLvoid APIENTRY __glim_Color4ub(__GLcontext *gc, GLubyte r, GLubyte g, GLubyte b
 
 GLvoid APIENTRY __glim_Color4ubv(__GLcontext *gc, const GLubyte *v)
 {
-     GLubyte ur = __GL_UB_TO_FLOAT(v[0]);
-     GLubyte ug = __GL_UB_TO_FLOAT(v[1]);
-     GLubyte ub = __GL_UB_TO_FLOAT(v[2]);
-     GLubyte ua  = __GL_UB_TO_FLOAT(v[3]);
+    GLubyte ur = v[0];
+    GLubyte ug = v[1];
+    GLubyte ub = v[2];
+    GLubyte ua = v[3];
 
     __glColor4ub(gc, ur, ug, ub, ua);
 }

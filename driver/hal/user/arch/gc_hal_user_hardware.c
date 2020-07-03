@@ -18808,6 +18808,18 @@ gcoHARDWARE_ConvertPixel(
                 ));
         }
 
+        else if (DstFormat->fmtClass == gcvFORMAT_CLASS_INTENSITY)
+        {
+            gcmONERROR(_ConvertComponent(
+                SrcPixel, DstPixel,
+                SrcBitOffset, DstBitOffset,
+                &SrcFormat->u.rgba.red,
+                &DstFormat->u.intensity.value,
+                SrcBoundary, DstBoundary,
+                0
+                ));
+        }
+
         else
         {
             /* Not supported combination. */
@@ -18992,6 +19004,18 @@ gcoHARDWARE_ConvertPixel(
                 ));
         }
 
+        else if (DstFormat->fmtClass == gcvFORMAT_CLASS_INTENSITY)
+        {
+            gcmONERROR(_ConvertComponent(
+                SrcPixel, DstPixel,
+                SrcBitOffset, DstBitOffset,
+                &SrcFormat->u.lum.value,
+                &DstFormat->u.intensity.value,
+                SrcBoundary, DstBoundary,
+                0
+                ));
+        }
+
         else
         {
             /* Not supported combination. */
@@ -19053,6 +19077,27 @@ gcoHARDWARE_ConvertPixel(
                 SrcBitOffset, DstBitOffset,
                 &SrcFormat->u.bump.w,
                 &DstFormat->u.bump.w,
+                SrcBoundary, DstBoundary,
+                0
+                ));
+        }
+
+        else
+        {
+            /* Not supported combination. */
+            gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+        }
+    }
+
+    else if (SrcFormat->fmtClass == gcvFORMAT_CLASS_INTENSITY)
+    {
+        if (DstFormat->fmtClass == gcvFORMAT_CLASS_INTENSITY)
+        {
+            gcmONERROR(_ConvertComponent(
+                SrcPixel, DstPixel,
+                SrcBitOffset, DstBitOffset,
+                &SrcFormat->u.intensity.value,
+                &DstFormat->u.intensity.value,
                 SrcBoundary, DstBoundary,
                 0
                 ));

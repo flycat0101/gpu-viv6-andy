@@ -1170,6 +1170,12 @@ typedef enum _gceSURF_FORMAT
     gcvSURF_B8,
     gcvSURF_G32F,
     gcvSURF_B32F,
+
+    /* Intensity formats */
+    gcvSURF_I4              = 2000,
+    gcvSURF_I8,
+    gcvSURF_I12,
+    gcvSURF_I16,
 }
 gceSURF_FORMAT;
 

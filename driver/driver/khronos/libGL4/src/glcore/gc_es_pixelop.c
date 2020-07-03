@@ -1336,11 +1336,6 @@ GLvoid APIENTRY __glim_Accum(__GLcontext *gc, GLenum op, GLfloat value)
         return;
     }
 
-    if (!gc->modes.haveAccumBuffer) {
-        __glSetError(gc, GL_INVALID_OPERATION);
-        return;
-    }
-
     switch (op) {
       case GL_ACCUM:
       case GL_LOAD:

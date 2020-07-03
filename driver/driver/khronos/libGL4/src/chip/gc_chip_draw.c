@@ -3031,6 +3031,132 @@ OnError:
 }
 
 static gceSTATUS
+gcChipPatchTriangleList(
+    __GLcontext *gc,
+    __GLchipContext *chipCtx,
+    __GLchipInstantDraw *instantDraw
+    )
+{
+    gctSIZE_T newPrimitiveCount;
+    gctSIZE_T newIndexCount;
+    gctSIZE_T vertexCount;
+    gceINDEX_TYPE indexType;
+    gctSIZE_T requiredSize;
+    GLvoid * tempIndices = gcvNULL;
+    gctSIZE_T i;
+    gceSTATUS status = gcvSTATUS_OK;
+
+    /* Header */
+    gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
+
+    GL_ASSERT(!instantDraw->primitiveRestart);
+
+    /* Get values */
+    instantDraw->primMode = gcvPRIMITIVE_LINE_LIST;
+    /* triangle list count */
+    newPrimitiveCount =  instantDraw->primCount * 3;
+    instantDraw->primCount = newPrimitiveCount;
+    newIndexCount = newPrimitiveCount * 2;
+    gco3D_SetAntiAliasLine(chipCtx->engine, GL_TRUE);
+    gco3D_SetAALineWidth(chipCtx->engine, (GLfloat)gc->state.line.aliasedWidth);
+
+    vertexCount = (gctSIZE_T)(gc->vertexArray.end - gc->vertexArray.start);
+    /* Check if the count fits in 8-bit. */
+    if (vertexCount + 1 < 256)
+    {
+        /* 8-bit indices. */
+        indexType     = gcvINDEX_8;
+        requiredSize  = newIndexCount;
+    }
+    /* Check if the count fits in 16-bit. */
+    else if (vertexCount + 1 < 65536)
+    {
+        /* 16-bit indices. */
+        indexType     = gcvINDEX_16;
+        requiredSize  = newIndexCount * 2;
+    }
+    else
+    {
+        /* 32-bit indices. */
+        indexType     = gcvINDEX_32;
+        requiredSize  = newIndexCount * 4;
+    }
+
+    /* Allocate a temporary buffer. */
+    tempIndices = gcChipPatchClaimIndexMemory(gc, chipCtx, requiredSize);
+    if (!tempIndices)
+    {
+        gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
+    }
+
+    /* Dispatch on index type. */
+    switch (indexType)
+    {
+    case gcvINDEX_8:
+        {
+            /* Cast pointer to index buffer. */
+            gctUINT8_PTR ptr = (gctUINT8_PTR) tempIndices;
+            for (i = 0; i < newPrimitiveCount / 3; ++i)
+            {
+                *ptr++ = (gctUINT8) (i * 3);
+                *ptr++ = (gctUINT8) (i * 3 + 1);
+                *ptr++ = (gctUINT8) (i * 3 + 1);
+                *ptr++ = (gctUINT8) (i * 3 + 2);
+                *ptr++ = (gctUINT8) (i * 3 + 2);
+                *ptr++ = (gctUINT8) (i * 3);
+            }
+        }
+        break;
+
+    case gcvINDEX_16:
+        {
+            /* Cast pointer to index buffer. */
+            gctUINT16_PTR ptr = (gctUINT16_PTR) tempIndices;
+            for (i = 0; i < newPrimitiveCount / 3; ++i)
+            {
+                *ptr++ = (gctUINT16) (i * 3);
+                *ptr++ = (gctUINT16) (i * 3 + 1);
+                *ptr++ = (gctUINT16) (i * 3 + 1);
+                *ptr++ = (gctUINT16) (i * 3 + 2);
+                *ptr++ = (gctUINT16) (i * 3 + 2);
+                *ptr++ = (gctUINT16) (i * 3);
+            }
+        }
+        break;
+
+    case gcvINDEX_32:
+        {
+            /* Cast pointer to index buffer. */
+            gctUINT32_PTR ptr = (gctUINT32_PTR) tempIndices;
+            for (i = 0; i < newPrimitiveCount / 3; ++i)
+            {
+                *ptr++ = (gctUINT32) (i * 3);
+                *ptr++ = (gctUINT32) (i * 3 + 1);
+                *ptr++ = (gctUINT32) (i * 3 + 1);
+                *ptr++ = (gctUINT32) (i * 3 + 2);
+                *ptr++ = (gctUINT32) (i * 3 + 2);
+                *ptr++ = (gctUINT32) (i * 3);
+            }
+        }
+        break;
+
+    default:
+        break;
+    }
+
+    /* Set output */
+    chipCtx->indexLoops = 1;
+    instantDraw->indexMemory = tempIndices;
+    instantDraw->count = newIndexCount;
+    instantDraw->indexType = indexType;
+    instantDraw->indexBuffer = gcvNULL;
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+static gceSTATUS
 gcChipPatchQuadListIndexed(
     __GLcontext *gc,
     __GLchipContext *chipCtx,
@@ -3194,6 +3320,129 @@ gcChipPatchQuadListIndexed(
                 *ptr++ = src[i * 4 + 1];
                 *ptr++ = src[i * 4 + 2];
                 *ptr++ = src[i * 4 + 3];
+            }
+        }
+        break;
+
+    default:
+        break;
+    }
+
+    /* Set output */
+    instantDraw->indexMemory = tempIndices;
+    instantDraw->count = newIndexCount;
+    instantDraw->indexBuffer = gcvNULL;
+
+OnError:
+    if (indexLocked)
+    {
+        /* Unlock index buffer */
+        gcmVERIFY_OK(gcoBUFOBJ_Unlock(oldIndexBuffer));
+    }
+    gcmFOOTER();
+    return status;
+}
+
+static gceSTATUS
+gcChipPatchTriangleListIndexed(
+    __GLcontext *gc,
+    __GLchipContext *chipCtx,
+    __GLchipInstantDraw *instantDraw
+    )
+{
+    gctSIZE_T newPrimitiveCount;
+    gctSIZE_T newIndexCount;
+    gctSIZE_T indexSize = 0;
+    gctBOOL indexLocked = gcvFALSE;
+    gctSIZE_T requiredSize;
+    GLvoid * indexMemory = instantDraw->indexMemory;
+    GLvoid * tempIndices = gcvNULL;
+    gcoBUFOBJ oldIndexBuffer = instantDraw->indexBuffer;
+    gctSIZE_T i;
+    gceSTATUS status = gcvSTATUS_OK;
+
+    /* Header */
+    gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
+
+    GL_ASSERT(!instantDraw->primitiveRestart);
+
+    /* Get values */
+    instantDraw->primMode = gcvPRIMITIVE_LINE_LIST;
+    /* triangle list count */
+    newPrimitiveCount =  instantDraw->primCount * 3;
+    instantDraw->primCount = newPrimitiveCount;
+    newIndexCount = newPrimitiveCount * 2;
+    gco3D_SetAntiAliasLine(chipCtx->engine, GL_TRUE);
+    gco3D_SetAALineWidth(chipCtx->engine, (GLfloat)gc->state.line.aliasedWidth);
+
+    gcmGET_INDEX_SIZE(instantDraw->indexType, indexSize);
+    requiredSize  = newIndexCount * indexSize;
+    /* Get index buffer */
+    if (oldIndexBuffer)
+    {
+        gctPOINTER indexBase = gcvNULL;
+        gcmONERROR(gcoBUFOBJ_Lock(oldIndexBuffer, gcvNULL, &indexBase));
+        indexMemory = (gctUINT8_PTR)indexBase + gcmPTR2SIZE(indexMemory);
+        indexLocked = gcvTRUE;
+    }
+
+    /* Allocate a temporary buffer. */
+    tempIndices = gcChipPatchClaimIndexMemory(gc, chipCtx, requiredSize);
+    if (!tempIndices)
+    {
+        gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
+    }
+
+    /* Dispatch on index type. */
+    switch (instantDraw->indexType)
+    {
+    case gcvINDEX_8:
+        {
+            /* Cast pointer to index buffer. */
+            gctUINT8_PTR src = (gctUINT8_PTR)indexMemory;
+            gctUINT8_PTR ptr = (gctUINT8_PTR) tempIndices;
+            for (i = 0; i < newPrimitiveCount / 3; ++i)
+            {
+                *ptr++ = src[i * 3];
+                *ptr++ = src[i * 3 + 1];
+                *ptr++ = src[i * 3 + 1];
+                *ptr++ = src[i * 3 + 2];
+                *ptr++ = src[i * 3 + 2];
+                *ptr++ = src[i * 3];
+            }
+        }
+        break;
+
+    case gcvINDEX_16:
+        {
+            /* Cast pointer to index buffer. */
+            gctUINT16_PTR ptr = (gctUINT16_PTR) tempIndices;
+            gctUINT16_PTR src = (gctUINT16_PTR)indexMemory;
+            for (i = 0; i < newPrimitiveCount / 3; ++i)
+            {
+                *ptr++ = src[i * 3];
+                *ptr++ = src[i * 3 + 1];
+                *ptr++ = src[i * 3 + 1];
+                *ptr++ = src[i * 3 + 2];
+                *ptr++ = src[i * 3 + 2];
+                *ptr++ = src[i * 3];
+            }
+        }
+        break;
+
+    case gcvINDEX_32:
+        {
+            /* Cast pointer to index buffer. */
+            gctUINT32_PTR ptr = (gctUINT32_PTR) tempIndices;
+            gctUINT32_PTR src = (gctUINT32_PTR)indexMemory;
+            for (i = 0; i < newPrimitiveCount / 3; ++i)
+            {
+                *ptr++ = src[i * 3];
+                *ptr++ = src[i * 3 + 1];
+                *ptr++ = src[i * 3 + 1];
+                *ptr++ = src[i * 3 + 2];
+                *ptr++ = src[i * 3 + 2];
+                *ptr++ = src[i * 3];
             }
         }
         break;
@@ -5101,6 +5350,19 @@ gcChipValidateDrawPath(
                         gcChipPatchQuadList(gc, chipCtx, defaultInstant);
                     }
                     break;
+                case GL_TRIANGLES:
+                    if (gc->state.polygon.frontMode == GL_LINE)
+                    {
+                        if (chipCtx->indexLoops)
+                        {
+                            gcChipPatchTriangleListIndexed(gc, chipCtx, defaultInstant);
+                        }
+                        else
+                        {
+                            gcChipPatchTriangleList(gc, chipCtx, defaultInstant);
+                        }
+                    }
+                    break;
                 case GL_QUAD_STRIP:
                     if (chipCtx->indexLoops)
                     {
@@ -5160,7 +5422,6 @@ gcChipValidateDrawPath(
                     }
                     break;
                 case GL_TRIANGLE_FAN:
-                case GL_TRIANGLES:
                     if (gc->state.polygon.frontMode == GL_LINE)
                     {
                         if (chipCtx->indexLoops)

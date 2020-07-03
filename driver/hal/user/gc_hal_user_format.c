@@ -1752,6 +1752,30 @@ void _ReadPixelFrom_S8D32F_2_A8R8G8B8(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcs
     outPixel->s = (pUI[0] & 0xFF);
 }
 
+void _ReadPixelFrom_I8(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctUINT8 ub = *(gctUINT8*)inAddr[0];
+
+    outPixel->color.f.r =
+    outPixel->color.f.g =
+    outPixel->color.f.b =
+    outPixel->color.f.a = gcdUNORM_TO_FLOAT(ub, 8);
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
+
+void _ReadPixelFrom_I16(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctUINT16 us = *(gctUINT16*)inAddr[0];
+
+    outPixel->color.f.r =
+    outPixel->color.f.g =
+    outPixel->color.f.b =
+    outPixel->color.f.a = gcdUNORM_TO_FLOAT(us, 16);
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
+
 _PFNreadPixel gcoSURF_GetReadPixelFunc(gcoSURF surf)
 {
     gceAPI currentApi;
@@ -2146,6 +2170,13 @@ _PFNreadPixel gcoSURF_GetReadPixelFunc(gcoSURF surf)
 
     case gcvSURF_B10G10R10A2:
         return _ReadPixelFrom_B10G10R10A2;
+
+    /* intensity format */
+    case gcvSURF_I8:
+        return _ReadPixelFrom_I8;
+
+    case gcvSURF_I16:
+        return _ReadPixelFrom_I16;
 
     default:
         gcmASSERT(0);
@@ -3416,6 +3447,10 @@ void _WritePixelTo_S8D32F_2_A8R8G8B8(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMA
     pUI[0] = inPixel->s;
 }
 
+void _WritePixelTo_I8(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    *(gctUINT8*)outAddr[0] = (gctUINT8)gcdFLOAT_TO_UNORM(inPixel->color.f.r, 8);
+}
 
 _PFNwritePixel gcoSURF_GetWritePixelFunc(gcoSURF surf)
 {
@@ -3807,6 +3842,10 @@ _PFNwritePixel gcoSURF_GetWritePixelFunc(gcoSURF surf)
 
     case gcvSURF_R10G10B10A2:
         return _WritePixelTo_R10G10B10A2;
+
+    /* intensity format */
+    case gcvSURF_I8:
+        return _WritePixelTo_I8;
 
     default:
         gcmASSERT(0);

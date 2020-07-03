@@ -514,7 +514,7 @@ GLvoid __glEnableDisable(__GLcontext *gc, GLenum cap, GLboolean val)
               if (gc->modes.rgbMode)
               {
                   es->colorBuffer.logicOp = val;
-                  __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_1, __GL_LOGICOP_ENDISABLE_BIT);
+                  __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_2, __GL_LOGICOP_ENDISABLE_BIT);
               }
           }
           break;
@@ -940,12 +940,6 @@ GLvoid GL_APIENTRY __glim_Clear(__GLcontext *gc, GLbitfield mask)
             __GL_ERROR_EXIT(GL_INVALID_VALUE);
         }
     }
-
-#ifdef OPENGL40
-    if (gc->imports.conformGLSpec && !gc->modes.haveAccumBuffer) {
-        mask &= ~GL_ACCUM_BUFFER_BIT;
-    }
-#endif
 
     if (gc->state.enables.rasterizerDiscard)
     {

@@ -2140,7 +2140,7 @@ GLvoid __glDrawDlistPrimitive(__GLcontext *gc, __GLPrimBegin *primBegin)
 
     mode = (indexedPrim) ? indexPrimModeDL[primBegin->primType] : primBegin->primType;
 
-    if (mode >= GL_TRIANGLES)
+    if (mode >= GL_TRIANGLES && gc->state.polygon.frontMode != GL_LINE)
     {
         mode = (!bothFaceFill) ? GL_LINE_LOOP : mode;
     }

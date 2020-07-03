@@ -538,6 +538,10 @@ struct __GLchipContextRec
     GLboolean                   isSolidLineStipple;
     GLboolean                   programDirty;
 
+    GLboolean                   useAccumBuffer;
+    GLint                       accumBufferWidth;
+    GLint                       accumBufferHeight;
+    GLfloat *                   accumBufferData;
 
     GLint                       errorNo;
     GLboolean                   multiSampleOn;

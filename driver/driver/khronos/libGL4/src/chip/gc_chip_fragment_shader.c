@@ -673,6 +673,39 @@ static gceSTATUS set_uTextureBorderColor(
     return status;
 }
 
+static gceSTATUS set_uAlphaRef(
+    __GLcontext * gc,
+    gcUNIFORM Uniform
+    )
+{
+    gceSTATUS status;
+    GLfloat clampRef = glmFLOATCLAMP_0_TO_1(gc->state.raster.alphaReference);
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+
+    gcmHEADER_ARG("gc=0x%x Uniform=0x%x", gc, Uniform);
+
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->programState.hints, &clampRef);
+
+    gcmFOOTER();
+    return status;
+}
+
+static gceSTATUS set_uPolygonStipple(
+    __GLcontext * gc,
+    gcUNIFORM Uniform
+    )
+{
+    gceSTATUS status;
+    __GLchipContext     *chipCtx = CHIP_CTXINFO(gc);
+    GLfloat viewportHeight = (GLfloat)gc->state.viewport.height;
+    gcmHEADER_ARG("gc=0x%x Uniform=0x%x", gc, Uniform);
+
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->programState.hints, &viewportHeight);
+
+    gcmFOOTER();
+    return status;
+}
+
 /*******************************************************************************
 ** Uniform access helpers.
 */
@@ -981,6 +1014,29 @@ static gceSTATUS using_uTextureBorderColor(
 
     return status;
 }
+
+static gceSTATUS using_uAlphaRef(
+    __GLcontext * gc,
+    glsFSCONTROL_PTR ShaderControl
+    )
+{
+    gceSTATUS status;
+    gcmHEADER_ARG("gc=0x%x ShaderControl=0x%x", gc, ShaderControl);
+
+    status = glfUsingUniform(
+        ShaderControl->i,
+        "uAplhaRef",
+        gcSHADER_FLOAT_X1,
+        1,
+        set_uAlphaRef,
+        &glmUNIFORM_WRAP(FS, uAlphaRef)
+        );
+
+    gcmFOOTER();
+
+    return status;
+}
+
 /*******************************************************************************
 ** Varying access helpers.
 */
@@ -1226,6 +1282,27 @@ static gceSTATUS using_vFace(
     return status;
 }
 
+static gceSTATUS using_uPolygonStipple(
+    __GLcontext * gc,
+    glsFSCONTROL_PTR ShaderControl
+    )
+{
+    gceSTATUS status;
+    gcmHEADER_ARG("gc=0x%x ShaderControl=0x%x", gc, ShaderControl);
+
+    status = glfUsingUniform(
+        ShaderControl->i,
+        "uPolygonStipple",
+        gcSHADER_FRAC_X1,
+        1,
+        set_uPolygonStipple,
+        &glmUNIFORM_WRAP(FS, uPolygonStipple)
+        );
+
+    gcmFOOTER();
+
+    return status;
+}
 
 /*******************************************************************************
 ** Output assigning helpers.
@@ -4228,9 +4305,22 @@ static gceSTATUS processPolygonStipple(
         samplerNumber = chipCtx->polygonStippleTextureStage;
         /* Allocate sampler. */
         glmUSING_INDEXED_VARYING(uTexSampler, samplerNumber);
+        /* Allocate Uniform. */
+        glmUSING_UNIFORM(uPolygonStipple);
 
         glmOPCODE(MOV, temp1, XY);
             glmVARYING(FS, vPosition, XYYY);
+
+        /*
+        * Using gc->state.viewport.height to correct Y of vPosition.
+        *     vPosition.y = viewport.height - vPosition.y
+        */
+        glmOPCODE(MUL, temp1, Y);
+            glmCONST(-1.0f);
+            glmTEMP(temp1, YYYY);
+        glmOPCODE(ADD, temp1, Y);
+            glmTEMP(temp1, YYYY);
+            glmUNIFORM(FS, uPolygonStipple, XXXX);
 
         glmOPCODE(MUL, temp2, XY);
             glmTEMP(temp1, XYYY);
@@ -4652,6 +4742,95 @@ static gceSTATUS roundResult(
     return status;
 }
 
+/*******************************************************************************
+**
+**  doAlphaTest
+**
+**  Map color output.
+**
+**  INPUT:
+**
+**      Context
+**          Pointer to the current context.
+**
+**      ShaderControl
+**          Pointer to the current shader object.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+static gceSTATUS doAlphaTest(
+    __GLcontext * gc,
+    glsFSCONTROL_PTR ShaderControl
+    )
+{
+    gceSTATUS status;
+    gcmHEADER_ARG("gc=0x%x ShaderControl=0x%x", gc, ShaderControl);
+
+    do
+    {
+        /* Allocate Uniform */
+        glmUSING_UNIFORM(uAlphaRef);
+
+        switch (gc->state.raster.alphaFunction)
+        {
+            case GL_NEVER:
+                glmOPCODE_BRANCH(KILL, ALWAYS, 0);
+                break;
+
+            case GL_LESS:
+                glmOPCODE_BRANCH(KILL, GREATER_OR_EQUAL, 0);
+                    glmTEMP(ShaderControl->oColor, WWWW);
+                    glmUNIFORM(FS, uAlphaRef, XXXX);
+                break;
+
+            case GL_EQUAL :
+                glmOPCODE_BRANCH(KILL, NOT_EQUAL, 0);
+                    glmTEMP(ShaderControl->oColor, WWWW);
+                    glmUNIFORM(FS, uAlphaRef, XXXX);
+                break;
+
+            case GL_LEQUAL :
+                glmOPCODE_BRANCH(KILL, GREATER, 0);
+                    glmTEMP(ShaderControl->oColor, WWWW);
+                    glmUNIFORM(FS, uAlphaRef, XXXX);
+                break;
+
+            case GL_GREATER :
+                glmOPCODE_BRANCH(KILL, LESS_OR_EQUAL, 0);
+                    glmTEMP(ShaderControl->oColor, WWWW);
+                    glmUNIFORM(FS, uAlphaRef, XXXX);
+                break;
+
+            case GL_NOTEQUAL:
+                glmOPCODE_BRANCH(KILL, EQUAL, 0);
+                    glmTEMP(ShaderControl->oColor, WWWW);
+                    glmUNIFORM(FS, uAlphaRef, XXXX);
+                break;
+
+            case GL_GEQUAL:
+                glmOPCODE_BRANCH(KILL, LESS, 0);
+                    glmTEMP(ShaderControl->oColor, WWWW);
+                    glmUNIFORM(FS, uAlphaRef, XXXX);
+                break;
+
+            /**
+            case glvALWAYS:
+                break;
+            */
+
+            default:
+                break;
+        }
+    }
+    while (gcvFALSE);
+
+    gcmFOOTER();
+
+    /* Return status. */
+    return status;
+}
 
 /*******************************************************************************
 **
@@ -4836,6 +5015,11 @@ gceSTATUS glfGenerateFSFixedFunction(
         if (chipCtx->fsRoundingEnabled)
         {
             gcmERR_BREAK(roundResult(gc, &fsControl));
+        }
+
+        if (gc->state.enables.colorBuffer.alphaTest)
+        {
+            gcmERR_BREAK(doAlphaTest(gc, &fsControl));
         }
 
         /* Map output. */

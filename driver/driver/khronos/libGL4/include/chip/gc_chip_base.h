@@ -195,6 +195,8 @@ typedef enum _gleFS_UNIFORMS
     glmUNIFORM_INDEX(FS, uPixelTransferBias),
     glmUNIFORM_INDEX(FS, uTextureBorderColor),
     glmUNIFORM_INDEX(FS, uYmajor),
+    glmUNIFORM_INDEX(FS, uAlphaRef),
+    glmUNIFORM_INDEX(FS, uPolygonStipple),
     glvUNIFORM_FS_COUNT
 }
 gleFS_UNIFORMS;

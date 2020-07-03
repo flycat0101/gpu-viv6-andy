@@ -785,282 +785,181 @@ GLvoid restoreAttributes(__GLcontext* gc, __GLchipContext *chipCtx)
     gc->error = chipCtx->errorNo;
 }
 
-
-GLvoid __glChipAccum(__GLcontext* gc, GLenum op, GLfloat value)
+/*
+* This implementation can support __glChipAccum for glAcccum (Together with gcChipclearAccumBuffer).
+* The original code isn't deleted, which may be a reference for possible future optimization.
+*/
+gceSTATUS initAccumBufferPatch(__GLcontext* gc, __GLchipContext *chipCtx)
 {
-    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
-    glsTEXTURESAMPLER    oldSampler[2];
-    gcsTEXTURE oldTexture[2];
-    glsCHIPACCUMBUFFER * accumBuffer;
-//    __GLchipRenderbufferObject *renderBuffer = gcvNULL;
-//    glsCHIPRENDERBUFFER * renderBuffer = gcvNULL;
-    GLint drawRTWidth, drawRTHeight;
-    gceSTATUS status = gcvSTATUS_OK;
-    __GLbitmask texmask;
-    GLint drawtofront = 0;
-    gcsSURF_VIEW surfView = {gcvNULL, 0, 1};
-    gcoSURF renderSurf = gcvNULL;
+    GLint width = gc->state.viewport.width - gc->state.viewport.x;
+    GLint height = gc->state.viewport.height - gc->state.viewport.y;
 
-    __GLdispatchTable *pDispatchTable = &gc->immedModeDispatch;
-
-    __GLcoord vertex[4] =
+    if ((!chipCtx->useAccumBuffer)
+        || (chipCtx->accumBufferWidth != width)
+        || (chipCtx->accumBufferHeight != height))
     {
-        {{-1.0f, -1.0f, 1.0f, 1.0f}},
-        {{ 1.0f, -1.0f, 1.0f, 1.0f}},
-        {{ 1.0f,  1.0f, 1.0f, 1.0f}},
-        {{-1.0f,  1.0f, 1.0f, 1.0f}},
-    };
-
-    /* We evaluateAttribute to update states before we change our special states */
-    __glEvaluateDrawableChange(gc, __GL_BUFFER_DRAW_READ_BITS);
-
-    /* Save current states */
-    saveAttributes(gc, chipCtx);
-
-    /* Reset current states to default states for manual draw */
-    resetAttributes(gc, chipCtx);
-
-    /* Disable color mask for accum op which target on accum buffer */
-    switch (op)
-    {
-    case GL_ACCUM:
-    case GL_LOAD:
-    case GL_MULT:
-    case GL_ADD:
-        /* When accum on accum buffer, it should not affected by color mask */
-        pDispatchTable->ColorMask(gc, GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-        pDispatchTable->ClampColor(gc, GL_CLAMP_FRAGMENT_COLOR_ARB, GL_FALSE);
-        break;
-
-    case GL_RETURN:
-        /* When return to color buffer, it should be affected by color mask */
-        break;
-
-    default:
-        GL_ASSERT(0);
-        break;
-    }
-
-    texmask = gc->texUnitAttrDirtyMask;
-    __glBitmaskSetAll(&gc->texUnitAttrDirtyMask, GL_FALSE);
-
-    chipCtx->drawToAccumBuf = GL_TRUE;
-    chipCtx->accumValue = value;
-
-    oldSampler[0] = chipCtx->texture.sampler[0];
-    oldSampler[1] = chipCtx->texture.sampler[1];
-    oldTexture[0] = chipCtx->texture.halTexture[0];
-    oldTexture[1] = chipCtx->texture.halTexture[1];
-
-    chipCtx->hashKey.accumMode = gccACCUM_UNKNOWN;
-
-    if (gc->drawablePrivate->width != 0 && gc->drawablePrivate->height != 0)
-    {
-        accumBuffer = (glsCHIPACCUMBUFFER*)(gc->drawablePrivate->accumBuffer.privateData);
-
-        switch (op)
+        if (chipCtx->useAccumBuffer)
         {
-        case GL_ACCUM:
-        case GL_LOAD:
-        case GL_MULT:
-        case GL_ADD:
-            switch (gc->state.pixel.readBuffer)
-            {
-            case GL_FRONT_LEFT:
-            case GL_FRONT_RIGHT:
-            case GL_FRONT:
-                renderSurf = (gcoSURF)(gc->readablePrivate->rtHandles[__GL_DRAWBUFFER_FRONTLEFT_INDEX]);
-                break;
-
-            case GL_BACK_LEFT:
-            case GL_BACK_RIGHT:
-            case GL_LEFT:
-            case GL_RIGHT:
-            case GL_BACK:
-                renderSurf = (gcoSURF)(gc->readablePrivate->rtHandles[__GL_DRAWBUFFER_BACKLEFT_INDEX]);
-                break;
-            }
-            break;
-
-        case GL_RETURN:
-            switch (gc->state.raster.drawBuffers[0])
-            {
-            case GL_FRONT_LEFT:
-            case GL_FRONT_RIGHT:
-            case GL_FRONT:
-                renderSurf = (gcoSURF)(gc->readablePrivate->rtHandles[__GL_DRAWBUFFER_FRONTLEFT_INDEX]);
-                break;
-
-            case GL_BACK_LEFT:
-            case GL_BACK_RIGHT:
-            case GL_LEFT:
-            case GL_RIGHT:
-            case GL_BACK:
-                renderSurf = (gcoSURF)(gc->readablePrivate->rtHandles[__GL_DRAWBUFFER_BACKLEFT_INDEX]);
-                break;
-            }
-            break;
-
-        default:
-            GL_ASSERT(0);
-            break;
+            gcmOS_SAFE_FREE(gcvNULL, chipCtx->accumBufferData);
         }
 
-        chipCtx->texture.sampler[0] = accumBuffer->sampler[0];
-        chipCtx->texture.sampler[1] = accumBuffer->sampler[1];
-        chipCtx->texture.halTexture[0] = accumBuffer->texture[0];
-        chipCtx->texture.halTexture[1] = accumBuffer->texture[1];
-
-        /* Blt rtResource to texResource if needed */
-
-        chipCtx->hashKey.accumMode = op - GL_ACCUM + gccACCUM_ACCUM;
-        /* Set new RT and textures */
-        gcoSURF_GetSize(accumBuffer->renderTarget, (gctUINT*)&drawRTWidth, (gctUINT*)&drawRTHeight, gcvNULL);
-
-        surfView.surf = accumBuffer->renderTarget;
-        status = gco3D_SetTarget(chipCtx->engine, 0, &surfView, 0);
-
-        if (gcmIS_ERROR(status))
+        if (gcmIS_SUCCESS(gcoOS_Allocate(gcvNULL, width * height * 4 * sizeof(GLfloat), (gctPOINTER*)&chipCtx->accumBufferData)))
         {
-            return;
-        }
+            __GL_MEMSET(chipCtx->accumBufferData, 0, width*height*4*sizeof(GLfloat));
 
-        /* Resolve the rectangle to the temporary surface. */
-        status = resolveDrawToTempBitmap(chipCtx,
-            accumBuffer->renderTarget,
-            0, 0,
-            drawRTWidth,
-            drawRTHeight);
-
-        if (gcmIS_ERROR(status))
-        {
-            return;
-        }
-
-        /* Upload the texture. */
-        status = gcoTEXTURE_Upload(accumBuffer->textureInfo[0].object,
-                                   0,
-                                   gcvFACE_NONE,
-                                   drawRTWidth,
-                                   drawRTHeight,
-                                   0,
-                                   chipCtx->tempLastLine,
-                                   chipCtx->tempStride,
-                                   chipCtx->tempFormat,
-                                   gcvSURF_COLOR_SPACE_LINEAR);
-
-        gcoSURF_GetSize(renderSurf, (gctUINT *)&drawRTWidth, (gctUINT *)&drawRTHeight, gcvNULL);
-
-        surfView.surf = renderSurf;
-        status = gco3D_SetTarget(chipCtx->engine, 0, &surfView, 0);
-
-        if (gcmIS_ERROR(status))
-        {
-            return;
-        }
-
-        /* Resolve the rectangle to the temporary surface. */
-        status = resolveDrawToTempBitmap(chipCtx,
-            renderSurf,
-            0, 0,
-            drawRTWidth,
-            drawRTHeight);
-
-        if (gcmIS_ERROR(status))
-        {
-            return;
-        }
-
-        /* Upload the texture. */
-        status = gcoTEXTURE_Upload(accumBuffer->textureInfo[1].object,
-                                   0,
-                                   gcvFACE_NONE,
-                                   drawRTWidth,
-                                   drawRTHeight,
-                                   0,
-                                   chipCtx->tempLastLine,
-                                   chipCtx->tempStride,
-                                   chipCtx->tempFormat,
-                                   gcvSURF_COLOR_SPACE_LINEAR);
-
-        surfView.surf = accumBuffer->renderTarget;
-        if (op != GL_RETURN)
-        {
-            gco3D_SetTarget(chipCtx->engine, 0, &surfView, 0);
-        }
-
-        if ( gc->flags & __GL_DRAW_TO_FRONT)
-        {
-            gc->flags &= ~__GL_DRAW_TO_FRONT;
-            drawtofront = 1;
-        }
-
-        /* Draw a quad */
-        pDispatchTable->Begin(gc, GL_QUADS);
-        pDispatchTable->MultiTexCoord2f(gc, GL_TEXTURE0, 0, 0);
-        pDispatchTable->MultiTexCoord2f(gc, GL_TEXTURE1, 0, 0);
-        pDispatchTable->Vertex4fv(gc, (GLfloat *)&vertex[0]);
-
-        pDispatchTable->MultiTexCoord2f(gc, GL_TEXTURE0, 1, 0);
-        pDispatchTable->MultiTexCoord2f(gc, GL_TEXTURE1, 1, 0);
-        pDispatchTable->Vertex4fv(gc, (GLfloat *)&vertex[1]);
-
-        pDispatchTable->MultiTexCoord2f(gc, GL_TEXTURE0, 1, 1);
-        pDispatchTable->MultiTexCoord2f(gc, GL_TEXTURE1, 1, 1);
-        pDispatchTable->Vertex4fv(gc, (GLfloat *)&vertex[2]);
-
-        pDispatchTable->MultiTexCoord2f(gc, GL_TEXTURE0, 0, 1);
-        pDispatchTable->MultiTexCoord2f(gc, GL_TEXTURE1, 0, 1);
-        pDispatchTable->Vertex4fv(gc, (GLfloat *)&vertex[3]);
-        pDispatchTable->End(gc);
-
-        /* Flush the cache. */
-        if (op != GL_RETURN)
-        {
-            gcoSURF_Flush(accumBuffer->renderTarget);
+            chipCtx->accumBufferWidth = width;
+            chipCtx->accumBufferHeight = height;
+            chipCtx->useAccumBuffer = gcvTRUE;
+            return gcvSTATUS_OUT_OF_MEMORY;
         }
         else
         {
-            gcoSURF_Flush(renderSurf);
+            chipCtx->accumBufferWidth = 0;
+            chipCtx->accumBufferHeight = 0;
+            chipCtx->useAccumBuffer = gcvFALSE;
         }
-        gcoHAL_Commit(chipCtx->hal, gcvTRUE);
+    }
+    return gcvSTATUS_OK;
+}
 
-        surfView.surf = renderSurf;
+GLvoid freeAccumBufferPatch(__GLcontext *gc, __GLchipContext *chipCtx)
+{
+    if (chipCtx->useAccumBuffer)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, chipCtx->accumBufferData);
+        chipCtx->accumBufferData = gcvNULL;
+        chipCtx->useAccumBuffer = gcvFALSE;
+    }
+}
 
-        if (op != GL_RETURN)
+GLboolean __glChipAccum(__GLcontext* gc, GLenum op, GLfloat value)
+{
+    __GLchipContext     *chipCtx = CHIP_CTXINFO(gc);
+    GLfloat * accumBuffer;
+    GLint width  = 0;
+    GLint height = 0;
+    GLint i = 0;
+    GLvoid *tmpBuffer = gcvNULL;
+    GLuint bufSize = 0;
+
+    gcmHEADER_ARG("gc=0x%x op=0x%04X value=%f", gc, op, value);
+
+    if (gcmIS_ERROR(initAccumBufferPatch(gc, chipCtx)))
+    {
+        gcChipSetError(chipCtx, gcvSTATUS_OUT_OF_MEMORY);
+        gcmFOOTER_ARG("return=%s", "FALSE");
+        return GL_FALSE;
+    }
+
+    width  = chipCtx->accumBufferWidth;
+    height = chipCtx->accumBufferHeight;
+    accumBuffer = chipCtx->accumBufferData;
+
+    switch (op)
+    {
+    case GL_RETURN:
+        bufSize = width * height * 4 * sizeof(GLubyte);
+        break;
+    case GL_ACCUM:
+    case GL_LOAD:
+        bufSize = width * height * 4 * sizeof(GLfloat);
+        break;
+    default:
+        break;
+    }
+
+    if (bufSize > 0)
+    {
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, bufSize, (gctPOINTER*)&tmpBuffer)))
         {
-            gco3D_SetTarget(chipCtx->engine, 0, &surfView, 0);
-        }
-
-        if ( drawtofront)
-        {
-            gc->flags |= __GL_DRAW_TO_FRONT;
-
-            if (op == GL_RETURN)
-            {
-                pDispatchTable->Flush(gc);
-            }
+            freeAccumBufferPatch(gc, chipCtx);
+            gcChipSetError(chipCtx, gcvSTATUS_OUT_OF_MEMORY);
+            gcmFOOTER_ARG("return=%s", "FALSE");
+            return GL_FALSE;
         }
     }
 
-    chipCtx->texture.sampler[0] = oldSampler[0];
-    chipCtx->texture.sampler[1] = oldSampler[1];
-    chipCtx->texture.halTexture[0] = oldTexture[0];
-    chipCtx->texture.halTexture[1] = oldTexture[1];
+    switch (op)
+    {
+    case GL_RETURN:
+        /*VIV TODO: This drawPixels of uByte can only suit some frame buffer, such as, RGB8/RGBA8.
+        * Need to add some other conver functions if need to support RGB565 or some format else.
+        * But, this may be enough to support demos's need for the glAccum.
+        */
+        if (8 == gc->drawablePrivate->rtFormatInfo->redSize)
+        {
+            for (i=0; i<width*height*4; i++)
+            {
+                accumBuffer[i] = accumBuffer[i] * value;
+                accumBuffer[i] = gcmCLAMP(accumBuffer[i], __glZero, __glOne);
+                *((GLubyte *)tmpBuffer +i) = (GLubyte)(accumBuffer[i] * 0xFF);
+            }
 
-    chipCtx->hashKey.accumMode = gccACCUM_UNKNOWN;
+            (*gc->dp.drawPixels)(gc, width, height, GL_RGBA, GL_UNSIGNED_BYTE, (GLubyte *)tmpBuffer);
+        }
+        break;
+    case GL_ACCUM:
+        if (0.0f != value)
+        {
+            (*gc->dp.readPixels)(gc, 0, 0, width, height, GL_RGBA, GL_FLOAT, (GLubyte*)tmpBuffer);
 
-    gc->texUnitAttrDirtyMask = texmask;
+            for (i=0; i<width*height*4; i++)
+            {
+                accumBuffer[i] = accumBuffer[i] + *((GLfloat *)tmpBuffer + i) * value;
+            }
+        }
+        break;
+    case GL_LOAD:
+        if (0.0f == value)
+        {
+            __GL_MEMSET(accumBuffer, 0, width*height*4*sizeof(GLfloat));
+        }
+        else
+        {
+            (*gc->dp.readPixels)(gc, 0, 0, width, height, GL_RGBA, GL_FLOAT, (GLubyte*)tmpBuffer);
 
-    pDispatchTable->MatrixMode(gc, GL_PROJECTION);
-    pDispatchTable->PopMatrix(gc);
-    pDispatchTable->MatrixMode(gc, GL_TEXTURE);
-    pDispatchTable->PopMatrix(gc);
-    pDispatchTable->MatrixMode(gc, GL_MODELVIEW);
-    pDispatchTable->PopMatrix(gc);
+            if (1.0f == value)
+            {
+                __GL_MEMCOPY(accumBuffer, tmpBuffer, width*height*4*sizeof(GLfloat));
+            }
+            else
+            {
+                for (i=0; i<width*height*4; i++)
+                {
+                    accumBuffer[i] = *((GLfloat *)tmpBuffer + i) * value;
+                }
+            }
+        }
+        break;
+    case GL_ADD:
+        if (0.0f != value)
+        {
+            for (i=0; i<width*height*4; i++)
+            {
+                accumBuffer[i] = accumBuffer[i] + value;
+            }
+        }
+        break;
+    case GL_MULT:
+        for (i=0; i<width*height*4; i++)
+        {
+            accumBuffer[i] = accumBuffer[i] * value;
+            accumBuffer[i] = gcmCLAMP(accumBuffer[i], __glMinusOne, __glOne);
+        }
+        break;
+    default:
+        break;
+    }
 
-    /* Restore saved current states */
-    restoreAttributes(gc, chipCtx);
+    if (gcvNULL != tmpBuffer)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, tmpBuffer);
+        tmpBuffer = gcvNULL;
+    }
+
+    gcmFOOTER_NO();
+    gcmFOOTER_ARG("return=%s", "FALSE");
+    return GL_TRUE;
 }
 
 /************************************************************************/

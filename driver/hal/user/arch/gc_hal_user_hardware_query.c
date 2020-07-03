@@ -3346,6 +3346,49 @@ static struct _gcsSURF_FORMAT_INFO formatASTC[] =
     }
 };
 
+/* Format value range: 2000-2099
+ * Class: intensity formats (gcsFORMAT_CLASS_TYPE_INTENSITY)
+ * Component encoding: */
+static struct _gcsSURF_FORMAT_INFO formatIntensity[] =
+{
+    {
+        gcmNameFormat(I4), gcvFORMAT_CLASS_INTENSITY, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(4),
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
+        {{{ 0, 8 }, {0}, {0}, {0}, {0}, {0}}},
+        {{{ 0, 8 }, {0}, {0}, {0}, {0}, {0}}},
+        gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_I8, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+    {
+        gcmNameFormat(I8), gcvFORMAT_CLASS_INTENSITY, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(8),
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
+        {{{ 0, 8 }, {0}, {0}, {0}, {0}, {0}}},
+        {{{ 0, 8 }, {0}, {0}, {0}, {0}, {0}}},
+        gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_I8, 0x03, baseComponents_rgba, gcvTRUE
+    },
+
+    {
+        gcmNameFormat(I12), gcvFORMAT_CLASS_INTENSITY, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(12),
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
+        {{{ 0, 12 }, {0}, {0}, {0}, {0}, {0}}},
+        {{{ 0, 12 }, {0}, {0}, {0}, {0}, {0}}},
+        gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_I8, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+    {
+        gcmNameFormat(I16), gcvFORMAT_CLASS_INTENSITY, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(16),
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_WORD,
+        {{{ 0, 16 }, {0}, {0}, {0}, {0}, {0}}},
+        {{{ 0, 16 }, {0}, {0}, {0}, {0}, {0}}},
+        gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_I8, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+};
+
 /******************************************************************************\
 ********************************* Format Array *********************************
 \******************************************************************************/
@@ -3417,6 +3460,13 @@ static struct gcsFORMAT_ARRAY formatArray[] =
 
     /* 1800-1899 */
     { formatINT2, gcmCOUNTOF(formatINT2) },
+
+    /* 1900-1999 */
+    gcmDUMMY_FORMAT_ARRAY_ENTRY(),
+
+    /* 2000-2099 */
+    { formatIntensity, gcmCOUNTOF(formatIntensity) },
+
 };
 
 #define gcmGET_SURF_FORMAT_INFO(Format) \
