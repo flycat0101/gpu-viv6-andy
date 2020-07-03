@@ -3378,7 +3378,7 @@ gckKERNEL_Dispatch(
                 gctUINT i = 0;
                 context = gcmNAME_TO_PTR(Interface->u.Attach.context);
 
-                for (i = 0; i < gcdCONTEXT_BUFFER_NUM; ++i)
+                for (i = 0; i < gcdCONTEXT_BUFFER_COUNT; ++i)
                 {
                     gcsCONTEXT_PTR buffer = context->buffer;
 
@@ -3408,7 +3408,7 @@ gckKERNEL_Dispatch(
 #if gcdCAPTURE_ONLY_MODE
                     gctUINT i = 0;
 
-                    for (i = 0; i < gcdCONTEXT_BUFFER_NUM; ++i)
+                    for (i = 0; i < gcdCONTEXT_BUFFER_COUNT; ++i)
                     {
                         Interface->u.Attach.logicals[i] = gcmPTR_TO_UINT64(Interface->u.Attach.contextLogical[i]);
                     }

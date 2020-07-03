@@ -301,7 +301,7 @@ static pthread_mutex_t _dumpFileMutex = PTHREAD_MUTEX_INITIALIZER;
         } \
         while (0)
 #else
-#   define gcmGETTHREADID() (gctUINT32)pthread_self()
+#   define gcmGETTHREADID() (gctUINT32)(gctUINTPTR_T) pthread_self()
 
 #   define gcmOUTPUT_STRING(File, String) \
         fprintf((File == gcvNULL) ? stderr : File, "%s", String); \

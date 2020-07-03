@@ -81,7 +81,7 @@ char const * const GALDeviceName[] =
     (gctUINT32) gettid()
 #else
 #   define gcmGETTHREADID() \
-    (gctUINT32) pthread_self()
+    (gctUINT32)(gctUINTPTR_T) pthread_self()
 #endif
 
 /*******************************************************************************
@@ -6610,22 +6610,28 @@ gcoOS_AddSignalHandler (
     case gcvHANDLE_SIGFPE_WHEN_SIGNAL_CODE_IS_0:
         {
 #if gcdDEBUG
-                /* Handler will not be registered in debug mode*/
-                gcmTRACE(
+            /* Handler will not be registered in debug mode*/
+            gcmTRACE(
                     gcvLEVEL_INFO,
                     "%s(%d): Will not register signal handler for type gcvHANDLE_SIGFPE_WHEN_SIGNAL_CODE_IS_0 in debug mode",
                     __FUNCTION__, __LINE__
                     );
+            goto OnError;
 #else
             struct sigaction temp;
             struct sigaction sigact;
-            sigaction (SIGFPE, NULL, &temp);
+
+            if ((sigaction (SIGFPE, NULL, &temp)) != 0)
+                goto OnError;
+
             if (temp.sa_handler != (void *)_SignalHandlerForSIGFPEWhenSignalCodeIs0)
             {
                 sigact.sa_handler = (void *)_SignalHandlerForSIGFPEWhenSignalCodeIs0;
                 sigact.sa_flags = SA_RESTART | SA_SIGINFO;
                 sigemptyset(&sigact.sa_mask);
-                sigaction(SIGFPE, &sigact, (struct sigaction *)NULL);
+
+                if ((sigaction(SIGFPE, &sigact, (struct sigaction *)NULL)) != 0)
+                    goto OnError;
             }
 #endif
             break;
@@ -6644,6 +6650,11 @@ gcoOS_AddSignalHandler (
 
     }
     gcmFOOTER();
+    return status;
+
+OnError:
+    gcmFOOTER();
+    status = gcvSTATUS_NOT_SUPPORTED;
     return status;
 }
 

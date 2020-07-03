@@ -68,7 +68,11 @@ extern "C" {
 #endif
 
 /* The number of context buffers per user. */
-#define gcdCONTEXT_BUFFER_NUM 2
+#if gcdCAPTURE_ONLY_MODE
+#define gcdCONTEXT_BUFFER_COUNT 1
+#else
+#define gcdCONTEXT_BUFFER_COUNT 2
+#endif
 
 /******************************************************************************\
 ******************************* I/O Control Codes ******************************
