@@ -1828,6 +1828,10 @@ GLvoid GL_APIENTRY __gles_GenQueries(__GLcontext *gc, GLsizei n, GLuint *ids)
     }
 
     start = __glGenerateNames(gc, gc->query.noShare, n);
+    if (start < 0)
+    {
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
 
     for (i = 0; i < n; i++)
     {
@@ -2142,12 +2146,12 @@ GLboolean __glDeleteQueryObj(__GLcontext *gc, __GLqueryObject *queryObj)
 
     if (queryObj->label)
     {
-        gc->imports.free(gc, queryObj->label);
+        gcmOS_SAFE_FREE(gcvNULL, queryObj->label);
     }
 
     (*gc->dp.deleteQuery)(gc, queryObj);
 
-    (*gc->imports.free)(gc, queryObj);
+    gcmOS_SAFE_FREE(gcvNULL, queryObj);
 
     return GL_TRUE;
 }

@@ -829,12 +829,12 @@ __glChipDeleteBufferObject(
 
         if (bufInfo->cache)
         {
-            gc->imports.free(gc, bufInfo->cache);
+            gcmOS_SAFE_FREE(gcvNULL, bufInfo->cache);
             bufInfo->cache = gcvNULL;
         }
 #endif
 
-        gc->imports.free(gc, bufInfo);
+        gcmOS_SAFE_FREE(gcvNULL, bufInfo);
         bufObj->privateData = gcvNULL;
     } while (GL_FALSE);
 
@@ -1098,13 +1098,13 @@ __glChipBufferData(
         {
             if (resized && bufInfo->cache)
             {
-                gc->imports.free(gc, bufInfo->cache);
+                gcmOS_SAFE_FREE(gcvNULL, bufInfo->cache);
                 bufInfo->cache = gcvNULL;
             }
 
             if (newSize > 0 && !bufInfo->cache)
             {
-                bufInfo->cache = gc->imports.malloc(gc, newSize);
+                gcmONERROR(gcoOS_Allocate(gcvNULL, newSize, (gctPOINTER *)&bufInfo->cache));
             }
 
             if (data)

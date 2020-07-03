@@ -229,7 +229,7 @@ GLboolean __glDeleteRenderbufferObject(__GLcontext *gc, __GLrenderbufferObject *
 
     if (renderbuffer->label)
     {
-        gc->imports.free(gc, renderbuffer->label);
+        gcmOS_SAFE_FREE(gcvNULL, renderbuffer->label);
     }
 
     /* Notify Dp that this renderbuffer object is deleted.
@@ -240,7 +240,7 @@ GLboolean __glDeleteRenderbufferObject(__GLcontext *gc, __GLrenderbufferObject *
     __glFreeImageUserList(gc, &renderbuffer->fboList);
 
     /* Delete the renderbuffer object structure */
-    (*gc->imports.free)(gc, renderbuffer);
+    gcmOS_SAFE_FREE(gcvNULL, renderbuffer);
 
     return GL_TRUE;
 }
@@ -306,7 +306,7 @@ GLboolean __glDeleteFramebufferObject(__GLcontext *gc, __GLframebufferObject *fr
 
     if (framebuffer->label)
     {
-        gc->imports.free(gc, framebuffer->label);
+        gcmOS_SAFE_FREE(gcvNULL, framebuffer->label);
     }
 
     /* Remove fbo from image userlist of attaching image */
@@ -323,7 +323,7 @@ GLboolean __glDeleteFramebufferObject(__GLcontext *gc, __GLframebufferObject *fr
         __glFramebufferResetAttachIndex(gc, framebuffer, i, GL_TRUE);
     }
 
-    (*gc->imports.free)(gc, framebuffer);
+    gcmOS_SAFE_FREE(gcvNULL, framebuffer);
 
     return GL_TRUE;
 }
@@ -366,7 +366,10 @@ GLvoid __glBindRenderbuffer(__GLcontext *gc, GLenum target, GLuint renderbuffer)
 
         /* Mark the name "renderbuffer" used in the renderbuffer nameArray.
         */
-        __glMarkNameUsed(gc, gc->frameBuffer.rboShared, renderbuffer);
+        if (__glMarkNameUsed(gc, gc->frameBuffer.rboShared, renderbuffer) < 0)
+        {
+            __glDeleteObject(gc, gc->frameBuffer.rboShared, renderbuffer);
+        }
     }
 
     /* Release the previously bound obj for this target.
@@ -448,7 +451,11 @@ GLvoid __glBindFramebuffer(__GLcontext *gc, GLenum target, GLuint name)
             __glAddObject(gc, gc->frameBuffer.fboManager, name, fbo);
 
             /* Mark the name "frameBuffer" used in the frameBuffer nameArray. */
-            __glMarkNameUsed(gc, gc->frameBuffer.fboManager, name);
+            if (__glMarkNameUsed(gc, gc->frameBuffer.rboShared, name) < 0)
+            {
+                __glDeleteObject(gc, gc->frameBuffer.rboShared, name);
+                __GL_ERROR_RET(GL_OUT_OF_MEMORY);
+            }
         }
 
         switch (target)
@@ -1220,6 +1227,10 @@ GLvoid GL_APIENTRY __gles_GenRenderbuffers(__GLcontext *gc, GLsizei n, GLuint *r
     GL_ASSERT(gcvNULL != gc->frameBuffer.rboShared);
 
     start = __glGenerateNames(gc, gc->frameBuffer.rboShared, n);
+    if (start < 0)
+    {
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
 
     for (i = 0; i < n; i++)
     {
@@ -1407,6 +1418,10 @@ GLvoid GL_APIENTRY __gles_GenFramebuffers(__GLcontext *gc, GLsizei n, GLuint *fr
     GL_ASSERT(gcvNULL != gc->frameBuffer.fboManager);
 
     start = __glGenerateNames(gc, gc->frameBuffer.fboManager, n);
+    if (start < 0)
+    {
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
 
     for (i = 0; i < n; i++)
     {

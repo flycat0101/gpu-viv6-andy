@@ -1026,7 +1026,7 @@ GLboolean __glDestroyContext(GLvoid *context)
         return retVal;
     }
 
-    (*gc->imports.free)(gc, gc);
+    gcmOS_SAFE_FREE(gcvNULL, gc);
     gcoOS_SetDriverTLS(gcvTLS_KEY_OPENGL_ES, (gcsDRIVER_TLS_PTR)gcvNULL);
 
     return retVal;
@@ -1147,7 +1147,7 @@ GLvoid *__glCreateContext(GLint clientVersion, VEGLimports *imports, GLvoid* sha
 
     if((*__glDevice->devCreateContext)(gc) == GL_FALSE)
     {
-        (*imports->free)(gc, gc);
+        gcmOS_SAFE_FREE(gcvNULL, gc);
         gc = gcvNULL;
         __GL_ERROR_EXIT2();
     }
@@ -1182,7 +1182,7 @@ GLvoid *__glCreateContext(GLint clientVersion, VEGLimports *imports, GLvoid* sha
 OnError:
     if (gc)
     {
-        (*imports->free)(gc, gc);
+        gcmOS_SAFE_FREE(gcvNULL, gc);
         gc = gcvNULL;
     }
     __GL_FOOTER();

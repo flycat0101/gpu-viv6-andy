@@ -106,7 +106,11 @@ __GL_INLINE GLvoid __glBindBufferToGeneralPoint(__GLcontext *gc, GLuint targetIn
             __glAddObject(gc, gc->bufferObject.shared, buffer, newBufObj);
 
             /* Mark the name "buffer" used in the buffer object nameArray.*/
-            __glMarkNameUsed(gc, gc->bufferObject.shared, buffer);
+            if (__glMarkNameUsed(gc, gc->bufferObject.shared, buffer) < 0)
+            {
+                __glDeleteObject(gc, gc->bufferObject.shared, buffer);
+                __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+            }
         }
         else
         {
@@ -270,7 +274,11 @@ __GL_INLINE GLvoid __glBindBufferToXfb(__GLcontext *gc, GLuint buffer)
             __glAddObject(gc, gc->bufferObject.shared, buffer, newBufObj);
 
             /* Mark the name "buffer" used in the buffer object nameArray.*/
-            __glMarkNameUsed(gc, gc->bufferObject.shared, buffer);
+            if (__glMarkNameUsed(gc, gc->bufferObject.shared, buffer) < 0)
+            {
+                __glDeleteObject(gc, gc->bufferObject.shared, buffer);
+                __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+            }
         }
         else
         {
@@ -528,7 +536,7 @@ GLboolean __glDeleteBufferObject(__GLcontext *gc, __GLbufferObject *bufObj)
 
     if (bufObj->label)
     {
-        gc->imports.free(gc, bufObj->label);
+        gcmOS_SAFE_FREE(gcvNULL, bufObj->label);
     }
 
     /* Notify Dp that this buffer object is deleted.
@@ -543,7 +551,7 @@ GLboolean __glDeleteBufferObject(__GLcontext *gc, __GLbufferObject *bufObj)
     __glFreeImageUserList(gc, &bufObj->bindList);
 
     /* Delete the buffer object structure */
-    (*gc->imports.free)(gc, bufObj);
+    gcmOS_SAFE_FREE(gcvNULL, bufObj);
 
 OnExit:
     __GL_FOOTER();
@@ -637,7 +645,7 @@ GLvoid __glFreeBufferObjectState(__GLcontext *gc)
     {
         if (gc->bufferObject.bindingPoints[bufIdx])
         {
-            (*gc->imports.free)(gc, gc->bufferObject.bindingPoints[bufIdx]);
+            gcmOS_SAFE_FREE(gcvNULL, gc->bufferObject.bindingPoints[bufIdx]);
             gc->bufferObject.bindingPoints[bufIdx] = gcvNULL;
         }
     }
@@ -846,6 +854,12 @@ GLvoid GL_APIENTRY __gles_GenBuffers(__GLcontext *gc, GLsizei n, GLuint * buffer
     GL_ASSERT(gcvNULL != gc->bufferObject.shared);
 
     start = __glGenerateNames(gc, gc->bufferObject.shared, n);
+
+    if (start < 0)
+    {
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
+
     for (i = 0; i < n; i++)
     {
         buffers[i] = start + i;

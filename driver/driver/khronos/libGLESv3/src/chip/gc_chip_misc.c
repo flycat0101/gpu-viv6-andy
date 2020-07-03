@@ -253,7 +253,9 @@ __glChipGetQueryObject(
         !chipCtx->chipFeature.hwFeature.hasBugFixes18)
     {
         gctSIZE_T num = chipCtx->drawRTWidth * chipCtx->drawRTHeight;
-        GLubyte *pixels = (GLubyte*)gc->imports.malloc(gc, 4 * num);
+        GLubyte *pixels;
+        gcmONERROR(gcoOS_Allocate(gcvNULL, 4 * num, (gctPOINTER *)&pixels));
+
 
         __glEvaluateDrawableChange(gc, __GL_BUFFER_READ_BIT);
 
@@ -271,7 +273,7 @@ __glChipGetQueryObject(
             }
         }
 
-        gc->imports.free(gc, pixels);
+        gcmOS_SAFE_FREE(gcvNULL, pixels);
         queryObj->resultAvailable = GL_TRUE;
         gcmFOOTER_ARG("return=%d", GL_TRUE);
         return GL_TRUE;
@@ -324,7 +326,8 @@ __glChipGetQueryObject(
             queryObj->count != 0)
         {
             gctSIZE_T num = chipCtx->drawRTWidth * chipCtx->drawRTHeight;
-            GLubyte *pixels = (GLubyte*)gc->imports.malloc(gc, 4 * num);
+            GLubyte *pixels;
+            gcmONERROR(gcoOS_Allocate(gcvNULL, 4 * num, (gctPOINTER *)&pixels));
 
             __glEvaluateDrawableChange(gc, __GL_BUFFER_READ_BIT);
 
@@ -347,7 +350,7 @@ __glChipGetQueryObject(
                 }
             }
 
-            gc->imports.free(gc, pixels);
+            gcmOS_SAFE_FREE(gcvNULL, pixels);
         }
 
 #if gcdDUMP
@@ -408,11 +411,11 @@ __glChipDeleteQuery(
 
             gcmONERROR(gcsSURF_NODE_Destroy(&queryHeader->headerNode));
 
-            (*gc->imports.free)(gc, queryHeader);
+            gcmOS_SAFE_FREE(gcvNULL, queryHeader);
             chipQuery->queryHeader = gcvNULL;
         }
 
-        (*gc->imports.free)(gc, chipQuery);
+        gcmOS_SAFE_FREE(gcvNULL, chipQuery);
 
         queryObj->privateData = gcvNULL;
     }
@@ -671,7 +674,7 @@ __glChipDeleteXFB(
 
         gcmONERROR(gcsSURF_NODE_Destroy(&chipXfb->headerNode));
 
-        (*gc->imports.free)(gc, chipXfb);
+        gcmOS_SAFE_FREE(gcvNULL, chipXfb);
         xfbObj->privateData = gcvNULL;
     }
 
