@@ -10828,7 +10828,7 @@ VIR_Shader_AnalysisCstRegReadPort(
             /* Update the working set. */
             for (i = 0; i < srcUniformCount; i++)
             {
-                gctUINT             usedInstCount = 0;
+                gctSIZE_T           usedInstCount = 0;
                 VIR_Symbol*         pUniformSymbol1 = gcvNULL;
                 VIR_Symbol*         pUniformSymbol2 = gcvNULL;
                 VSC_HASH_TABLE*     pUniformVecSet1 = gcvNULL;
