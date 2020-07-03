@@ -14,24 +14,52 @@
 #ifndef _gl_image_h_
 #define _gl_image_h_
 
-EXTERN_C GLint __glImageSize(GLsizei width, GLsizei height, GLenum format,
+#ifdef __cplusplus
+extern "C" {
+
+GLint __glImageSize(GLsizei width, GLsizei height, GLenum format,
                GLenum type);
 
-EXTERN_C GLint __glImageSize3D(GLsizei width, GLsizei height, GLsizei depth,
+GLint __glImageSize3D(GLsizei width, GLsizei height, GLsizei depth,
                  GLenum format, GLenum type);
 
-EXTERN_C GLvoid __glFillImage(__GLcontext *gc, GLsizei width, GLsizei height,
+GLvoid __glFillImage(__GLcontext *gc, GLsizei width, GLsizei height,
               GLenum format, GLenum type, const GLvoid *userdata,
               GLubyte *newimage);
 
-EXTERN_C GLvoid __glFillImage3D(__GLcontext *gc, GLsizei width, GLsizei height,
+GLvoid __glFillImage3D(__GLcontext *gc, GLsizei width, GLsizei height,
                 GLsizei depth, GLenum format, GLenum type,
                 const GLvoid *userdata, GLubyte *newimage);
 
-EXTERN_C GLvoid __glEmptyImage(__GLcontext *gc, GLsizei width, GLsizei height,
+GLvoid __glEmptyImage(__GLcontext *gc, GLsizei width, GLsizei height,
                GLenum format, GLenum type, const GLubyte *oldimage,
                GLvoid *userdata);
 
-EXTERN_C GLubyte __glMsbToLsbTable[256];
+GLubyte __glMsbToLsbTable[256];
+
+}
+#else
+
+extern GLint __glImageSize(GLsizei width, GLsizei height, GLenum format,
+               GLenum type);
+
+extern GLint __glImageSize3D(GLsizei width, GLsizei height, GLsizei depth,
+                 GLenum format, GLenum type);
+
+extern GLvoid __glFillImage(__GLcontext *gc, GLsizei width, GLsizei height,
+              GLenum format, GLenum type, const GLvoid *userdata,
+              GLubyte *newimage);
+
+extern GLvoid __glFillImage3D(__GLcontext *gc, GLsizei width, GLsizei height,
+                GLsizei depth, GLenum format, GLenum type,
+                const GLvoid *userdata, GLubyte *newimage);
+
+extern GLvoid __glEmptyImage(__GLcontext *gc, GLsizei width, GLsizei height,
+               GLenum format, GLenum type, const GLubyte *oldimage,
+               GLvoid *userdata);
+
+extern GLubyte __glMsbToLsbTable[256];
+
+#endif
 
 #endif /* __gc_gl_image_h_ */

@@ -376,7 +376,7 @@ GLvoid vivGetLock( __GLcontext *gc, GLuint flags )
     drm_vvt_sarea_t *sarea = pDriMirror->vvtSarea;
     __GLdrawablePrivate *glPriv;
     drm_clip_rect_t *drmClipRects;
-    RECT *pClipRects;
+    __GLrect *pClipRects;
     GLuint changeMask = 0;
     GLint x, y, w, h, i;
     vvtDeviceInfo *pDeviceInfo = sPriv->pDevPriv;
@@ -454,7 +454,7 @@ GLvoid vivGetLock( __GLcontext *gc, GLuint flags )
         /* Check the size of clipRects buffer in __GLdrawablePrivate */
         if (glPriv->numClipRects > 16) {
             (*imports.free)(0, glPriv->clipRects);
-            glPriv->clipRects = (GLuint *)(*imports.malloc)(0, glPriv->numClipRects * sizeof(RECT));
+            glPriv->clipRects = (GLuint *)(*imports.malloc)(0, glPriv->numClipRects * sizeof(__GLrect));
         }
     }
 
@@ -464,7 +464,7 @@ GLvoid vivGetLock( __GLcontext *gc, GLuint flags )
 
     /* Check the size of each clipRect */
     drmClipRects = dPriv->pClipRects;
-    pClipRects = (RECT *)glPriv->clipRects;
+    pClipRects = (__GLrect *)glPriv->clipRects;
     for (i = 0; i < dPriv->numClipRects; i++, drmClipRects++, pClipRects++) {
         if (drmClipRects->x1 != pClipRects->left || drmClipRects->x2 != pClipRects->right ||
             drmClipRects->y1 != pClipRects->top || drmClipRects->y2 != pClipRects->bottom) {
@@ -1020,7 +1020,7 @@ vivCreateDrawable( __DRIscreenPrivate *driScrnPriv,
     glPriv->clearSwapHintRectWIN = NULL;
 
     /* Allocate buffer for clipRects */
-    glPriv->clipRects = (GLuint *)(*imports.malloc)(0, 16 * sizeof(RECT));
+    glPriv->clipRects = (GLuint *)(*imports.malloc)(0, 16 * sizeof(__GLrect));
 
     {
         glPriv->yInverted = GL_FALSE;

@@ -74,7 +74,7 @@ typedef struct __GLlockRec {
 #else
 #define WNT_TEB_PTR                     0xBF0
 #define WNT_TEB_TLS_OFFSET              0xE10
-#define WNT_TLS_INDEX_TO_OFFSET(i)      ((i)*sizeof(DWORD)+WNT_TEB_TLS_OFFSET)
+#define WNT_TLS_INDEX_TO_OFFSET(i)      ((i)*sizeof(GLuint)+WNT_TEB_TLS_OFFSET)
 #endif
 
 extern unsigned long __wglTLSCXIndex;
@@ -96,21 +96,21 @@ extern unsigned long __wglTLSOffset;
 #elif defined (_X86_)
 
 #define __GL_GET_TLSCX_VALUE()                    \
-        __asm mov eax, DWORD PTR fs:[WNT_TEB_PTR]
+        __asm mov eax, fs:[WNT_TEB_PTR]
 #define __GL_SET_TLSCX_VALUE(val)                 \
-        __asm mov ecx, DWORD PTR (val)            \
-        __asm mov DWORD PTR fs:[WNT_TEB_PTR], ecx
+        __asm mov ecx, (val)            \
+        __asm mov fs:[WNT_TEB_PTR], ecx
 
 
 #define __GL_GET_TLS_VALUE()                      \
-        __asm mov eax, DWORD PTR fs:[WNT_TEB_PTR] \
-        __asm mov esi, DWORD PTR __wglTLSOffset   \
-        __asm mov eax, DWORD PTR [esi+eax]
+        __asm mov eax, fs:[WNT_TEB_PTR] \
+        __asm mov esi, __wglTLSOffset   \
+        __asm mov eax, [esi+eax]
 #define __GL_SET_TLS_VALUE(val)                   \
-        __asm mov eax, DWORD PTR fs:[WNT_TEB_PTR] \
-        __asm mov esi, DWORD PTR __wglTLSOffset   \
-        __asm mov ecx, DWORD PTR (val)            \
-        __asm mov DWORD PTR [esi+eax], ecx
+        __asm mov eax, fs:[WNT_TEB_PTR] \
+        __asm mov esi, __wglTLSOffset   \
+        __asm mov ecx, (val)            \
+        __asm mov [esi+eax], ecx
 #endif /* defined(_M_AMD64) */
 
 #if defined(_WIN32)

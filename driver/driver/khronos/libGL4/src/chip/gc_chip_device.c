@@ -64,7 +64,7 @@ static glsCONFIGACCUM configAccum[] =
     {32, 8, 8, 8,8},
 };
 
-static DWORD configFlags[] =
+static GLuint configFlags[] =
 {
     PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW | PFD_SUPPORT_COMPOSITION,
     PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER | PFD_SUPPORT_COMPOSITION | PFD_SWAP_COPY,
