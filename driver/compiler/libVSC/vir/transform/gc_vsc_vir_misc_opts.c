@@ -5422,6 +5422,7 @@ vscVIR_ConvertVirtualInstructions(
     VIR_Shader          *pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
     VIR_FuncIterator    funcIter;
     VIR_FunctionNode    *funcNode;
+    gctBOOL             codeChange = gcvFALSE;
 
     if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
@@ -5542,6 +5543,7 @@ vscVIR_ConvertVirtualInstructions(
                         samplerSrc->u.n.u2.vlInfo._isSymLocal = parentSrc->u.n.u2.vlInfo._isSymLocal;
                         samplerSrc->u.n.u2.vlInfo._relAddrLevel = parentSrc->u.n.u2.vlInfo._relAddrLevel;
                     }
+                    codeChange = gcvTRUE;
                     break;
                 }
 
@@ -5634,6 +5636,7 @@ vscVIR_ConvertVirtualInstructions(
                         VIR_Operand_SetIsSymLocal(samplerOrImageSrc, VIR_Operand_isSymLocal(parentSrc));
                         VIR_Operand_SetRelAddrLevel(samplerOrImageSrc, VIR_Operand_GetRelAddrLevel(parentSrc));
                     }
+                    codeChange = gcvTRUE;
                     break;
                 }
 
@@ -5726,6 +5729,7 @@ vscVIR_ConvertVirtualInstructions(
                         VIR_Operand_SetIsSymLocal(samplerOrImageSrc, VIR_Operand_isSymLocal(parentSrc));
                         VIR_Operand_SetRelAddrLevel(samplerOrImageSrc, VIR_Operand_GetRelAddrLevel(parentSrc));
                     }
+                    codeChange = gcvTRUE;
                     break;
                 }
                 default:
@@ -5733,8 +5737,13 @@ vscVIR_ConvertVirtualInstructions(
             }
         }
     }
-
-    if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    if (codeChange)
+    {
+        /*invalid DU*/
+        pPassWorker->pResDestroyReq->s.bInvalidateDu = gcvTRUE;
+        pPassWorker->pResDestroyReq->s.bInvalidateRdFlow = gcvTRUE;
+    }
+    if (codeChange && VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
         VIR_Shader_Dump(gcvNULL, "After Convert Virtual Instructions.", pShader, gcvTRUE);
     }
@@ -8170,6 +8179,9 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
     if (bChanged)
     {
         WARNING_REPORT(VSC_ERR_INVALID_DATA, "Get some uninitialized variables, please double check!!!");
+        /*invalid DU*/
+        pPassWorker->pResDestroyReq->s.bInvalidateDu = gcvTRUE;
+        pPassWorker->pResDestroyReq->s.bInvalidateRdFlow = gcvTRUE;
     }
 
     if (bChanged &&
@@ -14129,7 +14141,8 @@ _vscVIR_DetectBarrierWithinForwardJmp(
 
         /* Delete the NOP instruction. */
         errCode = VIR_Function_DeleteInstruction(pFunc,
-                                                 BB_GET_END_INST(pNewBB));
+                                                 BB_GET_END_INST(pNewBB),
+                                                 gcvTRUE);
         ON_ERROR(errCode, "Delete a instruction");
 
         /* Update the edges. */

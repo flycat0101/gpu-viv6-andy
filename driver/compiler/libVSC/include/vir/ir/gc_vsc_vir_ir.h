@@ -7033,7 +7033,8 @@ VIR_Function_RemoveInstruction(
 VSC_ErrCode
 VIR_Function_DeleteInstruction(
     IN VIR_Function *     Function,
-    IN VIR_Instruction *  Inst
+    IN VIR_Instruction *  Inst,
+    IN gctBOOL            FreeLabel
     );
 
 VSC_ErrCode

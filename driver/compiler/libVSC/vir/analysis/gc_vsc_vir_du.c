@@ -5933,7 +5933,7 @@ vscVIR_DeleteInstructionWithDu(
         ON_ERROR(errCode, "Failed in CleanDuForInstruction.");
     }
 
-    VIR_Function_DeleteInstruction(pFunction, pInst);
+    VIR_Function_DeleteInstruction(pFunction, pInst, gcvTRUE);
 
     /* If there is no instruction within one BB, we need to rebuild CFG. */
     if (pInvalidCFG && pBB && BB_GET_LENGTH(pBB) == 0)

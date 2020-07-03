@@ -12648,11 +12648,12 @@ VIR_Function_RemoveInstruction(
 VSC_ErrCode
 VIR_Function_DeleteInstruction(
     IN VIR_Function *     Function,
-    IN VIR_Instruction *  Inst
+    IN VIR_Instruction *  Inst,
+    IN gctBOOL            FreeLabel
     )
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
-    errCode = VIR_Function_RemoveInstruction(Function, Inst, gcvTRUE);
+    errCode = VIR_Function_RemoveInstruction(Function, Inst, FreeLabel);
 
     /* free operands */
     if (errCode == VSC_ERR_NONE)

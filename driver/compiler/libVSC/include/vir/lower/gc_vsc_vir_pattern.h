@@ -199,6 +199,11 @@ typedef enum _VIR_PATN_FLAG
     */
     VIR_PATN_FLAG_ALREADY_MATCHED_AND_REPLACED      = 0x4000,
 
+   /*
+    ** Don't generate label for a label instruction
+    */
+    VIR_PATN_FLAG_NO_REPLACE_LABEL                  = 0x8000,
+
 } VIR_PatnFlag;
 
 typedef struct _VIR_PATTERN

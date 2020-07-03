@@ -10851,6 +10851,37 @@ _NonScalarOperandOnNECond(
     return gcvFALSE;
 }
 
+static gctBOOL
+_rmJmpInstToLabel(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Instruction *jmpInst = VIR_Inst_GetNext(Inst);
+    VIR_Instruction *labelInst = VIR_Inst_GetNext(jmpInst);
+    if(VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(jmpInst)))
+    {
+        VIR_Operand* dest = VIR_Inst_GetDest(jmpInst);
+        VIR_Label* label = VIR_Operand_GetLabel(dest);
+
+        if (label)
+        {
+            VIR_Link* link = VIR_Link_RemoveLink(VIR_Label_GetReferenceAddr(label), (gctUINTPTR_T)jmpInst);
+
+            if (link)
+            {
+                VIR_Function *function = VIR_Inst_GetFunction(jmpInst);
+                VIR_Function_FreeLink(function, link);
+            }
+            label->defined = Inst;
+        }
+        Inst->sourceLoc = labelInst->sourceLoc;
+        return gcvTRUE;
+    }
+    return gcvFALSE;
+}
+
 /*
 jmp 1, 2, 3,
     jmp_any 1, 2, 3
@@ -10866,6 +10897,20 @@ static VIR_PatternReplaceInst _jmpcRepInst0[] = {
 
 static VIR_Pattern _jmpcPattern[] = {
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_jmpc, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+static VIR_PatternMatchInst _jmpPatInst0[] = {
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 1, 0, 0, 0 }, { VIR_Lower_jmp_2_succ1 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 2, 0, 0, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _jmpRepInst0[] = {
+    { VIR_OP_LABEL, -1, 0, { 2, 0, 0, 0 }, { _rmJmpInstToLabel } },
+};
+
+static VIR_Pattern _jmpPattern[] = {
+    { VIR_PATN_FLAG_NO_REPLACE_LABEL, CODEPATTERN(_jmp, 0) },
     { VIR_PATN_FLAG_NONE }
 };
 
@@ -10968,6 +11013,8 @@ _GetgcSL2VirPatterns(
         return _imgSamplerPattern;
     case VIR_OP_JMPC:
         return _jmpcPattern;
+    case VIR_OP_JMP:
+        return _jmpPattern;
     case VIR_OP_CMAD:
         return _cmadPattern;
     case VIR_OP_CMADCJ:
