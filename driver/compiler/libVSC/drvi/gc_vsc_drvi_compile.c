@@ -50,17 +50,19 @@ gceSTATUS vscCreatePrivateData(VSC_CORE_SYS_CONTEXT* pCoreSysCtx, VSC_PRIV_DATA_
 {
     VSC_PRIV_DATA*        pPrivData;
     VSC_PRIV_DATA_HANDLE  hPrivData;
+    gceSTATUS             status = gcvSTATUS_OK;
 
     gcmASSERT(pCoreSysCtx);
 
-    gcoOS_Allocate(gcvNULL, sizeof(VSC_PRIV_DATA), &hPrivData);
+    gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(VSC_PRIV_DATA), &hPrivData));
 
     pPrivData = (VSC_PRIV_DATA*)hPrivData;
     gcoOS_ZeroMemory(pPrivData, sizeof(VSC_PRIV_DATA));
 
     *phOutPrivData = hPrivData;
 
-    return gcvSTATUS_OK;
+OnError:
+    return status;
 }
 
 gceSTATUS vscDestroyPrivateData(VSC_CORE_SYS_CONTEXT* pCoreSysCtx, VSC_PRIV_DATA_HANDLE hPrivData)

@@ -12331,7 +12331,7 @@ _AddImageSizeUniform(
     gcmASSERT(isUniformImage(Uniform));
 
     length = gcoOS_StrLen(Uniform->name, gcvNULL) + 15;
-    gcoOS_Allocate(gcvNULL, length, &pointer);
+    gcmONERROR(gcoOS_Allocate(gcvNULL, length, &pointer));
     gcoOS_ZeroMemory(pointer, length);
     sizeUniformName = pointer;
 
@@ -12373,6 +12373,7 @@ _AddImageSizeUniform(
         }
     }
 
+OnError:
     if (pointer != gcvNULL)
     {
         gcmOS_SAFE_FREE(gcvNULL, pointer);
@@ -12545,7 +12546,7 @@ _LinkImageLibFuc(
                     if (!isUniformImageBuffer(uniform))
                     {
                         length += 3;
-                        gcoOS_Allocate(gcvNULL, length, &pointer);
+                        gcmONERROR(gcoOS_Allocate(gcvNULL, length, &pointer));
                         gcoOS_ZeroMemory(pointer, length);
                         formatLibName = pointer;
 
@@ -12560,7 +12561,7 @@ _LinkImageLibFuc(
 
                 default:
                     length += 1;
-                    gcoOS_Allocate(gcvNULL, length, &pointer);
+                    gcmONERROR(gcoOS_Allocate(gcvNULL, length, &pointer));
                     gcoOS_ZeroMemory(pointer, length);
                     formatLibName = pointer;
 
@@ -12578,7 +12579,7 @@ _LinkImageLibFuc(
                 {
                 case gcIMAGE_FORMAT_RGBA32F:
                     length += 9;
-                    gcoOS_Allocate(gcvNULL, length, &pointer);
+                    gcmONERROR(gcoOS_Allocate(gcvNULL, length, &pointer));
                     gcoOS_ZeroMemory(pointer, length);
                     formatLibName = pointer;
 
@@ -12594,7 +12595,7 @@ _LinkImageLibFuc(
                 case gcIMAGE_FORMAT_RGBA16I:
                 case gcIMAGE_FORMAT_RGBA16UI:
                     length += 1;
-                    gcoOS_Allocate(gcvNULL, length, &pointer);
+                    gcmONERROR(gcoOS_Allocate(gcvNULL, length, &pointer));
                     gcoOS_ZeroMemory(pointer, length);
                     formatLibName = pointer;
 
@@ -12606,7 +12607,7 @@ _LinkImageLibFuc(
                     break;
                 case gcIMAGE_FORMAT_R32F:
                     length += 6;
-                    gcoOS_Allocate(gcvNULL, length, &pointer);
+                    gcmONERROR(gcoOS_Allocate(gcvNULL, length, &pointer));
                     gcoOS_ZeroMemory(pointer, length);
                     formatLibName = pointer;
 
@@ -12618,7 +12619,7 @@ _LinkImageLibFuc(
                     break;
                 case gcIMAGE_FORMAT_RGBA8:
                     length += 7;
-                    gcoOS_Allocate(gcvNULL, length, &pointer);
+                    gcmONERROR(gcoOS_Allocate(gcvNULL, length, &pointer));
                     gcoOS_ZeroMemory(pointer, length);
                     formatLibName = pointer;
 
@@ -12630,7 +12631,7 @@ _LinkImageLibFuc(
                     break;
                 case gcIMAGE_FORMAT_RGBA8_SNORM:
                     length += 13;
-                    gcoOS_Allocate(gcvNULL, length, &pointer);
+                    gcmONERROR(gcoOS_Allocate(gcvNULL, length, &pointer));
                     gcoOS_ZeroMemory(pointer, length);
                     formatLibName = pointer;
 
@@ -12642,7 +12643,7 @@ _LinkImageLibFuc(
                     break;
                 case gcIMAGE_FORMAT_RGBA32I:
                     length += 9;
-                    gcoOS_Allocate(gcvNULL, length, &pointer);
+                    gcmONERROR(gcoOS_Allocate(gcvNULL, length, &pointer));
                     gcoOS_ZeroMemory(pointer, length);
                     formatLibName = pointer;
 
@@ -12655,7 +12656,7 @@ _LinkImageLibFuc(
                     break;
                 case gcIMAGE_FORMAT_RGBA8I:
                     length += 8;
-                    gcoOS_Allocate(gcvNULL, length, &pointer);
+                    gcmONERROR(gcoOS_Allocate(gcvNULL, length, &pointer));
                     gcoOS_ZeroMemory(pointer, length);
                     formatLibName = pointer;
 
@@ -12667,7 +12668,7 @@ _LinkImageLibFuc(
                     break;
                 case gcIMAGE_FORMAT_R32I:
                     length += 6;
-                    gcoOS_Allocate(gcvNULL, length, &pointer);
+                    gcmONERROR(gcoOS_Allocate(gcvNULL, length, &pointer));
                     gcoOS_ZeroMemory(pointer, length);
                     formatLibName = pointer;
 
@@ -12679,7 +12680,7 @@ _LinkImageLibFuc(
                     break;
                 case gcIMAGE_FORMAT_RGBA32UI:
                     length += 10;
-                    gcoOS_Allocate(gcvNULL, length, &pointer);
+                    gcmONERROR(gcoOS_Allocate(gcvNULL, length, &pointer));
                     gcoOS_ZeroMemory(pointer, length);
                     formatLibName = pointer;
 
@@ -12692,7 +12693,7 @@ _LinkImageLibFuc(
                     break;
                 case gcIMAGE_FORMAT_RGBA8UI:
                     length += 9;
-                    gcoOS_Allocate(gcvNULL, length, &pointer);
+                    gcmONERROR(gcoOS_Allocate(gcvNULL, length, &pointer));
                     gcoOS_ZeroMemory(pointer, length);
                     formatLibName = pointer;
 
@@ -12704,7 +12705,7 @@ _LinkImageLibFuc(
                     break;
                 case gcIMAGE_FORMAT_R32UI:
                     length += 7;
-                    gcoOS_Allocate(gcvNULL, length, &pointer);
+                    gcmONERROR(gcoOS_Allocate(gcvNULL, length, &pointer));
                     gcoOS_ZeroMemory(pointer, length);
                     formatLibName = pointer;
 
@@ -12716,7 +12717,7 @@ _LinkImageLibFuc(
                     break;
                 default:
                     length += 1;
-                    gcoOS_Allocate(gcvNULL, length, &pointer);
+                    gcmONERROR(gcoOS_Allocate(gcvNULL, length, &pointer));
                     gcoOS_ZeroMemory(pointer, length);
                     formatLibName = pointer;
 

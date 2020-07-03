@@ -99,12 +99,13 @@ _convertShaderType(
 
 #define DUMP_BUFFER_SIZE    512
 
-static void
+static gceSTATUS
 _DumpShaderSource(
     IN gcSHADER Shader,
     IN gctCONST_STRING Source
     )
 {
+    gceSTATUS status = gcvSTATUS_OK;
     if (gcSHADER_DumpSource(Shader))
     {
         gctCHAR *buffer;
@@ -114,7 +115,7 @@ _DumpShaderSource(
                     gcmShaderName(_convertShaderType(Shader->type)), Shader->_id,
                     (Source != Shader->source) ? "(replaced)" : "");
 
-        gcoOS_Allocate(gcvNULL, DUMP_BUFFER_SIZE, (gctPOINTER *)&buffer) ;
+        gcmONERROR(gcoOS_Allocate(gcvNULL, DUMP_BUFFER_SIZE, (gctPOINTER *)&buffer)) ;
 
         for (n = 0; n < Shader->sourceLength ; ++n)
         {
@@ -146,6 +147,8 @@ _DumpShaderSource(
 
         gcoOS_Free(gcvNULL, buffer);
     }
+OnError:
+    return status;
 }
 
 #if gcdUSE_PRECOMPILED_SHADERS
@@ -450,7 +453,7 @@ gcCompileShader(
 
     _ReplaceShaderSource(&shader_);
 
-    _DumpShaderSource(&shader_, Source);
+    gcmONERROR(_DumpShaderSource(&shader_, Source));
 
     if(ShaderType == gcSHADER_TYPE_PRECOMPILED)
     {

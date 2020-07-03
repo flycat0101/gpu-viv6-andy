@@ -2071,7 +2071,9 @@ _AddUniform(
         length = gcoOS_StrLen(Name, gcvNULL);
         length += 21;
 
-        gcoOS_Allocate(gcvNULL, length, &pointer);
+        status = gcoOS_Allocate(gcvNULL, length, &pointer);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
         gcoOS_ZeroMemory(pointer, length);
         symbol = pointer;
 

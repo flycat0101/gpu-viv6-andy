@@ -848,7 +848,7 @@ gcsCODE_GENERATOR_GetIP(
     return CodeGen->current->ip;
 }
 
-static void
+static gceSTATUS
 _DumpShader(
             IN gctUINT32_PTR States,
             IN gctUINT32 StateBufferOffset,
@@ -858,6 +858,7 @@ _DumpShader(
             IN gctBOOL IsDual16Shader
             )
 {
+    gceSTATUS status = gcvSTATUS_OK;
     gctUINTPTR_T lastState;
     gctUINT32 address, count, nextAddress;
     gctUINT       dumpBufferSize = 1024;
@@ -865,7 +866,7 @@ _DumpShader(
     VSC_DUMPER    vscDumper;
     VSC_MC_CODEC  mcCodec;
 
-    gcoOS_Allocate(gcvNULL, dumpBufferSize, (gctPOINTER*)&pDumpBuffer);
+    gcmONERROR(gcoOS_Allocate(gcvNULL, dumpBufferSize, (gctPOINTER*)&pDumpBuffer));
 
     vscDumper_Initialize(&vscDumper,
                          gcvNULL,
@@ -922,8 +923,10 @@ _DumpShader(
     }
 
     /* Release dumper buffer */
+OnError:
     gcoOS_Free(gcvNULL, pDumpBuffer);
     vscMC_EndCodec(&mcCodec);
+    return status;
 }
 
 static void
@@ -23355,8 +23358,8 @@ _GenerateStates(
     if (dumpCodeGen && CodeGen->lastStateCommand != gcvNULL && !CodeGen->useICache)
     {
         _DumpUniforms(CodeGen, StateBuffer, CodeGen->stateBufferOffset);
-        _DumpShader(StateBuffer, CodeGen->stateBufferOffset,
-                    CodeGen->hasInteger, instrBase, maxNumInstrStates, CodeGen->isDual16Shader);
+        gcmONERROR(_DumpShader(StateBuffer, CodeGen->stateBufferOffset,
+                    CodeGen->hasInteger, instrBase, maxNumInstrStates, CodeGen->isDual16Shader));
     }
 
     if ((CodeGen->lastStateCommand != gcvNULL) && (numInstrStates > maxNumInstrStates) && (!CodeGen->useICache))

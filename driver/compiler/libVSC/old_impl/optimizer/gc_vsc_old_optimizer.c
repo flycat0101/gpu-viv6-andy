@@ -10587,7 +10587,7 @@ gcSHADER_PackRegister(
     gctSIZE_T i;
     gctSIZE_T j;
     gctSIZE_T k;
-
+    gceSTATUS status = gcvSTATUS_OK;
     gctUINT32 regIndex = 0;
     gctUINT regCount = 0;   /*Register count that actually used.*/
     gctUINT maxCodeCount = 0;
@@ -10627,23 +10627,23 @@ gcSHADER_PackRegister(
         /*Allocate memory to array and set value to zero.*/
         if (maxCodeCount > 0)
         {
-            gcoOS_Allocate(gcvNULL, sizeof(gctINT8) * maxCodeCount, (gctPOINTER *)&codeUsageList);
+            gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(gctINT8) * maxCodeCount, (gctPOINTER *)&codeUsageList));
             gcoOS_ZeroMemory((gctPOINTER)codeUsageList, sizeof(gctINT8) * maxCodeCount);
         }
 
         if (maxFuncCount > 0)
         {
-            gcoOS_Allocate(gcvNULL, sizeof(gctINT8) * maxFuncCount, (gctPOINTER *)&funcUsageList);
+            gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(gctINT8) * maxFuncCount, (gctPOINTER *)&funcUsageList));
             gcoOS_ZeroMemory((gctPOINTER)funcUsageList, sizeof(gctINT8) * maxFuncCount);
         }
         if (maxVarCount > 0)
         {
-            gcoOS_Allocate(gcvNULL, sizeof(gctINT8) * maxVarCount, (gctPOINTER *)&varUsageList);
+            gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(gctINT8) * maxVarCount, (gctPOINTER *)&varUsageList));
             gcoOS_ZeroMemory((gctPOINTER)varUsageList, sizeof(gctINT8) * maxVarCount);
         }
         if (maxRegCount > 0)
         {
-            gcoOS_Allocate(gcvNULL, sizeof(struct regMap) * (maxRegCount + 1), (gctPOINTER *)&regMapList);
+            gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(struct regMap) * (maxRegCount + 1), (gctPOINTER *)&regMapList));
             gcoOS_ZeroMemory((gctPOINTER)regMapList, sizeof(struct regMap) * (maxRegCount + 1));
         }
     }
@@ -11321,6 +11321,7 @@ gcSHADER_PackRegister(
     /********************************************************************************************
         Free pointers
     *********************************************************************************************/
+OnError:
     if (regMapList != gcvNULL)
     {
         gcoOS_Free(gcvNULL, (gctPOINTER)regMapList);
@@ -11342,7 +11343,7 @@ gcSHADER_PackRegister(
     {
         gcDump_Shader(gcvNULL, "After pack resgister shader IR.", gcvNULL, Shader, gcvTRUE);
     }
-    return gcvSTATUS_OK;
+    return status;
 
 }
 
