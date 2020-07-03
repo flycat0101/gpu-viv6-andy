@@ -7082,7 +7082,7 @@ VIR_Inst_GetExpectedResultPrecision(
     IN VIR_Instruction  *Inst
     );
 
-void
+VSC_ErrCode
 VIR_Inst_InitMcInsts(
     IN VIR_Instruction  *Inst,
     IN VIR_Shader       *Shader,

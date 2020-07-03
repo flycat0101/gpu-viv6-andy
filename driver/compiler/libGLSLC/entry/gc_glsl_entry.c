@@ -534,6 +534,8 @@ OnError:
         {
             gctSTRING log = gcvNULL;
             gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, 2048, (gctPOINTER *)&log));
+            if(log == gcvNULL)
+                return gcvSTATUS_OUT_OF_MEMORY;
             gcoOS_StrCopySafe(log, 2047, *Log);
             log[2047] = '\0';
             gcoOS_Print("%s", log);

@@ -2318,6 +2318,9 @@ sloCOMPILER_Allocate(
 
 #if __USE_VSC_MP__
     pointer = vscMM_Alloc(&Compiler->currentPMP->mmWrapper, (gctUINT)Bytes);
+    if (!pointer) {
+        status = gcvSTATUS_OUT_OF_MEMORY;
+    }
 #else
     status = gcoOS_Allocate(gcvNULL,
                             Bytes + sizeof(slsDLINK_NODE),

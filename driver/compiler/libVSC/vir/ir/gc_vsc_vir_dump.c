@@ -3601,17 +3601,19 @@ void dbg_dumpVFunc(IN VIR_Function     *Func)
     return;
 }
 
-void dbg_dumpMCode(
+VSC_ErrCode dbg_dumpMCode(
     IN void *  Mcode,
     IN gctBOOL IsDual16Shader
     )
 {
+    VSC_ErrCode   errCode = VSC_ERR_NONE;
+    gceSTATUS     status = gcvSTATUS_OK;
     gctUINT       dumpBufferSize = 1024;
     gctCHAR*      pDumpBuffer;
     VSC_DUMPER    vscDumper;
     VSC_MC_CODEC  mcCodec;
 
-    gcoOS_Allocate(gcvNULL, dumpBufferSize, (gctPOINTER*)&pDumpBuffer);
+    status = gcoOS_Allocate(gcvNULL, dumpBufferSize, (gctPOINTER*)&pDumpBuffer);
 
     vscDumper_Initialize(&vscDumper,
                          gcvNULL,
@@ -3622,7 +3624,9 @@ void dbg_dumpMCode(
     vscMC_BeginCodec(&mcCodec, &gcHWCaps, IsDual16Shader, gcvFALSE);
     vscMC_DumpInst(&mcCodec, (VSC_MC_RAW_INST*)Mcode, 0, &vscDumper);
 
-    return;
+    if(status != gcvSTATUS_OK)
+        errCode = vscERR_CastGcStatus2ErrCode(status);
+    return errCode;
 }
 
 gctINT vscDumpOption =

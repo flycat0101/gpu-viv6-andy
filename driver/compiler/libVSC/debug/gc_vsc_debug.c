@@ -1174,14 +1174,10 @@ void vscDIDumpDIE(VSC_DIContext * context, gctUINT16 id, gctUINT shift, gctUINT 
                              gcmIS_SUCCESS(gcoOS_StrCmp(typeName, "union "))))
                         {
                             gctSTRING dieName = _GetNameStr(context,die->name);
-                            char * tempstr;
-                            gctPOINTER memory;
-                            gcoOS_AllocateMemory(NULL, 1024*sizeof(char), &memory);
-                            tempstr = (char*)memory;
+                            char tempstr[1024];
                             gcoOS_StrCopySafe(tempstr, 1024, typeName);
                             gcoOS_StrCatSafe(tempstr, 1024, dieName);
                             _SetNameStr(context, typeDie->name, tempstr);
-                            gcoOS_Free(gcvNULL, tempstr);
                         }
                     }
                 }
@@ -2760,30 +2756,21 @@ void vscDIGetVariableInfo(
     {
          if (varName)
         {
-            gctPOINTER memory;
-            char * tempstr;
-            gcoOS_AllocateMemory(NULL, nameLength*sizeof(char), &memory);
-            tempstr = (char*)memory;
+            char tempstr[128];
 
-            gcoOS_StrCopySafe(tempstr, nameLength, _GetNameStr(context, Vdie->name));
+            gcoOS_StrCopySafe(tempstr, 128, _GetNameStr(context, Vdie->name));
             varName[0]='*';
             for(index = 0; tempstr[index]!=0; index++)
                 varName[index + 1] = tempstr[index];
             varName[index + 1] = 0;
 
-            gcoOS_Free(gcvNULL, tempstr);
-
             if(Vdie->u.variable.type.array.numDim > 0 && (gctINT)dimDepth == Vdie->u.variable.type.array.numDim)
             {
-                gcoOS_AllocateMemory(NULL, nameLength*sizeof(char), &memory);
-                tempstr = (char*)memory;
                 offset = 0;
                 for (index = 0; index < dimDepth; index++)
                 {
-                    gcoOS_PrintStrSafe(tempstr, nameLength, &offset, "[%d]", dimNum[index]);
+                    gcoOS_PrintStrSafe(tempstr, 128, &offset, "[%d]", dimNum[index]);
                 }
-                gcoOS_StrCatSafe(varName, nameLength, tempstr);
-                gcoOS_Free(gcvNULL, tempstr);
             }
         }
 
@@ -3685,6 +3672,10 @@ gctBOOL _vscDIGetStructVariableLocByPC(VSC_DIContext * context, gctUINT pc, VSC_
         {
             j = 0;
             childDie = vscDIGetDIE(context, die->child);
+        }
+        else
+        {
+            return gcvFALSE;
         }
 
         while (childDie)

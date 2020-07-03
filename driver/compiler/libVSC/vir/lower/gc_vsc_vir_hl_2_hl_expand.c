@@ -1710,7 +1710,11 @@ _AllocateInterfaceBlock(
         {
             baseAddrArraySymId = (VIR_SymId *)vscMM_Alloc(Context->pMM,
                 arrayLength * sizeof(VIR_SymId));
-
+            if(baseAddrArraySymId == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                CHECK_ERROR(errCode, "_AllocateInterfaceBlock failed.");
+            }
             /* Make sure that the sym IDs are consecutive so that we can get the correct
             ** symbol ID in function _ReplaceInterfaceBlockWithBaseSymbol.
             */

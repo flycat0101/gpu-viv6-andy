@@ -235,7 +235,8 @@ VIR_intrinsic_LibSource(
 
     /* Allocate the string. */
     source = (gctSTRING) vscMM_Alloc(pMM, __LL_LIB_LENGTH__ * sizeof(char));
-
+    if(source == gcvNULL)
+        return VSC_ERR_OUT_OF_MEMORY;
     /* Add header. */
     if (pLibSource->header)
     {
@@ -310,9 +311,10 @@ VIR_intrinsic_LibSource(
     }
 
     /* Insert the shader into the lib list. */
-    VIR_Intrinsic_LibList_AppendNode(pIntrinsicLibList,
-                                     virIntrinsicLibrary,
-                                     pLibSource->libKind);
+    errCode = VIR_Intrinsic_LibList_AppendNode(pIntrinsicLibList,
+                                               virIntrinsicLibrary,
+                                               pLibSource->libKind);
+    ON_ERROR(errCode, "VIR_Intrinsic_LibList_AppendNode");
 OnError:
     if (source)
     {
@@ -843,7 +845,14 @@ _CreateIntrinsicLib(
     if ((isReadVirLib == gcvFALSE) &&((status != gcvSTATUS_OK) || (binary[0] == gcvNULL)))
     {
         for (i = 0; i < libNum; i++)
+        {
             sloBuiltinSource[i] = (gctSTRING) vscMM_Alloc(pMM, __LL_LIB_LENGTH__ * sizeof(char));
+            if(sloBuiltinSource[i] == gcvNULL)
+            {
+                status = gcvSTATUS_OUT_OF_MEMORY;
+                gcmONERROR(status);
+            }
+        }
 
         /* add the extension source */
         if (forDesktopGL)
@@ -1528,7 +1537,12 @@ _CreateCLIntrinsicLib(
     if ((isReadVirLib == gcvFALSE) &&((status != gcvSTATUS_OK) || (binary[0] == gcvNULL)))
     {
          for (i = 0; i < libNum; i++)
-            builtinSource[i] = (gctSTRING) vscMM_Alloc(pMM, __LL_LIB_LENGTH__ * sizeof(char));
+         {
+             builtinSource[i] = (gctSTRING) vscMM_Alloc(pMM, __LL_LIB_LENGTH__ * sizeof(char));
+             if(builtinSource[i] == gcvNULL)
+                 return VSC_ERR_OUT_OF_MEMORY;
+         }
+
 
         /* add the header source */
         length = gcoOS_StrLen(gcCLLibHeader, gcvNULL);
@@ -1908,18 +1922,23 @@ VIR_DestroyIntrinsicLib(
 }
 
 /* queue for lib functions that are needed to be linked in */
-void
+VSC_ErrCode
 VIR_LIB_WorkListQueue(
     IN VSC_MM                   *pMM,
     IN VIR_LIB_WORKLIST         *WorkList,
     IN VIR_Function             *Func
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_UNI_LIST_NODE_EXT *worklistNode = (VSC_UNI_LIST_NODE_EXT *)vscMM_Alloc(pMM,
         sizeof(VSC_UNI_LIST_NODE_EXT));
-
+    if(worklistNode == gcvNULL)
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
     vscULNDEXT_Initialize(worklistNode, Func);
     QUEUE_PUT_ENTRY(WorkList, worklistNode);
+    return errCode;
 }
 
 void
@@ -1937,18 +1956,22 @@ VIR_LIB_WorkListDequeue(
 }
 
 /* queue for call instruction that are needed to be updated */
-void
+VSC_ErrCode
 VIR_LIB_CallSitesQueue(
     IN VSC_MM                   *pMM,
     IN VIR_LIB_CALLSITES        *pCallSites,
     IN VIR_LINKER_CALL_INST_NODE*InstNode
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_UNI_LIST_NODE_EXT *worklistNode = (VSC_UNI_LIST_NODE_EXT *)vscMM_Alloc(pMM,
         sizeof(VSC_UNI_LIST_NODE_EXT));
+    if(!worklistNode)
+        return VSC_ERR_OUT_OF_MEMORY;
 
     vscULNDEXT_Initialize(worklistNode, InstNode);
     QUEUE_PUT_ENTRY(pCallSites, worklistNode);
+    return errCode;
 }
 
 void
@@ -2907,6 +2930,11 @@ _VIR_LinkIntrinsicLib_AddVregSymbol(
 
         /* Add the variable name, it should have the new name to avoid the same name. */
         newLibVarSymName = (gctSTRING) vscMM_Alloc(&pShader->pmp.mmWrapper, __LIB_NAME_LENGTH__ * sizeof(gctCHAR));
+        if(!newLibVarSymName)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR(errCode, "Memory Allocate.");
+        }
         gcoOS_StrCopySafe(newLibVarSymName, __LIB_NAME_LENGTH__, VIR_Shader_GetSymNameString(pLibShader, VIR_Function_GetSymbol(pLibFunc)));
         gcoOS_StrCatSafe(newLibVarSymName, __LIB_NAME_LENGTH__, "$");
         gcoOS_StrCatSafe(newLibVarSymName, __LIB_NAME_LENGTH__, libVarSymName);
@@ -3178,6 +3206,10 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
 
                         /* Allocate the initializer pointer. */
                         pInitializerPtr = (VIR_ConstId *)vscMM_Alloc(pMM, sizeof(VIR_ConstId) * arrayLength);
+                        if(!pInitializerPtr)
+                        {
+                            return VSC_ERR_OUT_OF_MEMORY;
+                        }
                         VIR_Uniform_SetInitializerPtr(pNewUniform, pInitializerPtr);
 
                         /* Copy the initializer pointer. */
@@ -3549,7 +3581,8 @@ _VIR_LinkIntrinsicLib_CopyInst(
                 ON_ERROR(errCode, "_VIR_LinkIntrinsicLib_CopyInst");
 
                 vscHTBL_DirectSet(pAddLibFuncSet, (void*) pCallee, gcvNULL);
-                VIR_LIB_WorkListQueue(pMM, pWorkList, pCallee);
+                errCode = VIR_LIB_WorkListQueue(pMM, pWorkList, pCallee);
+                ON_ERROR(errCode, "_VIR_LIB_WorkListQueue");
             }
 
             errCode = VIR_Function_AddInstruction(pFunc, VIR_OP_CALL, newTyId, &newInst);
@@ -3557,10 +3590,16 @@ _VIR_LinkIntrinsicLib_CopyInst(
             ON_ERROR(errCode, "_VIR_LinkIntrinsicLib_CopyInst");
 
             callInstNode = (VIR_LINKER_CALL_INST_NODE *) vscMM_Alloc(pMM, sizeof(VIR_LINKER_CALL_INST_NODE));
+            if(callInstNode == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                ON_ERROR(errCode, "_VIR_LinkIntrinsicLib_CopyInst");
+            }
             callInstNode->inst = newInst;
             callInstNode->u.libIntrinsicKind = VIR_IK_NONE;
 
-            VIR_LIB_CallSitesQueue(pMM, pCallSites, callInstNode);
+            errCode = VIR_LIB_CallSitesQueue(pMM, pCallSites, callInstNode);
+            ON_ERROR(errCode, "_VIR_LIB_CallSitesQueue");
 
             break;
         }
@@ -3573,7 +3612,11 @@ _VIR_LinkIntrinsicLib_CopyInst(
 
             /* the label should have new name to avoid the same name */
             labelName = (gctSTRING) vscMM_Alloc(pMM, __LIB_NAME_LENGTH__ * sizeof(char));
-
+            if(labelName == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                ON_ERROR(errCode, "_VIR_LinkIntrinsicLib_CopyInst");
+            }
             libLabel = VIR_Operand_GetLabel(libInst->dest);
             libSym = VIR_Function_GetSymFromId(libFunc, libLabel->sym);
 
@@ -5003,20 +5046,23 @@ VIR_Intrinsic_LibList_Finalize(
     vscUNILST_Finalize(&pIntrinsicLibList->intrinsicLibList);
 }
 
-void
+VSC_ErrCode
 VIR_Intrinsic_LibList_AppendNode(
     IN  VIR_Intrinsic_LibList    *pIntrinsicLibList,
     IN  VIR_Shader               *pIntrinsicLib,
     IN  VIR_Intrinsic_LibKind    libKind
     )
 {
+    VSC_ErrCode                    errCode = VSC_ERR_NONE;
     VIR_Intrinsic_LibNode        *lib_node = (VIR_Intrinsic_LibNode *)vscMM_Alloc(VIR_Intrinsic_LibList_GetMM(pIntrinsicLibList),
                                                                                   sizeof(VIR_Intrinsic_LibNode));
-
+    if(lib_node == gcvNULL)
+        return VSC_ERR_OUT_OF_MEMORY;
     VIR_Intrinsic_LibNode_SetLib(lib_node, pIntrinsicLib);
     VIR_Intrinsic_LibNode_SetLibKind(lib_node, libKind);
 
     vscUNILST_Append(VIR_Intrinsic_LibList_GetList(pIntrinsicLibList), VIR_Intrinsic_LibNode_GetNode(lib_node));
+    return errCode;
 }
 
 VIR_Intrinsic_LibNode*
@@ -5046,18 +5092,22 @@ VIR_Intrinsic_LibList_GetNodeByLibKind(
 /******************************************************************************
  Functions for LinkLib and link lib functions
 ******************************************************************************/
-static void
+static VSC_ErrCode
 _TranspointsQueue(
     IN VSC_MM                   *pMM,
     IN VIR_TRANS_WORKLIST       *TranList,
     IN void                     *TranPoint
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_UNI_LIST_NODE_EXT *worklistNode = (VSC_UNI_LIST_NODE_EXT *)vscMM_Alloc(pMM,
         sizeof(VSC_UNI_LIST_NODE_EXT));
+    if(worklistNode == gcvNULL)
+        return VSC_ERR_OUT_OF_MEMORY;
 
     vscULNDEXT_Initialize(worklistNode, TranPoint);
     QUEUE_PUT_ENTRY(TranList, worklistNode);
+    return errCode;
 }
 
 static void
@@ -5075,12 +5125,13 @@ _TranspointsDequeue(
 }
 
 /*********** functions for intrinsic/extCall function name LinkLib *************/
-static void
+static VSC_ErrCode
 _GetIntrinsicOrExtFunc(
     IN VIR_LinkLibContext         *Context,
     OUT VIR_TRANS_WORKLIST        *Worklist
     )
 {
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
     VIR_Shader              *pShader = Context->shader;
     VIR_FuncIterator        func_iter;
     VIR_FunctionNode        *func_node;
@@ -5127,10 +5178,16 @@ _GetIntrinsicOrExtFunc(
                 }
 
                 callInstNode = (VIR_LINKER_CALL_INST_NODE *) vscMM_Alloc(pMM, sizeof(VIR_LINKER_CALL_INST_NODE));
+                if(callInstNode == gcvNULL)
+                {
+                    errCode = VSC_ERR_OUT_OF_MEMORY;
+                    ON_ERROR(errCode, "_GetIntrinsicOrExtFunc");
+                }
                 callInstNode->inst = inst;
                 callInstNode->u.libIntrinsicKind = ik;
 
-                _TranspointsQueue(Context->pMM, Worklist, (void *) callInstNode);
+                errCode = _TranspointsQueue(Context->pMM, Worklist, (void *) callInstNode);
+                ON_ERROR(errCode, "_TranspointsQueue");
             }
             else if (VIR_Inst_GetOpcode(inst) == VIR_OP_EXTCALL)
             {
@@ -5138,13 +5195,22 @@ _GetIntrinsicOrExtFunc(
                 VIR_NameId nameId = VIR_Operand_GetNameId(src0);
 
                 callInstNode = (VIR_LINKER_CALL_INST_NODE *) vscMM_Alloc(pMM, sizeof(VIR_LINKER_CALL_INST_NODE));
+                if(callInstNode == gcvNULL)
+                {
+                    errCode = VSC_ERR_OUT_OF_MEMORY;
+                    ON_ERROR(errCode, "_GetIntrinsicOrExtFunc");
+                }
                 callInstNode->inst = inst;
                 callInstNode->u.extFuncName = nameId;
 
-                _TranspointsQueue(Context->pMM, Worklist, (void *) callInstNode);
+                errCode = _TranspointsQueue(Context->pMM, Worklist, (void *) callInstNode);
+                ON_ERROR(errCode, "_TranspointsQueue");
             }
         }
     }
+
+OnError:
+    return errCode;
 }
 
 static VSC_ErrCode
@@ -5186,12 +5252,13 @@ _InsertIntrinsicFunc(
 }
 
 /*********** functions for output format LinkLib *************/
-static void
+static VSC_ErrCode
 _GetTranspointOutputFmt(
     IN VIR_LinkLibContext         *Context,
     OUT VIR_TRANS_WORKLIST        *Worklist
     )
 {
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
     VIR_Shader              *pShader = Context->shader;
     VSC_LIB_LINK_POINT      *pLinkPoint = Context->linkPoint;
     VIR_OutputIdList        *pOutputs = VIR_Shader_GetOutputs(pShader);
@@ -5203,10 +5270,13 @@ _GetTranspointOutputFmt(
 
         if (output->layout.location == pLinkPoint->u.clrOutput.location)
         {
-            _TranspointsQueue(Context->pMM, Worklist, (void *) output);
+            errCode = _TranspointsQueue(Context->pMM, Worklist, (void *) output);
+            if(errCode != VSC_ERR_NONE)
+                return errCode;
             break;
         }
     }
+    return errCode;
 }
 
 static VSC_ErrCode _InsertInstAtEoMF(IN  VIR_Function *  Function,
@@ -5547,12 +5617,13 @@ _CheckTextureResource(
     return gcvFALSE;
 }
 
-static void
+static VSC_ErrCode
 _GetTranspointResourcePatch(
     IN VIR_LinkLibContext         *Context,
     OUT VIR_TRANS_WORKLIST        *Worklist
     )
 {
+    VSC_ErrCode                     errCode = VSC_ERR_NONE;
     VIR_Shader*                     pShader = Context->shader;
     VSC_LIB_LINK_POINT*             pLinkPoint = Context->linkPoint;
     VSC_LINK_POINT_RESOURCE_SUBTYPE linkPointSubType = pLinkPoint->u.resource.subType;
@@ -5596,14 +5667,16 @@ _GetTranspointResourcePatch(
 
                     if (_CheckTexldSymbolFmt(pLinkPoint, pShader, inst, srcOpnd, srcSym, resOpBit))
                     {
-                        _TranspointsQueue(Context->pMM, Worklist, (void *) inst);
+                        errCode = _TranspointsQueue(Context->pMM, Worklist, (void *) inst);
+                        if(errCode != VSC_ERR_NONE)
+                            return errCode;
                     }
                 }
             }
         }
     }
 
-    return;
+    return errCode;
 }
 
 static VSC_ErrCode
@@ -6789,6 +6862,11 @@ _AddYcbcrPlanesToSampler(
         samplerArrSize *= __YCBCR_PLANE_COUNT__;
 
         ptr = (gctUINT32*)vscMM_Alloc(&pShader->pmp.mmWrapper, sizeof(VIR_SymId) * samplerArrSize);
+        if(ptr == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR(errCode, "_AddYcbcrPlanesToSampler");
+        }
         pSamplerUniform->u.samplerOrImageAttr.pYcbcrPlaneSymId = ptr;
         for (i = 0; i < samplerArrSize; i++)
         {
@@ -7206,7 +7284,8 @@ _LinkLib_Transform(
     }
 
     /* step1: get the transform points (where lib-link is needed) into a worklist */
-    Context->getTranspoint(Context, &vTranspointslist);
+    errCode = Context->getTranspoint(Context, &vTranspointslist);
+    ON_ERROR(errCode, "_VIR_LIB_CallSitesQueue");
 
     /* for each transpoint in the worklist  */
     while(!QUEUE_CHECK_EMPTY(&vTranspointslist))
@@ -7225,11 +7304,17 @@ _LinkLib_Transform(
             if (str == gcvNULL)
             {
                 str = (gctSTRING) vscMM_Alloc(pMM, __LIB_NAME_LENGTH__ * sizeof(char));
+                if(str == gcvNULL)
+                {
+                    errCode = VSC_ERR_OUT_OF_MEMORY;
+                    ON_ERROR(errCode, "_LinkLib_Transform");
+                }
             }
             Context->getLibFuncName(Context, transPoint, &str);
             libFuncName = str;
 
-            VIR_LIB_CallSitesQueue(pMM, &vCallSites, (VIR_LINKER_CALL_INST_NODE*)transPoint);
+            errCode = VIR_LIB_CallSitesQueue(pMM, &vCallSites, (VIR_LINKER_CALL_INST_NODE*)transPoint);
+            ON_ERROR(errCode, "_VIR_LIB_CallSitesQueue");
         }
         else
         {
@@ -7269,7 +7354,8 @@ _LinkLib_Transform(
                                              &pFunc);
             ON_ERROR(errCode, "_LinkLib_Transform");
 
-            VIR_LIB_WorkListQueue(pMM, &vFuncList, pFunc);
+            errCode = VIR_LIB_WorkListQueue(pMM, &vFuncList, pFunc);
+            ON_ERROR(errCode, "_VIR_LIB_WorkListQueue");
 
             VIR_Function_SetFlag(pFunc, VIR_FUNCFLAG_LINKED_LIB);
 

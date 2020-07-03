@@ -1607,6 +1607,10 @@ VIR_Uniform_UpdateResOpBitFromSampledImage(
     if (VIR_Uniform_GetResOpBitsArray(DestUniform) == gcvNULL)
     {
         gctUINT32 * ptr = (gctUINT32*)vscMM_Alloc(&Shader->pmp.mmWrapper, sizeof(gctUINT32) * destArraySize);
+        if(ptr == gcvNULL)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         VIR_Uniform_SetResOpBitsArray(DestUniform, ptr);
         VIR_Uniform_SetResOpBitsArraySize(DestUniform, destArraySize);
         memset(ptr, 0, sizeof(gctUINT32) * destArraySize);
@@ -1647,6 +1651,10 @@ VIR_Uniform_UpdateResOpBits(
     if (VIR_Uniform_GetResOpBitsArray(Uniform) == gcvNULL)
     {
         gctUINT32 * ptr = (gctUINT32*)vscMM_Alloc(&Shader->pmp.mmWrapper, sizeof(gctUINT32) * arraySize);
+        if(ptr == gcvNULL)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         VIR_Uniform_SetResOpBitsArray(Uniform, ptr);
         VIR_Uniform_SetResOpBitsArraySize(Uniform, arraySize);
         memset(ptr, 0, sizeof(gctUINT32) * arraySize);
@@ -3033,6 +3041,11 @@ VIR_Shader_AddFunctionContent(
         /* add function to functionList */
         funcNode = (VIR_FunctionNode *)vscMM_Alloc(memPool, sizeof(VIR_FunctionNode));
         gcmASSERT(funcNode != gcvNULL);
+        if(funcNode == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            CHECK_ERROR(errCode, "Fail to add function to functionList");
+        }
         funcNode->function = func;
         vscBILST_Append(&Shader->functions, (VSC_BI_LIST_NODE*)funcNode);
 
@@ -3040,6 +3053,11 @@ VIR_Shader_AddFunctionContent(
         {
             funcNode = vscMM_Alloc(memPool, sizeof(VIR_FunctionNode));
             gcmASSERT(funcNode != gcvNULL);
+            if(funcNode == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                CHECK_ERROR(errCode, "Fail to add function to functionList");
+            }
             funcNode->function = func;
             vscBILST_Append(&Shader->kernelFunctions, (VSC_BI_LIST_NODE*)funcNode);
 
@@ -13056,7 +13074,7 @@ VIR_Inst_GetExpectedResultPrecision(
     return result;
 }
 
-void
+VSC_ErrCode
 VIR_Inst_InitMcInsts(
     IN VIR_Instruction  *Inst,
     IN VIR_Shader       *Shader,
@@ -13065,6 +13083,7 @@ VIR_Inst_InitMcInsts(
     IN gctBOOL          bUpdatePC
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     if (Inst->mcInst != gcvNULL)
     {
         vscMM_Free(&Shader->pmp.mmWrapper, Inst->mcInst);
@@ -13073,12 +13092,18 @@ VIR_Inst_InitMcInsts(
     Inst->mcInstCount = mcInstCount;
     Inst->mcInst = (VSC_MC_RAW_INST *)vscMM_Alloc(&Shader->pmp.mmWrapper,
         sizeof(VSC_MC_RAW_INST) * Inst->mcInstCount);
+    if(Inst->mcInst == gcvNULL)
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
     memset(Inst->mcInst, 0, sizeof(VSC_MC_RAW_INST) * Inst->mcInstCount);
 
     if (bUpdatePC)
     {
         VIR_Inst_SetMCInstPC(Inst, mcInstPC);
     }
+
+    return errCode;
 }
 
 VIR_Instruction*
