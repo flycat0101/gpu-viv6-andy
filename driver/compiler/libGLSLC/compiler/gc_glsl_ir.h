@@ -1233,6 +1233,7 @@ typedef struct _slsNAME
     slsDATA_TYPE *                          dataType;
     sltPOOL_STRING                          symbol;
     gctBOOL                                 isBuiltIn;
+    gctBOOL                                 usePreDefinedForBuiltin;
     gctBOOL                                 isUnsizeArraySet;
     sloEXTENSION                            extension;
     /* Whether this variable is a per-vertex array, TC/GS only. */

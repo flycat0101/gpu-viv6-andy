@@ -1496,21 +1496,23 @@ _AllocLogicalRegOrArray(
                 gcSHADER_SetFragOutUsage(binary, gcvFRAGOUT_USAGE_FRAGCOLOR);
             }
         }
-        status = slGetBuiltInVariableImplSymbol(Compiler,
-                                                Symbol,
-                                                &Symbol,
-                                                &storageQualifier);
-        if (gcmIS_ERROR(status))
+
+        if (!Name->usePreDefinedForBuiltin)
         {
-           gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                                           Name->lineNo,
-                                           Name->stringNo,
-                                           slvREPORT_ERROR,
-                                           "invalid builtin variable '%s'", Symbol));
-
-           gcmFOOTER_ARG("status=%d", gcvSTATUS_COMPILER_FE_PARSER_ERROR);
-
-           return gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+            status = slGetBuiltInVariableImplSymbol(Compiler,
+                                                    Symbol,
+                                                    &Symbol,
+                                                    &storageQualifier);
+            if (gcmIS_ERROR(status))
+            {
+                gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                                Name->lineNo,
+                                                Name->stringNo,
+                                                slvREPORT_ERROR,
+                                                "invalid builtin variable '%s'", Symbol));
+                gcmFOOTER_ARG("status=%d", gcvSTATUS_COMPILER_FE_PARSER_ERROR);
+                return gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+            }
         }
     }
 
@@ -16955,6 +16957,8 @@ _GenInitSpecialVariables(
     slsROPERAND localSize[1];
     gctSTRING variableName;
     slsNAME *sharedVariableStorageBlock;
+    gctBOOL hasHalti2 = GetHWHasHalti2();
+    gctBOOL useFullNewLinker = gcUseFullNewLinker(hasHalti2);
 
     if ((Compiler->shaderType != slvSHADER_TYPE_COMPUTE))
         return gcvSTATUS_OK;
@@ -16971,24 +16975,6 @@ _GenInitSpecialVariables(
     /* Compute gl_LocalInvocationIndex if it is referenced in compute shader. */
     if (localInvocationIndex->u.variableInfo.isReferenced)
     {
-        gcmONERROR(slsNAME_AllocLogicalRegs(Compiler,
-                                            CodeGenerator,
-                                            localInvocationIndex));
-
-        /* Begin to compute local invocation index */
-        variableName = "gl_LocalInvocationID";
-        status = sloCOMPILER_SearchBuiltinName(Compiler,
-                                               variableName,
-                                               &localId);
-        if (status != gcvSTATUS_OK)
-        {
-            gcmONERROR(gcvSTATUS_COMPILER_FE_PARSER_ERROR);
-        }
-
-        gcmONERROR(slsNAME_AllocLogicalRegs(Compiler,
-                                            CodeGenerator,
-                                            localId));
-
         gcmONERROR(sloCOMPILER_GetDefaultLayout(Compiler,
                                                 layout,
                                                 slvSTORAGE_QUALIFIER_IN));
@@ -16996,89 +16982,117 @@ _GenInitSpecialVariables(
         if (!(layout->id & sldLAYOUT_WORK_GROUP_SIZE_FIELDS))
         {
             gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                                            localId->lineNo,
-                                            localId->stringNo,
+                                            localInvocationIndex->lineNo,
+                                            localInvocationIndex->stringNo,
                                             slvREPORT_ERROR,
                                             "input layout qualifiers local_size_x, local_size_y, local_size_z "
                                             "have not been specified for special variable 'gl_LocalInvocationIndex'"));
             return gcvSTATUS_COMPILER_FE_PARSER_ERROR;
         }
 
-        /* Compute local invocation index :
-           Z * I * J + Y * I + X
-           where local Id = (X, Y, Z) and
-                 work group size = (I, J, K)  */
+        /* Generate a attribute under the vir path. */
+        if (useFullNewLinker)
+        {
+            localInvocationIndex->symbol = _sldLocalInvocationIndexName;
+            localInvocationIndex->dataType->qualifiers.storage = slvSTORAGE_QUALIFIER_VARYING_IN;
+            localInvocationIndex->usePreDefinedForBuiltin = gcvTRUE;
+        }
+        /* Generate a normal variable under the old path. */
+        else
+        {
+            gcmONERROR(slsNAME_AllocLogicalRegs(Compiler,
+                                                CodeGenerator,
+                                                localInvocationIndex));
 
-        /* Compute: (Z, Y) * I */
-        slsROPERAND_InitializeReg(localIdOperand,
-                                  localId->context.logicalRegs);
+            /* Begin to compute local invocation index */
+            variableName = "gl_LocalInvocationID";
+            status = sloCOMPILER_SearchBuiltinName(Compiler,
+                                                   variableName,
+                                                   &localId);
+            if (status != gcvSTATUS_OK)
+            {
+                gcmONERROR(gcvSTATUS_COMPILER_FE_PARSER_ERROR);
+            }
 
-        slGetVectorROperandSlice(localIdOperand,
-                                 1,
-                                 2,
-                                 rOperand1);
+            gcmONERROR(slsNAME_AllocLogicalRegs(Compiler,
+                                                CodeGenerator,
+                                                localId));
 
-        tempRegIndex = slNewTempRegs(Compiler, 1);
-        slsIOPERAND_Initialize(iOperand, rOperand1->dataType, gcSHADER_PRECISION_HIGH, tempRegIndex);
+            /* Compute local invocation index :
+                Z * I * J + Y * I + X
+                where local Id = (X, Y, Z) and
+                        work group size = (I, J, K)  */
 
-        slsROPERAND_InitializeIntOrIVecConstant(localSize,
-                                                localInvocationIndex->context.logicalRegs->dataType,
-                                                gcSHADER_PRECISION_HIGH,
-                                                layout->workGroupSize[0]);
+            /* Compute: (Z, Y) * I */
+            slsROPERAND_InitializeReg(localIdOperand, localId->context.logicalRegs);
 
-        gcmONERROR(slGenArithmeticExprCode(Compiler,
-                                           localId->lineNo,
-                                           localId->stringNo,
-                                           slvOPCODE_MUL,
-                                           iOperand,
-                                           rOperand1,
-                                           localSize));
+            slGetVectorROperandSlice(localIdOperand,
+                                     1,
+                                     2,
+                                     rOperand1);
 
-        /* Compute (Z * I) * J */
-        slsROPERAND_InitializeUsingIOperand(rOperand1, iOperand);
-        slsROPERAND_InitializeIntOrIVecConstant(localSize,
-                                                localInvocationIndex->context.logicalRegs->dataType,
-                                                gcSHADER_PRECISION_HIGH,
-                                                layout->workGroupSize[1]);
-        slmROPERAND_vectorComponent_GET(rOperand1, rOperand1, slvCOMPONENT_Y);
-        slsIOPERAND_New(Compiler,
-                        invocationIndex,
-                        localInvocationIndex->context.logicalRegs->dataType,
-                        gcSHADER_PRECISION_HIGH);
-        gcmONERROR(slGenArithmeticExprCode(Compiler,
-                                           localInvocationIndex->lineNo,
-                                           localInvocationIndex->stringNo,
-                                           slvOPCODE_MUL,
-                                           invocationIndex,
-                                           rOperand1,
-                                           localSize));
+            tempRegIndex = slNewTempRegs(Compiler, 1);
+            slsIOPERAND_Initialize(iOperand, rOperand1->dataType, gcSHADER_PRECISION_HIGH, tempRegIndex);
 
-        /* Compute (Z * I * J) + (Y * I) */
-        slsROPERAND_InitializeUsingIOperand(rOperand1, invocationIndex);
-        slsROPERAND_InitializeUsingIOperand(rOperand2, iOperand);
-        slmROPERAND_vectorComponent_GET(rOperand2, rOperand2, slvCOMPONENT_X);
-        slsIOPERAND_Initialize(invocationIndex,
-                               localInvocationIndex->context.logicalRegs->dataType,
-                               gcSHADER_PRECISION_HIGH,
-                               localInvocationIndex->context.logicalRegs->regIndex);
-        gcmONERROR(slGenArithmeticExprCode(Compiler,
-                                           localInvocationIndex->lineNo,
-                                           localInvocationIndex->stringNo,
-                                           slvOPCODE_ADD,
-                                           invocationIndex,
-                                           rOperand1,
-                                           rOperand2));
+            slsROPERAND_InitializeIntOrIVecConstant(localSize,
+                                                    localInvocationIndex->context.logicalRegs->dataType,
+                                                    gcSHADER_PRECISION_HIGH,
+                                                    layout->workGroupSize[0]);
 
-        /* Compute (Z * I * J) + (Y * I) + X */
-        slsROPERAND_InitializeUsingIOperand(rOperand1, invocationIndex);
-        slmROPERAND_vectorComponent_GET(rOperand2, localIdOperand, slvCOMPONENT_X);
-        gcmONERROR(slGenArithmeticExprCode(Compiler,
-                                           localInvocationIndex->lineNo,
-                                           localInvocationIndex->stringNo,
-                                           slvOPCODE_ADD,
-                                           invocationIndex,
-                                           rOperand1,
-                                           rOperand2));
+            gcmONERROR(slGenArithmeticExprCode(Compiler,
+                                               localId->lineNo,
+                                               localId->stringNo,
+                                               slvOPCODE_MUL,
+                                               iOperand,
+                                               rOperand1,
+                                               localSize));
+
+            /* Compute (Z * I) * J */
+            slsROPERAND_InitializeUsingIOperand(rOperand1, iOperand);
+            slsROPERAND_InitializeIntOrIVecConstant(localSize,
+                                                    localInvocationIndex->context.logicalRegs->dataType,
+                                                    gcSHADER_PRECISION_HIGH,
+                                                    layout->workGroupSize[1]);
+            slmROPERAND_vectorComponent_GET(rOperand1, rOperand1, slvCOMPONENT_Y);
+            slsIOPERAND_New(Compiler,
+                            invocationIndex,
+                            localInvocationIndex->context.logicalRegs->dataType,
+                            gcSHADER_PRECISION_HIGH);
+            gcmONERROR(slGenArithmeticExprCode(Compiler,
+                                               localInvocationIndex->lineNo,
+                                               localInvocationIndex->stringNo,
+                                               slvOPCODE_MUL,
+                                               invocationIndex,
+                                               rOperand1,
+                                               localSize));
+
+            /* Compute (Z * I * J) + (Y * I) */
+            slsROPERAND_InitializeUsingIOperand(rOperand1, invocationIndex);
+            slsROPERAND_InitializeUsingIOperand(rOperand2, iOperand);
+            slmROPERAND_vectorComponent_GET(rOperand2, rOperand2, slvCOMPONENT_X);
+            slsIOPERAND_Initialize(invocationIndex,
+                                   localInvocationIndex->context.logicalRegs->dataType,
+                                   gcSHADER_PRECISION_HIGH,
+                                   localInvocationIndex->context.logicalRegs->regIndex);
+            gcmONERROR(slGenArithmeticExprCode(Compiler,
+                                               localInvocationIndex->lineNo,
+                                               localInvocationIndex->stringNo,
+                                               slvOPCODE_ADD,
+                                               invocationIndex,
+                                               rOperand1,
+                                               rOperand2));
+
+            /* Compute (Z * I * J) + (Y * I) + X */
+            slsROPERAND_InitializeUsingIOperand(rOperand1, invocationIndex);
+            slmROPERAND_vectorComponent_GET(rOperand2, localIdOperand, slvCOMPONENT_X);
+            gcmONERROR(slGenArithmeticExprCode(Compiler,
+                                               localInvocationIndex->lineNo,
+                                               localInvocationIndex->stringNo,
+                                               slvOPCODE_ADD,
+                                               invocationIndex,
+                                               rOperand1,
+                                               rOperand2));
+        }
     }
 
     /* Create shared variable storage block */
