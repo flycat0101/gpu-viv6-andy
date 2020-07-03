@@ -70,7 +70,7 @@ extern GLvoid __glUpdateScissor(__GLcontext *gc, GLint x, GLint y, GLint w, GLin
 
 extern GLvoid __glInitImageState(__GLcontext *gc);
 
-extern GLvoid __glInitDebugState(__GLcontext *gc);
+extern GLboolean __glInitDebugState(__GLcontext *gc);
 extern GLvoid __glFreeDebugState(__GLcontext *gc);
 
 extern GLboolean __glInitTracerDispatchTable(GLint trmode);
@@ -768,7 +768,7 @@ GLboolean __glInitContextState(__GLcontext *gc)
 
     __glInitEnableState(gc);
     __glInitImageState(gc);
-    __glInitDebugState(gc);
+    initOK = initOK &&__glInitDebugState(gc);
     __glInitPrimBoundingState(gc);
 
     __glBitmaskInitAllOne(&gc->texUnitAttrDirtyMask, gc->constants.shaderCaps.maxCombinedTextureImageUnits);

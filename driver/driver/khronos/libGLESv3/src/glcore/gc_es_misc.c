@@ -977,7 +977,7 @@ GLvoid GL_APIENTRY __gles_BlendBarrier(__GLcontext *gc)
 }
 
 
-GLvoid __glInitDebugState(__GLcontext *gc)
+GLboolean __glInitDebugState(__GLcontext *gc)
 {
     __GLdbgSrc srcIdx;
     __GLdbgType typeIdx;
@@ -997,14 +997,14 @@ GLvoid __glInitDebugState(__GLcontext *gc)
     dbgMachine->current = 0;
     if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, dbgMachine->maxStackDepth * sizeof(__GLdbgGroupCtrl*), (gctPOINTER*)&dbgMachine->msgCtrlStack)))
     {
-        return;
+        return gcvFALSE;
     }
     gcoOS_ZeroMemory(dbgMachine->msgCtrlStack, dbgMachine->maxStackDepth * sizeof(__GLdbgGroupCtrl*));
 
     if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLdbgGroupCtrl), (gctPOINTER*)&groupCtrl)))
     {
         gcmOS_SAFE_FREE(gcvNULL, dbgMachine->msgCtrlStack);
-        return;
+        return gcvFALSE;
     }
     gcoOS_ZeroMemory(groupCtrl, sizeof(__GLdbgGroupCtrl));
     groupCtrl->message = NULL; /* No message for default group */
@@ -1022,6 +1022,7 @@ GLvoid __glInitDebugState(__GLcontext *gc)
         }
     }
     dbgMachine->msgCtrlStack[dbgMachine->current] = groupCtrl;
+    return gcvTRUE;
 }
 
 GLvoid __glFreeDebugState(__GLcontext *gc)
