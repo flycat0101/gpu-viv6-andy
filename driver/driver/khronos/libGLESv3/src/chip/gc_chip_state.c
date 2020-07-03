@@ -3989,7 +3989,7 @@ gcChipRecompileEvaluateKeyStates(
             }
         }
 
-        if (bTriangle && (gc->globalDirtyState[__GL_DIRTY_ATTRS_1] & __GL_FRONTFACE_BIT))
+        if (bTriangle)
         {
             if (gc->state.polygon.frontFace == GL_CW)
             {
