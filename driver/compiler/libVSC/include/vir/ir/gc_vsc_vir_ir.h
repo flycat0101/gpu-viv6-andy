@@ -942,6 +942,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
     VIR_Shader_GetSymNameString((Shader), VIR_Shader_GetSymFromId((Shader), (SymId)))
 
 #define VIR_Shader_GetTypeNameString(Shader, Type)  (VIR_Shader_GetStringFromId((Shader), (Type)->u1.nameId))
+#define VIR_Shader_GetHwSpecificAttributes(Shader)  (&((Shader)->hwSpecificAttributes))
 #define VIR_Shader_GetAttributes(Shader)            (&((Shader)->attributes))
 #define VIR_Shader_GetAttributeAliasList(Shader)    ((Shader)->attributeAliasList)
 #define VIR_Shader_SetAttributeAliasList(Shader, L) ((Shader)->attributeAliasList = (L))
@@ -2488,6 +2489,10 @@ extern VIR_NameId   VIR_NAME_UNKNOWN,
                     VIR_NAME_MULTI_TEX_COORD_5, /* gl_MultiTexCoord5 */
                     VIR_NAME_MULTI_TEX_COORD_6, /* gl_MultiTexCoord6 */
                     VIR_NAME_MULTI_TEX_COORD_7, /* gl_MultiTexCoord7 */
+                    VIR_NAME_HW_OUTPUT_REMAP_ADDR, /* TCS output remap address. */
+                    VIR_NAME_HW_PERPATCH_ADDR, /* per-patch address. */
+                    VIR_NAME_PER_VERTEX_INPUT_ADDR, /* per-vertex input. */
+                    VIR_NAME_PER_VERTEX_OUTPUT_ADDR, /* per-vertex output. */
                     VIR_NAME_BUILTIN_LAST;
 
 typedef enum _VIR_ROUNDMODE
@@ -4981,15 +4986,16 @@ typedef enum _VIR_SHADERFLAGS_EXT1
     VIR_SHFLAG_EXT1_HAS_DSY_BEFORE_LOWERING     = 0x00000010, /* shader has dsy IR before lowering to machine code, so it
                                                                   * wouldn't count fwidth() as using DSY for yInvert purpose. */
     VIR_SHFLAG_EXT1_ENABLE_ROBUST_CHECK         = 0x00000020, /* Whether enable robust out-of-bounds memory access check. */
-    VIR_SHFLAG_EXT1_CALC_LOCAL_INVOCATION_INDEX = 0x00000040, /* Whether need to calculate LocalInvocationIndex. */
-    VIR_SHFLAG_EXT1_CAPABILITY_FP16             = 0x00000080, /* Whether instruction support FP16 directly, so the data in register is FP16. */
-    VIR_SHFLAG_EXT1_IMAGE_FORMAT_MISMATCH       = 0x00000100, /* Whether any image format/sampled type mismatch. */
-    VIR_SHFLAG_EXT1_USE_EVIS_INST               = 0x00000200, /* Whether use EVIS instruction. */
+    VIR_SHFLAG_EXT1_CAPABILITY_FP16             = 0x00000040, /* Whether instruction support FP16 directly, so the data in register is FP16. */
+    VIR_SHFLAG_EXT1_IMAGE_FORMAT_MISMATCH       = 0x00000080, /* Whether any image format/sampled type mismatch. */
+    VIR_SHFLAG_EXT1_USE_EVIS_INST               = 0x00000100, /* Whether use EVIS instruction. */
+    VIR_SHFLAG_EXT1_SET_MIN_WORKGROUPSIZE       = 0x00000200, /* Whether driver sets the minimum workGroupSize. */
     VIR_SHFLAG_EXT1_COMPATIBILITY_PROFILR       = 0x00000400, /* Whether the shader version is compatibility profile. */
-    VIR_SHFLAG_EXT1_USE_CONST_REG_FOR_UBO       = 0x00000800, /* Whether use constant register to save the UBO. */
+    VIR_SHFLAG_EXT1_TCS_STORE_PERPATCH_ADDR     = 0x00000800, /* Whether TCS needs to store per-patch addr. */
+    VIR_SHFLAG_EXT1_TCS_STORE_PRIMITIVE_ID      = 0x00001000, /* Whether TCS needs to store PrimitiveId. */
+    VIR_SHFLAG_EXT1_USE_CONST_REG_FOR_UBO       = 0x00002000, /* Whether use constant register to save the UBO. */
+    VIR_SHFLAG_EXT1_HAS_NO_PER_VERTEX_INPUT     = 0x00004000, /* Whether VS have no any output, that is the lower shader have no per-vertex input. */
     VIR_SHFLAG_EXT1_ENABLE_PRECISION_UPDATE     = 0x00008000, /* Whether shader need update precision */
-
-    VIR_SHFLAG_EXT1_SET_MIN_WORKGROUPSIZE       = 0x00010000, /* Whether driver sets the minimum workGroupSize. */
 } VIR_ShaderFlagsExt1;
 
 /* Get the flags. */
@@ -5053,7 +5059,10 @@ typedef enum _VIR_SHADERFLAGS_EXT1
 #define VIR_Shader_HasImageFormatMismatch(Shader)   (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_IMAGE_FORMAT_MISMATCH) != 0)
 #define VIR_Shader_UseEvisInst(Shader)              (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_USE_EVIS_INST) != 0)
 #define VIR_Shader_IsCompatibilityProfile(Shader)   (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_COMPATIBILITY_PROFILR) != 0)
+#define VIR_Shader_TcsStorePerpatchAddr(Shader)     (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_TCS_STORE_PERPATCH_ADDR) != 0)
+#define VIR_Shader_TcsStorePrimitiveId(Shader)      (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_TCS_STORE_PRIMITIVE_ID) != 0)
 #define VIR_Shader_UseConstRegForUBO(Shader)        (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_USE_CONST_REG_FOR_UBO) != 0)
+#define VIR_Shader_HasNoPerVertexInput(Shader)      (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_HAS_NO_PER_VERTEX_INPUT) != 0)
 #define VIR_Shader_NeedUpdatePrecision(Shader)      (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_ENABLE_PRECISION_UPDATE) != 0)
 #define VIR_Shader_DriverSetMinWorkGroupSize(Shader)(((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_SET_MIN_WORKGROUPSIZE) != 0)
 
@@ -5174,12 +5183,19 @@ typedef struct _VIR_TESSLAYOUT
     VIR_TessVertexSpacing   tessVertexSpacing : 3;
     VIR_TessOrdering        tessOrdering      : 3;
     gctBOOL                 tessPointMode     : 2;
+
     /* Tesselation Control Shader layout only */
     gctINT                  tcsPatchInputVertices;
     gctINT                  tcsPatchOutputVertices;
+    /* The value of this count can be 0. */
+    gctINT                  tcsOutputVertexCount;
     gctBOOL                 hasOutputVertexAccess;
+
     /* Tesselation Evaluation Shader layout only */
     gctINT                  tessPatchInputVertices;
+    /* The value of this count can be 0. */
+    gctINT                  tessInputVertexCount;
+    gctBOOL                 hasInputVertexAccess;
 } VIR_TCSLayout, VIR_TESLayout;
 
 
@@ -5370,6 +5386,9 @@ struct _VIR_SHADER
     /* Constant memory address space size for openCL */
     gctUINT32           constantMemorySize;
     gctCHAR    *        constantMemoryBuffer;
+
+    /* HW specific attributes, no need to do linkage or collect to SEP. */
+    VIR_VariableIdList  hwSpecificAttributes;
 
     /* Attributes. */
     VIR_AttributeIdList attributes;
@@ -6219,6 +6238,25 @@ VIR_Shader_CreateOutputComponentMapList(
 VSC_ErrCode
 VIR_Shader_DestroyOutputComponentMapList(
     IN OUT  VIR_Shader*     pShader
+    );
+
+gctINT
+VIR_Shader_GetRegCountBasedOnVertexCount(
+    IN OUT  VIR_Shader*     pShader,
+    gctINT                  vertexCount
+    );
+
+typedef enum _VIR_QUERY_PER_VERTEX
+{
+    VIR_QUERY_PER_VERTEX_INPUT_ONLY     = 0,
+    VIR_QUERY_PER_VERTEX_OUTPUT_ONLY    = 1,
+    VIR_QUERY_PER_VERTEX_INPUT_OUTPUT   = 2,
+} VIR_QUERY_PER_VERTEX;
+
+gctINT
+VIR_Shader_GetTcsPerVertexRegCount(
+    IN OUT  VIR_Shader*     pShader,
+    VIR_QUERY_PER_VERTEX    queryMode
     );
 
 /* types */

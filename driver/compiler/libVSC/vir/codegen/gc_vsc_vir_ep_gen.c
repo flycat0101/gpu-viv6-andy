@@ -2494,15 +2494,18 @@ static void _CollectExeHints(VSC_SHADER_COMPILER_PARAM* pCompilerParam, VSC_SEP_
            GL API. This is BAD because recompiling is very time-consuming and a perf killer. We
            should only trigger recompiling when (a > b). But if so, we need remove USC and other
            throttle registers programmming out of VSC */
+        pOutSEP->exeHints.nativeHints.prvStates.ts.hasNoPerVertexInput = VIR_Shader_HasNoPerVertexInput(pShader);
+
         pOutSEP->exeHints.nativeHints.prvStates.ts.inputCtrlPointCount =
                                                   pShader->shaderLayout.tcs.tcsPatchInputVertices;
 
         pOutSEP->exeHints.nativeHints.prvStates.ts.outputCtrlPointCount =
-                                                  pShader->shaderLayout.tcs.tcsPatchOutputVertices;
+                                                  pShader->shaderLayout.tcs.tcsOutputVertexCount == 0 ? 1 : pShader->shaderLayout.tcs.tcsOutputVertexCount;
     }
 
     if (pShader->shaderKind == VIR_SHADER_TESSELLATION_EVALUATION)
     {
+        /* So far this variable is not used, we only use the inputCtrlPointCount of TCS to program. */
         pOutSEP->exeHints.nativeHints.prvStates.ts.inputCtrlPointCount =
                                                   pShader->shaderLayout.tes.tessPatchInputVertices;
     }

@@ -19763,14 +19763,26 @@ gcSHADER_GetUniformVectorCountUsedInShader(
         /* Get uniform. */
         gcUNIFORM uniform = Shader->uniforms[i];
 
-        if(!uniform)
+        if (!uniform)
+        {
             continue;
+        }
 
-        if (!isUniformNormal(uniform))
+        if (!(isUniformNormal(uniform)              ||
+              isUniformLodMinMax(uniform)           ||
+              isUniformLevelBaseSize(uniform)       ||
+              isUniformBlockMember(uniform)         ||
+              isUniformSampleLocation(uniform)      ||
+              isUniformMultiSampleBuffers(uniform)  ||
+              isUniformUBOAddress(uniform)))
+        {
             continue;
+        }
 
         if (!isUniformUsedInShader(uniform))
+        {
             continue;
+        }
 
         gcTYPE_GetTypeInfo(uniform->u.type, &components, &rows, 0);
         rows *= uniform->arraySize;

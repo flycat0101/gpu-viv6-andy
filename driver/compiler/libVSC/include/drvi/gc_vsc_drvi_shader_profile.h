@@ -1016,6 +1016,7 @@ typedef struct SHADER_EXECUTABLE_NATIVE_HINTS
             gctUINT                                      inputCtrlPointCount;
 
             /* HS only */
+            gctBOOL                                      hasNoPerVertexInput;
             gctUINT                                      outputCtrlPointCount;
 
             /* For DX, they are provided in HS, but for OGL they are provided in DS */

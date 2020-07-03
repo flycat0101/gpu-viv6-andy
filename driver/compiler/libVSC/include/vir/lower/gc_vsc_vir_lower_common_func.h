@@ -24,6 +24,7 @@ VIR_Lower_Initialize(
     IN VIR_Shader               *Shader,
     IN VIR_PatternLowerContext  *Context,
     IN VSC_HW_CONFIG            *HwCfg,
+    IN gctUINT                  cFlags,
     IN VSC_MM                   *pMM
     );
 

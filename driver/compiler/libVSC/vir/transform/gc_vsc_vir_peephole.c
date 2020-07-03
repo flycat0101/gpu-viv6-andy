@@ -18,6 +18,7 @@ static void VSC_PH_Peephole_Init(
     IN VIR_Shader* shader,
     IN VIR_DEF_USAGE_INFO* du_info,
     IN VSC_HW_CONFIG* hwCfg,
+    IN gctUINT cFlags,
     IN VSC_OPTN_PHOptions* options,
     IN VIR_Dumper* dumper,
     IN VSC_MM* pMM
@@ -29,6 +30,7 @@ static void VSC_PH_Peephole_Init(
     }
 
     VSC_PH_Peephole_SetShader(ph, shader);
+    VSC_PH_Peephole_SetCFlags(ph, cFlags);
     VSC_PH_Peephole_SetCurrBB(ph, gcvNULL);
     VSC_PH_Peephole_SetDUInfo(ph, du_info);
     VSC_PH_Peephole_SetHwCfg(ph, hwCfg);
@@ -3279,7 +3281,10 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
 
     /* Skip if this chip can't support the floating MAD. */
     bIsFloatInst = VIR_TypeId_isFloat(VIR_Operand_GetTypeId(mul_dest));
-    if (!VSC_PH_Peephole_GetHwCfg(ph)->hwFeatureFlags.hasFloatingMadFix && bIsFloatInst)
+
+    if (bIsFloatInst &&
+        !VSC_PH_Peephole_GetHwCfg(ph)->hwFeatureFlags.hasFloatingMadFix &&
+        !(VSC_PH_Peephole_GetCFlags(ph) & VSC_COMPILER_FLAG_FORCE_GEN_FLOAT_MAD))
     {
         if (generated != gcvNULL)
         {
@@ -6747,6 +6752,7 @@ VSC_ErrCode VSC_PH_Peephole_PerformOnShader(
     VIR_Shader_ClrFlag(shader, VIR_SHFLAG_USE_LOCAL_MEM);
 
     VSC_PH_Peephole_Init(&ph, shader, pPassWorker->pDuInfo, &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg,
+                         pPassWorker->pCompilerParam->cfg.cFlags,
                          options, pPassWorker->basePassWorker.pDumper, pPassWorker->basePassWorker.pMM);
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(shader));

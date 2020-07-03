@@ -67,8 +67,9 @@
 /* 0.0.1.44 Add VIR_ModifierOrder in VIR_Operand on 05/14/2020 */
 /* 0.0.1.45 Add a new enumeration for VIR_SymFlagExt 05/15/2020 */
 /* 0.0.1.46 Add a minimum workGroupSize in VIR_ComputeLayout 05/19/2020 */
-#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 46)
-#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 46)
+/* 0.0.1.47 Save the HW specific attributes in VIR_Shader 05/26/2020 */
+#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 47)
+#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 47)
 
 #if !defined(gcdTARGETHOST_BIGENDIAN)
 #define gcdTARGETHOST_BIGENDIAN 0  /* default host little endian, to change the
@@ -907,6 +908,7 @@ typedef gcsGLSLCaps VSC_GL_API_CONFIG, *PVSC_GL_API_CONFIG;
 #define VSC_COMPILER_FLAG_ADD_GLOBAL_OFFSET            0x00100000  /* gl_GlobalInvocationID = gl_GlobalInvocationID + #global_offset. */
 #define VSC_COMPILER_FLAG_ENABLE_DUAL16_FOR_VK         0x00200000  /* It is a temp option to enable dual16 for vulkan. we need to remove after verify all vulkan cases. */
 #define VSC_COMPILER_FLAG_USE_CONST_REG_FOR_UBO        0x00400000
+#define VSC_COMPILER_FLAG_FORCE_GEN_FLOAT_MAD          0x00800000  /* Force generate a floating MAD, no matter if HW can support it. */
 
 #define VSC_COMPILER_FLAG_COMPILE_FULL_LEVELS          0x0000000F
 

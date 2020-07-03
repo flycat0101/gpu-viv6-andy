@@ -836,6 +836,7 @@ typedef struct _gcsHINT
 
     /* per-vertex attributeCount. */
     gctUINT     tcsPerVertexAttributeCount;
+    gctBOOL     tcsHasNoPerVertexAttribute;
 
     gctUINT     extraUscPages;
 
@@ -852,7 +853,7 @@ typedef struct _gcsHINT
     gctBOOL     useGPRSpill[gcvPROGRAM_STAGE_LAST];
 
     /* padding bytes to make the offset of shaderVidNodes field be consistent in 32bit and 64bit platforms */
-    gctCHAR     reservedByteForShaderVidNodeOffset[4];
+    gctCHAR     reservedByteForShaderVidNodeOffset[8];
 
     /* shaderVidNodes should always be the LAST filed in hits. */
     /* SURF Node for memory that is used in shader. */
@@ -1023,8 +1024,8 @@ typedef enum _gceSHADER_FLAGS
     /* Remove unused uniforms on shader, only enable for es20 shader. */
     gcvSHADER_REMOVE_UNUSED_UNIFORMS    = 0x2000,
 
-    /* Force linking when either vertex or fragment shader not present */
-    gcvSHADER_FORCE_LINKING             = 0x4000,
+    /* Force generate a floating MAD, no matter if HW can support it. */
+    gcSHADER_FLAG_FORCE_GEN_FLOAT_MAD   = 0x4000,
 
     /* Disable default UBO for vertex and fragment shader. */
     gcvSHADER_DISABLE_DEFAULT_UBO       = 0x8000,

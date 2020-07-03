@@ -20,11 +20,13 @@ VIR_Lower_Initialize(
     IN VIR_Shader               *Shader,
     IN VIR_PatternLowerContext  *Context,
     IN VSC_HW_CONFIG            *HwCfg,
+    IN gctUINT                  cFlags,
     IN VSC_MM                   *pMM
     )
 {
     Context->hwCfg = HwCfg;
     Context->pMM = pMM;
+    Context->cFlags = cFlags;
 
     Context->hasNEW_TEXLD = HwCfg->hwFeatureFlags.hasHalti2;
 
@@ -85,7 +87,14 @@ VIR_Lower_HasNoFloatingMadFix(
     IN VIR_Instruction    *Inst
     )
 {
-    return !Context->vscContext->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasFloatingMadFix;
+    if ((((VIR_PatternLowerContext *)Context)->cFlags & VSC_COMPILER_FLAG_FORCE_GEN_FLOAT_MAD)
+        ||
+        Context->vscContext->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasFloatingMadFix)
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
 }
 
 gctBOOL

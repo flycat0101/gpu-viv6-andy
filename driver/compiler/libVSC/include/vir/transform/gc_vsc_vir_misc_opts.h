@@ -25,6 +25,17 @@ vscVIR_ConvertRetToJmpForFunctions(
     OUT gctBOOL*                    pInvalidCfg
     );
 
+VSC_ErrCode
+vscVIR_AddTsHwSpecificAttribute(
+    IN VIR_DEF_USAGE_INFO*          pDuInfo,
+    IN VIR_Shader*                  pShader,
+    IN VIR_Function*                pFunc,
+    IN VIR_Instruction*             pInst,
+    IN gctBOOL                      bHandlePerVertexLoadOnly,
+    OUT VIR_Symbol**                ppSymbol,
+    OUT gctBOOL*                    pChanged
+    );
+
 /***************************************Misc passes***************************************/
 
 typedef struct _VSC_PRELL_PASS_DATA

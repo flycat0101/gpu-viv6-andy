@@ -2472,6 +2472,7 @@ static VSC_ErrCode _ProgramHS(SHADER_HW_INFO* pShHwInfo, SHADER_HW_INFO* pLowerS
     _GetMinMaxUscSize(pShHwInfo, pStatesPgmer, &minUscSize, &maxUscSize, &extraUscSize);
 
     pStatesPgmer->pHints->tcsPerVertexAttributeCount = hsPerCPInputCount;
+    pStatesPgmer->pHints->tcsHasNoPerVertexAttribute = pHsSEP->exeHints.nativeHints.prvStates.ts.hasNoPerVertexInput;
     pStatesPgmer->pHints->extraUscPages += extraUscSize;
     pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_TCS] = (gceMEMORY_ACCESS_FLAG)pHsSEP->exeHints.nativeHints.globalStates.memoryAccessHint;
     pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_TCS] = (gceMEMORY_ACCESS_FLAG)pHsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;

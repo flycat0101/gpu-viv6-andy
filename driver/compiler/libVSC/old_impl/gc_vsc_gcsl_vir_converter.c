@@ -8167,6 +8167,7 @@ gcSHADER_Conv2VIR(
         break;
     case VIR_SHADER_TESSELLATION_CONTROL:
         VirShader->shaderLayout.tcs.tcsPatchOutputVertices = Shader->shaderLayout.tcs.tcsPatchOutputVertices;
+        VirShader->shaderLayout.tcs.tcsOutputVertexCount = VirShader->shaderLayout.tcs.tcsPatchOutputVertices;
         break;
     case VIR_SHADER_TESSELLATION_EVALUATION:
         VirShader->shaderLayout.tes.tessPrimitiveMode =
@@ -8179,6 +8180,7 @@ gcSHADER_Conv2VIR(
             Shader->shaderLayout.tes.tessPointMode;
         VirShader->shaderLayout.tes.tessPatchInputVertices =
             Shader->shaderLayout.tes.tessPatchInputVertices;
+        VirShader->shaderLayout.tes.tessInputVertexCount = VirShader->shaderLayout.tes.tessPatchInputVertices;
         break;
     case VIR_SHADER_GEOMETRY:
         VirShader->shaderLayout.geo.geoInvocations =

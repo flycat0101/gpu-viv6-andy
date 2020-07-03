@@ -58,7 +58,7 @@ VIR_Lower_MiddleLevel_To_LowLevel_Pre(
 
     VIR_Shader_SetRAEnabled(shader, bRAEnabled);
 
-    VIR_Lower_Initialize(shader, &context, hwCfg, pPassWorker->basePassWorker.pMM);
+    VIR_Lower_Initialize(shader, &context, hwCfg, pPassWorker->pCompilerParam->cfg.cFlags, pPassWorker->basePassWorker.pMM);
 
     errCode = VIR_Lower_ArraryIndexing_To_LDARR_STARR(shader, hwCfg, gcvNULL);
     CHECK_ERROR(errCode, "VIR_Lower_ArraryIndexing_To_LDARR_STARR failed.");
@@ -125,7 +125,7 @@ VIR_Lower_MiddleLevel_To_LowLevel_Post(
 
     VIR_Shader_SetRAEnabled(shader, bRAEnabled);
 
-    VIR_Lower_Initialize(shader, &context, hwCfg, pPassWorker->basePassWorker.pMM);
+    VIR_Lower_Initialize(shader, &context, hwCfg, pPassWorker->pCompilerParam->cfg.cFlags, pPassWorker->basePassWorker.pMM);
 
     errCode = VIR_Lower_MiddleLevel_To_LowLevel_Expand_Post(shader, &pPassWorker->pCompilerParam->cfg.ctx, &context);
     CHECK_ERROR(errCode, "ML to LL expand post failed.");

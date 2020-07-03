@@ -2636,7 +2636,7 @@ VIR_Lower_LowLevel_To_MachineCodeLevel(
         bScalarOnly = *(gctBOOL *)pPassWorker->basePassWorker.pPassSpecificData;
     }
 
-    VIR_Lower_Initialize(Shader, &context, HwCfg, pPassWorker->basePassWorker.pMM);
+    VIR_Lower_Initialize(Shader, &context, HwCfg, pPassWorker->pCompilerParam->cfg.cFlags, pPassWorker->basePassWorker.pMM);
 
     if (!bScalarOnly)
     {

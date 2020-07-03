@@ -249,6 +249,7 @@ typedef struct _VIR_PATTERN_LOWER_CONTEXT
     VIR_PatternContext          header;
     VSC_HW_CONFIG*              hwCfg;
     VSC_MM*                     pMM;
+    gctUINT                     cFlags;
     gctBOOL                     generateImmediate;
     gctBOOL                     hasNEW_TEXLD;
     gctBOOL                     isCL_X;

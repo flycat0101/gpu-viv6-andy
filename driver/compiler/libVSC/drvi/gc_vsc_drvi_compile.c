@@ -998,7 +998,7 @@ static VSC_ErrCode _PerformCodegen(VSC_SHADER_PASS_MANAGER*   pShPassMnger,
     }
     else
     {
-        ON_ERROR(errCode, "VIR_RA_LS_PerformTempRegAlloc");
+        ON_ERROR(errCode, "Fail to performa temp register allocation.");
     }
 
     CALL_SH_PASS(VSC_IS_InstSched_PerformOnShader, 1, gcvNULL);

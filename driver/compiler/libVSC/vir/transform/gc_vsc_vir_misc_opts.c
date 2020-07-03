@@ -145,6 +145,206 @@ OnError:
     return errCode;
 }
 
+VSC_ErrCode
+vscVIR_AddTsHwSpecificAttribute(
+    IN VIR_DEF_USAGE_INFO*          pDuInfo,
+    IN VIR_Shader*                  pShader,
+    IN VIR_Function*                pFunc,
+    IN VIR_Instruction*             pInst,
+    IN gctBOOL                      bHandlePerVertexLoadOnly,
+    OUT VIR_Symbol**                ppSymbol,
+    OUT gctBOOL*                    pChanged
+    )
+{
+    VSC_ErrCode                     errCode = VSC_ERR_NONE;
+    gctBOOL                         bChanged = gcvFALSE;
+    VIR_VariableIdList*             pHwSpecificAttributeList = VIR_Shader_GetHwSpecificAttributes(pShader);
+    VIR_Symbol*                     pHwSpecificAttributeSym = gcvNULL;
+    VIR_NameId                      symNameId = VIR_NAME_UNKNOWN;
+    VIR_TypeId                      symTypeId = VIR_TYPE_VOID;
+    VIR_Enable                      symEnable = VIR_ENABLE_X;
+    gctINT                          symArrayLength = 1;
+    VIR_SymId                       hwSpecificAttributeSymId = VIR_INVALID_ID, regSymId = VIR_INVALID_ID;
+    VIR_Symbol*                     pRegSym = gcvNULL;
+    VIR_VirRegId                    regId = VIR_INVALID_ID;
+    VIR_OpCode                      opCode = VIR_Inst_GetOpcode(pInst);
+    VIR_Operand*                    pSymOpnd = gcvNULL;
+    VIR_Symbol*                     pOpndSym = gcvNULL;
+    gctBOOL                         bPerVertexInput = gcvFALSE, bPerVertexOutput = gcvFALSE;
+
+    /* Check ATTR_LD/ATTR_ST only. */
+    if (!(opCode == VIR_OP_ATTR_LD || opCode == VIR_OP_ATTR_ST))
+    {
+        return errCode;
+    }
+
+    /* Try to find a match attribute from the operand. */
+    if (opCode == VIR_OP_ATTR_LD)
+    {
+        pSymOpnd = VIR_Inst_GetSource(pInst, 0);
+
+        /* Check the per-vertex input/output address. */
+        if (VIR_Operand_IsArrayedPerVertex(pSymOpnd))
+        {
+            if (VIR_Shader_IsTCS(pShader))
+            {
+                /* Per-vertex input/output is used. */
+                pOpndSym = VIR_Operand_GetUnderlyingSymbol(pSymOpnd);
+                if (VIR_Symbol_isOutput(pOpndSym))
+                {
+                    bPerVertexOutput = gcvTRUE;
+                    symNameId = VIR_NAME_PER_VERTEX_OUTPUT_ADDR;
+                    symTypeId = VIR_TYPE_UINT32;
+                    symEnable = VIR_ENABLE_XYZW;
+                }
+                else
+                {
+                    bPerVertexInput = gcvTRUE;
+                    symNameId = VIR_NAME_PER_VERTEX_INPUT_ADDR;
+                    symTypeId = VIR_TYPE_UINT32;
+                    symEnable = VIR_ENABLE_XYZW;
+                }
+            }
+        }
+        /* per-patch address is used. */
+        else if (VIR_Operand_IsPerPatch(pSymOpnd))
+        {
+            symNameId = VIR_NAME_HW_PERPATCH_ADDR;
+            symTypeId = VIR_TYPE_UINT32;
+            symEnable = VIR_ENABLE_X;
+        }
+
+    }
+    else if (opCode == VIR_OP_ATTR_ST)
+    {
+        pSymOpnd = VIR_Inst_GetDest(pInst);
+
+        if (VIR_Operand_IsArrayedPerVertex(pSymOpnd))
+        {
+            symNameId = VIR_NAME_HW_OUTPUT_REMAP_ADDR;
+            symTypeId = VIR_TYPE_UINT32;
+            symEnable = VIR_ENABLE_X;
+        }
+        /* per-patch address is used. */
+        else if (VIR_Operand_IsPerPatch(pSymOpnd))
+        {
+            symNameId = VIR_NAME_HW_PERPATCH_ADDR;
+            symTypeId = VIR_TYPE_UINT32;
+            symEnable = VIR_ENABLE_X;
+        }
+    }
+    else
+    {
+        gcmASSERT(gcvFALSE);
+    }
+
+    /* Not a match. */
+    if (symNameId == VIR_NAME_UNKNOWN)
+    {
+        return errCode;
+    }
+
+    if (bHandlePerVertexLoadOnly)
+    {
+        if (!(bPerVertexInput || bPerVertexOutput))
+        {
+            return errCode;
+        }
+    }
+    else
+    {
+        if (bPerVertexInput || bPerVertexOutput)
+        {
+            return errCode;
+        }
+    }
+
+    /* Get the symbol, if it is not existed, create one. */
+    pHwSpecificAttributeSym = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, symNameId);
+    if (pHwSpecificAttributeSym == gcvNULL)
+    {
+        /* We may need to create an array symbol. */
+        if (bPerVertexInput || bPerVertexOutput)
+        {
+            gcmASSERT(pShader->shaderLayout.tcs.tcsPatchInputVertices > 0);
+
+            symArrayLength = VIR_Shader_GetTcsPerVertexRegCount(pShader, bPerVertexInput ? VIR_QUERY_PER_VERTEX_INPUT_ONLY : VIR_QUERY_PER_VERTEX_OUTPUT_ONLY);
+
+            if (symArrayLength > 1)
+            {
+                errCode = VIR_Shader_AddArrayType(pShader,
+                                                  symTypeId,
+                                                  symArrayLength,
+                                                  1,
+                                                  &symTypeId);
+                ON_ERROR(errCode, "Fail to add an array type.");
+            }
+        }
+
+        /* Add this attribute as a variable. */
+        errCode = VIR_Shader_AddSymbol(pShader,
+                                       VIR_SYM_VARIABLE,
+                                       symNameId,
+                                       VIR_Shader_GetTypeFromId(pShader, symTypeId),
+                                       VIR_STORAGE_UNKNOWN,
+                                       &hwSpecificAttributeSymId);
+        ON_ERROR(errCode, "Fail to add a symbol.");
+
+        pHwSpecificAttributeSym = VIR_Shader_GetSymFromId(pShader, hwSpecificAttributeSymId);
+        VIR_Symbol_SetPrecision(pHwSpecificAttributeSym, VIR_PRECISION_HIGH);
+        VIR_Symbol_SetTyQualifier(pHwSpecificAttributeSym, VIR_TYQUAL_CONST);
+        VIR_Symbol_SetFlag(pHwSpecificAttributeSym, VIR_SYMFLAG_ENABLED | VIR_SYMFLAG_STATICALLY_USED);
+        VIR_Symbol_SetLayoutQualifier(pHwSpecificAttributeSym, VIR_LAYQUAL_NONE);
+
+        /* Create a temp for this variable. */
+        regId = VIR_Shader_NewVirRegId(pShader, symArrayLength);
+        errCode = VIR_Shader_AddSymbol(pShader,
+                                       VIR_SYM_VIRREG,
+                                       regId,
+                                       VIR_Shader_GetTypeFromId(pShader, symTypeId),
+                                       VIR_STORAGE_UNKNOWN,
+                                       &regSymId);
+        ON_ERROR(errCode, "Fail to add a temp register.");
+
+        pRegSym = VIR_Shader_GetSymFromId(pShader, regSymId);
+
+        VIR_Symbol_SetVariableVregIndex(pHwSpecificAttributeSym, regId);
+        VIR_Symbol_SetIndexRange(pHwSpecificAttributeSym, regId + symArrayLength);
+        VIR_Symbol_SetVregVariable(pRegSym, pHwSpecificAttributeSym);
+        VIR_Symbol_SetIndexRange(pRegSym, regId + symArrayLength);
+
+        /* Insert this variable to the list. */
+        VIR_IdList_Add(pHwSpecificAttributeList, hwSpecificAttributeSymId);
+
+        /* Add a new DEF. */
+        vscVIR_AddNewDef(pDuInfo,
+                         VIR_INPUT_DEF_INST,
+                         regId,
+                         symArrayLength,
+                         symEnable,
+                         VIR_HALF_CHANNEL_MASK_FULL,
+                         gcvNULL,
+                         gcvNULL);
+
+        /* Changed. */
+        bChanged = gcvTRUE;
+    }
+
+    /* Return the results. */
+    if (ppSymbol)
+    {
+        *ppSymbol = pHwSpecificAttributeSym;
+    }
+
+    if (pChanged)
+    {
+        *pChanged |= bChanged;
+    }
+
+OnError:
+    return errCode;
+}
+
 /***************************************Misc passes***************************************/
 DEF_QUERY_PASS_PROP(vscVIR_RemoveNop)
 {
@@ -11429,6 +11629,8 @@ _vscVIR_CheckSymbolUsedByHighpOpnd(
 DEF_QUERY_PASS_PROP(vscVIR_PreprocessCGShader)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
+
+    pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
 }
 
 DEF_SH_NECESSITY_CHECK(vscVIR_PreprocessCGShader)
@@ -11439,11 +11641,22 @@ DEF_SH_NECESSITY_CHECK(vscVIR_PreprocessCGShader)
 VSC_ErrCode vscVIR_PreprocessCGShader(VSC_SH_PASS_WORKER* pPassWorker)
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
-    VIR_Shader          *pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
-    VIR_Dumper          *pDumper = pPassWorker->basePassWorker.pDumper;
+    VIR_Shader*         pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_Dumper*         pDumper = pPassWorker->basePassWorker.pDumper;
+    VIR_DEF_USAGE_INFO* pDuInfo = pPassWorker->pDuInfo;
     VIR_FuncIterator    func_iter;
     VIR_FunctionNode*   func_node;
     gctBOOL             bChanged = gcvFALSE;
+
+    /* if both input and output vertex are less than 4, we pack their regmap in one register. */
+    if (VIR_Shader_IsTCS(pShader)
+        &&
+        (pShader->shaderLayout.tcs.tcsPatchInputVertices <= 4)
+        &&
+        (pShader->shaderLayout.tcs.tcsOutputVertexCount <= 4))
+    {
+        VIR_Shader_SetFlag(pShader, VIR_SHFLAG_TCS_USE_PACKED_REMAP);
+    }
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (func_node = VIR_FuncIterator_First(&func_iter);
@@ -11458,6 +11671,19 @@ VSC_ErrCode vscVIR_PreprocessCGShader(VSC_SH_PASS_WORKER* pPassWorker)
              inst != gcvNULL;
              inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
         {
+            if (VIR_Shader_IsTCS(pShader) || VIR_Shader_IsTES(pShader))
+            {
+                /* Only initialize the per-vertex load attribute here because the vertex count is fixed now. */
+                errCode = vscVIR_AddTsHwSpecificAttribute(pDuInfo,
+                                                          pShader,
+                                                          func,
+                                                          inst,
+                                                          gcvTRUE,
+                                                          gcvNULL,
+                                                          &bChanged);
+                ON_ERROR(errCode, "Fail to add a HW specific attribute.");
+            }
+
             if (VIR_Shader_isDual16Mode(pShader))
             {
                 gctBOOL bNeedRunSingleT = gcvFALSE;
@@ -11513,6 +11739,7 @@ VSC_ErrCode vscVIR_PreprocessCGShader(VSC_SH_PASS_WORKER* pPassWorker)
         VIR_LOG_FLUSH(pDumper);
     }
 
+OnError:
     return errCode;
 }
 
