@@ -382,6 +382,10 @@ enum vxnne_kernel_e
     VXNNE_KERNEL_TENSOREXPAND,
     VXNNE_KERNEL_GPU_TENSOREXPAND,
     VXNNE_KERNEL_FC_TP_CHECK,
+    VXNNE_KERNEL_SWISH,
+    VXNNE_KERNEL_GPU_SWISH,
+    VXNNE_KERNEL_HSWISH,
+    VXNNE_KERNEL_GPU_HSWISH,
     VXNNE_KERNEL_FIXED_COUNT,
 };
 
@@ -2884,6 +2888,23 @@ vxnne_shader_executable vxnneGetLeakyReluShaderExecutable(
     vx_tensor               output
     );
 
+vxnne_shader_executable vxnneGetSwishShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_scalar               beta,
+    vx_tensor               output
+    );
+
+vxnne_shader_executable vxnneGetHSwishShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_tensor               output
+    );
+
 vxnne_shader_executable vxnneGetFC_TPCheckShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
@@ -4253,6 +4274,24 @@ vxnne_shader_executable vxnneGetGPULeakyReluShaderExecutable(
     vx_tensor               input,
     vx_scalar               alpha,
     vx_tensor               output);
+
+vxnne_shader_executable vxnneGetGPUSwishShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_scalar               beta,
+    vx_tensor               output
+    );
+
+vxnne_shader_executable vxnneGetGPUHSwishShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_tensor               output
+    );
+
 
 vxnne_shader_executable vxnneGetGPUBatchNormShaderExecutable(
     vx_context              context,

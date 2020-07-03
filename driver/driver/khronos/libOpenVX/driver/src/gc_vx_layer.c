@@ -5747,6 +5747,685 @@ OnError:
     return VX_NULL;
 }
 
+vxnne_shader_executable vxnneGetSwishShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_scalar               beta,
+    vx_tensor               output
+    )
+{
+#if !gcdUSE_VXC_BINARY
+    vx_size    programLength = {0};
+    char *programSources     = NULL;
+#endif
+    vx_program program = VX_NULL;
+    vx_status  status = VX_FAILURE;
+    vxnne_shader_executable shaderExecutable = VX_NULL;
+    vxnne_kernel_shaders        kernel;
+
+    vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+    vx_reference  parameters[3]         = {(vx_reference)input, (vx_reference)output, (vx_reference)beta};
+    vx_uint32     dims                  = TENSOR_DIM_NUM(output);
+    vx_uint32     width                 = TENSOR_VIEW_SIZE_INDEX(output, 0);
+    vx_uint32     height                = dims > 1 ? TENSOR_VIEW_SIZE_INDEX(output, 1) : 1;
+    vx_uint32     depth                 = dims > 2 ? TENSOR_VIEW_SIZE_INDEX(output, 2) : 1;
+    vx_enum       srcFormat             = TENSOR_DATA_TYPE(input);
+    vx_enum       dstFormat             = TENSOR_DATA_TYPE(output);
+    vx_enum       inputQuantType        = TENSOR_QUANT_TYPE(input);
+    vx_enum       outputQuantType       = TENSOR_QUANT_TYPE(output);
+    vx_float32    input_scale           = 1.0f;
+    vx_float32    output_scale          = 1.0f;
+    vx_float32    inputTail             = 0;
+    vx_float32    outputZP              = 0;
+    vx_int8       srcFixPointPos        = 0;
+    vx_int8       dstFixPointPos        = 0;
+    vx_tensor     src0                  = NULL;
+    vx_tensor     dst                   = NULL;
+    vx_bool       enable_image_2d       = vx_false_e;
+    vx_float32    logE                  = (vx_float32)(log10(exp(1.0f)) / log10(2.0f));
+
+    gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
+         context, kernelEnum, borderMode, input, output);
+
+    if (1 == depth)
+    {
+        enable_image_2d = vx_true_e;
+    }
+
+    if(TENSOR_DIM_NUM(input) == 1)
+    {
+        vx_uint32 sizes[4] = {1, 1, 1, 1};
+
+        sizes[0]     = TENSOR_VIEW_SIZE_INDEX(input, 0);
+        src0          = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, 2);
+        parameters[0] = (vx_reference)src0;
+    }
+
+    if(TENSOR_DIM_NUM(output) == 1)
+    {
+        vx_uint32 sizes[4] = {1, 1, 1, 1};
+
+        sizes[0]    = TENSOR_VIEW_SIZE_INDEX(output, 0);
+        dst         = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 2);
+        parameters[2] = (vx_reference)dst;
+    }
+
+    borderMode->mode = VX_BORDER_REPLICATE;
+
+    if (inputQuantType == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        srcFixPointPos = TENSOR_POS(input);
+
+        if (srcFixPointPos >= 0)
+        {
+            input_scale = 1.0f / (vx_float32) (1 << srcFixPointPos);
+        }
+        else if (srcFixPointPos < 0)
+        {
+            input_scale = (vx_float32)(1 << -srcFixPointPos);
+        }
+    }
+    else if (inputQuantType == VX_QUANT_AFFINE_SCALE)
+    {
+        input_scale  = TENSOR_TF_SCALE(input);
+        inputTail    = 0 - (vx_float32)TENSOR_TF_ZEROPOINT(input) * input_scale;
+    }
+
+    if (outputQuantType == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        dstFixPointPos = TENSOR_POS(output);
+
+        if (dstFixPointPos >= 0)
+        {
+            output_scale = (vx_float32) (1 << dstFixPointPos);
+        }
+        else if (dstFixPointPos < 0)
+        {
+            output_scale = 1.0f / (vx_float32)(1 << -dstFixPointPos);
+        }
+    }
+    else if (outputQuantType == VX_QUANT_AFFINE_SCALE)
+    {
+        output_scale  = 1.0f / TENSOR_TF_SCALE(output);
+        outputZP      = (vx_float32)TENSOR_TF_ZEROPOINT(output);
+    }
+
+    kernel = vxnneGetKernelShadersByEnum(context, kernelEnum);
+
+    if (!kernel)
+    {
+        /* register an shader kernel */
+#if gcdUSE_VXC_BINARY
+        vx_uint32 len;
+        void * ptr = getVXCKernelInfo(context, Swish, &len);
+        program = vxCreateProgramWithBinary(context, ptr, len);
+#else
+        char path[_vxcFILENAME_MAX];
+
+        vxmONERROR(getFilePath("nnvxc_kernels/Swish.vx", path));
+
+        vxmONERROR_NULLPTR(programSources = loadSources(path, &programLength));
+
+        vxmONERROR_NULLPTR(program = vxCreateProgramWithSource(context, 1, (const vx_char**)&programSources, &programLength));
+
+        if (programSources)
+        {
+            vxFree(programSources);
+            programSources = NULL;
+        }
+#endif /*gcdUSE_VXC_BINARY*/
+        status = vxGetStatus((vx_reference)program);
+        if (status != VX_SUCCESS) goto OnError;
+
+        status = vxBuildProgram(program, "-cl-viv-vx-extension");
+        if (status != VX_SUCCESS) goto OnError;
+
+        kernel = vxnneAddKernelShadersInProgram(context, "swish", program, 3, kernelEnum);
+        if (!kernel) goto OnError;
+
+        vxReleaseProgram(&program);
+    }
+
+    {
+        vx_uint32 offset = 0;
+        char kernelName[1024];
+
+        switch (srcFormat)
+        {
+        case VX_TYPE_INT8:
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_I8");
+            break;
+        case VX_TYPE_UINT8:
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_U8");
+            break;
+        case VX_TYPE_INT16:
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_I16");
+            break;
+        case VX_TYPE_FLOAT16:
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_F16");
+            break;
+        case VX_TYPE_BFLOAT16:
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_BF16");
+            break;
+        default:
+            break;
+        }
+
+        switch (dstFormat)
+        {
+        case VX_TYPE_INT8:
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toI8");
+            break;
+        case VX_TYPE_UINT8:
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toU8");
+            break;
+        case VX_TYPE_INT16:
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toI16");
+            break;
+        case VX_TYPE_FLOAT16:
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toF16");
+            break;
+        case VX_TYPE_BFLOAT16:
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toBF16");
+            break;
+        default:
+            break;
+        }
+
+        if (enable_image_2d)
+        {
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_2D");
+        }
+
+        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, kernelName, borderMode);
+        if (!shaderExecutable) goto OnError;
+    }
+
+    {
+        vx_uint32 uniExtractInteger_2x8[16] = {
+            0x33333333, // TCfg
+            0x11110000, // ASelt
+            0x03020100, 0x03020100, // ABin
+            0x00000000, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00002400, // AccumType, ConstantType, and PostShift
+            0x00000000, 0x00000000, 0x00000000, 0x00000000,
+            0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
+        };
+        vx_uint32 uniExtractHalf8_2x8[16] = {
+            0x11111111, // TCfg
+            0x11110000, // ASelt
+            0x06040200, 0x06040200, // ABin
+            0x22222222, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000100, // AccumType, ConstantType, and PostShift
+            0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00,
+            0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00 // Constant
+        };
+        vx_uint32 uniDatatoFp32Part0_4x4[16] = {
+            0x01010101, // TCfg
+            0x00000000, // ASelt
+            0x00010000, 0x00030002, // ABin
+            0x02020202, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000100, // AccumType, ConstantType, and PostShift
+            0x00003c00, 0x00000000, 0x00003c00, 0x00000000, 0x00003c00, 0x00000000, 0x00003c00, 0x00000000 // Constant
+        };
+        vx_uint32 uniDatatoFp32Part1_4x4[16] = {
+            0x01010101, // TCfg
+            0x00000000, // ASelt
+            0x00050004, 0x00070006, // ABin
+            0x02020202, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000100, // AccumType, ConstantType, and PostShift
+            0x00003c00, 0x00000000, 0x00003c00, 0x00000000, 0x00003c00, 0x00000000, 0x00003c00, 0x00000000 // Constant
+        };
+        vx_uint32 uniConvBF16toF32_Part0_2x8[16] = {
+            0x11111111, // TCfg
+            0x01010101, // ASelt
+            0x01050004, 0x03070206, // ABin
+            0x22222222, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000600, // AccumType, ConstantType, and PostShift
+            0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+        };
+        vx_uint32 uniConvBF16toF32_Part1_2x8[16] = {
+            0x11111111, // TCfg
+            0x01010101, // ASelt
+            0x05050404, 0x07070606, // ABin
+            0x22222222, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000600, // AccumType, ConstantType, and PostShift
+            0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+        };
+        vx_uint32 uniExtractOddData_2x8[16] = {
+            0x11111111, // TCfg
+            0x11110000, // ASelt
+            0x07050301, 0x07050301, // ABin
+            0x22222222, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000600, // AccumType, ConstantType, and PostShift
+            0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+        };
+
+        if (VX_TYPE_BFLOAT16 == srcFormat && VX_TYPE_BFLOAT16 == dstFormat)
+        {
+            status  = vxnneShaderExecutable_SetUniform(shaderExecutable,
+                "uniConvBF16toF32_Part0_2x8", 1, uniConvBF16toF32_Part0_2x8);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable,
+                "uniConvBF16toF32_Part1_2x8", 1, uniConvBF16toF32_Part1_2x8);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable,
+                "uniExtractOddData_2x8", 1, uniExtractOddData_2x8);
+            if (VX_SUCCESS != status) goto OnError;
+        }
+
+        if (VX_TYPE_FLOAT16 == dstFormat)
+        {
+            status = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniExtract8Data_2x8", 1, uniExtractHalf8_2x8);
+        }
+        else
+        {
+            status = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniExtract8Data_2x8", 1, uniExtractInteger_2x8);
+        }
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "inputScale", 1, &input_scale);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "inputTail", 1, &inputTail);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outputScale", 1, &output_scale);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outputZP", 1, &outputZP);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniDatatoFp32Part0_4x4", 1, uniDatatoFp32Part0_4x4);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniDatatoFp32Part1_4x4", 1, uniDatatoFp32Part1_4x4);
+        if (VX_SUCCESS != status) goto OnError;
+
+        status = vxnneShaderExecutable_SetUniform(shaderExecutable, "logE", 1, &logE);
+        if (VX_SUCCESS != status) goto OnError;
+    }
+
+    execution_parameters.globalWorkScale[0]  = 8;
+    execution_parameters.globalWorkScale[1]  = 1;
+    execution_parameters.globalWorkScale[2]  = 1;
+    if (enable_image_2d)
+    {
+        execution_parameters.workDim = 2;
+        execution_parameters.globalWorkSize[0]   = (width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0];
+        execution_parameters.globalWorkSize[1]   = height;
+    }
+    else
+    {
+        execution_parameters.workDim = 3;
+        execution_parameters.globalWorkSize[0]   = (width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0];
+        execution_parameters.globalWorkSize[1]   = height;
+        execution_parameters.globalWorkSize[2]   = depth;
+    }
+
+    if (!shaderExecutable) goto OnError;
+    status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 3);
+    if (status != VX_SUCCESS) goto OnError;
+
+    status = vxnneShaderExecutable_SetExecutionParameters(shaderExecutable, &execution_parameters);
+    if (status != VX_SUCCESS) goto OnError;
+
+    if (src0) vxoTensor_ReleaseTensor(&src0);
+    if (dst) vxoTensor_ReleaseTensor(&dst);
+
+    gcmFOOTER_ARG("%p", shaderExecutable);
+    return shaderExecutable;
+
+OnError:
+    if (src0) vxoTensor_ReleaseTensor(&src0);
+    if (dst) vxoTensor_ReleaseTensor(&dst);
+    if (program) vxReleaseProgram(&program);
+    if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
+
+#if !gcdUSE_VXC_BINARY
+    if (programSources)
+    {
+        vxFree(programSources);
+        programSources = NULL;
+    }
+#endif
+
+    gcmFOOTER_NO();
+    return VX_NULL;
+}
+
+
+vxnne_shader_executable vxnneGetHSwishShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_tensor               output
+    )
+{
+#if !gcdUSE_VXC_BINARY
+    vx_size    programLength = {0};
+    char *programSources     = NULL;
+#endif
+    vx_program program = VX_NULL;
+    vx_status  status = VX_FAILURE;
+    vxnne_shader_executable shaderExecutable = VX_NULL;
+    vxnne_kernel_shaders        kernel;
+
+    vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+    vx_reference  parameters[2]         = {(vx_reference)input, (vx_reference)output};
+    vx_uint32     dims                  = TENSOR_DIM_NUM(output);
+    vx_uint32     width                 = TENSOR_VIEW_SIZE_INDEX(output, 0);
+    vx_uint32     height                = dims > 1 ? TENSOR_VIEW_SIZE_INDEX(output, 1) : 1;
+    vx_uint32     depth                 = dims > 2 ? TENSOR_VIEW_SIZE_INDEX(output, 2) : 1;
+    vx_enum       srcFormat             = TENSOR_DATA_TYPE(input);
+    vx_enum       dstFormat             = TENSOR_DATA_TYPE(output);
+    vx_enum       inputQuantType        = TENSOR_QUANT_TYPE(input);
+    vx_enum       outputQuantType       = TENSOR_QUANT_TYPE(output);
+    vx_float32    input_scale           = 1.0f;
+    vx_float32    output_scale          = 1.0f;
+    vx_float32    inputTail             = 0;
+    vx_float32    outputZP              = 0;
+    vx_int8       srcFixPointPos        = 0;
+    vx_int8       dstFixPointPos        = 0;
+    vx_tensor     src0                  = NULL;
+    vx_tensor     dst                   = NULL;
+    vx_bool       enable_image_2d       = vx_false_e;
+
+    gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
+         context, kernelEnum, borderMode, input, output);
+
+    if (1 == depth)
+    {
+        enable_image_2d = vx_true_e;
+    }
+
+    if(TENSOR_DIM_NUM(input) == 1)
+    {
+        vx_uint32 sizes[4] = {1, 1, 1, 1};
+
+        sizes[0]     = TENSOR_VIEW_SIZE_INDEX(input, 0);
+        src0          = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, 2);
+        parameters[0] = (vx_reference)src0;
+    }
+
+    if(TENSOR_DIM_NUM(output) == 1)
+    {
+        vx_uint32 sizes[4] = {1, 1, 1, 1};
+
+        sizes[0]    = TENSOR_VIEW_SIZE_INDEX(output, 0);
+        dst         = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 2);
+        parameters[1] = (vx_reference)dst;
+    }
+
+    borderMode->mode = VX_BORDER_REPLICATE;
+
+    if (inputQuantType == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        srcFixPointPos = TENSOR_POS(input);
+
+        if (srcFixPointPos >= 0)
+        {
+            input_scale = 1.0f / (vx_float32) (1 << srcFixPointPos);
+        }
+        else if (srcFixPointPos < 0)
+        {
+            input_scale = (vx_float32)(1 << -srcFixPointPos);
+        }
+    }
+    else if (inputQuantType == VX_QUANT_AFFINE_SCALE)
+    {
+        input_scale  = TENSOR_TF_SCALE(input);
+        inputTail    = 0 - (vx_float32)TENSOR_TF_ZEROPOINT(input) * input_scale;
+    }
+
+    if (outputQuantType == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        dstFixPointPos = TENSOR_POS(output);
+
+        if (dstFixPointPos >= 0)
+        {
+            output_scale = (vx_float32) (1 << dstFixPointPos);
+        }
+        else if (dstFixPointPos < 0)
+        {
+            output_scale = 1.0f / (vx_float32)(1 << -dstFixPointPos);
+        }
+    }
+    else if (outputQuantType == VX_QUANT_AFFINE_SCALE)
+    {
+        output_scale  = 1.0f / TENSOR_TF_SCALE(output);
+        outputZP      = (vx_float32)TENSOR_TF_ZEROPOINT(output);
+    }
+
+    kernel = vxnneGetKernelShadersByEnum(context, kernelEnum);
+
+    if (!kernel)
+    {
+        /* register an shader kernel */
+#if gcdUSE_VXC_BINARY
+        vx_uint32 len;
+        void * ptr = getVXCKernelInfo(context, HSwish, &len);
+        program = vxCreateProgramWithBinary(context, ptr, len);
+#else
+        char path[_vxcFILENAME_MAX];
+
+        vxmONERROR(getFilePath("nnvxc_kernels/HSwish.vx", path));
+
+        vxmONERROR_NULLPTR(programSources = loadSources(path, &programLength));
+
+        vxmONERROR_NULLPTR(program = vxCreateProgramWithSource(context, 1, (const vx_char**)&programSources, &programLength));
+
+        if (programSources)
+        {
+            vxFree(programSources);
+            programSources = NULL;
+        }
+#endif /*gcdUSE_VXC_BINARY*/
+        status = vxGetStatus((vx_reference)program);
+        if (status != VX_SUCCESS) goto OnError;
+
+        status = vxBuildProgram(program, "-cl-viv-vx-extension");
+        if (status != VX_SUCCESS) goto OnError;
+
+        kernel = vxnneAddKernelShadersInProgram(context, "hswish", program, 2, kernelEnum);
+        if (!kernel) goto OnError;
+
+        vxReleaseProgram(&program);
+    }
+
+    {
+        vx_uint32 offset = 0;
+        char kernelName[1024];
+
+        switch (srcFormat)
+        {
+        case VX_TYPE_INT8:
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_I8");
+            break;
+        case VX_TYPE_UINT8:
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_U8");
+            break;
+        case VX_TYPE_INT16:
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_I16");
+            break;
+        case VX_TYPE_FLOAT16:
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_F16");
+            break;
+        case VX_TYPE_BFLOAT16:
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_BF16");
+            break;
+        default:
+            break;
+        }
+
+        switch (dstFormat)
+        {
+        case VX_TYPE_INT8:
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toI8");
+            break;
+        case VX_TYPE_UINT8:
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toU8");
+            break;
+        case VX_TYPE_INT16:
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toI16");
+            break;
+        case VX_TYPE_FLOAT16:
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toF16");
+            break;
+        case VX_TYPE_BFLOAT16:
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toBF16");
+            break;
+        default:
+            break;
+        }
+
+        if (enable_image_2d)
+        {
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_2D");
+        }
+
+        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, kernelName, borderMode);
+        if (!shaderExecutable) goto OnError;
+    }
+
+    {
+        vx_uint32 uniExtractInteger_2x8[16] = {
+            0x33333333, // TCfg
+            0x11110000, // ASelt
+            0x03020100, 0x03020100, // ABin
+            0x00000000, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00002400, // AccumType, ConstantType, and PostShift
+            0x00000000, 0x00000000, 0x00000000, 0x00000000,
+            0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
+        };
+        vx_uint32 uniExtractHalf8_2x8[16] = {
+            0x11111111, // TCfg
+            0x11110000, // ASelt
+            0x06040200, 0x06040200, // ABin
+            0x22222222, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000100, // AccumType, ConstantType, and PostShift
+            0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00,
+            0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00 // Constant
+        };
+        vx_uint32 uniDatatoFp32Part0_4x4[16] = {
+            0x01010101, // TCfg
+            0x00000000, // ASelt
+            0x00010000, 0x00030002, // ABin
+            0x02020202, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000100, // AccumType, ConstantType, and PostShift
+            0x00003c00, 0x00000000, 0x00003c00, 0x00000000, 0x00003c00, 0x00000000, 0x00003c00, 0x00000000 // Constant
+        };
+        vx_uint32 uniDatatoFp32Part1_4x4[16] = {
+            0x01010101, // TCfg
+            0x00000000, // ASelt
+            0x00050004, 0x00070006, // ABin
+            0x02020202, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000100, // AccumType, ConstantType, and PostShift
+            0x00003c00, 0x00000000, 0x00003c00, 0x00000000, 0x00003c00, 0x00000000, 0x00003c00, 0x00000000 // Constant
+        };
+        vx_uint32 uniConvBF16toF32_Part0_2x8[16] = {
+            0x11111111, // TCfg
+            0x01010101, // ASelt
+            0x01050004, 0x03070206, // ABin
+            0x22222222, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000600, // AccumType, ConstantType, and PostShift
+            0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+        };
+        vx_uint32 uniConvBF16toF32_Part1_2x8[16] = {
+            0x11111111, // TCfg
+            0x01010101, // ASelt
+            0x05050404, 0x07070606, // ABin
+            0x22222222, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000600, // AccumType, ConstantType, and PostShift
+            0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+        };
+        vx_uint32 uniExtractOddData_2x8[16] = {
+            0x11111111, // TCfg
+            0x11110000, // ASelt
+            0x07050301, 0x07050301, // ABin
+            0x22222222, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000600, // AccumType, ConstantType, and PostShift
+            0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+        };
+
+        if (VX_TYPE_BFLOAT16 == srcFormat && VX_TYPE_BFLOAT16 == dstFormat)
+        {
+            status  = vxnneShaderExecutable_SetUniform(shaderExecutable,
+                "uniConvBF16toF32_Part0_2x8", 1, uniConvBF16toF32_Part0_2x8 );
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable,
+                "uniConvBF16toF32_Part1_2x8", 1, uniConvBF16toF32_Part1_2x8);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable,
+                "uniExtractOddData_2x8", 1, uniExtractOddData_2x8);
+            if (VX_SUCCESS != status) goto OnError;
+        }
+
+        if (VX_TYPE_FLOAT16 == dstFormat)
+        {
+            status = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniExtract8Data_2x8", 1, uniExtractHalf8_2x8);
+        }
+        else
+        {
+            status = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniExtract8Data_2x8", 1, uniExtractInteger_2x8);
+        }
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "inputScale", 1, &input_scale);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "inputTail", 1, &inputTail);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outputScale", 1, &output_scale);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outputZP", 1, &outputZP);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniDatatoFp32Part0_4x4", 1, uniDatatoFp32Part0_4x4);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniDatatoFp32Part1_4x4", 1, uniDatatoFp32Part1_4x4);
+        if (VX_SUCCESS != status) goto OnError;
+    }
+
+    execution_parameters.globalWorkScale[0]  = 8;
+    execution_parameters.globalWorkScale[1]  = 1;
+    execution_parameters.globalWorkScale[2]  = 1;
+    if (enable_image_2d)
+    {
+        execution_parameters.workDim = 2;
+        execution_parameters.globalWorkSize[0]   = (width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0];
+        execution_parameters.globalWorkSize[1]   = height;
+    }
+    else
+    {
+        execution_parameters.workDim = 3;
+        execution_parameters.globalWorkSize[0]   = (width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0];
+        execution_parameters.globalWorkSize[1]   = height;
+        execution_parameters.globalWorkSize[2]   = depth;
+    }
+
+    if (!shaderExecutable) goto OnError;
+    status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 2);
+    if (status != VX_SUCCESS) goto OnError;
+
+    status = vxnneShaderExecutable_SetExecutionParameters(shaderExecutable, &execution_parameters);
+    if (status != VX_SUCCESS) goto OnError;
+
+    if (src0) vxoTensor_ReleaseTensor(&src0);
+    if (dst) vxoTensor_ReleaseTensor(&dst);
+
+    gcmFOOTER_ARG("%p", shaderExecutable);
+    return shaderExecutable;
+
+OnError:
+    if (src0) vxoTensor_ReleaseTensor(&src0);
+    if (dst) vxoTensor_ReleaseTensor(&dst);
+    if (program) vxReleaseProgram(&program);
+    if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
+
+#if !gcdUSE_VXC_BINARY
+    if (programSources)
+    {
+        vxFree(programSources);
+        programSources = NULL;
+    }
+#endif
+
+    gcmFOOTER_NO();
+    return VX_NULL;
+}
 
 vxnne_shader_executable vxnneGetFC_TPCheckShaderExecutable(
     vx_context              context,
