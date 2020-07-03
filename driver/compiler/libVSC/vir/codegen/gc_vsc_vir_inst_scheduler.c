@@ -706,6 +706,10 @@ static VSC_BIT_VECTOR* _VSC_IS_DepDag_RentANodesBV(
             if(nodes_bv == gcvNULL)
             {
                 nodes_bv = vscBV_Create(VSC_IS_DepDag_GetMM(dag), VSC_IS_DepDag_GetGeneratedNodeCount(dag));
+                if(nodes_bv == gcvNULL)
+                {
+                    return gcvNULL;
+                }
                 VSC_IS_DepDag_SetNodes_BV(dag, i, nodes_bv);
             }
             VSC_IS_DepDag_SetUsingNodesBVs(dag, i);
@@ -751,6 +755,10 @@ static VSC_BIT_VECTOR* _VSC_IS_DepDag_RentAEdgesBV(
             if(edges_bv == gcvNULL)
             {
                 edges_bv = vscBV_Create(VSC_IS_DepDag_GetMM(dag), VSC_IS_DepDag_GetGeneratedEdgeCount(dag) * 8);
+                if(edges_bv == gcvNULL)
+                {
+                    return gcvNULL;
+                }
                 VSC_IS_DepDag_SetEdges_BV(dag, i, edges_bv);
             }
             VSC_IS_DepDag_SetUsingEdgesBVs(dag, i);

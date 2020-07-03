@@ -165,6 +165,8 @@ static VSC_LCSE_Key* _VSC_LCSE_ExpMap_NewKey(
     )
 {
     VSC_LCSE_Key* newKey = (VSC_LCSE_Key*)vscMM_Alloc(VSC_LCSE_ExpMap_GetMM(expMap), sizeof(VSC_LCSE_Key));
+    if(!newKey)
+        return newKey;
     _VSC_LCSE_Key_Init(newKey, inst, commonEval, firstEval);
 
     return newKey;
@@ -310,15 +312,17 @@ static gctBOOL _VSC_LCSE_ExpMap_FindExp(
     return gcvFALSE;
 }
 
-static void _VSC_LCSE_ExpMap_Gen(
+static VSC_ErrCode _VSC_LCSE_ExpMap_Gen(
     IN VSC_LCSE_ExpMap*     expMap,
     IN VIR_Instruction*     inst
     )
 {
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
     VSC_OPTN_LCSEOptions*   options = VSC_LCSE_ExpMap_GetOptions(expMap);
     VIR_Dumper*             dumper = VSC_LCSE_ExpMap_GetDumper(expMap);
     gctBOOL                 bVectorizeAttrLd = VSC_LCSE_ExpMap_GetVectorizeAttrLd(expMap);
     VSC_HASH_TABLE*         pWorkingInstSet = VSC_LCSE_ExpMap_GetWorkingInstSet(expMap);
+    VSC_LCSE_Key*           key;
 
     /* generated new expression */
     if(VSC_UTILS_MASK(VSC_OPTN_LCSEOptions_GetTrace(options), VSC_OPTN_LCSEOptions_TRACE_GENERATING))
@@ -327,7 +331,12 @@ static void _VSC_LCSE_ExpMap_Gen(
         VIR_Inst_Dump(dumper, inst);
     }
 
-    _VSC_LCSE_ExpMap_InsertKey(expMap, _VSC_LCSE_ExpMap_NewKey(expMap, inst, gcvNULL, inst));
+    key = _VSC_LCSE_ExpMap_NewKey(expMap, inst, gcvNULL, inst);
+    if(key == gcvNULL)
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
+    _VSC_LCSE_ExpMap_InsertKey(expMap, key);
 
     if (bVectorizeAttrLd)
     {
@@ -336,6 +345,7 @@ static void _VSC_LCSE_ExpMap_Gen(
         /* Insert a NULL key value here. */
         vscHTBL_DirectSet(pWorkingInstSet, (void *)inst, (void *)gcvNULL);
     }
+    return errCode;
 }
 
 static void _VSC_LCSE_ExpMap_Update(
@@ -917,7 +927,8 @@ static VSC_ErrCode _VSC_LCSE_PerformOnBBForAttrLd(
             {
                 if (vscHTBL_CountItems(pWorkingInstSet) <= maxInstCount)
                 {
-                    _VSC_LCSE_ExpMap_Gen(pFuncExpMap, pInstIter);
+                    errCode = _VSC_LCSE_ExpMap_Gen(pFuncExpMap, pInstIter);
+                    ON_ERROR(errCode, "Fail to gen ExpMap.");
                 }
             }
 
@@ -937,6 +948,7 @@ static VSC_ErrCode _VSC_LCSE_PerformOnBBForAttrLd(
 
     VSC_LCSE_ExpMap_SetVectorizeAttrLd(pFuncExpMap, gcvFALSE);
 
+    OnError:
     return errCode;
 }
 
@@ -1053,7 +1065,8 @@ static VSC_ErrCode _VSC_LCSE_PerformOnBB(
             }
             else
             {
-                _VSC_LCSE_ExpMap_Gen(&expMap, instIter);
+                errCode = _VSC_LCSE_ExpMap_Gen(&expMap, instIter);
+                ON_ERROR(errCode, "Fail to gen ExpMap.");
             }
         } while(gcvFALSE);
 
@@ -1077,6 +1090,7 @@ static VSC_ErrCode _VSC_LCSE_PerformOnBB(
         VIR_BasicBlock_Dump(dumper, bb, gcvTRUE);
     }
 
+    OnError:
     return errCode;
 }
 

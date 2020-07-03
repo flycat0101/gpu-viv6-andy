@@ -667,6 +667,8 @@ VSC_ErrCode VSC_IL_InlineSingleFunction(
         VSC_IL_INST_LIST_NODE   *node =
             (VSC_IL_INST_LIST_NODE*)vscMM_Alloc(VSC_IL_GetMM(pInliner),
             sizeof(VSC_IL_INST_LIST_NODE));
+        if(!node)
+            return VSC_ERR_OUT_OF_MEMORY;
         node->inst = pInst;
         INST_LIST_ADD_NODE(&calleeInsts, node);
     }
@@ -951,6 +953,8 @@ VSC_ErrCode VSC_IL_OptimizeCallStackDepth(
     ppFuncBlkRPO = (VIR_FUNC_BLOCK**)vscMM_Alloc(VSC_IL_GetMM(pInliner),
         sizeof(VIR_FUNC_BLOCK*)*countOfFuncBlk);
 
+    if(!ppFuncBlkRPO)
+        return VSC_ERR_OUT_OF_MEMORY;
     /* bottom up traverse of the call graph */
     CHECK_ERROR0(vscDG_PstOrderTraversal(&pCG->dgGraph,
                             VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
@@ -1037,6 +1041,8 @@ VSC_ErrCode VSC_IL_TopDownInline(
     ppFuncBlkRPO = (VIR_FUNC_BLOCK**)vscMM_Alloc(VSC_IL_GetMM(pInliner),
         sizeof(VIR_FUNC_BLOCK*)*countOfFuncBlk);
 
+    if(!ppFuncBlkRPO)
+        return VSC_ERR_OUT_OF_MEMORY;
     CHECK_ERROR0(vscDG_PstOrderTraversal(&pCG->dgGraph,
                             VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                             gcvFALSE,

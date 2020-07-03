@@ -197,6 +197,10 @@ static gctSTRING _GetVectorizedSymStrName(VIR_Shader* pShader, VIR_Symbol** ppSy
     newNameLength += 8;
 
     strNewName = (gctSTRING)vscMM_Alloc(pMM, newNameLength);
+    if(strNewName == gcvNULL)
+    {
+        return gcvNULL;
+    }
     strNewName[0] = '\0';
 
     /* Instance name */
@@ -351,6 +355,11 @@ static VSC_ErrCode _CreateIoVectorizedInfoFromIoPacket(VIR_Shader* pShader,
 
     /* Add new vectorized sym name */
     strNewName = _GetVectorizedIoSymStrName(pShader, pIoPacket, pMM);
+    if(strNewName == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR(errCode, "Add vectorized IO string");
+    }
     errCode = VIR_Shader_AddString(pShader,strNewName, &newNameId);
     ON_ERROR(errCode, "Add vectorized IO string");
 
@@ -380,6 +389,11 @@ static VSC_ErrCode _CreateIoVectorizedInfoFromIoPacket(VIR_Shader* pShader,
     pIoVectorizedInfo->vectorizedInfo.pVectorizedSym = pNewSym;
     pIoVectorizedInfo->vectorizedInfo.virRegRange = virRegRange;
 
+    if(pIoVectorizedInfo->vectorizedInfo.ppVectorizedVirRegArray == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR(errCode, "Get vectorized vectorizedInfo failed");
+    }
     /* Set correct attributes for this new sym */
     VIR_Symbol_SetTyQualifier(pNewSym, pIoPacket->bOutput ? VIR_TYQUAL_NONE : VIR_TYQUAL_CONST);
     VIR_Symbol_SetLayoutQualifier(pNewSym, VIR_LAYQUAL_NONE);
@@ -4129,6 +4143,12 @@ VSC_ErrCode vscVIR_VectorizeIoPackets(VIR_IO_VECTORIZE_PARAM* pIoVecParam)
     VIR_IO_VECTORIZED_INFO*     pIoVectorizedInfoArray = gcvNULL;
 
     pIoVectorizedInfoArray = (VIR_IO_VECTORIZED_INFO*)vscMM_Alloc(pMM, sizeof(VIR_IO_VECTORIZED_INFO)*numOfPackets);
+
+    if(pIoVectorizedInfoArray == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR(errCode, "Allocate pIoVectorizedInfoArray failed");
+    }
 
     /* Create io-vectorized-info based on each io-packet */
     for (packetIdx = 0; packetIdx < numOfPackets; packetIdx ++)

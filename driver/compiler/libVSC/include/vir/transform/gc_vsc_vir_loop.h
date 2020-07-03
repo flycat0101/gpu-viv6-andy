@@ -326,7 +326,7 @@ VIR_LoopOpts_DetectNaturalLoops(
     VIR_LoopOpts* loopOpts
     );
 
-void
+VSC_ErrCode
 VIR_LoopOpts_ComputeLoopBodies(
     VIR_LoopOpts* loopOpts
     );

@@ -68,7 +68,7 @@ typedef struct _VSC_BIT_VECTOR
 /* Creation, resize and destroy */
 VSC_BIT_VECTOR* vscBV_Create(VSC_MM* pMM, gctINT bvSize);
 VSC_ErrCode vscBV_Initialize(VSC_BIT_VECTOR* pBV, VSC_MM* pMM, gctINT bvSize);
-void vscBV_Resize(VSC_BIT_VECTOR *pBV, gctINT newBVSize, gctBOOL bKeep);
+VSC_ErrCode vscBV_Resize(VSC_BIT_VECTOR *pBV, gctINT newBVSize, gctBOOL bKeep);
 void vscBV_Destroy(VSC_BIT_VECTOR* pBV);
 void vscBV_Finalize(VSC_BIT_VECTOR* pBV);
 void vscBV_Reset(VSC_BIT_VECTOR* pBV);
@@ -287,7 +287,7 @@ typedef struct _VSC_STATE_VECTOR
 /* Creation, resize and destroy */
 VSC_STATE_VECTOR* vscSV_Create(VSC_MM* pMM, gctINT svSize, gctUINT stateCount);
 VSC_ErrCode vscSV_Initialize(VSC_STATE_VECTOR* pSV, VSC_MM* pMM, gctINT svSize, gctUINT stateCount);
-void vscSV_Resize(VSC_STATE_VECTOR *pSV, gctINT newSvSize, gctBOOL bKeep);
+VSC_ErrCode vscSV_Resize(VSC_STATE_VECTOR *pSV, gctINT newSvSize, gctBOOL bKeep);
 void vscSV_Destroy(VSC_STATE_VECTOR* pSV);
 void vscSV_Finalize(VSC_STATE_VECTOR* pSV);
 void vscSV_Reset(VSC_STATE_VECTOR* pSV);

@@ -497,6 +497,8 @@ _InsertPrecisionConvInst(
                    will change the udChain */
                 defCount = UD_CHAIN_GET_DEF_COUNT(&pUsage->udChain);
                 defIdxArray = (gctUINT*)vscMM_Alloc(pMM, defCount * sizeof(gctUINT));
+                if(!defIdxArray)
+                    return VSC_ERR_OUT_OF_MEMORY;
                 for (j = 0; j < defCount; j ++)
                 {
                     defIdx = UD_CHAIN_GET_DEF(&pUsage->udChain, j);

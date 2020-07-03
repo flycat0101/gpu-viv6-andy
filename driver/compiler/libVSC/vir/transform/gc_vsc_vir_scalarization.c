@@ -73,15 +73,19 @@ static VIR_Symbol* _VSC_SCL_ArrayInfo_GetNewSymbol(
     return new_sym;
 }
 
-static void _VSC_SCL_ArrayInfo_AppandOperand(
+static VSC_ErrCode _VSC_SCL_ArrayInfo_AppandOperand(
     IN OUT VSC_SCL_ArrayInfo* array_info,
     VIR_Operand* opnd
     )
 {
+    VSC_ErrCode     errCode     = VSC_ERR_NONE;
     VSC_SCL_OperandListNode* node =
         (VSC_SCL_OperandListNode*)vscMM_Alloc(VSC_SCL_ArrayInfo_GetMM(array_info), sizeof(VSC_SCL_OperandListNode));
+    if(node == gcvNULL)
+        return  VSC_ERR_OUT_OF_MEMORY;
     VSC_SCL_OperandListNode_SetOpnd(node, opnd);
     vscUNILST_Append(VSC_SCL_ArrayInfo_GetOpndList(array_info), VSC_SCL_OperandListNode_GetNode(node));
+    return errCode;
 }
 static void _VSC_SCL_ArrayInfo_DumpConstIndexes(
     IN VSC_BIT_VECTOR* const_indexes,
@@ -137,6 +141,8 @@ static VSC_SCL_ArrayInfo* _VSC_SCL_Scalarization_NewArrayInfo(
     )
 {
     VSC_SCL_ArrayInfo* array_info = (VSC_SCL_ArrayInfo*)vscMM_Alloc(VSC_SCL_Scalarization_GetMM(scl), sizeof(VSC_SCL_ArrayInfo));
+    if(array_info == gcvNULL)
+        return array_info;
     _VSC_SCL_ArrayInfo_Init(array_info, VSC_SCL_Scalarization_GetMM(scl));
 
     return array_info;
@@ -152,6 +158,8 @@ static VSC_SCL_ArrayInfo* _VSC_SCL_Scalarization_GetArrayInfo(
     if(!vscHTBL_DirectTestAndGet(VSC_SCL_Scalarization_GetArrayInfos(scl), sym, (void**)&array_info))
     {
         array_info = _VSC_SCL_Scalarization_NewArrayInfo(scl);
+        if(array_info == gcvNULL)
+            return array_info;
         vscHTBL_DirectSet(VSC_SCL_Scalarization_GetArrayInfos(scl), sym, array_info);
     }
     return array_info;
@@ -175,6 +183,11 @@ static VSC_ErrCode _VSC_SCL_CollectInformationFromOper(
     {
         VIR_Symbol* sym = VIR_Operand_GetSymbol(opnd);
         VSC_SCL_ArrayInfo* array_info = _VSC_SCL_Scalarization_GetArrayInfo(scl, sym);
+        if(array_info == gcvNULL)
+        {
+            errcode = VSC_ERR_OUT_OF_MEMORY;
+            return errcode;
+        }
         /* symbol has dynamic indexing, return */
         if(VSC_SCL_ArrayInfo_GetDynamicIndexing(array_info))
         {
@@ -185,7 +198,8 @@ static VSC_ErrCode _VSC_SCL_CollectInformationFromOper(
         {
             gctINT index = VIR_Operand_GetRelIndexing(opnd);
             vscBV_SetBit(VSC_SCL_ArrayInfo_GetConstIndexes(array_info), index);
-            _VSC_SCL_ArrayInfo_AppandOperand(array_info, opnd);
+            errcode = _VSC_SCL_ArrayInfo_AppandOperand(array_info, opnd);
+            ON_ERROR(errcode, "Fail to AppandOperand.");
         }
         else
         {
@@ -197,11 +211,18 @@ static VSC_ErrCode _VSC_SCL_CollectInformationFromOper(
     {
         VIR_Symbol* sym = VIR_GetFuncSymFromId(func, VIR_Operand_GetSymbolId(opnd));
         VSC_SCL_ArrayInfo* array_info = _VSC_SCL_Scalarization_GetArrayInfo(scl, sym);
+        if(array_info == gcvNULL)
+        {
+            errcode = VSC_ERR_OUT_OF_MEMORY;
+            return errcode;
+        }
         gctINT index = VIR_Operand_GetRelIndexing(opnd);
         vscBV_SetBit(VSC_SCL_ArrayInfo_GetConstIndexes(array_info), index);
-        _VSC_SCL_ArrayInfo_AppandOperand(array_info, opnd);
+        errcode = _VSC_SCL_ArrayInfo_AppandOperand(array_info, opnd);
+        ON_ERROR(errCode, "Fail to AppandOperand.");
     }*/
 
+    OnError:
     return errcode;
 }
 
@@ -287,6 +308,11 @@ static VSC_ErrCode _VSC_SCL_CollectInformationforShader(
             sym = (VIR_Symbol*)vscHTBLIterator_Next(&iter))
         {
             VSC_SCL_ArrayInfo* array_info = _VSC_SCL_Scalarization_GetArrayInfo(scl, sym);
+            if(array_info == gcvNULL)
+            {
+                errcode = VSC_ERR_OUT_OF_MEMORY;
+                return errcode;
+            }
             VIR_Symbol_Dump(dumper, sym, gcvFALSE);
             _VSC_SCL_ArrayInfo_Dump(array_info, dumper);
         }
@@ -345,6 +371,11 @@ static VSC_ErrCode _VSC_SCL_GenerateNewSymbolForShader(
         VSC_SCL_ArrayInfo* array_info;
         gctINT index;
         array_info = _VSC_SCL_Scalarization_GetArrayInfo(scl, sym);
+        if(array_info == gcvNULL)
+        {
+            errcode = VSC_ERR_OUT_OF_MEMORY;
+            return errcode;
+        }
 
         if(!VSC_SCL_ArrayInfo_GetDynamicIndexing(array_info))
         {
@@ -395,6 +426,11 @@ static VSC_ErrCode _VSC_SCL_DoSubstitutionForShader(
             sym != gcvNULL; sym = (VIR_Symbol*)vscHTBLIterator_Next(&array_info_iter))
     {
         VSC_SCL_ArrayInfo* array_info = _VSC_SCL_Scalarization_GetArrayInfo(scl, sym);
+        if(array_info == gcvNULL)
+        {
+            errcode = VSC_ERR_OUT_OF_MEMORY;
+            return errcode;
+        }
         if(HTBL_GET_ITEM_COUNT(VSC_SCL_ArrayInfo_GetNewSymbols(array_info)))
         {
             VSC_UL_ITERATOR opnd_iter;

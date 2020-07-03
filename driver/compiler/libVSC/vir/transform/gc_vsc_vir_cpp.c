@@ -36,6 +36,10 @@ static VSC_CPP_Usage* _VSC_CPP_NewUsage(
     )
 {
     VSC_CPP_Usage   *pUsage = (VSC_CPP_Usage*)vscMM_Alloc(VSC_CPP_GetMM(cpp), sizeof(VSC_CPP_Usage));
+    if(!pUsage)
+    {
+        return pUsage;
+    }
     pUsage->inst = usage->usageKey.pUsageInst;
     pUsage->opnd = usage->usageKey.pOperand;
     return pUsage;
@@ -2146,9 +2150,14 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
                 }
                 else
                 {
+                    VSC_CPP_Usage* pHashKey = _VSC_CPP_NewUsage(cpp, inst_usage);
+                    if(!pHashKey)
+                        ON_ERROR(VSC_ERR_OUT_OF_MEMORY, "Fail to allocate CPP new usage");
                     channelMask = (gctUINT*)vscMM_Alloc(VSC_CPP_GetMM(cpp), sizeof(gctUINT));
+                    if(!channelMask)
+                        ON_ERROR(VSC_ERR_OUT_OF_MEMORY, "Fail to allocate channelMask.");
                     *channelMask = (1<<channel);
-                    vscHTBL_DirectSet(inst_usage_set, (void*)_VSC_CPP_NewUsage(cpp, inst_usage), channelMask);
+                    vscHTBL_DirectSet(inst_usage_set, (void*)pHashKey, channelMask);
                 }
             }
         }
@@ -2391,6 +2400,7 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
 
     vscHTBL_Reset(inst_def_set);
 
+    OnError:
     return errCode;
 }
 
@@ -3223,6 +3233,8 @@ VSC_ErrCode VIR_SCPP_PerformOnBB(
                         if(!vscHTBL_DirectTestAndGet(defsTable, (void*)lhsSym, (void**)&copy))
                         {
                             copy = (VIR_SCPP_Copy*)vscMM_Alloc(VIR_SCPP_GetMM(scpp), sizeof(VIR_SCPP_Copy));
+                            if(!copy)
+                                ON_ERROR(VSC_ERR_OUT_OF_MEMORY, "Fail to allocate VIR_SCPP_Copy.");
                             _VIR_SCPP_Copy_Init(copy, instIter);
                             vscHTBL_DirectSet(defsTable, (void*)lhsSym, (void*)copy);
                         }
@@ -3312,6 +3324,8 @@ VSC_ErrCode VIR_SCPP_PerformOnBB(
                         if (!vscHTBL_DirectTestAndGet(defsTable, (void*)lhsSym, (void**)&copy))
                         {
                             copy = (VIR_SCPP_Copy*)vscMM_Alloc(VIR_SCPP_GetMM(scpp), sizeof(VIR_SCPP_Copy));
+                            if(!copy)
+                                ON_ERROR(VSC_ERR_OUT_OF_MEMORY, "Fail to allocate VIR_SCPP_Copy.");
                             _VIR_SCPP_Copy_Init(copy, instIter);
                             vscHTBL_DirectSet(defsTable, (void*)lhsSym, (void*)copy);
                         }
@@ -3380,6 +3394,7 @@ VSC_ErrCode VIR_SCPP_PerformOnBB(
         VIR_SCPP_SetIsChanged(scpp, gcvTRUE);
     }
 
+    OnError:
     return errCode;
 }
 

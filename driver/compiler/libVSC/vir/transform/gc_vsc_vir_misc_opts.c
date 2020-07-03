@@ -11783,6 +11783,8 @@ static VSC_DynamicIdx_Usage* _VSC_DynamicIdx_NewUsage(
 {
     VSC_DynamicIdx_Usage   *pUsage = (VSC_DynamicIdx_Usage*)vscMM_Alloc(pMM, sizeof(VSC_DynamicIdx_Usage));
 
+    if(!pUsage)
+        return pUsage;
     pUsage->symId = symId;
     pUsage->pDefInst = pDefInst;
     pUsage->pBB = pBB;
@@ -11927,6 +11929,11 @@ VSC_ErrCode vscVIR_FixDynamicIdxDep(VSC_SH_PASS_WORKER* pPassWorker)
 
                     pDynamicIdxUsage = _VSC_DynamicIdx_NewUsage(pMM, dstSymId, pInst, VIR_Inst_GetBasicBlock(pUsageInst));
 
+                    if(pDynamicIdxUsage == gcvNULL)
+                    {
+                        errCode = VSC_ERR_OUT_OF_MEMORY;
+                        ON_ERROR(errCode, "Fail to allocate DynamicIdx_NewUsage.");
+                    }
                     if (vscHTBL_DirectTestAndGet(usageInstHT,
                                                  (void*)pDynamicIdxUsage,
                                                  (void**)&pPrevUsageInst))
@@ -13228,7 +13235,7 @@ _vscVIR_CutDownWorkGroupSize(
     VIR_Shader_SetWorkGroupSizeFactor(pShader, pContext->activeDimension, activeFactor);
 }
 
-static void
+static VSC_ErrCode
 _vscVIR_InitializeCutDownWGS(
     IN VSC_CutDownWGS*  pContext,
     IN VIR_DEF_USAGE_INFO* pDuInfo,
@@ -13238,6 +13245,7 @@ _vscVIR_InitializeCutDownWGS(
     IN VSC_OPTN_LoopOptsOptions *pLoopOptsOptions
     )
 {
+    VSC_ErrCode         errCode     = VSC_ERR_NONE;
     gctUINT             i;
     gctBOOL             bCheckFactor4 = (pHwCfg->maxCoreCount == 1);
 
@@ -13286,6 +13294,21 @@ _vscVIR_InitializeCutDownWGS(
     pContext->ppTempSet = (VSC_HASH_TABLE**)vscMM_Alloc(pContext->pMM, pContext->activeFactor * sizeof(VSC_HASH_TABLE*));
     pContext->ppLabelSet = (VSC_HASH_TABLE**)vscMM_Alloc(pContext->pMM, pContext->activeFactor * sizeof(VSC_HASH_TABLE*));
     pContext->ppJmpSet = (VSC_HASH_TABLE**)vscMM_Alloc(pContext->pMM, pContext->activeFactor * sizeof(VSC_HASH_TABLE*));
+    if(pContext->ppTempSet == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        return errCode;
+    }
+    if(pContext->ppLabelSet == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        return errCode;
+    }
+    if(pContext->ppJmpSet == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        return errCode;
+    }
 
     for (i = 0; i < pContext->activeFactor; i++)
     {
@@ -13317,6 +13340,7 @@ _vscVIR_InitializeCutDownWGS(
                       pHwCfg);
 
     pContext->pSameJmpBBSet = (VSC_HASH_TABLE*)vscHTBL_Create(pContext->pMM, vscHFUNC_Default, vscHKCMP_Default, 4);
+    return errCode;
 }
 
 static void
@@ -13826,11 +13850,16 @@ _vscVIR_DetectBarrierWithinLoop(
     pBBWorkingSet = (VSC_HASH_TABLE*)vscHTBL_Create(pContext->pMM, vscHFUNC_Default, vscHKCMP_Default, 16);
 
     /* Initialize and detect all LOOPs. */
-    VIR_LoopOpts_NewLoopInfoMgr(pLoopOpts);
+    if (VIR_LoopOpts_NewLoopInfoMgr(pLoopOpts) == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR(errCode, "Fail to allocate NewLoopInfoMgr.");
+    }
     if (VIR_LoopOpts_DetectNaturalLoops(pLoopOpts))
     {
         /* Compute the loop body and some other information, we need to call these after add a new loopInfo. */
-        VIR_LoopOpts_ComputeLoopBodies(pLoopOpts);
+        errCode = VIR_LoopOpts_ComputeLoopBodies(pLoopOpts);
+        ON_ERROR(errCode, "Fail to ComputeLoopBodies.");
         VIR_LoopOpts_ComputeLoopTree(pLoopOpts);
         VIR_LoopOpts_IdentifyBreakContinues(pLoopOpts);
 
@@ -14592,6 +14621,16 @@ _vscVIR_DuplicateBBs(
     /* Allocate the start/end instruction. */
     ppNewStartInst = (VIR_Instruction **)vscMM_Alloc(pMM, (activeFactor - 1) * sizeof(VIR_Instruction*));
     ppNewEndInst = (VIR_Instruction **)vscMM_Alloc(pMM, (activeFactor - 1) * sizeof(VIR_Instruction*));
+    if(ppNewStartInst == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        return errCode;
+    }
+    if(ppNewEndInst == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        return errCode;
+    }
 
     /* Duplicate "factor-1" copies: Copy the instructions before BARRIER. */
     for (factorIndex = 0; factorIndex < activeFactor - 1; factorIndex++)
@@ -14869,12 +14908,13 @@ VSC_ErrCode vscVIR_CutDownWorkGroupSize(VSC_SH_PASS_WORKER* pPassWorker)
 
     /* I: Initialize the working context. */
     gcoOS_ZeroMemory(&context, gcmSIZEOF(VSC_CutDownWGS));
-    _vscVIR_InitializeCutDownWGS(&context,
+    errCode = _vscVIR_InitializeCutDownWGS(&context,
                                  pDuInfo,
                                  pPassWorker->basePassWorker.pMM,
                                  &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg,
                                  pShader,
                                  &loopOptions);
+    ON_ERROR(errCode, "Fail to InitializeCutDownWGS.");
 
     /* II: Cut down the workGroupSize. */
     _vscVIR_CutDownWorkGroupSize(&context);
