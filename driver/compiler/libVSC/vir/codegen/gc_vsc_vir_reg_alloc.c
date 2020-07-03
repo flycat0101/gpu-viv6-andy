@@ -801,12 +801,12 @@ VIR_Enable VIR_RA_LS_LR2WebChannelMask(
    functions to initialize (color pool, ...)
    ===========================================================================
 */
-void _VIR_RA_FlaseDepReg_Init(
+VSC_ErrCode _VIR_RA_FlaseDepReg_Init(
     VIR_RA_LS           *pRA,
     VSC_MM              *pMM,
     gctINT              regCount)
 {
-    vscBV_Initialize(VIR_RA_LS_GetFalseDepRegVec(pRA), pMM, regCount);
+    return vscBV_Initialize(VIR_RA_LS_GetFalseDepRegVec(pRA), pMM, regCount);
 }
 
 void _VIR_RA_FlaseDepReg_Finalize(
@@ -897,39 +897,44 @@ gctUINT _VIR_RA_GetMaxRegCount(
     return regCount;
 }
 
-void _VIR_RA_ColorMap_Init(
+VSC_ErrCode _VIR_RA_ColorMap_Init(
     VIR_RA_LS           *pRA,
     VIR_RA_ColorMap     *pCM,
     VSC_HW_CONFIG       *pHwCfg,
     VSC_MM              *pMM,
     VIR_RA_HWReg_Type   hwRegType)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     pCM->maxReg = _VIR_RA_GetMaxRegCount(pRA, pHwCfg, hwRegType);
     pCM->maxAllocReg = 0;
     pCM->availReg = 0;
 
     /* each register needs 4 channels (w, z, y, x) */
-    vscBV_Initialize(&pCM->usedColor, pMM,
-        pCM->maxReg * VIR_CHANNEL_NUM);
+    errCode = vscBV_Initialize(&pCM->usedColor, pMM, pCM->maxReg * VIR_CHANNEL_NUM);
+    CHECK_ERROR(errCode, "Failed for BV Initialize.");
 
     if (hwRegType == VIR_RA_HWREG_GR)
     {
-        _VIR_RA_FlaseDepReg_Init(pRA, pMM, pCM->maxReg);
+        return _VIR_RA_FlaseDepReg_Init(pRA, pMM, pCM->maxReg);
     }
+    return errCode;
 }
 
-void _VIR_RA_ColorPool_Init(
+VSC_ErrCode _VIR_RA_ColorPool_Init(
     VIR_RA_LS           *pRA,
     VIR_RA_ColorPool    *pCP,
     VSC_HW_CONFIG       *pHwCfg,
     VSC_MM              *pMM)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     /* initialize each hw register coloring map */
     gctUINT i;
     for (i = 0; i < VIR_RA_HWREG_TYPE_COUNT; i++)
     {
-        _VIR_RA_ColorMap_Init(pRA, &pCP->colorMap[i], pHwCfg, pMM, i);
+        errCode = _VIR_RA_ColorMap_Init(pRA, &pCP->colorMap[i], pHwCfg, pMM, i);
+        CHECK_ERROR(errCode, "Failed in _VIR_RA_ColorMap_Init.");
     }
+    return errCode;
 }
 
 void _VIR_RA_ColorPool_ClearAll(
@@ -1280,18 +1285,24 @@ static gctBOOL _VIR_RA_LS_Init(
     pRA->pMM = pMM;
 
     /* color pool initialization */
-    _VIR_RA_ColorPool_Init(
-        pRA,
-        VIR_RA_LS_GetColorPool(pRA),
-        pHwCfg,
-        VIR_RA_LS_GetMM(pRA));
+    errCode = _VIR_RA_ColorPool_Init(
+                pRA,
+                VIR_RA_LS_GetColorPool(pRA),
+                pHwCfg,
+                VIR_RA_LS_GetMM(pRA));
+    if (errCode != VSC_ERR_NONE)
+    {
+        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Failed for color pool initialization.");
+        return gcvFALSE;
+    }
 
     /* allocate the live LR vector */
-    vscBV_Initialize(
-        VIR_RA_LS_GetLiveLRVec(pRA),
-        VIR_RA_LS_GetMM(pRA),
-        numDef);
-
+    errCode = vscBV_Initialize(VIR_RA_LS_GetLiveLRVec(pRA), VIR_RA_LS_GetMM(pRA), numDef);
+    if (errCode != VSC_ERR_NONE)
+    {
+        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Failed for BV Initialize");
+        return gcvFALSE;
+    }
     /* allocate the live range table */
     errCode = vscSRARR_Initialize(
                 VIR_RA_LS_GetLRTable(pRA),
