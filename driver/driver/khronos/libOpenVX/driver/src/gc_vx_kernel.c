@@ -2967,7 +2967,11 @@ OnError:
         vxoShader_Free(kernel);
     }
 
-    if(pointer != gcvNULL) gcmOS_SAFE_FREE(gcvNULL, pointer);
+    if(pointer)
+{
+gcoOS_Free(gcvNULL, pointer);
+pointer = gcvNULL;
+}
 
     gcmFOOTER_ARG("%d", status);
     return status;
@@ -3481,7 +3485,7 @@ VX_PRIVATE_API vx_status vxoKernel_Remove(vx_kernel kernel)
         vx_uint32 t = 0, k = 0;
         vx_target target = VX_NULL;
 
-        vx_char targetName[VX_MAX_TARGET_NAME];
+vx_char targetName[VX_MAX_TARGET_NAME] = VX_DEFAULT_TARGET_NAME;
         vx_uint32 kernelIdx = 0u;
         vx_context context = kernel->base.context;
 

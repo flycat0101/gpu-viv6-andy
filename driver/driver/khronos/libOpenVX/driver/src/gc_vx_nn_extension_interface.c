@@ -972,7 +972,7 @@ VX_API_ENTRY vx_weights_biases_parameter VX_API_CALL vxCreateWeightsBiasesParame
     vx_enum     downScaleSizeRounding;
     vx_uint32   weightsNumOfDims;
     vx_uint32   weightsDims[VX_CONTEXT_TENSOR_MAX_DIMENSION];
-    vx_uint32   weightsOrgDims[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+    /*vx_uint32   weightsOrgDims[VX_CONTEXT_TENSOR_MAX_DIMENSION];*/
     vx_uint32   weightsSubDims[VX_CONTEXT_TENSOR_MAX_DIMENSION];
     vx_enum     weightsDataFormat;
     vx_enum     weightsQuantFormat;
@@ -1008,7 +1008,7 @@ VX_API_ENTRY vx_weights_biases_parameter VX_API_CALL vxCreateWeightsBiasesParame
     for (i = 0; i < VX_CONTEXT_TENSOR_MAX_DIMENSION; i++)
     {
         weightsDims[i] = readBits(&streamBufferPtr, &bitOffset, 32);
-        weightsOrgDims[i] = readBits(&streamBufferPtr, &bitOffset, 32);
+        /*weightsOrgDims[i] = readBits(&streamBufferPtr, &bitOffset, 32);*/
     }
     weightsDataFormat = readBits(&streamBufferPtr, &bitOffset, 32);
     weightsQuantFormat = readBits(&streamBufferPtr, &bitOffset, 32);
@@ -3361,7 +3361,7 @@ vx_status vxnneLayer_Ops_Initialize(
     )
 {
     vx_status status = VX_ERROR_NOT_SUPPORTED;
-    vx_uint32 i = 0, flag = 0;
+    vx_uint32 i = 0;
     vxnne_register_param_s reg_param = { 0 };
 
     /* destroy the existing layer */
@@ -3375,7 +3375,6 @@ vx_status vxnneLayer_Ops_Initialize(
     {
         vxnne_layer_imp imp = &ops->imps[i];
 
-        flag = 0;
         gcoOS_ZeroMemory(&reg_param, sizeof(vxnne_register_param_s));
 
         gcmASSERT((imp->verification != VX_NULL) && (imp->initialize != VX_NULL) && (size_of_layer > 0));

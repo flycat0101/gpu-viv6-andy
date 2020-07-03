@@ -847,13 +847,13 @@ VX_PRIVATE_API vx_bool print_string_ptr(const unsigned char * const input, print
     /* empty string */
     if (input == NULL)
     {
-        output = ensure(output_buffer, sizeof("\"\""));
+        output = ensure(output_buffer, strlen("\"\""));
         if (output == NULL)
         {
             gcmFOOTER_ARG("%d", vx_false_e);
             return vx_false_e;
         }
-        strncpy((char*)output, "\"\"", sizeof("\"\""));
+        strncpy((char*)output, "\"\"", strlen("\"\""));
 
         gcmFOOTER_ARG("%d", vx_true_e);
         return vx_true_e;

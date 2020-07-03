@@ -163,11 +163,11 @@ vx_status vxoTensorCopyOperationSH_Initialize(
     vx_tensor input      = NULL;
     vx_tensor output     = NULL;
     vx_int32   sizes[4]  = {0};
-    vx_enum    inputFormat             = TENSOR_DATA_TYPE(src);
-    vx_enum    outputFormat            = TENSOR_DATA_TYPE(dst);
-    vx_bool    shExe_flag              = vx_false_e;
-    vx_uint32 src_elementCount = 0;
-    vx_uint32 dst_elementCount = 0;
+    /*vx_enum    inputFormat             = TENSOR_DATA_TYPE(src);*/
+    /*vx_enum    outputFormat            = TENSOR_DATA_TYPE(dst);*/
+    /*vx_bool    shExe_flag              = vx_false_e;*/
+    /*vx_uint32 src_elementCount = 0;*/
+    /*vx_uint32 dst_elementCount = 0;*/
     vx_uint32 dimCount0        = 0;
     vx_uint32 width0           = 0;
     vx_uint32 height0          = 0;
@@ -184,21 +184,15 @@ vx_status vxoTensorCopyOperationSH_Initialize(
     height0      = (dimCount0 > 1) ? TENSOR_VIEW_SIZE_INDEX(src, 1) : 1;
     depth0       = (dimCount0 > 2) ? TENSOR_VIEW_SIZE_INDEX(src, 2) : 1;
     batch0       = (dimCount0 > 3) ? TENSOR_VIEW_SIZE_INDEX(src, 3) : 1;
-    src_elementCount = width0 * height0 * depth0 * batch0;
+    /*src_elementCount = width0 * height0 * depth0 * batch0;*/
 
     dimCount1    = TENSOR_VIEW_DIM_NUM(dst);
     width1       = TENSOR_VIEW_SIZE_INDEX(dst, 0);
     height1      = (dimCount1 > 1) ? TENSOR_VIEW_SIZE_INDEX(dst, 1) : 1;
     depth1       = (dimCount1 > 2) ? TENSOR_VIEW_SIZE_INDEX(dst, 2) : 1;
     batch1       = (dimCount1 > 3) ? TENSOR_VIEW_SIZE_INDEX(dst, 3) : 1;
-    dst_elementCount = width1 * height1 * depth1 * batch1;
+    /*dst_elementCount = width1 * height1 * depth1 * batch1;*/
 
-    shExe_flag = (vx_bool)(((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
-                         || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
-                         || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
-                         || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
-                         || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16))
-                         && src_elementCount == dst_elementCount);
 
     sizes[0]   = gcmMAX(gcmMAX(width0, height0), depth0);
     sizes[1]   = gcmMAX(gcmMIN(width0, height0), gcmMIN(gcmMAX(width0, height0), depth0));

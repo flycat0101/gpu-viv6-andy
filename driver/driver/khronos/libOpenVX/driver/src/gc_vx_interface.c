@@ -3403,7 +3403,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianReconstruct_Initializer(vx_node
     vx_node upSampleConvertNode = VX_NULL;
     vx_node upSamplePaddingNode = VX_NULL;
     vx_node upSampleConvolveNode = VX_NULL;
-    vx_node addNode = VX_NULL;
 
     vx_pyramid laplacian = (vx_pyramid)parameters[0];
     vx_image   input = (vx_image)parameters[1];
@@ -3466,7 +3465,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianReconstruct_Initializer(vx_node
         status |= vxReleaseNode(&upSampleConvolveNode);
         status |= vxReleaseNode(&upSampleConvertNode);
 
-        addNode = vxAddNode(graph, filter, pyr_level, policy, out);
+        vxAddNode(graph, filter, pyr_level, policy, out);
 
         status |= vxReleaseImage(&pyr_level);
 
@@ -12138,7 +12137,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoImageCopy_Initialize(vx_node node, const
 {
     vx_uint32 width,height;
     vx_df_image imageType;
-    vx_reference input, output;
+    vx_reference input/*, output*/;
     vx_image src;
     vx_kernel_execution_parameters_t shaderParam = {2, {0, 0, 0}, {1, 1, 0}, {0, 0, 0}, {0, 0, 0}};   /*workdim, globel offset, globel scale    local size, globel size,*/
     vx_status status = VX_FAILURE;
@@ -12151,7 +12150,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoImageCopy_Initialize(vx_node node, const
         return status;
     }
     input = (vx_reference)parameters[0];
-    output = (vx_reference)parameters[1];
+    /*output = (vx_reference)parameters[1];*/
     src = (vx_image)input;
     shaderParam.globalWorkScale[0] = 15;
     vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(vx_uint32));

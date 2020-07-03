@@ -312,7 +312,7 @@ vx_status vxnneConvolutionReluPoolingInitializer(
     vx_tensor interTensor = inputs;
     vx_uint32 tmpTensorIndex = 0;
     vx_bool enableBrickMode = vx_false_e;
-    vx_bool needExtraBrickOp = vx_true_e;
+    /*vx_bool needExtraBrickOp = vx_true_e;*/
 
     vx_weights_biases_parameter reshapeWb = VX_NULL;
 
@@ -445,7 +445,7 @@ vx_status vxnneConvolutionReluPoolingInitializer(
                 &convolutionReluPoolingLayer->reshuffle_tp_operation.base,
                 operationIndex++);
 
-            needExtraBrickOp = vx_false_e;
+            /*needExtraBrickOp = vx_false_e;*/
         }
         else
         {
@@ -663,7 +663,7 @@ vx_status vxnneConvolutionReluPoolingInitializer(
     }
 
     /* TODO. */
-    needExtraBrickOp = vx_false_e;
+    /*needExtraBrickOp = vx_false_e;*/
 
 
     if (weights_biases->wb_base->do_zdp_opt &&
@@ -1607,7 +1607,7 @@ VX_PRIVATE_API vx_status vxnneExecuteSWConv_Reshuffle(struct _vxnne_operation_s 
         vx_uint8_ptr inputs_ptr         = inputs->tensorBuffer->memory.logicals[0];
         vx_tensor reshuffle_inputs      = convOperation->reshuffled_inputs;
         vx_uint8_ptr reshuffled_inputs  = reshuffle_inputs->tensorBuffer->memory.logicals[0];
-        vx_uint8_ptr data = reshuffled_inputs, buffer = VX_NULL;
+        vx_uint8_ptr /*data = reshuffled_inputs,*/ buffer = VX_NULL;
 
         vx_int32 input_w = TENSOR_SIZE_INDEX(inputs, 0);
         vx_int32 input_h = TENSOR_SIZE_INDEX(inputs, 1);
@@ -1625,7 +1625,7 @@ VX_PRIVATE_API vx_status vxnneExecuteSWConv_Reshuffle(struct _vxnne_operation_s 
         else
         {
             buffer = (vx_uint8_ptr)vxAllocateAndZeroMemory(item_size * slice_size * input_c * batch);
-            data = reshuffled_inputs;
+            /*data = reshuffled_inputs;*/
 
 
             for (dy = 0; dy < dilation_h; dy++)

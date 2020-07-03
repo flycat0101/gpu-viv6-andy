@@ -1016,7 +1016,7 @@ VX_PRIVATE_API vx_status vxoNNPooling_NN_AVG_Initialize(vxnne_layer ops_layer, c
 
     vx_context context                       = vxGetContext((vx_reference)ops_layer->node);
 
-    vx_uint32 inputsWidth, inputsHeight, outputsWidth, outputsHeight;
+    /*vx_uint32 inputsWidth, inputsHeight, outputsWidth, outputsHeight;*/
     vx_int32  inputsDepth, outputsDepth;
     vx_uint32 batchCount;
 
@@ -1028,12 +1028,12 @@ VX_PRIVATE_API vx_status vxoNNPooling_NN_AVG_Initialize(vxnne_layer ops_layer, c
     vx_status status = VX_SUCCESS;
     vxnne_pooling_layer  poolingLayer = (vxnne_pooling_layer)ops_layer;
 
-    inputsWidth   = TENSOR_SIZE_INDEX(inputs, 0);
-    inputsHeight  = TENSOR_SIZE_INDEX(inputs, 1);
+    /*inputsWidth   = TENSOR_SIZE_INDEX(inputs, 0);*/
+    /*inputsHeight  = TENSOR_SIZE_INDEX(inputs, 1);*/
     inputsDepth   = TENSOR_SIZE_INDEX(inputs, 2);
     batchCount    = TENSOR_SIZE_INDEX(inputs, 3);
-    outputsWidth  = TENSOR_VIEW_SIZE_INDEX(outputs, 0);
-    outputsHeight = TENSOR_VIEW_SIZE_INDEX(outputs, 1);
+    /*outputsWidth  = TENSOR_VIEW_SIZE_INDEX(outputs, 0);*/
+    /*outputsHeight = TENSOR_VIEW_SIZE_INDEX(outputs, 1);*/
     outputsDepth  = TENSOR_VIEW_SIZE_INDEX(outputs, 2);
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
@@ -1405,7 +1405,7 @@ VX_PRIVATE_API vx_bool vxoNNPooling_TP_MAX_Support(vx_node node, const vx_refere
     vx_enum outputdata_format                = TENSOR_DATA_TYPE(outputs);
 
     vx_uint32 inputsWidth, outputsWidth, outputsHeight, inputsHeight;
-    vx_int32  inputsDepth, outputsDepth;
+    /*vx_int32  inputsDepth, outputsDepth;*/
     vx_uint32  stride_x = 1, stride_y = 1;
 
     vx_uint32 pool_pad_x_left  = poolPadXLeftScalar->value->u32;
@@ -1418,10 +1418,10 @@ VX_PRIVATE_API vx_bool vxoNNPooling_TP_MAX_Support(vx_node node, const vx_refere
 
     inputsWidth   = TENSOR_SIZE_INDEX(inputs, 0);
     inputsHeight  = TENSOR_SIZE_INDEX(inputs, 1);
-    inputsDepth   = TENSOR_SIZE_INDEX(inputs, 2);
+    /*inputsDepth   = TENSOR_SIZE_INDEX(inputs, 2);*/
     outputsWidth  = TENSOR_VIEW_SIZE_INDEX(outputs, 0);
     outputsHeight = TENSOR_VIEW_SIZE_INDEX(outputs, 1);
-    outputsDepth  = TENSOR_VIEW_SIZE_INDEX(outputs, 2);
+    /*outputsDepth  = TENSOR_VIEW_SIZE_INDEX(outputs, 2);*/
 
     if (!support)return support;
 

@@ -1420,175 +1420,6 @@ void _fill_TP_RESHUFFLE_Command(
 }
 
 
-VX_PRIVATE_API void
-_fill_TP_RESHUFFLE_Command_EX(
-    vx_context                  context,
-    vxnne_tensor_info           input,
-    vxnne_tensor_info           output,
-    vx_op_param                 parameter,
-    vx_nn_cmd_info_u*           general_info,
-    vx_uint32                   split_count,
-    vxnne_tensor_sub_block      input_split_blocks,
-    vxnne_tensor_sub_block      output_split_blocks,
-    vx_nn_cmd_split_info_u*     info_array
-    )
-{
-    vx_uint32 i;
-    vx_weights_biases_parameter weights_biases;
-    vx_uint32 outSliceSize;
-    vx_uint32 inXSizeTmp, outSize;
-    vx_uint32 in_offset_x, in_offset_y, in_offset_z;
-    vx_uint32 in_size_x, in_size_y, in_size_z;
-    vx_uint32 in_pitch_x, in_pitch_y;
-    vx_int32 pad_left, pad_top;
-    vx_uint32 stride_x = 1, stride_y = 1;
-    vx_uint32 out_offset_x, out_offset_y, out_offset_z;
-    vx_uint32 out_size_x, out_size_y, out_size_z;
-    vx_uint32 out_pitch_x, out_pitch_y;
-    vx_bool optimization_for_1x1_conv = vx_false_e;
-
-    DEFINE_TP_GENERAL_PARAMETER();
-
-    weights_biases = (vx_weights_biases_parameter)other_tensor;
-    if (weights_biases)
-    {
-        stride_x = WB_STRIDE_X(weights_biases);
-        stride_y = WB_STRIDE_Y(weights_biases);
-
-        optimization_for_1x1_conv = WB_KERNEL_X(weights_biases) == 1 &&
-                                    WB_KERNEL_Y(weights_biases) == 1 &&
-                                    WB_ORG_KERNEL_X(weights_biases) == 1 &&
-                                    WB_ORG_KERNEL_Y(weights_biases) == 1;
-    }
-
-    outSliceSize = outZStride / outputElemSize;
-
-    for (i = 0; i < split_count; i++)
-    {
-        in_offset_x = input_split_blocks[i].offset_x;
-        in_offset_y = input_split_blocks[i].offset_y;
-        in_offset_z = input_split_blocks[i].offset_z;
-
-        in_size_x = input_split_blocks[i].size_x;
-        in_size_y = input_split_blocks[i].size_y;
-        in_size_z = input_split_blocks[i].size_z;
-
-        in_pitch_x = input_split_blocks[i].pitch_x;
-        in_pitch_y = input_split_blocks[i].pitch_y;
-
-        pad_left = input_split_blocks[i].pad_left;
-        pad_top = input_split_blocks[i].pad_top;
-        /*pad_right = input_split_blocks[i].pad_right;
-        pad_bottom = input_split_blocks[i].pad_bottom;*/
-
-        out_offset_x = output_split_blocks[i].offset_x;
-        out_offset_y = output_split_blocks[i].offset_y;
-        out_offset_z = output_split_blocks[i].offset_z;
-
-        out_size_x = output_split_blocks[i].size_x;
-        out_size_y = output_split_blocks[i].size_y;
-        out_size_z = output_split_blocks[i].size_z;
-
-        out_pitch_x = output_split_blocks[i].pitch_x;
-        out_pitch_y = output_split_blocks[i].pitch_y;
-
-        inXSizeTmp = out_size_x * stride_x;
-
-        info_array[i].vx_tp_general_cmd_split_info.needReorder = vx_false_e;
-
-        if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_REORDER) &&
-            inXSizeTmp <= context->nnConfig.fixedFeature.tpReorderInImageSize)
-        {
-            vx_bool disableTPReorder = vx_false_e;
-
-            /* Viv: 1948. */
-            if (pad_left || pad_top)
-            {
-                outSize = out_size_x * out_size_y * out_size_z;
-                if (!((outSize - 1) % 3))
-                {
-                    disableTPReorder = vx_true_e;
-                }
-            }
-
-            if (!disableTPReorder)
-            {
-                /* Viv: 1919. */
-                if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REORDER_FIX))
-                {
-                    info_array[i].vx_tp_general_cmd_split_info.needReorder = vx_true_e;
-                }
-                else if (inXSizeTmp <= in_size_x + pad_left ||
-                         in_size_x + pad_left - inXSizeTmp < stride_x)
-                {
-                    inXSize = inXSizeTmp;
-                    info_array[i].vx_tp_general_cmd_split_info.needReorder = vx_true_e;
-                }
-            }
-        }
-
-        info_array[i].vx_tp_general_cmd_split_info.inImageXSize = in_size_x;
-        info_array[i].vx_tp_general_cmd_split_info.inImageYSize = in_size_y;
-        info_array[i].vx_tp_general_cmd_split_info.inImageZSize = in_size_z;
-        info_array[i].vx_tp_general_cmd_split_info.inImageStride = in_pitch_x;
-        info_array[i].vx_tp_general_cmd_split_info.inImageSlice = in_pitch_x * in_pitch_y;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = (-1) * pad_left;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = (-1) * pad_top;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = out_size_x * stride_x - pad_left - 1;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = out_size_y * stride_y - pad_top - 1;
-        info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
-        info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + (in_pitch_x * in_pitch_y * in_offset_z + in_pitch_x * in_offset_y + in_offset_x) * inputElemSize;
-        info_array[i].vx_tp_general_cmd_split_info.inTileXSize = out_size_x * stride_x;
-        info_array[i].vx_tp_general_cmd_split_info.inTileYSize = out_size_y * stride_y;
-        info_array[i].vx_tp_general_cmd_split_info.inTileXInc = out_size_x * stride_x;
-        info_array[i].vx_tp_general_cmd_split_info.inTileYInc = out_size_y * stride_y;
-        info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + (out_pitch_x * out_pitch_y * out_offset_z + out_pitch_x * out_offset_y + out_offset_x) * outputElemSize;
-
-        if (optimization_for_1x1_conv)
-        {
-            /* Optimize reshuffle for 1x1 conv. */
-            info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = outSliceSize * outZSize / (stride_x * stride_y);
-            info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = stride_x;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = 1;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = out_size_x;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 1;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = outSliceSize * outZSize / (stride_x * stride_y);
-            info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = stride_y;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = out_pitch_x;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = out_size_y;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset = 1;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = 0;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = 1;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = 0;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = 1;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = out_pitch_x * out_pitch_y;
-        }
-        else
-        {
-            info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = out_pitch_x * out_pitch_y;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = stride_x;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = 1;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = out_size_x;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 1;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = out_pitch_x * out_pitch_y * stride_x;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = stride_y;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = out_pitch_x;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = out_size_y;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset = 1;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = 0;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = 1;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = 0;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = 1;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = out_pitch_x * out_pitch_y * stride_x * stride_y;
-        }
-
-        info_array[i].vx_tp_general_cmd_split_info.noFlush = (i == split_count - 1 ? 0 : 1);
-        info_array[i].vx_tp_general_cmd_split_info.last = 1;
-    }
-}
-
 void _fill_TP_SINGLE_FC_Command(
     vx_context                  context,
     vxnne_tensor_info           input,
@@ -3657,139 +3488,7 @@ void _fill_TP_TENSOR_COPY_Command(
     }
 }
 
-VX_PRIVATE_API void
-_fill_TP_TENSOR_COPY_Command_EX2(
-    vx_context                  context,
-    vxnne_tensor_info           input,
-    vxnne_tensor_info           output,
-    vx_op_param                 parameter,
-    vx_nn_cmd_info_u*           general_info,
-    vx_enum                     split_type,
-    vx_uint32                   split_count,
-    vx_uint32                   split_sizes[],
-    vx_uint32                   split_offsets[],
-    vx_nn_cmd_split_info_u*     info_array
-    )
-{
-    vx_uint32 i;
-    DEFINE_TP_GENERAL_PARAMETER();
 
-    for (i = 0; i < split_count; i++)
-    {
-        info_array[i].vx_tp_general_cmd_split_info.inImageXSize = inXSize;
-        info_array[i].vx_tp_general_cmd_split_info.inImageYSize = inYSize;
-        info_array[i].vx_tp_general_cmd_split_info.inImageZSize = split_sizes[i];
-        info_array[i].vx_tp_general_cmd_split_info.inImageStride = inYStride / inputElemSize;
-        info_array[i].vx_tp_general_cmd_split_info.inImageSlice  = inZStride / inputElemSize;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = 0;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = 0;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = inXSize - 1;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = inYSize - 1;
-        info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
-        info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inZStride * split_offsets[i];
-        info_array[i].vx_tp_general_cmd_split_info.inTileXSize = inXSize;
-        info_array[i].vx_tp_general_cmd_split_info.inTileYSize = inYSize;
-        info_array[i].vx_tp_general_cmd_split_info.inTileXInc = inXSize;
-        info_array[i].vx_tp_general_cmd_split_info.inTileYInc = inYSize;
-        info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + outZStride * split_offsets[i];
-        info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = 1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = 1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = outXSize;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = outYStride / outputElemSize;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = outYSize;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = 1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = 1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = 1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = outZStride / outputElemSize;
-
-        info_array[i].vx_tp_general_cmd_split_info.noFlush = (i == split_count - 1 ? 0 : 1);
-        info_array[i].vx_tp_general_cmd_split_info.last = 1;
-    }
-}
-
-VX_PRIVATE_API void
-_fill_TP_TENSOR_COPY_Command_EX(
-    vx_context                  context,
-    vxnne_tensor_info           input,
-    vxnne_tensor_info           output,
-    vx_op_param                 parameter,
-    vx_nn_cmd_info_u*           general_info,
-    vx_uint32                   split_count,
-    vxnne_tensor_sub_block      input_split_blocks,
-    vxnne_tensor_sub_block      output_split_blocks,
-    vx_nn_cmd_split_info_u*     info_array
-    )
-{
-    vx_uint32 i;
-    DEFINE_TP_GENERAL_PARAMETER();
-
-    for (i = 0; i < split_count; i++)
-    {
-        vx_uint32 in_offset_x = input_split_blocks[i].offset_x;
-        vx_uint32 in_offset_y = input_split_blocks[i].offset_y;
-        vx_uint32 in_offset_z = input_split_blocks[i].offset_z;
-
-        vx_uint32 in_size_x = input_split_blocks[i].size_x;
-        vx_uint32 in_size_y = input_split_blocks[i].size_y;
-        vx_uint32 in_size_z = input_split_blocks[i].size_z;
-
-        vx_uint32 in_pitch_x = input_split_blocks[i].pitch_x;
-        vx_uint32 in_pitch_y = input_split_blocks[i].pitch_y;
-
-        vx_uint32 out_offset_x = output_split_blocks[i].offset_x;
-        vx_uint32 out_offset_y = output_split_blocks[i].offset_y;
-        vx_uint32 out_offset_z = output_split_blocks[i].offset_z;
-
-        vx_uint32 out_size_x = output_split_blocks[i].size_x;
-        vx_uint32 out_size_y = output_split_blocks[i].size_y;
-
-        vx_uint32 out_pitch_x = output_split_blocks[i].pitch_x;
-        vx_uint32 out_pitch_y = output_split_blocks[i].pitch_y;
-
-        info_array[i].vx_tp_general_cmd_split_info.inImageXSize = in_size_x;
-        info_array[i].vx_tp_general_cmd_split_info.inImageYSize = in_size_y;
-        info_array[i].vx_tp_general_cmd_split_info.inImageZSize = in_size_z;
-        info_array[i].vx_tp_general_cmd_split_info.inImageStride = in_pitch_x;
-        info_array[i].vx_tp_general_cmd_split_info.inImageSlice  = in_pitch_x * in_pitch_y;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = 0;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = 0;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = in_size_x - 1;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = in_size_y - 1;
-        info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
-        info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + (in_pitch_x * in_pitch_y * in_offset_z + in_pitch_x * in_offset_y + in_offset_x) * inputElemSize;
-        info_array[i].vx_tp_general_cmd_split_info.inTileXSize = in_size_x;
-        info_array[i].vx_tp_general_cmd_split_info.inTileYSize = in_size_y;
-        info_array[i].vx_tp_general_cmd_split_info.inTileXInc = in_size_x;
-        info_array[i].vx_tp_general_cmd_split_info.inTileYInc = in_size_y;
-        info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + (out_pitch_x * out_pitch_y * out_offset_z + out_pitch_x * out_offset_y + out_offset_x) * outputElemSize;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = 1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = 1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = out_size_x;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = out_pitch_x;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = out_size_y;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = 1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = 1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = 1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = out_pitch_x * out_pitch_y;
-
-        info_array[i].vx_tp_general_cmd_split_info.noFlush = (i == split_count - 1 ? 0 : 1);
-        info_array[i].vx_tp_general_cmd_split_info.last = 1;
-    }
-}
 
 void _fill_TP_TENSOR_PAD_Command(
     vx_context                  context,
@@ -4266,7 +3965,7 @@ _CalculateSplitSizes(vxnne_tensor_info input,
     vx_uint32 output_pitch_x;
     vx_uint32 output_pitch_y = output->zStride / output->yStride;
     vx_uint32 inferred_input_size_x, inferred_input_size_y;
-    vx_uint32 pad_left, pad_right, pad_top, pad_bottom;
+    vx_uint32 pad_left/*, pad_right*/, pad_top/*, pad_bottom*/;
     vx_uint32 index, last_x_index, last_y_index, last_z_index;
     vx_uint32 x_sizes[MAX_TP_SPLIT_XY_NUM], x_offsets[MAX_TP_SPLIT_XY_NUM], y_sizes[MAX_TP_SPLIT_XY_NUM], y_offsets[MAX_TP_SPLIT_XY_NUM], z_sizes[MAX_TP_SPLIT_XY_NUM], z_offsets[MAX_TP_SPLIT_XY_NUM];
 
@@ -4293,10 +3992,10 @@ _CalculateSplitSizes(vxnne_tensor_info input,
 
     pad_left = parameter->pad_x_left;
     pad_top = parameter->pad_y_top;
-    pad_right = (inferred_input_size_x > parameter->pad_x_left + input->width) ?
+    /*pad_right = (inferred_input_size_x > parameter->pad_x_left + input->width) ?
                 inferred_input_size_x - (parameter->pad_x_left + input->width) : 0;
     pad_bottom = (inferred_input_size_y > parameter->pad_y_top + input->height) ?
-                 inferred_input_size_y - (parameter->pad_y_top + input->height) : 0;
+                 inferred_input_size_y - (parameter->pad_y_top + input->height) : 0;*/
 
     calculateSplitSize(output->width, div_x, x_sizes, x_offsets);
     calculateSplitSize(output->height, div_y, y_sizes, y_offsets);

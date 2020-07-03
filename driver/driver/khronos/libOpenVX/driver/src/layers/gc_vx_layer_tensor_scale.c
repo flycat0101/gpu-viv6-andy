@@ -1310,7 +1310,7 @@ VX_PRIVATE_API vx_bool vxoYUV2RGBScale_NN_Support(vx_node node, const vx_referen
     vx_array   rects                      = (vx_array)parameters[1];
 
     vx_rectangle_t rect;
-    vx_uint32 input_rect_width, input_rect_height;
+    /*vx_uint32 input_rect_width, input_rect_height;*/
 
     vx_bool support = vx_true_e;
 
@@ -1336,8 +1336,8 @@ VX_PRIVATE_API vx_bool vxoYUV2RGBScale_NN_Support(vx_node node, const vx_referen
     if (rect.start_x > rect.end_x) rect.start_x = 0;
     if (rect.start_y > rect.end_y) rect.start_y = 0;
 
-    input_rect_width  = rect.end_x - rect.start_x;
-    input_rect_height = rect.end_y - rect.start_y;
+    /*input_rect_width  = rect.end_x - rect.start_x;
+    input_rect_height = rect.end_y - rect.start_y;*/
 
     support = support && vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SCALER);
 

@@ -7677,9 +7677,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMLayer_Initializer(vx_node node, c
     enable_layernorm = enable_layernorm;
 
     /* usused variable */
-    lstm_layer_type = NULL;
-    static_input = NULL;
-    cont = NULL;
+    /*lstm_layer_type = NULL;*/
+    /*static_input = NULL;
+    cont = NULL;*/
 
     input_dims = TENSOR_DIM_NUM(input);
     if (input_dims < 3)
@@ -8771,13 +8771,16 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMLayer_Initializer(vx_node node, c
 #else
     vxnne_lstm_layer lstm_layer = VX_NULL;
 
+if(static_input == NULL && cont == NULL && lstm_layer_type == NULL)
+        vxInfo("Invalid arg.");
+
     /* make compiler happy */
     enable_layernorm = enable_layernorm;
 
     /* usused variable */
-    lstm_layer_type = NULL;
-    static_input = NULL;
-    cont = NULL;
+    /*lstm_layer_type = NULL;*/
+    /*static_input = NULL;
+    cont = NULL;*/
     activation = NULL;
     cell2input_weight = NULL;
     cell2forget_weight = NULL;
