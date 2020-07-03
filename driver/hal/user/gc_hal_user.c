@@ -330,17 +330,6 @@ _FillInOptions(
         }
     }
 
-    envctrl = gcvNULL;
-    gcOptions[gcvOPTION_PREFER_RA_DEPTH_WRITE] = gcvTRUE;
-    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_DISABLE_RA_DEPTH_WRITE", &envctrl)) && envctrl)
-    {
-        if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "1")))
-        {
-            gcOptions[gcvOPTION_FBO_PREFER_MEM] = gcvFALSE;
-        }
-    }
-
-
     /* if VIV_MGPU_AFFINITY is COMBINED , VIV_OCL_USE_MULTI_DEVICE is ignore
         if VIV_MGPU_AFFINITY is INDEPENENT, single device if VIV_OCL_USE_MULTI_DEVICE is false else get mulit-device .
     */
