@@ -141,15 +141,6 @@ gcoSURF_LockTileStatus(
                                      Surface->tileStatusNode.logical,
                                      Surface->tileStatusNode.size,
                                      gcvCACHE_FLUSH));
-
-                gcmDUMP(gcvNULL, "#[info tile status buffer]");
-                /* Dump the memory write. */
-                gcmDUMP_BUFFER(gcvNULL,
-                               gcvDUMP_BUFFER_MEMORY,
-                               address,
-                               Surface->tileStatusNode.logical,
-                               0,
-                               Surface->tileStatusNode.size);
             }
 
             /* No longer first lock. */
