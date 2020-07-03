@@ -1235,6 +1235,11 @@ VSC_ErrCode vscVIR_CheckCstRegFileReadPortLimitation(VSC_SH_PASS_WORKER* pPassWo
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     replacedUniformSet = vscHTBL_Create(pPassWorker->basePassWorker.pMM, vscHFUNC_Default, vscHKCMP_Default, 256);
+    if(replacedUniformSet == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR0(errCode);
+    }
 
     for (func_node = VIR_FuncIterator_First(&func_iter);
          func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
@@ -1503,7 +1508,8 @@ VSC_ErrCode vscVIR_CheckCstRegFileReadPortLimitation(VSC_SH_PASS_WORKER* pPassWo
                                 (!VIR_Operand_GetMatrixConstIndex(opnd)) &&
                                 (VIR_Operand_GetRelAddrMode(opnd) == VIR_INDEXED_NONE))
                             {
-                                vscHTBL_DirectSet(replacedUniformSet, (void*)pSym, (void*)pNewInsertedInst);
+                                errCode = vscHTBL_DirectSet(replacedUniformSet, (void*)pSym, (void*)pNewInsertedInst);
+                                ON_ERROR0(errCode);
                             }
                         }
 
@@ -2782,7 +2788,8 @@ static VSC_ErrCode _GetLowerUpperVirRegSymId(VSC_MM* pMM,
 
                     /* Update the hash. */
                     pResultRegSym = VIR_Shader_GetSymFromId(pShader, workingRegSymId);
-                    vscHTBL_DirectSet(pWorkingSet, (void *)pSrcSym, (void *)pResultRegSym);
+                    errCode = vscHTBL_DirectSet(pWorkingSet, (void *)pSrcSym, (void *)pResultRegSym);
+                    ON_ERROR0(errCode);
                 }
                 else
             {
@@ -2882,7 +2889,8 @@ static VSC_ErrCode _GetLowerUpperVirRegSymId(VSC_MM* pMM,
             }
 
             pResultRegSym = VIR_Shader_GetSymFromId(pShader, workingRegSymId);
-            vscHTBL_DirectSet(pWorkingSet, (void *)pDefInst, (void *)pResultRegSym);
+            errCode = vscHTBL_DirectSet(pWorkingSet, (void *)pDefInst, (void *)pResultRegSym);
+            ON_ERROR0(errCode);
                 }
             }
 
@@ -2900,11 +2908,11 @@ static VSC_ErrCode _GetLowerUpperVirRegSymId(VSC_MM* pMM,
                                      &resultRegSymId,
                                      firstRegSymId);
         ON_ERROR(errCode, "Insert address assign. ");
-                    }
+    }
     else
     {
         resultRegSymId = firstRegSymId;
-                    }
+    }
 
     gcmASSERT(resultRegSymId != VIR_INVALID_ID);
     pResultRegSym = VIR_Shader_GetSymFromId(pShader, resultRegSymId);
@@ -2912,11 +2920,11 @@ static VSC_ErrCode _GetLowerUpperVirRegSymId(VSC_MM* pMM,
     if (pVirRegSymId)
     {
         *pVirRegSymId = resultRegSymId;
-                }
+    }
 
 OnError:
     return errCode;
-            }
+}
 
 DEF_QUERY_PASS_PROP(vscVIR_AddOutOfBoundCheckSupport)
 {
@@ -2979,7 +2987,11 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
 
     /* Initialize the working set. */
     pWorkingSet = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 256);
-
+    if(pWorkingSet == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR0(errCode);
+    }
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (func_node = VIR_FuncIterator_First(&func_iter);
          func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
@@ -3050,7 +3062,8 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
 
                         /* Update the hash. */
                         pVirRegSym = VIR_Shader_GetSymFromId(pShader, virRegSymId);
-                        vscHTBL_DirectSet(pWorkingSet, (void*)&pSym, (void**)&pVirRegSym);
+                        errCode = vscHTBL_DirectSet(pWorkingSet, (void*)&pSym, (void**)&pVirRegSym);
+                        ON_ERROR0(errCode);
                     }
                     }
                     else
@@ -7275,7 +7288,11 @@ VSC_ErrCode vscVIR_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
         }
 
         pWorkingInstSet = (VSC_HASH_TABLE*)vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 16);
-
+        if(pWorkingInstSet == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR0(errCode);
+        }
         gcoOS_ZeroMemory(&codeInfo, gcmSIZEOF(codeInfo));
         /* Calculate HW inst count */
         VIR_FuncIterator_Init(&funcIter, &Shader->functions);
@@ -11850,7 +11867,11 @@ VSC_ErrCode vscVIR_FixDynamicIdxDep(VSC_SH_PASS_WORKER* pPassWorker)
                                  _VSC_DynamicIdx_Usage_HFUNC,
                                  _VSC_DynamicIdx_Usage_HKCMP,
                                  512);
-
+    if(usageInstHT == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR0(errCode);
+    }
     /* Find all the usages. */
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (func_node = VIR_FuncIterator_First(&func_iter);
@@ -11941,17 +11962,19 @@ VSC_ErrCode vscVIR_FixDynamicIdxDep(VSC_SH_PASS_WORKER* pPassWorker)
                         /* Update the data. */
                         if (VIR_Inst_GetId(pPrevUsageInst) > VIR_Inst_GetId(pUsageInst))
                         {
-                            vscHTBL_DirectSet(usageInstHT,
-                                             (void *)pDynamicIdxUsage,
-                                             (void *)pUsageInst);
+                            errCode = vscHTBL_DirectSet(usageInstHT,
+                                                        (void *)pDynamicIdxUsage,
+                                                        (void *)pUsageInst);
+                            ON_ERROR0(errCode);
                         }
                         vscMM_Free(pMM, pDynamicIdxUsage);
                     }
                     else
                     {
-                        vscHTBL_DirectSet(usageInstHT,
-                                         (void *)pDynamicIdxUsage,
-                                         (void *)pUsageInst);
+                        errCode = vscHTBL_DirectSet(usageInstHT,
+                                                    (void *)pDynamicIdxUsage,
+                                                    (void *)pUsageInst);
+                        ON_ERROR0(errCode);
                     }
                 }
             }
@@ -13324,6 +13347,11 @@ _vscVIR_InitializeCutDownWGS(
                                                                  vscHFUNC_Default,
                                                                  vscHKCMP_Default,
                                                                  64);
+        if(pContext->ppTempSet[i] == gcvNULL || pContext->ppLabelSet[i] == gcvNULL || pContext->ppJmpSet[i] == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            return errCode;
+        }
     }
 
     pContext->pInitializationStartInst = gcvNULL;
@@ -13340,6 +13368,11 @@ _vscVIR_InitializeCutDownWGS(
                       pHwCfg);
 
     pContext->pSameJmpBBSet = (VSC_HASH_TABLE*)vscHTBL_Create(pContext->pMM, vscHFUNC_Default, vscHKCMP_Default, 4);
+    if(pContext->pSameJmpBBSet == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        return errCode;
+    }
     return errCode;
 }
 
@@ -13552,11 +13585,13 @@ _vscVIR_DetectSingleLoopInfo(
                 };
             }
 
-            vscHTBL_DirectSet(pBBWorkingSet, (void *)pWorkingBB, gcvNULL);
+            errCode = vscHTBL_DirectSet(pBBWorkingSet, (void *)pWorkingBB, gcvNULL);
+            ON_ERROR0(errCode);
         }
     }
 
-    vscHTBL_DirectSet(pLoopInfoWorkingSet, (void *)pLoopInfo, ((void*)(gctSIZE_T)bHasBarrier));
+    errCode = vscHTBL_DirectSet(pLoopInfoWorkingSet, (void *)pLoopInfo, ((void*)(gctSIZE_T)bHasBarrier));
+    ON_ERROR0(errCode);
 
     if (!bHasBarrier)
     {
@@ -13608,7 +13643,8 @@ _vscVIR_DetectSingleLoopInfo(
             ON_ERROR(errCode, "Move JMP out of BB.");
         }
 
-        vscHTBL_DirectSet(pSameJmpBBSet, (void *)pWorkingBB, gcvNULL);
+        errCode = vscHTBL_DirectSet(pSameJmpBBSet, (void *)pWorkingBB, gcvNULL);
+        ON_ERROR0(errCode);
     }
 
     /* If there is no initialized JMP, we need to create a fake one. */
@@ -13654,7 +13690,8 @@ _vscVIR_DetectSingleLoopInfo(
             if (!VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(pJmpInst)) &&
                 pEdge->type == VIR_CFG_EDGE_TYPE_ALWAYS)
             {
-                vscHTBL_DirectSet(pSameJmpBBSet, (void *)pNewBB, gcvNULL);
+                errCode = vscHTBL_DirectSet(pSameJmpBBSet, (void *)pNewBB, gcvNULL);
+                ON_ERROR0(errCode);
                 continue;
             }
 
@@ -13679,7 +13716,8 @@ _vscVIR_DetectSingleLoopInfo(
 
         if (bMatched)
         {
-            vscHTBL_DirectSet(pSameJmpBBSet, (void *)pLoopHeadBB, gcvNULL);
+            errCode = vscHTBL_DirectSet(pSameJmpBBSet, (void *)pLoopHeadBB, gcvNULL);
+            ON_ERROR0(errCode);
         }
     }
 
@@ -13824,7 +13862,8 @@ _vscVIR_AnalyzeMultiPathWithBarrier(
         VIR_Link_SetReference(pLink, (gctUINTPTR_T)pInst);
         VIR_Link_AddLink(VIR_Label_GetReferenceAddr(pNewLabel), pLink);
 
-        vscHTBL_DirectSet(pContext->pSameJmpBBSet, (void *)pNewReturnBB, gcvNULL);
+        errCode = vscHTBL_DirectSet(pContext->pSameJmpBBSet, (void *)pNewReturnBB, gcvNULL);
+        ON_ERROR0(errCode);
         break;
     }
 
@@ -13848,7 +13887,11 @@ _vscVIR_DetectBarrierWithinLoop(
 
     pLoopInfoWorkingSet = (VSC_HASH_TABLE*)vscHTBL_Create(pContext->pMM, vscHFUNC_Default, vscHKCMP_Default, 16);
     pBBWorkingSet = (VSC_HASH_TABLE*)vscHTBL_Create(pContext->pMM, vscHFUNC_Default, vscHKCMP_Default, 16);
-
+    if(pLoopInfoWorkingSet == gcvNULL || pBBWorkingSet == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR0(errCode);
+    }
     /* Initialize and detect all LOOPs. */
     if (VIR_LoopOpts_NewLoopInfoMgr(pLoopOpts) == gcvNULL)
     {
@@ -14027,7 +14070,8 @@ _vscVIR_DetectBarrierWithinForwardJmp(
         ON_ERROR(errCode, "Add a new edge.");
 
         /* Mark this JMP BB. */
-        vscHTBL_DirectSet(pContext->pSameJmpBBSet, (void *)pNewBB, gcvNULL);
+        errCode = vscHTBL_DirectSet(pContext->pSameJmpBBSet, (void *)pNewBB, gcvNULL);
+        ON_ERROR0(errCode);
     }
 
 OnError:
@@ -14333,7 +14377,8 @@ _vscVIR_RecalculateBuiltinAttributes(
                     pNewOpnd = VIR_Inst_GetSource(pNewInst, 1);
                     VIR_Operand_SetImmediateUint(pNewOpnd, i);
 
-                    vscHTBL_DirectSet(ppTempSet[i], pIdSym[j], (void*)pNewVirSym);
+                    errCode = vscHTBL_DirectSet(ppTempSet[i], pIdSym[j], (void*)pNewVirSym);
+                    ON_ERROR0(errCode);
                 }
             }
         }
@@ -14432,7 +14477,8 @@ _vscVIR_RemapOperand(
 
             /* Save the variable mapping. */
             pMapVarSym = VIR_Shader_GetSymFromId(pShader, newSymId);
-            vscHTBL_DirectSet(pTempSet, (void *)pVarSym, (void *)pMapVarSym);
+            errCode = vscHTBL_DirectSet(pTempSet, (void *)pVarSym, (void *)pMapVarSym);
+            ON_ERROR0(errCode);
 
             /* Add the related temp register. */
             regCount = VIR_Type_GetVirRegCount(pShader, VIR_Symbol_GetType(pVarSym), -1);
@@ -14464,7 +14510,8 @@ _vscVIR_RemapOperand(
 
                 pRegSym = VIR_Shader_GetSymFromId(pShader, newSymId);
 
-                vscHTBL_DirectSet(pTempSet, (void *)pRegSym, (void *)pMapRegSym);
+                errCode = vscHTBL_DirectSet(pTempSet, (void *)pRegSym, (void *)pMapRegSym);
+                ON_ERROR0(errCode);
             }
 
             /* Set the correct mapping symbol. */
@@ -14503,7 +14550,8 @@ _vscVIR_RemapOperand(
             VIR_Symbol_SetIndexRange(pMapRegSym, indexRange);
 
             /* Save the temp register mapping. */
-            vscHTBL_DirectSet(pTempSet, (void *)pRegSym, (void *)pMapRegSym);
+            errCode = vscHTBL_DirectSet(pTempSet, (void *)pRegSym, (void *)pMapRegSym);
+            ON_ERROR0(errCode);
 
             pMapSym = pMapRegSym;
         }
@@ -14548,17 +14596,19 @@ _vscVIR_DuplicateInstruction(
     {
         VIR_Label*  pOrigLabel = VIR_Operand_GetLabel(VIR_Inst_GetDest(pCopyFromInst));
 
-        vscHTBL_DirectSet(pLabelSet,
-                          VIR_Function_GetSymFromId(pFunc, pOrigLabel->sym),
-                          (void*)VIR_Operand_GetLabel(VIR_Inst_GetDest(pNewInst)));
+        errCode = vscHTBL_DirectSet(pLabelSet,
+                                    VIR_Function_GetSymFromId(pFunc, pOrigLabel->sym),
+                                    (void*)VIR_Operand_GetLabel(VIR_Inst_GetDest(pNewInst)));
+        ON_ERROR0(errCode);
     }
     else if (VIR_OPCODE_isBranch(opCode))
     {
         if (!(bSameJmpBB && bLastInst))
         {
-            vscHTBL_DirectSet(pJmpSet,
-                              (void *)pNewInst,
-                              gcvNULL);
+            errCode = vscHTBL_DirectSet(pJmpSet,
+                                        (void *)pNewInst,
+                                        gcvNULL);
+            ON_ERROR0(errCode);
         }
     }
 

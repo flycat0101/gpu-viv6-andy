@@ -266,7 +266,7 @@ VSC_IL_DupInstruction(
             newLabel = VIR_Function_GetLabelFromId(Function, labelId);
             newLabel->defined = inst;
             VIR_Operand_SetLabel(VIR_Inst_GetDest(inst), newLabel);
-            vscHTBL_DirectSet(pLabelSet, (void*) label, (void*) newLabel);
+            CHECK_ERROR0(vscHTBL_DirectSet(pLabelSet, (void*) label, (void*) newLabel));
         }
         else if (VIR_OPCODE_isBranch(opcode))
         {
@@ -285,7 +285,7 @@ VSC_IL_DupInstruction(
             {
                 /* we need to save the unchanged jmp into a list, its label willl be changed
                    at the end */
-                vscHTBL_DirectSet(pJmpSet, (void*) inst, gcvNULL);
+                CHECK_ERROR0(vscHTBL_DirectSet(pJmpSet, (void*) inst, gcvNULL));
             }
         }
     }
@@ -426,7 +426,8 @@ VSC_IL_DupSingleVariable(
                 /* save the new vreg to the table */
                 if (pNewVirReg)
                 {
-                    vscHTBL_DirectSet(pTempSet, (void*)pTempVirReg, (void*)pNewVirReg);
+                    errCode = vscHTBL_DirectSet(pTempSet, (void*)pTempVirReg, (void*)pNewVirReg);
+                    ON_ERROR0(errCode);
                 }
             }
         }
@@ -526,7 +527,8 @@ VSC_IL_DupSingleVariable(
                         VIR_Symbol_SetPrecision(pNewVirReg, VIR_Symbol_GetPrecision(pTempVirReg));
 
                         /* save the new vreg to the table */
-                        vscHTBL_DirectSet(pTempSet, (void*)pTempVirReg, (void*)pNewVirReg);
+                        errCode = vscHTBL_DirectSet(pTempSet, (void*)pTempVirReg, (void*)pNewVirReg);
+                        ON_ERROR0(errCode);
 
                         VIR_Symbol_SetIndexRange(pNewVirReg, VIR_Symbol_GetVregIndex(pNewVirReg) + indexRange - i);
                     }
@@ -537,7 +539,8 @@ VSC_IL_DupSingleVariable(
         }
 
         /* save the new variable to the table */
-        vscHTBL_DirectSet(pTempSet, (void*)pOldSym, (void*)pNewVarSym);
+        errCode = vscHTBL_DirectSet(pTempSet, (void*)pOldSym, (void*)pNewVarSym);
+        ON_ERROR0(errCode);
     }
 
 OnError:
@@ -682,7 +685,11 @@ VSC_ErrCode VSC_IL_InlineSingleFunction(
 
     pTempSet = (VSC_HASH_TABLE*)vscHTBL_Create(VSC_IL_GetMM(pInliner),
                 vscHFUNC_Default, vscHKCMP_Default, 512);
-
+    if(pLabelSet == gcvNULL || pJmpSet == gcvNULL || pTempSet == gcvNULL)
+    {
+        retValue = VSC_ERR_OUT_OF_MEMORY;
+        return retValue;
+    }
     /* go through all the caller to find the right one */
     VSC_ADJACENT_LIST_ITERATOR_INIT(&callerIter, &pCallerBLK->dgNode.succList);
     pCallerEdge = (VIR_CG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&callerIter);
@@ -908,18 +915,18 @@ VSC_ErrCode VSC_IL_SelectInlineFunctions(
 
         if (AlwayInline || callSites == 1)
         {
-            vscHTBL_DirectSet(pCandidates, (void*) pFunc, gcvNULL);
+            CHECK_ERROR0(vscHTBL_DirectSet(pCandidates, (void*) pFunc, gcvNULL));
             VSC_IL_SetInlineBudget(pInliner, leftBudget);
         }
         else if (smallfuncBody)
         {
-            vscHTBL_DirectSet(pCandidates, (void*) pFunc, gcvNULL);
+            CHECK_ERROR0(vscHTBL_DirectSet(pCandidates, (void*) pFunc, gcvNULL));
             VSC_IL_SetInlineBudget(pInliner, leftBudget);
         }
         /* only use the code size as the heuristic for now */
         else if (leftBudget > 0)
         {
-            vscHTBL_DirectSet(pCandidates, (void*) pFunc, gcvNULL);
+            CHECK_ERROR0(vscHTBL_DirectSet(pCandidates, (void*) pFunc, gcvNULL));
             VSC_IL_SetInlineBudget(pInliner, leftBudget);
         }
     }
@@ -1217,7 +1224,7 @@ static VSC_ErrCode VSC_IL_CleanupLables(
     return errCode;
 }
 
-static void _VSC_IL_Init(
+static VSC_ErrCode _VSC_IL_Init(
     VIR_Inliner         *pInliner,
     VIR_Shader          *pShader,
     VSC_HW_CONFIG       *pHwCfg,
@@ -1227,6 +1234,7 @@ static void _VSC_IL_Init(
     VSC_MM*             pMM,
     VSC_IL_PASS_DATA    *pILPassData)
 {
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
     gctUINT             maxInstCount = 0;
 
     VSC_IL_SetShader(pInliner, pShader);
@@ -1241,7 +1249,11 @@ static void _VSC_IL_Init(
 
     pInliner->pCandidates = vscHTBL_Create(VSC_IL_GetMM(pInliner),
                 vscHFUNC_Default, vscHKCMP_Default, 512);
-
+    if(pInliner->pCandidates == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR0(errCode);
+    }
     if (pHwCfg->hwFeatureFlags.instBufferUnified)
     {
         maxInstCount = pHwCfg->maxTotalInstCount;
@@ -1311,6 +1323,9 @@ static void _VSC_IL_Init(
     {
         VSC_IL_SetCheckAlwaysInlineOnly(pInliner, gcvTRUE);
     }
+
+OnError:
+    return errCode;
 }
 
 static void _VSC_IL_Final(

@@ -55,19 +55,24 @@ VSC_UNDIRECTED_GRAPH* vscUDG_Create(VSC_MM* pMM, gctUINT initNodeCount)
         ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Fail to create UDG");
         return gcvNULL;
     }
-    vscUDG_Initialize(pUDG, pMM, initNodeCount);
+    if(vscUDG_Initialize(pUDG, pMM, initNodeCount) != VSC_ERR_NONE)
+        return gcvNULL;
 
     return pUDG;
 }
 
-void vscUDG_Initialize(VSC_UNDIRECTED_GRAPH* pUDG, VSC_MM* pMM, gctUINT initNodeCount)
+VSC_ErrCode vscUDG_Initialize(VSC_UNDIRECTED_GRAPH* pUDG, VSC_MM* pMM, gctUINT initNodeCount)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     pUDG->pMM = pMM;
     pUDG->nextNodeId = 0;
     DGNLST_INITIALIZE(&pUDG->nodeList);
-    vscHTBL_Initialize(&pUDG->ndHashTable, pMM, _HFUNC_PassThroughNodeId, gcvNULL, GNODE_HASH_TABLE_SIZE);
-    vscBM_Initialize(&pUDG->bitMatrix, pMM, initNodeCount, initNodeCount);
+    errCode = vscHTBL_Initialize(&pUDG->ndHashTable, pMM, _HFUNC_PassThroughNodeId, gcvNULL, GNODE_HASH_TABLE_SIZE);
+    CHECK_ERROR0(errCode);
+    errCode = vscBM_Initialize(&pUDG->bitMatrix, pMM, initNodeCount, initNodeCount);
+    CHECK_ERROR0(errCode);
     pUDG->matrixWidth = initNodeCount;
+    return errCode;
 }
 
 void vscUDG_Finalize(VSC_UNDIRECTED_GRAPH* pUDG)
@@ -89,7 +94,7 @@ void vscUDG_Destroy(VSC_UNDIRECTED_GRAPH* pUDG)
     }
 }
 
-void vscUDG_AddNode(VSC_UNDIRECTED_GRAPH* pUDG, VSC_UDG_NODE* pNode)
+VSC_ErrCode vscUDG_AddNode(VSC_UNDIRECTED_GRAPH* pUDG, VSC_UDG_NODE* pNode)
 {
     /* A node can not be added into graph twice */
     gcmASSERT(pNode->id == INVALID_GNODE_ID);
@@ -103,7 +108,7 @@ void vscUDG_AddNode(VSC_UNDIRECTED_GRAPH* pUDG, VSC_UDG_NODE* pNode)
     UDGNLST_ADD_NODE(&pUDG->nodeList, pNode);
     pNode->id = pUDG->nextNodeId ++;
 
-    vscHTBL_DirectSet(&pUDG->ndHashTable, (void*)(gctUINTPTR_T)pNode->id, pNode);
+    return vscHTBL_DirectSet(&pUDG->ndHashTable, (void*)(gctUINTPTR_T)pNode->id, pNode);
 }
 
 void vscUDG_RemoveNode(VSC_UNDIRECTED_GRAPH* pUDG, VSC_UDG_NODE* pNode)

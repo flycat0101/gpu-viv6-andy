@@ -431,11 +431,11 @@ _VSC_CPF_InitializeBlkFlow(
 
     VSC_CPF_SetFlowSize(pCPF, flowSize);
 
-    vscSRARR_Initialize(pBlkFlowArray,
-                        pMM,
-                        vscDG_GetHistNodeCount(&pOwnerFB->cfg.dgGraph),
-                        sizeof(VSC_CPF_BLOCK_FLOW),
-                        gcvNULL);
+    CHECK_ERROR0(vscSRARR_Initialize(pBlkFlowArray,
+                                     pMM,
+                                     vscDG_GetHistNodeCount(&pOwnerFB->cfg.dgGraph),
+                                     sizeof(VSC_CPF_BLOCK_FLOW),
+                                     gcvNULL));
 
     /* pBlkFlowArray's element count is the number of BB in CFG */
     vscSRARR_SetElementCount(pBlkFlowArray,
@@ -515,11 +515,12 @@ _VSC_CPF_InitFunction(
     ON_ERROR(errCode, "Fail to add the entry bb to the worklist.");
 
     /* initialize the const hash table */
-    vscHTBL_Initialize(VSC_CPF_GetConstTable(pCPF),
-                       VSC_CPF_GetMM(pCPF),
-                       (PFN_VSC_HASH_FUNC) _HFUNC_CPF_CONSTKEY,
-                       (PFN_VSC_KEY_CMP) _HKCMP_CPF_CONSTKEY,
-                       1024);
+    errCode = vscHTBL_Initialize(VSC_CPF_GetConstTable(pCPF),
+                                 VSC_CPF_GetMM(pCPF),
+                                 (PFN_VSC_HASH_FUNC) _HFUNC_CPF_CONSTKEY,
+                                 (PFN_VSC_KEY_CMP) _HKCMP_CPF_CONSTKEY,
+                                 1024);
+    ON_ERROR0(errCode);
 
     /* Initialize the loopOpts. */
     VIR_LoopOpts_Init(&VSC_CPF_GetLoopOpts(pCPF),
@@ -652,9 +653,8 @@ _VSC_CPF_SetConstVal(
                                                    constType);
         if(!pHashKey || !pVal)
             return gcvFALSE;
-        vscHTBL_DirectSet(VSC_CPF_GetConstTable(pCPF),
-                          (void*)pHashKey,
-                          (void*)pVal);
+        if(vscHTBL_DirectSet(VSC_CPF_GetConstTable(pCPF), (void*)pHashKey, (void*)pVal) != VSC_ERR_NONE)
+            return gcvFALSE;
         changed = gcvTRUE;
     }
 
@@ -3044,7 +3044,8 @@ _VSC_CPF_AnalysisOnBlock(
     */
     if (pCalculatedBBInLoopTable != gcvNULL)
     {
-        vscHTBL_DirectSet(pCalculatedBBInLoopTable, (void *)pBB, (void *)pCurrentLoopInfo);
+        errCode = vscHTBL_DirectSet(pCalculatedBBInLoopTable, (void *)pBB, (void *)pCurrentLoopInfo);
+        ON_ERROR0(errCode);
     }
 
     /*
@@ -3067,6 +3068,11 @@ _VSC_CPF_AnalysisOnBlock(
         {
             /* Create the hash table. */
             pLoopBBTable = vscHTBL_Create(VSC_CPF_GetMM(pCPF), vscHFUNC_Default, vscHKCMP_Default, 32);
+            if(pLoopBBTable == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                ON_ERROR0(errCode);
+            }
 
             bParentLoop = gcvTRUE;
         }
@@ -3138,6 +3144,9 @@ _VSC_CPF_AnalysisOnBlock(
     if (pTmpFlow == gcvNULL)
     {
         pTmpFlow = vscSV_Create(VSC_CPF_GetMM(pCPF), VSC_CPF_GetFlowSize(pCPF), VSC_CPF_GetStateCount(pCPF));
+        if(pTmpFlow == gcvNULL)
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR0(errCode);
         VSC_CPF_SetTmpFlow(pCPF, pTmpFlow);
     }
     else if (VSC_CPF_GetFlowSize(pCPF) > (gctUINT)pTmpFlow->svSize)
@@ -3357,6 +3366,9 @@ _VSC_CPF_TransformOnBlock(
     if (pTmpFlow == gcvNULL)
     {
         pTmpFlow = vscSV_Create(VSC_CPF_GetMM(pCPF), VSC_CPF_GetFlowSize(pCPF), VSC_CPF_GetStateCount(pCPF));
+        if (pTmpFlow == gcvNULL)
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR0(errCode);
         VSC_CPF_SetTmpFlow(pCPF, pTmpFlow);
     }
     else if (VSC_CPF_GetFlowSize(pCPF) > (gctUINT)pTmpFlow->svSize)

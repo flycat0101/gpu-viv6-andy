@@ -187,10 +187,11 @@ gctUINT vscVIR_FindFirstDefIndexWithChannel(VIR_DEF_USAGE_INFO* pDuInfo,
     return fisrtDefIndex;
 }
 
-static void _AddFirstDefIndex(VIR_DEF_USAGE_INFO* pDuInfo,
+static VSC_ErrCode _AddFirstDefIndex(VIR_DEF_USAGE_INFO* pDuInfo,
                                             gctUINT FirstDefRegNo,
                                             gctUINT NewDefIndex)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VIR_DEF *    pDef;
     if (pDuInfo->bHashRegNoInst)
     {
@@ -202,9 +203,10 @@ static void _AddFirstDefIndex(VIR_DEF_USAGE_INFO* pDuInfo,
             firstDefInfo = (VIR_1st_DEF_INFO *)vscMM_Alloc(&pDuInfo->pmp.mmWrapper,
                                                            sizeof(VIR_1st_DEF_INFO));
             firstDefInfo->firstDefIndex = firstDefInfo->lastDefIndex = NewDefIndex;
-            vscHTBL_DirectSet(pDuInfo->pFirstDefTable,
-                              (void*)(gctPTRDIFF_T)FirstDefRegNo,
-                              (void*)firstDefInfo);
+            errCode = vscHTBL_DirectSet(pDuInfo->pFirstDefTable,
+                                        (void*)(gctPTRDIFF_T)FirstDefRegNo,
+                                        (void*)firstDefInfo);
+            ON_ERROR0(errCode);
         }
         else
         {
@@ -233,7 +235,9 @@ static void _AddFirstDefIndex(VIR_DEF_USAGE_INFO* pDuInfo,
             pDef->nextDefIdxOfSameRegNo = firstDefIdxOfSameRegNo;
         }
     }
-    return ;
+
+OnError:
+    return errCode;
 }
 
 /* update the first def table when deleting a defIndex,
@@ -1003,11 +1007,15 @@ static VSC_ErrCode _BuildDefTable(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuIn
     VIR_Instruction*       pInst;
     gctINT                 duHTSize = estimateDUHashTableSize(pShader);
 
-    pDuInfo->pFirstDefTable =
-        vscHTBL_Create(&pDuInfo->pmp.mmWrapper,
-                        _HFUNC_FirstDefRegNo,
-                        _HKCMP_FirstDefKeyEqual,
-                        duHTSize);
+    pDuInfo->pFirstDefTable = vscHTBL_Create(&pDuInfo->pmp.mmWrapper,
+                                            _HFUNC_FirstDefRegNo,
+                                            _HKCMP_FirstDefKeyEqual,
+                                            duHTSize);
+    if(duHTSize > 0 && pDuInfo->pFirstDefTable == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        CHECK_ERROR0(errCode);
+    }
 
     /* Initialize def table with hash enabled due to we want to get def index with def content */
     if (vscBT_Initialize(&pDuInfo->defTable,
@@ -5167,6 +5175,11 @@ _IsRedefineBetweenInsts(
     if (pBBHashTable == gcvNULL)
     {
         pBBHashTable = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 512);
+        if (pBBHashTable == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR0(errCode);
+        }
         pResInfo->pBBHashTable = pBBHashTable;
     }
 
@@ -5218,7 +5231,8 @@ _IsRedefineBetweenInsts(
                     continue;
                 }
 
-                vscHTBL_DirectSet(pInstHashTable, (void*)pDefInst, gcvNULL);
+                errCode = vscHTBL_DirectSet(pInstHashTable, (void*)pDefInst, gcvNULL);
+                ON_ERROR0(errCode);
 
                 /* Get a refined match. */
                 if (pDefInst == endInst || pDefInst == startInst)

@@ -118,7 +118,8 @@ VSC_DIRECTED_GRAPH* vscDG_Create(VSC_MM* pMM, gctUINT rootInitAllocCount, gctUIN
         ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Fail to create DG");
         return gcvNULL;
     }
-    vscDG_Initialize(pDG, pMM, rootInitAllocCount, tailInitAllocCount, edgeAllocSize);
+    if (vscDG_Initialize(pDG, pMM, rootInitAllocCount, tailInitAllocCount, edgeAllocSize) != VSC_ERR_NONE)
+        return gcvNULL;
 
     return pDG;
 }
@@ -131,16 +132,19 @@ gctUINT _HFUNC_PassThroughNodeId(const void* pKey)
     return nodeId;
 }
 
-void vscDG_Initialize(VSC_DIRECTED_GRAPH* pDG, VSC_MM* pMM, gctUINT rootInitAllocCount, gctUINT tailInitAllocCount, gctUINT edgeAllocSize)
+VSC_ErrCode vscDG_Initialize(VSC_DIRECTED_GRAPH* pDG, VSC_MM* pMM, gctUINT rootInitAllocCount, gctUINT tailInitAllocCount, gctUINT edgeAllocSize)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     pDG->pMM = pMM;
     pDG->nextNodeId = 0;
     pDG->nextEdgeId = 0;
     pDG->edgeAllocSize = edgeAllocSize;
     DGNLST_INITIALIZE(&pDG->nodeList);
-    vscSRARR_Initialize(&pDG->rootNodeArray, pMM, rootInitAllocCount, sizeof(VSC_DG_NODE*), DG_NODE_CMP);
-    vscSRARR_Initialize(&pDG->tailNodeArray, pMM, tailInitAllocCount, sizeof(VSC_DG_NODE*), DG_NODE_CMP);
-    vscHTBL_Initialize(&pDG->ndHashTable, pMM, _HFUNC_PassThroughNodeId, gcvNULL, GNODE_HASH_TABLE_SIZE);
+    CHECK_ERROR0(vscSRARR_Initialize(&pDG->rootNodeArray, pMM, rootInitAllocCount, sizeof(VSC_DG_NODE*), DG_NODE_CMP));
+    CHECK_ERROR0(vscSRARR_Initialize(&pDG->tailNodeArray, pMM, tailInitAllocCount, sizeof(VSC_DG_NODE*), DG_NODE_CMP));
+    CHECK_ERROR0(vscHTBL_Initialize(&pDG->ndHashTable, pMM, _HFUNC_PassThroughNodeId, gcvNULL, GNODE_HASH_TABLE_SIZE));
+
+    return errCode;
 }
 
 void vscDG_Finalize(VSC_DIRECTED_GRAPH* pDG)
@@ -207,18 +211,24 @@ static void _UpdateRootTailArray(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
     _UpdateTailArray(pDG, pNode);
 }
 
-void vscDG_AddNode(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
+VSC_ErrCode vscDG_AddNode(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+
     /* A node can not be added into graph twice */
     gcmASSERT(pNode->id == INVALID_GNODE_ID);
 
     DGNLST_ADD_NODE(&pDG->nodeList, pNode);
     pNode->id = pDG->nextNodeId ++;
 
-    vscHTBL_DirectSet(&pDG->ndHashTable, (void*)(gctUINTPTR_T)pNode->id, pNode);
+    errCode = vscHTBL_DirectSet(&pDG->ndHashTable, (void*)(gctUINTPTR_T)pNode->id, pNode);
+    ON_ERROR0(errCode);
 
     /* Since this is fresh node, so it must be as both root and tail. */
     _UpdateRootTailArray(pDG, pNode);
+
+OnError:
+    return errCode;
 }
 
 VSC_DG_EDGE* vscDG_GetEdge(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_DG_NODE* pToNode)
@@ -802,7 +812,7 @@ static VSC_ErrCode _DoPreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
         /* Determine direction */
         pAdjList = (bFromTail) ? &pNode->predList : &pNode->succList;
 
-        vscSRARR_Initialize(&unvisitedDescendantArray, pDG->pMM, 16, sizeof(VSC_DG_NODE*), DG_NODE_CMP);
+        CHECK_ERROR0(vscSRARR_Initialize(&unvisitedDescendantArray, pDG->pMM, 16, sizeof(VSC_DG_NODE*), DG_NODE_CMP));
 
         /* Visit siblings before descendants */
         for (pEdge = AJLST_GET_FIRST_EDGE(pAdjList);
@@ -1045,7 +1055,7 @@ static VSC_ErrCode _DoPostOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
         /* Determine direction */
         pAdjList = (bFromTail) ? &pNode->predList : &pNode->succList;
 
-        vscSRARR_Initialize(&unvisitedDescendantArray, pDG->pMM, 16, sizeof(VSC_DG_NODE*), DG_NODE_CMP);
+        CHECK_ERROR0(vscSRARR_Initialize(&unvisitedDescendantArray, pDG->pMM, 16, sizeof(VSC_DG_NODE*), DG_NODE_CMP));
 
         /* Visit siblings before descendants */
         for (pEdge = AJLST_GET_FIRST_EDGE(pAdjList);
@@ -1277,7 +1287,7 @@ static VSC_ErrCode _DoTraversalCB(VSC_DIRECTED_GRAPH* pDG,
         /* Determine direction */
         pAdjList = (bFromTail) ? &pNode->predList : &pNode->succList;
 
-        vscSRARR_Initialize(&unvisitedDescendantArray, pDG->pMM, 16, sizeof(VSC_DG_NODE*), DG_NODE_CMP);
+        CHECK_ERROR0(vscSRARR_Initialize(&unvisitedDescendantArray, pDG->pMM, 16, sizeof(VSC_DG_NODE*), DG_NODE_CMP));
 
         /* Visit siblings before descendants */
         for (pEdge = AJLST_GET_FIRST_EDGE(pAdjList);

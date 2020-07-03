@@ -586,16 +586,20 @@ static void VSC_IS_DepDagNode_PropagateKillPriority(
 }
 
 /* dependence DAG utilities */
-static void _VSC_IS_DepDag_Init(
+static VSC_ErrCode _VSC_IS_DepDag_Init(
     IN VSC_IS_DepDag* dag,
     IN VSC_MM* mm
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     gctUINT i;
 
-    vscDG_Initialize(VSC_IS_DepDag_GetDGraph(dag), mm, 2, 4, sizeof(VSC_IS_DepDagEdge));
-    vscHTBL_Initialize(VSC_IS_DepDag_GetInst2Node(dag), mm, vscHFUNC_Default, vscHKCMP_Default, 512);
-    vscSRARR_Initialize(VSC_IS_DepDag_GetKillNodesArray(dag), mm, 4, sizeof(VSC_IS_DepDagNode*), gcvNULL);
+    errCode = vscDG_Initialize(VSC_IS_DepDag_GetDGraph(dag), mm, 2, 4, sizeof(VSC_IS_DepDagEdge));
+    ON_ERROR0(errCode);
+    errCode = vscHTBL_Initialize(VSC_IS_DepDag_GetInst2Node(dag), mm, vscHFUNC_Default, vscHKCMP_Default, 512);
+    ON_ERROR0(errCode);
+    errCode = vscSRARR_Initialize(VSC_IS_DepDag_GetKillNodesArray(dag), mm, 4, sizeof(VSC_IS_DepDagNode*), gcvNULL);
+    ON_ERROR0(errCode);
 
     for(i = 0; i < VSC_IS_DEPDAG_NODES_BV_COUNT; i++)
     {
@@ -610,6 +614,9 @@ static void _VSC_IS_DepDag_Init(
     }
 
     VSC_IS_DepDag_SetMM(dag, mm);
+
+OnError:
+    return errCode;
 }
 
 static VSC_IS_DepDagNode* _VSC_IS_DepDag_NewNode(
@@ -1751,7 +1758,8 @@ static VSC_ErrCode _VSC_IS_BuildDAGForBB_Basic(
         VSC_IS_RegConflictType_Reset(excludeRCT);
         VSC_IS_OtherConflictType_Reset(excludeOCT);
 
-        vscHTBL_DirectSet(inst2node, inst, node);
+        err_code = vscHTBL_DirectSet(inst2node, inst, node);
+        CHECK_ERROR0(err_code);
         _VSC_IS_DepDag_AddNode(dag, node);
         for(j = i - 1, prev = VIR_Inst_GetPrev(inst); j >= 0; j--, prev = VIR_Inst_GetPrev(prev))
         {
@@ -1802,7 +1810,8 @@ static VSC_ErrCode _VSC_IS_DepDag_UpdateMemLdBubble(
     VSC_IS_DepDagNode* node;
     VSC_SIMPLE_RESIZABLE_ARRAY ldnodeArray;
 
-    vscSRARR_Initialize(&ldnodeArray, is->pMM, 0, sizeof(VSC_IS_DepDagNode*), gcvNULL);
+    err_code = vscSRARR_Initialize(&ldnodeArray, is->pMM, 0, sizeof(VSC_IS_DepDagNode*), gcvNULL);
+    ON_ERROR0(err_code);
 
     vscDG_ITERATOR_Initialize(&iter, VSC_IS_DepDag_GetDGraph(dag),
         VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_WIDE, VSC_GRAPH_TRAVERSAL_ORDER_PREV, gcvFALSE);
@@ -1864,6 +1873,7 @@ static VSC_ErrCode _VSC_IS_DepDag_UpdateMemLdBubble(
             }
         }
     }
+OnError:
     vscDG_ITERATOR_End(&iter);
     vscSRARR_Finalize(&ldnodeArray);
     return err_code;
@@ -2012,12 +2022,18 @@ typedef struct VSC_IS_HEURISTIC_BASE VSC_IS_Heuristic_Base;
 #define VSC_IS_Heuristic_GetDumper(heur)                        (((VSC_IS_Heuristic_Base*)heur)->is->dumper)
 #define VSC_IS_Heuristic_GetMM(heur)                            (((VSC_IS_Heuristic_Base*)heur)->is->pMM)
 
-static void _VSC_IS_Heuristic_NewOutSet(
+static VSC_ErrCode _VSC_IS_Heuristic_NewOutSet(
     IN OUT VSC_IS_Heuristic_Base* heur
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_HASH_TABLE* out_set = vscHTBL_Create(VSC_IS_Heuristic_GetMM(heur), vscHFUNC_Default, vscHKCMP_Default, 512);
+    if(out_set == gcvNULL)
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
     VSC_IS_Heuristic_SetOutSet(heur, out_set);
+    return errCode;
 }
 
 typedef enum VSC_IS_HEURISTIC_RESULT
@@ -2107,7 +2123,8 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PreferRange(
             VSC_IS_DepDagNode* node = (VSC_IS_DepDagNode*)VSC_DIRECT_HNODE_PAIR_FIRST(&pair);
             if(VSC_IS_DepDagNode_GetID(node) == VSC_IS_Heuristic_GetToSchedule(heur))
             {
-                vscHTBL_DirectSet(out_set, node, gcvNULL);
+                error_code = vscHTBL_DirectSet(out_set, node, gcvNULL);
+                ON_ERROR0(error_code);
                 break;
             }
         }
@@ -2121,12 +2138,14 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PreferRange(
             VSC_IS_DepDagNode* node = (VSC_IS_DepDagNode*)VSC_DIRECT_HNODE_PAIR_FIRST(&pair);
             if(VSC_OPTN_InRange(VSC_IS_DepDagNode_GetID(node), VSC_OPTN_ISOptions_GetBeforeInst(options), VSC_OPTN_ISOptions_GetAfterInst(options)))
             {
-                vscHTBL_DirectSet(out_set, node, gcvNULL);
+                error_code = vscHTBL_DirectSet(out_set, node, gcvNULL);
+                ON_ERROR0(error_code);
             }
         }
         gcmASSERT(HTBL_GET_ITEM_COUNT(out_set) > 0);
     }
 
+OnError:
     return error_code;
 }
 
@@ -2164,12 +2183,14 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PreferBinding(
             out_set = VSC_IS_Heuristic_GetOutSet(heur);
             gcmASSERT(vscHTBL_DirectTestAndGet(in_set, VSC_IS_DepDagEdge_GetToNode(succ_edge), gcvNULL));
             gcmASSERT(VSC_IS_DepDagNode_HasFlag(VSC_IS_DepDagEdge_GetToNode(succ_edge), VSC_IS_DEPDAGNODE_FLAG_HAS_BINDING_PRED));
-            vscHTBL_DirectSet(out_set, VSC_IS_DepDagEdge_GetToNode(succ_edge), gcvNULL);
+            error_code = vscHTBL_DirectSet(out_set, VSC_IS_DepDagEdge_GetToNode(succ_edge), gcvNULL);
+            ON_ERROR0(error_code);
             break;
         }
     }
     gcmASSERT(succ_edge != gcvNULL);
 
+OnError:
     return error_code;
 }
 
@@ -2195,9 +2216,11 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PreferKill(
         VSC_IS_DepDagNode* node = (VSC_IS_DepDagNode*)VSC_DIRECT_HNODE_PAIR_FIRST(&pair);
         if(VIR_Inst_GetOpcode(VSC_IS_DepDagNode_GetInst(node)) == VIR_OP_KILL)
         {
-            vscHTBL_DirectSet(out_set, node, gcvNULL);
+            error_code = vscHTBL_DirectSet(out_set, node, gcvNULL);
+            ON_ERROR0(error_code);
         }
     }
+OnError:
     return error_code;
 }
 
@@ -2260,9 +2283,11 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PreferKillDep(
         VSC_IS_DepDagNode* node = (VSC_IS_DepDagNode*)VSC_DIRECT_HNODE_PAIR_FIRST(&pair);
         if(vscHTBL_DirectTestAndGet(smallest_kill_dep_set, (void*)node, gcvNULL))
         {
-            vscHTBL_DirectSet(out_set, node, gcvNULL);
+            error_code = vscHTBL_DirectSet(out_set, node, gcvNULL);
+            ON_ERROR0(error_code);
         }
     }
+OnError:
     return error_code;
 }
 
@@ -2295,9 +2320,11 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PrePreferTexld(
         VSC_IS_DepDagNode* node = (VSC_IS_DepDagNode*)VSC_DIRECT_HNODE_PAIR_FIRST(&pair);
         if(VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(VSC_IS_DepDagNode_GetInst(node))))
         {
-            vscHTBL_DirectSet(out_set, node, gcvNULL);
+            error_code = vscHTBL_DirectSet(out_set, node, gcvNULL);
+            ON_ERROR0(error_code);
         }
     }
+OnError:
     return error_code;
 }
 
@@ -2329,9 +2356,11 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PrePreferMemld(
         VSC_IS_DepDagNode* node = (VSC_IS_DepDagNode*)VSC_DIRECT_HNODE_PAIR_FIRST(&pair);
         if(VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(VSC_IS_DepDagNode_GetInst(node))))
         {
-            vscHTBL_DirectSet(out_set, node, gcvNULL);
+            error_code = vscHTBL_DirectSet(out_set, node, gcvNULL);
+            ON_ERROR0(error_code);
         }
     }
+OnError:
     return error_code;
 }
 
@@ -2370,7 +2399,8 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PreferAntiBubble(
         {
             min_bubble = node_bubble;
         }
-        vscHTBL_DirectSet(out_set, node, (void*)(gctUINTPTR_T)node_bubble);
+        error_code = vscHTBL_DirectSet(out_set, node, (void*)(gctUINTPTR_T)node_bubble);
+        CHECK_ERROR0(error_code);
     }
 
     vscHTBLIterator_Init(&iter, out_set);
@@ -2434,9 +2464,11 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PostPreferTexld(
         VSC_IS_DepDagNode* node = (VSC_IS_DepDagNode*)VSC_DIRECT_HNODE_PAIR_FIRST(&pair);
         if(VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(VSC_IS_DepDagNode_GetInst(node))))
         {
-            vscHTBL_DirectSet(out_set, node, gcvNULL);
+            error_code = vscHTBL_DirectSet(out_set, node, gcvNULL);
+            ON_ERROR0(error_code);
         }
     }
+OnError:
     return error_code;
 }
 
@@ -2466,7 +2498,8 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PostPreferMemld(
         VSC_IS_DepDagNode* node = (VSC_IS_DepDagNode*)VSC_DIRECT_HNODE_PAIR_FIRST(&pair);
         if(VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(VSC_IS_DepDagNode_GetInst(node))))
         {
-            vscHTBL_DirectSet(out_set, node, gcvNULL);
+            error_code = vscHTBL_DirectSet(out_set, node, gcvNULL);
+            CHECK_ERROR0(error_code);
         }
     }
     return error_code;
@@ -2485,7 +2518,8 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_DelayTexLd(
     _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
     out_set = VSC_IS_Heuristic_GetOutSet(heur);
 
-    vscHTBL_DirectDuplicate(out_set, in_set);
+    error_code = vscHTBL_DirectDuplicate(out_set, in_set);
+    CHECK_ERROR0(error_code);
     if(VSC_IS_FW_Heuristic_GetTexldWithDepBubbleCount(heur))
     {
         VSC_DIRECT_HNODE_PAIR pair;
@@ -2518,7 +2552,8 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_DelayMemLd(
     _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
     out_set = VSC_IS_Heuristic_GetOutSet(heur);
 
-    vscHTBL_DirectDuplicate(out_set, in_set);
+    error_code = vscHTBL_DirectDuplicate(out_set, in_set);
+    CHECK_ERROR0(error_code);
     if(VSC_IS_FW_Heuristic_GetMemldWithDepBubbleCount(heur))
     {
         VSC_DIRECT_HNODE_PAIR pair;
@@ -2562,7 +2597,8 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PostPreferTexldMemld(
            VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(VSC_IS_DepDagNode_GetInst(node))) ||
            VIR_OPCODE_isAttrLd(VIR_Inst_GetOpcode(VSC_IS_DepDagNode_GetInst(node))))
         {
-            vscHTBL_DirectSet(out_set, node, gcvNULL);
+            error_code = vscHTBL_DirectSet(out_set, node, gcvNULL);
+            CHECK_ERROR0(error_code);
         }
     }
     return error_code;
@@ -2595,7 +2631,8 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PreferOrder(
         }
     }
     gcmASSERT(min_node);
-    vscHTBL_DirectSet(out_set, min_node, gcvNULL);
+    error_code = vscHTBL_DirectSet(out_set, min_node, gcvNULL);
+    CHECK_ERROR0(error_code);
 
     gcmASSERT(HTBL_GET_ITEM_COUNT(out_set) == 1);
     return error_code;
@@ -2615,7 +2652,8 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_CollectKillDepSet(
     {
         return err_code;
     }
-    vscHTBL_DirectSet(kill_dep_set, (void*)node, gcvNULL);
+    err_code = vscHTBL_DirectSet(kill_dep_set, (void*)node, gcvNULL);
+    CHECK_ERROR0(err_code);
     edge_list = VSC_IS_DepDagNode_GetPredEdgeList(node);
     VSC_ADJACENT_LIST_ITERATOR_INIT(&iter, edge_list);
     for(edge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_FIRST(&iter);
@@ -2636,6 +2674,11 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_CollectKillDepSets(
     VSC_DG_ITERATOR dg_iter;
     VSC_IS_DepDagNode* node;
     VSC_HASH_TABLE* kill_dep_sets = vscHTBL_Create(VSC_IS_Heuristic_GetMM(heur), vscHFUNC_Default, vscHKCMP_Default, 512);
+    if (kill_dep_sets == gcvNULL)
+    {
+        err_code = VSC_ERR_OUT_OF_MEMORY;
+        return err_code;
+    }
 
     vscDG_ITERATOR_Initialize(&dg_iter, VSC_IS_DepDag_GetDGraph(dag), VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
         VSC_GRAPH_TRAVERSAL_ORDER_POST, gcvFALSE);
@@ -2647,8 +2690,14 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_CollectKillDepSets(
         if(VIR_Inst_GetOpcode(inst) == VIR_OP_KILL)
         {
             VSC_HASH_TABLE* kill_dep_set = vscHTBL_Create(VSC_IS_Heuristic_GetMM(heur), vscHFUNC_Default, vscHKCMP_Default, 512);
+            if (kill_dep_set == gcvNULL)
+            {
+                err_code = VSC_ERR_OUT_OF_MEMORY;
+                return err_code;
+            }
             _VSC_IS_FW_Heuristic_CollectKillDepSet(node, kill_dep_set);
-            vscHTBL_DirectSet(kill_dep_sets, (void*)node, (void*)kill_dep_set);
+            err_code = vscHTBL_DirectSet(kill_dep_sets, (void*)node, (void*)kill_dep_set);
+            CHECK_ERROR0(err_code);
         }
     }
 
@@ -2656,11 +2705,12 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_CollectKillDepSets(
     return err_code;
 }
 
-static void _VSC_IS_FW_Heuristic_Init(
+static VSC_ErrCode _VSC_IS_FW_Heuristic_Init(
     IN OUT VSC_IS_FW_Heuristic* heur,
     IN VSC_IS_InstSched* is
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_OPTN_ISOptions* options = VSC_IS_InstSched_GetOptions(is);
     VSC_HASH_TABLE* texld_with_bubble;
     VSC_HASH_TABLE* memld_with_bubble;
@@ -2686,9 +2736,19 @@ static void _VSC_IS_FW_Heuristic_Init(
     VSC_IS_Heuristic_SetInSet(heur, gcvNULL);
     VSC_IS_Heuristic_SetOutSet(heur, gcvNULL);
     texld_with_bubble = vscHTBL_Create(VSC_IS_Heuristic_GetMM(heur), vscHFUNC_Default, vscHKCMP_Default, 512);
+    if (texld_with_bubble == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR0(errCode);
+    }
     VSC_IS_FW_Heuristic_SetTexldWithDepBubble(heur, texld_with_bubble);
     VSC_IS_FW_Heuristic_SetTexldInterfaceBubble(heur, 0);
     memld_with_bubble = vscHTBL_Create(VSC_IS_Heuristic_GetMM(heur), vscHFUNC_Default, vscHKCMP_Default, 512);
+    if (memld_with_bubble == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR0(errCode);
+    }
     VSC_IS_FW_Heuristic_SetMemldWithDepBubble(heur, memld_with_bubble);
     VSC_IS_FW_Heuristic_SetMemldInterfaceBubble(heur, 0);
     VSC_IS_Heuristic_SetToSchedule(heur, 0);
@@ -2699,6 +2759,9 @@ static void _VSC_IS_FW_Heuristic_Init(
     {
         _VSC_IS_FW_Heuristic_CollectKillDepSets(heur);
     }
+
+OnError:
+    return errCode;
 }
 
 typedef struct VSC_IS_BW_HEURISTIC VSC_IS_BW_Heuristic;
@@ -2750,7 +2813,8 @@ static VSC_ErrCode _VSC_IS_BW_Heuristic_PreferRange(
             VSC_IS_DepDagNode* node = (VSC_IS_DepDagNode*)VSC_DIRECT_HNODE_PAIR_FIRST(&pair);
             if(VSC_IS_DepDagNode_GetID(node) == VSC_IS_Heuristic_GetToSchedule(heur))
             {
-                vscHTBL_DirectSet(out_set, node, gcvNULL);
+                error_code = vscHTBL_DirectSet(out_set, node, gcvNULL);
+                CHECK_ERROR0(error_code);
                 break;
             }
         }
@@ -2764,7 +2828,8 @@ static VSC_ErrCode _VSC_IS_BW_Heuristic_PreferRange(
             VSC_IS_DepDagNode* node = (VSC_IS_DepDagNode*)VSC_DIRECT_HNODE_PAIR_FIRST(&pair);
             if(VSC_OPTN_InRange(VSC_IS_DepDagNode_GetID(node), VSC_OPTN_ISOptions_GetBeforeInst(options), VSC_OPTN_ISOptions_GetAfterInst(options)))
             {
-                vscHTBL_DirectSet(out_set, node, gcvNULL);
+                error_code = vscHTBL_DirectSet(out_set, node, gcvNULL);
+                CHECK_ERROR0(error_code);
             }
         }
         gcmASSERT(HTBL_GET_ITEM_COUNT(out_set) > 0);
@@ -2800,7 +2865,8 @@ static VSC_ErrCode _VSC_IS_BW_Heuristic_PreferOrder(
         }
     }
     gcmASSERT(max_node);
-    vscHTBL_DirectSet(out_set, max_node, gcvNULL);
+    error_code = vscHTBL_DirectSet(out_set, max_node, gcvNULL);
+    CHECK_ERROR0(error_code);
 
     gcmASSERT(HTBL_GET_ITEM_COUNT(out_set) == 1);
     return error_code;
@@ -2872,11 +2938,12 @@ static void _VSC_IS_Heuristic_DumpResultSet(
     }
 }
 
-static void _VSC_IS_FW_Heuristic_Update(
+static VSC_ErrCode _VSC_IS_FW_Heuristic_Update(
     IN VSC_IS_FW_Heuristic* heur,
     VSC_IS_DepDagNode* result
     )
 {
+    VSC_ErrCode error_code = VSC_ERR_NONE;
     VSC_HASH_ITERATOR iter;
     VSC_DIRECT_HNODE_PAIR pair;
     VSC_IS_DepDagNode* node;
@@ -2893,7 +2960,8 @@ static void _VSC_IS_FW_Heuristic_Update(
         }
         else
         {
-            vscHTBL_DirectSet(VSC_IS_FW_Heuristic_GetTexldWithDepBubble(heur), node, (void*)(gctUINTPTR_T)(bubble - 1));
+            error_code = vscHTBL_DirectSet(VSC_IS_FW_Heuristic_GetTexldWithDepBubble(heur), node, (void*)(gctUINTPTR_T)(bubble - 1));
+            CHECK_ERROR0(error_code);
         }
     }
 
@@ -2908,13 +2976,15 @@ static void _VSC_IS_FW_Heuristic_Update(
         }
         else
         {
-            vscHTBL_DirectSet(VSC_IS_FW_Heuristic_GetMemldWithDepBubble(heur), node, (void*)(gctUINTPTR_T)(bubble - 1));
+            error_code = vscHTBL_DirectSet(VSC_IS_FW_Heuristic_GetMemldWithDepBubble(heur), node, (void*)(gctUINTPTR_T)(bubble - 1));
+            CHECK_ERROR0(error_code);
         }
     }
 
     if(VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(VSC_IS_DepDagNode_GetInst(result))))
     {
-        vscHTBL_DirectSet(VSC_IS_FW_Heuristic_GetTexldWithDepBubble(heur), result, (void*)(gctUINTPTR_T)(VSC_IS_Heuristic_GetTexldBubble(heur)));
+        error_code = vscHTBL_DirectSet(VSC_IS_FW_Heuristic_GetTexldWithDepBubble(heur), result, (void*)(gctUINTPTR_T)(VSC_IS_Heuristic_GetTexldBubble(heur)));
+        CHECK_ERROR0(error_code);
         VSC_IS_FW_Heuristic_ResetTexldInterfaceBubble(heur);
     }
     else
@@ -2923,7 +2993,8 @@ static void _VSC_IS_FW_Heuristic_Update(
     }
     if(VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(VSC_IS_DepDagNode_GetInst(result))))
     {
-        vscHTBL_DirectSet(VSC_IS_FW_Heuristic_GetMemldWithDepBubble(heur), result, (void*)(gctUINTPTR_T)(VSC_IS_Heuristic_GetMemldBubble(heur)));
+        error_code = vscHTBL_DirectSet(VSC_IS_FW_Heuristic_GetMemldWithDepBubble(heur), result, (void*)(gctUINTPTR_T)(VSC_IS_Heuristic_GetMemldBubble(heur)));
+        CHECK_ERROR0(error_code);
         VSC_IS_FW_Heuristic_ResetMemldInterfaceBubble(heur);
     }
     else
@@ -2960,6 +3031,8 @@ static void _VSC_IS_FW_Heuristic_Update(
     VSC_IS_DepDagNode_SetScheduledPosition(result, VSC_IS_Heuristic_GetToSchedule(heur));
     VSC_IS_Heuristic_IncToSchedule(heur);
     VSC_IS_Heuristic_SetLastScheduled(heur, result);
+
+    return error_code;
 }
 
 static void _VSC_IS_BW_Heuristic_Update(
@@ -3127,44 +3200,55 @@ typedef struct VSC_IS_LISTSCHEDULING
 #define VSC_IS_ListScheduling_GetDumper(ls)         ((ls)->is->dumper)
 #define VSC_IS_ListScheduling_GetMM(ls)             ((ls)->is->pMM)
 
-static void _VSC_IS_FW_ListScheduling_Init(
+static VSC_ErrCode _VSC_IS_FW_ListScheduling_Init(
     IN OUT VSC_IS_ListScheduling* ls,
     IN VSC_IS_InstSched* is
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_SIMPLE_RESIZABLE_ARRAY* root_array;
     gctUINT32 i;
 
     VSC_IS_ListScheduling_SetIS(ls, is);
-    vscHTBL_Initialize(VSC_IS_ListScheduling_GetCands(ls), VSC_IS_ListScheduling_GetMM(ls), vscHFUNC_Default, vscHKCMP_Default, 512);
+    errCode = vscHTBL_Initialize(VSC_IS_ListScheduling_GetCands(ls), VSC_IS_ListScheduling_GetMM(ls), vscHFUNC_Default, vscHKCMP_Default, 512);
+    ON_ERROR0(errCode);
     _VSC_IS_FW_Heuristic_Init(VSC_IS_ListScheduling_GetFwHeur(ls), is);
 
     root_array = DG_GET_ROOT_ARRAY_P(VSC_IS_DepDag_GetDGraph(VSC_IS_ListScheduling_GetDag(ls)));
     for(i = 0; i < vscSRARR_GetElementCount(root_array); i++)
     {
         VSC_IS_DepDagNode** node = (VSC_IS_DepDagNode**)vscSRARR_GetElement(root_array, i);
-        vscHTBL_DirectSet(VSC_IS_ListScheduling_GetCands(ls), *node, gcvNULL);
+        errCode = vscHTBL_DirectSet(VSC_IS_ListScheduling_GetCands(ls), *node, gcvNULL);
+        ON_ERROR0(errCode);
     }
+
+OnError:
+    return errCode;
 }
 
-static void _VSC_IS_BW_ListScheduling_Init(
+static VSC_ErrCode _VSC_IS_BW_ListScheduling_Init(
     IN OUT VSC_IS_ListScheduling* ls,
     IN VSC_IS_InstSched* is
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_SIMPLE_RESIZABLE_ARRAY* tail_array;
     gctUINT32 i;
 
     VSC_IS_ListScheduling_SetIS(ls, is);
-    vscHTBL_Initialize(VSC_IS_ListScheduling_GetCands(ls), VSC_IS_ListScheduling_GetMM(ls), vscHFUNC_Default, vscHKCMP_Default, 512);
+    errCode = vscHTBL_Initialize(VSC_IS_ListScheduling_GetCands(ls), VSC_IS_ListScheduling_GetMM(ls), vscHFUNC_Default, vscHKCMP_Default, 512);
+    ON_ERROR0(errCode);
     _VSC_IS_BW_Heuristic_Init(VSC_IS_ListScheduling_GetBwHeur(ls), is);
 
     tail_array = DG_GET_TAIL_ARRAY_P(VSC_IS_DepDag_GetDGraph(VSC_IS_ListScheduling_GetDag(ls)));
     for(i = 0; i < vscSRARR_GetElementCount(tail_array); i++)
     {
         VSC_IS_DepDagNode** node = (VSC_IS_DepDagNode**)vscSRARR_GetElement(tail_array, i);
-        vscHTBL_DirectSet(VSC_IS_ListScheduling_GetCands(ls), *node, gcvNULL);
+        errCode = vscHTBL_DirectSet(VSC_IS_ListScheduling_GetCands(ls), *node, gcvNULL);
+        ON_ERROR0(errCode);
     }
+OnError:
+    return errCode;
 }
 
 static void _VSC_IS_FW_ListScheduling_Final(
@@ -3298,7 +3382,8 @@ static VSC_ErrCode _VSC_IS_DoListScheduling(
                     }
                     if(succ_pred_edge == gcvNULL)
                     {
-                        vscHTBL_DirectSet(VSC_IS_ListScheduling_GetCands(&ls), succ, gcvNULL);
+                        err_code = vscHTBL_DirectSet(VSC_IS_ListScheduling_GetCands(&ls), succ, gcvNULL);
+                        CHECK_ERROR0(err_code);
                     }
                 }
             }
@@ -3413,7 +3498,8 @@ static VSC_ErrCode _VSC_IS_DoListScheduling(
                     }
                     if(pred_succ_edge == gcvNULL)
                     {
-                        vscHTBL_DirectSet(VSC_IS_ListScheduling_GetCands(&ls), pred, gcvNULL);
+                        err_code = vscHTBL_DirectSet(VSC_IS_ListScheduling_GetCands(&ls), pred, gcvNULL);
+                        CHECK_ERROR0(err_code);
                     }
                 }
             }

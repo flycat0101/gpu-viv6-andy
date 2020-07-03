@@ -6796,7 +6796,8 @@ _ConvCode2VirInstruction(
         VIR_Inst_SetConditionOp(virInst, virCond);
         if(externOpcode != 0)
         {
-            vscHTBL_DirectSet(ExternOpcodeTable, (void *)(gctUINTPTR_T)virInst, (void *)externOpcode);
+            virErrCode = vscHTBL_DirectSet(ExternOpcodeTable, (void *)(gctUINTPTR_T)virInst, (void *)externOpcode);
+            ON_ERROR0(virErrCode);
         }
 
         if(gcmSL_OPCODE_GET(Code->opcode, Round))
@@ -7004,6 +7005,9 @@ _ConvCode2VirInstruction(
     (*VirInst)->sourceLoc.fileId = 0;
     (*VirInst)->sourceLoc.colNo = GCSL_SRC_LOC_COLNO(Code->srcLoc);
     (*VirInst)->sourceLoc.lineNo= GCSL_SRC_LOC_LINENO(Code->srcLoc);
+
+
+OnError:
     return virErrCode;
 }
 
@@ -7221,7 +7225,11 @@ gcSHADER_Conv2VIR(
     vscPMP_Intialize(&mp, gcvNULL, 1024, sizeof(void *), gcvTRUE);
     externOpcodeTable = vscHTBL_Create(&mp.mmWrapper,
                                        vscHFUNC_DefaultPtr, vscHKCMP_Default, 256);
-
+    if(externOpcodeTable == gcvNULL)
+    {
+        status =  gcvSTATUS_OUT_OF_MEMORY;
+        gcmONERROR(status);
+    }
     _gcVIR_SHADER_Clean(VirShader);
 
     VirShader->clientApiVersion = Shader->clientApiVersion;

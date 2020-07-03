@@ -140,6 +140,11 @@ VSC_ErrCode vscVIR_TransformFromSpvSSA(VIR_Shader* pShader)
     labelEndMap = vscHTBL_Create(&pShader->pmp.mmWrapper, vscHFUNC_Default, vscHKCMP_Default, 512);
     movToDupMap = vscHTBL_Create(&pShader->pmp.mmWrapper, vscHFUNC_Default, vscHKCMP_Default, 512);
     movFromDupMap = vscHTBL_Create(&pShader->pmp.mmWrapper, vscHFUNC_Default, vscHKCMP_Default, 512);
+    if (labelEndMap == gcvNULL || movToDupMap == gcvNULL || movFromDupMap == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        CHECK_ERROR0(errCode);
+    }
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
 
@@ -159,13 +164,15 @@ VSC_ErrCode vscVIR_TransformFromSpvSSA(VIR_Shader* pShader)
                 label = VIR_Operand_GetLabel(VIR_Inst_GetDest(inst));
                 if(lastLabel)
                 {
-                    vscHTBL_DirectSet(labelEndMap, (void*)lastLabel, VIR_Inst_GetPrev(inst));
+                    errCode = vscHTBL_DirectSet(labelEndMap, (void*)lastLabel, VIR_Inst_GetPrev(inst));
+                    CHECK_ERROR0(errCode);
                 }
                 lastLabel = label;
             }
             if(VIR_Inst_GetNext(inst) == gcvNULL && label)
             {
-                vscHTBL_DirectSet(labelEndMap, (void*)label, inst);
+                errCode = vscHTBL_DirectSet(labelEndMap, (void*)label, inst);
+                CHECK_ERROR0(errCode);
             }
         }
 
@@ -245,7 +252,8 @@ VSC_ErrCode vscVIR_TransformFromSpvSSA(VIR_Shader* pShader)
 
                         VIR_Operand_Copy(VIR_Inst_GetSource(movToDupInst, 0), VIR_PhiOperand_GetValue(phiOperand));
 
-                        vscHTBL_DirectSet(movToDupMap, (void*)VIR_PhiOperand_GetLabel(phiOperand), (void*)movToDupInst);
+                        errCode = vscHTBL_DirectSet(movToDupMap, (void*)VIR_PhiOperand_GetLabel(phiOperand), (void*)movToDupInst);
+                        CHECK_ERROR0(errCode);
 
                         /* insert mov from dup inst */
                         if(!vscHTBL_DirectTestAndGet(movFromDupMap, (void*)VIR_PhiOperand_GetLabel(phiOperand), (void**)&prevMovFromDupInst))
@@ -259,7 +267,8 @@ VSC_ErrCode vscVIR_TransformFromSpvSSA(VIR_Shader* pShader)
                         VIR_Operand_SetSymbol(VIR_Inst_GetSource(movFromDupInst, 0), func, VIR_Symbol_GetIndex(dupDestSym));
                         VIR_Operand_SetSwizzle(VIR_Inst_GetSource(movFromDupInst, 0), VIR_Enable_2_Swizzle_WShift(VIR_Operand_GetEnable(dest)));
 
-                        vscHTBL_DirectSet(movFromDupMap, (void*)VIR_PhiOperand_GetLabel(phiOperand), (void*)movFromDupInst);
+                        errCode = vscHTBL_DirectSet(movFromDupMap, (void*)VIR_PhiOperand_GetLabel(phiOperand), (void*)movFromDupInst);
+                        CHECK_ERROR0(errCode);
                     }
 
                     VIR_Function_RemoveInstruction(func, inst, gcvTRUE);

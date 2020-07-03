@@ -42,25 +42,30 @@ typedef struct _VSC_SCL_ARRAYINFO
 #define VSC_SCL_ArrayInfo_GetMM(ai)                     ((ai)->mm)
 #define VSC_SCL_ArrayInfo_SetMM(ai, m)                ((ai)->mm = (m))
 
-static void _VSC_SCL_ArrayInfo_Init(
+static VSC_ErrCode _VSC_SCL_ArrayInfo_Init(
     IN OUT VSC_SCL_ArrayInfo* array_info,
     IN VSC_MM* mm
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_SCL_ArrayInfo_SetDynamicIndexing(array_info, gcvFALSE);
-    vscBV_Initialize(VSC_SCL_ArrayInfo_GetConstIndexes(array_info), mm, 64);
-    vscHTBL_Initialize(VSC_SCL_ArrayInfo_GetNewSymbols(array_info), mm, vscHFUNC_Default, vscHKCMP_Default, 512);
+    errCode = vscBV_Initialize(VSC_SCL_ArrayInfo_GetConstIndexes(array_info), mm, 64);
+    ON_ERROR0(errCode);
+    errCode = vscHTBL_Initialize(VSC_SCL_ArrayInfo_GetNewSymbols(array_info), mm, vscHFUNC_Default, vscHKCMP_Default, 512);
+    ON_ERROR0(errCode);
     vscUNILST_Initialize(VSC_SCL_ArrayInfo_GetOpndList(array_info), gcvFALSE);
     VSC_SCL_ArrayInfo_SetMM(array_info, mm);
+OnError:
+    return errCode;
 }
 
-static void _VSC_SCL_ArrayInfo_MapNewSymbol(
+static VSC_ErrCode _VSC_SCL_ArrayInfo_MapNewSymbol(
     IN OUT VSC_SCL_ArrayInfo* array_info,
     IN gctINT index,
     IN VIR_Symbol* sym
     )
 {
-    vscHTBL_DirectSet(VSC_SCL_ArrayInfo_GetNewSymbols(array_info), (void*)(gctUINTPTR_T)index, (void*)sym);
+    return vscHTBL_DirectSet(VSC_SCL_ArrayInfo_GetNewSymbols(array_info), (void*)(gctUINTPTR_T)index, (void*)sym);
 }
 
 static VIR_Symbol* _VSC_SCL_ArrayInfo_GetNewSymbol(
@@ -120,7 +125,7 @@ static void _VSC_SCL_ArrayInfo_Dump(
     _VSC_SCL_ArrayInfo_DumpNewSymbols(VSC_SCL_ArrayInfo_GetNewSymbols(array_info), dumper);
 }
 
-static void VSC_SCL_Scalarization_Init(
+static VSC_ErrCode VSC_SCL_Scalarization_Init(
     IN OUT VSC_SCL_Scalarization* scl,
     IN VIR_Shader* shader,
     IN VSC_OPTN_SCLOptions* options,
@@ -128,12 +133,17 @@ static void VSC_SCL_Scalarization_Init(
     IN VSC_MM* pMM
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     scl->pMM = pMM;
-    vscHTBL_Initialize(VSC_SCL_Scalarization_GetArrayInfos(scl),
-        VSC_SCL_Scalarization_GetMM(scl), vscHFUNC_Default, vscHKCMP_Default, 512);
+    errCode = vscHTBL_Initialize(VSC_SCL_Scalarization_GetArrayInfos(scl),
+                                 VSC_SCL_Scalarization_GetMM(scl), vscHFUNC_Default, vscHKCMP_Default, 512);
+    ON_ERROR0(errCode);
     VSC_SCL_Scalarization_SetShader(scl, shader);
     VSC_SCL_Scalarization_SetOptions(scl, options);
     VSC_SCL_Scalarization_SetDumper(scl, dumper);
+
+OnError:
+    return errCode;
 }
 
 static VSC_SCL_ArrayInfo* _VSC_SCL_Scalarization_NewArrayInfo(
@@ -160,7 +170,8 @@ static VSC_SCL_ArrayInfo* _VSC_SCL_Scalarization_GetArrayInfo(
         array_info = _VSC_SCL_Scalarization_NewArrayInfo(scl);
         if(array_info == gcvNULL)
             return array_info;
-        vscHTBL_DirectSet(VSC_SCL_Scalarization_GetArrayInfos(scl), sym, array_info);
+        if(vscHTBL_DirectSet(VSC_SCL_Scalarization_GetArrayInfos(scl), sym, array_info) != VSC_ERR_NONE)
+            return gcvNULL;
     }
     return array_info;
 }

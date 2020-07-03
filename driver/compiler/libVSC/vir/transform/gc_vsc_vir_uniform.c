@@ -37,13 +37,14 @@ VSC_GlobalUniformItem_Initialize(
     VSC_GlobalUniformItem_SetOffset(global_uniform_item, -1);
 }
 
-void
+VSC_ErrCode
 VSC_GlobalUniformItem_Update(
     IN OUT VSC_GlobalUniformItem* item,
     IN VIR_Shader* shader,
     IN VIR_SymId uniform_symid
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_GlobalUniformTable* global_uniform_table = VSC_GlobalUniformItem_GetGlobalUniformTable(item);
     gctUINT shader_kind_id = VIR_ShaderKind_Map2KindId(VIR_Shader_GetKind(shader));
     VIR_Symbol* uniform_sym = VIR_Shader_GetSymFromId(shader, uniform_symid);
@@ -68,7 +69,8 @@ VSC_GlobalUniformItem_Update(
     }
     VSC_GlobalUniformItem_SetRegCount(item, VIR_Type_GetVirRegCount(shader, uniform_type, -1));
     VSC_GlobalUniformItem_SetByteSize(item, VIR_Type_GetTypeByteSize(shader, uniform_type));
-    vscHTBL_DirectSet(VSC_GlobalUniformTable_GetNameMap(global_uniform_table), name, item);
+    errCode = vscHTBL_DirectSet(VSC_GlobalUniformTable_GetNameMap(global_uniform_table), name, item);
+    return errCode;
 }
 
 gctBOOL
@@ -243,19 +245,27 @@ VSC_GlobalUniformItem_Dump(
 }
 
 /* VSC_GlobalUniformTable methods */
-void
+VSC_ErrCode
 VSC_GlobalUniformTable_Initialize(
     IN OUT VSC_GlobalUniformTable* global_uniform_table,
     IN VSC_AllShaders* all_shaders,
     IN VSC_MM* mm_wrapper
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_GlobalUniformTable_SetAllShaders(global_uniform_table, all_shaders);
     vscUNILST_Initialize(VSC_GlobalUniformTable_GetItemList(global_uniform_table), gcvFALSE);
     VSC_GlobalUniformTable_SetNameMap(global_uniform_table, vscHTBL_Create(mm_wrapper, vscHFUNC_String, vcsHKCMP_String, 512));
+    if(global_uniform_table->name_map == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        return errCode;
+    }
     VSC_GlobalUniformTable_ResetHasActiveUniform(global_uniform_table);
     VSC_GlobalUniformTable_SetItemCount(global_uniform_table, 0);
     VSC_GlobalUniformTable_SetMM(global_uniform_table, mm_wrapper);
+
+    return errCode;
 }
 
 VSC_GlobalUniformItem*
@@ -2230,6 +2240,11 @@ _VSC_UF_AUBO_GetAuxAddress(
     if(auxAddressTable == gcvNULL)
     {
         auxAddressTable = vscHTBL_Create(VSC_UF_AUBO_GetMM(aubo), _VSC_UF_AUBO_GetAuxAddress_HashFunc, _VSC_UF_AUBO_GetAuxAddress_KeyCmp, 16);
+        if(auxAddressTable == gcvNULL)
+        {
+            virErrCode = VSC_ERR_OUT_OF_MEMORY;
+            return VIR_INVALID_ID;
+        }
         VSC_UF_AUBO_SetAuxAddresses(aubo, auxAddressTable);
     }
 
@@ -2290,7 +2305,8 @@ _VSC_UF_AUBO_GetAuxAddress(
             VIR_Uniform_SetAuxAddrSymId(defaultUBOAddrUniform, auxAddrSymId);
         }
 
-        vscHTBL_DirectSet(auxAddressTable, (void*)key, (void*)auxAddrSym);
+        virErrCode = vscHTBL_DirectSet(auxAddressTable, (void*)key, (void*)auxAddrSym);
+        if(virErrCode != VSC_ERR_NONE) return VIR_INVALID_ID;
     }
 
     auxAddrSymId = VIR_Symbol_GetIndex(auxAddrSym);
@@ -4695,10 +4711,16 @@ VSC_ErrCode VSC_UF_UseConstRegForUBO(
         if (pWorkingBaseAddrSet == gcvNULL)
         {
             pWorkingBaseAddrSet = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 8);
+            if(pWorkingBaseAddrSet == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                ON_ERROR0(errCode);
+            }
         }
 
         /* Insert the base address symbol. */
-        vscHTBL_DirectSet(pWorkingBaseAddrSet, (void *)pBaseAddrSym, gcvNULL);
+        errCode = vscHTBL_DirectSet(pWorkingBaseAddrSet, (void *)pBaseAddrSym, gcvNULL);
+        ON_ERROR0(errCode);
     }
 
     /* Empty, just bail out. */
@@ -4764,10 +4786,16 @@ VSC_ErrCode VSC_UF_UseConstRegForUBO(
             if (pWorkingInstAddSet == gcvNULL)
             {
                 pWorkingInstAddSet = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 16);
+                if(pWorkingInstAddSet == gcvNULL)
+                {
+                    errCode = VSC_ERR_OUT_OF_MEMORY;
+                    ON_ERROR0(errCode);
+                }
             }
 
             /* Insert the matched instruction. */
-            vscHTBL_DirectSet(pWorkingInstAddSet, (void *)pInst, gcvNULL);
+            errCode = vscHTBL_DirectSet(pWorkingInstAddSet, (void *)pInst, gcvNULL);
+            ON_ERROR0(errCode);
         }
     }
 

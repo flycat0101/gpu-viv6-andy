@@ -127,12 +127,12 @@ typedef struct _VSC_UNDIRECTED_GRAPH
 
 /* Creation and destroy */
 VSC_UNDIRECTED_GRAPH* vscUDG_Create(VSC_MM* pMM, gctUINT initNodeCount);
-void vscUDG_Initialize(VSC_UNDIRECTED_GRAPH* pUDG, VSC_MM* pMM, gctUINT initNodeCount);
+VSC_ErrCode vscUDG_Initialize(VSC_UNDIRECTED_GRAPH* pUDG, VSC_MM* pMM, gctUINT initNodeCount);
 void vscUDG_Finalize(VSC_UNDIRECTED_GRAPH* pUDG);
 void vscUDG_Destroy(VSC_UNDIRECTED_GRAPH* pUDG);
 
 /* Build graph */
-void vscUDG_AddNode(VSC_UNDIRECTED_GRAPH* pUDG, VSC_UDG_NODE* pNode);
+VSC_ErrCode vscUDG_AddNode(VSC_UNDIRECTED_GRAPH* pUDG, VSC_UDG_NODE* pNode);
 void vscUDG_RemoveNode(VSC_UNDIRECTED_GRAPH* pUDG, VSC_UDG_NODE* pNode);
 void vscUDG_ConnectTwoNodes(VSC_UNDIRECTED_GRAPH* pUDG, VSC_UDG_NODE* pNode1, VSC_UDG_NODE* pNode2);
 
@@ -333,13 +333,13 @@ typedef void    (*PFN_DG_EDGE_HANLDER)(VSC_DIRECTED_GRAPH* pDG, VSC_DG_EDGE* pEd
 
 /* Creation and destroy */
 VSC_DIRECTED_GRAPH* vscDG_Create(VSC_MM* pMM, gctUINT rootInitAllocCount, gctUINT tailInitAllocCount, gctUINT edgeAllocSize);
-void vscDG_Initialize(VSC_DIRECTED_GRAPH* pDG, VSC_MM* pMM, gctUINT rootInitAllocCount, gctUINT tailInitAllocCount, gctUINT edgeAllocSize);
+VSC_ErrCode vscDG_Initialize(VSC_DIRECTED_GRAPH* pDG, VSC_MM* pMM, gctUINT rootInitAllocCount, gctUINT tailInitAllocCount, gctUINT edgeAllocSize);
 void vscDG_Finalize(VSC_DIRECTED_GRAPH* pDG);
 void vscDG_Destroy(VSC_DIRECTED_GRAPH* pDG);
 
 /* Build graph */
 
-void vscDG_AddNode(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode);
+VSC_ErrCode vscDG_AddNode(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode);
 /* Return 2 VSC_DG_EDGEs which are successive, first one is successor edge, and 2nd is predecessor edge. */
 VSC_DG_EDGE* vscDG_AddEdge(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_DG_NODE* pToNode, gctBOOL* pIsNewEdge);
 VSC_DG_EDGE* vscDG_GetEdge(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_DG_NODE* pToNode);

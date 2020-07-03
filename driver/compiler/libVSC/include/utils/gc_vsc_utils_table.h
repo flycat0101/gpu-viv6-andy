@@ -172,7 +172,7 @@ gctUINT vscBT_AddEntry(VSC_BLOCK_TABLE* pBT, void* pData);
 gctUINT vscBT_AddContinuousEntries(VSC_BLOCK_TABLE* pBT, void* pData, gctUINT entryCount);
 void* vscBT_RemoveEntry(VSC_BLOCK_TABLE* pBT, gctUINT entryId);
 void vscBT_RemoveEntryPtr(VSC_BLOCK_TABLE* pBT, void * entryPtr);
-void vscBT_AddToHash(VSC_BLOCK_TABLE* pBT, gctUINT entryId, void* pHashKey);
+VSC_ErrCode vscBT_AddToHash(VSC_BLOCK_TABLE* pBT, gctUINT entryId, void* pHashKey);
 gctUINT vscBT_HashSearch(VSC_BLOCK_TABLE* pBT, void* pHashKey);
 gctUINT vscBT_RemoveFromHash(VSC_BLOCK_TABLE* pBT, void* pHashKey);
 VSC_ErrCode vscBT_ResizeBlockArray(VSC_BLOCK_TABLE* pBT, gctUINT newBlockCount, gctBOOL bPreAllocBlock);

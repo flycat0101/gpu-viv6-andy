@@ -1872,7 +1872,7 @@ VIR_IO_readStringTable(VIR_Shader_IOBuffer *Buf, VIR_StringTable* pStringTbl)
             return VSC_ERR_OUT_OF_BOUNDS;
         }
         str = (gctCHAR *)BT_GET_ENTRY_DATA(pStringTbl, nameId);
-        vscBT_AddToHash(pStringTbl, nameId, str);
+        ON_ERROR0(vscBT_AddToHash(pStringTbl, nameId, str));
     } while (1);
 
 OnError:
@@ -1896,7 +1896,7 @@ VIR_IO_readTypeTable(VIR_Shader_IOBuffer *Buf, VIR_TypeTable* pTypeTbl)
         gcmASSERT(tyId <= (pTypeTbl->curBlockIdx * pTypeTbl->blockSize +
                              pTypeTbl->nextOffsetInCurBlock)/pTypeTbl->entrySize);
         ty = (VIR_Type *)BT_GET_ENTRY_DATA(pTypeTbl, tyId);
-        vscBT_AddToHash(pTypeTbl, tyId, ty);
+        ON_ERROR0(vscBT_AddToHash(pTypeTbl, tyId, ty));
     } while (1);
 
 OnError:
@@ -1920,7 +1920,7 @@ VIR_IO_readLabelTable(VIR_Shader_IOBuffer *Buf, VIR_LabelTable* pLabelTbl)
         gcmASSERT(labelId <= (pLabelTbl->curBlockIdx * pLabelTbl->blockSize +
                              pLabelTbl->nextOffsetInCurBlock)/pLabelTbl->entrySize);
         label = (VIR_Label *)BT_GET_ENTRY_DATA(pLabelTbl, labelId);
-        vscBT_AddToHash(pLabelTbl, labelId, label);
+        ON_ERROR0(vscBT_AddToHash(pLabelTbl, labelId, label));
     } while (1);
 
 OnError:
@@ -1944,7 +1944,7 @@ VIR_IO_readConstTable(VIR_Shader_IOBuffer *Buf, VIR_ConstTable* pConstTbl)
         gcmASSERT(constId <= (pConstTbl->curBlockIdx * pConstTbl->blockSize +
                              pConstTbl->nextOffsetInCurBlock)/pConstTbl->entrySize);
         cnst = (VIR_Const *)BT_GET_ENTRY_DATA(pConstTbl, constId);
-        vscBT_AddToHash(pConstTbl, constId, cnst);
+        ON_ERROR0(vscBT_AddToHash(pConstTbl, constId, cnst));
     } while (1);
 
 OnError:
@@ -1976,7 +1976,7 @@ VIR_IO_readSymTable(VIR_Shader_IOBuffer *Buf, VIR_SymTable* pSymTbl)
         gcmASSERT(symId <= (pSymTbl->curBlockIdx * pSymTbl->blockSize +
                              pSymTbl->nextOffsetInCurBlock)/pSymTbl->entrySize);
         sym = (VIR_Symbol *)BT_GET_ENTRY_DATA(pSymTbl, symId);
-        vscBT_AddToHash(pSymTbl, symId, sym);
+        ON_ERROR0(vscBT_AddToHash(pSymTbl, symId, sym));
     } while (1);
 
 OnError:
@@ -1991,16 +1991,15 @@ VIR_IO_readVirRegTable(VIR_Shader_IOBuffer *Buf, VIR_VirRegTable* pVirRegTbl)
     do {
         VIR_Id       symId;
         VIR_Id       virRegId;
-        ON_ERROR0(VIR_IO_readUint(Buf, &virRegId));
+        CHECK_ERROR0(VIR_IO_readUint(Buf, &virRegId));
 
         if (virRegId == VIR_INVALID_ID)
             break;
 
-        ON_ERROR0(VIR_IO_readUint(Buf, &symId));
-        vscHTBL_DirectSet(pVirRegTbl, (void*)(gctUINTPTR_T)virRegId, (void*)(gctUINTPTR_T)symId);
+        CHECK_ERROR0(VIR_IO_readUint(Buf, &symId));
+        CHECK_ERROR0(vscHTBL_DirectSet(pVirRegTbl, (void*)(gctUINTPTR_T)virRegId, (void*)(gctUINTPTR_T)symId));
     } while (1);
 
-OnError:
     return errCode;
 }
 VSC_ErrCode
@@ -3507,7 +3506,7 @@ VIR_CopyBlock(gctCHAR *Dest, gctCHAR *Source, gctUINT Sz)
     return errCode;
 }
 
-void VIR_CopyHashTable(
+VSC_ErrCode VIR_CopyHashTable(
     VIR_CopyContext *    Ctx,
     VSC_BLOCK_TABLE *    pToBlockTbl,
     VSC_HASH_TABLE *     pDstHT,
@@ -3518,6 +3517,7 @@ void VIR_CopyHashTable(
 #ifdef _SANITY_CHECK
     gctINT      count;
 #endif
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     gcmASSERT(pSrcHT && pDstHT);
 
     if (pDstHT->tableSize > 0)
@@ -3542,10 +3542,11 @@ void VIR_CopyHashTable(
         {
             void* pVal = vscHTBL_DirectGet(pSrcHT, pSrcHashNode->pHashKey);
             newKey = fpGetKey(pToBlockTbl, pVal);
-            vscHTBL_DirectSet(pDstHT, newKey, pVal);
+            errCode = vscHTBL_DirectSet(pDstHT, newKey, pVal);
+            CHECK_ERROR0(errCode);
         }
     }
-    return;
+    return errCode;
 #ifdef _SANITY_CHECK
 OnError:
     abort();
@@ -4574,9 +4575,10 @@ VIR_Copy_FixSymbol(VIR_CopyContext * Ctx, VIR_Symbol* pSymbol)
         {
             VIR_VirRegId virRegId = VIR_Symbol_GetVregIndex(pSymbol);
             /* add <virregId, symId> to shader virreg hash table */
-            vscHTBL_DirectSet(VIR_Shader_GetVirRegTable(Ctx->toShader),
-                             (void *)(gctUINTPTR_T)virRegId,
-                             (void *)(gctUINTPTR_T)VIR_Symbol_GetIndex(pSymbol));
+            errCode = vscHTBL_DirectSet(VIR_Shader_GetVirRegTable(Ctx->toShader),
+                                        (void *)(gctUINTPTR_T)virRegId,
+                                        (void *)(gctUINTPTR_T)VIR_Symbol_GetIndex(pSymbol));
+            ON_ERROR0(errCode);
             break;
         }
     case VIR_SYM_TYPE:

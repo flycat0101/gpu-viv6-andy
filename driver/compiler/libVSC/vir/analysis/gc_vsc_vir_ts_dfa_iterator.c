@@ -79,8 +79,9 @@ void vscVIR_FinalizeTsBlockFlow(VIR_TS_BLOCK_FLOW* pTsBlkFlow)
     pTsBlkFlow->pOwnerBB->pTsWorkDataFlow = gcvNULL;
 }
 
-void vscVIR_InitializeTsFuncFlow(VIR_TS_FUNC_FLOW* pTsFuncFlow, VIR_FUNC_BLOCK* pOwnerFB, VSC_MM* pMM, gctINT flowSize)
+VSC_ErrCode vscVIR_InitializeTsFuncFlow(VIR_TS_FUNC_FLOW* pTsFuncFlow, VIR_FUNC_BLOCK* pOwnerFB, VSC_MM* pMM, gctINT flowSize)
 {
+    VSC_ErrCode        errCode = VSC_ERR_NONE;
     CFG_ITERATOR       basicBlkIter;
     VIR_BASIC_BLOCK*   pBasicBlk;
 
@@ -91,11 +92,11 @@ void vscVIR_InitializeTsFuncFlow(VIR_TS_FUNC_FLOW* pTsFuncFlow, VIR_FUNC_BLOCK* 
 
     /* Intialize block flow array. Note as iterative analyzer will use id of basicblk to index
        block-flow, history node count will be used to allocate these contents */
-    vscSRARR_Initialize(&pTsFuncFlow->tsBlkFlowArray,
-                        pMM,
-                        vscDG_GetHistNodeCount(&pOwnerFB->cfg.dgGraph),
-                        sizeof(VIR_TS_BLOCK_FLOW),
-                        gcvNULL);
+    CHECK_ERROR0(vscSRARR_Initialize(&pTsFuncFlow->tsBlkFlowArray,
+                                     pMM,
+                                     vscDG_GetHistNodeCount(&pOwnerFB->cfg.dgGraph),
+                                     sizeof(VIR_TS_BLOCK_FLOW),
+                                     gcvNULL));
 
     /* Directly mark all elements are used because we control index of array by ourself (i.e
        id of graph node) */
@@ -110,6 +111,8 @@ void vscVIR_InitializeTsFuncFlow(VIR_TS_FUNC_FLOW* pTsFuncFlow, VIR_FUNC_BLOCK* 
 
         vscVIR_InitializeTsBlockFlow(pBlkFlow, pBasicBlk, pMM, flowSize);
     }
+
+    return errCode;
 }
 
 void vscVIR_UpdateTsFuncFlowSize(VIR_TS_FUNC_FLOW* pTsFuncFlow, gctINT newFlowSize)
@@ -155,9 +158,10 @@ void vscVIR_FinalizeTsFuncFlow(VIR_TS_FUNC_FLOW* pTsFuncFlow)
     vscSRARR_Finalize(&pTsFuncFlow->tsBlkFlowArray);
 }
 
-void vscVIR_InitializeBaseTsDFA(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_CALL_GRAPH* pCg, VIR_DFA_TYPE dfaType,
+VSC_ErrCode vscVIR_InitializeBaseTsDFA(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_CALL_GRAPH* pCg, VIR_DFA_TYPE dfaType,
                                 gctINT flowSize, VSC_MM* pMM, VIR_TS_DFA_RESOLVERS* pTsDfaResolvers)
 {
+    VSC_ErrCode     errCode = VSC_ERR_NONE;
     CG_ITERATOR     funcBlkIter;
     VIR_FUNC_BLOCK* pFuncBlk;
 
@@ -173,11 +177,11 @@ void vscVIR_InitializeBaseTsDFA(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_CALL_GRAPH* pCg
 
     /* Initialize func-flow array. Note as iterative analyzer will use id of funcblk to index
        func-flow, history node count will be used to allocate these contents */
-    vscSRARR_Initialize(&pBaseTsDFA->tsFuncFlowArray,
-                        pMM,
-                        vscDG_GetHistNodeCount(&pCg->dgGraph),
-                        sizeof(VIR_TS_FUNC_FLOW),
-                        gcvNULL);
+    CHECK_ERROR0(vscSRARR_Initialize(&pBaseTsDFA->tsFuncFlowArray,
+                                     pMM,
+                                     vscDG_GetHistNodeCount(&pCg->dgGraph),
+                                     sizeof(VIR_TS_FUNC_FLOW),
+                                     gcvNULL));
 
     /* Directly mark all elements are used because we control index of array by ourself (i.e
        id of graph node) */
@@ -192,6 +196,8 @@ void vscVIR_InitializeBaseTsDFA(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_CALL_GRAPH* pCg
 
         vscVIR_InitializeTsFuncFlow(pFuncFlow, pFuncBlk, pMM, flowSize);
     }
+
+    return errCode;
 }
 
 void vscVIR_UpdateBaseTsDFAFlowSize(VIR_BASE_TS_DFA* pBaseTsDFA, gctINT newFlowSize)

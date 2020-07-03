@@ -21,18 +21,23 @@
 #define GLOBAL_BB_HASH_TABLE_SIZE    GNODE_HASH_TABLE_SIZE
 #define INVALID_GLOBAL_BB_ID         INVALID_GNODE_ID
 
-static void _IntializeCallGraph(VSC_MM* pScratchMemPool, VIR_CALL_GRAPH* pCg, VIR_Shader* pShader)
+static VSC_ErrCode _IntializeCallGraph(VSC_MM* pScratchMemPool, VIR_CALL_GRAPH* pCg, VIR_Shader* pShader)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     gctINT instCount = BT_GET_MAX_VALID_ID(&pShader->instTable);
     gctINT hashTblSize;
     vscPMP_Intialize(&pCg->pmp, gcvNULL, 20*(sizeof(VIR_FUNC_BLOCK)+4*sizeof(VIR_CG_EDGE)), sizeof(void*), gcvTRUE);
-    vscDG_Initialize(&pCg->dgGraph, &pCg->pmp.mmWrapper, 2, 4, sizeof(VIR_CG_EDGE));
+    errCode = vscDG_Initialize(&pCg->dgGraph, &pCg->pmp.mmWrapper, 2, 4, sizeof(VIR_CG_EDGE));
+    ON_ERROR0(errCode);
     pCg->pOwnerShader = pShader;
     pCg->nextGlobalBbId = 0;
     pCg->pScratchMemPool = pScratchMemPool;
     hashTblSize = (instCount/5 > GLOBAL_BB_HASH_TABLE_SIZE) ? instCount/5 : GLOBAL_BB_HASH_TABLE_SIZE;
-    vscHTBL_Initialize(&pCg->globalBbHashTable, &pCg->pmp.mmWrapper, _HFUNC_PassThroughGlobalBbId,
-                       gcvNULL, hashTblSize);
+    errCode = vscHTBL_Initialize(&pCg->globalBbHashTable, &pCg->pmp.mmWrapper, _HFUNC_PassThroughGlobalBbId,
+                                 gcvNULL, hashTblSize);
+    ON_ERROR0(errCode);
+OnError:
+    return errCode;
 }
 
 static void _FinalizeCallGraph(VIR_CALL_GRAPH* pCg)
@@ -69,7 +74,8 @@ static VIR_FUNC_BLOCK* _TryAddFuncBlockToCallGraph(VIR_CALL_GRAPH* pCg, VIR_Func
         pFuncBlk->maxCallDepth = 0;
         pFuncBlk->minCallDepth = VIR_INFINITE_CALL_DEPTH;
         memset(&pFuncBlk->cfg, 0, sizeof(VIR_CONTROL_FLOW_GRAPH));
-        vscSRARR_Initialize(&pFuncBlk->mixedCallSiteArray, &pCg->pmp.mmWrapper, 2, sizeof(VIR_Instruction*), CALL_SITE_CMP);
+        if(vscSRARR_Initialize(&pFuncBlk->mixedCallSiteArray, &pCg->pmp.mmWrapper, 2, sizeof(VIR_Instruction*), CALL_SITE_CMP) != VSC_ERR_NONE)
+            return gcvNULL;
         vscDG_AddNode(&pCg->dgGraph, &pFuncBlk->dgNode);
     }
 
@@ -387,21 +393,25 @@ VSC_ErrCode vscVIR_RemoveFuncBlockFromCallGraph(VIR_CALL_GRAPH* pCg,
  *    Control flow graph related code
  */
 
-static void _IntializeCFG(VIR_CONTROL_FLOW_GRAPH* pCfg, VSC_MM* pScratchMemPool, VIR_FUNC_BLOCK* pFuncBlk)
+static VSC_ErrCode _IntializeCFG(VIR_CONTROL_FLOW_GRAPH* pCfg, VSC_MM* pScratchMemPool, VIR_FUNC_BLOCK* pFuncBlk)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     vscPMP_Intialize(&pCfg->pmp, gcvNULL,
                      20*(sizeof(VIR_BASIC_BLOCK) + 2*sizeof(VIR_DOM_TREE_NODE) + 4*sizeof(VIR_CFG_EDGE)),
                      sizeof(void*), gcvTRUE);
     vscDG_Initialize(&pCfg->dgGraph, &pCfg->pmp.mmWrapper, 10, 10, sizeof(VIR_CFG_EDGE));
 
-    vscTREE_Initialize(&pCfg->domTree.tree, &pCfg->pmp.mmWrapper, 4);
-    vscTREE_Initialize(&pCfg->postDomTree.tree, &pCfg->pmp.mmWrapper, 4);
+    ON_ERROR0(vscTREE_Initialize(&pCfg->domTree.tree, &pCfg->pmp.mmWrapper, 4));
+    ON_ERROR0(vscTREE_Initialize(&pCfg->postDomTree.tree, &pCfg->pmp.mmWrapper, 4));
 
     pCfg->domTree.pOwnerCFG = pCfg;
     pCfg->postDomTree.pOwnerCFG = pCfg;
 
     pCfg->pOwnerFuncBlk = pFuncBlk;
     pCfg->pScratchMemPool = pScratchMemPool;
+
+OnError:
+    return errCode;
 }
 
 static void _FinalizeCFG(VIR_CONTROL_FLOW_GRAPH* pCfg)
@@ -481,8 +491,8 @@ static VIR_BASIC_BLOCK* _AddBasicBlockToCFG(VIR_CONTROL_FLOW_GRAPH* pCfg)
     pBasicBlock->globalBbId = pCfg->pOwnerFuncBlk->pOwnerCG->nextGlobalBbId ++;
     pBasicBlock->dfsPreVisitOrderIdx = NOT_ASSIGNED;
     pBasicBlock->dfsPostVisitOrderIdx = NOT_ASSIGNED;
-    vscHTBL_DirectSet(&pCfg->pOwnerFuncBlk->pOwnerCG->globalBbHashTable,
-                      (void*)(gctUINTPTR_T)pBasicBlock->globalBbId, pBasicBlock);
+    errCode = vscHTBL_DirectSet(&pCfg->pOwnerFuncBlk->pOwnerCG->globalBbHashTable,
+                                (void*)(gctUINTPTR_T)pBasicBlock->globalBbId, pBasicBlock);
 
     errCode = vscBV_Initialize(&pBasicBlock->domSet, gcvNULL, 0);
     if(errCode != VSC_ERR_NONE)

@@ -61,15 +61,19 @@ _VIR_DefInLoop_Init(
     VIR_DefInLoop_SetDefEnable(def, enable);
 }
 
-static void
+static VSC_ErrCode
 _VIR_LoopDU_Init(
     VIR_LoopDU* du,
     VSC_MM* mm
     )
 {
-    vscHTBL_Initialize(VIR_LoopDU_GetSymToDefListTable(du), mm, vscHFUNC_Default, vscHKCMP_Default, 256);
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    errCode = vscHTBL_Initialize(VIR_LoopDU_GetSymToDefListTable(du), mm, vscHFUNC_Default, vscHKCMP_Default, 256);
+    if(errCode != VSC_ERR_NONE)
+        return errCode;
     VIR_LoopDU_SetInValid(du);
     VIR_LoopDU_SetMM(du, mm);
+    return errCode;
 }
 
 static void
@@ -117,7 +121,7 @@ _VIR_LoopDU_AddDef(
             return errCode;
         }
         vscUNILST_Initialize(list, gcvFALSE);
-        vscHTBL_DirectSet(symToDefTable, sym, list);
+        CHECK_ERROR0(vscHTBL_DirectSet(symToDefTable, sym, list));
     }
 
     def = (VIR_DefInLoop*)vscMM_Alloc(VIR_LoopDU_GetMM(du), sizeof(VIR_DefInLoop));
@@ -2184,7 +2188,8 @@ _VIR_LoopInfo_IdentifyBasicIVs(
     if(ivMgr == gcvNULL)
         return VSC_ERR_OUT_OF_MEMORY;
     _VIR_LoopInfo_BuildLoopEndDominators(loopInfo);
-    vscHTBL_Initialize(&definedSymbols, VIR_LoopInfo_GetMM(loopInfo), vscHFUNC_Default, vscHKCMP_Default, 256);
+    errCode = vscHTBL_Initialize(&definedSymbols, VIR_LoopInfo_GetMM(loopInfo), vscHFUNC_Default, vscHKCMP_Default, 256);
+    ON_ERROR0(errCode);
 
     VIR_LoopInfo_BBIterator_Init(&iter, loopInfo, VIR_LoopInfo_BBIterator_Type_DepthFirst);
     for(bb = VIR_LoopInfo_BBIterator_First(&iter);
@@ -2223,12 +2228,12 @@ _VIR_LoopInfo_IdentifyBasicIVs(
                     if(definedEnable != enable)
                     {
                         definedEnable = (VIR_Enable)((gctUINT)definedEnable | (gctUINT)enable);
-                        vscHTBL_DirectSet(&definedSymbols, destSym, (void*)definedEnable);
+                        CHECK_ERROR0(vscHTBL_DirectSet(&definedSymbols, destSym, (void*)definedEnable));
                     }
                 }
                 else
                 {
-                    vscHTBL_DirectSet(&definedSymbols, destSym, (void*)enable);
+                    CHECK_ERROR0(vscHTBL_DirectSet(&definedSymbols, destSym, (void*)enable));
                 }
 
                 possibleKillingIVEnable = (VIR_Enable)((gctUINT)definedEnable & (gctUINT)enable);
@@ -2492,6 +2497,7 @@ _VIR_LoopInfo_IdentifyBasicIVs(
         _VIR_IVMgr_Dump(ivMgr, VIR_LoopInfo_GetDumper(loopInfo));
     }
 
+OnError:
     return errCode;
 }
 
@@ -2681,7 +2687,7 @@ VIR_LoopInfoMgr_Dump(
 /* VIR_LoopOpts methods */
 /************************************************************************************/
 
-void
+VSC_ErrCode
 VIR_LoopOpts_Init(
     VIR_LoopOpts* loopOpts,
     VIR_DEF_USAGE_INFO* pDuInfo,
@@ -2693,7 +2699,13 @@ VIR_LoopOpts_Init(
     VSC_HW_CONFIG* pHwCfg
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_HASH_TABLE* processedLoopInfos = vscHTBL_Create(mm, vscHFUNC_Default, vscHKCMP_Default, 16);
+    if(processedLoopInfos == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR0(errCode);
+    }
     memset(loopOpts, 0, sizeof(VIR_LoopOpts));
 
     VIR_LoopOpts_SetShader(loopOpts, shader);
@@ -2708,6 +2720,9 @@ VIR_LoopOpts_Init(
     VIR_LoopOpts_SetHWsupportPerCompDepForLS(loopOpts, pHwCfg->hwFeatureFlags.supportPerCompDepForLS);
     VIR_LoopOpts_SetOuterLoopFirst(loopOpts, gcvFALSE);
     VIR_LoopOpts_SetCurInvariantCodeMotionCount(loopOpts, 0);
+
+OnError:
+    return errCode;
 }
 
 void
@@ -4574,7 +4589,11 @@ _VIR_LoopInfo_CopyLoop(
     VIR_CFG* cfg = VIR_LoopInfo_GetCFG(loopInfo);
     VSC_HASH_TABLE* labelToNewLabelMap = vscHTBL_Create(VIR_LoopInfo_GetMM(loopInfo), vscHFUNC_Default, vscHKCMP_Default, 256);
     VSC_HASH_TABLE* childLoopInfoMap = vscHTBL_Create(VIR_LoopInfo_GetMM(loopInfo), vscHFUNC_Default, vscHKCMP_Default, 16);
-
+    if(labelToNewLabelMap == gcvNULL || childLoopInfoMap == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR0(errCode);
+    }
     /* insert BBs */
     for(bb = VIR_LoopInfo_BBIterator_First(pBbIter); bb != gcvNULL; bb = VIR_LoopInfo_BBIterator_Next(pBbIter))
     {
@@ -4591,7 +4610,7 @@ _VIR_LoopInfo_CopyLoop(
             return errCode;
         }
 
-        vscHTBL_DirectSet(bbToNewBBMap, (void*)bb, (void*)newBB);
+        CHECK_ERROR0(vscHTBL_DirectSet(bbToNewBBMap, (void*)bb, (void*)newBB));
 
         /* The child loop has only one BB, just insert it. */
         if (_VIR_LoopInfo_IsBBEntireChildLoop(loopInfo, bb))
@@ -4603,7 +4622,7 @@ _VIR_LoopInfo_CopyLoop(
         /* Detect a head of a child loop, record it. */
         else if (_VIR_LoopInfo_IsBBChildLoop(loopInfo, bb, gcvTRUE, &pChildLoopInfo))
         {
-            vscHTBL_DirectSet(childLoopInfoMap, (void *)bb, (void *)pChildLoopInfo);
+            CHECK_ERROR0(vscHTBL_DirectSet(childLoopInfoMap, (void *)bb, (void *)pChildLoopInfo));
         }
         /* Detect a tail of a child loop, and if the head is already been detected, add it to the loop manager. */
         else if (_VIR_LoopInfo_IsBBChildLoop(loopInfo, bb, gcvFALSE, &pChildLoopInfo))
@@ -4687,7 +4706,8 @@ _VIR_LoopInfo_CopyLoop(
             bbLabel = VIR_Operand_GetLabel(VIR_Inst_GetDest(bbInst));
             newBBLabel = VIR_Operand_GetLabel(VIR_Inst_GetDest(newBBInst));
 
-            vscHTBL_DirectSet(labelToNewLabelMap, bbLabel, newBBLabel);
+            errCode = vscHTBL_DirectSet(labelToNewLabelMap, bbLabel, newBBLabel);
+            ON_ERROR0(errCode);
         }
     }
 
@@ -4757,11 +4777,11 @@ _VIR_LoopInfo_CopyLoop(
         }
     }
 
+OnError:
     /* Destroy hash tables. */
     vscHTBL_Destroy(labelToNewLabelMap);
     vscHTBL_Destroy(childLoopInfoMap);
 
-    OnError:
     return errCode;
 }
 
@@ -4863,13 +4883,18 @@ _VIR_LoopInfo_StaticallyUnroll(
     if(bbToNewBBMaps == gcvNULL)
     {
         errCode = VSC_ERR_OUT_OF_MEMORY;
-        return errCode;
+        ON_ERROR0(errCode);
     }
     VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_CoveringIRSequence);
 
     for(i = 0; i < copyCount; i++)
     {
         bbToNewBBMaps[i] = vscHTBL_Create(VIR_LoopInfo_GetMM(loopInfo), vscHFUNC_Default, vscHKCMP_Default, 256);
+        if(bbToNewBBMaps[i] == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR0(errCode);
+        }
         _VIR_LoopInfo_CopyLoop(loopInfo, &bbIter, lowerNeighbour, bbToNewBBMaps[i]);
     }   /* now loop order is loopInfo, newBB0, newBB1, newBB2, newBB3.... */
 
@@ -4936,10 +4961,12 @@ _VIR_LoopInfo_StaticallyUnroll(
         }
     }
 
+OnError:
     for(i = 0; i < copyCount; i++)
     {
         vscHTBL_Destroy(bbToNewBBMaps[i]);
     }
+
     vscMM_Free(VIR_LoopInfo_GetMM(loopInfo), bbToNewBBMaps);
 
     VIR_LoopInfoMgr_RemoveLoopInfo(VIR_LoopInfo_GetLoopInfoMgr(loopInfo), loopInfo);
@@ -5285,6 +5312,11 @@ _VIR_LoopInfo_DynamicallyUnroll(
         for(i = 0; i < factor; i++)
         {
             bbToNewBBMaps[i] = vscHTBL_Create(VIR_LoopInfo_GetMM(loopInfo), vscHFUNC_Default, vscHKCMP_Default, 256);
+            if(bbToNewBBMaps[i] == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                return errCode;
+            }
             _VIR_LoopInfo_CopyLoop(loopInfo, &bbIter, lowerNeighbour, bbToNewBBMaps[i]);
         }
 
@@ -5381,7 +5413,7 @@ _VIR_LoopInfo_PerformLoopUnrollingOnLoop(
     /* check shader instrs number, early quit if shader program is too large */
     if (VIR_Shader_GetTotalInstructionCount(pShader) > VIR_LoopOpts_GetAllowedInstNumAfterUnroll(loopOpts))
     {
-        vscHTBL_DirectSet(processedLoopInfos, (void *)loopInfo, gcvNULL);
+        errCode = vscHTBL_DirectSet(processedLoopInfos, (void *)loopInfo, gcvNULL);
         return errCode;
     }
 
@@ -5414,7 +5446,8 @@ _VIR_LoopInfo_PerformLoopUnrollingOnLoop(
     }
 
     /* check current loop */
-    vscHTBL_DirectSet(processedLoopInfos, (void *)loopInfo, gcvNULL);
+    errCode = vscHTBL_DirectSet(processedLoopInfos, (void *)loopInfo, gcvNULL);
+    ON_ERROR0(errCode);
     if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(VIR_LoopInfo_GetOptions(loopInfo)), VSC_OPTN_LoopOptsOptions_TRACE_UNROLL))
     {
         VIR_LOG(VIR_LoopInfo_GetDumper(loopInfo), "loop unrolling input loop:\n");
@@ -5624,7 +5657,7 @@ _VIR_LoopOpts_PerformSpecOptOnLoops(
             break;
         }
 
-        vscHTBL_DirectSet(processedLoopInfos, (void *)loopInfo, gcvNULL);
+        CHECK_ERROR0(vscHTBL_DirectSet(processedLoopInfos, (void *)loopInfo, gcvNULL));
         VIR_LoopOpts_SetOuterLoopFirst(loopOpts, (!bInnerLoopFirst)); /* reset tranverse sequence */
     }
 

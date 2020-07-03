@@ -1636,7 +1636,8 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
             continue;
         }
 
-        vscHTBL_DirectSet(inst_def_set, (void*) def_inst, gcvNULL);
+        errCode = vscHTBL_DirectSet(inst_def_set, (void*) def_inst, gcvNULL);
+        ON_ERROR0(errCode);
 
         def_inst_dest   = VIR_Inst_GetDest(def_inst);
         def_inst_enable = VIR_Operand_GetEnable(def_inst_dest);
@@ -2146,18 +2147,26 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
                 if(vscHTBL_DirectTestAndGet(inst_usage_set, (void*)&(inst_usage->usageKey), (void**)&channelMask))
                 {
                     *channelMask = (*channelMask) | (1<<channel);
-                    vscHTBL_DirectSet(inst_usage_set, (void*)&(inst_usage->usageKey), channelMask);
+                    errCode = vscHTBL_DirectSet(inst_usage_set, (void*)&(inst_usage->usageKey), channelMask);
+                    ON_ERROR0(errCode);
                 }
                 else
                 {
                     VSC_CPP_Usage* pHashKey = _VSC_CPP_NewUsage(cpp, inst_usage);
                     if(!pHashKey)
-                        ON_ERROR(VSC_ERR_OUT_OF_MEMORY, "Fail to allocate CPP new usage");
+                    {
+                        errCode = VSC_ERR_OUT_OF_MEMORY;
+                        ON_ERROR(errCode, "Fail to allocate CPP new usage");
+                    }
                     channelMask = (gctUINT*)vscMM_Alloc(VSC_CPP_GetMM(cpp), sizeof(gctUINT));
                     if(!channelMask)
-                        ON_ERROR(VSC_ERR_OUT_OF_MEMORY, "Fail to allocate channelMask.");
+                    {
+                        errCode = VSC_ERR_OUT_OF_MEMORY;
+                        ON_ERROR(errCode, "Fail to allocate channelMask.");
+                    }
                     *channelMask = (1<<channel);
-                    vscHTBL_DirectSet(inst_usage_set, (void*)pHashKey, channelMask);
+                    errCode = vscHTBL_DirectSet(inst_usage_set, (void*)pHashKey, channelMask);
+                    ON_ERROR0(errCode);
                 }
             }
         }
@@ -2482,6 +2491,11 @@ static VSC_ErrCode VSC_CPP_PerformOnFunction(
         inst_def_set = vscHTBL_Create(VSC_CPP_GetMM(cpp), vscHFUNC_Default, vscHKCMP_Default, 512);
         inst_usage_set = vscHTBL_Create(VSC_CPP_GetMM(cpp), _VSC_CPP_Usage_HFUNC, _VSC_CPP_Usage_HKCMP, 512);
         visitSet = vscHTBL_Create(VSC_CPP_GetMM(cpp), vscHFUNC_Default, vscHKCMP_Default, 512);
+        if (inst_def_set == gcvNULL || inst_usage_set == gcvNULL || visitSet == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            CHECK_ERROR0(errCode);
+        }
         for(bb = CFG_ITERATOR_FIRST(&cfg_iter); bb != gcvNULL; bb = CFG_ITERATOR_NEXT(&cfg_iter))
         {
             if(BB_GET_LENGTH(bb) != 0)
@@ -2954,6 +2968,11 @@ VSC_ErrCode VIR_SCPP_PerformOnBB(
     gctBOOL bChanged = gcvFALSE;
     gctBOOL bHandleModifier = gcvFALSE;
 
+    if(defsTable == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR0(errCode);
+    }
     if(VSC_UTILS_MASK(VSC_OPTN_SCPPOptions_GetTrace(option), VSC_OPTN_SCPPOptions_TRACE_INPUT_BB))
     {
         VIR_LOG(VIR_SCPP_GetDumper(scpp), "bb before scpp from mov:\n");
@@ -3234,9 +3253,13 @@ VSC_ErrCode VIR_SCPP_PerformOnBB(
                         {
                             copy = (VIR_SCPP_Copy*)vscMM_Alloc(VIR_SCPP_GetMM(scpp), sizeof(VIR_SCPP_Copy));
                             if(!copy)
-                                ON_ERROR(VSC_ERR_OUT_OF_MEMORY, "Fail to allocate VIR_SCPP_Copy.");
+                            {
+                                errCode = VSC_ERR_OUT_OF_MEMORY;
+                                ON_ERROR(errCode, "Fail to allocate VIR_SCPP_Copy.");
+                            }
                             _VIR_SCPP_Copy_Init(copy, instIter);
-                            vscHTBL_DirectSet(defsTable, (void*)lhsSym, (void*)copy);
+                            errCode = vscHTBL_DirectSet(defsTable, (void*)lhsSym, (void*)copy);
+                            ON_ERROR0(errCode);
                         }
 
                         _VIR_SCPP_Copy_UpdateChannel(copy, VIR_SWIZZLE_X, VIR_Symbol_GetIndex(lhsSym), VIR_Symbol_GetIndex(rhsSym), VIR_SWIZZLE_X);
@@ -3325,9 +3348,13 @@ VSC_ErrCode VIR_SCPP_PerformOnBB(
                         {
                             copy = (VIR_SCPP_Copy*)vscMM_Alloc(VIR_SCPP_GetMM(scpp), sizeof(VIR_SCPP_Copy));
                             if(!copy)
-                                ON_ERROR(VSC_ERR_OUT_OF_MEMORY, "Fail to allocate VIR_SCPP_Copy.");
+                            {
+                                errCode = VSC_ERR_OUT_OF_MEMORY;
+                                ON_ERROR(errCode, "Fail to allocate VIR_SCPP_Copy.");
+                            }
                             _VIR_SCPP_Copy_Init(copy, instIter);
-                            vscHTBL_DirectSet(defsTable, (void*)lhsSym, (void*)copy);
+                            errCode = vscHTBL_DirectSet(defsTable, (void*)lhsSym, (void*)copy);
+                            ON_ERROR0(errCode);
                         }
 
                         for (i = 0; i < VIR_CHANNEL_NUM; i++)
