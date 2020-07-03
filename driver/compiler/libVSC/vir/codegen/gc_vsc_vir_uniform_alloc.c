@@ -19,7 +19,7 @@
    This is to allocation uniforms.
    ===========================================================================
 */
-void _VIR_CG_UniformColorMap_Init(
+VSC_ErrCode _VIR_CG_UniformColorMap_Init(
     IN VIR_Shader           *pShader,
     IN VSC_HW_CONFIG        *pHwConfig,
     IN VSC_MM               *pMM,
@@ -27,6 +27,7 @@ void _VIR_CG_UniformColorMap_Init(
     OUT gctUINT             *CodeGenUniformBase
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     uniformCM->maxAllocReg = 0;
     uniformCM->availReg = 0;
 
@@ -63,9 +64,8 @@ void _VIR_CG_UniformColorMap_Init(
     uniformCM->maxReg = pHwConfig->maxTotalConstRegCount;
 
     /* each const registers needs 4 channels (w, z, y, x) */
-    vscBV_Initialize(&uniformCM->usedColor,
-        pMM,
-        uniformCM->maxReg * VIR_CHANNEL_NUM);
+    errCode = vscBV_Initialize(&uniformCM->usedColor, pMM, uniformCM->maxReg * VIR_CHANNEL_NUM);
+    return errCode;
 }
 
 static void _VIR_CG_ConfigSamplers(
@@ -1805,12 +1805,13 @@ VSC_ErrCode VIR_CG_MapUniforms(
     gctUINT             codeGenUniformBase;
 
     /* initialize the colorMap */
-    _VIR_CG_UniformColorMap_Init(
-        pShader,
-        pHwConfig,
-        pMM,
-        &uniformColorMap,
-        &codeGenUniformBase);
+    retValue = _VIR_CG_UniformColorMap_Init(
+                pShader,
+                pHwConfig,
+                pMM,
+                &uniformColorMap,
+                &codeGenUniformBase);
+    ON_ERROR(retValue, "Failed to initialize the colorMap.");
 
     /* Config sampler setting. */
     _VIR_CG_ConfigSamplers(pShader, pHwConfig, &maxSampler, &sampler, &allocateSamplerReverse);
@@ -2304,12 +2305,13 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
     VIR_SHADER_RESOURCE_ALLOC_LAYOUT* pResAllocLayout = &pShader->shaderResAllocLayout;
 
     /* initialize the colorMap */
-    _VIR_CG_UniformColorMap_Init(
-        pShader,
-        pHwConfig,
-        pMM,
-        &uniformColorMap,
-        &codeGenUniformBase);
+    retValue = _VIR_CG_UniformColorMap_Init(
+                pShader,
+                pHwConfig,
+                pMM,
+                &uniformColorMap,
+                &codeGenUniformBase);
+    ON_ERROR(retValue, "Failed to initialize the colorMap.");
 
     /* config the sampler setting */
     _VIR_CG_ConfigSamplers(pShader, pHwConfig, &maxSampler, &sampler, &allocateSamplerReverse);
@@ -3331,13 +3333,14 @@ OnError:
     return retValue;
 }
 
-void _VIR_CG_Unified_UniformColorMap_Init(
+VSC_ErrCode _VIR_CG_Unified_UniformColorMap_Init(
     IN VSC_HW_CONFIG        *pHwConfig,
     IN VSC_MM               *pMM,
     IN OUT VIR_RA_ColorMap  *uniformCM,
     OUT gctUINT             *CodeGenUniformBase
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     uniformCM->maxAllocReg = 0;
     uniformCM->availReg = 0;
     *CodeGenUniformBase = pHwConfig->vsConstRegAddrBase;
@@ -3345,9 +3348,8 @@ void _VIR_CG_Unified_UniformColorMap_Init(
     uniformCM->maxReg = pHwConfig->maxTotalConstRegCount;
 
     /* each const registers needs 4 channels (w, z, y, x) */
-    vscBV_Initialize(&uniformCM->usedColor,
-        pMM,
-        uniformCM->maxReg * VIR_CHANNEL_NUM);
+    errCode = vscBV_Initialize(&uniformCM->usedColor, pMM, uniformCM->maxReg * VIR_CHANNEL_NUM);
+    return errCode;
 }
 
 static void _VIR_CG_Unified_ConfigSamplers(
@@ -3450,11 +3452,12 @@ VSC_ErrCode VIR_CG_Unified_MapUniforms(
     VSC_GlobalUniformItem* item;
 
     /* initialize the colorMap */
-    _VIR_CG_Unified_UniformColorMap_Init(
-        pHwConfig,
-        pMM,
-        &uniformColorMap,
-        &codeGenUniformBase);
+    retValue = _VIR_CG_Unified_UniformColorMap_Init(
+                pHwConfig,
+                pMM,
+                &uniformColorMap,
+                &codeGenUniformBase);
+    ON_ERROR(retValue, "Failed to initialize the colorMap");
 
     /* Config sampler setting. */
     _VIR_CG_Unified_ConfigSamplers(all_shaders,

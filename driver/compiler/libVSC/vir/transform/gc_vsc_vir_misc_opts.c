@@ -1748,13 +1748,14 @@ VSC_ErrCode vscVIR_CheckEvisInstSwizzleRestriction(VSC_SH_PASS_WORKER* pPassWork
     return errCode;
 }
 
-static gctBOOL _IsPosAndDepthConflicted(VIR_Shader* pShader,
-                                        VIR_Symbol* pPosSym,
-                                        VIR_Symbol* pDepthSym,
-                                        VIR_DEF_USAGE_INFO* pDuInfo,
-                                        VSC_MM* pMM)
+static VSC_ErrCode _IsPosAndDepthConflicted(VIR_Shader* pShader,
+                                            VIR_Symbol* pPosSym,
+                                            VIR_Symbol* pDepthSym,
+                                            VIR_DEF_USAGE_INFO* pDuInfo,
+                                            VSC_MM* pMM,
+                                            gctBOOL* bIsConflicted)
 {
-    gctBOOL                  bIsConflicted = gcvFALSE;
+    VSC_ErrCode              errCode = VSC_ERR_NONE;
     VIR_DEF_KEY              defKey;
     gctUINT                  posZDefIdx, depDefIdx;
     VIR_USAGE*               pUsage = gcvNULL;
@@ -1779,7 +1780,8 @@ static gctBOOL _IsPosAndDepthConflicted(VIR_Shader* pShader,
     /* If no pos_z is defined, just bail out */
     if (VIR_INVALID_DEF_INDEX == posZDefIdx)
     {
-        return gcvFALSE;
+        *bIsConflicted = gcvFALSE;
+        return errCode;
     }
 
     /* If pos_z is defined, but not used, just bail out */
@@ -1787,17 +1789,21 @@ static gctBOOL _IsPosAndDepthConflicted(VIR_Shader* pShader,
     gcmASSERT(pPosZDef);
     if (DU_CHAIN_GET_USAGE_COUNT(&pPosZDef->duChain) == 0)
     {
-        return gcvFALSE;
+        *bIsConflicted = gcvFALSE;
+        return errCode;
     }
 
     /* If reach-def flow is invalidated, just always consider they are conflicted each other */
     if (pDuInfo->baseTsDFA.baseDFA.cmnDfaFlags.bFlowInvalidated)
     {
-        return gcvTRUE;
+        *bIsConflicted = gcvTRUE;
+        return errCode;
     }
 
-    vscBV_Initialize(&tempMask, pDuInfo->baseTsDFA.baseDFA.pScratchMemPool, pDuInfo->baseTsDFA.baseDFA.flowSize);
-    vscBV_Initialize(&depDefIdxMask, pDuInfo->baseTsDFA.baseDFA.pScratchMemPool, pDuInfo->baseTsDFA.baseDFA.flowSize);
+    errCode = vscBV_Initialize(&tempMask, pDuInfo->baseTsDFA.baseDFA.pScratchMemPool, pDuInfo->baseTsDFA.baseDFA.flowSize);
+    ON_ERROR(errCode, "Failed to initialize BV.");
+    errCode = vscBV_Initialize(&depDefIdxMask, pDuInfo->baseTsDFA.baseDFA.pScratchMemPool, pDuInfo->baseTsDFA.baseDFA.flowSize);
+    ON_ERROR(errCode, "Failed to initialize BV.");
 
     /* Collect all depth defs and mask them */
     depDefIdx = vscVIR_FindFirstDefIndex(pDuInfo, pDepthSym->u2.tempIndex);
@@ -1831,7 +1837,7 @@ static gctBOOL _IsPosAndDepthConflicted(VIR_Shader* pShader,
 
         if (vscBV_Any(&tempMask))
         {
-            bIsConflicted = gcvTRUE;
+            *bIsConflicted = gcvTRUE;
             break;
         }
         else
@@ -1873,7 +1879,7 @@ static gctBOOL _IsPosAndDepthConflicted(VIR_Shader* pShader,
                             pDstSym = VIR_Symbol_GetVregVariable(pDstSym);
                             if (pDstSym && VIR_Symbol_GetName(pDstSym) == VIR_NAME_DEPTH)
                             {
-                                bIsConflicted = gcvTRUE;
+                                *bIsConflicted = gcvTRUE;
                                 break;
                             }
                         }
@@ -1889,7 +1895,7 @@ static gctBOOL _IsPosAndDepthConflicted(VIR_Shader* pShader,
                         pInst = VIR_Inst_GetNext(pInst);
                     }
 
-                    if (bIsConflicted == gcvTRUE)
+                    if (*bIsConflicted == gcvTRUE)
                     {
                         break;
                     }
@@ -1898,17 +1904,17 @@ static gctBOOL _IsPosAndDepthConflicted(VIR_Shader* pShader,
                 depDefIdx ++;
             }
 
-            if (bIsConflicted == gcvTRUE)
+            if (*bIsConflicted == gcvTRUE)
             {
                 break;
             }
         }
     }
 
+OnError:
     vscBV_Finalize(&tempMask);
     vscBV_Finalize(&depDefIdxMask);
-
-    return bIsConflicted;
+    return errCode;
 }
 
 DEF_QUERY_PASS_PROP(vscVIR_CheckPosAndDepthConflict)
@@ -1954,6 +1960,7 @@ VSC_ErrCode vscVIR_CheckPosAndDepthConflict(VSC_SH_PASS_WORKER* pPassWorker)
     VIR_TypeId                 depthTypeId;
     VIR_NATIVE_DEF_FLAGS       nativeDefFlags;
     VIR_Operand *              opnd;
+    gctBOOL                    bIsConflicted = gcvFALSE;
 
     /* Does shader have pos? */
     for (ioIdx = 0; ioIdx < VIR_IdList_Count(pAttrIdLsts); ioIdx ++)
@@ -1998,7 +2005,10 @@ VSC_ErrCode vscVIR_CheckPosAndDepthConflict(VSC_SH_PASS_WORKER* pPassWorker)
     }
 
     /* Check whether position and depth is conflicted */
-    if (!_IsPosAndDepthConflicted(pShader, pPosSym, pDepthSym, pDuInfo, pPassWorker->basePassWorker.pMM))
+    errCode = _IsPosAndDepthConflicted(pShader, pPosSym, pDepthSym, pDuInfo, pPassWorker->basePassWorker.pMM, &bIsConflicted);
+    ON_ERROR(errCode, "Failed to Check whether position and depth is conflicted.");
+
+    if (!bIsConflicted)
     {
         return VSC_ERR_NONE;
     }
