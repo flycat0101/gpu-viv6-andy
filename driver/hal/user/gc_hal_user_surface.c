@@ -12885,6 +12885,15 @@ gcoSURF_BlitCPU(
 
                             pfReadPixel(srcAddr_l, &samplePixels[sampleCount]);
 
+                            /* HW can not support R8_SNORM internal format as render target, so after the recompiling,
+                            ** need to do the linear transformation below. */
+
+                            if ((currentApi == gcvAPI_OPENGL) && (srcSurf->type == gcvSURF_RENDER_TARGET) &&
+                                (srcSurf->format == gcvSURF_R8_SNORM) && (srcSurf->flags & gcvSURF_FLAG_CONTENT_UPDATED))
+                            {
+                                samplePixels[sampleCount].color.f.r = (samplePixels[sampleCount].color.f.r - 0.5f) * 2.0f;
+                            }
+
                             if (colorSpaceConvert == gcdCOLOR_SPACE_CONVERSION_TO_LINEAR)
                             {
                                 gcoSURF_PixelToLinear(&samplePixels[sampleCount]);

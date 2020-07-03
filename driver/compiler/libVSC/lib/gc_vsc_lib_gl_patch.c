@@ -2448,6 +2448,10 @@ gctSTRING gcLibTexFormatConvertHalti2_OutputCvtUnifiedFunc =
 "\n";
 
 gctSTRING gcLibTexFormatConvertHalti2_OutputCvtFunc =
+"highp float _outputcvt_R8_SNORM(highp vec4 val)\n"
+"{\n"
+"    return val.x * 0.5 + 0.5;\n"
+"}\n"
 "highp vec4 _outputcvt_R8_1_X8R8G8B8(highp vec4 val)\n"
 "{\n"
 "    return vec4(val.x, 0.0, 0.0, 1.0);\n"
