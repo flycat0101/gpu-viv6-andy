@@ -19630,6 +19630,10 @@ _LinkProgramPipeline(
         if (gcmIS_ERROR(status))
         {
             /* Return on error. */
+            if (fsTemp != gcvNULL)
+            {
+                gcmVERIFY_OK(gcSHADER_Destroy(fsTemp));
+            }
             return status;
         }
         if (gcShaderHwRegAllocated(vsTemp))

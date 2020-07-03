@@ -5864,7 +5864,7 @@ gcSHADER_MergeKernel(
                                                                          sizeof(_gcsExternFunctionItem));
                         if (functionSymbolItem == gcvNULL)
                         {
-                            return gcvSTATUS_OUT_OF_MEMORY;
+                            gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
                         }
 
                         functionSymbolItem->externSymbol = kernelFunction->name;
@@ -5919,7 +5919,7 @@ gcSHADER_MergeKernel(
                                                                                        sizeof(_gcsExternFunctionItem));
                             if (functionSymbolItem == gcvNULL)
                             {
-                                return gcvSTATUS_OUT_OF_MEMORY;
+                                gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
                             }
                             functionSymbolItem->externSymbol = function->name;
                             functionSymbolItem->isKernelFunction = gcvFALSE;
@@ -5980,7 +5980,7 @@ gcSHADER_MergeKernel(
                                                                                        sizeof(_gcsExternVariableItem));
                             if (variableSymbolItem == gcvNULL)
                             {
-                                return gcvSTATUS_OUT_OF_MEMORY;
+                                gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
                             }
 
                             variableSymbolItem->externSymbol = variable->name;
