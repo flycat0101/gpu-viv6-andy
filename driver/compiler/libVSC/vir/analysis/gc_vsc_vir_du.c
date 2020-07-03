@@ -188,8 +188,8 @@ gctUINT vscVIR_FindFirstDefIndexWithChannel(VIR_DEF_USAGE_INFO* pDuInfo,
 }
 
 static VSC_ErrCode _AddFirstDefIndex(VIR_DEF_USAGE_INFO* pDuInfo,
-                                            gctUINT FirstDefRegNo,
-                                            gctUINT NewDefIndex)
+                                     gctUINT FirstDefRegNo,
+                                     gctUINT NewDefIndex)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VIR_DEF *    pDef;
@@ -202,6 +202,11 @@ static VSC_ErrCode _AddFirstDefIndex(VIR_DEF_USAGE_INFO* pDuInfo,
             /* first time, create a new entry */
             firstDefInfo = (VIR_1st_DEF_INFO *)vscMM_Alloc(&pDuInfo->pmp.mmWrapper,
                                                            sizeof(VIR_1st_DEF_INFO));
+            if (firstDefInfo == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                ON_ERROR(errCode, "Failed to allcate memory for firstDefInfo.");
+            }
             firstDefInfo->firstDefIndex = firstDefInfo->lastDefIndex = NewDefIndex;
             errCode = vscHTBL_DirectSet(pDuInfo->pFirstDefTable,
                                         (void*)(gctPTRDIFF_T)FirstDefRegNo,
@@ -324,20 +329,22 @@ static void _FinalizeDef(VIR_DEF* pDef)
     pDef->webIdx = VIR_INVALID_WEB_INDEX;
 }
 
-static gctBOOL _AddNewDefToTable(VIR_DEF_USAGE_INFO* pDuInfo,
-                                 VSC_BLOCK_TABLE* pDefTable,
-                                 gctUINT firstRegNo,
-                                 gctUINT regNoRange,
-                                 VIR_Enable defEnableMask,
-                                 gctUINT8 halfChannelMask,
-                                 VIR_Instruction* pDefInst,
-                                 VIR_NATIVE_DEF_FLAGS nativeDefFlags,
-                                 gctBOOL bCheckRedundant,
-                                 gctBOOL bPartialUpdate,
-                                 gctUINT* pRetDefIdxArray,
-                                 gctUINT* pUpdatedDefIdxArray,
-                                 gctBOOL* pIsUpdateDefHomonymyArray)
+static VSC_ErrCode _AddNewDefToTable(VIR_DEF_USAGE_INFO* pDuInfo,
+                                     VSC_BLOCK_TABLE* pDefTable,
+                                     gctUINT firstRegNo,
+                                     gctUINT regNoRange,
+                                     VIR_Enable defEnableMask,
+                                     gctUINT8 halfChannelMask,
+                                     VIR_Instruction* pDefInst,
+                                     VIR_NATIVE_DEF_FLAGS nativeDefFlags,
+                                     gctBOOL bCheckRedundant,
+                                     gctBOOL bPartialUpdate,
+                                     gctUINT* pRetDefIdxArray,
+                                     gctUINT* pUpdatedDefIdxArray,
+                                     gctBOOL* pIsUpdateDefHomonymyArray,
+                                     gctBOOL* bNewDefAdded)
 {
+    VSC_ErrCode            errCode = VSC_ERR_NONE;
     VIR_DEF*               pNewDef;
     VIR_DEF*               pOldDef;
     gctUINT                regNo, newDefIdx, oldDefIdx;
@@ -345,14 +352,16 @@ static gctBOOL _AddNewDefToTable(VIR_DEF_USAGE_INFO* pDuInfo,
     gctUINT8               channel;
     VIR_Enable             totalEnableMask = defEnableMask;
     VIR_Enable             needNewAddEnableMask = VIR_ENABLE_NONE;
-    gctBOOL                bNewDefAdded = gcvFALSE;
     VIR_OperandInfo        operandInfo, operandInfo0;
-
+    if (bNewDefAdded)
+    {
+        *bNewDefAdded = gcvFALSE;
+    }
     if (defEnableMask == VIR_ENABLE_NONE || halfChannelMask == VIR_HALF_CHANNEL_MASK_NONE)
     {
         /* So weired, Uha??? */
         gcmASSERT(gcvFALSE);
-        return bNewDefAdded;
+        return errCode;
     }
 
     for (regNo = firstRegNo; regNo < firstRegNo + regNoRange; regNo ++)
@@ -418,6 +427,10 @@ static gctBOOL _AddNewDefToTable(VIR_DEF_USAGE_INFO* pDuInfo,
 
             /* Just get an empty def entry to fill */
             newDefIdx = vscBT_NewEntry(pDefTable);
+            if (VIR_Id_isInvalid(newDefIdx))
+            {
+                return VSC_ERR_OUT_OF_MEMORY;
+            }
             pNewDef = GET_DEF_BY_IDX(pDefTable, newDefIdx);
             gcmASSERT(pNewDef);
 
@@ -449,7 +462,9 @@ static gctBOOL _AddNewDefToTable(VIR_DEF_USAGE_INFO* pDuInfo,
             else
             {
                 /* add newDefIdx to the first def table */
-                _AddFirstDefIndex(pDuInfo, regNo, newDefIdx);
+                errCode = _AddFirstDefIndex(pDuInfo, regNo, newDefIdx);
+                if (errCode == VSC_ERR_OUT_OF_MEMORY)
+                    return errCode;
             }
 
             /* Take care of bDynIndexed */
@@ -481,11 +496,14 @@ static gctBOOL _AddNewDefToTable(VIR_DEF_USAGE_INFO* pDuInfo,
             /* Lastly, add defIdx to hash */
             vscBT_AddToHash(pDefTable, newDefIdx, &pNewDef->defKey);
 
-            bNewDefAdded = gcvTRUE;
+            if (bNewDefAdded)
+            {
+                *bNewDefAdded = gcvTRUE;
+            }
         }
     }
 
-    return bNewDefAdded;
+    return errCode;
 }
 
 static gctBOOL _DeleteDefFromTable(VIR_DEF_USAGE_INFO* pDuInfo,
@@ -787,9 +805,10 @@ gctBOOL vscVIR_QueryRealWriteVirRegInfo(VIR_Shader* pShader,
     return gcvTRUE;
 }
 
-static void _AddRealWriteDefs(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuInfo,
+static VSC_ErrCode _AddRealWriteDefs(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuInfo,
                               VSC_BLOCK_TABLE* pDefTable, VIR_Instruction* pInst)
 {
+    VSC_ErrCode            errCode = VSC_ERR_NONE;
     VIR_Enable             defEnableMask;
     gctUINT                firstRegNo, regNoRange;
     gctUINT8               halfChannelMask;
@@ -804,25 +823,30 @@ static void _AddRealWriteDefs(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuInfo,
                                         &nativeDefFlags,
                                         gcvNULL))
     {
-        _AddNewDefToTable(pDuInfo,
-                          pDefTable,
-                          firstRegNo,
-                          regNoRange,
-                          defEnableMask,
-                          halfChannelMask,
-                          pInst,
-                          nativeDefFlags,
-                          gcvFALSE,
-                          gcvFALSE,
-                          gcvNULL,
-                          gcvNULL,
-                          gcvNULL);
+        errCode = _AddNewDefToTable(pDuInfo,
+                                    pDefTable,
+                                    firstRegNo,
+                                    regNoRange,
+                                    defEnableMask,
+                                    halfChannelMask,
+                                    pInst,
+                                    nativeDefFlags,
+                                    gcvFALSE,
+                                    gcvFALSE,
+                                    gcvNULL,
+                                    gcvNULL,
+                                    gcvNULL,
+                                    gcvNULL);
+        ON_ERROR(errCode, "Failed in add new def to table.");
     }
+OnError:
+    return errCode;
 }
 
-static void _AddInputDefs(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuInfo,
+static VSC_ErrCode _AddInputDefs(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuInfo,
                           VSC_BLOCK_TABLE* pDefTable, VIR_Instruction* pInst)
 {
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
     VIR_OperandInfo         operandInfo, operandInfo1;
     VIR_Enable              defEnableMask;
     gctUINT                 firstRegNo, regNoRange;
@@ -857,19 +881,21 @@ static void _AddInputDefs(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuInfo,
                 nativeDefFlags.bIsPerPrim = operandInfo1.isPerPrim;
                 nativeDefFlags.bIsPerVtxCp = operandInfo1.isPerVtxCp;
 
-                _AddNewDefToTable(pDuInfo,
-                                  pDefTable,
-                                  operandInfo1.u1.virRegInfo.virReg,
-                                  1,
-                                  VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pInst->src[VIR_Operand_Src1])),
-                                  (gctUINT8)operandInfo1.halfChannelMask,
-                                  VIR_INPUT_DEF_INST,
-                                  nativeDefFlags,
-                                  gcvTRUE,
-                                  gcvFALSE,
-                                  gcvNULL,
-                                  gcvNULL,
-                                  gcvNULL);
+                errCode = _AddNewDefToTable(pDuInfo,
+                                            pDefTable,
+                                            operandInfo1.u1.virRegInfo.virReg,
+                                            1,
+                                            VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pInst->src[VIR_Operand_Src1])),
+                                            (gctUINT8)operandInfo1.halfChannelMask,
+                                            VIR_INPUT_DEF_INST,
+                                            nativeDefFlags,
+                                            gcvTRUE,
+                                            gcvFALSE,
+                                            gcvNULL,
+                                            gcvNULL,
+                                            gcvNULL,
+                                            gcvNULL);
+                ON_ERROR(errCode, "Failed in add new def to table.");
             }
 
             firstRegNo = operandInfo.u1.virRegInfo.startVirReg;
@@ -882,19 +908,21 @@ static void _AddInputDefs(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuInfo,
             nativeDefFlags.bIsPerPrim = operandInfo.isPerPrim;
             nativeDefFlags.bIsPerVtxCp = operandInfo.isPerVtxCp;
 
-            _AddNewDefToTable(pDuInfo,
-                              pDefTable,
-                              firstRegNo,
-                              regNoRange,
-                              defEnableMask,
-                              (gctUINT8)operandInfo.halfChannelMask,
-                              VIR_INPUT_DEF_INST,
-                              nativeDefFlags,
-                              gcvTRUE,
-                              gcvFALSE,
-                              gcvNULL,
-                              gcvNULL,
-                              gcvNULL);
+            errCode = _AddNewDefToTable(pDuInfo,
+                                        pDefTable,
+                                        firstRegNo,
+                                        regNoRange,
+                                        defEnableMask,
+                                        (gctUINT8)operandInfo.halfChannelMask,
+                                        VIR_INPUT_DEF_INST,
+                                        nativeDefFlags,
+                                        gcvTRUE,
+                                        gcvFALSE,
+                                        gcvNULL,
+                                        gcvNULL,
+                                        gcvNULL,
+                                        gcvNULL);
+            ON_ERROR(errCode, "Failed in add new def to table.");
         }
     }
     else
@@ -916,27 +944,33 @@ static void _AddInputDefs(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuInfo,
                 nativeDefFlags.bIsPerPrim = operandInfo.isPerPrim;
                 nativeDefFlags.bIsPerVtxCp = operandInfo.isPerVtxCp;
 
-                _AddNewDefToTable(pDuInfo,
-                                  pDefTable,
-                                  firstRegNo,
-                                  regNoRange,
-                                  defEnableMask,
-                                  (gctUINT8)operandInfo.halfChannelMask,
-                                  VIR_INPUT_DEF_INST,
-                                  nativeDefFlags,
-                                  gcvTRUE,
-                                  gcvFALSE,
-                                  gcvNULL,
-                                  gcvNULL,
-                                  gcvNULL);
+                errCode = _AddNewDefToTable(pDuInfo,
+                                            pDefTable,
+                                            firstRegNo,
+                                            regNoRange,
+                                            defEnableMask,
+                                            (gctUINT8)operandInfo.halfChannelMask,
+                                            VIR_INPUT_DEF_INST,
+                                            nativeDefFlags,
+                                            gcvTRUE,
+                                            gcvFALSE,
+                                            gcvNULL,
+                                            gcvNULL,
+                                            gcvNULL,
+                                            gcvNULL);
+                ON_ERROR(errCode, "Failed in add new def to table.");
             }
         }
     }
+
+OnError:
+    return errCode;
 }
 
-static void _AddHwSpecificDefs(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuInfo,
+static VSC_ErrCode _AddHwSpecificDefs(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuInfo,
                                VSC_BLOCK_TABLE* pDefTable, VIR_Instruction* pInst)
 {
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
     VIR_OperandInfo         operandInfo;
     VIR_Enable              defEnableMask;
     gctUINT                 firstRegNo, regNoRange;
@@ -965,21 +999,25 @@ static void _AddHwSpecificDefs(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuInfo,
             regNoRange = 1;
             defEnableMask = VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pOpnd));
 
-            _AddNewDefToTable(pDuInfo,
-                              pDefTable,
-                              firstRegNo,
-                              regNoRange,
-                              defEnableMask,
-                              (gctUINT8)operandInfo.halfChannelMask,
-                              VIR_HW_SPECIAL_DEF_INST,
-                              nativeDefFlags,
-                              gcvTRUE,
-                              gcvFALSE,
-                              gcvNULL,
-                              gcvNULL,
-                              gcvNULL);
+            errCode = _AddNewDefToTable(pDuInfo,
+                                        pDefTable,
+                                        firstRegNo,
+                                        regNoRange,
+                                        defEnableMask,
+                                        (gctUINT8)operandInfo.halfChannelMask,
+                                        VIR_HW_SPECIAL_DEF_INST,
+                                        nativeDefFlags,
+                                        gcvTRUE,
+                                        gcvFALSE,
+                                        gcvNULL,
+                                        gcvNULL,
+                                        gcvNULL,
+                                        gcvNULL);
+            ON_ERROR(errCode, "Failed in add new def to table.");
         }
     }
+OnError:
+    return errCode;
 }
 
 static gctINT estimateDUHashTableSize(VIR_Shader*            pShader)
@@ -1050,19 +1088,20 @@ static VSC_ErrCode _BuildDefTable(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuIn
         for (; pInst != gcvNULL; pInst = (VIR_Instruction *)VIR_InstIterator_Next(&instIter))
         {
             /* Insts who has real writes into vir regs */
-            _AddRealWriteDefs(pShader, pDuInfo, &pDuInfo->defTable, pInst);
+            errCode = _AddRealWriteDefs(pShader, pDuInfo, &pDuInfo->defTable, pInst);
+            ON_ERROR(errCode, "Failed at add real write Defs.");
 
             /* Input (attribute) reg is not explicitly defined by shader, but they do are
                defined by pre-shader stage. So we need add them to our def table */
-            _AddInputDefs(pShader, pDuInfo, &pDuInfo->defTable, pInst);
-
+            errCode = _AddInputDefs(pShader, pDuInfo, &pDuInfo->defTable, pInst);
+            ON_ERROR(errCode, "Failed at add input Defs.");
             /* For MC-level shader, there might be registers that are specially assigned by
                HW to certain HW registers, and these special HW registers will be used like
                input, such as out-sample-mask, so we need add this kind of def to table */
             _AddHwSpecificDefs(pShader, pDuInfo, &pDuInfo->defTable, pInst);
         }
     }
-
+OnError:
     return errCode;
 }
 
@@ -1715,18 +1754,19 @@ void vscUSGN_Finalize(VIR_DU_CHAIN_USAGE_NODE* pUsageNode)
     vscULN_Finalize(&pUsageNode->uniLstNode);
 }
 
-static gctBOOL _AddNewUsageToTable(VIR_DEF_USAGE_INFO* pDuInfo,
-                                   VSC_BIT_VECTOR *pWorkingDefFlow,
-                                   VIR_Instruction* pUsageInst,
-                                   VIR_Operand* pOperand,
-                                   gctBOOL bIsIndexingRegUsage,
-                                   gctUINT firstRegNo,
-                                   gctUINT regNoRange,
-                                   VIR_Enable defEnableMask,
-                                   gctUINT8 halfChannelMask,
-                                   gctBOOL bPartialUpdate,
-                                   gctUINT* pRetUsageIdx)
+static VSC_ErrCode _AddNewUsageToTable(VIR_DEF_USAGE_INFO* pDuInfo,
+                                       VSC_BIT_VECTOR *pWorkingDefFlow,
+                                       VIR_Instruction* pUsageInst,
+                                       VIR_Operand* pOperand,
+                                       gctBOOL bIsIndexingRegUsage,
+                                       gctUINT firstRegNo,
+                                       gctUINT regNoRange,
+                                       VIR_Enable defEnableMask,
+                                       gctUINT8 halfChannelMask,
+                                       gctBOOL bPartialUpdate,
+                                       gctUINT* pRetUsageIdx)
 {
+    VSC_ErrCode              errCode = VSC_ERR_NONE;
     VIR_USAGE*               pNewUsage = gcvNULL;
     VIR_USAGE*               pTmpUsage;
     VIR_DEF*                 pDef;
@@ -1736,7 +1776,8 @@ static gctBOOL _AddNewUsageToTable(VIR_DEF_USAGE_INFO* pDuInfo,
     gctUINT                  regNo, defIdx;
     gctUINT                  newUsageIdx = VIR_INVALID_USAGE_INDEX;
     gctUINT8                 channel;
-    gctBOOL                  bDefFound = gcvFALSE, bNewUsageAdded = gcvFALSE;
+    gctBOOL                  bDefFound = gcvFALSE;
+    gctBOOL                  bNewUsageAdded = gcvFALSE;
     VIR_DU_CHAIN_USAGE_NODE* pUsageNode;
     VSC_DU_ITERATOR          duIter;
     VIR_OperandInfo          operandInfo, operandInfo1;
@@ -1745,7 +1786,7 @@ static gctBOOL _AddNewUsageToTable(VIR_DEF_USAGE_INFO* pDuInfo,
     {
         /* So weired, Uha??? */
         gcmASSERT(gcvFALSE);
-        return bNewUsageAdded;
+        return errCode;
     }
 
     if (bPartialUpdate)
@@ -1769,6 +1810,10 @@ static gctBOOL _AddNewUsageToTable(VIR_DEF_USAGE_INFO* pDuInfo,
     {
         /* Just get an empty usage entry to fill */
         newUsageIdx = vscBT_NewEntry(pUsageTable);
+        if (VIR_Id_isInvalid(newUsageIdx))
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         pNewUsage = GET_USAGE_BY_IDX(pUsageTable, newUsageIdx);
         gcmASSERT(pNewUsage);
 
@@ -1843,6 +1888,11 @@ static gctBOOL _AddNewUsageToTable(VIR_DEF_USAGE_INFO* pDuInfo,
                         /* DU chain */
                         pUsageNode = (VIR_DU_CHAIN_USAGE_NODE*)vscMM_Alloc(&pDuInfo->pmp.mmWrapper,
                                                                            sizeof(VIR_DU_CHAIN_USAGE_NODE));
+                        if (pUsageNode == gcvNULL)
+                        {
+                            errCode = VSC_ERR_OUT_OF_MEMORY;
+                            ON_ERROR(errCode, "Failed to allcate memory for usageNode.");
+                        }
                         vscUSGN_Initialize(pUsageNode, newUsageIdx);
                         DU_CHAIN_ADD_USAGE(&pDef->duChain, pUsageNode);
 
@@ -1932,7 +1982,8 @@ static gctBOOL _AddNewUsageToTable(VIR_DEF_USAGE_INFO* pDuInfo,
         }
     }
 
-    return bNewUsageAdded;
+OnError:
+    return errCode;
 }
 
 static gctBOOL _DeleteUsageFromTable(VIR_DEF_USAGE_INFO* pDuInfo,
@@ -2184,13 +2235,14 @@ static gctBOOL _CanAddUsageToOutputDef(VIR_DEF_USAGE_INFO* pDuInfo,
     return gcvFALSE;
 }
 
-static void _AddOutputUsages(VIR_Shader* pShader,
-                             VIR_DEF_USAGE_INFO* pDuInfo,
-                             VSC_BIT_VECTOR* pWorkingDefFlow,
-                             VIR_Instruction* pOutputUsageInst,
-                             gctBOOL bCheckAllOutput,
-                             gctINT streamNumber)
+static VSC_ErrCode _AddOutputUsages(VIR_Shader* pShader,
+                                    VIR_DEF_USAGE_INFO* pDuInfo,
+                                    VSC_BIT_VECTOR* pWorkingDefFlow,
+                                    VIR_Instruction* pOutputUsageInst,
+                                    gctBOOL bCheckAllOutput,
+                                    gctINT streamNumber)
 {
+    VSC_ErrCode              errCode = VSC_ERR_NONE;
     VSC_BLOCK_TABLE*         pDefTable = &pDuInfo->defTable;
     VSC_BLOCK_TABLE*         pUsageTable = &pDuInfo->usageTable;
     gctUINT                  defCount = pDuInfo->baseTsDFA.baseDFA.flowSize;
@@ -2243,6 +2295,10 @@ static void _AddOutputUsages(VIR_Shader* pShader,
 
         /* Just get an empty usage entry to fill */
         newUsageIdx = vscBT_NewEntry(pUsageTable);
+        if (VIR_Id_isInvalid(newUsageIdx))
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         pNewUsage = GET_USAGE_BY_IDX(pUsageTable, newUsageIdx);
         gcmASSERT(pNewUsage);
 
@@ -2272,6 +2328,11 @@ static void _AddOutputUsages(VIR_Shader* pShader,
                     /* DU chain */
                     pUsageNode = (VIR_DU_CHAIN_USAGE_NODE*)vscMM_Alloc(&pDuInfo->pmp.mmWrapper,
                                                                         sizeof(VIR_DU_CHAIN_USAGE_NODE));
+                    if (pUsageNode == gcvNULL)
+                    {
+                        errCode = VSC_ERR_OUT_OF_MEMORY;
+                        ON_ERROR(errCode, "Failed to allcate memory for usageNode.");
+                    }
                     vscUSGN_Initialize(pUsageNode, newUsageIdx);
                     DU_CHAIN_ADD_USAGE(&pDef->duChain, pUsageNode);
 
@@ -2290,14 +2351,17 @@ static void _AddOutputUsages(VIR_Shader* pShader,
         }
     }
 
+OnError:
     vscBV_Finalize(&tmpMask);
+    return errCode;
 }
 
-static void _AddUsages(VIR_Shader* pShader,
-                       VSC_BIT_VECTOR *pWorkingDefFlow,
-                       VIR_Instruction* pInst,
-                       VIR_DEF_USAGE_INFO* pDuInfo)
+static VSC_ErrCode _AddUsages(VIR_Shader* pShader,
+                              VSC_BIT_VECTOR *pWorkingDefFlow,
+                              VIR_Instruction* pInst,
+                              VIR_DEF_USAGE_INFO* pDuInfo)
 {
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
     gctUINT                 firstRegNo, regNoRange;
     VIR_Enable              defEnableMask;
     VIR_OperandInfo         operandInfo, operandInfo1;
@@ -2317,17 +2381,18 @@ static void _AddUsages(VIR_Shader* pShader,
             regNoRange = 1;
             defEnableMask = (1 << operandInfo.componentOfIndexingVirRegNo);
 
-            _AddNewUsageToTable(pDuInfo,
-                                pWorkingDefFlow,
-                                pInst,
-                                pInst->dest,
-                                gcvTRUE,
-                                firstRegNo,
-                                regNoRange,
-                                defEnableMask,
-                                (gctUINT8)operandInfo.halfChannelMaskOfIndexingVirRegNo,
-                                gcvFALSE,
-                                gcvNULL);
+            errCode = _AddNewUsageToTable(pDuInfo,
+                                          pWorkingDefFlow,
+                                          pInst,
+                                          pInst->dest,
+                                          gcvTRUE,
+                                          firstRegNo,
+                                          regNoRange,
+                                          defEnableMask,
+                                          (gctUINT8)operandInfo.halfChannelMaskOfIndexingVirRegNo,
+                                          gcvFALSE,
+                                          gcvNULL);
+            ON_ERROR(errCode, "Failed in add new usage to table.");
         }
     }
 
@@ -2351,17 +2416,18 @@ static void _AddUsages(VIR_Shader* pShader,
         {
             if (VIR_OpndInfo_Is_Virtual_Reg(&operandInfo1))
             {
-                _AddNewUsageToTable(pDuInfo,
-                                    pWorkingDefFlow,
-                                    pInst,
-                                    pInst->src[VIR_Operand_Src1],
-                                    gcvFALSE,
-                                    operandInfo1.u1.virRegInfo.virReg,
-                                    1,
-                                    VIR_Operand_GetRealUsedChannels(pInst->src[VIR_Operand_Src1], pInst, gcvNULL),
-                                    (gctUINT8)operandInfo1.halfChannelMask,
-                                    gcvFALSE,
-                                    gcvNULL);
+                errCode = _AddNewUsageToTable(pDuInfo,
+                                              pWorkingDefFlow,
+                                              pInst,
+                                              pInst->src[VIR_Operand_Src1],
+                                              gcvFALSE,
+                                              operandInfo1.u1.virRegInfo.virReg,
+                                              1,
+                                              VIR_Operand_GetRealUsedChannels(pInst->src[VIR_Operand_Src1], pInst, gcvNULL),
+                                              (gctUINT8)operandInfo1.halfChannelMask,
+                                              gcvFALSE,
+                                              gcvNULL);
+                ON_ERROR(errCode, "Failed in add new usage to table.");
             }
 
             firstRegNo = operandInfo.u1.virRegInfo.startVirReg;
@@ -2372,17 +2438,18 @@ static void _AddUsages(VIR_Shader* pShader,
         {
             defEnableMask = VIR_Operand_GetRealUsedChannels(pInst->src[VIR_Operand_Src0], pInst, gcvNULL);
 
-            _AddNewUsageToTable(pDuInfo,
-                                pWorkingDefFlow,
-                                pInst,
-                                pInst->src[VIR_Operand_Src0],
-                                gcvFALSE,
-                                firstRegNo,
-                                regNoRange,
-                                defEnableMask,
-                                (gctUINT8)operandInfo.halfChannelMask,
-                                gcvFALSE,
-                                gcvNULL);
+            errCode = _AddNewUsageToTable(pDuInfo,
+                                          pWorkingDefFlow,
+                                          pInst,
+                                          pInst->src[VIR_Operand_Src0],
+                                          gcvFALSE,
+                                          firstRegNo,
+                                          regNoRange,
+                                          defEnableMask,
+                                          (gctUINT8)operandInfo.halfChannelMask,
+                                          gcvFALSE,
+                                          gcvNULL);
+            ON_ERROR(errCode, "Failed in add new usage to table.");
         }
     }
     else
@@ -2412,17 +2479,18 @@ static void _AddUsages(VIR_Shader* pShader,
                 }
                 defEnableMask = VIR_Operand_GetRealUsedChannels(pOpnd, pInst, gcvNULL);
 
-                _AddNewUsageToTable(pDuInfo,
-                                    pWorkingDefFlow,
-                                    pInst,
-                                    pOpnd,
-                                    gcvFALSE,
-                                    firstRegNo,
-                                    regNoRange,
-                                    defEnableMask,
-                                    (gctUINT8)operandInfo.halfChannelMask,
-                                    gcvFALSE,
-                                    gcvNULL);
+                errCode = _AddNewUsageToTable(pDuInfo,
+                                              pWorkingDefFlow,
+                                              pInst,
+                                              pOpnd,
+                                              gcvFALSE,
+                                              firstRegNo,
+                                              regNoRange,
+                                              defEnableMask,
+                                              (gctUINT8)operandInfo.halfChannelMask,
+                                              gcvFALSE,
+                                              gcvNULL);
+                ON_ERROR(errCode, "Failed in add new usage to table.");
             }
 
             /* For the case of Rb[Ro.single_channel] access, we need consider Ro usage */
@@ -2432,17 +2500,18 @@ static void _AddUsages(VIR_Shader* pShader,
                 regNoRange = 1;
                 defEnableMask = (1 << operandInfo.componentOfIndexingVirRegNo);
 
-                _AddNewUsageToTable(pDuInfo,
-                                    pWorkingDefFlow,
-                                    pInst,
-                                    pOpnd,
-                                    gcvTRUE,
-                                    firstRegNo,
-                                    regNoRange,
-                                    defEnableMask,
-                                    (gctUINT8)operandInfo.halfChannelMaskOfIndexingVirRegNo,
-                                    gcvFALSE,
-                                    gcvNULL);
+                errCode = _AddNewUsageToTable(pDuInfo,
+                                              pWorkingDefFlow,
+                                              pInst,
+                                              pOpnd,
+                                              gcvTRUE,
+                                              firstRegNo,
+                                              regNoRange,
+                                              defEnableMask,
+                                              (gctUINT8)operandInfo.halfChannelMaskOfIndexingVirRegNo,
+                                              gcvFALSE,
+                                              gcvNULL);
+                ON_ERROR(errCode, "Failed in add new usage to table.");
             }
         }
     }
@@ -2460,12 +2529,17 @@ static void _AddUsages(VIR_Shader* pShader,
             streamNumber = VIR_Operand_GetImmediateInt(VIR_Inst_GetSource(pInst, 0));
         }
 
-        _AddOutputUsages(pShader, pDuInfo, pWorkingDefFlow, pInst, bCheckAllOutput, streamNumber);
+        errCode = _AddOutputUsages(pShader, pDuInfo, pWorkingDefFlow, pInst, bCheckAllOutput, streamNumber);
+        ON_ERROR(errCode, "Failed in add output usages.");
     }
+
+OnError:
+    return errCode;
 }
 
-static void _BuildDUUDChainPerBB(VIR_BASIC_BLOCK* pBasicBlk, VIR_DEF_USAGE_INFO* pDuInfo)
+static VSC_ErrCode _BuildDUUDChainPerBB(VIR_BASIC_BLOCK* pBasicBlk, VIR_DEF_USAGE_INFO* pDuInfo)
 {
+    VSC_ErrCode            errCode = VSC_ERR_NONE;
     VIR_Shader*            pShader = pBasicBlk->pOwnerCFG->pOwnerFuncBlk->pOwnerCG->pOwnerShader;
     VSC_BLOCK_TABLE*       pDefTable = &pDuInfo->defTable;
     VSC_BIT_VECTOR         workingDefFlow;
@@ -2496,8 +2570,8 @@ static void _BuildDUUDChainPerBB(VIR_BASIC_BLOCK* pBasicBlk, VIR_DEF_USAGE_INFO*
     while (pInst)
     {
         /* To each vir reg read, find its def, if can not be found, it is an undef'ed usage */
-        _AddUsages(pShader, &workingDefFlow, pInst, pDuInfo);
-
+        errCode = _AddUsages(pShader, &workingDefFlow, pInst, pDuInfo);
+        ON_ERROR(errCode, "Failed in add new usage.");
         /* Update working flow */
         if (vscVIR_QueryRealWriteVirRegInfo(pShader,
                                             pInst,
@@ -2562,8 +2636,10 @@ static void _BuildDUUDChainPerBB(VIR_BASIC_BLOCK* pBasicBlk, VIR_DEF_USAGE_INFO*
        fully killed in basic-block, or it is not fully killed. */
     gcmASSERT(vscSV_All(&localHalfChannelKillFlow, VIR_HALF_CHANNEL_MASK_NONE));
 
+OnError:
     vscSV_Finalize(&localHalfChannelKillFlow);
     vscBV_Finalize(&workingDefFlow);
+    return errCode;
 }
 
 static VSC_ErrCode _BuildDUUDChain(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuInfo)
@@ -2605,7 +2681,8 @@ static VSC_ErrCode _BuildDUUDChain(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuI
         for (; pThisBlock != gcvNULL; pThisBlock = (VIR_BASIC_BLOCK *)CFG_ITERATOR_NEXT(&basicBlkIter))
         {
             /* For each basic block, build du/ud chain */
-            _BuildDUUDChainPerBB(pThisBlock, pDuInfo);
+            errCode = _BuildDUUDChainPerBB(pThisBlock, pDuInfo);
+            ON_ERROR(errCode, "Failed in BuildDUUDChainPerBB.");
         }
     }
 
@@ -2615,10 +2692,12 @@ static VSC_ErrCode _BuildDUUDChain(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuI
 
     /* Outputs have special implicit usages from next stage. All false outputs will be
        also corrected by setting bIsOutput as FALSE */
-    _AddOutputUsages(pCg->pOwnerShader, pDuInfo, pMainFlowOut, VIR_OUTPUT_USAGE_INST, gcvTRUE, 0);
+    errCode = _AddOutputUsages(pCg->pOwnerShader, pDuInfo, pMainFlowOut, VIR_OUTPUT_USAGE_INST, gcvTRUE, 0);
+    ON_ERROR(errCode, "Failed in add new usage to table.");
 
     pDuInfo->bDUUDChainBuilt = gcvTRUE;
 
+OnError:
     return errCode;
 }
 
@@ -2860,13 +2939,14 @@ static void _PostProcessNewWeb(VIR_DEF_USAGE_INFO* pDuInfo, gctUINT newWebIdx)
     }
 }
 
-static gctBOOL _BuildNewWeb(VIR_DEF_USAGE_INFO* pDuInfo,
-                            VSC_BIT_VECTOR* pGlobalWorkingFlow,
-                            VSC_BIT_VECTOR* pLocalWorkingFlow,
-                            gctUINT* pGlobalSearchStartDefIdx,
-                            gctBOOL bPartialUpdate,
-                            gctUINT* pRetWebeIdx)
+static VSC_ErrCode _BuildNewWeb(VIR_DEF_USAGE_INFO* pDuInfo,
+                                VSC_BIT_VECTOR* pGlobalWorkingFlow,
+                                VSC_BIT_VECTOR* pLocalWorkingFlow,
+                                gctUINT* pGlobalSearchStartDefIdx,
+                                gctBOOL bPartialUpdate,
+                                gctUINT* pRetWebeIdx)
 {
+    VSC_ErrCode              errCode = VSC_ERR_NONE;
     VSC_BLOCK_TABLE*         pDefTable = &pDuInfo->defTable;
     VSC_BLOCK_TABLE*         pUsageTable = &pDuInfo->usageTable;
     VSC_BLOCK_TABLE*         pWebTable = &pDuInfo->webTable;
@@ -2889,7 +2969,7 @@ static gctBOOL _BuildNewWeb(VIR_DEF_USAGE_INFO* pDuInfo,
 
     if (!vscBV_Any(pLocalWorkingFlow))
     {
-        return bNewWebAdded;
+        return errCode;
     }
 
     /* Check whether there is existed web for current requested defs, if yes, just
@@ -3010,6 +3090,10 @@ static gctBOOL _BuildNewWeb(VIR_DEF_USAGE_INFO* pDuInfo,
     {
         /* New a web and init it */
         newWebIdx = vscBT_NewEntry(pWebTable);
+        if (VIR_Id_isInvalid(newWebIdx))
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         pNewWeb = GET_WEB_BY_IDX(pWebTable, newWebIdx);
         gcmASSERT(pNewWeb);
         _InitializeWeb(pNewWeb, VIR_WEB_TYPE_UNKNOWN);
@@ -3172,7 +3256,7 @@ static gctBOOL _BuildNewWeb(VIR_DEF_USAGE_INFO* pDuInfo,
         _PostProcessNewWeb(pDuInfo, newWebIdx);
     }
 
-    return bNewWebAdded;
+    return errCode;
 }
 
 static VSC_ErrCode _BuildWebs(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuInfo)
@@ -3196,8 +3280,7 @@ static VSC_ErrCode _BuildWebs(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuInfo)
                          0) == gcvFALSE)
     {
         errCode = VSC_ERR_OUT_OF_MEMORY;
-        ERR_REPORT(errCode, "Failed to allocate memory for BT.");
-        return errCode;
+        ON_ERROR(errCode, "Failed to allocate memory for BT.");
     }
 
     /* Mark web has been built */
@@ -3242,12 +3325,13 @@ static VSC_ErrCode _BuildWebs(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuInfo)
                 vscBV_ClearAll(&localWorkingFlow);
                 vscBV_SetBit(&localWorkingFlow, defIdx);
 
-                _BuildNewWeb(pDuInfo,
-                             &globalWorkingFlow,
-                             &localWorkingFlow,
-                             &globalsearchStartDefIdx,
-                             gcvFALSE,
-                             gcvNULL);
+                errCode = _BuildNewWeb(pDuInfo,
+                                       &globalWorkingFlow,
+                                       &localWorkingFlow,
+                                       &globalsearchStartDefIdx,
+                                       gcvFALSE,
+                                       gcvNULL);
+                ON_ERROR(errCode, "Failed to build new Web.");
             }
 
             /* Get next def with same regNo */
@@ -3255,6 +3339,7 @@ static VSC_ErrCode _BuildWebs(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuInfo)
         }
     }
 
+OnError:
     vscBV_Finalize(&globalWorkingFlow);
     vscBV_Finalize(&localWorkingFlow);
 
@@ -3532,25 +3617,37 @@ static gctBOOL _UpdateReachDefFlow(VIR_DEF_USAGE_INFO* pDuInfo,
     return bSuccUpdated;
 }
 
-void vscVIR_AddNewDef(VIR_DEF_USAGE_INFO* pDuInfo,
-                      VIR_Instruction* pDefInst,
-                      gctUINT firstDefRegNo,
-                      gctUINT defRegNoRange,
-                      VIR_Enable defEnableMask,
-                      gctUINT8 halfChannelMask,
-                      VIR_NATIVE_DEF_FLAGS* pNativeDefFlags,
-                      gctUINT* pRetDefIdxArray)
+VSC_ErrCode vscVIR_AddNewDef(VIR_DEF_USAGE_INFO* pDuInfo,
+                             VIR_Instruction* pDefInst,
+                             gctUINT firstDefRegNo,
+                             gctUINT defRegNoRange,
+                             VIR_Enable defEnableMask,
+                             gctUINT8 halfChannelMask,
+                             VIR_NATIVE_DEF_FLAGS* pNativeDefFlags,
+                             gctUINT* pRetDefIdxArray)
 {
+    VSC_ErrCode            errCode = VSC_ERR_NONE;
     VSC_BLOCK_TABLE*       pDefTable = &pDuInfo->defTable;
     gctUINT                i;
-    gctUINT*               pUpdatedDefIdxArray;
-    gctBOOL*               pIsUpdateDefHomonymyArray;
+    gctUINT*               pUpdatedDefIdxArray = gcvNULL;
+    gctBOOL*               pIsUpdateDefHomonymyArray = gcvNULL;
     VIR_NATIVE_DEF_FLAGS   nativeDefFlags;
+    gctBOOL                bNewDefAdded = gcvFALSE;
 
     pUpdatedDefIdxArray = (gctUINT*)vscMM_Alloc(&pDuInfo->pmp.mmWrapper,
                                                 sizeof(gctUINT)*VIR_CHANNEL_NUM*defRegNoRange);
+    if (pUpdatedDefIdxArray == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR(errCode, "Failed to allocate memory for pUpdatedDefIdxArray.");
+    }
     pIsUpdateDefHomonymyArray = (gctBOOL*)vscMM_Alloc(&pDuInfo->pmp.mmWrapper,
                                                 sizeof(gctBOOL)*VIR_CHANNEL_NUM*defRegNoRange);
+    if (pIsUpdateDefHomonymyArray == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR(errCode, "Failed to allocate memory for pIsUpdateDefHomonymyArray.");
+    }
 
     for (i = 0; i < VIR_CHANNEL_NUM*defRegNoRange; i ++)
     {
@@ -3572,19 +3669,22 @@ void vscVIR_AddNewDef(VIR_DEF_USAGE_INFO* pDuInfo,
         memset(&nativeDefFlags, 0, sizeof(VIR_NATIVE_DEF_FLAGS));
     }
 
-    if (_AddNewDefToTable(pDuInfo,
-                          pDefTable,
-                          firstDefRegNo,
-                          defRegNoRange,
-                          defEnableMask,
-                          halfChannelMask,
-                          pDefInst,
-                          nativeDefFlags,
-                          gcvTRUE,
-                          gcvTRUE,
-                          pRetDefIdxArray,
-                          pUpdatedDefIdxArray,
-                          pIsUpdateDefHomonymyArray))
+    errCode = _AddNewDefToTable(pDuInfo,
+                                pDefTable,
+                                firstDefRegNo,
+                                defRegNoRange,
+                                defEnableMask,
+                                halfChannelMask,
+                                pDefInst,
+                                nativeDefFlags,
+                                gcvTRUE,
+                                gcvTRUE,
+                                pRetDefIdxArray,
+                                pUpdatedDefIdxArray,
+                                pIsUpdateDefHomonymyArray,
+                                &bNewDefAdded);
+    ON_ERROR(errCode, "Failed in add new def to table.");
+    if (bNewDefAdded)
     {
         /* If flow has been invalidated, no need to update it anymore */
         if (!pDuInfo->baseTsDFA.baseDFA.cmnDfaFlags.bFlowInvalidated &&
@@ -3603,27 +3703,47 @@ void vscVIR_AddNewDef(VIR_DEF_USAGE_INFO* pDuInfo,
         }
     }
 
-    vscMM_Free(&pDuInfo->pmp.mmWrapper, pUpdatedDefIdxArray);
-    vscMM_Free(&pDuInfo->pmp.mmWrapper, pIsUpdateDefHomonymyArray);
+OnError:
+    if (!pUpdatedDefIdxArray)
+    {
+        vscMM_Free(&pDuInfo->pmp.mmWrapper, pUpdatedDefIdxArray);
+    }
+    if (!pIsUpdateDefHomonymyArray)
+    {
+        vscMM_Free(&pDuInfo->pmp.mmWrapper, pIsUpdateDefHomonymyArray);
+    }
+    return errCode;
 }
 
-void vscVIR_DeleteDef(VIR_DEF_USAGE_INFO* pDuInfo,
-                      VIR_Instruction* pDefInst,
-                      gctUINT firstDefRegNo,
-                      gctUINT defRegNoRange,
-                      VIR_Enable defEnableMask,
-                      gctUINT8 halfChannelMask,
-                      gctUINT* pRetDefIdxArray)
+VSC_ErrCode vscVIR_DeleteDef(VIR_DEF_USAGE_INFO* pDuInfo,
+                             VIR_Instruction* pDefInst,
+                             gctUINT firstDefRegNo,
+                             gctUINT defRegNoRange,
+                             VIR_Enable defEnableMask,
+                             gctUINT8 halfChannelMask,
+                             gctUINT* pRetDefIdxArray)
 {
+    VSC_ErrCode            errCode = VSC_ERR_NONE;
     VSC_BLOCK_TABLE*       pDefTable = &pDuInfo->defTable;
     gctUINT                i;
-    gctUINT*               pUpdatedDefIdxArray;
-    gctBOOL*               pIsUpdateDefHomonymyArray;
+    gctUINT*               pUpdatedDefIdxArray = gcvNULL;
+    gctBOOL*               pIsUpdateDefHomonymyArray = gcvNULL;
 
     pUpdatedDefIdxArray = (gctUINT*)vscMM_Alloc(&pDuInfo->pmp.mmWrapper,
                                                 sizeof(gctUINT)*VIR_CHANNEL_NUM*defRegNoRange);
+    if (pUpdatedDefIdxArray == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR(errCode, "Failed to allocate memory for pUpdatedDefIdxArray.");
+    }
+
     pIsUpdateDefHomonymyArray = (gctBOOL*)vscMM_Alloc(&pDuInfo->pmp.mmWrapper,
                                                 sizeof(gctBOOL)*VIR_CHANNEL_NUM*defRegNoRange);
+    if (pIsUpdateDefHomonymyArray == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR(errCode, "Failed to allocate memory for pIsUpdateDefHomonymyArray.");
+    }
 
     for (i = 0; i < VIR_CHANNEL_NUM*defRegNoRange; i ++)
     {
@@ -3663,21 +3783,30 @@ void vscVIR_DeleteDef(VIR_DEF_USAGE_INFO* pDuInfo,
         }
     }
 
-    vscMM_Free(&pDuInfo->pmp.mmWrapper, pUpdatedDefIdxArray);
-    vscMM_Free(&pDuInfo->pmp.mmWrapper, pIsUpdateDefHomonymyArray);
+OnError:
+    if (!pUpdatedDefIdxArray)
+    {
+        vscMM_Free(&pDuInfo->pmp.mmWrapper, pUpdatedDefIdxArray);
+    }
+    if (!pIsUpdateDefHomonymyArray)
+    {
+        vscMM_Free(&pDuInfo->pmp.mmWrapper, pIsUpdateDefHomonymyArray);
+    }
+    return errCode;
 }
 
-void vscVIR_AddNewUsageToDef(VIR_DEF_USAGE_INFO* pDuInfo,
-                             VIR_Instruction* pDefInst,
-                             VIR_Instruction* pUsageInst,
-                             VIR_Operand* pOperand,
-                             gctBOOL bIsIndexingRegUsage,
-                             gctUINT firstUsageRegNo,
-                             gctUINT usageRegNoRange,
-                             VIR_Enable defEnableMask,
-                             gctUINT8 halfChannelMask,
-                             gctUINT* pRetUsageIdx)
+VSC_ErrCode vscVIR_AddNewUsageToDef(VIR_DEF_USAGE_INFO* pDuInfo,
+                                    VIR_Instruction* pDefInst,
+                                    VIR_Instruction* pUsageInst,
+                                    VIR_Operand* pOperand,
+                                    gctBOOL bIsIndexingRegUsage,
+                                    gctUINT firstUsageRegNo,
+                                    gctUINT usageRegNoRange,
+                                    VIR_Enable defEnableMask,
+                                    gctUINT8 halfChannelMask,
+                                    gctUINT* pRetUsageIdx)
 {
+    VSC_ErrCode              errCode = VSC_ERR_NONE;
     VSC_BLOCK_TABLE*         pDefTable = &pDuInfo->defTable;
     VSC_BIT_VECTOR           tmpWorkingDefFlow;
     gctUINT                  regNo, defIdx;
@@ -3701,7 +3830,7 @@ void vscVIR_AddNewUsageToDef(VIR_DEF_USAGE_INFO* pDuInfo,
         /* Only vir reg operand can be added as usage */
         if (!VIR_OpndInfo_Is_Virtual_Reg(&operandInfo))
         {
-            return;
+            return errCode;
         }
     }
 
@@ -3756,30 +3885,34 @@ void vscVIR_AddNewUsageToDef(VIR_DEF_USAGE_INFO* pDuInfo,
     }
 
     /* Add new usage based on target defs */
-    _AddNewUsageToTable(pDuInfo,
-                        &tmpWorkingDefFlow,
-                        pUsageInst,
-                        pOperand,
-                        bIsIndexingRegUsage,
-                        firstUsageRegNo,
-                        usageRegNoRange,
-                        defEnableMask,
-                        halfChannelMask,
-                        gcvTRUE,
-                        pRetUsageIdx);
+    errCode = _AddNewUsageToTable(pDuInfo,
+                                  &tmpWorkingDefFlow,
+                                  pUsageInst,
+                                  pOperand,
+                                  bIsIndexingRegUsage,
+                                  firstUsageRegNo,
+                                  usageRegNoRange,
+                                  defEnableMask,
+                                  halfChannelMask,
+                                  gcvTRUE,
+                                  pRetUsageIdx);
+    ON_ERROR(errCode, "Failed in add new usage to table.");
 
     /* Then add new usage to web that defs have already holded */
     if (pDuInfo->bWebTableBuilt)
     {
-        _BuildNewWeb(pDuInfo,
-                     gcvNULL,
-                     &tmpWorkingDefFlow,
-                     gcvNULL,
-                     gcvTRUE,
-                     gcvNULL);
+        errCode =  _BuildNewWeb(pDuInfo,
+                                gcvNULL,
+                                &tmpWorkingDefFlow,
+                                gcvNULL,
+                                gcvTRUE,
+                                gcvNULL);
+        ON_ERROR(errCode, "Failed to build new Web.");
     }
 
+OnError:
     vscBV_Finalize(&tmpWorkingDefFlow);
+    return errCode;
 }
 
 void vscVIR_DeleteUsage(VIR_DEF_USAGE_INFO* pDuInfo,
@@ -5616,11 +5749,12 @@ gctBOOL vscVIR_FindUniqueNearestDefInst(
     return bFound;
 }
 
-gctBOOL vscVIR_CleanDuForInstruction(
+VSC_ErrCode vscVIR_CleanDuForInstruction(
     IN VIR_DEF_USAGE_INFO*          pDuInfo,
     IN VIR_Instruction*             pInst
     )
 {
+    VSC_ErrCode                     errCode = VSC_ERR_NONE;
     VIR_Shader*                     pShader = VIR_Inst_GetShader(pInst);
     VIR_Operand*                    pOpnd = gcvNULL;
     VIR_OperandInfo                 opndInfo;
@@ -5636,13 +5770,14 @@ gctBOOL vscVIR_CleanDuForInstruction(
         VIR_Operand_GetOperandInfo(pInst, pOpnd, &opndInfo);
         gcmASSERT(opndInfo.isVreg);
 
-        vscVIR_DeleteDef(pDuInfo,
-                         pInst,
-                         opndInfo.u1.virRegInfo.virReg,
-                         1,
-                         VIR_Operand_GetEnable(pOpnd),
-                         VIR_HALF_CHANNEL_MASK_FULL,
-                         gcvNULL);
+        errCode = vscVIR_DeleteDef(pDuInfo,
+                                   pInst,
+                                   opndInfo.u1.virRegInfo.virReg,
+                                   1,
+                                   VIR_Operand_GetEnable(pOpnd),
+                                   VIR_HALF_CHANNEL_MASK_FULL,
+                                   gcvNULL);
+        ON_ERROR(errCode, "Failed in Delete Def.");
     }
 
     /* Check all sources. */
@@ -5695,7 +5830,8 @@ gctBOOL vscVIR_CleanDuForInstruction(
                            gcvNULL);
     }
 
-    return gcvTRUE;
+OnError:
+    return errCode;
 }
 
 VSC_ErrCode
@@ -5711,7 +5847,8 @@ vscVIR_DeleteInstructionWithDu(
 
     if (pDuInfo)
     {
-        vscVIR_CleanDuForInstruction(pDuInfo, pInst);
+        errCode = vscVIR_CleanDuForInstruction(pDuInfo, pInst);
+        ON_ERROR(errCode, "Failed in CleanDuForInstruction.");
     }
 
     VIR_Function_DeleteInstruction(pFunction, pInst);
@@ -5722,6 +5859,7 @@ vscVIR_DeleteInstructionWithDu(
         *pInvalidCFG = gcvTRUE;
     }
 
+OnError:
     return errCode;
 }
 
@@ -5738,7 +5876,8 @@ vscVIR_RemoveInstructionWithDu(
 
     if (pDuInfo)
     {
-        vscVIR_CleanDuForInstruction(pDuInfo, pInst);
+        errCode = vscVIR_CleanDuForInstruction(pDuInfo, pInst);
+        ON_ERROR(errCode, "Failed in CleanDuForInstruction.");
     }
 
     VIR_Function_RemoveInstruction(pFunction, pInst, gcvTRUE);
@@ -5749,6 +5888,7 @@ vscVIR_RemoveInstructionWithDu(
         *pInvalidCFG = gcvTRUE;
     }
 
+OnError:
     return errCode;
 }
 

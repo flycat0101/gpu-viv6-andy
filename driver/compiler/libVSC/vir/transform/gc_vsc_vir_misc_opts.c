@@ -1523,12 +1523,14 @@ VSC_ErrCode vscVIR_CheckCstRegFileReadPortLimitation(VSC_SH_PASS_WORKER* pPassWo
                             VIR_Inst_SetThreadMode(inst, VIR_THREAD_D16_DUAL_32);
                         }
 
-                        vscVIR_AddNewDef(pDuInfo, pNewInsertedInst, newDstRegNo, 1, VIR_ENABLE_XYZW, VIR_HALF_CHANNEL_MASK_FULL,
-                                            gcvNULL, gcvNULL);
+                        errCode = vscVIR_AddNewDef(pDuInfo, pNewInsertedInst, newDstRegNo, 1, VIR_ENABLE_XYZW,
+                                                   VIR_HALF_CHANNEL_MASK_FULL, gcvNULL, gcvNULL);
+                        ON_ERROR(errCode, "Failed to add new def.");
 
-                        vscVIR_AddNewUsageToDef(pDuInfo, pNewInsertedInst, inst, opnd,
-                                                gcvFALSE, newDstRegNo, 1, VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(opnd)),
-                                                VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+                        errCode = vscVIR_AddNewUsageToDef(pDuInfo, pNewInsertedInst, inst, opnd,
+                                                          gcvFALSE, newDstRegNo, 1, VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(opnd)),
+                                                          VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+                        ON_ERROR(errCode, "Failed to add new usage to def.");
 
                         /* Change happens. */
                         bChanged = gcvTRUE;
@@ -1614,36 +1616,40 @@ _FixSwizzleRestrictForLocalStorageAddr(
     VIR_Operand_Change2Src_WShift(pOrigSrc);
 
     /* Update DU info. */
-    vscVIR_AddNewDef(pDuInfo,
-                     pNewInst,
-                     destRegId,
-                     1,
-                     enable,
-                     VIR_HALF_CHANNEL_MASK_FULL,
-                     gcvNULL,
-                     gcvNULL);
+    errCode = vscVIR_AddNewDef(pDuInfo,
+                               pNewInst,
+                               destRegId,
+                               1,
+                               enable,
+                               VIR_HALF_CHANNEL_MASK_FULL,
+                               gcvNULL,
+                               gcvNULL);
+    ON_ERROR(errCode, "Failed to add new def.");
 
-    vscVIR_AddNewUsageToDef(pDuInfo,
-                            VIR_INPUT_DEF_INST,
-                            pNewInst,
-                            pNewOpnd,
-                            gcvFALSE,
-                            VIR_Symbol_GetVariableVregIndex(pLocalStorageAddr),
-                            1,
-                            VIR_ENABLE_W,
-                            VIR_HALF_CHANNEL_MASK_FULL,
-                            gcvNULL);
+    errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                      VIR_INPUT_DEF_INST,
+                                      pNewInst,
+                                      pNewOpnd,
+                                      gcvFALSE,
+                                      VIR_Symbol_GetVariableVregIndex(pLocalStorageAddr),
+                                      1,
+                                      VIR_ENABLE_W,
+                                      VIR_HALF_CHANNEL_MASK_FULL,
+                                      gcvNULL);
+    ON_ERROR(errCode, "Failed to add new usage to def.");
 
-    vscVIR_AddNewUsageToDef(pDuInfo,
-                            pNewInst,
-                            pInst,
-                            pOrigSrc,
-                            gcvFALSE,
-                            destRegId,
-                            1,
-                            enable,
-                            VIR_HALF_CHANNEL_MASK_FULL,
-                            gcvNULL);
+    errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                      pNewInst,
+                                      pInst,
+                                      pOrigSrc,
+                                      gcvFALSE,
+                                      destRegId,
+                                      1,
+                                      enable,
+                                      VIR_HALF_CHANNEL_MASK_FULL,
+                                      gcvNULL);
+    ON_ERROR(errCode, "Failed to add new usage to def.");
+
 OnError:
     return errCode;
 }
@@ -2032,13 +2038,15 @@ VSC_ErrCode vscVIR_CheckPosAndDepthConflict(VSC_SH_PASS_WORKER* pPassWorker)
 
     memset(&nativeDefFlags, 0, sizeof(nativeDefFlags));
     nativeDefFlags.bIsOutput = gcvTRUE;
-    vscVIR_AddNewDef(pDuInfo, pNewInsertedInst, pDepthSym->u2.tempIndex, 1, VIR_ENABLE_X, VIR_HALF_CHANNEL_MASK_FULL,
-                     &nativeDefFlags, gcvNULL);
+    errCode = vscVIR_AddNewDef(pDuInfo, pNewInsertedInst, pDepthSym->u2.tempIndex, 1, VIR_ENABLE_X,
+                               VIR_HALF_CHANNEL_MASK_FULL, &nativeDefFlags, gcvNULL);
+    ON_ERROR(errCode, "Failed to add new def.");
 
-    vscVIR_AddNewUsageToDef(pDuInfo, pNewInsertedInst, VIR_OUTPUT_USAGE_INST,
-                            (VIR_Operand*)(gctUINTPTR_T)pDepthSym->u2.tempIndex,
-                            gcvFALSE, pDepthSym->u2.tempIndex, 1, VIR_ENABLE_X,
-                            VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+    errCode = vscVIR_AddNewUsageToDef(pDuInfo, pNewInsertedInst, VIR_OUTPUT_USAGE_INST,
+                                      (VIR_Operand*)(gctUINTPTR_T)pDepthSym->u2.tempIndex,
+                                      gcvFALSE, pDepthSym->u2.tempIndex, 1, VIR_ENABLE_X,
+                                      VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+    ON_ERROR(errCode, "Failed to add new usage to def.");
 
     /* Set dual16 thread mode */
     if (VIR_Shader_isDual16Mode(pShader))
@@ -2078,17 +2086,20 @@ VSC_ErrCode vscVIR_CheckPosAndDepthConflict(VSC_SH_PASS_WORKER* pPassWorker)
                     gcmASSERT(VIR_Operand_GetEnable(dstOpnd) == VIR_ENABLE_X);
                     VIR_Operand_SetTempRegister(dstOpnd, func, newRegSymId, depthTypeId);
 
-                    vscVIR_DeleteDef(pDuInfo, inst, pDepthSym->u2.tempIndex, 1, VIR_ENABLE_X,
-                                     VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+                    errCode = vscVIR_DeleteDef(pDuInfo, inst, pDepthSym->u2.tempIndex, 1, VIR_ENABLE_X,
+                                               VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+                    ON_ERROR(errCode, "Failed in Delete Def.");
 
                     memset(&nativeDefFlags, 0, sizeof(nativeDefFlags));
-                    vscVIR_AddNewDef(pDuInfo, inst, newRegNo, 1, VIR_ENABLE_X, VIR_HALF_CHANNEL_MASK_FULL,
-                                     &nativeDefFlags, gcvNULL);
+                    errCode = vscVIR_AddNewDef(pDuInfo, inst, newRegNo, 1, VIR_ENABLE_X, VIR_HALF_CHANNEL_MASK_FULL,
+                                               &nativeDefFlags, gcvNULL);
+                    ON_ERROR(errCode, "Failed to add new def.");
 
                     opnd = VIR_Inst_GetSource(pNewInsertedInst, VIR_Operand_Src0);
-                    vscVIR_AddNewUsageToDef(pDuInfo, inst, pNewInsertedInst, opnd,
-                                            gcvFALSE, newRegNo, 1, VIR_ENABLE_X,
-                                            VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+                    errCode = vscVIR_AddNewUsageToDef(pDuInfo, inst, pNewInsertedInst, opnd,
+                                                      gcvFALSE, newRegNo, 1, VIR_ENABLE_X,
+                                                      VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+                    ON_ERROR(errCode, "Failed to add new usage to def.");
                 }
             }
         }
@@ -2218,11 +2229,13 @@ VSC_ErrCode vscVIR_ConvFrontFacing(VSC_SH_PASS_WORKER* pPassWorker)
         /* Update DU. */
         vscVIR_AddNewDef(pDuInfo, pConvInst, newRegNo, 1, VIR_ENABLE_X, VIR_HALF_CHANNEL_MASK_FULL,
                          gcvNULL, gcvNULL);
+        ON_ERROR(errCode, "Failed to add new def.");
 
-        vscVIR_AddNewUsageToDef(pDuInfo, VIR_INPUT_DEF_INST, pConvInst,
-                                pOpnd,
-                                gcvFALSE, VIR_Symbol_GetVariableVregIndex(pFrontFacingSym), 1, VIR_ENABLE_X,
-                                VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+        errCode = vscVIR_AddNewUsageToDef(pDuInfo, VIR_INPUT_DEF_INST, pConvInst,
+                                          pOpnd,
+                                          gcvFALSE, VIR_Symbol_GetVariableVregIndex(pFrontFacingSym), 1, VIR_ENABLE_X,
+                                          VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+        ON_ERROR(errCode, "Failed to add new usage to def.");
     }
 
     /* Find if any operand using gl_FrontFace and use the new temp register to replace it. */
@@ -2279,16 +2292,17 @@ VSC_ErrCode vscVIR_ConvFrontFacing(VSC_SH_PASS_WORKER* pPassWorker)
                         VIR_Operand_SetTempRegister(pOpnd, pFunc, newRegSymId, VIR_TYPE_BOOLEAN);
 
                         /* Add the new usage. */
-                        vscVIR_AddNewUsageToDef(pDuInfo,
-                                                pConvInst,
-                                                pInst,
-                                                pOpnd,
-                                                gcvFALSE,
-                                                newRegNo,
-                                                1,
-                                                VIR_ENABLE_X,
-                                                VIR_HALF_CHANNEL_MASK_FULL,
-                                                gcvNULL);
+                        errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                                          pConvInst,
+                                                          pInst,
+                                                          pOpnd,
+                                                          gcvFALSE,
+                                                          newRegNo,
+                                                          1,
+                                                          VIR_ENABLE_X,
+                                                          VIR_HALF_CHANNEL_MASK_FULL,
+                                                          gcvNULL);
+                        ON_ERROR(errCode, "Failed to add new usage to def.");
                     }
                 }
             }
@@ -2401,14 +2415,15 @@ static VSC_ErrCode _InitializeUniformCopy(VIR_DEF_USAGE_INFO* pDuInfo,
         VIR_Operand_GetOperandInfo(pNewInst, pOpnd, &operandInfo);
 
         /* Update def. */
-        vscVIR_AddNewDef(pDuInfo,
-                         pNewInst,
-                         operandInfo.u1.virRegInfo.virReg,
-                         1,
-                         VIR_ENABLE_X,
-                         VIR_HALF_CHANNEL_MASK_FULL,
-                         gcvNULL,
-                         gcvNULL);
+        errCode = vscVIR_AddNewDef(pDuInfo,
+                                   pNewInst,
+                                   operandInfo.u1.virRegInfo.virReg,
+                                   1,
+                                   VIR_ENABLE_X,
+                                   VIR_HALF_CHANNEL_MASK_FULL,
+                                   gcvNULL,
+                                   gcvNULL);
+        ON_ERROR(errCode, "Failed to add new def.");
 
         /* Set SOURCE. */
         pOpnd = VIR_Inst_GetSource(pNewInst, 0);
@@ -2435,14 +2450,15 @@ static VSC_ErrCode _InitializeUniformCopy(VIR_DEF_USAGE_INFO* pDuInfo,
         VIR_Operand_GetOperandInfo(pNewInst, pOpnd, &operandInfo);
 
         /* Update def. */
-        vscVIR_AddNewDef(pDuInfo,
-                         pNewInst,
-                         operandInfo.u1.virRegInfo.virReg,
-                         1,
-                         VIR_ENABLE_Y,
-                         VIR_HALF_CHANNEL_MASK_FULL,
-                         gcvNULL,
-                         gcvNULL);
+        errCode = vscVIR_AddNewDef(pDuInfo,
+                                   pNewInst,
+                                   operandInfo.u1.virRegInfo.virReg,
+                                   1,
+                                   VIR_ENABLE_Y,
+                                   VIR_HALF_CHANNEL_MASK_FULL,
+                                   gcvNULL,
+                                   gcvNULL);
+        ON_ERROR(errCode, "Failed to add new def.");
 
         /* Set SOURCE. */
         pOpnd = VIR_Inst_GetSource(pNewInst, 0);
@@ -2468,14 +2484,15 @@ static VSC_ErrCode _InitializeUniformCopy(VIR_DEF_USAGE_INFO* pDuInfo,
         VIR_Operand_GetOperandInfo(pNewInst, pOpnd, &operandInfo);
 
         /* Update def. */
-        vscVIR_AddNewDef(pDuInfo,
-                         pNewInst,
-                         operandInfo.u1.virRegInfo.virReg,
-                         1,
-                         VIR_ENABLE_XY,
-                         VIR_HALF_CHANNEL_MASK_FULL,
-                         gcvNULL,
-                         gcvNULL);
+        errCode = vscVIR_AddNewDef(pDuInfo,
+                                   pNewInst,
+                                   operandInfo.u1.virRegInfo.virReg,
+                                   1,
+                                   VIR_ENABLE_XY,
+                                   VIR_HALF_CHANNEL_MASK_FULL,
+                                   gcvNULL,
+                                   gcvNULL);
+        ON_ERROR(errCode, "Failed to add new def.");
 
         /* Set SOURCE. */
         pOpnd = VIR_Inst_GetSource(pNewInst, 0);
@@ -2538,14 +2555,15 @@ static VSC_ErrCode _InsertAddressCopy(VIR_DEF_USAGE_INFO* pDuInfo,
     VIR_Operand_GetOperandInfo(pNewInst, pOpnd, &operandInfo);
 
     /* Update def. */
-    vscVIR_AddNewDef(pDuInfo,
-                     pNewInst,
-                     operandInfo.u1.virRegInfo.virReg,
-                     1,
-                     VIR_ENABLE_XY,
-                     VIR_HALF_CHANNEL_MASK_FULL,
-                     gcvNULL,
-                     gcvNULL);
+    errCode = vscVIR_AddNewDef(pDuInfo,
+                               pNewInst,
+                               operandInfo.u1.virRegInfo.virReg,
+                               1,
+                               VIR_ENABLE_XY,
+                               VIR_HALF_CHANNEL_MASK_FULL,
+                               gcvNULL,
+                               gcvNULL);
+    ON_ERROR(errCode, "Failed to add new def.");
 
     /* Set SOURCE. */
     pOpnd = VIR_Inst_GetSource(pNewInst, 0);
@@ -2554,16 +2572,17 @@ static VSC_ErrCode _InsertAddressCopy(VIR_DEF_USAGE_INFO* pDuInfo,
     VIR_Operand_GetOperandInfo(pNewInst, pOpnd, &operandInfo);
 
     /* Update usage. */
-    vscVIR_AddNewUsageToDef(pDuInfo,
-                            VIR_ANY_DEF_INST,
-                            pNewInst,
-                            pOpnd,
-                            gcvFALSE,
-                            operandInfo.u1.virRegInfo.virReg,
-                            1,
-                            VIR_ENABLE_XY,
-                            VIR_HALF_CHANNEL_MASK_FULL,
-                            gcvNULL);
+    errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                      VIR_ANY_DEF_INST,
+                                      pNewInst,
+                                      pOpnd,
+                                      gcvFALSE,
+                                      operandInfo.u1.virRegInfo.virReg,
+                                      1,
+                                      VIR_ENABLE_XY,
+                                      VIR_HALF_CHANNEL_MASK_FULL,
+                                      gcvNULL);
+    ON_ERROR(errCode, "Failed to add new usage to def.");
 
 OnError:
     return errCode;
@@ -2608,14 +2627,15 @@ static VSC_ErrCode _InsertCompareAddressCopy(VIR_DEF_USAGE_INFO* pDuInfo,
     VIR_Operand_GetOperandInfo(pNewInst, pOpnd, &operandInfo);
 
     /* Update def. */
-    vscVIR_AddNewDef(pDuInfo,
-                     pNewInst,
-                     operandInfo.u1.virRegInfo.virReg,
-                     1,
-                     VIR_ENABLE_XY,
-                     VIR_HALF_CHANNEL_MASK_FULL,
-                     gcvNULL,
-                     gcvNULL);
+    errCode = vscVIR_AddNewDef(pDuInfo,
+                               pNewInst,
+                               operandInfo.u1.virRegInfo.virReg,
+                               1,
+                               VIR_ENABLE_XY,
+                               VIR_HALF_CHANNEL_MASK_FULL,
+                               gcvNULL,
+                               gcvNULL);
+    ON_ERROR(errCode, "Failed to add new def.");
 
     /* Copy the condition operand. */
     pOpnd = VIR_Inst_GetSource(pNewInst, 0);
@@ -2625,16 +2645,17 @@ static VSC_ErrCode _InsertCompareAddressCopy(VIR_DEF_USAGE_INFO* pDuInfo,
     /* Update usage. */
     if (operandInfo.isVreg)
     {
-        vscVIR_AddNewUsageToDef(pDuInfo,
-                                VIR_ANY_DEF_INST,
-                                pNewInst,
-                                pOpnd,
-                                gcvFALSE,
-                                operandInfo.u1.virRegInfo.virReg,
-                                1,
-                                VIR_ENABLE_XY,
-                                VIR_HALF_CHANNEL_MASK_FULL,
-                                gcvNULL);
+        errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                          VIR_ANY_DEF_INST,
+                                          pNewInst,
+                                          pOpnd,
+                                          gcvFALSE,
+                                          operandInfo.u1.virRegInfo.virReg,
+                                          1,
+                                          VIR_ENABLE_XY,
+                                          VIR_HALF_CHANNEL_MASK_FULL,
+                                          gcvNULL);
+        ON_ERROR(errCode, "Failed to add new usage to def.");
     }
     /* Set SOURCEs. */
     for (i = 0; i < 2; i++)
@@ -2645,22 +2666,24 @@ static VSC_ErrCode _InsertCompareAddressCopy(VIR_DEF_USAGE_INFO* pDuInfo,
         VIR_Operand_GetOperandInfo(pNewInst, pOpnd, &operandInfo);
 
         /* Update usage. */
-        vscVIR_AddNewUsageToDef(pDuInfo,
-                                VIR_ANY_DEF_INST,
-                                pNewInst,
-                                pOpnd,
-                                gcvFALSE,
-                                operandInfo.u1.virRegInfo.virReg,
-                                1,
-                                VIR_ENABLE_XY,
-                                VIR_HALF_CHANNEL_MASK_FULL,
-                                gcvNULL);
+        errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                          VIR_ANY_DEF_INST,
+                                          pNewInst,
+                                          pOpnd,
+                                          gcvFALSE,
+                                          operandInfo.u1.virRegInfo.virReg,
+                                          1,
+                                          VIR_ENABLE_XY,
+                                          VIR_HALF_CHANNEL_MASK_FULL,
+                                          gcvNULL);
+        ON_ERROR(errCode, "Failed to add new usage to def.");
     }
 
     if (pResultSymId)
     {
         *pResultSymId = resultSymId;
     }
+
 OnError:
     return errCode;
 }
@@ -3127,14 +3150,15 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
                 VIR_Operand_SetSwizzle(opnd, VIR_Operand_GetSwizzle(pOpnd));
                 VIR_Operand_SetTypeId(opnd, VIR_TYPE_UINT32);
                 VIR_Operand_SetPrecision(opnd, VIR_Operand_GetPrecision(pOpnd));
-                vscVIR_AddNewDef(pDuInfo,
-                                 pNewInsertedInstX,
-                                 newDstRegNo,
-                                 1,
-                                 VIR_ENABLE_X,
-                                 VIR_HALF_CHANNEL_MASK_FULL,
-                                 gcvNULL,
-                                 gcvNULL);
+                errCode = vscVIR_AddNewDef(pDuInfo,
+                                           pNewInsertedInstX,
+                                           newDstRegNo,
+                                           1,
+                                           VIR_ENABLE_X,
+                                           VIR_HALF_CHANNEL_MASK_FULL,
+                                           gcvNULL,
+                                           gcvNULL);
+                ON_ERROR(errCode, "Failed to add new def.");
 
                 VIR_Operand_GetOperandInfo(inst, pOpnd, &srcInfo);
 
@@ -3144,16 +3168,17 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
                      pDef != gcvNULL;
                      pDef = vscVIR_GeneralUdIterator_Next(&udIter))
                 {
-                    vscVIR_AddNewUsageToDef(pDuInfo,
-                                            pDef->defKey.pDefInst,
-                                            pNewInsertedInstX,
-                                            opnd,
-                                            gcvFALSE,
-                                            srcInfo.u1.virRegInfo.virReg,
-                                            1,
-                                            1 << pDef->defKey.channel,
-                                            VIR_HALF_CHANNEL_MASK_FULL,
-                                            gcvNULL);
+                    errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                                      pDef->defKey.pDefInst,
+                                                      pNewInsertedInstX,
+                                                      opnd,
+                                                      gcvFALSE,
+                                                      srcInfo.u1.virRegInfo.virReg,
+                                                      1,
+                                                      1 << pDef->defKey.channel,
+                                                      VIR_HALF_CHANNEL_MASK_FULL,
+                                                      gcvNULL);
+                    ON_ERROR(errCode, "Failed to add new usage to def.");
                 }
 
                 /* Add following inst just before current inst:
@@ -3174,26 +3199,28 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
                 VIR_Operand_SetSymbol(opnd, func, virRegSymId);
                 VIR_Operand_SetSwizzle(opnd, virmSWIZZLE(X, X, Y, Y));
 
-                vscVIR_AddNewDef(pDuInfo,
-                                 pNewInsertedInstYZ,
-                                 newDstRegNo,
-                                 1,
-                                 VIR_ENABLE_YZ,
-                                 VIR_HALF_CHANNEL_MASK_FULL,
-                                 gcvNULL,
-                                 gcvNULL);
+                errCode = vscVIR_AddNewDef(pDuInfo,
+                                           pNewInsertedInstYZ,
+                                           newDstRegNo,
+                                           1,
+                                           VIR_ENABLE_YZ,
+                                           VIR_HALF_CHANNEL_MASK_FULL,
+                                           gcvNULL,
+                                           gcvNULL);
+                ON_ERROR(errCode, "Failed to add new def.");
 
                 VIR_Operand_GetOperandInfo(pNewInsertedInstYZ, opnd, &operandInfo);
-                vscVIR_AddNewUsageToDef(pDuInfo,
-                                        VIR_ANY_DEF_INST,
-                                        pNewInsertedInstYZ,
-                                        opnd,
-                                        gcvFALSE,
-                                        operandInfo.u1.virRegInfo.virReg,
-                                        1,
-                                        VIR_ENABLE_YZ,
-                                        VIR_HALF_CHANNEL_MASK_FULL,
-                                        gcvNULL);
+                errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                                  VIR_ANY_DEF_INST,
+                                                  pNewInsertedInstYZ,
+                                                  opnd,
+                                                  gcvFALSE,
+                                                  operandInfo.u1.virRegInfo.virReg,
+                                                  1,
+                                                  VIR_ENABLE_YZ,
+                                                  VIR_HALF_CHANNEL_MASK_FULL,
+                                                  gcvNULL);
+                ON_ERROR(errCode, "Failed to add new usage to def.");
 
                 /* Change operand of current inst to new-temp-reg */
                 VIR_Operand_SetMatrixConstIndex(pOpnd, 0);
@@ -3201,27 +3228,29 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
                 VIR_Operand_SetRelIndexing(pOpnd, 0);
                 VIR_Operand_SetTempRegister(pOpnd, func, newDstSymId, VIR_TYPE_UINT_X3);
 
-                vscVIR_AddNewUsageToDef(pDuInfo,
-                                        pNewInsertedInstX,
-                                        inst,
-                                        pOpnd,
-                                        gcvFALSE,
-                                        newDstRegNo,
-                                        1,
-                                        VIR_ENABLE_X,
-                                        VIR_HALF_CHANNEL_MASK_FULL,
-                                        gcvNULL);
+                errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                                  pNewInsertedInstX,
+                                                  inst,
+                                                  pOpnd,
+                                                  gcvFALSE,
+                                                  newDstRegNo,
+                                                  1,
+                                                  VIR_ENABLE_X,
+                                                  VIR_HALF_CHANNEL_MASK_FULL,
+                                                  gcvNULL);
+                ON_ERROR(errCode, "Failed to add new usage to def.");
 
-                vscVIR_AddNewUsageToDef(pDuInfo,
-                                        pNewInsertedInstYZ,
-                                        inst,
-                                        pOpnd,
-                                        gcvFALSE,
-                                        newDstRegNo,
-                                        1,
-                                        VIR_ENABLE_YZ,
-                                        VIR_HALF_CHANNEL_MASK_FULL,
-                                        gcvNULL);
+                errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                                  pNewInsertedInstYZ,
+                                                  inst,
+                                                  pOpnd,
+                                                  gcvFALSE,
+                                                  newDstRegNo,
+                                                  1,
+                                                  VIR_ENABLE_YZ,
+                                                  VIR_HALF_CHANNEL_MASK_FULL,
+                                                  gcvNULL);
+                ON_ERROR(errCode, "Failed to add new usage to def.");
             }
 
             /* Change the swizzle of src0 to XYZ */
@@ -7778,35 +7807,38 @@ static VSC_ErrCode _InsertInitializeInst(
     }
     VIR_Operand_SetPrecision(opnd, VIR_PRECISION_HIGH);
 
-    vscVIR_AddNewDef(pDuInfo, pNewMovInst, firstRegNo, regNoRange,
-                     defEnableMask, halfChannelMask, gcvNULL, gcvNULL);
+    errCode = vscVIR_AddNewDef(pDuInfo, pNewMovInst, firstRegNo, regNoRange,
+                               defEnableMask, halfChannelMask, gcvNULL, gcvNULL);
+    ON_ERROR(errCode, "Failed to add new def.");
 
     if (pUsage != gcvNULL)
     {
-        vscVIR_AddNewUsageToDef(pDuInfo,
-                                pNewMovInst,
-                                pUsage->usageKey.pUsageInst,
-                                pUsage->usageKey.pOperand,
-                                pUsage->usageKey.bIsIndexingRegUsage,
-                                firstRegNo,
-                                regNoRange,
-                                defEnableMask,
-                                halfChannelMask, gcvNULL);
+        errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                          pNewMovInst,
+                                          pUsage->usageKey.pUsageInst,
+                                          pUsage->usageKey.pOperand,
+                                          pUsage->usageKey.bIsIndexingRegUsage,
+                                          firstRegNo,
+                                          regNoRange,
+                                          defEnableMask,
+                                          halfChannelMask, gcvNULL);
+        ON_ERROR(errCode, "Failed to add new usage to def.");
     }
     else if (bOutUage)
     {
-        vscVIR_AddNewUsageToDef(pDuInfo,
-                                pNewMovInst,
-                                VIR_OUTPUT_USAGE_INST,
-                                (VIR_Operand*)(gctUINTPTR_T)firstRegNo,
-                                gcvFALSE,
-                                firstRegNo,
-                                regNoRange,
-                                defEnableMask,
-                                halfChannelMask,
-                                gcvNULL);
+        errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                          pNewMovInst,
+                                          VIR_OUTPUT_USAGE_INST,
+                                          (VIR_Operand*)(gctUINTPTR_T)firstRegNo,
+                                          gcvFALSE,
+                                          firstRegNo,
+                                          regNoRange,
+                                          defEnableMask,
+                                          halfChannelMask,
+                                          gcvNULL);
+        ON_ERROR(errCode, "Failed to add new usage to def.");
     }
-
+OnError:
     return errCode;
 }
 
@@ -10055,25 +10087,26 @@ static VSC_ErrCode _CalculateIndexForPrivateMemory(
 
             /* Update the DU for IMOD. */
             VIR_Operand_GetOperandInfo(pModInst, VIR_Inst_GetSource(pModInst, VIR_Operand_Src0), &srcOpndInfo);
-            vscVIR_AddNewDef(pDuInfo,
-                             pModInst,
-                             newVirRegIdx,
-                             1,
-                             VIR_Operand_GetEnable(dstOpnd),
-                             VIR_HALF_CHANNEL_MASK_FULL,
-                             gcvNULL,
-                             gcvNULL);
+            errCode = vscVIR_AddNewDef(pDuInfo,
+                                       pModInst,
+                                       newVirRegIdx,
+                                       1,
+                                       VIR_Operand_GetEnable(dstOpnd),
+                                       VIR_HALF_CHANNEL_MASK_FULL,
+                                       gcvNULL,
+                                       gcvNULL);
 
-            vscVIR_AddNewUsageToDef(pDuInfo,
-                                    VIR_ANY_DEF_INST,
-                                    pModInst,
-                                    VIR_Inst_GetSource(pModInst, VIR_Operand_Src0),
-                                    gcvFALSE,
-                                    srcOpndInfo.u1.virRegInfo.virReg,
-                                    1,
-                                    VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(pModInst, VIR_Operand_Src0))),
-                                    VIR_HALF_CHANNEL_MASK_FULL,
-                                    gcvNULL);
+            errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                              VIR_ANY_DEF_INST,
+                                              pModInst,
+                                              VIR_Inst_GetSource(pModInst, VIR_Operand_Src0),
+                                              gcvFALSE,
+                                              srcOpndInfo.u1.virRegInfo.virReg,
+                                              1,
+                                              VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(pModInst, VIR_Operand_Src0))),
+                                              VIR_HALF_CHANNEL_MASK_FULL,
+                                              gcvNULL);
+            ON_ERROR(errCode, "Failed to add new usage to def.");
 
             /* Change the SRC0 of LSHIFT/MUL. */
             srcOpnd = VIR_Inst_GetSource(shiftOrMulInst, VIR_Operand_Src0);
@@ -10096,16 +10129,17 @@ static VSC_ErrCode _CalculateIndexForPrivateMemory(
             VIR_Operand_SetSwizzle(srcOpnd, VIR_Enable_2_Swizzle_WShift(VIR_Operand_GetEnable(dstOpnd)));
             VIR_Operand_GetOperandInfo(shiftOrMulInst, srcOpnd, &srcOpndInfo);
 
-            vscVIR_AddNewUsageToDef(pDuInfo,
-                                    VIR_ANY_DEF_INST,
-                                    shiftOrMulInst,
-                                    srcOpnd,
-                                    gcvFALSE,
-                                    srcOpndInfo.u1.virRegInfo.virReg,
-                                    1,
-                                    VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(srcOpnd)),
-                                    VIR_HALF_CHANNEL_MASK_FULL,
-                                    gcvNULL);
+            errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                              VIR_ANY_DEF_INST,
+                                              shiftOrMulInst,
+                                              srcOpnd,
+                                              gcvFALSE,
+                                              srcOpndInfo.u1.virRegInfo.virReg,
+                                              1,
+                                              VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(srcOpnd)),
+                                              VIR_HALF_CHANNEL_MASK_FULL,
+                                              gcvNULL);
+            ON_ERROR(errCode, "Failed to add new usage to def.");
         }
         else
         {
@@ -10136,25 +10170,27 @@ static VSC_ErrCode _CalculateIndexForPrivateMemory(
 
             /* Update the DU for IMOD. */
             VIR_Operand_GetOperandInfo(pModInst, VIR_Inst_GetSource(pModInst, VIR_Operand_Src0), &srcOpndInfo);
-            vscVIR_AddNewDef(pDuInfo,
-                             pModInst,
-                             newVirRegIdx,
-                             1,
-                             VIR_Operand_GetEnable(dstOpnd),
-                             VIR_HALF_CHANNEL_MASK_FULL,
-                             gcvNULL,
-                             gcvNULL);
+            errCode = vscVIR_AddNewDef(pDuInfo,
+                                       pModInst,
+                                       newVirRegIdx,
+                                       1,
+                                       VIR_Operand_GetEnable(dstOpnd),
+                                       VIR_HALF_CHANNEL_MASK_FULL,
+                                       gcvNULL,
+                                       gcvNULL);
+            ON_ERROR(errCode, "Failed to add new def.");
 
-            vscVIR_AddNewUsageToDef(pDuInfo,
-                                    VIR_ANY_DEF_INST,
-                                    pModInst,
-                                    VIR_Inst_GetSource(pModInst, VIR_Operand_Src0),
-                                    gcvFALSE,
-                                    srcOpndInfo.u1.virRegInfo.virReg,
-                                    1,
-                                    VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(pModInst, VIR_Operand_Src0))),
-                                    VIR_HALF_CHANNEL_MASK_FULL,
-                                    gcvNULL);
+            errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                              VIR_ANY_DEF_INST,
+                                              pModInst,
+                                              VIR_Inst_GetSource(pModInst, VIR_Operand_Src0),
+                                              gcvFALSE,
+                                              srcOpndInfo.u1.virRegInfo.virReg,
+                                              1,
+                                              VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(pModInst, VIR_Operand_Src0))),
+                                              VIR_HALF_CHANNEL_MASK_FULL,
+                                              gcvNULL);
+            ON_ERROR(errCode, "Failed to add new usage to def.");
 
             /* Change the SRC0 of MAD. */
             srcOpnd = VIR_Inst_GetSource(pInst, VIR_Operand_Src0);
@@ -10177,16 +10213,17 @@ static VSC_ErrCode _CalculateIndexForPrivateMemory(
             VIR_Operand_SetSwizzle(srcOpnd, VIR_Enable_2_Swizzle_WShift(VIR_Operand_GetEnable(dstOpnd)));
             VIR_Operand_GetOperandInfo(pInst, srcOpnd, &srcOpndInfo);
 
-            vscVIR_AddNewUsageToDef(pDuInfo,
-                                    VIR_ANY_DEF_INST,
-                                    pInst,
-                                    srcOpnd,
-                                    gcvFALSE,
-                                    srcOpndInfo.u1.virRegInfo.virReg,
-                                    1,
-                                    VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(srcOpnd)),
-                                    VIR_HALF_CHANNEL_MASK_FULL,
-                                    gcvNULL);
+            errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                              VIR_ANY_DEF_INST,
+                                              pInst,
+                                              srcOpnd,
+                                              gcvFALSE,
+                                              srcOpndInfo.u1.virRegInfo.virReg,
+                                              1,
+                                              VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(srcOpnd)),
+                                              VIR_HALF_CHANNEL_MASK_FULL,
+                                              gcvNULL);
+            ON_ERROR(errCode, "Failed to add new usage to def.");
         }
 
         /* Start to generate instructions to calculate the offset for the private memory. */
@@ -10238,14 +10275,15 @@ static VSC_ErrCode _CalculateIndexForPrivateMemory(
         VIR_Operand_SetImmediateUint(pNewOpnd, 1);
 
         /* Update the DU. */
-        vscVIR_AddNewDef(pDuInfo,
-                         pAtomAddInst,
-                         newVirRegIdx,
-                         1,
-                         VIR_ENABLE_X,
-                         VIR_HALF_CHANNEL_MASK_FULL,
-                         gcvNULL,
-                         gcvNULL);
+        errCode = vscVIR_AddNewDef(pDuInfo,
+                                   pAtomAddInst,
+                                   newVirRegIdx,
+                                   1,
+                                   VIR_ENABLE_X,
+                                   VIR_HALF_CHANNEL_MASK_FULL,
+                                   gcvNULL,
+                                   gcvNULL);
+        ON_ERROR(errCode, "Failed to add new def.");
 
         /* Change the SRC0 of MOD instruction. */
         pNewOpnd = VIR_Inst_GetSource(pModInst, 0);
@@ -10271,16 +10309,17 @@ static VSC_ErrCode _CalculateIndexForPrivateMemory(
         VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XXXX);
 
         /* Update the DU for MAD. */
-        vscVIR_AddNewUsageToDef(pDuInfo,
-                                pAtomAddInst,
-                                pModInst,
-                                pNewOpnd,
-                                gcvFALSE,
-                                newVirRegIdx,
-                                1,
-                                VIR_ENABLE_X,
-                                VIR_HALF_CHANNEL_MASK_FULL,
-                                gcvNULL);
+        errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                          pAtomAddInst,
+                                          pModInst,
+                                          pNewOpnd,
+                                          gcvFALSE,
+                                          newVirRegIdx,
+                                          1,
+                                          VIR_ENABLE_X,
+                                          VIR_HALF_CHANNEL_MASK_FULL,
+                                          gcvNULL);
+        ON_ERROR(errCode, "Failed to add new usage to def.");
     }
 
 OnError:
@@ -10396,25 +10435,27 @@ static VSC_ErrCode _CalculateIndexForLocalMemory(
 
             /* Update the DU for IMOD. */
             VIR_Operand_GetOperandInfo(newInst, VIR_Inst_GetSource(newInst, VIR_Operand_Src0), &srcOpndInfo);
-            vscVIR_AddNewDef(pDuInfo,
-                             newInst,
-                             newVirRegIdx,
-                             1,
-                             VIR_Operand_GetEnable(dstOpnd),
-                             VIR_HALF_CHANNEL_MASK_FULL,
-                             gcvNULL,
-                             gcvNULL);
+            errCode = vscVIR_AddNewDef(pDuInfo,
+                                       newInst,
+                                       newVirRegIdx,
+                                       1,
+                                       VIR_Operand_GetEnable(dstOpnd),
+                                       VIR_HALF_CHANNEL_MASK_FULL,
+                                       gcvNULL,
+                                       gcvNULL);
+            ON_ERROR(errCode, "Failed to add new def.");
 
-            vscVIR_AddNewUsageToDef(pDuInfo,
-                                    VIR_ANY_DEF_INST,
-                                    newInst,
-                                    VIR_Inst_GetSource(newInst, VIR_Operand_Src0),
-                                    gcvFALSE,
-                                    srcOpndInfo.u1.virRegInfo.virReg,
-                                    1,
-                                    VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(newInst, VIR_Operand_Src0))),
-                                    VIR_HALF_CHANNEL_MASK_FULL,
-                                    gcvNULL);
+            errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                              VIR_ANY_DEF_INST,
+                                              newInst,
+                                              VIR_Inst_GetSource(newInst, VIR_Operand_Src0),
+                                              gcvFALSE,
+                                              srcOpndInfo.u1.virRegInfo.virReg,
+                                              1,
+                                              VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(newInst, VIR_Operand_Src0))),
+                                              VIR_HALF_CHANNEL_MASK_FULL,
+                                              gcvNULL);
+            ON_ERROR(errCode, "Failed to add new usage to def.");
 
             /* Change the SRC0 of LSHIFT/MUL. */
             srcOpnd = VIR_Inst_GetSource(shiftOrMulInst, VIR_Operand_Src0);
@@ -10437,16 +10478,17 @@ static VSC_ErrCode _CalculateIndexForLocalMemory(
             VIR_Operand_SetSwizzle(srcOpnd, VIR_Enable_2_Swizzle_WShift(VIR_Operand_GetEnable(dstOpnd)));
             VIR_Operand_GetOperandInfo(shiftOrMulInst, srcOpnd, &srcOpndInfo);
 
-            vscVIR_AddNewUsageToDef(pDuInfo,
-                                    VIR_ANY_DEF_INST,
-                                    shiftOrMulInst,
-                                    srcOpnd,
-                                    gcvFALSE,
-                                    srcOpndInfo.u1.virRegInfo.virReg,
-                                    1,
-                                    VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(srcOpnd)),
-                                    VIR_HALF_CHANNEL_MASK_FULL,
-                                    gcvNULL);
+            errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                              VIR_ANY_DEF_INST,
+                                              shiftOrMulInst,
+                                              srcOpnd,
+                                              gcvFALSE,
+                                              srcOpndInfo.u1.virRegInfo.virReg,
+                                              1,
+                                              VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(srcOpnd)),
+                                              VIR_HALF_CHANNEL_MASK_FULL,
+                                              gcvNULL);
+            ON_ERROR(errCode, "Failed to add new usage to def.");
         }
         else
         {
@@ -10477,25 +10519,27 @@ static VSC_ErrCode _CalculateIndexForLocalMemory(
 
             /* Update the DU for IMOD. */
             VIR_Operand_GetOperandInfo(newInst, VIR_Inst_GetSource(newInst, VIR_Operand_Src0), &srcOpndInfo);
-            vscVIR_AddNewDef(pDuInfo,
-                             newInst,
-                             newVirRegIdx,
-                             1,
-                             VIR_Operand_GetEnable(dstOpnd),
-                             VIR_HALF_CHANNEL_MASK_FULL,
-                             gcvNULL,
-                             gcvNULL);
+            errCode = vscVIR_AddNewDef(pDuInfo,
+                                       newInst,
+                                       newVirRegIdx,
+                                       1,
+                                       VIR_Operand_GetEnable(dstOpnd),
+                                       VIR_HALF_CHANNEL_MASK_FULL,
+                                       gcvNULL,
+                                       gcvNULL);
+            ON_ERROR(errCode, "Failed to add new def.");
 
-            vscVIR_AddNewUsageToDef(pDuInfo,
-                                    VIR_ANY_DEF_INST,
-                                    newInst,
-                                    VIR_Inst_GetSource(newInst, VIR_Operand_Src0),
-                                    gcvFALSE,
-                                    srcOpndInfo.u1.virRegInfo.virReg,
-                                    1,
-                                    VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(newInst, VIR_Operand_Src0))),
-                                    VIR_HALF_CHANNEL_MASK_FULL,
-                                    gcvNULL);
+            errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                              VIR_ANY_DEF_INST,
+                                              newInst,
+                                              VIR_Inst_GetSource(newInst, VIR_Operand_Src0),
+                                              gcvFALSE,
+                                              srcOpndInfo.u1.virRegInfo.virReg,
+                                              1,
+                                              VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(newInst, VIR_Operand_Src0))),
+                                              VIR_HALF_CHANNEL_MASK_FULL,
+                                              gcvNULL);
+            ON_ERROR(errCode, "Failed to add new usage to def.");
 
             /* Change the SRC0 of MAD. */
             srcOpnd = VIR_Inst_GetSource(pInst, VIR_Operand_Src0);
@@ -10518,16 +10562,17 @@ static VSC_ErrCode _CalculateIndexForLocalMemory(
             VIR_Operand_SetSwizzle(srcOpnd, VIR_Enable_2_Swizzle_WShift(VIR_Operand_GetEnable(dstOpnd)));
             VIR_Operand_GetOperandInfo(pInst, srcOpnd, &srcOpndInfo);
 
-            vscVIR_AddNewUsageToDef(pDuInfo,
-                                    VIR_ANY_DEF_INST,
-                                    pInst,
-                                    srcOpnd,
-                                    gcvFALSE,
-                                    srcOpndInfo.u1.virRegInfo.virReg,
-                                    1,
-                                    VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(srcOpnd)),
-                                    VIR_HALF_CHANNEL_MASK_FULL,
-                                    gcvNULL);
+            errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                              VIR_ANY_DEF_INST,
+                                              pInst,
+                                              srcOpnd,
+                                              gcvFALSE,
+                                              srcOpndInfo.u1.virRegInfo.virReg,
+                                              1,
+                                              VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(srcOpnd)),
+                                              VIR_HALF_CHANNEL_MASK_FULL,
+                                              gcvNULL);
+            ON_ERROR(errCode, "Failed to add new usage to def.");
         }
     }
 
@@ -10685,26 +10730,28 @@ static VSC_ErrCode _ReplaceLocalMemoryAddress(
         /* Add def. */
         memset(&nativeDefFlags, 0, sizeof(nativeDefFlags));
         nativeDefFlags.bIsInput = gcvTRUE;
-        vscVIR_AddNewDef(pDuInfo,
-                         VIR_INPUT_DEF_INST,
-                         outRegId,
-                         1,
-                         VIR_ENABLE_W,
-                         VIR_HALF_CHANNEL_MASK_FULL,
-                         &nativeDefFlags,
-                         gcvNULL);
+        errCode = vscVIR_AddNewDef(pDuInfo,
+                                   VIR_INPUT_DEF_INST,
+                                   outRegId,
+                                   1,
+                                   VIR_ENABLE_W,
+                                   VIR_HALF_CHANNEL_MASK_FULL,
+                                   &nativeDefFlags,
+                                   gcvNULL);
+        ON_ERROR(errCode, "Failed to add new def.");
 
         /* Add usage. */
-        vscVIR_AddNewUsageToDef(pDuInfo,
-                                VIR_INPUT_DEF_INST,
-                                pInst,
-                                pOpnd,
-                                gcvFALSE,
-                                outRegId,
-                                1,
-                                VIR_ENABLE_W,
-                                VIR_HALF_CHANNEL_MASK_FULL,
-                                gcvNULL);
+        errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                          VIR_INPUT_DEF_INST,
+                                          pInst,
+                                          pOpnd,
+                                          gcvFALSE,
+                                          outRegId,
+                                          1,
+                                          VIR_ENABLE_W,
+                                          VIR_HALF_CHANNEL_MASK_FULL,
+                                          gcvNULL);
+        ON_ERROR(errCode, "Failed to add new usage to def.");
 
         /* Set the flag. */
         VIR_Shader_SetUseHwManagedLS(pShader, gcvTRUE);
@@ -10713,7 +10760,7 @@ static VSC_ErrCode _ReplaceLocalMemoryAddress(
         VIR_Symbol_ClrFlag(localMemSym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
         VIR_Symbol_SetFlag(localMemSym, VIR_SYMFLAG_INACTIVE);
     }
-
+OnError:
     return errCode;
 }
 
@@ -10981,26 +11028,28 @@ _UpdateWorkGroupIdForMultiGPU(
         VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XYZZ);
 
         /* Add a new def. */
-        vscVIR_AddNewDef(pDuInfo,
-                         pNewAddInst,
-                         VIR_Symbol_GetVregIndex(pWorkGroupIdSym),
-                         1,
-                         VIR_ENABLE_XYZ,
-                         VIR_HALF_CHANNEL_MASK_FULL,
-                         gcvNULL,
-                         gcvNULL);
+        errCode = vscVIR_AddNewDef(pDuInfo,
+                                   pNewAddInst,
+                                   VIR_Symbol_GetVregIndex(pWorkGroupIdSym),
+                                   1,
+                                   VIR_ENABLE_XYZ,
+                                   VIR_HALF_CHANNEL_MASK_FULL,
+                                   gcvNULL,
+                                   gcvNULL);
+        ON_ERROR(errCode, "Failed to add new def.");
 
         /* Add source0 usage. */
-        vscVIR_AddNewUsageToDef(pDuInfo,
-                                VIR_INPUT_DEF_INST,
-                                pNewAddInst,
-                                VIR_Inst_GetSource(pNewAddInst, VIR_Operand_Src0),
-                                gcvFALSE,
-                                VIR_Symbol_GetVregIndex(pWorkGroupIdSym),
-                                1,
-                                VIR_ENABLE_XYZ,
-                                VIR_HALF_CHANNEL_MASK_FULL,
-                                gcvNULL);
+        errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                          VIR_INPUT_DEF_INST,
+                                          pNewAddInst,
+                                          VIR_Inst_GetSource(pNewAddInst, VIR_Operand_Src0),
+                                          gcvFALSE,
+                                          VIR_Symbol_GetVregIndex(pWorkGroupIdSym),
+                                          1,
+                                          VIR_ENABLE_XYZ,
+                                          VIR_HALF_CHANNEL_MASK_FULL,
+                                          gcvNULL);
+        ON_ERROR(errCode, "Failed to add new usage to def.");
 
         /* Add a new def for all its usages(channel XYZ). */
         defIdx = vscVIR_FindFirstDefIndex(pDuInfo, VIR_Symbol_GetVregIndex(pWorkGroupIdSym));
@@ -11025,16 +11074,17 @@ _UpdateWorkGroupIdForMultiGPU(
                     pUsageInst = pUsage->usageKey.pUsageInst;
                     pUsageOpnd = pUsage->usageKey.pOperand;
 
-                    vscVIR_AddNewUsageToDef(pDuInfo,
-                                            pNewAddInst,
-                                            pUsageInst,
-                                            pUsageOpnd,
-                                            gcvFALSE,
-                                            VIR_Symbol_GetVregIndex(pWorkGroupIdSym),
-                                            1,
-                                            (VIR_Enable)(VIR_ENABLE_X << pDef->defKey.channel),
-                                            VIR_HALF_CHANNEL_MASK_FULL,
-                                            gcvNULL);
+                    errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                                      pNewAddInst,
+                                                      pUsageInst,
+                                                      pUsageOpnd,
+                                                      gcvFALSE,
+                                                      VIR_Symbol_GetVregIndex(pWorkGroupIdSym),
+                                                      1,
+                                                      (VIR_Enable)(VIR_ENABLE_X << pDef->defKey.channel),
+                                                      VIR_HALF_CHANNEL_MASK_FULL,
+                                                      gcvNULL);
+                    ON_ERROR(errCode, "Failed to add new usage to def.");
                 }
             }
 
@@ -11088,26 +11138,28 @@ _UpdateWorkGroupIdForMultiGPU(
         VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XYZZ);
 
         /* Add a new def. */
-        vscVIR_AddNewDef(pDuInfo,
-                         pNewAddInst,
-                         VIR_Symbol_GetVregIndex(pGlobalIdSym),
-                         1,
-                         VIR_ENABLE_XYZ,
-                         VIR_HALF_CHANNEL_MASK_FULL,
-                         gcvNULL,
-                         gcvNULL);
+        errCode = vscVIR_AddNewDef(pDuInfo,
+                                   pNewAddInst,
+                                   VIR_Symbol_GetVregIndex(pGlobalIdSym),
+                                   1,
+                                   VIR_ENABLE_XYZ,
+                                   VIR_HALF_CHANNEL_MASK_FULL,
+                                   gcvNULL,
+                                   gcvNULL);
+        ON_ERROR(errCode, "Failed to add new def.");
 
         /* Add source0 usage. */
-        vscVIR_AddNewUsageToDef(pDuInfo,
-                                VIR_INPUT_DEF_INST,
-                                pNewAddInst,
-                                VIR_Inst_GetSource(pNewAddInst, VIR_Operand_Src0),
-                                gcvFALSE,
-                                VIR_Symbol_GetVregIndex(pGlobalIdSym),
-                                1,
-                                VIR_ENABLE_XYZ,
-                                VIR_HALF_CHANNEL_MASK_FULL,
-                                gcvNULL);
+        errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                          VIR_INPUT_DEF_INST,
+                                          pNewAddInst,
+                                          VIR_Inst_GetSource(pNewAddInst, VIR_Operand_Src0),
+                                          gcvFALSE,
+                                          VIR_Symbol_GetVregIndex(pGlobalIdSym),
+                                          1,
+                                          VIR_ENABLE_XYZ,
+                                          VIR_HALF_CHANNEL_MASK_FULL,
+                                          gcvNULL);
+        ON_ERROR(errCode, "Failed to add new usage to def.");
 
         /* Add a new def for all its usages(channel XYZ). */
         defIdx = vscVIR_FindFirstDefIndex(pDuInfo, VIR_Symbol_GetVregIndex(pGlobalIdSym));
@@ -11132,16 +11184,17 @@ _UpdateWorkGroupIdForMultiGPU(
                     pUsageInst = pUsage->usageKey.pUsageInst;
                     pUsageOpnd = pUsage->usageKey.pOperand;
 
-                    vscVIR_AddNewUsageToDef(pDuInfo,
-                                            pNewAddInst,
-                                            pUsageInst,
-                                            pUsageOpnd,
-                                            gcvFALSE,
-                                            VIR_Symbol_GetVregIndex(pGlobalIdSym),
-                                            1,
-                                            (VIR_Enable)(VIR_ENABLE_X << pDef->defKey.channel),
-                                            VIR_HALF_CHANNEL_MASK_FULL,
-                                            gcvNULL);
+                    errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                                      pNewAddInst,
+                                                      pUsageInst,
+                                                      pUsageOpnd,
+                                                      gcvFALSE,
+                                                      VIR_Symbol_GetVregIndex(pGlobalIdSym),
+                                                      1,
+                                                      (VIR_Enable)(VIR_ENABLE_X << pDef->defKey.channel),
+                                                      VIR_HALF_CHANNEL_MASK_FULL,
+                                                      gcvNULL);
+                    ON_ERROR(errCode, "Failed to add new usage to def.");
                 }
             }
 
@@ -11265,16 +11318,19 @@ _UpdateSubGroupId(
     VIR_Operand_SetSymbol(pSrcOpnd, VIR_Inst_GetFunction(pInst), VIR_Symbol_GetIndex(pLocalInvocationId));
 
     /* Add new usage. */
-    vscVIR_AddNewUsageToDef(pDuInfo,
-                            VIR_INPUT_DEF_INST,
-                            pInst,
-                            pSrcOpnd,
-                            gcvFALSE,
-                            VIR_Symbol_GetVariableVregIndex(pLocalInvocationId),
-                            1,
-                            VIR_ENABLE_X,
-                            VIR_HALF_CHANNEL_MASK_FULL,
-                            gcvNULL);
+    errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                      VIR_INPUT_DEF_INST,
+                                      pInst,
+                                      pSrcOpnd,
+                                      gcvFALSE,
+                                      VIR_Symbol_GetVariableVregIndex(pLocalInvocationId),
+                                      1,
+                                      VIR_ENABLE_X,
+                                      VIR_HALF_CHANNEL_MASK_FULL,
+                                      gcvNULL);
+    ON_ERROR(errCode, "Failed to add new usage to def.");
+
+OnError:
     return errCode;
 }
 
@@ -12027,26 +12083,28 @@ VSC_ErrCode vscVIR_FixDynamicIdxDep(VSC_SH_PASS_WORKER* pPassWorker)
         gcmASSERT(VIR_OpndInfo_Is_Virtual_Reg(&opndInfo));
 
         /* Add a new def for MOV instruction. */
-        vscVIR_AddNewDef(pDuInfo,
-                         pNewInst,
-                         opndInfo.u1.virRegInfo.virReg,
-                         1,
-                         VIR_TypeId_Conv2Enable(VIR_Symbol_GetTypeId(pSym)),
-                         VIR_HALF_CHANNEL_MASK_FULL,
-                         gcvNULL,
-                         gcvNULL);
+        errCode = vscVIR_AddNewDef(pDuInfo,
+                                   pNewInst,
+                                   opndInfo.u1.virRegInfo.virReg,
+                                   1,
+                                   VIR_TypeId_Conv2Enable(VIR_Symbol_GetTypeId(pSym)),
+                                   VIR_HALF_CHANNEL_MASK_FULL,
+                                   gcvNULL,
+                                   gcvNULL);
+        ON_ERROR(errCode, "Failed to add new def.");
 
         /* Add a new usage for MOV instruction. */
-        vscVIR_AddNewUsageToDef(pDuInfo,
-                                pNewInst,
-                                pUsageInst,
-                                pUsageOpnd,
-                                gcvFALSE,
-                                opndInfo.u1.virRegInfo.virReg,
-                                1,
-                                VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pUsageOpnd)),
-                                VIR_HALF_CHANNEL_MASK_FULL,
-                                gcvNULL);
+        errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                          pNewInst,
+                                          pUsageInst,
+                                          pUsageOpnd,
+                                          gcvFALSE,
+                                          opndInfo.u1.virRegInfo.virReg,
+                                          1,
+                                          VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pUsageOpnd)),
+                                          VIR_HALF_CHANNEL_MASK_FULL,
+                                          gcvNULL);
+        ON_ERROR(errCode, "Failed to add new usage to def.");
 
         /* Delete the old usage instruction. */
         vscVIR_DeleteUsage(pDuInfo,
@@ -12061,16 +12119,17 @@ VSC_ErrCode vscVIR_FixDynamicIdxDep(VSC_SH_PASS_WORKER* pPassWorker)
                            gcvNULL);
 
         /* Add a new usage for original def instruction. */
-        vscVIR_AddNewUsageToDef(pDuInfo,
-                                pDefInst,
-                                pNewInst,
-                                pNewOpnd,
-                                gcvFALSE,
-                                opndInfo.u1.virRegInfo.virReg,
-                                1,
-                                VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pNewOpnd)),
-                                VIR_HALF_CHANNEL_MASK_FULL,
-                                gcvNULL);
+        errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                          pDefInst,
+                                          pNewInst,
+                                          pNewOpnd,
+                                          gcvFALSE,
+                                          opndInfo.u1.virRegInfo.virReg,
+                                          1,
+                                          VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pNewOpnd)),
+                                          VIR_HALF_CHANNEL_MASK_FULL,
+                                          gcvNULL);
+        ON_ERROR(errCode, "Failed to add new usage to def.");
 
         /* Free dynamic idx usage node. */
         vscMM_Free(pMM, (void*)pDynamicIdxUsage);

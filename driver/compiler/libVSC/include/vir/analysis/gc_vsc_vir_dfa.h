@@ -596,7 +596,7 @@ VSC_ErrCode vscVIR_DestoryWebs(VIR_DEF_USAGE_INFO* pDuInfo); /* Only web table w
 
 /* Partially update routines */
 
-void vscVIR_AddNewDef(VIR_DEF_USAGE_INFO* pDuInfo,
+VSC_ErrCode vscVIR_AddNewDef(VIR_DEF_USAGE_INFO* pDuInfo,
                       VIR_Instruction* pDefInst,
                       gctUINT firstDefRegNo,
                       gctUINT defRegNoRange,
@@ -608,27 +608,27 @@ void vscVIR_AddNewDef(VIR_DEF_USAGE_INFO* pDuInfo,
                                                    is new added into def-table */
                      );
 
-void vscVIR_DeleteDef(VIR_DEF_USAGE_INFO* pDuInfo,
-                      VIR_Instruction* pDefInst,
-                      gctUINT firstDefRegNo,
-                      gctUINT defRegNoRange,
-                      VIR_Enable defEnableMask,
-                      gctUINT8 halfChannelMask,
-                      gctUINT* pRetDefIdxArray  /* VIR_CHANNEL_NUM*defRegNoRange sized array to
-                                                   return def index for each enabled channel that
-                                                   is just deleted from def-table */
-                     );
-
-void vscVIR_AddNewUsageToDef(VIR_DEF_USAGE_INFO* pDuInfo,
+VSC_ErrCode vscVIR_DeleteDef(VIR_DEF_USAGE_INFO* pDuInfo,
                              VIR_Instruction* pDefInst,
-                             VIR_Instruction* pUsageInst,
-                             VIR_Operand* pOperand,
-                             gctBOOL bIsIndexingRegUsage,
-                             gctUINT firstUsageRegNo,
-                             gctUINT usageRegNoRange,
+                             gctUINT firstDefRegNo,
+                             gctUINT defRegNoRange,
                              VIR_Enable defEnableMask,
                              gctUINT8 halfChannelMask,
-                             gctUINT* pRetUsageIdx);
+                             gctUINT* pRetDefIdxArray  /* VIR_CHANNEL_NUM*defRegNoRange sized array to
+                                                         return def index for each enabled channel that
+                                                         is just deleted from def-table */
+                             );
+
+VSC_ErrCode vscVIR_AddNewUsageToDef(VIR_DEF_USAGE_INFO* pDuInfo,
+                                    VIR_Instruction* pDefInst,
+                                    VIR_Instruction* pUsageInst,
+                                    VIR_Operand* pOperand,
+                                    gctBOOL bIsIndexingRegUsage,
+                                    gctUINT firstUsageRegNo,
+                                    gctUINT usageRegNoRange,
+                                    VIR_Enable defEnableMask,
+                                    gctUINT8 halfChannelMask,
+                                    gctUINT* pRetUsageIdx);
 
 void vscVIR_DeleteUsage(VIR_DEF_USAGE_INFO* pDuInfo,
                         VIR_Instruction* pDefInst, /* Can be set as VIR_ANY_DEF_INST */
@@ -838,7 +838,7 @@ gctBOOL vscVIR_FindUniqueNearestDefInst(
     INOUT VIR_Instruction**         ppNearestDefInst
     );
 
-gctBOOL vscVIR_CleanDuForInstruction(
+VSC_ErrCode vscVIR_CleanDuForInstruction(
     IN VIR_DEF_USAGE_INFO*          pDuInfo,
     IN VIR_Instruction*             pInst
     );

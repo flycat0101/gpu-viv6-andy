@@ -230,14 +230,15 @@ static VSC_ErrCode _VSC_CPP_RemoveDefInst(
     }
 
     /* remove the def */
-    vscVIR_DeleteDef(
-        VSC_CPP_GetDUInfo(cpp),
-        defInst,
-        dstInfo.u1.virRegInfo.virReg,
-        1,
-        movEnable,
-        VIR_HALF_CHANNEL_MASK_FULL,
-        gcvNULL);
+    errCode = vscVIR_DeleteDef(
+                               VSC_CPP_GetDUInfo(cpp),
+                               defInst,
+                               dstInfo.u1.virRegInfo.virReg,
+                               1,
+                               movEnable,
+                               VIR_HALF_CHANNEL_MASK_FULL,
+                               gcvNULL);
+    ON_ERROR(errCode, "Failed in Delete Def.");
 
     if (movSrcInfo.isVreg)
     {
@@ -265,7 +266,9 @@ static VSC_ErrCode _VSC_CPP_RemoveDefInst(
 
     /* remove MOV */
     errCode = vscVIR_DeleteInstructionWithDu(gcvNULL, func, defInst, &VSC_CPP_GetInvalidCfg(cpp));
+    ON_ERROR(errCode, "Failed in DeleteInstructionWithDu.");
 
+OnError:
     return errCode;
 }
 
@@ -1327,16 +1330,17 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                     {
                         if (VIR_Swizzle_2_Enable(newSwizzle) & (1 << pDef->defKey.channel))
                         {
-                            vscVIR_AddNewUsageToDef(VSC_CPP_GetDUInfo(cpp),
-                                                    pDef->defKey.pDefInst,
-                                                    inst,
-                                                    newSrc,
-                                                    gcvFALSE,
-                                                    movSrcInfo.u1.virRegInfo.virReg,
-                                                    1,
-                                                    (1 << pDef->defKey.channel),
-                                                    VIR_HALF_CHANNEL_MASK_FULL,
-                                                    gcvNULL);
+                            errCode = vscVIR_AddNewUsageToDef(VSC_CPP_GetDUInfo(cpp),
+                                                              pDef->defKey.pDefInst,
+                                                              inst,
+                                                              newSrc,
+                                                              gcvFALSE,
+                                                              movSrcInfo.u1.virRegInfo.virReg,
+                                                              1,
+                                                              (1 << pDef->defKey.channel),
+                                                              VIR_HALF_CHANNEL_MASK_FULL,
+                                                              gcvNULL);
+                            ON_ERROR(errCode, "Failed to add new usage to def.");
                         }
                     }
                 }
@@ -1360,6 +1364,7 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
         }
     } while (gcvFALSE);
 
+OnError:
     return errCode;
 }
 
@@ -2195,14 +2200,15 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
                 /* this statement is the modification */
                 def_inst_dest   = VIR_Inst_GetDest(def_inst);
                 def_inst_enable = VIR_Operand_GetEnable(def_inst_dest);
-                vscVIR_DeleteDef(
-                    VSC_CPP_GetDUInfo(cpp),
-                    def_inst,
-                    inst_src0_info.u1.virRegInfo.virReg,
-                    1,
-                    def_inst_enable,
-                    VIR_HALF_CHANNEL_MASK_FULL,
-                    gcvNULL);
+                errCode = vscVIR_DeleteDef(
+                                           VSC_CPP_GetDUInfo(cpp),
+                                           def_inst,
+                                           inst_src0_info.u1.virRegInfo.virReg,
+                                           1,
+                                           def_inst_enable,
+                                           VIR_HALF_CHANNEL_MASK_FULL,
+                                           gcvNULL);
+                ON_ERROR(errCode, "Failed in Delete Def.");
 
                 if ((VIR_Inst_GetOpcode(def_inst) == VIR_OP_CMAD ||
                      VIR_Inst_GetOpcode(def_inst) == VIR_OP_CMUL ||
@@ -2279,15 +2285,16 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
                 memset(&nativeDefFlags, 0, sizeof(nativeDefFlags));
                 nativeDefFlags.bIsInput = inst_dest_info.isInput;
                 nativeDefFlags.bIsOutput = inst_dest_info.isOutput;
-                vscVIR_AddNewDef(
-                    VSC_CPP_GetDUInfo(cpp),
-                    def_inst,
-                    inst_dest_info.u1.virRegInfo.virReg,
-                    1,
-                    def_inst_enable,
-                    VIR_HALF_CHANNEL_MASK_FULL,
-                    &nativeDefFlags,
-                    gcvNULL);
+                errCode = vscVIR_AddNewDef(
+                                           VSC_CPP_GetDUInfo(cpp),
+                                           def_inst,
+                                           inst_dest_info.u1.virRegInfo.virReg,
+                                           1,
+                                           def_inst_enable,
+                                           VIR_HALF_CHANNEL_MASK_FULL,
+                                           &nativeDefFlags,
+                                           gcvNULL);
+                ON_ERROR(errCode, "Failed to add new def.");
 
                 VIR_Operand_SetModifier(def_inst_dest, VIR_Operand_GetModifier(inst_src0));
                 if (VIR_Inst_GetOpcode(inst) == VIR_OP_SAT)
@@ -2342,17 +2349,18 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
                                 VIR_HALF_CHANNEL_MASK_FULL,
                                 gcvNULL);
 
-                            vscVIR_AddNewUsageToDef(
-                                VSC_CPP_GetDUInfo(cpp),
-                                def_inst,
-                                inst_usage_inst,
-                                inst_usage_opnd,
-                                gcvFALSE,
-                                inst_dest_info.u1.virRegInfo.virReg,
-                                1,
-                                (VIR_Enable)(enable & def_inst_enable),
-                                VIR_HALF_CHANNEL_MASK_FULL,
-                                gcvNULL);
+                            errCode = vscVIR_AddNewUsageToDef(
+                                                              VSC_CPP_GetDUInfo(cpp),
+                                                              def_inst,
+                                                              inst_usage_inst,
+                                                              inst_usage_opnd,
+                                                              gcvFALSE,
+                                                              inst_dest_info.u1.virRegInfo.virReg,
+                                                              1,
+                                                              (VIR_Enable)(enable & def_inst_enable),
+                                                              VIR_HALF_CHANNEL_MASK_FULL,
+                                                              gcvNULL);
+                            ON_ERROR(errCode, "Failed to add new usage to def.");
                         }
                     }
                 }
@@ -2382,14 +2390,15 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
             gcvNULL);
 
         /* delete the def info of the dest of input inst */
-        vscVIR_DeleteDef(
-            VSC_CPP_GetDUInfo(cpp),
-            inst,
-            inst_dest_info.u1.virRegInfo.virReg,
-            1,
-            inst_dest_enable,
-            VIR_HALF_CHANNEL_MASK_FULL,
-            gcvNULL);
+        errCode = vscVIR_DeleteDef(
+                                   VSC_CPP_GetDUInfo(cpp),
+                                   inst,
+                                   inst_dest_info.u1.virRegInfo.virReg,
+                                   1,
+                                   inst_dest_enable,
+                                   VIR_HALF_CHANNEL_MASK_FULL,
+                                   gcvNULL);
+        ON_ERROR(errCode, "Failed in Delete Def.");
 
         VSC_CPP_SetBWOptCount(cpp, VSC_CPP_GetBWOptCount(cpp) + 1);
 
@@ -2409,7 +2418,7 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
 
     vscHTBL_Reset(inst_def_set);
 
-    OnError:
+OnError:
     return errCode;
 }
 
@@ -3067,16 +3076,17 @@ VSC_ErrCode VIR_SCPP_PerformOnBB(
                             VIR_Operand_GetOperandInfo(instIter, src, &srcOpndInfo);
                             if (srcOpndInfo.isVreg)
                             {
-                                vscVIR_AddNewUsageToDef(pDuInfo,
-                                                        VIR_ANY_DEF_INST,
-                                                        instIter,
-                                                        src,
-                                                        gcvFALSE,
-                                                        srcOpndInfo.u1.virRegInfo.virReg,
-                                                        1,
-                                                        VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(src)),
-                                                        VIR_HALF_CHANNEL_MASK_FULL,
-                                                        gcvNULL);
+                                errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                                                  VIR_ANY_DEF_INST,
+                                                                  instIter,
+                                                                  src,
+                                                                  gcvFALSE,
+                                                                  srcOpndInfo.u1.virRegInfo.virReg,
+                                                                  1,
+                                                                  VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(src)),
+                                                                  VIR_HALF_CHANNEL_MASK_FULL,
+                                                                  gcvNULL);
+                                ON_ERROR(errCode, "Failed to add new usage to def.");
                             }
 
                             bChanged = gcvTRUE;
@@ -3229,16 +3239,17 @@ VSC_ErrCode VIR_SCPP_PerformOnBB(
 
                         if (operandInfo.isVreg)
                         {
-                            vscVIR_AddNewUsageToDef(pDuInfo,
-                                                    VIR_ANY_DEF_INST,
-                                                    instIter,
-                                                    pNewOpnd,
-                                                    gcvFALSE,
-                                                    operandInfo.u1.virRegInfo.virReg,
-                                                    1,
-                                                    VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pNewOpnd)),
-                                                    VIR_HALF_CHANNEL_MASK_FULL,
-                                                    gcvNULL);
+                            errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                                              VIR_ANY_DEF_INST,
+                                                              instIter,
+                                                              pNewOpnd,
+                                                              gcvFALSE,
+                                                              operandInfo.u1.virRegInfo.virReg,
+                                                              1,
+                                                              VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pNewOpnd)),
+                                                              VIR_HALF_CHANNEL_MASK_FULL,
+                                                              gcvNULL);
+                            ON_ERROR(errCode, "Failed to add new usage to def.");
                         }
                     }
 
@@ -3421,7 +3432,7 @@ VSC_ErrCode VIR_SCPP_PerformOnBB(
         VIR_SCPP_SetIsChanged(scpp, gcvTRUE);
     }
 
-    OnError:
+OnError:
     return errCode;
 }
 

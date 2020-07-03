@@ -2547,6 +2547,10 @@ _VIR_Shader_InitTypeTable(VIR_Shader *    Shader)
                 typeInfo->OCLNameId = vscStringTable_Find(&Shader->stringTable,
                                                         typeInfo->name,
                                                         strlen(typeInfo->name)+1);
+                if (VIR_Id_isInvalid(typeInfo->OCLNameId))
+                {
+                    return VSC_ERR_OUT_OF_MEMORY;
+                }
             }
         }
         else
@@ -3412,8 +3416,7 @@ VIR_Shader_AddString(
     )
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
-    VIR_NameId  id = vscStringTable_Find(&Shader->stringTable,
-        String, strlen(String) + 1);
+    VIR_NameId  id = vscStringTable_Find(&Shader->stringTable, String, strlen(String) + 1);
 
     if (VIR_Id_isInvalid(id))
     {
@@ -3466,12 +3469,18 @@ VIR_Shader_AddBuiltinType(
     type._qualifier     = (gctUINT)VIR_TYQUAL_NONE;
     type.arrayStride    = 0;
     type.matrixStride   = 0;
-    type.u1.nameId      = vscStringTable_Find(&Shader->stringTable,
-        TypeInfo->name,
-        strlen(TypeInfo->name)+1);
+    type.u1.nameId      = vscStringTable_Find(&Shader->stringTable, TypeInfo->name, strlen(TypeInfo->name)+1);
+    if (VIR_Id_isInvalid(type.u1.nameId ))
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
     type.u1.symId       = VIR_INVALID_ID;
     type.u2.size        = TypeInfo->sz;
     tyId                = vscBT_AddEntry(&Shader->typeTable, &type);
+    if (VIR_Id_isInvalid(tyId))
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
     *TypeId             = tyId;
     newType = VIR_Shader_GetTypeFromId(Shader, tyId);
     newType->_tyIndex   = tyId;
@@ -3512,6 +3521,10 @@ VIR_Shader_AddArrayType(
     type.u1.symId       = VIR_INVALID_ID;
     type.u2.arrayLength = ArrayLength;
     tyId                = vscBT_Find(&Shader->typeTable, &type);
+    if (VIR_Id_isInvalid(tyId))
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
     aggregateType = VIR_Shader_GetTypeFromId(Shader, tyId);
     aggregateType->_tyIndex = tyId;
     *TypeId             = tyId;
@@ -3546,6 +3559,10 @@ VIR_Shader_AddPointerType(
     type.u1.symId       = VIR_INVALID_ID;
     type.u2.size        = POINTER_SIZE;
     tyId                = vscBT_Find(&Shader->typeTable, &type);
+    if (VIR_Id_isInvalid(tyId))
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
     ptrType = VIR_Shader_GetTypeFromId(Shader, tyId);
     ptrType->_tyIndex = tyId;
     *TypeId             = tyId;
@@ -3582,6 +3599,10 @@ VIR_Shader_AddTypeDefType(
     /* The size may be unknown if the base type is a undefined struct, please use VIR_Type_GetTypeByteSize to get the size. */
     type.u2.size        = 0;
     tyId                = vscBT_Find(&Shader->typeTable, &type);
+    if (VIR_Id_isInvalid(tyId))
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
     ptrType = VIR_Shader_GetTypeFromId(Shader, tyId);
     ptrType->_tyIndex = tyId;
     *TypeId             = tyId;
@@ -3614,6 +3635,10 @@ VIR_Shader_AddFunctionType(
     type.u1.symId       = VIR_INVALID_ID;
     type.u2.params      = Params;
     tyId                = vscBT_Find(&Shader->typeTable, &type);
+    if (VIR_Id_isInvalid(tyId))
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
     *TypeId             = tyId;
     funcType = VIR_Shader_GetTypeFromId(Shader, tyId);
     funcType->_tyIndex = tyId;
@@ -3655,6 +3680,10 @@ VIR_Shader_AddStructType(
 
         /* For a new id with same type */
         tyId = vscBT_AddEntry(&Shader->typeTable, &type);
+        if (VIR_Id_isInvalid(tyId))
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
 
         if (origTyId != VIR_INVALID_ID)
         {
@@ -3664,6 +3693,10 @@ VIR_Shader_AddStructType(
     else
     {
         tyId = vscBT_Find(&Shader->typeTable, &type);
+        if (VIR_Id_isInvalid(tyId))
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
     }
 
     *TypeId             = tyId;
@@ -3698,6 +3731,10 @@ VIR_Shader_AddEnumType(
     type.u2.fields      = gcvNULL;
 
     tyId = vscBT_Find(&Shader->typeTable, &type);
+    if (VIR_Id_isInvalid(tyId))
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
 
     *TypeId             = tyId;
     structType = VIR_Shader_GetTypeFromId(Shader, tyId);

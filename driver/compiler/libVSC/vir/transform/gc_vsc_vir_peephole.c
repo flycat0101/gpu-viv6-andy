@@ -1708,14 +1708,15 @@ static VSC_ErrCode _VSC_PH_MergeAndAddResultInsts(
         VIR_Operand_GetOperandInfo(newInst, newInstDest, &newInstDestInfo);
         memset(&nativeDefFlags, 0, sizeof(nativeDefFlags));
         nativeDefFlags.bIsOutput = newInstDestInfo.isOutput;
-        vscVIR_AddNewDef(duInfo,
-                         newInst,
-                         newInstDestInfo.u1.virRegInfo.startVirReg,
-                         newInstDestInfo.u1.virRegInfo.virRegCount,
-                         instDestEnable,
-                         VIR_HALF_CHANNEL_MASK_FULL,
-                         &nativeDefFlags,
-                         gcvNULL);
+        errCode = vscVIR_AddNewDef(duInfo,
+                                   newInst,
+                                   newInstDestInfo.u1.virRegInfo.startVirReg,
+                                   newInstDestInfo.u1.virRegInfo.virRegCount,
+                                   instDestEnable,
+                                   VIR_HALF_CHANNEL_MASK_FULL,
+                                   &nativeDefFlags,
+                                   gcvNULL);
+        ON_ERROR(errCode, "Failed to add new def.");
 
         for(channel = 0; channel < VIR_CHANNEL_NUM; channel++)
         {
@@ -1732,16 +1733,17 @@ static VSC_ErrCode _VSC_PH_MergeAndAddResultInsts(
                 VIR_Instruction* instUsageInst = instUsage->usageKey.pUsageInst;
                 VIR_Operand* instUsageInstOperand = instUsage->usageKey.pOperand;
 
-                vscVIR_AddNewUsageToDef(duInfo,
-                                        newInst,
-                                        instUsageInst,
-                                        instUsageInstOperand,
-                                        instUsage->usageKey.bIsIndexingRegUsage,
-                                        newInstDestInfo.u1.virRegInfo.startVirReg,
-                                        newInstDestInfo.u1.virRegInfo.virRegCount,
-                                        (VIR_Enable)(1 << channel),
-                                        VIR_HALF_CHANNEL_MASK_FULL,
-                                        gcvNULL);
+                errCode = vscVIR_AddNewUsageToDef(duInfo,
+                                                  newInst,
+                                                  instUsageInst,
+                                                  instUsageInstOperand,
+                                                  instUsage->usageKey.bIsIndexingRegUsage,
+                                                  newInstDestInfo.u1.virRegInfo.startVirReg,
+                                                  newInstDestInfo.u1.virRegInfo.virRegCount,
+                                                  (VIR_Enable)(1 << channel),
+                                                  VIR_HALF_CHANNEL_MASK_FULL,
+                                                  gcvNULL);
+                ON_ERROR(errCode, "Failed to add new usage to def.");
             }
         }
     }
@@ -1825,16 +1827,17 @@ static VSC_ErrCode _VSC_PH_MergeAndAddResultInsts(
                             {
                                 VIR_Instruction* fromOperandDefInst = fromOperandDef->defKey.pDefInst;
 
-                                vscVIR_AddNewUsageToDef(duInfo,
-                                                        fromOperandDefInst,
-                                                        newInst,
-                                                        newInstOperand,
-                                                        gcvFALSE,
-                                                        newInstOperandInfo.u1.virRegInfo.startVirReg,
-                                                        newInstOperandInfo.u1.virRegInfo.virRegCount,
-                                                        (VIR_Enable)(1 << swizzle),
-                                                        VIR_HALF_CHANNEL_MASK_FULL,
-                                                        gcvNULL);
+                                errCode = vscVIR_AddNewUsageToDef(duInfo,
+                                                                  fromOperandDefInst,
+                                                                  newInst,
+                                                                  newInstOperand,
+                                                                  gcvFALSE,
+                                                                  newInstOperandInfo.u1.virRegInfo.startVirReg,
+                                                                  newInstOperandInfo.u1.virRegInfo.virRegCount,
+                                                                  (VIR_Enable)(1 << swizzle),
+                                                                  VIR_HALF_CHANNEL_MASK_FULL,
+                                                                  gcvNULL);
+                                ON_ERROR(errCode, "Failed to add new usage to def.");
                             }
                             if(newInstOperandInfo.indexingVirRegNo != VIR_INVALID_REG_NO)
                             {
@@ -1845,16 +1848,17 @@ static VSC_ErrCode _VSC_PH_MergeAndAddResultInsts(
                                 {
                                     VIR_Instruction* fromOperandDefInst = fromOperandDef->defKey.pDefInst;
 
-                                    vscVIR_AddNewUsageToDef(duInfo,
-                                                            fromOperandDefInst,
-                                                            newInst,
-                                                            newInstOperand,
-                                                            gcvTRUE,
-                                                            newInstOperandInfo.indexingVirRegNo,
-                                                            1,
-                                                            (VIR_Enable)(newInstOperandInfo.indexingKind),
-                                                            VIR_HALF_CHANNEL_MASK_FULL,
-                                                            gcvNULL);
+                                    errCode = vscVIR_AddNewUsageToDef(duInfo,
+                                                                      fromOperandDefInst,
+                                                                      newInst,
+                                                                      newInstOperand,
+                                                                      gcvTRUE,
+                                                                      newInstOperandInfo.indexingVirRegNo,
+                                                                      1,
+                                                                      (VIR_Enable)(newInstOperandInfo.indexingKind),
+                                                                      VIR_HALF_CHANNEL_MASK_FULL,
+                                                                      gcvNULL);
+                                    ON_ERROR(errCode, "Failed to add new usage to def.");
                                 }
                             }
                         }
@@ -1924,16 +1928,17 @@ static VSC_ErrCode _VSC_PH_MergeAndAddResultInsts(
                                 {
                                     VIR_Instruction* fromOperandDefInst = fromOperandDef->defKey.pDefInst;
 
-                                    vscVIR_AddNewUsageToDef(duInfo,
-                                                            fromOperandDefInst,
-                                                            newInst,
-                                                            newInstOperand,
-                                                            gcvFALSE,
-                                                            newInstOperandInfo.u1.virRegInfo.startVirReg,
-                                                            newInstOperandInfo.u1.virRegInfo.virRegCount,
-                                                            (VIR_Enable)(1 << swizzle),
-                                                            VIR_HALF_CHANNEL_MASK_FULL,
-                                                            gcvNULL);
+                                    errCode = vscVIR_AddNewUsageToDef(duInfo,
+                                                                      fromOperandDefInst,
+                                                                      newInst,
+                                                                      newInstOperand,
+                                                                      gcvFALSE,
+                                                                      newInstOperandInfo.u1.virRegInfo.startVirReg,
+                                                                      newInstOperandInfo.u1.virRegInfo.virRegCount,
+                                                                      (VIR_Enable)(1 << swizzle),
+                                                                      VIR_HALF_CHANNEL_MASK_FULL,
+                                                                      gcvNULL);
+                                    ON_ERROR(errCode, "Failed to add new usage to def.");
                                 }
                                 if(newInstOperandInfo.indexingVirRegNo != VIR_INVALID_REG_NO)
                                 {
@@ -1944,16 +1949,17 @@ static VSC_ErrCode _VSC_PH_MergeAndAddResultInsts(
                                     {
                                         VIR_Instruction* fromOperandDefInst = fromOperandDef->defKey.pDefInst;
 
-                                        vscVIR_AddNewUsageToDef(duInfo,
-                                                                fromOperandDefInst,
-                                                                newInst,
-                                                                newInstOperand,
-                                                                gcvTRUE,
-                                                                newInstOperandInfo.indexingVirRegNo,
-                                                                1,
-                                                                (VIR_Enable)(newInstOperandInfo.indexingKind),
-                                                                VIR_HALF_CHANNEL_MASK_FULL,
-                                                                gcvNULL);
+                                        errCode = vscVIR_AddNewUsageToDef(duInfo,
+                                                                          fromOperandDefInst,
+                                                                          newInst,
+                                                                          newInstOperand,
+                                                                          gcvTRUE,
+                                                                          newInstOperandInfo.indexingVirRegNo,
+                                                                          1,
+                                                                          (VIR_Enable)(newInstOperandInfo.indexingKind),
+                                                                          VIR_HALF_CHANNEL_MASK_FULL,
+                                                                          gcvNULL);
+                                        ON_ERROR(errCode, "Failed to add new usage to def.");
                                     }
                                 }
                             }
@@ -2013,6 +2019,7 @@ static VSC_ErrCode _VSC_PH_MergeAndAddResultInsts(
         VIR_Inst_Dump(dumper, newInst);
     }
 
+OnError:
     return errCode;
 }
 
@@ -2057,7 +2064,8 @@ static VSC_ErrCode _VSC_PH_RemoveInst(
         {
             if(instDestEnable & (1 << channel))
             {
-                vscVIR_DeleteDef(duInfo, inst, instDestInfo.u1.virRegInfo.startVirReg, instDestInfo.u1.virRegInfo.virRegCount, (VIR_Enable)(1 << channel), VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+                errCode = vscVIR_DeleteDef(duInfo, inst, instDestInfo.u1.virRegInfo.startVirReg, instDestInfo.u1.virRegInfo.virRegCount, (VIR_Enable)(1 << channel), VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+                ON_ERROR(errCode, "Failed in Delete Def.");
             }
         }
     }
@@ -2129,6 +2137,8 @@ static VSC_ErrCode _VSC_PH_RemoveInst(
         }
         _VSC_PH_RemoveSingleInst(ph, func, inst);
     }
+
+OnError:
     return errCode;
 }
 
@@ -2626,15 +2636,18 @@ static VSC_ErrCode _VSC_PH_GenerateLValueModifier(
                 }
 
                 /* this statement is the modification */
-                vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph), work_inst, inst_src0_info.u1.virRegInfo.virReg,
-                                 1, old_work_inst_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+                errCode = vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph), work_inst, inst_src0_info.u1.virRegInfo.virReg,
+                                           1, old_work_inst_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+                ON_ERROR(errCode, "Failed in Delete Def.");
+
                 VIR_Operand_ReplaceDefOperandWithDef(work_inst_dest, inst_dest, new_work_inst_enable, gcvFALSE);
 
                 memset(&nativeDefFlags, 0, sizeof(nativeDefFlags));
                 nativeDefFlags.bIsInput = inst_dest_info.isInput;
                 nativeDefFlags.bIsOutput = inst_dest_info.isOutput;
-                vscVIR_AddNewDef(VSC_PH_Peephole_GetDUInfo(ph), work_inst, inst_dest_info.u1.virRegInfo.virReg, 1,
-                                 new_work_inst_enable, VIR_HALF_CHANNEL_MASK_FULL, &nativeDefFlags, gcvNULL);
+                errCode = vscVIR_AddNewDef(VSC_PH_Peephole_GetDUInfo(ph), work_inst, inst_dest_info.u1.virRegInfo.virReg, 1,
+                                           new_work_inst_enable, VIR_HALF_CHANNEL_MASK_FULL, &nativeDefFlags, gcvNULL);
+                ON_ERROR(errCode, "Failed to add new def.");
 
                 if (!(VIR_Inst_GetOpcode(work_inst) == VIR_OP_DP2
                     || VIR_Inst_GetOpcode(work_inst) == VIR_OP_DP3
@@ -2688,9 +2701,12 @@ static VSC_ErrCode _VSC_PH_GenerateLValueModifier(
                                            inst_dest_info.u1.virRegInfo.virReg, 1,
                                            (VIR_Enable)(enable & inst_dest_enable), VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
                         if(new_work_inst_enable & enable)
-                            vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), work_inst, inst_usage_inst, inst_usage_opnd, gcvFALSE,
-                                                    inst_dest_info.u1.virRegInfo.virReg, 1, (VIR_Enable)(new_work_inst_enable & enable),
-                                                    VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+                        {
+                            errCode = vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), work_inst, inst_usage_inst, inst_usage_opnd, gcvFALSE,
+                                                              inst_dest_info.u1.virRegInfo.virReg, 1, (VIR_Enable)(new_work_inst_enable & enable),
+                                                              VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+                            ON_ERROR(errCode, "Failed to add new usage to def.");
+                        }
                     }
                 }
 
@@ -2716,8 +2732,10 @@ static VSC_ErrCode _VSC_PH_GenerateLValueModifier(
                            inst_src0, gcvFALSE, inst_src0_info.u1.virRegInfo.virReg, 1,
                            inst_src0_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
         /* delete the def info of the dest of input inst */
-        vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph), inst, inst_dest_info.u1.virRegInfo.virReg,
-                         1, inst_dest_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+        errCode = vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph), inst, inst_dest_info.u1.virRegInfo.virReg,
+                                   1, inst_dest_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+        ON_ERROR(errCode, "Failed in Delete Def.");
+
         /* remove the input inst */
         _VSC_PH_RemoveSingleInst(ph, func, inst);
         _VSC_PH_ResetHashTable(inst_usage_set);
@@ -3108,9 +3126,10 @@ static VSC_ErrCode _VSC_PH_GenerateRValueModifier(
                            the channels used in work_inst is a subset of the enable of inst*/
                         if(enable & work_inst_enable)
                         {
-                            vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), def_inst, work_inst, work_opnd, gcvFALSE,
-                                                    inst_src0_info.u1.virRegInfo.virReg, 1,
-                                                    (VIR_Enable)(enable & work_inst_enable), VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+                            errCode = vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), def_inst, work_inst, work_opnd, gcvFALSE,
+                                                              inst_src0_info.u1.virRegInfo.virReg, 1,
+                                                              (VIR_Enable)(enable & work_inst_enable), VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+                            ON_ERROR(errCode, "Failed to add new usage to def.");
                         }
                     }
                 }
@@ -3120,8 +3139,10 @@ static VSC_ErrCode _VSC_PH_GenerateRValueModifier(
         vscVIR_DeleteUsage(VSC_PH_Peephole_GetDUInfo(ph), VIR_ANY_DEF_INST,
                            inst, inst_src0, gcvFALSE, inst_src0_info.u1.virRegInfo.virReg,
                            1, inst_src0_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
-        vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph), inst, inst_dest_info.u1.virRegInfo.virReg,
-                         1, inst_dest_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+        errCode = vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph), inst, inst_dest_info.u1.virRegInfo.virReg,
+                                   1, inst_dest_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+        ON_ERROR(errCode, "Failed in Delete Def.");
+
         _VSC_PH_RemoveSingleInst(ph, func, inst);
         _VSC_PH_ResetHashTable(def_inst_set);
     }
@@ -3733,9 +3754,10 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
 
                     if (def_dest_enable & mad_src0_enable)
                     {
-                        vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), def_inst, add_sub, mad_src0, gcvFALSE,
-                                                mul_src0_info.u1.virRegInfo.virReg, 1, (VIR_Enable)(def_dest_enable & mad_src0_enable),
-                                                VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+                        errCode = vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), def_inst, add_sub, mad_src0, gcvFALSE,
+                                                          mul_src0_info.u1.virRegInfo.virReg, 1, (VIR_Enable)(def_dest_enable & mad_src0_enable),
+                                                          VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+                        ON_ERROR(errCode, "Failed to add new usage to def.");
                     }
                 }
                 vscHTBLIterator_Init(&def_inst_set_iter, def_inst_set1);
@@ -3756,11 +3778,12 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
 
                     if (def_dest_enable & mad_src1_enable)
                     {
-                        vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), def_inst, add_sub, mad_src1, gcvFALSE,
-                                                mul_src1_info.u1.virRegInfo.virReg, 1,
-                                                (VIR_Enable)(def_dest_enable & mad_src1_enable),
-                                                VIR_HALF_CHANNEL_MASK_FULL,
-                                                gcvNULL);
+                        errCode = vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), def_inst, add_sub, mad_src1, gcvFALSE,
+                                                          mul_src1_info.u1.virRegInfo.virReg, 1,
+                                                          (VIR_Enable)(def_dest_enable & mad_src1_enable),
+                                                          VIR_HALF_CHANNEL_MASK_FULL,
+                                                          gcvNULL);
+                        ON_ERROR(errCode, "Failed to add new usage to def.");
                     }
                 }
             }
@@ -3789,8 +3812,9 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
         }
         /* remove the def of mul */
         {
-            vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph), mul, mul_dest_info.u1.virRegInfo.virReg,
-                             1, mul_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+            errCode = vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph), mul, mul_dest_info.u1.virRegInfo.virReg,
+                                       1, mul_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+            ON_ERROR(errCode, "Failed in Delete Def.");
         }
         _VSC_PH_RemoveSingleInst(ph, func, mul);
     }
@@ -4148,16 +4172,17 @@ static VSC_ErrCode _VSC_PH_MergeAddSubSameValue(
                          pDef != gcvNULL;
                          pDef = vscVIR_GeneralUdIterator_Next(&inst_ud_iter))
                     {
-                        vscVIR_AddNewUsageToDef(pDuInfo,
-                                                pDef->defKey.pDefInst,
-                                                pUsageInst,
-                                                VIR_Inst_GetSource(pUsageInst, i),
-                                                gcvFALSE,
-                                                opndInfo.u1.virRegInfo.virReg,
-                                                1,
-                                                VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(pUsageInst, i))),
-                                                VIR_HALF_CHANNEL_MASK_FULL,
-                                                gcvNULL);
+                        errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                                          pDef->defKey.pDefInst,
+                                                          pUsageInst,
+                                                          VIR_Inst_GetSource(pUsageInst, i),
+                                                          gcvFALSE,
+                                                          opndInfo.u1.virRegInfo.virReg,
+                                                          1,
+                                                          VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(pUsageInst, i))),
+                                                          VIR_HALF_CHANNEL_MASK_FULL,
+                                                          gcvNULL);
+                        ON_ERROR(errCode, "Failed to add new usage to def.");
                     }
                 }
             }
@@ -4199,16 +4224,17 @@ static VSC_ErrCode _VSC_PH_MergeAddSubSameValue(
                      pDef != gcvNULL;
                      pDef = vscVIR_GeneralUdIterator_Next(&inst_ud_iter))
                 {
-                    vscVIR_AddNewUsageToDef(pDuInfo,
-                                            pDef->defKey.pDefInst,
-                                            pUsageInst,
-                                            VIR_Inst_GetSource(pUsageInst, 0),
-                                            gcvFALSE,
-                                            opndInfo.u1.virRegInfo.virReg,
-                                            1,
-                                            VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(pUsageInst, 0))),
-                                            VIR_HALF_CHANNEL_MASK_FULL,
-                                            gcvNULL);
+                    errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                                      pDef->defKey.pDefInst,
+                                                      pUsageInst,
+                                                      VIR_Inst_GetSource(pUsageInst, 0),
+                                                      gcvFALSE,
+                                                      opndInfo.u1.virRegInfo.virReg,
+                                                      1,
+                                                      VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(pUsageInst, 0))),
+                                                      VIR_HALF_CHANNEL_MASK_FULL,
+                                                      gcvNULL);
+                    ON_ERROR(errCode, "Failed to add new usage to def.");
                 }
             }
 
@@ -4553,9 +4579,10 @@ static VSC_ErrCode _VSC_PH_GenerateRSQ(
 
                     if (def_dest_enable & rsq_src0_enable)
                     {
-                        vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), def_inst, rcp, VIR_Inst_GetSource(rcp, 0), gcvFALSE,
-                                                sqrt_src0_info.u1.virRegInfo.virReg, 1, (VIR_Enable)(def_dest_enable & rsq_src0_enable),
-                                                VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+                        errCode = vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), def_inst, rcp, VIR_Inst_GetSource(rcp, 0), gcvFALSE,
+                                                          sqrt_src0_info.u1.virRegInfo.virReg, 1, (VIR_Enable)(def_dest_enable & rsq_src0_enable),
+                                                          VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+                        ON_ERROR(errCode, "Failed to add new usage to def.");
                     }
                 }
             }
@@ -4581,8 +4608,9 @@ static VSC_ErrCode _VSC_PH_GenerateRSQ(
         }
         /* remove the def of sqrt */
         {
-            vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph), sqrt, sqrt_dest_info.u1.virRegInfo.virReg,
-                             1, sqrt_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+            errCode = vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph), sqrt, sqrt_dest_info.u1.virRegInfo.virReg,
+                                       1, sqrt_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+            ON_ERROR(errCode, "Failed in Delete Def.");
         }
         _VSC_PH_RemoveSingleInst(ph, func, sqrt);
     }
@@ -4942,9 +4970,10 @@ static VSC_ErrCode _VSC_PH_GenerateLShiftedLS(
 
                     if (def_dest_enable & lshifted_ls_src1_enable)
                     {
-                        vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), def_inst, ls, VIR_Inst_GetSource(ls, 1), gcvFALSE,
-                                                lshift_src0_info.u1.virRegInfo.virReg, 1, (VIR_Enable)(def_dest_enable & lshifted_ls_src1_enable),
-                                                VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+                        errCode = vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), def_inst, ls, VIR_Inst_GetSource(ls, 1), gcvFALSE,
+                                                          lshift_src0_info.u1.virRegInfo.virReg, 1, (VIR_Enable)(def_dest_enable & lshifted_ls_src1_enable),
+                                                          VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+                        ON_ERROR(errCode, "Failed to add new usage to def.");
                     }
                 }
             }
@@ -4970,8 +4999,9 @@ static VSC_ErrCode _VSC_PH_GenerateLShiftedLS(
                                 lshift_src0_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
 
             /* remove the def of lshift */
-            vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph), lshift, lshift_dest_info.u1.virRegInfo.virReg,
-                             1, lshift_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+            errCode = vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph), lshift, lshift_dest_info.u1.virRegInfo.virReg,
+                                       1, lshift_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+            ON_ERROR(errCode, "Failed in Delete Def.");
 
             _VSC_PH_RemoveSingleInst(ph, func, lshift);
         }
@@ -5220,16 +5250,17 @@ static VSC_ErrCode _VSC_PH_GenerateLoadStore(
                      pDef != gcvNULL;
                      pDef = vscVIR_GeneralUdIterator_Next(&udIter))
                 {
-                    vscVIR_AddNewUsageToDef(pDuInfo,
-                                            pDef->defKey.pDefInst,
-                                            pUsageInst,
-                                            pBaseOpnd,
-                                            gcvFALSE,
-                                            addSrc0Info.u1.virRegInfo.virReg,
-                                            1,
-                                            VIR_Swizzle_2_Enable(newSwizzle),
-                                            VIR_HALF_CHANNEL_MASK_FULL,
-                                            gcvNULL);
+                    errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                                      pDef->defKey.pDefInst,
+                                                      pUsageInst,
+                                                      pBaseOpnd,
+                                                      gcvFALSE,
+                                                      addSrc0Info.u1.virRegInfo.virReg,
+                                                      1,
+                                                      VIR_Swizzle_2_Enable(newSwizzle),
+                                                      VIR_HALF_CHANNEL_MASK_FULL,
+                                                      gcvNULL);
+                    ON_ERROR(errCode, "Failed to add new usage to def.");
                 }
             }
 
@@ -5256,16 +5287,17 @@ static VSC_ErrCode _VSC_PH_GenerateLoadStore(
                          pDef != gcvNULL;
                          pDef = vscVIR_GeneralUdIterator_Next(&udIter))
                     {
-                        vscVIR_AddNewUsageToDef(pDuInfo,
-                                                pDef->defKey.pDefInst,
-                                                pUsageInst,
-                                                pOffsetOpnd,
-                                                gcvFALSE,
-                                                addSrc1Info.u1.virRegInfo.virReg,
-                                                1,
-                                                VIR_Swizzle_2_Enable(newSwizzle),
-                                                VIR_HALF_CHANNEL_MASK_FULL,
-                                                gcvNULL);
+                        errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                                          pDef->defKey.pDefInst,
+                                                          pUsageInst,
+                                                          pOffsetOpnd,
+                                                          gcvFALSE,
+                                                          addSrc1Info.u1.virRegInfo.virReg,
+                                                          1,
+                                                          VIR_Swizzle_2_Enable(newSwizzle),
+                                                          VIR_HALF_CHANNEL_MASK_FULL,
+                                                          gcvNULL);
+                        ON_ERROR(errCode, "Failed to add new usage to def.");
                     }
                 }
             }
@@ -5403,16 +5435,17 @@ static VSC_ErrCode _VSC_PH_ReplaceUsages(
         VIR_Operand_SetSwizzle(VIR_Inst_GetSource(use_inst, srcIndex),
             VIR_Swizzle_ApplyMappingSwizzle(use_swizzle, mapping_swizzle));
 
-        vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph),
-            merged_inst,
-            use_inst,
-            VIR_Inst_GetSource(use_inst, srcIndex),
-            gcvFALSE,
-            merged_inst_dst_info.u1.virRegInfo.virReg,
-            1,
-            VIR_Swizzle_2_Enable(VIR_Swizzle_ApplyMappingSwizzle(use_swizzle, mapping_swizzle)),
-            VIR_HALF_CHANNEL_MASK_FULL,
-            gcvNULL);
+        errCode = vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph),
+                                          merged_inst,
+                                          use_inst,
+                                          VIR_Inst_GetSource(use_inst, srcIndex),
+                                          gcvFALSE,
+                                          merged_inst_dst_info.u1.virRegInfo.virReg,
+                                          1,
+                                          VIR_Swizzle_2_Enable(VIR_Swizzle_ApplyMappingSwizzle(use_swizzle, mapping_swizzle)),
+                                          VIR_HALF_CHANNEL_MASK_FULL,
+                                          gcvNULL);
+        ON_ERROR(errCode, "Failed to add new usage to def.");
 
         if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_VEC))
         {
@@ -5422,6 +5455,7 @@ static VSC_ErrCode _VSC_PH_ReplaceUsages(
         }
     }
 
+OnError:
     return errCode;
 }
 
@@ -5675,13 +5709,14 @@ static VSC_ErrCode _VSC_PH_VEC_MergeInst(
                 VIR_Operand_SetEnable(merged_inst_dst, merged_inst->enable);
 
                 /* generates the new dest with the new enable */
-                vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph),
-                    merged_inst->inst,
-                    merged_inst_dst_info.u1.virRegInfo.virReg,
-                    1,
-                    merged_inst_src_enable,
-                    VIR_HALF_CHANNEL_MASK_FULL,
-                    gcvNULL);
+                errCode = vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph),
+                                           merged_inst->inst,
+                                           merged_inst_dst_info.u1.virRegInfo.virReg,
+                                           1,
+                                           merged_inst_src_enable,
+                                           VIR_HALF_CHANNEL_MASK_FULL,
+                                           gcvNULL);
+                ON_ERROR(errCode, "Failed in Delete Def.");
                 VIR_Operand_ReplaceDefOperandWithDef(
                     merged_inst_dst,
                     new_dst,
@@ -5689,29 +5724,31 @@ static VSC_ErrCode _VSC_PH_VEC_MergeInst(
                     gcvFALSE);
                 VIR_Function_FreeOperand(func, new_dst);
 
-                vscVIR_AddNewDef(VSC_PH_Peephole_GetDUInfo(ph),
-                    merged_inst->inst,
-                    merged_inst_dst_info.u1.virRegInfo.virReg,
-                    1,
-                    merged_inst->enable,
-                    VIR_HALF_CHANNEL_MASK_FULL,
-                    gcvNULL,
-                    gcvNULL);
+                errCode = vscVIR_AddNewDef(VSC_PH_Peephole_GetDUInfo(ph),
+                                           merged_inst->inst,
+                                           merged_inst_dst_info.u1.virRegInfo.virReg,
+                                           1,
+                                           merged_inst->enable,
+                                           VIR_HALF_CHANNEL_MASK_FULL,
+                                           gcvNULL,
+                                           gcvNULL);
+                ON_ERROR(errCode, "Failed to add new def.");
 
                 VIR_Operand_SetSwizzle(merged_inst_src,
                     VIR_Enable_2_Swizzle_WShift(merged_inst->enable));
 
                 /* update the du info */
-                vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph),
-                            mergeKey->defKey->pDefInst,
-                            merged_inst->inst,
-                            merged_inst_src,
-                            gcvFALSE,
-                            merged_inst_src_info.u1.virRegInfo.virReg,
-                            1,
-                            merged_inst->enable,
-                            VIR_HALF_CHANNEL_MASK_FULL,
-                            gcvNULL);
+                errCode = vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph),
+                                                  mergeKey->defKey->pDefInst,
+                                                  merged_inst->inst,
+                                                  merged_inst_src,
+                                                  gcvFALSE,
+                                                  merged_inst_src_info.u1.virRegInfo.virReg,
+                                                  1,
+                                                  merged_inst->enable,
+                                                  VIR_HALF_CHANNEL_MASK_FULL,
+                                                  gcvNULL);
+                ON_ERROR(errCode, "Failed to add new usage to def.");
 
                 if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_VEC))
                 {
@@ -5752,13 +5789,14 @@ static VSC_ErrCode _VSC_PH_VEC_MergeInst(
             _VSC_PH_ResetHashTable(usages_set);
 
             /* delete the def of mova_dst */
-            vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph),
-                inst,
-                inst_dst_info.u1.virRegInfo.virReg,
-                1,
-                inst_enable,
-                VIR_HALF_CHANNEL_MASK_FULL,
-                gcvNULL);
+            errCode = vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph),
+                                       inst,
+                                       inst_dst_info.u1.virRegInfo.virReg,
+                                       1,
+                                       inst_enable,
+                                       VIR_HALF_CHANNEL_MASK_FULL,
+                                       gcvNULL);
+            ON_ERROR(errCode, "Failed in Delete Def.");
 
             if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_VEC))
             {
@@ -6124,15 +6162,16 @@ void _VSC_PH_Inst_DeleteUses(
     }
 }
 
-void _VSC_PH_Inst_DeleteDef(
+VSC_ErrCode _VSC_PH_Inst_DeleteDef(
     IN OUT VSC_PH_Peephole  *ph,
     IN VIR_Instruction      *pInst
     )
 {
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
     VIR_DEF_USAGE_INFO  *pDuInfo = ph->du_info;
-    VIR_Operand     *dstOpnd = gcvNULL;
-    VIR_OperandInfo  operandInfo;
-    VIR_Enable      instEnable;
+    VIR_Operand         *dstOpnd = gcvNULL;
+    VIR_OperandInfo     operandInfo;
+    VIR_Enable          instEnable;
 
     dstOpnd = VIR_Inst_GetDest(pInst);
     gcmASSERT(dstOpnd);
@@ -6142,21 +6181,26 @@ void _VSC_PH_Inst_DeleteDef(
         dstOpnd,
         &operandInfo);
 
-    vscVIR_DeleteDef(
-        pDuInfo,
-        pInst,
-        operandInfo.u1.virRegInfo.virReg,
-        1,
-        instEnable,
-        VIR_HALF_CHANNEL_MASK_FULL,
-        gcvNULL);
+    errCode = vscVIR_DeleteDef(
+                               pDuInfo,
+                               pInst,
+                               operandInfo.u1.virRegInfo.virReg,
+                               1,
+                               instEnable,
+                               VIR_HALF_CHANNEL_MASK_FULL,
+                               gcvNULL);
+    ON_ERROR(errCode, "Failed in Delete Def.");
+
+OnError:
+    return errCode;
 }
 
-static void _VSC_PH_DeleteRedundantMOV(
+static VSC_ErrCode _VSC_PH_DeleteRedundantMOV(
     IN OUT VSC_PH_Peephole* ph,
     IN VIR_Instruction *pMovInst,
     OUT gctBOOL    *changed)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VIR_BB* bb = VSC_PH_Peephole_GetCurrBB(ph);
     VIR_Instruction* nextInst = VIR_Inst_GetNext(pMovInst);
     VIR_Operand *destOpnd = VIR_Inst_GetDest(pMovInst);
@@ -6196,7 +6240,8 @@ static void _VSC_PH_DeleteRedundantMOV(
             {
                 /*change instruction to nop*/
                 _VSC_PH_Inst_DeleteUses(ph, nextInst, VIR_Inst_GetSrcNum(nextInst));
-                _VSC_PH_Inst_DeleteDef(ph, nextInst);
+                errCode = _VSC_PH_Inst_DeleteDef(ph, nextInst);
+                ON_ERROR(errCode, "Failed in PH_Inst_DeleteDef.");
                 VIR_Function_ChangeInstToNop(VSC_PH_Peephole_GetCurrFunc(ph), nextInst);
                 VSC_PH_Peephole_SetCfgChanged(ph, gcvTRUE); /* invalid du infomation */
                 if (changed != gcvNULL)
@@ -6212,7 +6257,8 @@ static void _VSC_PH_DeleteRedundantMOV(
         }
         nextInst = VIR_Inst_GetNext(nextInst);
     }
-    return;
+OnError:
+    return errCode;
 }
 
 static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
@@ -6499,7 +6545,8 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
                         {
                             /*change instruction to nop*/
                             _VSC_PH_Inst_DeleteUses(ph, inst, VIR_Inst_GetSrcNum(inst));
-                            _VSC_PH_Inst_DeleteDef(ph, inst);
+                            errCode = _VSC_PH_Inst_DeleteDef(ph, inst);
+                            ON_ERROR(errCode, "Failed in PH_Inst_DeleteDef.");
                             VIR_Function_ChangeInstToNop(VSC_PH_Peephole_GetCurrFunc(ph), inst);
                         }
                     }
@@ -6664,7 +6711,8 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
         {
             if (VIR_Inst_GetOpcode(inst) == VIR_OP_MOV)
             {
-                _VSC_PH_DeleteRedundantMOV(ph, inst, gcvNULL);
+                errCode = _VSC_PH_DeleteRedundantMOV(ph, inst, gcvNULL);
+                ON_ERROR(errCode, "Failed in PH_DeleteRedundantMOV.");
             }
             inst = VIR_Inst_GetNext(inst);
         }
