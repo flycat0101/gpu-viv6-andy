@@ -101,7 +101,7 @@ extern GLvoid __glDeleteNamesFrList(__GLcontext *gc, __GLsharedObjectMachine *sh
 extern __GLobjItem **__glLookupObjectItem(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint id);
 extern __GLobjItem * __glFindObjItemNode(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint id);
 extern GLvoid __glFreeSharedObjectState(__GLcontext *gc, __GLsharedObjectMachine *shared);
-extern GLvoid __glCheckLinearTableSize(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint size);
+extern GLboolean __glCheckLinearTableSize(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint size);
 
 #ifdef __cplusplus
 }

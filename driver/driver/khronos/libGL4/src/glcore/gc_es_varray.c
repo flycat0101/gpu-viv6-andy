@@ -13,10 +13,11 @@
 
 #include "gc_es_context.h"
 #include "gc_es_object_inline.c"
+#include "api/gc_gl_api_inline.c"
 
 #define _GC_OBJ_ZONE gcdZONE_GL40_CORE
 
-
+extern GLvoid __glSelectImmedDrawArraysFn(__GLcontext *gc);
 extern GLvoid __glDrawPrimitive(__GLcontext *gc, GLenum mode);
 extern GLvoid __glInitBufferObject(__GLcontext *gc, __GLbufferObject *bufObj, GLuint name);
 #ifdef OPENGL40
@@ -24,94 +25,184 @@ extern GLvoid __glConfigArrayVertexStream(__GLcontext *gc, GLenum mode);
 #endif
 
 
-__GL_INLINE GLvoid __glVertexAttrib4f(__GLcontext *gc, GLuint index, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
+__GL_INLINE GLvoid __glVertexAttrib4fv(__GLcontext *gc, GLuint index,  GLfloat *v)
 {
-    if (index >= gc->constants.shaderCaps.maxUserVertAttributes)
+    GLuint * current;
+    GLuint *iv = (GLuint *)v;
+    GLuint64 at4fMask = (__GL_ONE_64 << (__GL_AT4F_I0_INDEX + index));
+
+    if (gc->input.preVertexFormat & at4fMask)
     {
-        __GL_ERROR_RET(GL_INVALID_VALUE);
+        if ((gc->input.vertexFormat & at4fMask) == 0)
+        {
+            gc->input.attribute[index].currentPtrDW += gc->input.vertTotalStrideDW;
+        }
+        current = ( GLuint * ) gc->input.attribute[index].currentPtrDW;
+        current[0] = iv[0];
+        current[1] = iv[1];
+        current[2] = iv[2];
+        current[3] = iv[3];
+        gc->input.vertexFormat |= at4fMask;
     }
+    else
+    {
+        if ((gc->input.currentInputMask & (__GL_ONE_64 << (__GL_INPUT_ATT0_INDEX + index))) == 0)
+        {
+            /* If glAttribute is not needed in glBegin/glEnd */
+            gc->state.current.attribute[index].i.ix = iv[0];
+            gc->state.current.attribute[index].i.iy = iv[1];
+            gc->state.current.attribute[index].i.iz = iv[2];
+            gc->state.current.attribute[index].i.iw = iv[3];
+        }
+        else if (gc->input.lastVertexIndex == gc->input.vertex.index)
+        {
+            if (gc->input.lastVertexIndex != 0)
+            {
+                /* The first glAttribute after glBegin has different format from the previous primitives */
+                __glConsistentFormatChange(gc);
+            }
 
+            /* For the first glAttribute after glBegin */
+            gc->input.attribute[index].offsetDW = (GLuint)(gc->input.currentDataBufPtr - gc->input.primBeginAddr);
+            gc->input.attribute[index].currentPtrDW = gc->input.currentDataBufPtr;
+            gc->input.attribute[index].pointer = (GLubyte*)gc->input.currentDataBufPtr;
+            gc->input.attribute[index].sizeDW = 4;
+            gc->input.currentDataBufPtr = gc->input.currentDataBufPtr + 4;
+            gc->input.preVertexFormat |= at4fMask;
+            current = ( GLuint * )gc->input.attribute[index].currentPtrDW;
+            current[0] = iv[0];
+            current[1] = iv[1];
+            current[2] = iv[2];
+            current[3] = iv[3];
+            gc->input.vertexFormat |= at4fMask;
+            __GL_PRIM_ELEMENT(gc->input.primElemSequence, __GL_AT4F_I0_TAG + index);
+        }
+        else if (gc->input.preVertexFormat != 0)
+        {
+            /* If a new vertex attribute occurs in the middle of glBegin and glEnd */
+            __glSwitchToNewPrimtiveFormat(gc, __GL_AT4F_I0_INDEX + index);
 
-    gc->state.current.attribute[index].f.x = x;
-    gc->state.current.attribute[index].f.y = y;
-    gc->state.current.attribute[index].f.z = z;
-    gc->state.current.attribute[index].f.w = w;
+            gc->input.attribute[index].currentPtrDW += gc->input.vertTotalStrideDW;
+            current =( GLuint * ) gc->input.attribute[index].currentPtrDW;
+            current[0] = iv[0];
+            current[1] = iv[1];
+            current[2] = iv[2];
+            current[3] = iv[3];
+            gc->input.vertexFormat |= at4fMask;
+        }
+        else
+        {
+            /* The vertex format is changed in the middle of glBegin/glEnd. */
+            if (gc->input.inconsistentFormat == GL_FALSE)
+            {
+                if ((gc->state.current.attribute[index].i.ix == iv[0]) &&
+                    (gc->state.current.attribute[index].i.iy == iv[1]) &&
+                    (gc->state.current.attribute[index].i.iz == iv[2]) &&
+                    (gc->state.current.attribute[index].i.iw == iv[3]))
+                {
+                    return;
+                }
 
+                __glSwitchToInconsistentFormat(gc);
+            }
+
+            gc->input.attribute[index].currentPtrDW = (GLfloat*)gc->input.attribute[index].pointer +
+                gc->input.attribute[index].index * gc->input.vertTotalStrideDW;
+            current = ( GLuint * )gc->input.attribute[index].currentPtrDW;
+            current[0] = iv[0];
+            current[1] = iv[1];
+            current[2] = iv[2];
+            current[3] = iv[3];
+            gc->input.attribute[index].index += 1;
+            gc->input.vertexFormat |= at4fMask;
+        }
+    }
 }
 
-__GL_INLINE GLvoid __glVertexAttribI4ui(__GLcontext *gc, GLuint index, GLuint ix, GLuint iy, GLuint iz, GLuint iw)
-{
-    if (index >= gc->constants.shaderCaps.maxUserVertAttributes)
-    {
-        __GL_ERROR_RET(GL_INVALID_VALUE);
-    }
-
-    gc->state.current.attribute[index].i.ix = ix;
-    gc->state.current.attribute[index].i.iy = iy;
-    gc->state.current.attribute[index].i.iz = iz;
-    gc->state.current.attribute[index].i.iw = iw;
-
-}
+#define __GL_VERTEXATTRIB4F(gc, index, x, y, z, w, fv, Suffix)       \
+    if (index >= gc->constants.shaderCaps.maxUserVertAttributes)     \
+    {                                                                \
+        __GL_ERROR_RET(GL_INVALID_VALUE);                            \
+    }                                                                \
+    fv[0] = (GLfloat)x;                                              \
+    fv[1] = (GLfloat)y;                                              \
+    fv[2] = (GLfloat)z;                                              \
+    fv[3] = (GLfloat)w;                                              \
+    __glVertexAttrib4fv##Suffix(gc,  index, (GLfloat *)fv );
 
 GLvoid GL_APIENTRY __glim_VertexAttrib1f(__GLcontext *gc, GLuint index, GLfloat x)
 {
+    GLfloat fv[4];
+
     __GL_HEADER();
 
-    __glVertexAttrib4f(gc, index, x, 0.0f, 0.0f, 1.0f);
+    __GL_VERTEXATTRIB4F(gc, index, x, 0.0f, 0.0f, 1.0f, fv,  );
 
     __GL_FOOTER();
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttrib1fv(__GLcontext *gc, GLuint index, const GLfloat *v)
 {
+    GLfloat fv[4];
+
     __GL_HEADER();
 
-    __glVertexAttrib4f(gc, index, v[0], 0.0f, 0.0f, 1.0f);
+    __GL_VERTEXATTRIB4F(gc, index, v[0], 0.0f, 0.0f, 1.0f, fv, );
 
     __GL_FOOTER();
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttrib2f(__GLcontext *gc, GLuint index, GLfloat x, GLfloat y)
 {
+    GLfloat fv[4];
+
     __GL_HEADER();
 
-    __glVertexAttrib4f(gc, index, x, y, 0.0f, 1.0f);
+    __GL_VERTEXATTRIB4F(gc, index, x, y, 0.0f, 1.0f, fv, );
 
     __GL_FOOTER();
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttrib2fv(__GLcontext *gc, GLuint index, const GLfloat *v)
 {
+    GLfloat fv[4];
+
     __GL_HEADER();
 
-    __glVertexAttrib4f(gc, index, v[0], v[1], 0.0f, 1.0f);
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], 0.0f, 1.0f, fv, );
 
     __GL_FOOTER();
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttrib3f(__GLcontext *gc, GLuint index, GLfloat x, GLfloat y, GLfloat z)
 {
+    GLfloat fv[4];
+
     __GL_HEADER();
 
-    __glVertexAttrib4f(gc, index, x, y, z, 1.0f);
+    __GL_VERTEXATTRIB4F(gc, index, x, y, z, 1.0f, fv, );
 
     __GL_FOOTER();
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttrib3fv(__GLcontext *gc, GLuint index, const GLfloat *v)
 {
+    GLfloat fv[4];
+
     __GL_HEADER();
 
-    __glVertexAttrib4f(gc, index, v[0], v[1], v[2], 1.0f);
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], 1.0f, fv, );
 
     __GL_FOOTER();
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttrib4f(__GLcontext *gc, GLuint index, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
 {
+    GLfloat fv[4];
+
     __GL_HEADER();
 
-    __glVertexAttrib4f(gc, index, x, y, z, w);
+    __GL_VERTEXATTRIB4F(gc, index, x, y, z, w, fv, );
 
     __GL_FOOTER();
 }
@@ -120,43 +211,51 @@ GLvoid GL_APIENTRY __glim_VertexAttrib4fv(__GLcontext *gc, GLuint index, const G
 {
     __GL_HEADER();
 
-    __glVertexAttrib4f(gc, index, v[0], v[1], v[2], v[3]);
+    __glVertexAttrib4fv(gc, index, (GLfloat *)v);
 
     __GL_FOOTER();
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI4i(__GLcontext *gc, GLuint index, GLint x, GLint y, GLint z, GLint w)
 {
+    GLfloat fv[4];
+
     __GL_HEADER();
 
-    __glVertexAttribI4ui(gc, index, (GLuint)x, (GLuint)y, (GLuint)z, (GLuint)w);
+    __GL_VERTEXATTRIB4F(gc, index, (GLfloat)x, (GLfloat)y, (GLfloat)z, (GLfloat)w, fv, );
 
     __GL_FOOTER();
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI4ui(__GLcontext *gc, GLuint index, GLuint x, GLuint y, GLuint z, GLuint w)
 {
+    GLfloat fv[4];
+
     __GL_HEADER();
 
-    __glVertexAttribI4ui(gc, index, x, y, z, w);
+    __GL_VERTEXATTRIB4F(gc, index, x, y, z, w, fv, );
 
     __GL_FOOTER();
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI4iv(__GLcontext *gc, GLuint index, const GLint *v)
 {
+    GLfloat fv[4];
+
     __GL_HEADER();
 
-    __glVertexAttribI4ui(gc, index, (GLuint)v[0], (GLuint)v[1], (GLuint)v[2], (GLuint)v[3]);
+    __GL_VERTEXATTRIB4F(gc, index, (GLuint)v[0], (GLuint)v[1], (GLuint)v[2], (GLuint)v[3], fv, );
 
     __GL_FOOTER();
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI4uiv(__GLcontext *gc, GLuint index, const GLuint *v)
 {
+    GLfloat fv[4];
+
     __GL_HEADER();
 
-    __glVertexAttribI4ui(gc, index, v[0], v[1], v[2], v[3]);
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], v[3], fv, );
 
     __GL_FOOTER();
 }
@@ -164,172 +263,312 @@ GLvoid GL_APIENTRY __glim_VertexAttribI4uiv(__GLcontext *gc, GLuint index, const
 #ifdef OPENGL40
 GLvoid APIENTRY __glim_VertexAttrib1s(__GLcontext *gc, GLuint index, GLshort x)
 {
-    __glVertexAttrib4f(gc, index, x, 0.0f, 0.0f, 1.0f);
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, x, 0.0f, 0.0f, 1.0f, fv, );
+
+    __GL_FOOTER();
 }
 
 
 GLvoid APIENTRY __glim_VertexAttrib1d(__GLcontext *gc, GLuint index, GLdouble x)
 {
-    __glVertexAttrib4f(gc, index, (GLfloat)x, 0.0f, 0.0f, 1.0f);
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, (GLfloat)x, 0.0f, 0.0f, 1.0f, fv, );
+
+    __GL_FOOTER();
 }
 
 GLvoid APIENTRY __glim_VertexAttrib2s(__GLcontext *gc, GLuint index, GLshort x, GLshort y)
 {
-    __glVertexAttrib4f(gc, index, x, y, 0.0f, 1.0f);
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, 0.0f, 1.0f, fv, );
+
+    __GL_FOOTER();
 }
 
 
 GLvoid APIENTRY __glim_VertexAttrib2d(__GLcontext *gc, GLuint index, GLdouble x, GLdouble y)
 {
-    __glVertexAttrib4f(gc, index, (GLfloat)x, (GLfloat)y, 0.0f, 1.0f);
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, (GLfloat)x, (GLfloat)y, 0.0f, 1.0f, fv, );
+
+    __GL_FOOTER();
 }
 
 GLvoid APIENTRY __glim_VertexAttrib3s(__GLcontext *gc, GLuint index, GLshort x, GLshort y, GLshort z)
 {
-    __glVertexAttrib4f(gc, index, x, y, z, 1.0f);
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, z, 1.0f, fv, );
+
+    __GL_FOOTER();
 }
 
 
 GLvoid APIENTRY __glim_VertexAttrib3d(__GLcontext *gc, GLuint index, GLdouble x, GLdouble y, GLdouble z)
 {
-    __glVertexAttrib4f(gc, index, (GLfloat)x, (GLfloat)y, (GLfloat)z, 1.0f);
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, (GLfloat)x, (GLfloat)y, (GLfloat)z, 1.0f, fv, );
+
+    __GL_FOOTER();
 }
 
 GLvoid APIENTRY __glim_VertexAttrib4s(__GLcontext *gc, GLuint index, GLshort x, GLshort y, GLshort z, GLshort w)
 {
-    __glVertexAttrib4f(gc, index, x, y, z, w);
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, z, w, fv, );
+
+    __GL_FOOTER();
 }
 
 
 GLvoid APIENTRY __glim_VertexAttrib4d(__GLcontext *gc, GLuint index, GLdouble x, GLdouble y, GLdouble z, GLdouble w)
 {
-    __glVertexAttrib4f(gc, index, (GLfloat)x, (GLfloat)y, (GLfloat)z, (GLfloat)w);
+    GLfloat fv[4];
+    __GL_HEADER();
+
+   __GL_VERTEXATTRIB4F(gc, index, (GLfloat)x, (GLfloat)y, (GLfloat)z, (GLfloat)w, fv, );
+
+   __GL_FOOTER();
 }
 
 GLvoid APIENTRY __glim_VertexAttrib1sv(__GLcontext *gc, GLuint index, const GLshort *v)
 {
-    __glVertexAttrib4f(gc, index, v[0], 0.0f, 0.0f, 1.0f);
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], 0.0f, 0.0f, 1.0f, fv, );
+
+    __GL_FOOTER();
 }
 
 
 GLvoid APIENTRY __glim_VertexAttrib1dv(__GLcontext *gc, GLuint index, const GLdouble *v)
 {
-    __glVertexAttrib4f(gc, index, (GLfloat)v[0], 0.0f, 0.0f, 1.0f);
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, (GLfloat)v[0], 0.0f, 0.0f, 1.0f, fv, );
+
+    __GL_FOOTER();
 }
 
 GLvoid APIENTRY __glim_VertexAttrib2sv(__GLcontext *gc, GLuint index, const GLshort *v)
 {
-    __glVertexAttrib4f(gc, index, v[0], v[1], 0.0f, 1.0f);
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], 0.0f, 1.0f, fv, );
+
+    __GL_FOOTER();
 }
 
 
 GLvoid APIENTRY __glim_VertexAttrib2dv(__GLcontext *gc, GLuint index, const GLdouble *v)
 {
-    __glVertexAttrib4f(gc,index, (GLfloat)v[0], (GLfloat)v[1], 0.0f, 1.0f);
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc,index, (GLfloat)v[0], (GLfloat)v[1], 0.0f, 1.0f, fv, );
+
+    __GL_FOOTER();
 }
 
 GLvoid APIENTRY __glim_VertexAttrib3sv(__GLcontext *gc, GLuint index, const GLshort *v)
 {
-    __glVertexAttrib4f(gc,index, v[0], v[1], v[2], 1.0f);
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc,index, v[0], v[1], v[2], 1.0f, fv, );
+
+    __GL_FOOTER();
 }
 
 GLvoid APIENTRY __glim_VertexAttrib3dv(__GLcontext *gc, GLuint index, const GLdouble *v)
 {
-    __glVertexAttrib4f(gc, index, (GLfloat)v[0], (GLfloat)v[1], (GLfloat)v[2], 1.0f);
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, (GLfloat)v[0], (GLfloat)v[1], (GLfloat)v[2], 1.0f, fv, );
+
+    __GL_FOOTER();
 }
 
 GLvoid APIENTRY __glim_VertexAttrib4bv(__GLcontext *gc, GLuint index, const GLbyte *v)
 {
-    __glVertexAttrib4f(gc, index, (GLfloat)v[0], (GLfloat)v[1], (GLfloat)v[2], (GLfloat)v[3]);
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, (GLfloat)v[0], (GLfloat)v[1], (GLfloat)v[2], (GLfloat)v[3], fv, );
+
+    __GL_FOOTER();
 }
 
 GLvoid APIENTRY __glim_VertexAttrib4sv(__GLcontext *gc, GLuint index, const GLshort *v)
 {
-    __glVertexAttrib4f(gc, index, (GLfloat)v[0], (GLfloat)v[1], (GLfloat)v[2], (GLfloat)v[3]);
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, (GLfloat)v[0], (GLfloat)v[1], (GLfloat)v[2], (GLfloat)v[3], fv, );
+
+    __GL_FOOTER();
 }
 
 GLvoid APIENTRY __glim_VertexAttrib4iv(__GLcontext *gc, GLuint index, const GLint *v)
 {
-    __glVertexAttrib4f(gc, index, (GLfloat)v[0], (GLfloat)v[1], (GLfloat)v[2], (GLfloat)v[3]);
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, (GLfloat)v[0], (GLfloat)v[1], (GLfloat)v[2], (GLfloat)v[3], fv, );
+
+    __GL_FOOTER();
 }
 
 GLvoid APIENTRY __glim_VertexAttrib4ubv(__GLcontext *gc, GLuint index, const GLubyte *v)
 {
-    __glVertexAttrib4f(gc, index, v[0], (GLfloat)v[1], (GLfloat)v[2], (GLfloat)v[3]);
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], (GLfloat)v[1], (GLfloat)v[2], (GLfloat)v[3], fv, );
+
+    __GL_FOOTER();
 }
 
 GLvoid APIENTRY __glim_VertexAttrib4usv(__GLcontext *gc, GLuint index, const GLushort *v)
 {
-    __glVertexAttrib4f(gc, index, v[0], (GLfloat)v[1], (GLfloat)v[2], (GLfloat)v[3]);
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], (GLfloat)v[1], (GLfloat)v[2], (GLfloat)v[3], fv, );
+
+    __GL_FOOTER();
 }
 
 GLvoid APIENTRY __glim_VertexAttrib4uiv(__GLcontext *gc, GLuint index, const GLuint *v)
 {
-    __glVertexAttrib4f(gc, index, (GLfloat)v[0], (GLfloat)v[1], (GLfloat)v[2], (GLfloat)v[3]);
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, (GLfloat)v[0], (GLfloat)v[1], (GLfloat)v[2], (GLfloat)v[3], fv, );
+
+    __GL_FOOTER();
 }
 
 
 GLvoid APIENTRY __glim_VertexAttrib4dv(__GLcontext *gc, GLuint index, const GLdouble *v)
 {
-    __glVertexAttrib4f(gc, index, (GLfloat)v[0], (GLfloat)v[1], (GLfloat)v[2], (GLfloat)v[3]);
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, (GLfloat)v[0], (GLfloat)v[1], (GLfloat)v[2], (GLfloat)v[3], fv, );
+    __GL_FOOTER();
+
 }
 
 GLvoid APIENTRY __glim_VertexAttrib4Nub(__GLcontext *gc, GLuint index, GLubyte x, GLubyte y, GLubyte z, GLubyte w)
 {
-    __glVertexAttrib4f(gc, index, __GL_UB_TO_FLOAT(x), __GL_UB_TO_FLOAT(y),
-        __GL_UB_TO_FLOAT(z), __GL_UB_TO_FLOAT(w));
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_UB_TO_FLOAT(x), __GL_UB_TO_FLOAT(y),
+        __GL_UB_TO_FLOAT(z), __GL_UB_TO_FLOAT(w), fv, );
+
+    __GL_FOOTER();
 }
 
 GLvoid APIENTRY __glim_VertexAttrib4Nbv(__GLcontext *gc, GLuint index, const GLbyte *v)
 {
-    __glVertexAttrib4f(gc, index, __GL_B_TO_FLOAT(v[0]), __GL_B_TO_FLOAT(v[1]),
-        __GL_B_TO_FLOAT(v[2]), __GL_B_TO_FLOAT(v[3]));
+    GLfloat fv[4];
+    __GL_HEADER();
+    __GL_VERTEXATTRIB4F(gc, index, __GL_B_TO_FLOAT(v[0]), __GL_B_TO_FLOAT(v[1]),
+        __GL_B_TO_FLOAT(v[2]), __GL_B_TO_FLOAT(v[3]), fv, );
+    __GL_FOOTER();
 }
 
 GLvoid APIENTRY __glim_VertexAttrib4Nsv(__GLcontext *gc, GLuint index, const GLshort *v)
 {
-    __glVertexAttrib4f(gc, index, __GL_S_TO_FLOAT(v[0]), __GL_S_TO_FLOAT(v[1]),
-        __GL_S_TO_FLOAT(v[2]), __GL_S_TO_FLOAT(v[3]));
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_S_TO_FLOAT(v[0]), __GL_S_TO_FLOAT(v[1]),
+        __GL_S_TO_FLOAT(v[2]), __GL_S_TO_FLOAT(v[3]), fv, );
+
+    __GL_FOOTER();
 }
 
 GLvoid APIENTRY __glim_VertexAttrib4Niv(__GLcontext *gc, GLuint index, const GLint *v)
 {
-    __glVertexAttrib4f(gc, index, __GL_I_TO_FLOAT(v[0]), __GL_I_TO_FLOAT(v[1]),
-        __GL_I_TO_FLOAT(v[2]), __GL_I_TO_FLOAT(v[3]));
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_I_TO_FLOAT(v[0]), __GL_I_TO_FLOAT(v[1]),
+        __GL_I_TO_FLOAT(v[2]), __GL_I_TO_FLOAT(v[3]), fv, );
+
+    __GL_FOOTER();
 }
 
 GLvoid APIENTRY __glim_VertexAttrib4Nubv(__GLcontext *gc, GLuint index, const GLubyte *v)
 {
-    __glVertexAttrib4f(gc, index, __GL_UB_TO_FLOAT(v[0]), __GL_UB_TO_FLOAT(v[1]),
-        __GL_UB_TO_FLOAT(v[2]), __GL_UB_TO_FLOAT(v[3]));
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_UB_TO_FLOAT(v[0]), __GL_UB_TO_FLOAT(v[1]),
+        __GL_UB_TO_FLOAT(v[2]), __GL_UB_TO_FLOAT(v[3]), fv, );
+
+    __GL_FOOTER();
 }
 
 GLvoid APIENTRY __glim_VertexAttrib4Nusv(__GLcontext *gc, GLuint index, const GLushort *v)
 {
-    __glVertexAttrib4f(gc, index, __GL_US_TO_FLOAT(v[0]), __GL_US_TO_FLOAT(v[1]),
-        __GL_US_TO_FLOAT(v[2]), __GL_US_TO_FLOAT(v[3]));
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_US_TO_FLOAT(v[0]), __GL_US_TO_FLOAT(v[1]),
+        __GL_US_TO_FLOAT(v[2]), __GL_US_TO_FLOAT(v[3]), fv, );
+
+    __GL_FOOTER();
 }
 
 GLvoid APIENTRY __glim_VertexAttrib4Nuiv(__GLcontext *gc, GLuint index, const GLuint *v)
 {
-    __glVertexAttrib4f(gc, index, __GL_UI_TO_FLOAT(v[0]), __GL_UI_TO_FLOAT(v[1]),
-        __GL_UI_TO_FLOAT(v[2]), __GL_UI_TO_FLOAT(v[3]));
+    GLfloat fv[4];
+    __GL_HEADER();
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_UI_TO_FLOAT(v[0]), __GL_UI_TO_FLOAT(v[1]),
+        __GL_UI_TO_FLOAT(v[2]), __GL_UI_TO_FLOAT(v[3]), fv, );
+
+    __GL_FOOTER();
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI1i(__GLcontext *gc, GLuint index, GLint x)
 {
+    GLfloat fv[4];
     __GL_HEADER();
 
-    __glVertexAttribI4ui(gc, index, (GLuint)x, 0, 0, 0);
+    __GL_VERTEXATTRIB4F(gc, index, (GLuint)x, 0, 0, 0, fv, );
 
     __GL_FOOTER();
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI2i(__GLcontext *gc, GLuint index, GLint x, GLint y)
 {
+    GLfloat fv[4];
     __GL_HEADER();
 
-    __glVertexAttribI4ui(gc, index, (GLuint)x, (GLuint)y, 0, 0);
+    __GL_VERTEXATTRIB4F(gc, index, (GLuint)x, (GLuint)y, 0, 0, fv, );
 
     __GL_FOOTER();
 }
@@ -337,90 +576,100 @@ GLvoid GL_APIENTRY __glim_VertexAttribI2i(__GLcontext *gc, GLuint index, GLint x
 
 GLvoid GL_APIENTRY __glim_VertexAttribI3i(__GLcontext *gc, GLuint index, GLint x, GLint y, GLint z)
 {
+    GLfloat fv[4];
     __GL_HEADER();
 
-    __glVertexAttribI4ui(gc, index, (GLuint)x, (GLuint)y, (GLuint)z, 0);
+    __GL_VERTEXATTRIB4F(gc, index, (GLuint)x, (GLuint)y, (GLuint)z, 0, fv, );
 
     __GL_FOOTER();
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI1ui(__GLcontext *gc, GLuint index, GLuint x)
 {
+    GLfloat fv[4];
     __GL_HEADER();
 
-    __glVertexAttribI4ui(gc, index, (GLuint)x, 0, 0, 0);
+    __GL_VERTEXATTRIB4F(gc, index, (GLuint)x, 0, 0, 0, fv, );
 
     __GL_FOOTER();
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI2ui(__GLcontext *gc, GLuint index, GLuint x, GLuint y)
 {
+    GLfloat fv[4];
     __GL_HEADER();
 
-    __glVertexAttribI4ui(gc, index, (GLuint)x, (GLuint)y, 0, 0);
+    __GL_VERTEXATTRIB4F(gc, index, (GLuint)x, (GLuint)y, 0, 0, fv, );
 
     __GL_FOOTER();
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI3ui(__GLcontext *gc, GLuint index, GLuint x, GLuint y, GLuint z)
 {
+    GLfloat fv[4];
     __GL_HEADER();
 
-    __glVertexAttribI4ui(gc, index, (GLuint)x, (GLuint)y, (GLuint)z, 0);
+    __GL_VERTEXATTRIB4F(gc, index, (GLuint)x, (GLuint)y, (GLuint)z, 0, fv, );
 
     __GL_FOOTER();
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI1iv(__GLcontext *gc, GLuint index, const GLint *v)
 {
+    GLfloat fv[4];
     __GL_HEADER();
 
-    __glVertexAttribI4ui(gc, index, (GLuint)v[0], 0, 0, 0);
+    __GL_VERTEXATTRIB4F(gc, index, (GLuint)v[0], 0, 0, 0, fv, );
 
     __GL_FOOTER();
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI2iv(__GLcontext *gc, GLuint index, const GLint *v)
 {
+    GLfloat fv[4];
     __GL_HEADER();
 
-    __glVertexAttribI4ui(gc, index, (GLuint)v[0], (GLuint)v[1], 0, 0);
+    __GL_VERTEXATTRIB4F(gc, index, (GLuint)v[0], (GLuint)v[1], 0, 0, fv, );
 
     __GL_FOOTER();
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI3iv(__GLcontext *gc, GLuint index, const GLint *v)
 {
+    GLfloat fv[4];
     __GL_HEADER();
 
-    __glVertexAttribI4ui(gc, index, (GLuint)v[0], (GLuint)v[1], (GLuint)v[2], 0);
+    __GL_VERTEXATTRIB4F(gc, index, (GLuint)v[0], (GLuint)v[1], (GLuint)v[2], 0, fv, );
 
     __GL_FOOTER();
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI1uiv(__GLcontext *gc, GLuint index, const GLuint *v)
 {
+    GLfloat fv[4];
     __GL_HEADER();
 
-    __glVertexAttribI4ui(gc, index, v[0], 0, 0, 0);
+    __GL_VERTEXATTRIB4F(gc, index, v[0], 0, 0, 0, fv, );
 
     __GL_FOOTER();
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI2uiv(__GLcontext *gc, GLuint index, const GLuint *v)
 {
+    GLfloat fv[4];
     __GL_HEADER();
 
-    __glVertexAttribI4ui(gc, index, v[0], v[1], 0, 0);
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], 0, 0, fv, );
 
     __GL_FOOTER();
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI3uiv(__GLcontext *gc, GLuint index, const GLuint *v)
 {
+    GLfloat fv[4];
     __GL_HEADER();
 
-    __glVertexAttribI4ui(gc, index, v[0], v[1], v[2], 0);
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], 0, fv, );
 
     __GL_FOOTER();
 }
@@ -456,6 +705,7 @@ GLvoid GL_APIENTRY __glim_VertexAttribI4usv(__GLcontext *gc, GLuint index, const
 GLvoid APIENTRY __glim_GetVertexAttribdv(__GLcontext *gc,  GLuint index, GLenum pname, GLdouble *params)
 {
     __GLvertexAttrib *pAttrib;
+    __GLvertexAttribBinding *pAttribBinding;
     __GLvertexArrayState * pVertexArrayState = &gc->vertexArray.boundVAO->vertexArray;
     GLuint bit;
 
@@ -475,8 +725,8 @@ GLvoid APIENTRY __glim_GetVertexAttribdv(__GLcontext *gc,  GLuint index, GLenum 
     }
 #endif
 
-    pVertexArrayState = &gc->clientState.vertexArray;
     pAttrib = &pVertexArrayState->attribute[index];
+    pAttribBinding = &pVertexArrayState->attributeBinding[pAttrib->attribBinding];
 
     switch(pname)
     {
@@ -506,27 +756,34 @@ GLvoid APIENTRY __glim_GetVertexAttribdv(__GLcontext *gc,  GLuint index, GLenum 
         break;
 
     case GL_CURRENT_VERTEX_ATTRIB:
-        if (index > 0)
-        {
 #ifdef OPENGL40
-            if (gc->imports.conformGLSpec)
-            {
-                *params++ = gc->state.current.currentState[index].f.x;
-                *params++ = gc->state.current.currentState[index].f.y;
-                *params++ = gc->state.current.currentState[index].f.z;
-                *params++ = gc->state.current.currentState[index].f.w;
-            }
-            else  /* Running OES api */
-#endif
-            {
-                *params++ = gc->state.current.attribute[index].f.x;
-                *params++ = gc->state.current.attribute[index].f.y;
-                *params++ = gc->state.current.attribute[index].f.z;
-                *params++ = gc->state.current.attribute[index].f.w;
-            }
+        if (gc->imports.conformGLSpec)
+        {
+            *params++ = gc->state.current.currentState[index].f.x;
+            *params++ = gc->state.current.currentState[index].f.y;
+            *params++ = gc->state.current.currentState[index].f.z;
+            *params++ = gc->state.current.currentState[index].f.w;
         }
-        else
-            __glSetError(gc, GL_INVALID_OPERATION);
+        else  /* Running OES api */
+#endif
+        {
+            *params++ = gc->state.current.attribute[index].f.x;
+            *params++ = gc->state.current.attribute[index].f.y;
+            *params++ = gc->state.current.attribute[index].f.z;
+            *params++ = gc->state.current.attribute[index].f.w;
+        }
+        break;
+
+    case GL_VERTEX_ATTRIB_ARRAY_DIVISOR:
+        *params   = (GLfloat)pAttribBinding->divisor;
+        break;
+
+    case GL_VERTEX_ATTRIB_BINDING:
+        *params = (GLfloat) pAttrib->attribBinding;
+        break;
+
+    case GL_VERTEX_ATTRIB_RELATIVE_OFFSET:
+        *params = (GLfloat)pAttrib->relativeOffset;
         break;
 
     default:
@@ -826,6 +1083,12 @@ __GL_INLINE GLvoid __glDrawRangeElements(__GLcontext *gc, GLenum mode, GLsizei c
                                          GLenum type, const GLvoid *indices)
 {
     __GLvertexArrayMachine *vertexArray = &gc->vertexArray;
+
+    __GL_VERTEX_BUFFER_FLUSH(gc);
+
+    if (gc->input.deferredAttribDirty) {
+        __glCopyDeferedAttribToCurrent(gc);
+    }
 
     /* The indices might be used as an offset */
     vertexArray->indexCount = count;
@@ -1159,6 +1422,12 @@ GLvoid __glDrawArraysInstanced(__GLcontext *gc, GLenum mode, GLint first, GLsize
         return;
     }
 
+    __GL_VERTEX_BUFFER_FLUSH(gc);
+
+    if (gc->input.deferredAttribDirty) {
+        __glCopyDeferedAttribToCurrent(gc);
+    }
+
     vertexArray->indexCount = 0;
     vertexArray->instanceCount  = instanceCount;
     vertexArray->start = first;
@@ -1358,6 +1627,12 @@ GLvoid GL_APIENTRY __glim_DrawArraysIndirect(__GLcontext *gc, GLenum mode, const
         __GL_EXIT();
     }
 
+    __GL_VERTEX_BUFFER_FLUSH(gc);
+
+    if (gc->input.deferredAttribDirty) {
+        __glCopyDeferedAttribToCurrent(gc);
+    }
+
     /* Assign fake start, end values to make primcount > 0,
     ** 32(max patch vertices)is to pass ts vertex count check */
     gc->vertexArray.start = 0xdeadbeef;
@@ -1434,6 +1709,12 @@ GLvoid GL_APIENTRY __glim_DrawElementsIndirect(__GLcontext *gc, GLenum mode, GLe
             1))
     {
         __GL_EXIT();
+    }
+
+    __GL_VERTEX_BUFFER_FLUSH(gc);
+
+    if (gc->input.deferredAttribDirty) {
+        __glCopyDeferedAttribToCurrent(gc);
     }
 
     gc->vertexArray.start = 0;
@@ -1516,6 +1797,12 @@ GLvoid GL_APIENTRY __glim_MultiDrawArraysIndirect(__GLcontext *gc, GLenum mode, 
             1))
     {
         __GL_EXIT();
+    }
+
+    __GL_VERTEX_BUFFER_FLUSH(gc);
+
+    if (gc->input.deferredAttribDirty) {
+        __glCopyDeferedAttribToCurrent(gc);
     }
 
     /* Assign fake start, end values to make primcount > 0,
@@ -1611,6 +1898,12 @@ GLvoid GL_APIENTRY __glim_MultiDrawElementsIndirect(__GLcontext *gc, GLenum mode
             1))
     {
         __GL_EXIT();
+    }
+
+    __GL_VERTEX_BUFFER_FLUSH(gc);
+
+    if (gc->input.deferredAttribDirty) {
+        __glCopyDeferedAttribToCurrent(gc);
     }
 
     gc->vertexArray.start = 0;
@@ -2281,11 +2574,23 @@ GLvoid __glBindVertexArray(__GLcontext *gc, GLuint array)
         vertexArrayObj = (__GLvertexArrayObject *)__glGetObject(gc, gc->vertexArray.noShare, array);
         if (vertexArrayObj == gcvNULL)
         {
-            vertexArrayObj = (__GLvertexArrayObject*)(*gc->imports.calloc)(gc, 1, sizeof(__GLvertexArrayObject));
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLvertexArrayObject), (gctPOINTER*)&vertexArrayObj)))
+            {
+                __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+            }
+            gcoOS_ZeroMemory(vertexArrayObj, sizeof(__GLvertexArrayObject));
 
             __glInitVertexArrayObject(gc,  vertexArrayObj, array);
-            __glAddObject(gc, gc->vertexArray.noShare, array, vertexArrayObj);
-            __glMarkNameUsed(gc, gc->vertexArray.noShare, array);
+            if (__glAddObject(gc, gc->vertexArray.noShare, array, vertexArrayObj) == GL_FALSE)
+            {
+                gcmOS_SAFE_FREE(gcvNULL, vertexArrayObj);
+                __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+            }
+            if (__glMarkNameUsed(gc, gc->vertexArray.noShare, array) < 0)
+            {
+                __glDeleteObject(gc, gc->vertexArray.noShare, array);
+                __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+            }
         }
     }
     else
@@ -2355,31 +2660,41 @@ GLboolean __glDeleteVertexArrayObject(__GLcontext *gc, __GLvertexArrayObject *ve
 
     if (vertexArrayObj->label)
     {
-        gc->imports.free(gc, vertexArrayObj->label);
+        gcmOS_SAFE_FREE(gcvNULL, vertexArrayObj->label);
     }
 
     /* Delete the vertex array object structure */
-    (*gc->imports.free)(gc, vertexArrayObj);
+    gcmOS_SAFE_FREE(gcvNULL, vertexArrayObj);
 
     __GL_FOOTER();
 
     return GL_TRUE;
 }
 
-void __glInitVertexArrayState(__GLcontext *gc)
+GLboolean __glInitVertexArrayState(__GLcontext *gc)
 {
     __GL_HEADER();
 
     /* Vertex array object cannot be shared between contexts */
     if (gc->vertexArray.noShare == gcvNULL)
     {
-        gc->vertexArray.noShare = (__GLsharedObjectMachine*)(*gc->imports.calloc)(gc, 1, sizeof(__GLsharedObjectMachine));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLsharedObjectMachine), (gctPOINTER*)&gc->vertexArray.noShare)))
+        {
+            __GL_FOOTER();
+            return GL_FALSE;
+        }
+        gcoOS_ZeroMemory(gc->vertexArray.noShare, sizeof(__GLsharedObjectMachine));
 
         /* Initialize a linear lookup table for vertex array object */
         gc->vertexArray.noShare->maxLinearTableSize = __GL_MAX_VAO_LINEAR_TABLE_SIZE;
         gc->vertexArray.noShare->linearTableSize = __GL_DEFAULT_VAO_LINEAR_TABLE_SIZE;
-        gc->vertexArray.noShare->linearTable = (GLvoid **)
-            (*gc->imports.calloc)(gc, 1, gc->vertexArray.noShare->linearTableSize * sizeof(GLvoid *));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, gc->vertexArray.noShare->linearTableSize * sizeof(GLvoid *), (gctPOINTER*)&gc->vertexArray.noShare->linearTable)))
+        {
+            gcmOS_SAFE_FREE(gcvNULL, gc->vertexArray.noShare);
+            __GL_FOOTER();
+            return GL_FALSE;
+        }
+        gcoOS_ZeroMemory(gc->vertexArray.noShare->linearTable, gc->vertexArray.noShare->linearTableSize * sizeof(GLvoid *));
 
         gc->vertexArray.noShare->hashSize = __GL_VAO_HASH_TABLE_SIZE;
         gc->vertexArray.noShare->hashMask = __GL_VAO_HASH_TABLE_SIZE - 1;
@@ -2406,6 +2721,7 @@ void __glInitVertexArrayState(__GLcontext *gc)
     gc->vertexArray.fromDrawXFB =  GL_FALSE;
 #endif
     __GL_FOOTER();
+    return GL_TRUE;
 }
 
 void __glFreeVertexArrayState(__GLcontext *gc)
@@ -2587,24 +2903,30 @@ GLvoid GL_APIENTRY __glim_BindVertexBuffer(__GLcontext *gc, GLuint bindingindex,
 
         if (NULL == bufObj)
         {
-            bufObj = (__GLbufferObject *)(*gc->imports.calloc)(gc, 1, sizeof(__GLbufferObject));
-
-            if (!bufObj)
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLbufferObject), (gctPOINTER*)&bufObj)))
             {
                 __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
             }
+            gcoOS_ZeroMemory(bufObj, sizeof(__GLbufferObject));
 
             __glInitBufferObject(gc, bufObj, buffer);
 
             /* Add this buffer object to the "gc->bufferObject.shared" structure. */
-            __glAddObject(gc, gc->bufferObject.shared, buffer, bufObj);
+            if (__glAddObject(gc, gc->bufferObject.shared, buffer, bufObj) == GL_FALSE)
+            {
+                gcmOS_SAFE_FREE(gcvNULL, bufObj);
+                __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+            }
 
             /* Mark the name "buffer" used in the buffer object nameArray.*/
-            __glMarkNameUsed(gc, gc->bufferObject.shared, buffer);
-
+            if (__glMarkNameUsed(gc, gc->bufferObject.shared, buffer) < 0)
+            {
+                __glDeleteObject(gc, gc->bufferObject.shared, buffer);
+                __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+            }
             if (!(*gc->dp.bindBuffer)(gc,bufObj,gcvBUFOBJ_TYPE_ARRAY_BUFFER))
             {
-                __GL_ERROR((*gc->dp.getError)(gc));
+                __GL_ERROR_EXIT((*gc->dp.getError)(gc));
             }
         }
         GL_ASSERT(bufObj);
@@ -3149,8 +3471,18 @@ __GL_INLINE GLvoid __glValidateVertexArrays(__GLcontext *gc)
         gc->vertexArray.arrayElementFunc = __glim_ArrayElement;
     }
 
+    if (gc->vertexArray.varrayDirty & (__GL_DIRTY_VARRAY_FORMAT_BIT |
+        __GL_DIRTY_VARRAY_ENABLE_BIT |
+        __GL_DIRTY_VARRAY_STOP_CACHE_BIT))
+    {
+        /* Validate DrawArrays/ArrayElement function */
+        __glSelectImmedDrawArraysFn(gc);
+
+        gc->vertexArray.varrayDirty &= (~__GL_DIRTY_VARRAY_STOP_CACHE_BIT);
+    }
+
     /* Finally, Clear the vertex array dirty bits */
-    gc->vertexArray.globalDirtyBackup = gc->vertexArray.varrayDirty;
+    gc->vertexArray.varrayDirtyBackup = gc->vertexArray.varrayDirty;
 }
 
 #define __GL_SIZE_F \
@@ -3366,11 +3698,9 @@ GLvoid APIENTRY __glim_DrawArrays_Validate(__GLcontext *gc, GLenum mode, GLint f
 
     __glValidateVertexArrays(gc);
 
-    gc->immedModeDispatch.ArrayElement = gc->vertexArray.arrayElementFunc;
-    gc->immedModeDispatch.DrawArrays   = gc->vertexArray.drawArraysFunc;
-    gc->immedModeDispatch.DrawElements = gc->vertexArray.drawElementsFunc;
+    gc->immedModeOutsideDispatch.DrawArrays   = gc->vertexArray.drawArraysFunc;
 
-    (*gc->immedModeDispatch.DrawArrays)(gc, mode, first, count);
+    (*gc->immedModeOutsideDispatch.DrawArrays)(gc, mode, first, count);
 }
 
 GLvoid APIENTRY __glim_DrawElements_Validate(__GLcontext *gc, GLenum mode, GLsizei count, GLenum type, const GLvoid *indices)
@@ -3385,11 +3715,9 @@ GLvoid APIENTRY __glim_DrawElements_Validate(__GLcontext *gc, GLenum mode, GLsiz
 
     __glValidateVertexArrays(gc);
 
-    gc->immedModeDispatch.ArrayElement = gc->vertexArray.arrayElementFunc;
-    gc->immedModeDispatch.DrawArrays   = gc->vertexArray.drawArraysFunc;
-    gc->immedModeDispatch.DrawElements = gc->vertexArray.drawElementsFunc;
+    gc->immedModeOutsideDispatch.DrawElements = gc->vertexArray.drawElementsFunc;
 
-    (*gc->immedModeDispatch.DrawElements)(gc, mode, count, type, indices);
+    (*gc->immedModeOutsideDispatch.DrawElements)(gc, mode, count, type, indices);
 }
 
 GLvoid APIENTRY __glim_ArrayElement_Validate(__GLcontext *gc, GLint element)
@@ -3404,11 +3732,9 @@ GLvoid APIENTRY __glim_ArrayElement_Validate(__GLcontext *gc, GLint element)
 
     __glValidateVertexArrays(gc);
 
-    gc->immedModeDispatch.ArrayElement = gc->vertexArray.arrayElementFunc;
-    gc->immedModeDispatch.DrawArrays   = gc->vertexArray.drawArraysFunc;
-    gc->immedModeDispatch.DrawElements = gc->vertexArray.drawElementsFunc;
+    gc->immedModeOutsideDispatch.ArrayElement = gc->vertexArray.arrayElementFunc;
 
-    (*gc->immedModeDispatch.ArrayElement)(gc, element);
+    (*gc->immedModeOutsideDispatch.ArrayElement)(gc, element);
 }
 
 GLvoid APIENTRY __glim_ArrayElement(__GLcontext *gc, GLint element)
@@ -3554,4 +3880,1009 @@ GLvoid APIENTRY __glim_ArrayElement(__GLcontext *gc, GLint element)
         i++;
     }
 }
+
+/*
+ * Following APIs are used for immediate mode OpenGL vertex attribute APIs
+ * performance improvement
+ */
+__GL_INLINE GLvoid __glVertexAttrib4fv_Info(__GLcontext *gc, GLuint index, GLfloat *v)
+{
+    GLuint *current;
+    GLuint *iv = (GLuint *)v;
+    GLuint64 at4fMask = (__GL_ONE_64 << (__GL_AT4F_I0_INDEX + index));
+    __GLvertexInfo *vtxinfo;
+
+    if (gc->input.preVertexFormat & at4fMask)
+    {
+        if ((gc->input.vertexFormat & at4fMask) == 0)
+        {
+            gc->input.attribute[index].currentPtrDW += gc->input.vertTotalStrideDW;
+        }
+        current = ( GLuint * )gc->input.attribute[index].currentPtrDW;
+        current[0] = iv[0];
+        current[1] = iv[1];
+        current[2] = iv[2];
+        current[3] = iv[3];
+        gc->input.vertexFormat |= at4fMask;
+
+        vtxinfo = gc->input.currentInfoBufPtr++;
+        vtxinfo->inputTag = __GL_AT4F_I0_TAG + index;
+        vtxinfo->offsetDW = (GLushort)(( GLfloat* )current - gc->input.vertexDataBuffer);
+        vtxinfo->appDataPtr = (GLuint *)v;
+        vtxinfo->ptePointer = __glGetPageTableEntryPointer(gc, v);
+        __glClearPageTableEntryDirty(gc, vtxinfo->ptePointer, __GL_INPUT_ATT0_INDEX + index);
+    }
+    else
+    {
+        if ((gc->input.currentInputMask & (__GL_ONE_64 << (__GL_INPUT_ATT0_INDEX + index))) == 0)
+        {
+            /* If glAttribute is not needed in glBegin/glEnd */
+            gc->state.current.attribute[index].i.ix = iv[0];
+            gc->state.current.attribute[index].i.iy = iv[1];
+            gc->state.current.attribute[index].i.iz = iv[2];
+            gc->state.current.attribute[index].i.iw = iv[3];
+        }
+        else if (gc->input.lastVertexIndex == gc->input.vertex.index)
+        {
+            if (gc->input.lastVertexIndex != 0)
+            {
+                /* The first glAttribute after glBegin has different format from the previous primitives */
+                __glConsistentFormatChange(gc);
+            }
+
+            /* For the first glAttribute after glBegin */
+            gc->input.attribute[index].offsetDW = (GLuint)(gc->input.currentDataBufPtr - gc->input.primBeginAddr);
+            gc->input.attribute[index].currentPtrDW = gc->input.currentDataBufPtr;
+            gc->input.attribute[index].pointer = (GLubyte*)gc->input.currentDataBufPtr;
+            gc->input.attribute[index].sizeDW = 4;
+            gc->input.currentDataBufPtr = gc->input.currentDataBufPtr + 4;
+            gc->input.preVertexFormat |= at4fMask;
+            current = ( GLuint * )gc->input.attribute[index].currentPtrDW;
+            current[0] = iv[0];
+            current[1] = iv[1];
+            current[2] = iv[2];
+            current[3] = iv[3];
+            gc->input.vertexFormat |= at4fMask;
+            __GL_PRIM_ELEMENT(gc->input.primElemSequence, __GL_AT4F_I0_TAG + index);
+
+            vtxinfo = gc->input.currentInfoBufPtr++;
+            vtxinfo->inputTag = __GL_AT4F_I0_TAG + index;
+            vtxinfo->offsetDW = (GLushort)(( GLfloat * )current - gc->input.vertexDataBuffer);
+            vtxinfo->appDataPtr = (GLuint *)v;
+            vtxinfo->ptePointer = __glGetPageTableEntryPointer(gc, v);
+            __glClearPageTableEntryDirty(gc, vtxinfo->ptePointer, __GL_INPUT_ATT0_INDEX + index);
+        }
+        else if (gc->input.preVertexFormat != 0)
+        {
+            /* If a new vertex attribute occurs in the middle of glBegin and glEnd */
+            __glSwitchToNewPrimtiveFormat(gc, __GL_AT4F_I0_INDEX + index);
+
+            gc->input.attribute[index].currentPtrDW += gc->input.vertTotalStrideDW;
+            current = (GLuint *)gc->input.attribute[index].currentPtrDW;
+            current[0] = iv[0];
+            current[1] = iv[1];
+            current[2] = iv[2];
+            current[3] = iv[3];
+            gc->input.vertexFormat |= at4fMask;
+        }
+        else
+        {
+            /* The vertex format is changed in the middle of glBegin/glEnd. */
+            if (gc->input.inconsistentFormat == GL_FALSE)
+            {
+                if ((gc->state.current.attribute[index].i.ix == iv[0]) &&
+                    (gc->state.current.attribute[index].i.iy == iv[1]) &&
+                    (gc->state.current.attribute[index].i.iz == iv[2]) &&
+                    (gc->state.current.attribute[index].i.iw == iv[3]))
+                {
+                    return;
+                }
+
+                __glSwitchToInconsistentFormat(gc);
+            }
+
+            gc->input.attribute[index].currentPtrDW = (GLfloat*)gc->input.attribute[index].pointer +
+                gc->input.attribute[index].index * gc->input.vertTotalStrideDW;
+            current = (GLuint *)gc->input.attribute[index].currentPtrDW;
+            current[0] = iv[0];
+            current[1] = iv[1];
+            current[2] = iv[2];
+            current[3] = iv[3];
+            gc->input.attribute[index].index += 1;
+            gc->input.vertexFormat |= at4fMask;
+        }
+    }
+}
+
+__GL_INLINE GLvoid __glVertexAttrib4fv_Cache(__GLcontext *gc, GLuint index, GLfloat *fatt)
+{
+    __GLvertexInfo *vtxinfo;
+    GLuint pteStatus;
+    GLuint *buf;
+    GLuint * att = (GLuint *)fatt;
+
+    vtxinfo = gc->pCurrentInfoBufPtr;
+
+    /* If the inputTag matches the incoming data */
+    if (vtxinfo->inputTag == (__GL_AT4F_I0_TAG + index))
+    {
+        /* If the cached vertex data pointer matches the incoming pointer */
+        if (vtxinfo->appDataPtr == att)
+        {
+            /* If the page is valid and the page dirty bit is not set */
+            pteStatus = (GLuint)(*vtxinfo->ptePointer);
+            if (__GL_PTE_NOT_DIRTY(pteStatus))
+            {
+                /* Then application data has not been changed, just return */
+                gc->pCurrentInfoBufPtr++;
+                return;
+            }
+        }
+
+        buf = (GLuint *)gc->pVertexDataBufPtr + vtxinfo->offsetDW;
+
+        /* If incoming vertex data are the same as cached vertex data, just return */
+        if (((att[0] ^ buf[0]) | (att[1] ^ buf[1]) | (att[2] ^ buf[2]) | (att[3] ^ buf[3])) == 0)
+        {
+            gc->pCurrentInfoBufPtr++;
+            return;
+        }
+    }
+
+    {
+
+        /* If it is the end of vertex cache buffer then flush the vertex data */
+        if (vtxinfo->inputTag == __GL_BATCH_END_TAG)
+        {
+            __glImmedFlushBuffer_Cache(gc, (__GL_AT4F_I0_TAG + index));
+            (*gc->currentImmediateDispatch->VertexAttrib4fv)(gc, index, (GLfloat *)att);
+            return;
+        }
+
+        if (gc->input.currentInputMask & (__GL_ONE_64 << (__GL_INPUT_ATT0_INDEX + index)))
+        {
+            /* Switch the current vertex buffer back to the default vertex buffer */
+            __glSwitchToDefaultVertexBuffer(gc, (__GL_AT4F_I0_TAG + index));
+
+            /* Wirte vertex data into the default vertex buffer */
+            (*gc->currentImmediateDispatch->VertexAttrib4fv)(gc, index, (GLfloat *)att);
+        }
+        else
+        {
+            /* Normal is not needed, just update current normal state */
+            gc->state.current.attribute[index].i.ix = (att)[0];
+            gc->state.current.attribute[index].i.iy = (att)[1];
+            gc->state.current.attribute[index].i.iz = (att)[2];
+            gc->state.current.attribute[index].i.iw = (att)[3];
+        }
+    }
+}
+
+__GL_INLINE GLvoid __glVertexAttrib4fv_Outside(__GLcontext *gc, GLuint index, GLfloat *v)
+{
+    GLuint mask = (__GL_ONE_32 << (__GL_INPUT_ATT0_INDEX + index));
+    GLuint *iv = (GLuint *)v;
+
+    __GL_DLIST_BUFFER_FLUSH(gc);
+
+    if ((gc->input.currentInputMask & mask) == 0 ||
+        gc->input.beginMode != __GL_SMALL_DRAW_BATCH)
+    {
+        /* glattribute is not needed in glBegin/glEnd.
+        */
+        gc->state.current.attribute[index].i.ix = iv[0];
+        gc->state.current.attribute[index].i.iy = iv[1];
+        gc->state.current.attribute[index].i.iz = iv[2];
+        gc->state.current.attribute[index].i.iw = iv[3];
+    }
+    else
+    {
+        /* glattribute is needed in glBegin/glEnd.
+        */
+        if (gc->input.prevPrimInputMask & mask)
+        {
+            /* If previous primitive has glattribute in glBegin/glEnd.
+            */
+            __glPrimitiveBatchEnd(gc);
+
+            gc->state.current.attribute[index].i.ix = iv[0];
+            gc->state.current.attribute[index].i.iy = iv[1];
+            gc->state.current.attribute[index].i.iz = iv[2];
+            gc->state.current.attribute[index].i.iw = iv[3];
+        }
+        else
+        {
+            /* Previous primitive has no glattribute (but it needs attribute) in glBegin/glEnd.
+            */
+            if (gc->state.current.attribute[index].i.ix != iv[0] ||
+                gc->state.current.attribute[index].i.iy != iv[1] ||
+                gc->state.current.attribute[index].i.iz != iv[2] ||
+                gc->state.current.attribute[index].i.iw != iv[3])
+            {
+                __glPrimitiveBatchEnd(gc);
+
+                gc->state.current.attribute[index].i.ix = iv[0];
+                gc->state.current.attribute[index].i.iy = iv[1];
+                gc->state.current.attribute[index].i.iz = iv[2];
+                gc->state.current.attribute[index].i.iw = iv[3];
+            }
+        }
+    }
+}
+
+
+/**********************************************************************************************************************/
+GLvoid APIENTRY __glim_VertexAttrib1s_Info(__GLcontext *gc, GLuint index, GLshort x)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, 0.0f, 0.0f, 1.0f, fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib1f_Info(__GLcontext *gc, GLuint index, GLfloat x)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, 0.0f, 0.0f, 1.0f, fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib1d_Info(__GLcontext *gc, GLuint index, GLdouble x)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, 0.0f, 0.0f, 1.0f, fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib2s_Info(__GLcontext *gc, GLuint index, GLshort x, GLshort y)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, 0.0f, 1.0f, fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib2f_Info(__GLcontext *gc, GLuint index, GLfloat x, GLfloat y)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, 0.0f, 1.0f, fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib2d_Info(__GLcontext *gc, GLuint index, GLdouble x, GLdouble y)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, 0.0f, 1.0f, fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib3s_Info(__GLcontext *gc, GLuint index, GLshort x, GLshort y, GLshort z)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, z, 1.0f, fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib3f_Info(__GLcontext *gc, GLuint index, GLfloat x, GLfloat y, GLfloat z)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, z, 1.0f, fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib3d_Info(__GLcontext *gc, GLuint index, GLdouble x, GLdouble y, GLdouble z)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, z, 1.0f, fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4s_Info(__GLcontext *gc, GLuint index, GLshort x, GLshort y, GLshort z, GLshort w)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, z, w, fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4f_Info(__GLcontext *gc, GLuint index, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, z, w, fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4d_Info(__GLcontext *gc, GLuint index, GLdouble x, GLdouble y, GLdouble z, GLdouble w)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, z, w, fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib1sv_Info(__GLcontext *gc, GLuint index, const GLshort *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], 0.0f, 0.0f, 1.0f, fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib1fv_Info(__GLcontext *gc, GLuint index, const GLfloat *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], 0.0f, 0.0f, 1.0f, fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib1dv_Info(__GLcontext *gc, GLuint index, const GLdouble *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], 0.0f, 0.0f, 1.0f, fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib2sv_Info(__GLcontext *gc, GLuint index, const GLshort *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], 0.0f, 1.0f, fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib2fv_Info(__GLcontext *gc, GLuint index, const GLfloat *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], 0.0f, 1.0f, fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib2dv_Info(__GLcontext *gc, GLuint index, const GLdouble *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], 0.0f, 1.0f, fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib3sv_Info(__GLcontext *gc, GLuint index, const GLshort *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], 1.0f, fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib3fv_Info(__GLcontext *gc, GLuint index, const GLfloat *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], 1.0f, fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib3dv_Info(__GLcontext *gc, GLuint index, const GLdouble *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], 1.0f, fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4bv_Info(__GLcontext *gc, GLuint index, const GLbyte *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], v[3], fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4sv_Info(__GLcontext *gc, GLuint index, const GLshort *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], v[3], fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4iv_Info(__GLcontext *gc, GLuint index, const GLint *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], v[3], fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4ubv_Info(__GLcontext *gc, GLuint index, const GLubyte *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], v[3], fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4usv_Info(__GLcontext *gc, GLuint index, const GLushort *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], v[3], fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4uiv_Info(__GLcontext *gc, GLuint index, const GLuint *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], v[3], fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4fv_Info(__GLcontext *gc, GLuint index, const GLfloat *v)
+{
+    __glVertexAttrib4fv_Info(gc, index, (GLfloat *)v );
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4dv_Info(__GLcontext *gc, GLuint index, const GLdouble *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], v[3], fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nub_Info(__GLcontext *gc, GLuint index, GLubyte x, GLubyte y, GLubyte z, GLubyte w)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_UB_TO_FLOAT(x), __GL_UB_TO_FLOAT(y),
+        __GL_UB_TO_FLOAT(z), __GL_UB_TO_FLOAT(w), fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nbv_Info(__GLcontext *gc, GLuint index, const GLbyte *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_B_TO_FLOAT(v[0]), __GL_B_TO_FLOAT(v[1]),
+        __GL_B_TO_FLOAT(v[2]), __GL_B_TO_FLOAT(v[3]), fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nsv_Info(__GLcontext *gc, GLuint index, const GLshort *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_S_TO_FLOAT(v[0]), __GL_S_TO_FLOAT(v[1]),
+        __GL_S_TO_FLOAT(v[2]), __GL_S_TO_FLOAT(v[3]), fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Niv_Info(__GLcontext *gc, GLuint index, const GLint *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_I_TO_FLOAT(v[0]), __GL_I_TO_FLOAT(v[1]),
+        __GL_I_TO_FLOAT(v[2]), __GL_I_TO_FLOAT(v[3]), fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nubv_Info(__GLcontext *gc, GLuint index, const GLubyte *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_UB_TO_FLOAT(v[0]), __GL_UB_TO_FLOAT(v[1]),
+        __GL_UB_TO_FLOAT(v[2]), __GL_UB_TO_FLOAT(v[3]), fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nusv_Info(__GLcontext *gc, GLuint index, const GLushort *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_US_TO_FLOAT(v[0]), __GL_US_TO_FLOAT(v[1]),
+        __GL_US_TO_FLOAT(v[2]), __GL_US_TO_FLOAT(v[3]), fv, _Info);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nuiv_Info(__GLcontext *gc, GLuint index, const GLuint *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_UI_TO_FLOAT(v[0]), __GL_UI_TO_FLOAT(v[1]),
+        __GL_UI_TO_FLOAT(v[2]), __GL_UI_TO_FLOAT(v[3]), fv, _Info);
+}
+
+/***********************************************************************************************************************/
+GLvoid APIENTRY __glim_VertexAttrib1s_Cache(__GLcontext *gc, GLuint index, GLshort x)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, 0.0f, 0.0f, 1.0f, fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib1f_Cache(__GLcontext *gc, GLuint index, GLfloat x)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, 0.0f, 0.0f, 1.0f, fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib1d_Cache(__GLcontext *gc, GLuint index, GLdouble x)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, 0.0f, 0.0f, 1.0f, fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib2s_Cache(__GLcontext *gc, GLuint index, GLshort x, GLshort y)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, 0.0f, 1.0f, fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib2f_Cache(__GLcontext *gc, GLuint index, GLfloat x, GLfloat y)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, 0.0f, 1.0f, fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib2d_Cache(__GLcontext *gc, GLuint index, GLdouble x, GLdouble y)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, 0.0f, 1.0f, fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib3s_Cache(__GLcontext *gc, GLuint index, GLshort x, GLshort y, GLshort z)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, z, 1.0f, fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib3f_Cache(__GLcontext *gc, GLuint index, GLfloat x, GLfloat y, GLfloat z)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, z, 1.0f, fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib3d_Cache(__GLcontext *gc, GLuint index, GLdouble x, GLdouble y, GLdouble z)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, z, 1.0f, fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4s_Cache(__GLcontext *gc, GLuint index, GLshort x, GLshort y, GLshort z, GLshort w)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, z, w, fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4f_Cache(__GLcontext *gc, GLuint index, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, z, w, fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4d_Cache(__GLcontext *gc, GLuint index, GLdouble x, GLdouble y, GLdouble z, GLdouble w)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, z, w, fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib1sv_Cache(__GLcontext *gc, GLuint index, const GLshort *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], 0.0f, 0.0f, 1.0f, fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib1fv_Cache(__GLcontext *gc, GLuint index, const GLfloat *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], 0.0f, 0.0f, 1.0f, fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib1dv_Cache(__GLcontext *gc, GLuint index, const GLdouble *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], 0.0f, 0.0f, 1.0f, fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib2sv_Cache(__GLcontext *gc, GLuint index, const GLshort *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], 0.0f, 1.0f, fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib2fv_Cache(__GLcontext *gc, GLuint index, const GLfloat *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], 0.0f, 1.0f, fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib2dv_Cache(__GLcontext *gc, GLuint index, const GLdouble *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], 0.0f, 1.0f, fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib3sv_Cache(__GLcontext *gc, GLuint index, const GLshort *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], 1.0f, fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib3fv_Cache(__GLcontext *gc, GLuint index, const GLfloat *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], 1.0f, fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib3dv_Cache(__GLcontext *gc, GLuint index, const GLdouble *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], 1.0f, fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4bv_Cache(__GLcontext *gc, GLuint index, const GLbyte *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], v[3], fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4sv_Cache(__GLcontext *gc, GLuint index, const GLshort *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], v[3], fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4iv_Cache(__GLcontext *gc, GLuint index, const GLint *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], v[3], fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4ubv_Cache(__GLcontext *gc, GLuint index, const GLubyte *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], v[3], fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4usv_Cache(__GLcontext *gc, GLuint index, const GLushort *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], v[3], fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4uiv_Cache(__GLcontext *gc, GLuint index, const GLuint *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], v[3], fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4fv_Cache(__GLcontext *gc, GLuint index, const GLfloat *v)
+{
+    __glVertexAttrib4fv_Cache(gc, index, (GLfloat *)v );
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4dv_Cache(__GLcontext *gc, GLuint index, const GLdouble *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], v[3], fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nub_Cache(__GLcontext *gc, GLuint index, GLubyte x, GLubyte y, GLubyte z, GLubyte w)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_UB_TO_FLOAT(x), __GL_UB_TO_FLOAT(y),
+        __GL_UB_TO_FLOAT(z), __GL_UB_TO_FLOAT(w), fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nbv_Cache(__GLcontext *gc, GLuint index, const GLbyte *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_B_TO_FLOAT(v[0]), __GL_B_TO_FLOAT(v[1]),
+        __GL_B_TO_FLOAT(v[2]), __GL_B_TO_FLOAT(v[3]), fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nsv_Cache(__GLcontext *gc, GLuint index, const GLshort *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_S_TO_FLOAT(v[0]), __GL_S_TO_FLOAT(v[1]),
+        __GL_S_TO_FLOAT(v[2]), __GL_S_TO_FLOAT(v[3]), fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Niv_Cache(__GLcontext *gc, GLuint index, const GLint *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_I_TO_FLOAT(v[0]), __GL_I_TO_FLOAT(v[1]),
+        __GL_I_TO_FLOAT(v[2]), __GL_I_TO_FLOAT(v[3]), fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nubv_Cache(__GLcontext *gc, GLuint index, const GLubyte *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_UB_TO_FLOAT(v[0]), __GL_UB_TO_FLOAT(v[1]),
+        __GL_UB_TO_FLOAT(v[2]), __GL_UB_TO_FLOAT(v[3]), fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nusv_Cache(__GLcontext *gc, GLuint index, const GLushort *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_US_TO_FLOAT(v[0]), __GL_US_TO_FLOAT(v[1]),
+        __GL_US_TO_FLOAT(v[2]), __GL_US_TO_FLOAT(v[3]), fv, _Cache);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nuiv_Cache(__GLcontext *gc, GLuint index, const GLuint *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_UI_TO_FLOAT(v[0]), __GL_UI_TO_FLOAT(v[1]),
+        __GL_UI_TO_FLOAT(v[2]), __GL_UI_TO_FLOAT(v[3]), fv, _Cache);
+}
+
+/***********************************************************************************************************************/
+GLvoid APIENTRY __glim_VertexAttrib1s_Outside(__GLcontext *gc, GLuint index, GLshort x)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, 0.0f, 0.0f, 1.0f, fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib1f_Outside(__GLcontext *gc, GLuint index, GLfloat x)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, 0.0f, 0.0f, 1.0f, fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib1d_Outside(__GLcontext *gc, GLuint index, GLdouble x)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, 0.0f, 0.0f, 1.0f, fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib2s_Outside(__GLcontext *gc, GLuint index, GLshort x, GLshort y)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, 0.0f, 1.0f, fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib2f_Outside(__GLcontext *gc, GLuint index, GLfloat x, GLfloat y)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, 0.0f, 1.0f, fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib2d_Outside(__GLcontext *gc, GLuint index, GLdouble x, GLdouble y)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, 0.0f, 1.0f, fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib3s_Outside(__GLcontext *gc, GLuint index, GLshort x, GLshort y, GLshort z)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, z, 1.0f, fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib3f_Outside(__GLcontext *gc, GLuint index, GLfloat x, GLfloat y, GLfloat z)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, z, 1.0f, fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib3d_Outside(__GLcontext *gc, GLuint index, GLdouble x, GLdouble y, GLdouble z)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, z, 1.0f, fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4s_Outside(__GLcontext *gc, GLuint index, GLshort x, GLshort y, GLshort z, GLshort w)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, z, w, fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4f_Outside(__GLcontext *gc, GLuint index, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, z, w, fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4d_Outside(__GLcontext *gc, GLuint index, GLdouble x, GLdouble y, GLdouble z, GLdouble w)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, x, y, z, w, fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib1sv_Outside(__GLcontext *gc, GLuint index, const GLshort *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], 0.0f, 0.0f, 1.0f, fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib1fv_Outside(__GLcontext *gc, GLuint index, const GLfloat *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], 0.0f, 0.0f, 1.0f, fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib1dv_Outside(__GLcontext *gc, GLuint index, const GLdouble *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], 0.0f, 0.0f, 1.0f, fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib2sv_Outside(__GLcontext *gc, GLuint index, const GLshort *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], 0.0f, 1.0f, fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib2fv_Outside(__GLcontext *gc, GLuint index, const GLfloat *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], 0.0f, 1.0f, fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib2dv_Outside(__GLcontext *gc, GLuint index, const GLdouble *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], 0.0f, 1.0f, fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib3sv_Outside(__GLcontext *gc, GLuint index, const GLshort *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], 1.0f, fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib3fv_Outside(__GLcontext *gc, GLuint index, const GLfloat *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], 1.0f, fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib3dv_Outside(__GLcontext *gc, GLuint index, const GLdouble *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], 1.0f, fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4bv_Outside(__GLcontext *gc, GLuint index, const GLbyte *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], v[3], fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4sv_Outside(__GLcontext *gc, GLuint index, const GLshort *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], v[3], fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4iv_Outside(__GLcontext *gc, GLuint index, const GLint *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], v[3], fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4ubv_Outside(__GLcontext *gc, GLuint index, const GLubyte *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], v[3], fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4usv_Outside(__GLcontext *gc, GLuint index, const GLushort *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], v[3], fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4uiv_Outside(__GLcontext *gc, GLuint index, const GLuint *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], v[3], fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4fv_Outside(__GLcontext *gc, GLuint index, const GLfloat *v)
+{
+    __glVertexAttrib4fv_Outside(gc, index, (GLfloat *)v );
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4dv_Outside(__GLcontext *gc, GLuint index, const GLdouble *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, v[0], v[1], v[2], v[3], fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nub_Outside(__GLcontext *gc, GLuint index, GLubyte x, GLubyte y, GLubyte z, GLubyte w)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_UB_TO_FLOAT(x), __GL_UB_TO_FLOAT(y),
+        __GL_UB_TO_FLOAT(z), __GL_UB_TO_FLOAT(w), fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nbv_Outside(__GLcontext *gc, GLuint index, const GLbyte *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_B_TO_FLOAT(v[0]), __GL_B_TO_FLOAT(v[1]),
+        __GL_B_TO_FLOAT(v[2]), __GL_B_TO_FLOAT(v[3]), fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nsv_Outside(__GLcontext *gc, GLuint index, const GLshort *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_S_TO_FLOAT(v[0]), __GL_S_TO_FLOAT(v[1]),
+        __GL_S_TO_FLOAT(v[2]), __GL_S_TO_FLOAT(v[3]), fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Niv_Outside(__GLcontext *gc, GLuint index, const GLint *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_I_TO_FLOAT(v[0]), __GL_I_TO_FLOAT(v[1]),
+        __GL_I_TO_FLOAT(v[2]), __GL_I_TO_FLOAT(v[3]), fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nubv_Outside(__GLcontext *gc, GLuint index, const GLubyte *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_UB_TO_FLOAT(v[0]), __GL_UB_TO_FLOAT(v[1]),
+        __GL_UB_TO_FLOAT(v[2]), __GL_UB_TO_FLOAT(v[3]), fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nusv_Outside(__GLcontext *gc, GLuint index, const GLushort *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_US_TO_FLOAT(v[0]), __GL_US_TO_FLOAT(v[1]),
+        __GL_US_TO_FLOAT(v[2]), __GL_US_TO_FLOAT(v[3]), fv, _Outside);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nuiv_Outside(__GLcontext *gc, GLuint index, const GLuint *v)
+{
+    GLfloat fv[4];
+
+    __GL_VERTEXATTRIB4F(gc, index, __GL_UI_TO_FLOAT(v[0]), __GL_UI_TO_FLOAT(v[1]),
+        __GL_UI_TO_FLOAT(v[2]), __GL_UI_TO_FLOAT(v[3]), fv, _Outside);
+}
 #endif
+

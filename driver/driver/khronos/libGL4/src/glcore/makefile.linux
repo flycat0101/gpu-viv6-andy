@@ -64,7 +64,6 @@ INCLUDE += \
 	-I$(AQROOT)/driver/khronos/libEGL/source \
 	-I$(AQROOT)/driver/khronos/libGL4/src/glcore \
 	-I$(ROOTDIR)/include \
-	-I$(ROOTDIR)/include/backend \
 	-I$(ROOTDIR)/include/gl \
 	-I$(ROOTDIR)/include/glcore \
 	-I$(ROOTDIR)/include/chip \
@@ -113,6 +112,7 @@ OBJECTS :=  \
     $(OBJ_DIR)/gc_gl_math.o \
     $(OBJ_DIR)/gc_gl_memmgr.o \
     $(OBJ_DIR)/gc_gl_prim.o \
+    $(OBJ_DIR)/gc_gl_primcache.o \
     $(OBJ_DIR)/gc_gl_px_util.o \
     $(OBJ_DIR)/gc_gl_pushpop.o \
     $(OBJ_DIR)/gc_gl_rect.o \

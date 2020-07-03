@@ -312,7 +312,7 @@ OnError:
 #endif
 }
 #ifdef OPENGL40
-GLvoid  __glChipCreateAccumBufferInfo(__GLcontext* gc,
+GLboolean  __glChipCreateAccumBufferInfo(__GLcontext* gc,
                               gcoSURF accumSurf,
                               __GLdrawablePrivate *glDrawable)
 {
@@ -320,15 +320,19 @@ GLvoid  __glChipCreateAccumBufferInfo(__GLcontext* gc,
     glsCHIPACCUMBUFFER   *chipAccumBuffer = NULL;
 
     bufSize = sizeof(glsCHIPACCUMBUFFER);
-    gcoOS_Allocate(gcvNULL,
+    if (gcmIS_SUCCESS(gcoOS_Allocate(gcvNULL,
             bufSize,
-            (gctPOINTER *) &chipAccumBuffer);
+            (gctPOINTER *) &chipAccumBuffer)))
+    {
+        gcoOS_ZeroMemory(chipAccumBuffer, bufSize);
+        chipAccumBuffer->renderTarget = accumSurf;
+        chipAccumBuffer->renderTargetFormat = accumSurf->format;
+        gcChipclearAccumBuffer(gc, chipAccumBuffer);
+        glDrawable->accumBuffer.privateData = chipAccumBuffer;
+        return GL_TRUE;
+    }
 
-    gcoOS_ZeroMemory(chipAccumBuffer, bufSize);
-    chipAccumBuffer->renderTarget = accumSurf;
-    chipAccumBuffer->renderTargetFormat = accumSurf->format;
-    gcChipclearAccumBuffer(gc, chipAccumBuffer);
-    glDrawable->accumBuffer.privateData = chipAccumBuffer;
+    return GL_FALSE;
 }
 
 GLvoid initAccumOperationPatch(__GLcontext* gc)
@@ -686,7 +690,7 @@ gceSTATUS resolveDrawToTempBitmap(
 /* Save current states */
 GLvoid saveAttributes(__GLcontext* gc, __GLchipContext *chipCtx)
 {
-    __GLdispatchTable *pDispatchTable = &gc->immedModeDispatch;
+    __GLdispatchTable *pDispatchTable = gc->currentImmediateDispatch;
 
     /* Save current states affected by push/pop */
     pDispatchTable->PushAttrib(gc, GL_CURRENT_BIT  | GL_POLYGON_BIT        | GL_POLYGON_STIPPLE_BIT |
@@ -705,7 +709,7 @@ GLvoid saveAttributes(__GLcontext* gc, __GLchipContext *chipCtx)
 /* Reset current states to default states for manual draw */
 GLvoid resetAttributes(__GLcontext* gc, __GLchipContext *chipCtx)
 {
-    __GLdispatchTable *pDispatchTable = &gc->immedModeDispatch;
+    __GLdispatchTable *pDispatchTable = gc->currentImmediateDispatch;
 
     /* Push Matrix*/
     pDispatchTable->MatrixMode(gc, GL_MODELVIEW);
@@ -766,7 +770,7 @@ GLvoid resetAttributes(__GLcontext* gc, __GLchipContext *chipCtx)
 /* Restore current states according to last save result */
 GLvoid restoreAttributes(__GLcontext* gc, __GLchipContext *chipCtx)
 {
-    __GLdispatchTable *pDispatchTable = &gc->immedModeDispatch;
+    __GLdispatchTable *pDispatchTable = gc->currentImmediateDispatch;
 
     /* Restore previous pushed states */
     pDispatchTable->PopAttrib(gc);
@@ -810,13 +814,13 @@ gceSTATUS initAccumBufferPatch(__GLcontext* gc, __GLchipContext *chipCtx)
             chipCtx->accumBufferWidth = width;
             chipCtx->accumBufferHeight = height;
             chipCtx->useAccumBuffer = gcvTRUE;
-            return gcvSTATUS_OUT_OF_MEMORY;
         }
         else
         {
             chipCtx->accumBufferWidth = 0;
             chipCtx->accumBufferHeight = 0;
             chipCtx->useAccumBuffer = gcvFALSE;
+            return gcvSTATUS_OUT_OF_MEMORY;
         }
     }
     return gcvSTATUS_OK;
@@ -957,8 +961,7 @@ GLboolean __glChipAccum(__GLcontext* gc, GLenum op, GLfloat value)
         tmpBuffer = gcvNULL;
     }
 
-    gcmFOOTER_NO();
-    gcmFOOTER_ARG("return=%s", "FALSE");
+    gcmFOOTER_ARG("return=%s", "TRUE");
     return GL_TRUE;
 }
 
@@ -1016,15 +1019,27 @@ GLboolean __glChipBitmaps(__GLcontext *gc, GLsizei width, GLsizei height, GLfloa
     }
     else
     {
-        newbits = (GLubyte *) (*gc->imports.malloc)(gc, (GLsizei)__glImageSize(width, height, GL_COLOR_INDEX, GL_BITMAP));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, (GLsizei)__glImageSize(width, height, GL_COLOR_INDEX, GL_BITMAP),
+            (gctPOINTER*)&newbits)))
+        {
+            return GL_FALSE;
+        }
+
         __glFillImage(gc, width, height, GL_COLOR_INDEX, GL_BITMAP, bitmap, newbits);
         bFreeNewBits = GL_TRUE;
     }
 
-    texImageData =
-    texImagePointer = (GLubyte *)(*gc->imports.malloc)(gc, 2*width * height);
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, 2*width * height,
+        (gctPOINTER*)&texImagePointer)))
+    {
+        if (bFreeNewBits)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, newbits);
+        }
+        return GL_FALSE;
+    }
 
-    GL_ASSERT(texImagePointer);
+    texImageData = texImagePointer;
 
     /* Convert bit mask to image */
     for (h = 0; h < height; h++)
@@ -1075,11 +1090,17 @@ GLboolean __glChipBitmaps(__GLcontext *gc, GLsizei width, GLsizei height, GLfloa
         __GLcoord vertex = gc->state.rasterPos.rPos.winPos;
         __GLcolor color = gc->state.rasterPos.rPos.colors[__GL_FRONTFACE];
         __GLcolor secondaryColor = gc->state.rasterPos.rPos.colors2[__GL_FRONTFACE];
-        __GLdispatchTable *pDispatchTable = &gc->immedModeDispatch;
+        __GLdispatchTable *pDispatchTable = gc->currentImmediateDispatch;
 
         /* The simulation need to use the last texture unit. But if it was already been used, return FALSE */
         if (gc->state.enables.texUnits[texStage].enabledDimension > 0 )
         {
+            gcmOS_SAFE_FREE(gcvNULL, texImageData);
+
+            if (bFreeNewBits)
+            {
+                gcmOS_SAFE_FREE(gcvNULL, newbits);
+            }
             return GL_FALSE;
         }
 
@@ -1157,6 +1178,10 @@ GLboolean __glChipBitmaps(__GLcontext *gc, GLsizei width, GLsizei height, GLfloa
         pDispatchTable->SecondaryColor3f(gc, secondaryColor.r, secondaryColor.g, secondaryColor.b);
 
         pDispatchTable->Begin(gc, GL_QUADS);
+        /*
+         * Re-update dispatch table, it could be switched after glBegin calls.
+        */
+        pDispatchTable = gc->currentImmediateDispatch;
         pDispatchTable->MultiTexCoord2f(gc, GL_TEXTURE0 + texStage, 0, 0);
         pDispatchTable->Vertex4fv(gc, (GLfloat *)&vertex);
 
@@ -1172,6 +1197,10 @@ GLboolean __glChipBitmaps(__GLcontext *gc, GLsizei width, GLsizei height, GLfloa
         pDispatchTable->MultiTexCoord2f(gc, GL_TEXTURE0 + texStage, 1, 0);
         pDispatchTable->Vertex4fv(gc, (GLfloat *)&vertex);
         pDispatchTable->End(gc);
+        /*
+         * Re-update dispatch table, it could be switched after glEnd calls.
+        */
+        pDispatchTable = gc->currentImmediateDispatch;
 
         pDispatchTable->Flush(gc);
 
@@ -1205,12 +1234,12 @@ __Exit:
 
     if (texImageData)
     {
-        (*gc->imports.free)(gc, texImageData);
+        gcmOS_SAFE_FREE(gcvNULL, texImageData);
     }
 
     if (bFreeNewBits)
     {
-        (*gc->imports.free)(gc, newbits);
+        gcmOS_SAFE_FREE(gcvNULL, newbits);
     }
 
     /*temporarily disable*/
@@ -1249,7 +1278,7 @@ GLboolean simulatePixelOperation(__GLcontext *gc, GLint x, GLint y, GLsizei widt
     __GLcoord vertex = gc->state.rasterPos.rPos.winPos;
     __GLcolor color = gc->state.rasterPos.rPos.colors[__GL_FRONTFACE];
     __GLcolor secondaryColor = gc->state.rasterPos.rPos.colors2[__GL_FRONTFACE];
-    __GLdispatchTable *pDispatchTable = &gc->immedModeDispatch;
+    __GLdispatchTable *pDispatchTable = gc->currentImmediateDispatch;
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
 
     if (gc->renderMode != GL_RENDER  || format == GL_STENCIL_INDEX)
@@ -1459,6 +1488,10 @@ GLboolean simulatePixelOperation(__GLcontext *gc, GLint x, GLint y, GLsizei widt
     /* Draw a Quad*/
     /* Spec vertex with only xyz channel.*/
     pDispatchTable->Begin(gc, GL_QUADS);
+    /*
+     * Re-update dispatch table, it could be switched after glBegin calls.
+    */
+    pDispatchTable = gc->currentImmediateDispatch;
     pDispatchTable->MultiTexCoord2f(gc, GL_TEXTURE0 + texStage, 0, 0 );
     pDispatchTable->Vertex3fv(gc, (GLfloat *)&vertex);
 
@@ -1474,6 +1507,10 @@ GLboolean simulatePixelOperation(__GLcontext *gc, GLint x, GLint y, GLsizei widt
     pDispatchTable->MultiTexCoord2f(gc, GL_TEXTURE0 + texStage, 1, 0 );
     pDispatchTable->Vertex3fv(gc, (GLfloat *)&vertex);
     pDispatchTable->End(gc);
+    /*
+     * Re-update dispatch table, it could be switched after glEnd calls.
+    */
+    pDispatchTable = gc->currentImmediateDispatch;
     pDispatchTable->Disable(gc, GL_TEXTURE_2D);      /* Disable texture */
 
     pDispatchTable->Flush(gc);
@@ -2197,7 +2234,8 @@ __glChipReadPixels(
     }
 
     if ((GL_TRUE == transferInfo.srcNeedFree) && (gcvNULL != transferInfo.srcImage)){
-    (*gc->imports.free)(gc, (void*)transferInfo.srcImage);
+    logicalAddress = (gctPOINTER)transferInfo.srcImage;
+    gcmOS_SAFE_FREE(gcvNULL, logicalAddress);
     transferInfo.srcImage = gcvNULL;
     }
 

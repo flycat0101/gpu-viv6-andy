@@ -59,6 +59,9 @@
 #define __GL_DLIST_SEMAPHORE_LOCK()
 #define __GL_DLIST_SEMAPHORE_UNLOCK()
 
+/* Macro to check if privateData contains a valid device resource object */
+#define __GL_VALID_DEVICE_RESOURCE(privateData)   \
+    (privateData && *(GLuint*)(privateData))
 
 /*
 *** Data types are used by display list
@@ -80,7 +83,6 @@ typedef struct __GLPrimBeginRec {
     GLvoid *ibPrivateData;
     GLboolean *edgeflagBuffer;
     GLvoid *privateData;
-    GLvoid *privStreamInfo;
     GLint indexCount;
     GLuint64 primElemSequence;
     GLuint64 primitiveFormat;
@@ -260,3 +262,4 @@ extern GLvoid __glDlistAppendOp(__GLcontext *gc, __GLdlistOp *newop);
 extern GLvoid __glDisplayListBatchEnd(__GLcontext *gc);
 
 #endif /* __gc_gl_dlist_h_ */
+

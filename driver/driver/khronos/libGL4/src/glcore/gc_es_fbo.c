@@ -228,7 +228,7 @@ GLboolean __glDeleteRenderbufferObject(__GLcontext *gc, __GLrenderbufferObject *
 
     if (renderbuffer->label)
     {
-        gc->imports.free(gc, renderbuffer->label);
+        gcmOS_SAFE_FREE(gcvNULL, renderbuffer->label);
     }
 
     /* Notify Dp that this renderbuffer object is deleted.
@@ -239,7 +239,7 @@ GLboolean __glDeleteRenderbufferObject(__GLcontext *gc, __GLrenderbufferObject *
     __glFreeImageUserList(gc, &renderbuffer->fboList);
 
     /* Delete the renderbuffer object structure */
-    (*gc->imports.free)(gc, renderbuffer);
+    gcmOS_SAFE_FREE(gcvNULL, renderbuffer);
 
     return GL_TRUE;
 }
@@ -305,7 +305,7 @@ GLboolean __glDeleteFramebufferObject(__GLcontext *gc, __GLframebufferObject *fr
 
     if (framebuffer->label)
     {
-        gc->imports.free(gc, framebuffer->label);
+        gcmOS_SAFE_FREE(gcvNULL, framebuffer->label);
     }
 
     /* Remove fbo from image userlist of attaching image */
@@ -322,7 +322,7 @@ GLboolean __glDeleteFramebufferObject(__GLcontext *gc, __GLframebufferObject *fr
         __glFramebufferResetAttachIndex(gc, framebuffer, i, GL_TRUE);
     }
 
-    (*gc->imports.free)(gc, framebuffer);
+    gcmOS_SAFE_FREE(gcvNULL, framebuffer);
 
     return GL_TRUE;
 }
@@ -356,16 +356,29 @@ GLvoid __glBindRenderbuffer(__GLcontext *gc, GLenum target, GLuint renderbuffer)
         ** If this is the first time this name has been bound,
         ** then create a new renderbuffer object and initialize it.
         */
-        renderbufferObj = (__GLrenderbufferObject *)(*gc->imports.calloc)(gc, 1, sizeof(__GLrenderbufferObject));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLrenderbufferObject), (gctPOINTER*)&renderbufferObj)))
+        {
+            __GL_ERROR_RET(GL_OUT_OF_MEMORY);
+        }
+        gcoOS_ZeroMemory(renderbufferObj, sizeof(__GLrenderbufferObject));
+
         __glInitRenderbufferObject(gc, renderbufferObj, renderbuffer);
 
         /* Add this renderbuffer object to the "gc->frameBuffer.shared" structure.
         */
-        __glAddObject(gc, gc->frameBuffer.rboShared, renderbuffer, renderbufferObj);
+        if (__glAddObject(gc, gc->frameBuffer.rboShared, renderbuffer, renderbufferObj) == GL_FALSE)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, renderbufferObj);
+            __GL_ERROR_RET(GL_OUT_OF_MEMORY);
+        }
 
         /* Mark the name "renderbuffer" used in the renderbuffer nameArray.
         */
-        __glMarkNameUsed(gc, gc->frameBuffer.rboShared, renderbuffer);
+        if (__glMarkNameUsed(gc, gc->frameBuffer.rboShared, renderbuffer) < 0)
+        {
+            __glDeleteObject(gc, gc->frameBuffer.rboShared, renderbuffer);
+            __GL_ERROR_RET(GL_OUT_OF_MEMORY);
+        }
     }
 
     /* Release the previously bound obj for this target.
@@ -391,7 +404,10 @@ GLvoid __glBindRenderbuffer(__GLcontext *gc, GLenum target, GLuint renderbuffer)
     }
 
     /* Call the dp interface */
-    (*gc->dp.bindRenderbuffer)(gc, renderbufferObj);
+    if ((*gc->dp.bindRenderbuffer)(gc, renderbufferObj) == GL_FALSE)
+    {
+        __GL_ERROR((*gc->dp.getError)(gc));
+    }
 }
 
 GLvoid __glBindFramebuffer(__GLcontext *gc, GLenum target, GLuint name)
@@ -439,15 +455,27 @@ GLvoid __glBindFramebuffer(__GLcontext *gc, GLenum target, GLuint name)
 
         if (gcvNULL == fbo)
         {
-            fbo = (__GLframebufferObject*)(*gc->imports.calloc)(gc, 1, sizeof(__GLframebufferObject));
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLframebufferObject), (gctPOINTER*)&fbo)))
+            {
+                __GL_ERROR_RET(GL_OUT_OF_MEMORY);
+            }
+            gcoOS_ZeroMemory(fbo, sizeof(__GLframebufferObject));
 
             __glInitFramebufferObject(gc, fbo, name);
 
             /* Add this frameBuffer object to the "gc->frameBuffer.shared" structure. */
-            __glAddObject(gc, gc->frameBuffer.fboManager, name, fbo);
-
+            if (__glAddObject(gc, gc->frameBuffer.fboManager, name, fbo) == GL_FALSE)
+            {
+                gcmOS_SAFE_FREE(gcvNULL, fbo);
+                __GL_ERROR_RET(GL_OUT_OF_MEMORY);
+            }
             /* Mark the name "frameBuffer" used in the frameBuffer nameArray. */
-            __glMarkNameUsed(gc, gc->frameBuffer.fboManager, name);
+            if (__glMarkNameUsed(gc, gc->frameBuffer.fboManager, name) < 0)
+            {
+                __glDeleteObject(gc, gc->frameBuffer.fboManager, name);
+                __GL_ERROR_RET(GL_OUT_OF_MEMORY);
+            }
+
         }
 
         switch (target)
@@ -1195,7 +1223,7 @@ OnExit:
     return formatInfo;
 }
 
-GLvoid __glInitFramebufferStates(__GLcontext *gc)
+GLboolean __glInitFramebufferStates(__GLcontext *gc)
 {
     __GLsharedObjectMachine *fboManager = gcvNULL, *rboShared = gcvNULL;
 
@@ -1203,14 +1231,23 @@ GLvoid __glInitFramebufferStates(__GLcontext *gc)
 
     /* FBO can NOT be shared across contexts */
     GL_ASSERT(gc->frameBuffer.fboManager == gcvNULL);
-    gc->frameBuffer.fboManager = (__GLsharedObjectMachine *)(*gc->imports.calloc)(gc, 1, sizeof(__GLsharedObjectMachine));
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLsharedObjectMachine), (gctPOINTER*)&gc->frameBuffer.fboManager)))
+    {
+        return GL_FALSE;
+    }
+    gcoOS_ZeroMemory(gc->frameBuffer.fboManager, sizeof(__GLsharedObjectMachine));
 
     fboManager = gc->frameBuffer.fboManager;
     /* Initialize a linear lookup table for framebuffer object */
     fboManager->maxLinearTableSize = __GL_MAX_FBOBJ_LINEAR_TABLE_SIZE;
     fboManager->linearTableSize = __GL_DEFAULT_FBOBJ_LINEAR_TABLE_SIZE;
-    fboManager->linearTable = (GLvoid **)
-        (*gc->imports.calloc)(gc, 1, fboManager->linearTableSize * sizeof(GLvoid *));
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, fboManager->linearTableSize * sizeof(GLvoid *), (gctPOINTER*)&fboManager->linearTable)))
+    {
+        gcmOS_SAFE_FREE(gcvNULL, gc->frameBuffer.fboManager);
+        return GL_FALSE;
+    }
+    gcoOS_ZeroMemory(fboManager->linearTable, fboManager->linearTableSize * sizeof(GLvoid *));
+
 
     fboManager->hashSize = __GL_FBOBJ_HASH_TABLE_SIZE;
     fboManager->hashMask = __GL_FBOBJ_HASH_TABLE_SIZE - 1;
@@ -1229,7 +1266,12 @@ GLvoid __glInitFramebufferStates(__GLcontext *gc)
         /* Allocate VEGL lock */
         if (gcvNULL == gc->frameBuffer.rboShared->lock)
         {
-            gc->frameBuffer.rboShared->lock = (*gc->imports.calloc)(gc, 1, sizeof(VEGLLock));
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(VEGLLock), (gctPOINTER*)&gc->frameBuffer.rboShared->lock)))
+            {
+                return GL_FALSE;
+            }
+            gcoOS_ZeroMemory(gc->frameBuffer.rboShared->lock, sizeof(VEGLLock));
+
             (*gc->imports.createMutex)(gc->frameBuffer.rboShared->lock);
         }
         gcoOS_UnLockPLS();
@@ -1238,14 +1280,22 @@ GLvoid __glInitFramebufferStates(__GLcontext *gc)
     {
         GL_ASSERT(gcvNULL == gc->frameBuffer.rboShared);
 
-        gc->frameBuffer.rboShared = (__GLsharedObjectMachine*)(*gc->imports.calloc)(gc, 1, sizeof(__GLsharedObjectMachine));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLsharedObjectMachine), (gctPOINTER*)&gc->frameBuffer.rboShared)))
+        {
+            return GL_FALSE;
+        }
+        gcoOS_ZeroMemory(gc->frameBuffer.rboShared, sizeof(__GLsharedObjectMachine));
 
         rboShared = gc->frameBuffer.rboShared;
         /* Initialize a linear lookup table for renderbuffer object */
         rboShared->maxLinearTableSize = __GL_MAX_RBOBJ_LINEAR_TABLE_SIZE;
         rboShared->linearTableSize = __GL_DEFAULT_RBOBJ_LINEAR_TABLE_SIZE;
-        rboShared->linearTable = (GLvoid **)
-            (*gc->imports.calloc)(gc, 1, rboShared->linearTableSize * sizeof(GLvoid *));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, rboShared->linearTableSize * sizeof(GLvoid *), (gctPOINTER*)&rboShared->linearTable)))
+        {
+            gcmOS_SAFE_FREE(gcvNULL, gc->frameBuffer.rboShared);
+            return GL_FALSE;
+        }
+        gcoOS_ZeroMemory(rboShared->linearTable, rboShared->linearTableSize * sizeof(GLvoid *));
 
         rboShared->hashSize = __GL_RBOBJ_HASH_TABLE_SIZE;
         rboShared->hashMask = __GL_RBOBJ_HASH_TABLE_SIZE - 1;
@@ -1267,6 +1317,7 @@ GLvoid __glInitFramebufferStates(__GLcontext *gc)
     gc->frameBuffer.boundRenderbufObj = &gc->frameBuffer.defaultRBO;
 
     __GL_FOOTER();
+    return GL_TRUE;
 }
 
 GLvoid __glFreeFramebufferStates(__GLcontext *gc)

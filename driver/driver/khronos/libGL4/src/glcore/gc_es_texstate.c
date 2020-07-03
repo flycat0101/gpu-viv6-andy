@@ -44,7 +44,10 @@ GLvoid __glFreeDefaultTextureObject(__GLcontext *gc, __GLtextureObject *tex)
     /* Free texture unit list */
     __glFreeImageUserList(gc, &tex->texUnitBoundList);
 
-    (*gc->imports.free)(gc, tex->faceMipmap);
+    if (tex->faceMipmap)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, tex->faceMipmap);
+    }
 }
 
 GLvoid __glInitTextureObject(__GLcontext *gc, __GLtextureObject *tex, GLuint id, GLuint targetIndex)
@@ -199,8 +202,13 @@ GLvoid __glInitTextureObject(__GLcontext *gc, __GLtextureObject *tex, GLuint id,
     tex->maxDepths = maxDepths;
     tex->maxSlices = maxSlices;
 
-    pointer = gc->imports.calloc(gc, 1, maxFaces * sizeof(__GLmipMapLevel*) +
-                                        maxFaces * maxLevels * sizeof(__GLmipMapLevel));
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+        maxFaces * sizeof(__GLmipMapLevel*) + maxFaces * maxLevels * sizeof(__GLmipMapLevel),
+        (gctPOINTER*)&pointer)))
+    {
+        return;
+    }
+    gcoOS_ZeroMemory(pointer, maxFaces * sizeof(__GLmipMapLevel*) + maxFaces * maxLevels * sizeof(__GLmipMapLevel));
 
     tex->faceMipmap = (__GLmipMapLevel**)pointer;
     mipmaps = (__GLmipMapLevel*)(tex->faceMipmap + maxFaces);
@@ -245,7 +253,7 @@ GLvoid __glFreeTextureState(__GLcontext *gc)
     __glFreeSharedObjectState(gc, gc->texture.shared);
 }
 
-GLvoid __glInitTextureState(__GLcontext *gc)
+GLboolean __glInitTextureState(__GLcontext *gc)
 {
     __GLtextureObject *tex;
 #ifdef OPENGL40
@@ -267,7 +275,14 @@ GLvoid __glInitTextureState(__GLcontext *gc)
         /* Allocate VEGL lock */
         if (gcvNULL == gc->texture.shared->lock)
         {
-            gc->texture.shared->lock = (*gc->imports.calloc)(gc, 1, sizeof(VEGLLock));
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+                sizeof(VEGLLock),
+                (gctPOINTER*)&gc->texture.shared->lock)))
+            {
+                return GL_FALSE;
+            }
+            gcoOS_ZeroMemory(gc->texture.shared->lock, sizeof(VEGLLock));
+
             (*gc->imports.createMutex)(gc->texture.shared->lock);
         }
         gcoOS_UnLockPLS();
@@ -276,13 +291,25 @@ GLvoid __glInitTextureState(__GLcontext *gc)
     {
         GL_ASSERT(NULL == gc->texture.shared);
 
-        gc->texture.shared = (__GLsharedObjectMachine*)(*gc->imports.calloc)(gc, 1, sizeof(__GLsharedObjectMachine));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+                sizeof(__GLsharedObjectMachine),
+                (gctPOINTER*)&gc->texture.shared)))
+        {
+            return GL_FALSE;
+        }
+        gcoOS_ZeroMemory(gc->texture.shared, sizeof(__GLsharedObjectMachine));
 
         /* Initialize a linear lookup table for texture object */
         gc->texture.shared->maxLinearTableSize = __GL_MAX_TEXOBJ_LINEAR_TABLE_SIZE;
         gc->texture.shared->linearTableSize = __GL_DEFAULT_TEXOBJ_LINEAR_TABLE_SIZE;
-        gc->texture.shared->linearTable = (GLvoid **)
-            (*gc->imports.calloc)(gc, 1, gc->texture.shared->linearTableSize * sizeof(GLvoid *));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+                gc->texture.shared->linearTableSize * sizeof(GLvoid *),
+                (gctPOINTER*)&gc->texture.shared->linearTable)))
+        {
+            gcmOS_SAFE_FREE(gcvNULL, gc->texture.shared);
+            return GL_FALSE;
+        }
+        gcoOS_ZeroMemory(gc->texture.shared->linearTable, gc->texture.shared->linearTableSize * sizeof(GLvoid *));
 
         gc->texture.shared->hashSize = __GL_TEXOBJ_HASH_TABLE_SIZE;
         gc->texture.shared->hashMask = __GL_TEXOBJ_HASH_TABLE_SIZE - 1;
@@ -378,6 +405,7 @@ GLvoid __glInitTextureState(__GLcontext *gc)
         }
     }
 #endif
+    return GL_TRUE;
 }
 
 GLboolean __glIsTextureComplete(__GLcontext *gc, __GLtextureObject *texObj, GLenum minFilter,
@@ -2131,16 +2159,31 @@ GLvoid __glBindTexture(__GLcontext *gc, GLuint unitIdx, GLuint targetIndex, GLui
         ** If this is the first time this name has been bound,
         ** then create a new texture object and initialize it.
         */
-        texObj = (__GLtextureObject *)(*gc->imports.calloc)(gc, 1, sizeof(__GLtextureObject));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+                sizeof(__GLtextureObject),
+                (gctPOINTER*)&texObj)))
+        {
+            __GL_ERROR_RET(GL_OUT_OF_MEMORY);
+        }
+        gcoOS_ZeroMemory(texObj, sizeof(__GLtextureObject));
+
         __glInitTextureObject(gc, texObj, texture, targetIndex);
 
         /* Add this texture object to the "gc->texture.shared" structure.
         */
-        __glAddObject(gc, gc->texture.shared, texture, texObj);
+        if (__glAddObject(gc, gc->texture.shared, texture, texObj) == GL_FALSE)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, texObj);
+            __GL_ERROR_RET(GL_OUT_OF_MEMORY);
+        }
 
         /* Mark the name "texture" used in the texture nameArray.
         */
-        __glMarkNameUsed(gc, gc->texture.shared, texture);
+        if (__glMarkNameUsed(gc, gc->texture.shared, texture) < 0)
+        {
+            __glDeleteObject(gc, gc->texture.shared, texture);
+            __GL_ERROR_RET(GL_OUT_OF_MEMORY);
+        }
     }
     else
     {
@@ -2398,7 +2441,7 @@ GLboolean __glDeleteTextureObject(__GLcontext *gc, __GLtextureObject *tex)
 
     if (tex->label)
     {
-        gc->imports.free(gc, tex->label);
+        gcmOS_SAFE_FREE(gcvNULL, tex->label);
     }
 
     /* Notify Dp that this texture object is deleted.
@@ -2411,7 +2454,7 @@ GLboolean __glDeleteTextureObject(__GLcontext *gc, __GLtextureObject *tex)
     /* Delete the texture object's texture image */
     if (tex->faceMipmap)
     {
-        (*gc->imports.free)(gc, tex->faceMipmap);
+        gcmOS_SAFE_FREE(gcvNULL, tex->faceMipmap);
         tex->faceMipmap = NULL;
     }
 
@@ -2425,7 +2468,7 @@ GLboolean __glDeleteTextureObject(__GLcontext *gc, __GLtextureObject *tex)
     __glFreeImageUserList(gc, &tex->imageList);
 
     /* Delete the texture object structure */
-    (*gc->imports.free)(gc, tex);
+    gcmOS_SAFE_FREE(gcvNULL, tex);
 
     return GL_TRUE;
 }
@@ -2484,8 +2527,20 @@ __GL_INLINE __GLsamplerObject* __glGetSamplerObject(__GLcontext *gc, GLuint name
     samplerObj = (__GLsamplerObject *)__glGetObject(gc, gc->sampler.shared, name);
     if (!samplerObj)
     {
-        samplerObj = (__GLsamplerObject *)(*gc->imports.calloc)(gc, 1, sizeof(__GLsamplerObject));
-        __glAddObject(gc, gc->sampler.shared, name, samplerObj);
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+                sizeof(__GLsamplerObject),
+                (gctPOINTER*)&samplerObj)))
+        {
+            __GL_ERROR_RET_VAL(GL_OUT_OF_MEMORY,  NULL);
+        }
+        gcoOS_ZeroMemory(samplerObj, sizeof(__GLsamplerObject));
+
+        if (__glAddObject(gc, gc->sampler.shared, name, samplerObj) == GL_FALSE)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, samplerObj);
+            __GL_ERROR_RET_VAL(GL_OUT_OF_MEMORY,  NULL);
+        }
+
         samplerObj->name = name;
         samplerObj->bindCount = 0;
         samplerObj->flags = 0;
@@ -2586,13 +2641,13 @@ GLboolean __glDeleteSamplerObj(__GLcontext *gc, __GLsamplerObject *samplerObj)
 
     if (samplerObj->label)
     {
-        gc->imports.free(gc, samplerObj->label);
+        gcmOS_SAFE_FREE(gcvNULL, samplerObj->label);
     }
 
     /* Free texture unit list */
     __glFreeImageUserList(gc, &samplerObj->texUnitBoundList);
 
-    (*gc->imports.free)(gc, samplerObj);
+    gcmOS_SAFE_FREE(gcvNULL, samplerObj);
 
     return GL_TRUE;
 }
@@ -2841,7 +2896,7 @@ __GL_INLINE GLvoid __glGetSamplerParameterfv(__GLcontext *gc, __GLsamplerObject 
     }
 }
 
-GLvoid __glInitSamplerState(__GLcontext *gc)
+GLboolean __glInitSamplerState(__GLcontext *gc)
 {
     /* Sampler objects can be shared across contexts */
     if (gc->shareCtx)
@@ -2854,7 +2909,14 @@ GLvoid __glInitSamplerState(__GLcontext *gc)
         /* Allocate VEGL lock */
         if (gcvNULL == gc->sampler.shared->lock)
         {
-            gc->sampler.shared->lock = (*gc->imports.calloc)(gc, 1, sizeof(VEGLLock));
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+                sizeof(VEGLLock),
+                (gctPOINTER*)&gc->sampler.shared->lock)))
+            {
+                return GL_FALSE;
+            }
+            gcoOS_ZeroMemory(gc->sampler.shared->lock, sizeof(VEGLLock));
+
             (*gc->imports.createMutex)(gc->sampler.shared->lock);
         }
         gcoOS_UnLockPLS();
@@ -2864,13 +2926,25 @@ GLvoid __glInitSamplerState(__GLcontext *gc)
     {
         GL_ASSERT(NULL == gc->sampler.shared);
 
-        gc->sampler.shared = (__GLsharedObjectMachine*)(*gc->imports.calloc)(gc, 1, sizeof(__GLsharedObjectMachine));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+            sizeof(__GLsharedObjectMachine),
+            (gctPOINTER*)&gc->sampler.shared)))
+        {
+                return GL_FALSE;
+        }
+        gcoOS_ZeroMemory(gc->sampler.shared, sizeof(__GLsharedObjectMachine));
 
         /* Initialize a linear lookup table for Sampler object */
         gc->sampler.shared->maxLinearTableSize = __GL_MAX_SAMPLEROBJ_LINEAR_TABLE_SIZE;
         gc->sampler.shared->linearTableSize = __GL_DEFAULT_SAMPLEROBJ_LINEAR_TABLE_SIZE;
-        gc->sampler.shared->linearTable = (GLvoid **)
-            (*gc->imports.calloc)(gc, 1, gc->sampler.shared->linearTableSize * sizeof(GLvoid*));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+            gc->sampler.shared->linearTableSize * sizeof(GLvoid*),
+            (gctPOINTER*)&gc->sampler.shared->linearTable)))
+        {
+            gcmOS_SAFE_FREE(gcvNULL, gc->sampler.shared);
+            return GL_FALSE;
+        }
+        gcoOS_ZeroMemory(gc->sampler.shared->linearTable, gc->sampler.shared->linearTableSize * sizeof(GLvoid*));
 
         gc->sampler.shared->hashSize = __GL_SAMPLER_HASH_TABLE_SIZE;
         gc->sampler.shared->hashMask = __GL_SAMPLER_HASH_TABLE_SIZE - 1;
@@ -2878,6 +2952,8 @@ GLvoid __glInitSamplerState(__GLcontext *gc)
         gc->sampler.shared->deleteObject = (__GLdeleteObjectFunc)__glDeleteSamplerObj;
         gc->sampler.shared->immediateInvalid = GL_TRUE;
     }
+
+    return GL_TRUE;
 }
 
 GLvoid __glFreeSamplerState(__GLcontext *gc)

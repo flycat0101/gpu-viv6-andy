@@ -18,6 +18,7 @@
 
 extern GLsizei minVertexNumber[];
 extern GLuint fmtIndex2InputIndex[];
+extern GLvoid __glDeleteDlist(__GLcontext *gc, GLvoid *obj);
 
 /*
 ** Display list execution function table
@@ -40,10 +41,18 @@ GLvoid __glDlistFreePrivateData(__GLcontext *gc, GLubyte *data)
     if (primBegin->privateData || primBegin->ibPrivateData)
     {
         /* Notify Dp to delete cached vertex buffer in video memory */
-        /* to do*/
-        /*
-        (*gc->dp.updatePrivateData)(gc, (GLvoid *)primBegin, __GL_DL_CACHE);
-        */
+        if (primBegin->privateData)
+        {
+            (*gc->dp.deletePrimData)(gc, primBegin->privateData);
+            primBegin->privateData = NULL;
+        }
+
+        if (primBegin->ibPrivateData)
+        {
+            (*gc->dp.deletePrimData)(gc, primBegin->ibPrivateData);
+            primBegin->ibPrivateData = NULL;
+        }
+
     }
 }
 
@@ -56,49 +65,40 @@ GLvoid __glDlistFreePrimitive(__GLcontext *gc, GLubyte *data)
 
     if (primBegin->primStartAddr)
     {
-        (*gc->imports.free)(gc, primBegin->primStartAddr);
+        gcmOS_SAFE_FREE(gcvNULL, primBegin->primStartAddr);
         primBegin->primStartAddr = NULL;
     }
 
     if (primBegin->primVertCount)
     {
-        (*gc->imports.free)(gc, primBegin->primVertCount);
+        gcmOS_SAFE_FREE(gcvNULL, primBegin->primVertCount);
         primBegin->primVertCount = NULL;
     }
 
     if (primBegin->indexBuffer)
     {
-        (*gc->imports.free)(gc, primBegin->indexBuffer);
+        gcmOS_SAFE_FREE(gcvNULL, primBegin->indexBuffer);
         primBegin->indexBuffer = NULL;
     }
 
     if (primBegin->edgeflagBuffer)
     {
-        (*gc->imports.free)(gc, primBegin->edgeflagBuffer);
+        gcmOS_SAFE_FREE(gcvNULL, primBegin->edgeflagBuffer);
         primBegin->edgeflagBuffer = NULL;
     }
 
     if (primBegin->privateData)
     {
         /* Notify Dp to delete cached vertex buffer in video memory */
-        /* to do */
-        /*(*gc->dp.deletePrimData)(gc, primBegin->privateData);*/
+        (*gc->dp.deletePrimData)(gc, primBegin->privateData);
         primBegin->privateData = NULL;
     }
 
     if (primBegin->ibPrivateData)
     {
         /* Notify Dp to delete cached vertex buffer in video memory */
-        /* to do */
-        /*(*gc->dp.deletePrimData)(gc, primBegin->ibPrivateData);*/
+        (*gc->dp.deletePrimData)(gc, primBegin->ibPrivateData);
         primBegin->ibPrivateData = NULL;
-    }
-
-    if (primBegin->privStreamInfo)
-    {
-        /* to do */
-        /*(*gc->dp.deleteStreamInfo)(gc, primBegin->privStreamInfo);*/
-        primBegin->privStreamInfo = NULL;
     }
 }
 
@@ -197,11 +197,17 @@ GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist)
 {
     __GLdlistOp *dlistop = cdlist->dlist;
     __GLdlistOp *beginOp, *endOp, *primOp, *primBeginOp = NULL;
+    __GLdlistOp *outsideAttOp = NULL;
+    __GLdlistOp *nextNonEmptyOp;
     GLuint firstVertex, index, input, datasize, startNewPrim, discardVertexNum;
     GLuint64 primFormat, fmtMask, inputMask;
     __GLPrimBegin prim, *primBegin;
     GLfloat *currentPtr[__GL_TOTAL_VERTEX_ATTRIBUTES];
+    __GLcoord currentState[__GL_TOTAL_VERTEX_ATTRIBUTES];
     GLfloat *startAddr, *v;
+    GLuint outsideInputMask = 0;
+    GLuint outsidePrimFormat = 0;
+    GLuint missingInputMask = 0;
 
     primOp = NULL;
 
@@ -224,6 +230,37 @@ GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist)
             while (firstVertex) {
                 switch (dlistop->opcode) {
                 case __glop_Vertex2fv:
+                    /* If attribute(s) is(are) missing from the first vertex but
+                    ** it(they) is(are) set outside of begin and end, merge it(them)
+                    ** into the primtive's format so display list can be optimized
+                    ** even attribute is missing in the first vertex. Currently only
+                    ** normal3fv is implemented. We can add more later
+                    */
+                    index = 0;
+                    missingInputMask = (~prim.primInputMask & outsideInputMask) & __GL_INPUT_NORMAL;
+                    while (missingInputMask)
+                    {
+                        if (missingInputMask & 1)
+                        {
+                            switch (index)
+                            {
+                                case __GL_INPUT_NORMAL_INDEX:
+                                    prim.primInputMask |= __GL_INPUT_NORMAL;
+                                    prim.primitiveFormat |= __GL_N3F_BIT;
+                                    __GL_PRIM_ELEMENT(prim.primElemSequence, __GL_N3F_TAG);
+                                    prim.elemOffsetDW[__GL_INPUT_NORMAL_INDEX] = prim.totalStrideDW;
+                                    prim.elemSizeDW[__GL_INPUT_NORMAL_INDEX] = 3;
+                                    prim.totalStrideDW += 3;
+                                    prim.elementCount += 1;
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                        index++;
+                        missingInputMask >>= 1;
+                    }
+
                     prim.primInputMask |= __GL_INPUT_VERTEX;
                     prim.primitiveFormat |= __GL_V2F_BIT;
                     __GL_PRIM_ELEMENT(prim.primElemSequence, __GL_V2F_TAG);
@@ -234,6 +271,36 @@ GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist)
                     firstVertex = GL_FALSE;
                     break;
                 case __glop_Vertex3fv:
+                    /* If attribute(s) is(are) missing from the first vertex but
+                    ** it(they) is(are) set outside of begin and end, merge it(them)
+                    ** into the primtive's format so display list can be optimized
+                    ** even attribute is missing in the first vertex. Currently only
+                    ** normal3fv is implemented. We can add more later
+                    */
+                    index = 0;
+                    missingInputMask = (~prim.primInputMask & outsideInputMask) & __GL_INPUT_NORMAL;
+                    while (missingInputMask)
+                    {
+                        if (missingInputMask & 1)
+                        {
+                            switch (index)
+                            {
+                                case __GL_INPUT_NORMAL_INDEX:
+                                    prim.primInputMask |= __GL_INPUT_NORMAL;
+                                    prim.primitiveFormat |= __GL_N3F_BIT;
+                                    __GL_PRIM_ELEMENT(prim.primElemSequence, __GL_N3F_TAG);
+                                    prim.elemOffsetDW[__GL_INPUT_NORMAL_INDEX] = prim.totalStrideDW;
+                                    prim.elemSizeDW[__GL_INPUT_NORMAL_INDEX] = 3;
+                                    prim.totalStrideDW += 3;
+                                    prim.elementCount += 1;
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                        index++;
+                        missingInputMask >>= 1;
+                    }
                     prim.primInputMask |= __GL_INPUT_VERTEX;
                     prim.primitiveFormat |= __GL_V3F_BIT;
                     __GL_PRIM_ELEMENT(prim.primElemSequence, __GL_V3F_TAG);
@@ -244,14 +311,36 @@ GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist)
                     firstVertex = GL_FALSE;
                     break;
                 case __glop_Vertex4fv:
-                    prim.primInputMask |= __GL_INPUT_VERTEX;
-                    prim.primitiveFormat |= __GL_V4F_BIT;
-                    __GL_PRIM_ELEMENT(prim.primElemSequence, __GL_V4F_TAG);
-                    prim.elemOffsetDW[__GL_INPUT_VERTEX_INDEX] = prim.totalStrideDW;
-                    prim.elemSizeDW[__GL_INPUT_VERTEX_INDEX] = 4;
-                    prim.totalStrideDW += 4;
-                    prim.elementCount += 1;
-                    firstVertex = GL_FALSE;
+                    /* If attribute(s) is(are) missing from the first vertex but
+                    ** it(they) is(are) set outside of begin and end, merge it(them)
+                    ** into the primtive's format so display list can be optimized
+                    ** even attribute is missing in the first vertex. Currently only
+                    ** normal3fv is implemented. We can add more later
+                    */
+                    index = 0;
+                    missingInputMask = (~prim.primInputMask & outsideInputMask) & __GL_INPUT_NORMAL;
+                    while (missingInputMask)
+                    {
+                        if (missingInputMask & 1)
+                        {
+                            switch (index)
+                            {
+                                case __GL_INPUT_NORMAL_INDEX:
+                                    prim.primInputMask |= __GL_INPUT_NORMAL;
+                                    prim.primitiveFormat |= __GL_N3F_BIT;
+                                    __GL_PRIM_ELEMENT(prim.primElemSequence, __GL_N3F_TAG);
+                                    prim.elemOffsetDW[__GL_INPUT_NORMAL_INDEX] = prim.totalStrideDW;
+                                    prim.elemSizeDW[__GL_INPUT_NORMAL_INDEX] = 3;
+                                    prim.totalStrideDW += 3;
+                                    prim.elementCount += 1;
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                        index++;
+                        missingInputMask >>= 1;
+                    }
                     break;
                 case __glop_Normal3fv:
                     if ((prim.primInputMask & __GL_INPUT_NORMAL) == 0) {
@@ -631,13 +720,45 @@ GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist)
                 }
             }
 
+            /* Skip outside normal3fv because it is packed into __glop_Primitive
+            ** or __glop_PrimContinue
+            */
+            while (outsideAttOp && (outsideAttOp != beginOp))
+            {
+                switch (outsideAttOp->opcode)
+                {
+                    case __glop_Normal3fv:
+                        outsideAttOp->opcode = __glop_Skip;
+                        break;
+
+                    default:
+                        break;
+                }
+                outsideAttOp = outsideAttOp->next;
+            }
+
+            outsideAttOp = NULL;
+
             /* If the current primitive is right after a primOp node and they have the same
             ** primType and primitiveFormat, or if the first primitive is Line primtive and
             ** followed by another Line primitive, then the current primitive will be coalesced
             ** with the prevoius primOp node.
             */
             startNewPrim = GL_TRUE;
-            if (primOp && primOp->next == beginOp) {
+            nextNonEmptyOp = primOp;
+            while (nextNonEmptyOp && nextNonEmptyOp->next)
+            {
+                if (nextNonEmptyOp->next->opcode == __glop_Skip)
+                {
+                    nextNonEmptyOp = nextNonEmptyOp->next;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            if (primOp && nextNonEmptyOp && nextNonEmptyOp->next == beginOp) {
                 /* Set primBegin to the primitive begin node */
                 primBegin = (__GLPrimBegin *)(primBeginOp + 1);
 
@@ -656,6 +777,15 @@ GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist)
                             (prim.primType >= GL_LINES && prim.primType <= GL_LINE_STRIP))
                         {
                             primBegin->primType = GL_LINE_STRIP;
+                            startNewPrim = GL_FALSE;
+                        }
+                        /* Allow QUADs and QUAD_STRIP to be packed together, gears' pattern is QUAD_STRP and QUADS
+                        ** alternatively.
+                        */
+                        if ((primBegin->primType >= GL_QUADS && primBegin->primType <= GL_QUAD_STRIP) &&
+                            (prim.primType >= GL_QUADS && prim.primType <= GL_QUAD_STRIP))
+                        {
+                            primBegin->primType = GL_QUAD_STRIP;
                             startNewPrim = GL_FALSE;
                         }
                     }
@@ -701,6 +831,7 @@ GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist)
             /* Setup the currentPtr[] array according to elemOffset[] */
             input = 0;
             inputMask = prim.primInputMask;
+            gcoOS_ZeroMemory(currentPtr, gcmSIZEOF(GLfloat *) * __GL_TOTAL_VERTEX_ATTRIBUTES);
             while (inputMask) {
                 if (inputMask & 0x1) {
                     currentPtr[input] = startAddr - prim.totalStrideDW + prim.elemOffsetDW[input];
@@ -709,9 +840,36 @@ GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist)
                 inputMask >>= 1;
             }
 
-            /* Now pack this consistent primitive into a single __GLdlistOp.
-            ** At the same time, extract the bounding box from all vertices.
+            /*
+            ** If there are missing attributes, set the missing attributes to the primitive stream.
+            ** currently only normal is considered.
             */
+            index = 0;
+            firstVertex = GL_FALSE;
+            inputMask = outsideInputMask;
+            while (inputMask)
+            {
+                if (inputMask & 0x1)
+                {
+                    switch (index)
+                    {
+                        case __GL_INPUT_NORMAL_INDEX:
+                            if (currentPtr[index])
+                            {
+                                *(struct __gllc_Normal3fv_Rec *)(currentPtr[index] + prim.totalStrideDW) = *(struct __gllc_Normal3fv_Rec *)&currentState[index];
+                                firstVertex = GL_TRUE;
+                            }
+                            break;
+
+                        default:
+                            break;
+                    }
+                }
+                index += 1;
+                inputMask >>= 1;
+            }
+
+            /* Now pack this consistent primitive into a single __GLdlistOp.*/
             dlistop = beginOp;
             while (dlistop != endOp) {
                 switch (dlistop->opcode) {
@@ -751,10 +909,17 @@ GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist)
                                 case __GL_TC3F_U5_INDEX:
                                 case __GL_TC3F_U6_INDEX:
                                 case __GL_TC3F_U7_INDEX:
-                                    v = currentPtr[input];
-                                    currentPtr[input] += prim.totalStrideDW;
-                                    *(struct __gllc_TexCoord3fv_Rec *)currentPtr[input] =
-                                        *(struct __gllc_TexCoord3fv_Rec *)v;
+                                    if (firstVertex)
+                                    {
+                                        currentPtr[input] += prim.totalStrideDW;
+                                    }
+                                    else
+                                    {
+                                        v = currentPtr[input];
+                                        currentPtr[input] += prim.totalStrideDW;
+                                        *(struct __gllc_TexCoord3fv_Rec *)currentPtr[input] =
+                                            *(struct __gllc_TexCoord3fv_Rec *)v;
+                                    }
                                     break;
                                 case __GL_C4F_INDEX:
                                 case __GL_TC4F_INDEX:
@@ -807,6 +972,7 @@ GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist)
                     *(struct __gllc_Vertex2fv_Rec *)currentPtr[input] =
                         *(struct __gllc_Vertex2fv_Rec *)(dlistop + 1);
                     primFormat = 0;
+                    firstVertex = GL_FALSE;
                     break;
 
                 case __glop_Vertex3fv:
@@ -842,10 +1008,17 @@ GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist)
                                 case __GL_TC3F_U5_INDEX:
                                 case __GL_TC3F_U6_INDEX:
                                 case __GL_TC3F_U7_INDEX:
-                                    v = currentPtr[input];
-                                    currentPtr[input] += prim.totalStrideDW;
-                                    *(struct __gllc_TexCoord3fv_Rec *)currentPtr[input] =
-                                        *(struct __gllc_TexCoord3fv_Rec *)v;
+                                    if (firstVertex)
+                                    {
+                                        currentPtr[input] += prim.totalStrideDW;
+                                    }
+                                    else
+                                    {
+                                        v = currentPtr[input];
+                                        currentPtr[input] += prim.totalStrideDW;
+                                        *(struct __gllc_TexCoord3fv_Rec *)currentPtr[input] =
+                                            *(struct __gllc_TexCoord3fv_Rec *)v;
+                                    }
                                     break;
                                 case __GL_C4F_INDEX:
                                 case __GL_TC4F_INDEX:
@@ -898,6 +1071,7 @@ GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist)
                     *(struct __gllc_Vertex3fv_Rec *)currentPtr[input] =
                         *(struct __gllc_Vertex3fv_Rec *)(dlistop + 1);
                     primFormat = 0;
+                    firstVertex = GL_FALSE;
                     break;
 
                 case __glop_Vertex4fv:
@@ -905,7 +1079,7 @@ GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist)
                     primFormat |= __GL_V4F_BIT;
                     fmtMask = prim.primitiveFormat & ~primFormat;
                     index = 0;
-                    while (fmtMask) {
+                    while (fmtMask ) {
                         if (fmtMask & 0x1) {
                             input = fmtIndex2InputIndex[index];
                             switch (index) {
@@ -933,10 +1107,17 @@ GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist)
                                 case __GL_TC3F_U5_INDEX:
                                 case __GL_TC3F_U6_INDEX:
                                 case __GL_TC3F_U7_INDEX:
-                                    v = currentPtr[input];
-                                    currentPtr[input] += prim.totalStrideDW;
-                                    *(struct __gllc_TexCoord3fv_Rec *)currentPtr[input] =
-                                        *(struct __gllc_TexCoord3fv_Rec *)v;
+                                    if (firstVertex)
+                                    {
+                                        currentPtr[input] += prim.totalStrideDW;
+                                    }
+                                    else
+                                    {
+                                        v = currentPtr[input];
+                                        currentPtr[input] += prim.totalStrideDW;
+                                        *(struct __gllc_TexCoord3fv_Rec *)currentPtr[input] =
+                                            *(struct __gllc_TexCoord3fv_Rec *)v;
+                                    }
                                     break;
                                 case __GL_C4F_INDEX:
                                 case __GL_TC4F_INDEX:
@@ -989,6 +1170,7 @@ GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist)
                     *(struct __gllc_Vertex4fv_Rec *)currentPtr[input] =
                         *(struct __gllc_Vertex4fv_Rec *)(dlistop + 1);
                     primFormat = 0;
+                    firstVertex = GL_FALSE;
                     break;
 
                 case __glop_Normal3fv:
@@ -998,6 +1180,7 @@ GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist)
                     }
                     *(struct __gllc_Normal3fv_Rec *)currentPtr[input] =
                         *(struct __gllc_Normal3fv_Rec *)(dlistop + 1);
+                    currentState[input] = *(__GLcoord *)(dlistop + 1);
                     primFormat |= __GL_N3F_BIT;
                     break;
                 case __glop_Color3fv:
@@ -1143,6 +1326,20 @@ GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist)
             dlistop->next = primOp;
             dlistop = primOp;
         }
+        else
+        {
+            if (dlistop->opcode == __glop_Normal3fv)
+            {
+                outsideInputMask |= __GL_INPUT_NORMAL;
+                outsidePrimFormat |= __GL_N3F_BIT;
+                currentState[__GL_INPUT_NORMAL_INDEX] =
+                    *(__GLcoord *)(dlistop + 1);
+                if (outsideAttOp == NULL)
+                {
+                    outsideAttOp = dlistop;
+                }
+            }
+        }
 
 Next_dlistop:
         dlistop = dlistop->next;
@@ -1170,24 +1367,28 @@ __GLdlist * __glAllocateDlist(__GLcontext *gc, GLuint segsize, GLuint freeCount,
 
     if (dlist == NULL)
     {
-        dlist = (__GLdlist *)(*gc->imports.calloc)(gc, 1, sizeof(__GLdlist) );
-        if (dlist == NULL)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+            sizeof(__GLdlist),
+            (gctPOINTER*)&dlist)))
         {
             __glSetError( gc, GL_OUT_OF_MEMORY);
-            return (NULL);
+             return NULL;
         }
+        gcoOS_ZeroMemory(dlist, sizeof(__GLdlist));
     }
 
     if (freeCount)
     {
         memsize = sizeof(__GLDlistFreeFns) * freeCount + sizeof(GLuint);
-        dlist->freefunc = (GLubyte *)(*gc->imports.calloc)(gc, 1, memsize );
-        if (dlist->freefunc == NULL)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+            memsize,
+            (gctPOINTER*)&dlist->freefunc)))
         {
-            (*gc->imports.free)(gc, dlist);
+            gcmOS_SAFE_FREE(gcvNULL, dlist);
             __glSetError( gc, GL_OUT_OF_MEMORY);
             return (NULL);
         }
+        gcoOS_ZeroMemory(dlist->freefunc, memsize);
         tmp = (GLuint *)dlist->freefunc;
         *tmp = freeCount;
     }
@@ -1201,10 +1402,9 @@ __GLdlist * __glAllocateDlist(__GLcontext *gc, GLuint segsize, GLuint freeCount,
 
     if (segsize)
     {
-        dlist->segment = (GLubyte *)(*gc->imports.malloc)(gc, segsize );
-        if (dlist->segment == NULL)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, segsize, (gctPOINTER*)&dlist->segment)))
         {
-            (*gc->imports.free)(gc, dlist);
+            gcmOS_SAFE_FREE(gcvNULL, dlist);
             __glSetError( gc, GL_OUT_OF_MEMORY);
             return (NULL);
         }
@@ -1352,7 +1552,7 @@ GLvoid __glGeneratePrimIndexStream(__GLcontext *gc, GLuint vertexCount, GLuint c
     primBegin->indexCount = indexCount;
 }
 
-GLvoid __glProcessPrimitiveOp(__GLcontext *gc, GLint primIndex, GLuint vertexCount, GLuint currentIndex,
+GLboolean __glProcessPrimitiveOp(__GLcontext *gc, GLint primIndex, GLuint vertexCount, GLuint currentIndex,
                             __GLPrimBegin *primBegin, GLenum currentPrimType, GLubyte *data)
 {
     /* For disjoint primitives, simply combine and return.
@@ -1363,18 +1563,16 @@ GLvoid __glProcessPrimitiveOp(__GLcontext *gc, GLint primIndex, GLuint vertexCou
         primBegin->primType == GL_POINTS)
     {
         primBegin->primCount = 1;
-        return;
+        return GL_TRUE;
     }
 
     /* Allocate vertex indexBuffer */
     if (primIndex == 0)
     {
-        primBegin->indexBuffer = (GLushort *)
-            (*gc->imports.malloc)(gc, 3 * primBegin->vertexCount * sizeof(GLushort) );
-        if (primBegin->indexBuffer == NULL)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, 3 * primBegin->vertexCount * sizeof(GLushort), (gctPOINTER*)&primBegin->indexBuffer)))
         {
             __glSetError( gc, GL_OUT_OF_MEMORY);
-            return;
+            return GL_FALSE;
         }
     }
 
@@ -1384,14 +1582,25 @@ GLvoid __glProcessPrimitiveOp(__GLcontext *gc, GLint primIndex, GLuint vertexCou
         if (primIndex == 0)
         {
             /* Allocate primStartAddr, primVertCount buffers */
-            primBegin->primStartAddr = (GLfloat **)
-                (*gc->imports.malloc)(gc, primBegin->primCount * sizeof(GLfloat*) );
-            primBegin->primVertCount = (GLint *)
-                (*gc->imports.malloc)(gc, primBegin->primCount * sizeof(GLuint) );
-            if (primBegin->primStartAddr == NULL || primBegin->primVertCount == NULL)
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, primBegin->primCount * sizeof(GLfloat*), (gctPOINTER*)&primBegin->primStartAddr)))
             {
+                if (primBegin->indexBuffer)
+                {
+                    gcmOS_SAFE_FREE(gcvNULL, primBegin->indexBuffer);
+                }
                 __glSetError( gc, GL_OUT_OF_MEMORY);
-                return;
+                return GL_FALSE;
+            }
+
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, primBegin->primCount * sizeof(GLuint), (gctPOINTER*)&primBegin->primVertCount)))
+            {
+                gcmOS_SAFE_FREE(gcvNULL, primBegin->primStartAddr);
+                if (primBegin->indexBuffer)
+                {
+                    gcmOS_SAFE_FREE(gcvNULL, primBegin->indexBuffer);
+                }
+                __glSetError( gc, GL_OUT_OF_MEMORY);
+                return GL_FALSE;
             }
 
             primBegin->primStartAddr[primIndex] = (GLfloat *)(data + sizeof(__GLPrimBegin));
@@ -1406,6 +1615,8 @@ GLvoid __glProcessPrimitiveOp(__GLcontext *gc, GLint primIndex, GLuint vertexCou
 
     /* Generate vertex index stream */
     __glGeneratePrimIndexStream(gc, vertexCount, currentIndex, primBegin, currentPrimType);
+
+    return GL_TRUE;
 }
 
 /*
@@ -1524,16 +1735,26 @@ __GLdlist * __glCompileDisplayList(__GLcontext *gc, __GLcompiledDlist *compDlist
                 currentIndex = 0;
                 vertexCount = (dlistop->size - sizeof(__GLPrimBegin)) / (primBegin->totalStrideDW << 2);
                 /* Generate vertex indices */
-                __glProcessPrimitiveOp(gc, primIndex, vertexCount, currentIndex,
-                                        primBegin, dlistop->primType, data);
+                if (__glProcessPrimitiveOp(gc, primIndex, vertexCount, currentIndex,
+                                        primBegin, dlistop->primType, data) == GL_FALSE)
+                {
+                    __glDlistFreePrimitive(gc, (GLubyte *)primBegin);
+                    __glDeleteDlist(gc, (GLvoid *)dlist);
+                    return (NULL);
+                }
                 currentIndex += vertexCount;
                 break;
             case __glop_PrimContinue:
                 primIndex += 1;
                 vertexCount = dlistop->size / (primBegin->totalStrideDW << 2);
                 /* Generate vertex indices */
-                __glProcessPrimitiveOp(gc, primIndex, vertexCount, currentIndex,
-                                        primBegin, dlistop->primType, data);
+                if (__glProcessPrimitiveOp(gc, primIndex, vertexCount, currentIndex,
+                                        primBegin, dlistop->primType, data) == GL_FALSE)
+                {
+                    __glDlistFreePrimitive(gc, (GLubyte *)primBegin);
+                    __glDeleteDlist(gc, (GLvoid *)dlist);
+                    return (NULL);
+                }
                 currentIndex += vertexCount;
                 break;
             case __glop_Frustum:

@@ -22,12 +22,12 @@
 __GL_INLINE GLvoid __glRect(__GLcontext *gc, GLfloat x0, GLfloat y0, GLfloat x1, GLfloat y1)
 {
 
-    (*gc->immedModeDispatch.Begin)(gc, GL_QUADS);
-    (*gc->immedModeDispatch.Vertex2f)(gc, x0, y0);
-    (*gc->immedModeDispatch.Vertex2f)(gc, x1, y0);
-    (*gc->immedModeDispatch.Vertex2f)(gc, x1, y1);
-    (*gc->immedModeDispatch.Vertex2f)(gc, x0, y1);
-    (*gc->immedModeDispatch.End)(gc);
+    (*gc->currentImmediateDispatch->Begin)(gc, GL_QUADS);
+    (*gc->currentImmediateDispatch->Vertex2f)(gc, x0, y0);
+    (*gc->currentImmediateDispatch->Vertex2f)(gc, x1, y0);
+    (*gc->currentImmediateDispatch->Vertex2f)(gc, x1, y1);
+    (*gc->currentImmediateDispatch->Vertex2f)(gc, x0, y1);
+    (*gc->currentImmediateDispatch->End)(gc);
 
 }
 

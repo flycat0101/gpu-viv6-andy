@@ -74,3 +74,55 @@ GLvoid APIENTRY __glim_EdgeFlagv(__GLcontext *gc, const GLboolean *tag)
     __glEdgeFlag(gc, tag[0]);
 }
 
+/*
+ * Following APIs are used for immediate mode OpenGL edge flag APIs performance improvement
+ */
+
+__GL_INLINE GLvoid __glEdgeFlag_Outside(__GLcontext *gc, GLboolean tag)
+{
+    __GL_DLIST_BUFFER_FLUSH(gc);
+
+    if ((gc->input.currentInputMask & __GL_INPUT_EDGEFLAG) == 0 ||
+        gc->input.beginMode != __GL_SMALL_DRAW_BATCH)
+    {
+        /* edgeflag is not needed in glBegin/glEnd.
+        */
+        gc->state.current.edgeflag = tag;
+    }
+    else
+    {
+        /* edgeflag is needed in glBegin/glEnd.
+        */
+        if (gc->input.prevPrimInputMask & __GL_INPUT_EDGEFLAG)
+        {
+            /* If previous primitive has edgeflag in glBegin/glEnd.
+            */
+            __glPrimitiveBatchEnd(gc);
+
+            gc->state.current.edgeflag = tag;
+        }
+        else
+        {
+            /* Previous primitive has no edgeflag (but it needs edgeflag) in glBegin/glEnd.
+            */
+            if (gc->state.current.edgeflag != tag)
+            {
+                __glPrimitiveBatchEnd(gc);
+
+                gc->state.current.edgeflag = tag;
+            }
+        }
+    }
+}
+
+GLvoid APIENTRY __glim_EdgeFlag_Outside(__GLcontext *gc, GLboolean tag)
+{
+    __glEdgeFlag_Outside(gc, tag);
+}
+
+GLvoid APIENTRY __glim_EdgeFlagv_Outside(__GLcontext *gc, const GLboolean *tag)
+{
+    __glEdgeFlag_Outside(gc, tag[0]);
+}
+
+

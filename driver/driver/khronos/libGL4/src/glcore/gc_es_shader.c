@@ -120,7 +120,11 @@ GLboolean __glInitProgramObject(__GLcontext *gc, __GLprogramObject *programObjec
 
     __GL_MEMZERO(programObject->bindingInfo.workGroupSize, 3 * sizeof(GLuint));
 
-    programObject->programInfo.infoLog = (GLchar*)(*gc->imports.calloc)(gc, __GLSL_LOG_INFO_SIZE, sizeof(GLchar));
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, __GLSL_LOG_INFO_SIZE * sizeof(GLchar), (gctPOINTER*)&programObject->programInfo.infoLog)))
+    {
+        return GL_FALSE;
+    }
+    gcoOS_ZeroMemory(programObject->programInfo.infoLog, __GLSL_LOG_INFO_SIZE * sizeof(GLchar));
 
     return GL_TRUE;
 }
@@ -162,7 +166,7 @@ GLvoid __glDetachShader(__GLcontext *gc, __GLprogramObject * programObject, __GL
         {
             current->next = next->next;
         }
-        (*gc->imports.free)(gc, next);
+        gcmOS_SAFE_FREE(gcvNULL, next);
     }
 
     if ((--shaderObject->objectInfo.bindCount) == 0 && shaderObject->shaderInfo.deleteStatus)
@@ -184,20 +188,20 @@ GLboolean __glDeleteShaderObject(__GLcontext *gc, __GLshaderObject * shaderObjec
 
     if (shaderObject->objectInfo.label)
     {
-        gc->imports.free(gc, shaderObject->objectInfo.label);
+        gcmOS_SAFE_FREE(gcvNULL, shaderObject->objectInfo.label);
     }
 
     /* Delete shader source */
     if (shaderObject->shaderInfo.source)
     {
-        (*gc->imports.free)(gc, shaderObject->shaderInfo.source);
+        gcmOS_SAFE_FREE(gcvNULL, shaderObject->shaderInfo.source);
         shaderObject->shaderInfo.source = gcvNULL;
     }
 
     (*gc->dp.deleteShader)(gc, shaderObject);
 
     /* Delete shader object */
-    (*gc->imports.free)(gc, shaderObject);
+    gcmOS_SAFE_FREE(gcvNULL, shaderObject);
 
     return GL_TRUE;
 }
@@ -243,7 +247,7 @@ GLboolean __glDeleteProgramObject(__GLcontext *gc, __GLprogramObject * programOb
                 {
                     __glDeleteObject(gc, gc->shaderProgram.spShared, current->shader->objectInfo.id);
                 }
-                (*gc->imports.free)(gc, current);
+                gcmOS_SAFE_FREE(gcvNULL, current);
             }
             programObject->programInfo.attachedShader[i] = gcvNULL;
         }
@@ -251,28 +255,28 @@ GLboolean __glDeleteProgramObject(__GLcontext *gc, __GLprogramObject * programOb
 
     if (programObject->objectInfo.label)
     {
-        gc->imports.free(gc, programObject->objectInfo.label);
+        gcmOS_SAFE_FREE(gcvNULL, programObject->objectInfo.label);
     }
 
     /* Free info log buffer */
     if (programObject->programInfo.infoLog != gcvNULL)
     {
-        (*gc->imports.free)(gc, programObject->programInfo.infoLog);
+        gcmOS_SAFE_FREE(gcvNULL, programObject->programInfo.infoLog);
         programObject->programInfo.infoLog = gcvNULL;
     }
 
     for (i = 0; i < programObject->xfbVaryingNum; i++)
     {
         GL_ASSERT(programObject->ppXfbVaryingNames[i]);
-        (*gc->imports.free)(gc, programObject->ppXfbVaryingNames[i]);
+        gcmOS_SAFE_FREE(gcvNULL, programObject->ppXfbVaryingNames[i]);
     }
 
     if (programObject->ppXfbVaryingNames)
     {
-        (*gc->imports.free)(gc, programObject->ppXfbVaryingNames);
+        gcmOS_SAFE_FREE(gcvNULL, programObject->ppXfbVaryingNames);
     }
 
-    (*gc->imports.free)(gc, programObject);
+    gcmOS_SAFE_FREE(gcvNULL, programObject);
 
     return GL_TRUE;
 }
@@ -334,15 +338,27 @@ GLvoid __glBindTransformFeedback(__GLcontext *gc, GLuint id)
 
     if (gcvNULL == xfbObj)
     {
-        xfbObj = (__GLxfbObject *)(*gc->imports.calloc)(gc, 1, sizeof(__GLxfbObject));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLxfbObject), (gctPOINTER*)&xfbObj)))
+        {
+            __GL_ERROR_RET(GL_OUT_OF_MEMORY);
+        }
+        gcoOS_ZeroMemory(xfbObj, sizeof(__GLxfbObject));
+
         __glInitXfbObject(gc, xfbObj, id);
-        __glAddObject(gc, gc->xfb.noShare, id, xfbObj);
+        if (__glAddObject(gc, gc->xfb.noShare, id, xfbObj) == GL_FALSE)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, xfbObj);
+            __GL_ERROR_RET(GL_OUT_OF_MEMORY);
+        }
     }
 
     gc->xfb.boundXfbObj = xfbObj;
 
     /* Call the dp interface */
-    (*gc->dp.bindXFB)(gc, xfbObj);
+    if ((*gc->dp.bindXFB)(gc, xfbObj) == GL_FALSE)
+    {
+        __GL_ERROR((*gc->dp.getError)(gc));
+    }
 
     gc->xfb.dirtyState |= __GL_XFB_DIRTY_OBJECT;
 }
@@ -419,18 +435,18 @@ GLboolean __glDeleteXfbObj(__GLcontext *gc, __GLxfbObject *xfbObj)
 
     if (xfbObj->label)
     {
-        gc->imports.free(gc, xfbObj->label);
+        gcmOS_SAFE_FREE(gcvNULL, xfbObj->label);
     }
 
     (*gc->dp.deleteXFB)(gc, xfbObj);
 
-    (*gc->imports.free)(gc, xfbObj);
+    gcmOS_SAFE_FREE(gcvNULL, xfbObj);
 
     return GL_TRUE;
 }
 
 
-GLvoid __glInitShaderProgramState(__GLcontext *gc)
+GLboolean __glInitShaderProgramState(__GLcontext *gc)
 {
     __GLSLStage stage;
     GLuint unit;
@@ -447,8 +463,13 @@ GLvoid __glInitShaderProgramState(__GLcontext *gc)
         /* Allocate VEGL lock */
         if (gcvNULL == gc->shaderProgram.spShared->lock)
         {
-            gc->shaderProgram.spShared->lock = (*gc->imports.calloc)(gc, 1, sizeof(VEGLLock));
-           (*gc->imports.createMutex)(gc->shaderProgram.spShared->lock);
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(VEGLLock), (gctPOINTER*)&gc->shaderProgram.spShared->lock)))
+            {
+                return GL_FALSE;
+            }
+            gcoOS_ZeroMemory(gc->shaderProgram.spShared->lock, sizeof(VEGLLock));
+
+            (*gc->imports.createMutex)(gc->shaderProgram.spShared->lock);
         }
         gcoOS_UnLockPLS();
     }
@@ -456,12 +477,21 @@ GLvoid __glInitShaderProgramState(__GLcontext *gc)
     {
         GL_ASSERT(gcvNULL == gc->shaderProgram.spShared);
 
-        gc->shaderProgram.spShared = (__GLsharedObjectMachine*)(*gc->imports.calloc)(gc, 1, sizeof(__GLsharedObjectMachine));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLsharedObjectMachine), (gctPOINTER*)&gc->shaderProgram.spShared)))
+        {
+            return GL_FALSE;
+        }
+        gcoOS_ZeroMemory(gc->shaderProgram.spShared, sizeof(__GLsharedObjectMachine));
+
         /* Initialize a linear lookup table for program objects */
         gc->shaderProgram.spShared->maxLinearTableSize = __GL_MAX_PRGOBJ_LINEAR_TABLE_SIZE;
         gc->shaderProgram.spShared->linearTableSize = __GL_DEFAULT_PRGOBJ_LINEAR_TABLE_SIZE;
-        gc->shaderProgram.spShared->linearTable = (GLvoid **)
-            (*gc->imports.calloc)(gc, 1, gc->shaderProgram.spShared->linearTableSize * sizeof(GLvoid *));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, gc->shaderProgram.spShared->linearTableSize * sizeof(GLvoid *), (gctPOINTER*)&gc->shaderProgram.spShared->linearTable)))
+        {
+            gcmOS_SAFE_FREE(gcvNULL, gc->shaderProgram.spShared);
+            return GL_FALSE;
+        }
+        gcoOS_ZeroMemory(gc->shaderProgram.spShared->linearTable, gc->shaderProgram.spShared->linearTableSize * sizeof(GLvoid *));
 
         gc->shaderProgram.spShared->hashSize = __GL_PRGOBJ_HASH_TABLE_SIZE;
         gc->shaderProgram.spShared->hashMask = __GL_PRGOBJ_HASH_TABLE_SIZE - 1;
@@ -474,14 +504,21 @@ GLvoid __glInitShaderProgramState(__GLcontext *gc)
     /* Program Pipeline Objects cannot be shared across contexts */
     if (gc->shaderProgram.ppNoShare == gcvNULL)
     {
-        gc->shaderProgram.ppNoShare = (__GLsharedObjectMachine *)
-            (*gc->imports.calloc)(gc, 1, sizeof(__GLsharedObjectMachine));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLsharedObjectMachine), (gctPOINTER*)&gc->shaderProgram.ppNoShare)))
+        {
+            return GL_FALSE;
+        }
+        gcoOS_ZeroMemory(gc->shaderProgram.ppNoShare, sizeof(__GLsharedObjectMachine));
 
         /* Initialize a linear lookup table for program pipeline Object */
         gc->shaderProgram.ppNoShare->maxLinearTableSize = __GL_MAX_PRGOBJ_LINEAR_TABLE_SIZE;
         gc->shaderProgram.ppNoShare->linearTableSize = __GL_DEFAULT_PRGOBJ_LINEAR_TABLE_SIZE;
-        gc->shaderProgram.ppNoShare->linearTable = (GLvoid **)
-            (*gc->imports.calloc)(gc, 1, gc->shaderProgram.ppNoShare->linearTableSize * sizeof(GLvoid *));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, gc->shaderProgram.ppNoShare->linearTableSize * sizeof(GLvoid *), (gctPOINTER*)&gc->shaderProgram.ppNoShare->linearTable)))
+        {
+            gcmOS_SAFE_FREE(gcvNULL, gc->shaderProgram.ppNoShare);
+            return GL_FALSE;
+        }
+        gcoOS_ZeroMemory(gc->shaderProgram.ppNoShare->linearTable, gc->shaderProgram.ppNoShare->linearTableSize * sizeof(GLvoid *));
 
         gc->shaderProgram.ppNoShare->hashSize = __GL_PRGOBJ_HASH_TABLE_SIZE;
         gc->shaderProgram.ppNoShare->hashMask = __GL_PRGOBJ_HASH_TABLE_SIZE - 1;
@@ -526,6 +563,7 @@ GLvoid __glInitShaderProgramState(__GLcontext *gc)
     }
 
     gc->shaderProgram.maxSampler = 0;
+    return GL_TRUE;
 }
 
 GLvoid __glFreeShaderProgramState(__GLcontext * gc)
@@ -587,17 +625,23 @@ GLuint GL_APIENTRY __glim_CreateShader(__GLcontext *gc,  GLenum type)
 
     GL_ASSERT(gc->shaderProgram.spShared);
     shader = __glGenerateNames(gc, gc->shaderProgram.spShared, 1);
-    __glMarkNameUsed(gc, gc->shaderProgram.spShared, shader);
+    if (__glMarkNameUsed(gc, gc->shaderProgram.spShared, shader) < 0)
+    {
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
 
-    shaderObject = (__GLshaderObject *)(*gc->imports.calloc)(gc, 1, sizeof(__GLshaderObject));
-    if (gcvNULL == shaderObject)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLshaderObject), (gctPOINTER*)&shaderObject)))
     {
         shader = 0;
         __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
     }
+    gcoOS_ZeroMemory(shaderObject, sizeof(__GLshaderObject));
 
     __glInitShaderObject(gc, shaderObject, type, shader);
-    __glAddObject(gc, gc->shaderProgram.spShared, shader, shaderObject);
+    if (__glAddObject(gc, gc->shaderProgram.spShared, shader, shaderObject) == GL_FALSE)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, shaderObject);
+    }
 
 OnError:
     __GL_FOOTER();
@@ -654,8 +698,7 @@ GLvoid GL_APIENTRY __glim_ShaderSource(__GLcontext *gc, GLuint shader, GLsizei c
     }
 
     /* Assemble all sources into one string*/
-    source = (GLchar *)(*gc->imports.malloc)(gc, sourceLen + 1);
-    if (gcvNULL == source)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sourceLen + 1, (gctPOINTER*)&source)))
     {
         __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
     }
@@ -678,7 +721,7 @@ GLvoid GL_APIENTRY __glim_ShaderSource(__GLcontext *gc, GLuint shader, GLsizei c
     /* Free the previsou shader source. */
     if (shaderObject->shaderInfo.source != gcvNULL)
     {
-        (*gc->imports.free)(gc, shaderObject->shaderInfo.source);
+        gcmOS_SAFE_FREE(gcvNULL, shaderObject->shaderInfo.source);
     }
 
     shaderObject->shaderInfo.source     = source;
@@ -715,11 +758,11 @@ GLvoid GL_APIENTRY __glim_ShaderBinary(__GLcontext *gc, GLsizei n, const GLuint*
     }
 
     /* Set shader binary. */
-    shaderObjects = (__GLshaderObject**)gc->imports.calloc(gc, n, sizeof(__GLshaderObject*));
-    if (shaderObjects == gcvNULL)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, n * sizeof(__GLshaderObject), (gctPOINTER*)&shaderObjects)))
     {
         __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
     }
+    gcoOS_ZeroMemory(shaderObjects, n * sizeof(__GLshaderObject));
 
     for (i = 0; i < n; ++i)
     {
@@ -728,12 +771,12 @@ GLvoid GL_APIENTRY __glim_ShaderBinary(__GLcontext *gc, GLsizei n, const GLuint*
         {
             if (shaderObjects[i] && shaderObjects[i]->objectInfo.objectType == __GL_PROGRAM_OBJECT_TYPE)
             {
-                gc->imports.free(gc, (gctPOINTER)shaderObjects);
+                gcmOS_SAFE_FREE(gcvNULL, shaderObjects);
                 __GL_ERROR_EXIT(GL_INVALID_OPERATION);
             }
             else
             {
-                gc->imports.free(gc, (gctPOINTER)shaderObjects);
+                gcmOS_SAFE_FREE(gcvNULL, shaderObjects);
                 __GL_ERROR_EXIT(GL_INVALID_VALUE);
             }
         }
@@ -781,13 +824,16 @@ GLvoid GL_APIENTRY __glim_ShaderBinary(__GLcontext *gc, GLsizei n, const GLuint*
 
     if ((binary == gcvNULL) || (length <= 0))
     {
-        gc->imports.free(gc, (gctPOINTER)shaderObjects);
+        gcmOS_SAFE_FREE(gcvNULL, shaderObjects);
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
     noerr = gc->dp.shaderBinary(gc, n, shaderObjects, binaryformat, binary, length);
 
-    gc->imports.free(gc, (gctPOINTER)shaderObjects);    /* Free the resource. */
+    if (shaderObjects)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, shaderObjects);    /* Free the resource. */
+    }
     if (!noerr)
     {
         __GL_ERROR(GL_INVALID_VALUE);
@@ -862,18 +908,35 @@ GLuint GL_APIENTRY __glim_CreateProgram(__GLcontext *gc)
     program = __glGenerateNames(gc, gc->shaderProgram.spShared, 1);
     uniqueId = __glMarkNameUsed(gc, gc->shaderProgram.spShared, program);
 
-    programObject = (__GLprogramObject *)(*gc->imports.calloc)(gc, 1, sizeof(__GLprogramObject));
-    if (!programObject)
+    if ((GLint)uniqueId < 0)
+    {
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
+
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLprogramObject), (gctPOINTER*)&programObject)))
     {
         program = 0;
         __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
     }
+    gcoOS_ZeroMemory(programObject, sizeof(__GLprogramObject));
 
-    __glInitProgramObject(gc, programObject, program, uniqueId);
-    __glAddObject(gc, gc->shaderProgram.spShared, program, programObject);
+    if (__glInitProgramObject(gc, programObject, program, uniqueId) == GL_FALSE)
+    {
+        program = 0;
+        gcmOS_SAFE_FREE(gcvNULL, programObject);
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
+
+    if (__glAddObject(gc, gc->shaderProgram.spShared, program, programObject) == GL_FALSE)
+    {
+        program = 0;
+        gcmOS_SAFE_FREE(gcvNULL, programObject);
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
 
     if (!(*gc->dp.createProgram)(gc, programObject))
     {
+        __glDeleteProgramObject(gc, programObject);
         __GL_ERROR((*gc->dp.getError)(gc));
     }
 
@@ -923,13 +986,13 @@ GLvoid GL_APIENTRY __glim_AttachShader(__GLcontext *gc,  GLuint program, GLuint 
 
     stage = __glGetShaderStage(shaderObject->shaderInfo.shaderType);
 
-    pAttachedShader= (__GLshaderObjectList *)(*gc->imports.calloc)(gc, 1, sizeof(__GLshaderObjectList));
-    if (gcvNULL == pAttachedShader)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLshaderObjectList), (gctPOINTER*)&pAttachedShader)))
     {
         __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
     }
     else
     {
+        gcoOS_ZeroMemory(pAttachedShader, sizeof(__GLshaderObjectList));
         pAttachedShader->shader = shaderObject;
         pAttachedShader->next = gcvNULL;
     }
@@ -3945,19 +4008,26 @@ OnError:
 ** XFB
 */
 
-GLvoid __glInitXfbState(__GLcontext *gc)
+GLboolean __glInitXfbState(__GLcontext *gc)
 {
     /* Transform feedback objects cannot be shared across contexts */
     if (gc->xfb.noShare == gcvNULL)
     {
-        gc->xfb.noShare = (__GLsharedObjectMachine *)
-            (*gc->imports.calloc)(gc, 1, sizeof(__GLsharedObjectMachine));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLsharedObjectMachine), (gctPOINTER*)&gc->xfb.noShare)))
+        {
+            return GL_FALSE;
+        }
+        gcoOS_ZeroMemory(gc->xfb.noShare, sizeof(__GLsharedObjectMachine));
 
         /* Initialize a linear lookup table for XFB object */
         gc->xfb.noShare->maxLinearTableSize = __GL_MAX_XFBOBJ_LINEAR_TABLE_SIZE;
         gc->xfb.noShare->linearTableSize = __GL_DEFAULT_XFBOBJ_LINEAR_TABLE_SIZE;
-        gc->xfb.noShare->linearTable = (GLvoid **)
-            (*gc->imports.calloc)(gc, 1, gc->xfb.noShare->linearTableSize * sizeof(GLvoid *));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, gc->xfb.noShare->linearTableSize * sizeof(GLvoid *), (gctPOINTER*)&gc->xfb.noShare->linearTable)))
+        {
+            gcmOS_SAFE_FREE(gcvNULL, gc->xfb.noShare);
+            return GL_FALSE;
+        }
+        gcoOS_ZeroMemory(gc->xfb.noShare->linearTable, gc->xfb.noShare->linearTableSize * sizeof(GLvoid *));
 
         gc->xfb.noShare->hashSize = __GL_XFB_HASH_TABLE_SIZE;
         gc->xfb.noShare->hashMask = __GL_XFB_HASH_TABLE_SIZE - 1;
@@ -3970,6 +4040,7 @@ GLvoid __glInitXfbState(__GLcontext *gc)
     __glInitXfbObject(gc, &gc->xfb.defaultXfbObj, 0);
     gc->xfb.boundXfbObj = &gc->xfb.defaultXfbObj;
     gc->xfb.dirtyState = __GL_XFB_DIRTY_OBJECT;
+    return GL_TRUE;
 }
 
 GLvoid __glFreeXfbState(__GLcontext *gc)
@@ -4228,6 +4299,7 @@ GLvoid GL_APIENTRY __glim_TransformFeedbackVaryings(__GLcontext *gc, GLuint prog
                                                     const GLchar* const* varyings, GLenum bufferMode)
 {
     GLuint i;
+    GLuint j;
     __GLprogramObject *programObject;
     GLint nextBufferCount = 0;
     GLuint invalidIdentifierCount = 0;
@@ -4268,7 +4340,14 @@ GLvoid GL_APIENTRY __glim_TransformFeedbackVaryings(__GLcontext *gc, GLuint prog
         }
     }
 
-    invalidPos = (GLboolean*)(*gc->imports.malloc)(gc, count*sizeof(GLboolean));
+    if (count > 0)
+    {
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, count*sizeof(GLboolean), (gctPOINTER*)&invalidPos)))
+        {
+            __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+        }
+        gcoOS_ZeroMemory(invalidPos, count*sizeof(GLboolean));
+    }
 
     if (bufferMode == GL_INTERLEAVED_ATTRIBS && count > 0)
     {
@@ -4334,12 +4413,15 @@ GLvoid GL_APIENTRY __glim_TransformFeedbackVaryings(__GLcontext *gc, GLuint prog
     for (i = 0; i < programObject->xfbVaryingNum; i++)
     {
         GL_ASSERT(programObject->ppXfbVaryingNames[i]);
-        (*gc->imports.free)(gc, programObject->ppXfbVaryingNames[i]);
+        if (programObject->ppXfbVaryingNames[i])
+        {
+            gcmOS_SAFE_FREE(gcvNULL, programObject->ppXfbVaryingNames[i]);
+        }
     }
 
     if (programObject->ppXfbVaryingNames)
     {
-        (*gc->imports.free)(gc, programObject->ppXfbVaryingNames);
+        gcmOS_SAFE_FREE(gcvNULL, programObject->ppXfbVaryingNames);
     }
     programObject->ppXfbVaryingNames = gcvNULL;
 
@@ -4349,7 +4431,10 @@ GLvoid GL_APIENTRY __glim_TransformFeedbackVaryings(__GLcontext *gc, GLuint prog
 
     if (programObject->xfbVaryingNum > 0)
     {
-        programObject->ppXfbVaryingNames = (GLchar**)(*gc->imports.malloc)(gc, programObject->xfbVaryingNum*sizeof(GLchar*));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, programObject->xfbVaryingNum*sizeof(GLchar*), (gctPOINTER*)&programObject->ppXfbVaryingNames)))
+        {
+            __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+        }
     }
 
     for (i = 0; i < (GLuint)count; i++)
@@ -4360,7 +4445,16 @@ GLvoid GL_APIENTRY __glim_TransformFeedbackVaryings(__GLcontext *gc, GLuint prog
             continue;
         }
         nameLen = (GLuint)strlen(varyings[i]) + 1;
-        programObject->ppXfbVaryingNames[dstPos] = (GLchar*)(*gc->imports.malloc)(gc, nameLen);
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, nameLen, (gctPOINTER*)&programObject->ppXfbVaryingNames[dstPos])))
+        {
+            for (j = 0; j < dstPos; j++)
+            {
+                gcmOS_SAFE_FREE(gcvNULL, programObject->ppXfbVaryingNames[j]);
+            }
+            gcmOS_SAFE_FREE(gcvNULL, programObject->ppXfbVaryingNames);
+            __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+        }
+
         strcpy(programObject->ppXfbVaryingNames[dstPos], varyings[i]);
         dstPos++;
     }
@@ -4368,7 +4462,7 @@ GLvoid GL_APIENTRY __glim_TransformFeedbackVaryings(__GLcontext *gc, GLuint prog
 OnError:
     if (invalidPos)
     {
-        (*gc->imports.free)(gc, invalidPos);
+        gcmOS_SAFE_FREE(gcvNULL, invalidPos);
         invalidPos = gcvNULL;
     }
     __GL_FOOTER();
@@ -4896,25 +4990,48 @@ GLuint GL_APIENTRY __glim_CreateShaderProgramv(__GLcontext *gc, GLenum type, GLs
     /* Create shader object */
     GL_ASSERT(gc->shaderProgram.spShared);
     shader = __glGenerateNames(gc, gc->shaderProgram.spShared, 1);
-    __glMarkNameUsed(gc, gc->shaderProgram.spShared, shader);
-    shaderObj = (__GLshaderObject *)(*gc->imports.calloc)(gc, 1, sizeof(__GLshaderObject));
-    if (!shaderObj)
+    if (__glMarkNameUsed(gc, gc->shaderProgram.spShared, shader) < 0)
     {
         __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
     }
+
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLshaderObject), (gctPOINTER*)&shaderObj)))
+    {
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
+    gcoOS_ZeroMemory(shaderObj, sizeof(__GLshaderObject));
+
     __glInitShaderObject(gc, shaderObj, type, shader);
-    __glAddObject(gc, gc->shaderProgram.spShared, shader, shaderObj);
+    if (__glAddObject(gc, gc->shaderProgram.spShared, shader, shaderObj) == GL_FALSE)
+    {
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
 
     /* Create program object */
     program = __glGenerateNames(gc, gc->shaderProgram.spShared, 1);
     uniqueId = __glMarkNameUsed(gc, gc->shaderProgram.spShared, program);
-    progObj = (__GLprogramObject *)(*gc->imports.calloc)(gc, 1, sizeof(__GLprogramObject));
-    if (!progObj)
+    if ((GLint)uniqueId < 0)
     {
         __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
     }
-    __glInitProgramObject(gc, progObj, program, uniqueId);
-    __glAddObject(gc, gc->shaderProgram.spShared, program, progObj);
+
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLprogramObject), (gctPOINTER*)&progObj)))
+    {
+        program = 0;
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
+    gcoOS_ZeroMemory(progObj, sizeof(__GLprogramObject));
+
+    if (__glInitProgramObject(gc, progObj, program, uniqueId) == GL_FALSE)
+    {
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
+
+    if (__glAddObject(gc, gc->shaderProgram.spShared, program, progObj) == GL_FALSE)
+    {
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
+
     if (!(*gc->dp.createProgram)(gc, progObj))
     {
         __GL_ERROR_EXIT((*gc->dp.getError)(gc));
@@ -4930,8 +5047,7 @@ GLuint GL_APIENTRY __glim_CreateShaderProgramv(__GLcontext *gc, GLenum type, GLs
     }
 
     /* Assemble all sources into one string*/
-    shaderObj->shaderInfo.source = (GLchar *)(*gc->imports.malloc)(gc, shaderObj->shaderInfo.sourceSize + 1);
-    if (!shaderObj->shaderInfo.source)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, shaderObj->shaderInfo.sourceSize + 1, (gctPOINTER*)&shaderObj->shaderInfo.source)))
     {
         __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
     }
@@ -4951,13 +5067,13 @@ GLuint GL_APIENTRY __glim_CreateShaderProgramv(__GLcontext *gc, GLenum type, GLs
         __GLshaderObjectList *pAttachedShader;
         __GLSLStage stage = __glGetShaderStage(type);
 
-        pAttachedShader= (__GLshaderObjectList *)(*gc->imports.calloc)(gc, 1, sizeof(__GLshaderObjectList));
-        if (gcvNULL == pAttachedShader)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLshaderObjectList), (gctPOINTER*)&pAttachedShader)))
         {
             __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
         }
         else
         {
+            gcoOS_ZeroMemory(pAttachedShader, sizeof(__GLshaderObjectList));
             pAttachedShader->shader = shaderObj;
             pAttachedShader->next = gcvNULL;
         }
@@ -4978,7 +5094,7 @@ GLuint GL_APIENTRY __glim_CreateShaderProgramv(__GLcontext *gc, GLenum type, GLs
         }
 
         /* Detach Shader */
-        (*gc->imports.free)(gc, pAttachedShader);
+        gcmOS_SAFE_FREE(gcvNULL, pAttachedShader);
         progObj->programInfo.attachedShader[stage] = gcvNULL;
     }
 
@@ -5007,6 +5123,11 @@ OnError:
         program = 0;
     }
 
+    if (!success && progObj)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, progObj);
+    }
+
     __GL_FOOTER();
 
     return program;
@@ -5017,10 +5138,15 @@ OnError:
 ** Program Pipeline Object
 */
 
-GLvoid __glInitProgramPipelineObject(__GLcontext *gc, __GLprogramPipelineObject *ppObj, GLuint pipeline)
+GLboolean __glInitProgramPipelineObject(__GLcontext *gc, __GLprogramPipelineObject *ppObj, GLuint pipeline)
 {
     ppObj->name = pipeline;
-    ppObj->infoLog = (GLchar*)(*gc->imports.calloc)(gc, __GLSL_LOG_INFO_SIZE, sizeof(GLchar));
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, __GLSL_LOG_INFO_SIZE * sizeof(GLchar), (gctPOINTER*)&ppObj->infoLog)))
+    {
+        return GL_FALSE;
+    }
+    gcoOS_ZeroMemory(ppObj->infoLog, __GLSL_LOG_INFO_SIZE * sizeof(GLchar));
+    return GL_TRUE;
 }
 
 __GLprogramPipelineObject* __glGetProgramPipelineObject(__GLcontext *gc, GLuint pipeline)
@@ -5035,10 +5161,27 @@ __GLprogramPipelineObject* __glGetProgramPipelineObject(__GLcontext *gc, GLuint 
     ppObj = (__GLprogramPipelineObject *)__glGetObject(gc, gc->shaderProgram.ppNoShare, pipeline);
     if (ppObj == gcvNULL)
     {
-        ppObj = (__GLprogramPipelineObject*)(*gc->imports.calloc)(gc, 1, sizeof(__GLprogramPipelineObject));
+        if (gcmIS_SUCCESS(gcoOS_Allocate(gcvNULL, sizeof(__GLprogramPipelineObject), (gctPOINTER*)&ppObj)))
+        {
+            gcoOS_ZeroMemory(ppObj, sizeof(__GLprogramPipelineObject));
 
-        __glInitProgramPipelineObject(gc, ppObj, pipeline);
-        __glAddObject(gc, gc->shaderProgram.ppNoShare, pipeline, ppObj);
+            if (__glInitProgramPipelineObject(gc, ppObj, pipeline) == GL_TRUE)
+            {
+                if (__glAddObject(gc, gc->shaderProgram.ppNoShare, pipeline, ppObj) == GL_FALSE)
+                {
+                    gcmOS_SAFE_FREE(gcvNULL, ppObj);
+                    __GL_ERROR(GL_OUT_OF_MEMORY);
+                }
+            }
+            else
+            {
+                gcmOS_SAFE_FREE(gcvNULL, ppObj);
+            }
+        }
+        else
+        {
+            __GL_ERROR(GL_OUT_OF_MEMORY);
+        }
     }
 
     return ppObj;
@@ -5163,16 +5306,16 @@ GLboolean __glDeleteProgramPipelineObj(__GLcontext *gc, __GLprogramPipelineObjec
 
     if (ppObj->label)
     {
-        gc->imports.free(gc, ppObj->label);
+        gcmOS_SAFE_FREE(gcvNULL, ppObj->label);
     }
 
     if (ppObj->infoLog)
     {
-        (*gc->imports.free)(gc, ppObj->infoLog);
+        gcmOS_SAFE_FREE(gcvNULL, ppObj->infoLog);
         ppObj->infoLog = gcvNULL;
     }
 
-    (*gc->imports.free)(gc, ppObj);
+    gcmOS_SAFE_FREE(gcvNULL, ppObj);
 
     return GL_TRUE;
 }

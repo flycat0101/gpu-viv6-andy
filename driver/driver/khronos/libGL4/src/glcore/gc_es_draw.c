@@ -85,10 +85,6 @@ GLvoid __glConfigArrayVertexStream(__GLcontext *gc, GLenum mode)
     */
     if (gc->vertexArray.fastStreamSetup && gc->vertexStreams.streamMode == VERTEXARRAY_STREAMMODE)
     {
-#if defined (_DEBUG) || defined (DEBUG)
-        GLuint elementIdx;
-        GLuint arrayIdx_2;
-#endif
         for (streamIdx = 0; streamIdx < gc->vertexStreams.numStreams; streamIdx++ )
         {
             stream = &gc->vertexStreams.streams[streamIdx];
@@ -107,12 +103,6 @@ GLvoid __glConfigArrayVertexStream(__GLcontext *gc, GLenum mode)
                 GL_ASSERT(vertexArrayState->attributeBinding[vertexArrayState->attribute[arrayIdx].attribBinding].boundArrayName == 0 ||
                     (bufObj && bufObj->size == 0) );
                 stream->streamAddr = (GLvoid *)gc->clientState.vertexArray.attribute[arrayIdx].pointer;
-#if defined (_DEBUG) || defined (DEBUG)
-                for ( elementIdx = 0; elementIdx < stream->numElements; elementIdx++ )
-                {
-                    arrayIdx_2 = stream->streamElement[elementIdx].inputIndex;
-                }
-#endif
             }
         }
 
@@ -1496,14 +1486,14 @@ __GL_INLINE GLboolean __glDrawValidateState(__GLcontext *gc)
 GLenum indexPrimMode[] = {
     GL_POINTS,                          /* GL_POINTS */
     GL_LINES,                           /* GL_LINES */
-    GL_LINE_LOOP,                       /* GL_LINE_LOOP */
-    GL_LINE_STRIP,                      /* GL_LINE_STRIP */
+    GL_LINES,                           /* GL_LINE_LOOP */
+    GL_LINES,                           /* GL_LINE_STRIP */
     GL_TRIANGLES,                       /* GL_TRIANGLES */
-    GL_TRIANGLE_STRIP,                  /* GL_TRIANGLE_STRIP */
-    GL_TRIANGLE_FAN,                    /* GL_TRIANGLE_FAN */
+    GL_TRIANGLES,                       /* GL_TRIANGLE_STRIP */
+    GL_TRIANGLES,                       /* GL_TRIANGLE_FAN */
     GL_QUADS,                           /* GL_QUADS */
-    GL_QUAD_STRIP,                      /* GL_QUAD_STRIP */
-    GL_POLYGON,                         /* GL_POLYGON */
+    GL_TRIANGLES,                       /* GL_QUAD_STRIP */
+    GL_TRIANGLES,                       /* GL_POLYGON */
     GL_LINES_ADJACENCY_EXT,             /* GL_LINES_ADJACENCY_EXT */
     GL_LINE_STRIP_ADJACENCY_EXT,        /* GL_LINE_STRIP_ADJACENCY_EXT */
     GL_TRIANGLES_ADJACENCY_EXT,         /* GL_TRIANGLES_ADJACENCY_EXT */
@@ -1512,7 +1502,7 @@ GLenum indexPrimMode[] = {
 
 /***** Vertex stream config functions ********/
 
-GLvoid __glConfigImmedVertexStream(__GLcontext *gc, GLenum mode)
+GLvoid __glConfigImmedVertexStream(__GLcontext *gc, GLenum mode, GLvoid **privDataPtrAddr, GLvoid **ibPrivateData)
 {
     __GLvertexInput *input = NULL;
     __GLstreamDecl *stream;
@@ -1533,11 +1523,41 @@ GLvoid __glConfigImmedVertexStream(__GLcontext *gc, GLenum mode)
     gc->vertexStreams.edgeflagStream =
         (gc->input.primInputMask & __GL_INPUT_EDGEFLAG) ? gc->input.edgeflag.pointer : NULL;
 
+    if (gc->input.indexCount)
+    {   /* Configure the index stream */
+        if (ibPrivateData && __GL_VALID_DEVICE_RESOURCE(*ibPrivateData))
+        {
+            gc->vertexStreams.indexStream.streamAddr = (GLvoid *)0;
+        }
+        else
+        {
+            gc->vertexStreams.indexStream.streamAddr = (GLvoid *)gc->input.indexBuffer;
+        }
+
+        gc->vertexStreams.indexStream.type = GL_UNSIGNED_SHORT;
+        gc->vertexStreams.indexStream.ppIndexBufPriv = ibPrivateData;
+        gc->vertexStreams.indexStream.offset = 0;
+        vertexArray->end = 0;
+        vertexArray->indices = gc->input.indexBuffer;
+        vertexArray->indexType = GL_UNSIGNED_SHORT;
+    }
+    else
+    {
+        vertexArray->end = gc->input.vertex.index;
+    }
+
     stream = &gc->vertexStreams.streams[0];
     stream->numElements = gc->input.numberOfElements;
-    stream->streamAddr = (GLuint *)gc->input.vertexDataBuffer;
+    if (privDataPtrAddr && __GL_VALID_DEVICE_RESOURCE(*privDataPtrAddr))
+    {
+        stream->streamAddr = 0;
+    }
+    else
+    {
+        stream->streamAddr = (GLuint *)gc->input.vertexDataBuffer;
+    }
     stream->stride = (gc->input.vertTotalStrideDW << 2);
-    stream->privPtrAddr = NULL;
+    stream->privPtrAddr = privDataPtrAddr;
 
     offset = 0;
     for (i = 0; i < gc->input.numberOfElements; i++)
@@ -1579,10 +1599,9 @@ GLvoid __glConfigImmedVertexStream(__GLcontext *gc, GLenum mode)
     gc->vertexStreams.streamMode = IMMEDIATE_STREAMMODE;
 
 
-    vertexArray->indexCount = 0;
     vertexArray->instanceCount  = 1;
+    vertexArray->indexCount = gc->input.indexCount;
     vertexArray->start = 0;
-    vertexArray->end = gc->input.vertex.index;
     vertexArray->baseVertex = 0;
     vertexArray->drawIndirect = GL_FALSE;
     vertexArray->multidrawIndirect = GL_FALSE;
@@ -1981,6 +2000,8 @@ extern GLvoid configStream(__GLcontext *gc);
 GLvoid  __glDrawImmedPrimitive(__GLcontext *gc)
 {
     GLenum mode;
+    GLvoid **privDataPtrAddr, **privIndexBufferPtr;
+    __GLvertexDataCache *vertexCache;
 
     ENTERFUNC_TM();
     mode = (gc->input.indexCount ? indexPrimMode[gc->input.primMode] : gc->input.primMode);
@@ -1996,12 +2017,33 @@ GLvoid  __glDrawImmedPrimitive(__GLcontext *gc)
         __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_2, __GL_PRIMMODE_BIT);
     }
 
+    privDataPtrAddr = NULL;
+    privIndexBufferPtr = NULL;
+
+    /* If we have a cache hit in the immediate mode vertex data cache,
+    ** then we could use the cached stream information for fast stream setup.
+    */
+    if (gc->input.vertexCacheEnabled) {
+        vertexCache = __glCheckCachedImmedPrimtive(gc);
+
+        if (vertexCache) {
+#if __GL_VERTEX_CACHE_STATISTIC
+            if (gc->input.vertexCacheStatus & __GL_IMMED_VERTEX_CACHE_HIT)
+            {
+                gc->input.cacheHitDraws++;
+            }
+#endif
+            privDataPtrAddr = &vertexCache->privateData;
+            privIndexBufferPtr = &vertexCache->ibPrivateData;
+        }
+    }
+
     /* Get the latest drawable information */
 //   LINUX_LOCK_FRAMEBUFFER(gc);
 
  //   __glEvaluateAttribDrawableChange(gc);
 
-    __glConfigImmedVertexStream(gc, mode);
+    __glConfigImmedVertexStream(gc, mode, privDataPtrAddr, privIndexBufferPtr);
 
 //    configStream(gc);
 
@@ -2118,14 +2160,30 @@ GLvoid __glConfigDlistVertexStream(__GLcontext *gc, __GLPrimBegin *primBegin, GL
     vertexArray->drawIndirect = GL_FALSE;
     vertexArray->multidrawIndirect = GL_FALSE;
 }
-GLvoid __glDrawDlistPrimitive(__GLcontext *gc, __GLPrimBegin *primBegin)
+GLvoid __glDrawDlistPrimitive(__GLcontext *gc, __GLPrimBegin *primBegin, GLboolean cacheDataInDevice)
 {
     GLfloat *beginAddr;
+    GLushort * indexStart;
     GLint vertexCount, indexCount, i;
     GLboolean bothFaceFill, indexedPrim;
     GLenum mode;
+    GLvoid **privIBPtrAddr = NULL;
+    GLvoid **privPtrAddr = NULL;
 
     ENTERFUNC_TM();
+
+    /* This is necessary for flushing the immediate mode vertex data that are
+    ** accumulated during the Dlist execution.
+    */
+    if (gc->input.beginMode == __GL_SMALL_DRAW_BATCH)
+    {
+        __glPrimitiveBatchEnd(gc);
+    }
+
+    if (gc->input.deferredAttribDirty)
+    {
+        __glCopyDeferedAttribToCurrent(gc);
+    }
 
     /* Compute the required attribute mask */
     if (gc->input.inputMaskChanged)
@@ -2155,9 +2213,38 @@ GLvoid __glDrawDlistPrimitive(__GLcontext *gc, __GLPrimBegin *primBegin)
     {
         indexCount = (indexedPrim || bothFaceFill) ? primBegin->indexCount : 0;
 
-        beginAddr = (GLfloat *)(primBegin + 1);
-         __glConfigDlistVertexStream(gc, primBegin, beginAddr, primBegin->vertexCount,
-                indexCount, primBegin->indexBuffer, &primBegin->privateData, &primBegin->ibPrivateData);
+
+        if (__GL_VALID_DEVICE_RESOURCE(primBegin->privateData))
+        {
+            beginAddr = NULL;
+            privPtrAddr = &primBegin->privateData;
+        }
+        else
+        {
+            if (cacheDataInDevice)
+            {
+                privPtrAddr = &primBegin->privateData;
+            }
+            beginAddr = (GLfloat *)(primBegin + 1);
+        }
+
+        if (__GL_VALID_DEVICE_RESOURCE(primBegin->ibPrivateData))
+        {
+            indexStart = NULL;
+            privIBPtrAddr = &primBegin->ibPrivateData;
+        }
+        else
+        {
+            if (cacheDataInDevice)
+            {
+                privIBPtrAddr = &primBegin->ibPrivateData;
+            }
+            indexStart = primBegin->indexBuffer;
+        }
+
+        __glConfigDlistVertexStream(gc, primBegin, beginAddr, primBegin->vertexCount,
+            indexCount, indexStart, privPtrAddr, privIBPtrAddr);
+
 
         LEAVEFUNC_TM();
         /* Draw indexed primitive */

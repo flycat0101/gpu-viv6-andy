@@ -2236,15 +2236,17 @@ __glChipProfile_BindReadFramebuffer(
     __GLCHIP_PROFILER_FOOTER();
 }
 
-GLvoid
+GLboolean
 __glChipProfile_BindRenderbuffer(
     __GLcontext *gc,
     __GLrenderbufferObject *renderbuf
     )
 {
+    GLboolean ret;
     __GLCHIP_PROFILER_HEADER();
-    __glChipBindRenderbuffer(gc, renderbuf);
+    ret = __glChipBindRenderbuffer(gc, renderbuf);
     __GLCHIP_PROFILER_FOOTER();
+    return ret;
 }
 
 GLvoid
@@ -2533,15 +2535,17 @@ __glChipProfile_SyncImage(
     return ret;
 }
 
-GLvoid
+GLboolean
 __glChipProfile_BindXFB(
     __GLcontext *gc,
     __GLxfbObject *xfbObj
     )
 {
+    GLboolean ret;
     __GLCHIP_PROFILER_HEADER();
-    __glChipBindXFB(gc, xfbObj);
+    ret = __glChipBindXFB(gc, xfbObj);
     __GLCHIP_PROFILER_FOOTER();
+    return ret;
 }
 
 GLvoid
@@ -2990,8 +2994,6 @@ gcChipInitProfileDevicePipeline(
     /* profiler */
 #if VIVANTE_PROFILER
     gc->dp.profiler = __glChipProfile_ProfilerSet;
-#else
-    gc->dp.profiler = NULL;
 #endif
 
     /* Patches. */

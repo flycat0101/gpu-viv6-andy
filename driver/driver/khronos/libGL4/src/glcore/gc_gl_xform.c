@@ -1082,7 +1082,7 @@ GLvoid APIENTRY __glim_Ortho(__GLcontext *gc, GLdouble left, GLdouble right, GLd
     __glDoMultMatrix(gc, &m, __glMultiplyMatrix);
 }
 
-GLvoid __glInitTransformState(__GLcontext *gc)
+GLboolean __glInitTransformState(__GLcontext *gc)
 {
     __GLtransform *tr;
     GLuint unit;
@@ -1104,8 +1104,13 @@ GLvoid __glInitTransformState(__GLcontext *gc)
     gc->transform.matrix.mult = __glMultMatrix;
 
     /* Allocate memory for matrix stacks */
-    gc->transform.modelViewStack = (__GLtransform*)(*gc->imports.calloc)
-        (gc, gc->constants.maxModelViewStackDepth, sizeof(__GLtransform) );
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+        gc->constants.maxModelViewStackDepth * sizeof(__GLtransform),
+        (gctPOINTER*)&gc->transform.modelViewStack)))
+    {
+         return GL_FALSE;
+    }
+    gcoOS_ZeroMemory(gc->transform.modelViewStack, gc->constants.maxModelViewStackDepth * sizeof(__GLtransform));
 
     gc->transform.modelView = tr = &gc->transform.modelViewStack[0];
     (*gc->transform.matrix.makeIdentity)(&tr->matrix);
@@ -1113,44 +1118,71 @@ GLvoid __glInitTransformState(__GLcontext *gc)
     (*gc->transform.matrix.makeIdentity)(&tr->mvp);
     tr->updateInverse = GL_FALSE;
 
-    gc->transform.projectionStack = (__GLtransform*)(*gc->imports.calloc)
-        (gc, gc->constants.maxProjectionStackDepth, sizeof(__GLtransform) );
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+        gc->constants.maxProjectionStackDepth * sizeof(__GLtransform),
+        (gctPOINTER*)&gc->transform.projectionStack)))
+    {
+         return GL_FALSE;
+    }
+    gcoOS_ZeroMemory(gc->transform.projectionStack, gc->constants.maxProjectionStackDepth * sizeof(__GLtransform));
 
     gc->transform.projection = tr = &gc->transform.projectionStack[0];
     (*gc->transform.matrix.makeIdentity)(&tr->matrix);
 
     for (unit = 0; unit < __GL_MAX_TEXTURE_UNITS; unit++) {
-        gc->transform.textureStack[unit] = (__GLtransform*)(*gc->imports.calloc)
-            (gc, gc->constants.maxTextureStackDepth, sizeof(__GLtransform) );
-
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+            gc->constants.maxTextureStackDepth * sizeof(__GLtransform),
+            (gctPOINTER*)&gc->transform.textureStack[unit])))
+        {
+             return GL_FALSE;
+        }
+        gcoOS_ZeroMemory(gc->transform.textureStack[unit], gc->constants.maxTextureStackDepth * sizeof(__GLtransform));
         gc->transform.texture[unit] = tr = &gc->transform.textureStack[unit][0];
         (*gc->transform.matrix.makeIdentity)(&tr->matrix);
     }
 
     for (unit = 0; unit < __GL_MAX_PROGRAM_MATRICES; unit++) {
-        gc->transform.programStack[unit] = (__GLtransform*)(*gc->imports.calloc)
-            (gc, gc->constants.maxProgramStackDepth, sizeof(__GLtransform) );
-
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+            gc->constants.maxProgramStackDepth * sizeof(__GLtransform),
+            (gctPOINTER*)&gc->transform.programStack[unit])))
+        {
+             return GL_FALSE;
+        }
+        gcoOS_ZeroMemory(gc->transform.programStack[unit], gc->constants.maxProgramStackDepth * sizeof(__GLtransform));
         gc->transform.program[unit] = tr = &gc->transform.programStack[unit][0];
         (*gc->transform.matrix.makeIdentity)(&tr->matrix);
     }
 
     gc->state.enables.scissorTest = GL_FALSE;
+    return GL_TRUE;
 }
 
 GLvoid __glFreeTransformState(__GLcontext *gc)
 {
     GLuint unit;
 
-    (*gc->imports.free)(gc, gc->transform.modelViewStack);
-    (*gc->imports.free)(gc, gc->transform.projectionStack);
+    if (gc->transform.modelViewStack)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, gc->transform.modelViewStack);
+    }
+
+    if (gc->transform.projectionStack)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, gc->transform.projectionStack);
+    }
 
     for (unit = 0; unit < __GL_MAX_TEXTURE_UNITS; unit++) {
-        (*gc->imports.free)(gc, gc->transform.textureStack[unit]);
+        if (gc->transform.textureStack[unit])
+        {
+            gcmOS_SAFE_FREE(gcvNULL, gc->transform.textureStack[unit]);
+        }
     }
 
     for (unit = 0; unit < __GL_MAX_PROGRAM_MATRICES; unit++) {
-        (*gc->imports.free)(gc, gc->transform.programStack[unit]);
+        if (gc->transform.programStack[unit])
+        {
+            gcmOS_SAFE_FREE(gcvNULL, gc->transform.programStack[unit]);
+        }
     }
 }
 

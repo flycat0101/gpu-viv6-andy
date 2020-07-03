@@ -229,6 +229,7 @@ extern GLsizei minVertexNumber[];
 enum {
     __GL_DRAWARRAYS_NEW_BEGIN   = 0,
     __GL_DRAWARRAYS_CONT_BEGIN  = 1,
+    __GL_DRAWARRAYS_CACHE       = 2,
 };
 
 GLvoid __glArrayElement_V2F(__GLcontext *, GLuint, GLfloat **);
@@ -360,7 +361,7 @@ enum
     __GL_DIRTY_VARRAY_BINDING,
     __GL_DIRTY_VARRAY_OFFSET,
     __GL_DIRTY_VARRAY_DIVISOR,
-
+    __GL_DIRTY_VARRAY_STOP_CACHE,
     __GL_DIRTY_VARRAY_END,
 };
 
@@ -370,6 +371,7 @@ enum
 #define __GL_DIRTY_VARRAY_BINDING_BIT       (1 << __GL_DIRTY_VARRAY_BINDING)
 #define __GL_DIRTY_VARRAY_OFFSET_BIT        (1 << __GL_DIRTY_VARRAY_OFFSET)
 #define __GL_DIRTY_VARRAY_DIVISOR_BIT       (1 << __GL_DIRTY_VARRAY_DIVISOR)
+#define __GL_DIRTY_VARRAY_STOP_CACHE_BIT    (1 << __GL_DIRTY_VARRAY_STOP_CACHE)
 
 /*
 ** Macros that set vertex array dirty bits
@@ -392,6 +394,8 @@ enum
 #define __GL_SET_VARRAY_DIVISOR_BIT(gc) \
     (gc)->vertexArray.varrayDirty |= __GL_DIRTY_VARRAY_DIVISOR_BIT
 
+#define __GL_SET_VARRAY_STOP_CACHE_BIT(gc) \
+    (gc)->vertexArray.varrayDirty |= __GL_DIRTY_VARRAY_STOP_CACHE_BIT
 /*
 ** Vertex array object
 */
@@ -461,7 +465,7 @@ typedef struct __GLvertexArrayMachineRec
 #ifdef OPENGL40
     GLboolean formatChanged;
     GLboolean interleaved;
-    GLbitfield               globalDirtyBackup;
+    GLbitfield               varrayDirtyBackup;
     GLboolean                fastStreamSetup;
 
     /* Record whether the draw call comes from XFB.

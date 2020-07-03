@@ -18,7 +18,6 @@
 #include "viv_lock.h"
 #endif
 
-
 #define _GC_OBJ_ZONE gcdZONE_GL40_CORE
 /*******************************************************************************
 ***** Version Signature *******************************************************/
@@ -40,31 +39,31 @@ extern GLboolean __glDpInitialize(__GLdeviceStruct deviceEntry[]);
 
 extern GLvoid __glInitPixelState(__GLcontext *gc);
 
-extern GLvoid __glInitBufferObjectState(__GLcontext *gc);
+extern GLboolean __glInitBufferObjectState(__GLcontext *gc);
 extern GLvoid __glFreeBufferObjectState(__GLcontext *gc);
 
-extern GLvoid __glInitTextureState(__GLcontext *gc);
+extern GLboolean __glInitTextureState(__GLcontext *gc);
 extern GLvoid __glFreeTextureState(__GLcontext *gc);
 
-extern GLvoid __glInitSamplerState(__GLcontext *gc);
+extern GLboolean __glInitSamplerState(__GLcontext *gc);
 extern GLvoid __glFreeSamplerState(__GLcontext *gc);
 
-extern GLvoid __glInitShaderProgramState(__GLcontext *gc);
+extern GLboolean __glInitShaderProgramState(__GLcontext *gc);
 extern GLvoid __glFreeShaderProgramState(__GLcontext * gc);
 
-extern GLvoid __glInitFramebufferStates(__GLcontext *gc);
+extern GLboolean __glInitFramebufferStates(__GLcontext *gc);
 extern GLvoid __glFreeFramebufferStates(__GLcontext *gc);
 
-extern GLvoid __glInitSyncState(__GLcontext *gc);
+extern GLboolean __glInitSyncState(__GLcontext *gc);
 extern GLvoid __glFreeSyncState(__GLcontext *gc);
 
-extern GLvoid __glInitXfbState(__GLcontext *gc);
+extern GLboolean __glInitXfbState(__GLcontext *gc);
 extern GLvoid __glFreeXfbState(__GLcontext *gc);
 
-extern GLvoid __glInitQueryState(__GLcontext *gc);
+extern GLboolean __glInitQueryState(__GLcontext *gc);
 extern GLvoid __glFreeQueryState(__GLcontext *gc);
 
-extern GLvoid __glInitVertexArrayState(__GLcontext *gc);
+extern GLboolean __glInitVertexArrayState(__GLcontext *gc);
 extern GLvoid __glFreeVertexArrayState(__GLcontext * gc);
 
 extern GLvoid __glUpdateViewport(__GLcontext *gc, GLint x, GLint y, GLsizei w, GLsizei h);
@@ -85,10 +84,15 @@ extern GLvoid __glFreeTransformState(__GLcontext *gc);
 extern GLvoid __glFreeEvaluatorState(__GLcontext *gc);
 extern GLvoid __glFreeDlistState(__GLcontext *gc);
 extern GLvoid __glFreeAttribStackState(__GLcontext *gc);
-extern GLvoid __glInitEvaluatorState(__GLcontext *gc);
+extern GLboolean __glInitEvaluatorState(__GLcontext *gc);
 extern GLfloat __glClampWidth(GLfloat width, __GLdeviceConstants *constants);
 extern GLvoid __glComputeClipBox(__GLcontext *gc);
 extern GLvoid __glOverWriteListCompileTable();
+extern void __glInitImmedCacheEntries(__GLdispatchTable *dispatch);
+extern void __glInitImmedOutsideEntries(__GLdispatchTable *dispatch);
+extern void __glInitImmedVertexInfoEntries(__GLdispatchTable *dispatch);
+extern void __glInitImmedNoVertInfoEntries(__GLdispatchTable *dispatch);
+extern GLvoid __glFreeImmedVertexCacheBuffer( __GLcontext *gc );
 #endif
 
 extern __GLformatInfo __glFormatInfoTable[];
@@ -228,6 +232,8 @@ GLvoid __glInitDevPipeDefault(__GLdevicePipeline *dp)
     __GL_NOOP_RET1(dp->makeCurrent);
     __GL_NOOP_RET1(dp->loseCurrent);
     __GL_NOOP(dp->destroyPrivateData);
+    __GL_NOOP(dp->queryFormatInfo);
+
     __GL_NOOP(dp->drawPrimitive);
     __GL_NOOP(dp->readPixelsBegin);
     __GL_NOOP(dp->readPixelsValidateState);
@@ -238,12 +244,11 @@ GLvoid __glInitDevPipeDefault(__GLdevicePipeline *dp)
     __GL_NOOP(dp->drawValidateState);
     __GL_NOOP(dp->drawEnd);
 
-    /* Read/draw buffers */
-    __GL_NOOP(dp->changeDrawBuffers);
-    __GL_NOOP(dp->changeReadBuffers);
-    __GL_NOOP(dp->detachDrawable);
+    /* Flush, Finish */
+    __GL_NOOP(dp->flush);
+    __GL_NOOP(dp->finish);
 
-    /* Texture functions */
+    /* Texture related functions */
     __GL_NOOP(dp->bindTexture);
     __GL_NOOP(dp->deleteTexture);
     __GL_NOOP(dp->detachTexture);
@@ -254,9 +259,6 @@ GLvoid __glInitDevPipeDefault(__GLdevicePipeline *dp)
     __GL_NOOP(dp->copyTexImage2D);
     __GL_NOOP(dp->copyTexSubImage2D);
     __GL_NOOP(dp->copyTexSubImage3D);
-    __GL_NOOP(dp->texDirectVIV);
-    __GL_NOOP(dp->texDirectInvalidateVIV);
-    __GL_NOOP(dp->texDirectVIVMap);
     __GL_NOOP(dp->compressedTexImage2D);
     __GL_NOOP(dp->compressedTexImage3D);
     __GL_NOOP(dp->compressedTexSubImage2D);
@@ -269,32 +271,26 @@ GLvoid __glInitDevPipeDefault(__GLdevicePipeline *dp)
 
     __GL_NOOP(dp->copyImageSubData);
 
-    /* Texture functions */
+    /* EGL image */
+    __GL_NOOP_RET1(dp->bindTexImage);
     __GL_NOOP(dp->freeTexImage);
-    __GL_NOOP(dp->createEglImageTexture);
-    __GL_NOOP(dp->createEglImageRenderbuffer);
-    __GL_NOOP(dp->eglImageTargetTexture2DOES);
-    __GL_NOOP(dp->eglImageTargetRenderbufferStorageOES);
-    __GL_NOOP(dp->getTextureAttribFromImage);
+    __GL_NOOP_RET1(dp->createEglImageTexture);
+    __GL_NOOP_RET1(dp->createEglImageRenderbuffer);
+    __GL_NOOP_RET1(dp->eglImageTargetTexture2DOES);
+    __GL_NOOP_RET1(dp->eglImageTargetRenderbufferStorageOES);
+    __GL_NOOP_RET1(dp->getTextureAttribFromImage);
 
-    /* Vertex buffer object extension */
-    __GL_NOOP(dp->bufferData);
-    __GL_NOOP(dp->mapBufferRange);
-    __GL_NOOP(dp->flushMappedBufferRange);
-    __GL_NOOP_RET0(dp->unmapBuffer);
-    __GL_NOOP(dp->deleteBuffer);
-    __GL_NOOP(dp->bufferData);
-    __GL_NOOP(dp->bufferSubData);
-    __GL_NOOP(dp->copyBufferSubData);
+    /* VIV_texture_direct */
+    __GL_NOOP_RET1(dp->texDirectVIV);
+    __GL_NOOP_RET1(dp->texDirectInvalidateVIV);
+    __GL_NOOP_RET1(dp->texDirectVIVMap);;
 
-    /* Occlusion query extension */
-    __GL_NOOP(dp->beginQuery);
-    __GL_NOOP(dp->endQuery);
-    __GL_NOOP(dp->getQueryObject);
+    /* Toggle buffer change */
+    __GL_NOOP_RET1(dp->changeDrawBuffers);
+    __GL_NOOP_RET1(dp->changeReadBuffers);
+    __GL_NOOP(dp->detachDrawable);
 
-    /* Flush, Finish */
-    __GL_NOOP(dp->flush);
-    __GL_NOOP(dp->finish);
+    /* Clear buffer */
     __GL_NOOP(dp->clearBegin);
     __GL_NOOP(dp->clearValidateState);
     __GL_NOOP(dp->clearEnd);
@@ -330,7 +326,18 @@ GLvoid __glInitDevPipeDefault(__GLdevicePipeline *dp)
     __GL_NOOP(dp->getProgramResourceiv);
     __GL_NOOP_RET0(dp->validateProgramPipeline);
 
-    /* RBO & FBO */
+        /* Buffer object */
+    __GL_NOOP_RET1(dp->bindBuffer);
+    __GL_NOOP(dp->deleteBuffer);
+    __GL_NOOP(dp->mapBufferRange);
+    __GL_NOOP(dp->flushMappedBufferRange);
+    __GL_NOOP_RET0(dp->unmapBuffer);
+    __GL_NOOP(dp->bufferData);
+    __GL_NOOP(dp->bufferSubData);
+    __GL_NOOP(dp->copyBufferSubData);
+    __GL_NOOP_RET1(dp->getBufferSubData);
+
+    /* FBO */
     __GL_NOOP(dp->bindDrawFramebuffer);
     __GL_NOOP(dp->bindReadFramebuffer);
     __GL_NOOP(dp->bindRenderbuffer);
@@ -349,13 +356,19 @@ GLvoid __glInitDevPipeDefault(__GLdevicePipeline *dp)
     __GL_NOOP(dp->cleanTextureShadow);
     __GL_NOOP(dp->cleanRenderbufferShadow);
 
+    /* Query */
+    __GL_NOOP(dp->beginQuery);
+    __GL_NOOP(dp->endQuery);
+    __GL_NOOP(dp->getQueryObject);
+    __GL_NOOP(dp->deleteQuery);
+
     /* Sync */
     __GL_NOOP(dp->createSync);
     __GL_NOOP(dp->deleteSync);
     __GL_NOOP_RET0(dp->waitSync);
     __GL_NOOP(dp->syncImage);
 
-    /* Transform feedback */
+    /* XFB */
     __GL_NOOP(dp->bindXFB);
     __GL_NOOP(dp->deleteXFB);
     __GL_NOOP(dp->beginXFB);
@@ -365,8 +378,6 @@ GLvoid __glInitDevPipeDefault(__GLdevicePipeline *dp)
     __GL_NOOP(dp->getXfbVarying);
     __GL_NOOP_RET0(dp->checkXFBBufSizes);
 
-
-    /* GL_EXT_robustness */
     __GL_NOOP_RET0(dp->getGraphicsResetStatus);
 
     /* Multisample */
@@ -379,10 +390,34 @@ GLvoid __glInitDevPipeDefault(__GLdevicePipeline *dp)
     __GL_NOOP(dp->computeEnd);
 
     __GL_NOOP(dp->memoryBarrier);
+    __GL_NOOP(dp->blendBarrier);
+#if VIVANTE_PROFILER
+    __GL_NOOP_RET1(dp->profiler);
+#endif
+
+#if gcdPATTERN_FAST_PATH
+    __GL_NOOP_RET1(dp->drawPattern);
+#endif
+
+    __GL_NOOP(dp->deletePrimData);;
 
 #ifdef OPENGL40
+    __GL_NOOP_RET1(dp->texImage1D);
+    __GL_NOOP_RET1(dp->texSubImage1D);
+    __GL_NOOP_RET1(dp->copyTexImage1D);
+    __GL_NOOP_RET1(dp->copyTexSubImage1D);
+    __GL_NOOP_RET1(dp->compressedTexImage1D);
+    __GL_NOOP_RET1(dp->compressedTexSubImage1D);
+    __GL_NOOP(dp->rasterBegin);
+    __GL_NOOP(dp->rasterEnd);
+    __GL_NOOP_RET1(dp->bitmaps);
+    __GL_NOOP_RET1(dp->drawPixels);
+    __GL_NOOP_RET1(dp->copyPixels);
+    __GL_NOOP_RET1(dp->createAccumBufferInfo);
     __GL_NOOP(dp->bindFragDataLocation);
-    __GL_NOOP(dp->createAccumBufferInfo);
+    __GL_NOOP_RET1(dp->accum);
+    __GL_NOOP_RET1(dp->getCompressedTexImage);
+    __GL_NOOP(dp->bindFragDataLocation);
 #endif
 }
 
@@ -933,6 +968,8 @@ GLuint __glShareContext(__GLcontext *gc, __GLcontext *gcShare)
 
 GLvoid __glFreeDataCacheInVideoMemory(__GLcontext *gc)
 {
+    /* Free IM vertex cache if it is in video memory */
+    __glFreeImmedCacheInVideoMemory(gc);
     /* Free DL vertex cache if it is in video memory */
     __glFreeDlistVertexCache(gc);
     __glFreeConcatDlistCache(gc);
@@ -1133,6 +1170,7 @@ DispatchDrawableChange_Exit:
 */
 GLvoid __glNotifyDrawableChange(__GLcontext *gc, GLuint mask)
 {
+    GLuint i;
     /*
     ** The window message handler may not run in the same thread as the
     ** GL drawing thread, so we must lock the access to "gc->changeMask"
@@ -1189,16 +1227,108 @@ GLvoid __glNotifyDrawableChange(__GLcontext *gc, GLuint mask)
             gc->changeMask &= ~__GL_DRAWABLE_PENDING_MOVE;
         }
 
+        /*
+        ** Application is using immediate mode path.
+        */
+        if (gc->input.vtxCacheDrawIndex)
+        {
+            /*
+            ** Stop vertex caching if there is no cache hit at all in 4 consecutive frames.
+            */
+            if ((gc->input.enableVertexCaching == GL_TRUE) &&
+                (gc->input.currentFrameIndex - gc->input.cacheHitFrameIndex) > 3 &&
+                !(gc->input.vertexCacheHistory & __GL_IMMED_VERTEX_CACHE_HIT))
+            {
+                 /* Overwrite immediate vertex entries with no-vertex-info entries */
+                 __glInitImmedNoVertInfoEntries(&gc->immedModeDispatch);
+                 gc->pModeDispatch = &gc->immedModeOutsideDispatch; /* immediate mode by default. */
+                 gc->currentImmediateDispatch = gc->pModeDispatch;
+                 gc->currentImmediateDispatch->Begin = __glim_Begin;
+
+                 __glFreeImmedVertexCacheBuffer(gc);
+                 gc->input.enableVertexCaching = gc->input.origVertexCacheFlag = GL_FALSE;
+
+    #if __GL_VERTEX_CACHE_STATISTIC
+                fprintf(gc->input.vtxCacheStatFile, "Frame:%3d, Disable vertex cache for continuous cache miss!\n",
+                    gc->input.currentFrameIndex);
+    #endif
+                 /* Force re-validation of DrawArrays/DrawElements dispatch functions */
+                 gc->currentImmediateDispatch->DrawArrays = __glim_DrawArrays_Validate;
+                 gc->currentImmediateDispatch->DrawElements = __glim_DrawElements_Validate;
+                 __GL_SET_VARRAY_STOP_CACHE_BIT(gc);
+            }
+        }
+        else
+        {
+            gc->input.cacheHitFrameIndex = gc->input.currentFrameIndex;
+
+            /*
+            ** Free vertex cache buffers if the application stop using immediate mode path.
+            */
+            if (gc->input.totalCacheMemSize > 0) {
+                __glFreeImmedVertexCacheBlocks(gc);
+            }
+        }
+
+    #if __GL_VERTEX_CACHE_STATISTIC
+        if (gc->input.canCacheDraws != 0)
+        {
+            fprintf(gc->input.vtxCacheStatFile, "Frame:%3d, canCacheDraws:%5d  cacheHitDraw:%5d  cacheMissDraws:%5d  disabledDraws:%5d  cacheHitRatio:%3d%%;\n\n",
+                gc->input.currentFrameIndex, gc->input.canCacheDraws, gc->input.cacheHitDraws, gc->input.cacheMissDraws, gc->input.disabledDraws,
+                100*gc->input.cacheHitDraws/gc->input.canCacheDraws);
+        }
+        else
+        {
+            fprintf(gc->input.vtxCacheStatFile, "Frame:%3d, all the draws of this frame are too samll to do cache!\n\n", gc->input.currentFrameIndex);
+        }
+
+        gc->input.canCacheDraws = 0;
+        gc->input.cacheHitDraws = 0;
+        gc->input.cacheMissDraws = 0;
+        gc->input.disabledDraws = 0;
+    #endif
+
+        /*
+        ** Reset vtxCacheDrawIndex so we can compare drawPrimitives
+        ** in this frame with the previous frame's drawPrimitives.
+        */
+        gc->input.vertexCacheHistory |= gc->input.vertexCacheStatus;
+        gc->input.vertexCacheStatus = 0;
+        gc->input.vtxCacheDrawIndex = 0;
+
+        /* Reset currentDrawIndex and increment currentFrameIndex */
+        gc->input.currentDrawIndex = 0;
+        gc->input.currentFrameIndex += 1;
+
+        /* Handle gc->input.currentFrameIndex UINT wrap around case */
+        if ((gc->input.currentFrameIndex ^ 0xffffffff) == 0)
+        {
+            __GLvertexCacheBlock *cacheBlock = gc->input.vertexCacheBlock;
+            while (cacheBlock)
+            {
+                for (i = 0; i < __GL_VERTEX_CACHE_BLOCK_SIZE; i++) {
+                    cacheBlock->cache[i].frameIndex = 0;
+                }
+                cacheBlock = cacheBlock->next;
+            }
+            gc->input.cacheHitFrameIndex = gc->input.currentFrameIndex = 1;
+        }
+
+        /* Reset currentCacheBlock and currentVertexCache pointers */
+        gc->input.currentCacheBlock = gc->input.vertexCacheBlock;
+        gc->input.currentVertexCache = &gc->input.vertexCacheBlock->cache[0];
+
         /* Reset immediate mode vertex buffer */
-        __glResetImmedVertexBuffer(gc);
+        __glResetImmedVertexBuffer(gc, GL_FALSE);
     }
 
     (*gc->imports.unlockMutex)((VEGLLock *)&drawableChangeLock);
 }
 #endif
 
-GLvoid __glInitContextState(__GLcontext *gc)
+GLboolean __glInitContextState(__GLcontext *gc)
 {
+    GLboolean initOK = GL_TRUE;
     gc->flags = __GL_CONTEXT_UNINITIALIZED;
     gc->invalidCommonCommit = gcvTRUE;
     gc->invalidDrawCommit = gcvTRUE;
@@ -1216,15 +1346,16 @@ GLvoid __glInitContextState(__GLcontext *gc)
     __glInitPolygonState(gc);
     __glInitPixelState(gc);
     __glInitMultisampleState(gc);
-    __glInitVertexArrayState(gc);
-    __glInitFramebufferStates(gc);
-    __glInitTextureState(gc);
-    __glInitBufferObjectState(gc);
-    __glInitShaderProgramState(gc);
-    __glInitSamplerState(gc);
-    __glInitXfbState(gc);
-    __glInitQueryState(gc);
-    __glInitSyncState(gc);
+    initOK = __glInitVertexArrayState(gc);
+    initOK = initOK && __glInitFramebufferStates(gc);
+    initOK = initOK && __glInitTextureState(gc);
+    initOK = initOK && __glInitBufferObjectState(gc);
+    initOK = initOK && __glInitShaderProgramState(gc);
+    initOK = initOK && __glInitSamplerState(gc);
+    initOK = initOK && __glInitXfbState(gc);
+    initOK = initOK && __glInitQueryState(gc);
+    initOK = initOK && __glInitSyncState(gc);
+
     __glInitEnableState(gc);
     __glInitImageState(gc);
     __glInitDebugState(gc);
@@ -1235,13 +1366,13 @@ GLvoid __glInitContextState(__GLcontext *gc)
     if (gc->imports.conformGLSpec)
     {
         gc->renderMode = GL_RENDER;
-        __glInitAttribStackState(gc);
-        __glInitTransformState(gc);
+        initOK = initOK && __glInitAttribStackState(gc);
+        initOK = initOK && __glInitTransformState(gc);
         __glInitFogState(gc);
         __glInitLightState(gc);
         __glInitPointState(gc);
-        __glInitEvaluatorState(gc);
-        __glInitDlistState(gc);
+        initOK = initOK && __glInitEvaluatorState(gc);
+        initOK = initOK && __glInitDlistState(gc);
         __glInitFeedback(gc);
     }
 #endif
@@ -1249,7 +1380,17 @@ GLvoid __glInitContextState(__GLcontext *gc)
     __glBitmaskInitAllOne(&gc->texUnitAttrDirtyMask, gc->constants.shaderCaps.maxCombinedTextureImageUnits);
     __glBitmaskInitAllOne(&gc->imageUnitDirtyMask, gc->constants.shaderCaps.maxImageUnit);
 
+    /* Initialize currentAttribMask/deferredAttribMask to GL default values.
+    */
+    gc->state.currentAttribMask |= (__GL_ATTRIB_DEPTH_MASK_BIT);
+    gc->state.deferredAttribMask = gc->state.currentAttribMask;
+
+    gc->state.currentColorMask = 0xffffffff;
+    gc->state.deferredColorMask = 0xffffffff;
+
     __glSetAttributeStatesDirty(gc);
+
+    return initOK;
 }
 
 GLvoid __glOverturnCommitStates(__GLcontext *gc)
@@ -1361,7 +1502,7 @@ GLvoid __glOverturnCommitStates(__GLcontext *gc)
         pCommit->enables.texUnits[i].textureRec = !pState->enables.texUnits[i].textureRec;
     }
 
-    pCommit->enables.depthBuffer.test = !pState->enables.depthBuffer.test;
+    pCommit->enables.depthTest = !pState->enables.depthTest;
 
     pCommit->enables.line.smooth = !pState->enables.line.smooth;
     pCommit->enables.line.stipple = !pState->enables.line.stipple;
@@ -1511,6 +1652,15 @@ GLboolean __glLoseCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdr
 {
     GLboolean retVal;
 
+    __GL_VERTEX_BUFFER_FLUSH(gc);
+
+    /* Copy the deferred attribute states to current attribute states.
+    */
+    if (gc->input.deferredAttribDirty)
+    {
+        __glCopyDeferedAttribToCurrent(gc);
+    }
+
     __glSetDrawable(gc, drawable, readable);
 
     /* Notify DP the context is not current anymore */
@@ -1609,6 +1759,9 @@ GLboolean __glMakeCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdr
         __glEvaluateDrawableChange(gc, __GL_BUFFER_DRAW_READ_BITS);
     }
 
+    /* This flag will be reset after page directory table mapping code is added later */
+    gc->flags |= __GL_USE_FAKE_PAGE_TABLE_ENTRY;
+
     /* Notify the DP of the new context drawable pair */
     retVal = (*gc->dp.makeCurrent)(gc);
 
@@ -1660,7 +1813,7 @@ GLboolean __glDestroyContext(GLvoid *context)
         return retVal;
     }
 
-    (*gc->imports.free)(gc, gc);
+    gcmOS_SAFE_FREE(gcvNULL, gc);
     gcoOS_SetDriverTLS(gcvTLS_KEY_OPENGL, (gcsDRIVER_TLS_PTR)gcvNULL);
 
     return retVal;
@@ -1757,11 +1910,12 @@ GLvoid *__glCreateContext(GLint clientVersion,
 
     /* Allocate memory for core GL context.
     */
-    gc = (__GLcontext*)(*imports->calloc)(gc, 1, sizeof(__GLcontext));
-    if (!gc)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLcontext), (gctPOINTER*)&gc)))
     {
         __GL_EXIT();
     }
+
+    gcoOS_ZeroMemory(gc, sizeof(__GLcontext));
 
     gc->imports = *imports;
 
@@ -1823,6 +1977,9 @@ GLvoid *__glCreateContext(GLint clientVersion,
         }
     }
 
+    /* Set cache enable flag on/off here based on total video memory size */
+    gc->input.enableVertexCaching = gc->input.origVertexCacheFlag = GL_TRUE;
+
     /* Initialize the device constants with GL defaults.
     */
     __glInitConstantDefault(&gc->constants);
@@ -1833,7 +1990,10 @@ GLvoid *__glCreateContext(GLint clientVersion,
 
     /* Initialize the core GL context states.
     */
-    __glInitContextState(gc);
+    if (__glInitContextState(gc) == GL_FALSE)
+    {
+        __GL_EXIT();
+    }
 
     /* Initialize DP context function pointers with default Noop functions.
     */
@@ -1845,8 +2005,6 @@ GLvoid *__glCreateContext(GLint clientVersion,
 
     if ((*__glDevice->devCreateContext)(gc) == GL_FALSE)
     {
-        (*imports->free)(gc, gc);
-        gc = gcvNULL;
         __GL_EXIT();
     }
 
@@ -1874,10 +2032,28 @@ GLvoid *__glCreateContext(GLint clientVersion,
     if (gc->imports.conformGLSpec)
     {
         gc->dlCompileDispatch = __glListCompileFuncTable;
+        gc->immedModeOutsideDispatch = __glImmediateFuncTable;
+        __glInitImmedOutsideEntries(&gc->immedModeOutsideDispatch);
+        gc->immedModeCacheDispatch = __glImmediateFuncTable;
+        __glInitImmedCacheEntries(&gc->immedModeCacheDispatch);
     }
 #endif
     gc->immedModeDispatch = __glImmediateFuncTable;
-    gc->pModeDispatch = &gc->immedModeDispatch; /* immediate mode by default. */
+    if (gc->input.enableVertexCaching)
+    {
+        __glInitImmedVertexInfoEntries(&gc->immedModeDispatch);
+        gc->immedModeOutsideDispatch.Begin = __glim_Begin_Info;
+    }
+    else
+    {
+        /* Overwrite immediate vertex entries with no-vertex-info entries */
+        __glInitImmedNoVertInfoEntries(&gc->immedModeDispatch);
+        gc->immedModeOutsideDispatch.Begin = __glim_Begin;
+    }
+
+    gc->pModeDispatch = &gc->immedModeOutsideDispatch; /* immediate mode by default. */
+    gc->currentImmediateDispatch = gc->pModeDispatch;
+
     gc->pEntryDispatch = gc->apiProfile ? &__glProfileFuncTable : gc->pModeDispatch;
 
     gc->magic = ES3X_MAGIC;
@@ -1891,7 +2067,8 @@ GLvoid *__glCreateContext(GLint clientVersion,
 OnExit:
     if (gc)
     {
-        (*imports->free)(gc, gc);
+        __glDestroyContext(gc);
+        gcmOS_SAFE_FREE(gcvNULL, gc);
         gc = gcvNULL;
     }
     __GL_FOOTER();

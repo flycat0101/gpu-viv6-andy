@@ -47,10 +47,12 @@ GLvoid __glAddNameToNameList(__GLcontext *gc, __GLdlistNameNode **nameListHead, 
     }
 
     if (!foundNode) {
-        nameNode = (__GLdlistNameNode *)(*gc->imports.malloc)(gc, sizeof(__GLdlistNameNode) );
-        nameNode->name = name;
-        nameNode->next = *nameListHead;
-        *nameListHead = nameNode;
+        if (gcmIS_SUCCESS(gcoOS_Allocate(gcvNULL, sizeof(__GLdlistNameNode), (gctPOINTER*)&nameNode)))
+        {
+            nameNode->name = name;
+            nameNode->next = *nameListHead;
+            *nameListHead = nameNode;
+        }
     }
 }
 
@@ -63,7 +65,7 @@ GLvoid __glRemoveNameFrNameList(__GLcontext *gc, __GLdlistNameNode **nameListHea
     while (nameNode) {
         if (nameNode->name == name) {
             *prevNode = nameNode->next;
-            (*gc->imports.free)(gc, nameNode);
+            gcmOS_SAFE_FREE(gcvNULL, nameNode);
             break;
         }
         prevNode = &nameNode->next;
@@ -82,7 +84,10 @@ GLvoid __glAddParentChildLink(__GLcontext *gc, __GLsharedObjectMachine *shared, 
         parentDlist = __glAllocateDlist(gc, 0, 0, parent);
 
         /* Insert parentDlist to the display list lookup table */
-        __glAddObject(gc, gc->dlist.shared, parent, parentDlist);
+        if (__glAddObject(gc, gc->dlist.shared, parent, parentDlist) == GL_FALSE)
+        {
+            __GL_ERROR_RET(GL_OUT_OF_MEMORY);
+        }
     }
     __glAddNameToNameList(gc, &parentDlist->child, child);
 
@@ -93,7 +98,10 @@ GLvoid __glAddParentChildLink(__GLcontext *gc, __GLsharedObjectMachine *shared, 
         childDlist = __glAllocateDlist(gc, 0, 0, child);
 
         /* Insert childDlist to the display list lookup table */
-        __glAddObject(gc, gc->dlist.shared, child, childDlist);
+        if (__glAddObject(gc, gc->dlist.shared, child, childDlist) == GL_FALSE)
+        {
+            __GL_ERROR_RET(GL_OUT_OF_MEMORY);
+        }
     }
     __glAddNameToNameList(gc, &childDlist->parent, parent);
 }
@@ -118,7 +126,7 @@ GLboolean __glDeleteParentChildLists(__GLcontext *gc, __GLdlist *dlist)
         __glRemoveNameFrNameList(gc, &parentDlist->child, dlist->name);
 
         /* Free the current __GLdlistNameNode */
-        (*gc->imports.free)(gc, nameNode);
+        gcmOS_SAFE_FREE(gcvNULL, nameNode);
 
         nameNode = *ppNameNode;
     }
@@ -138,7 +146,7 @@ GLboolean __glDeleteParentChildLists(__GLcontext *gc, __GLdlist *dlist)
         __glRemoveNameFrNameList(gc, &childDlist->parent, dlist->name);
 
         /* Free the current __GLdlistNameNode */
-        (*gc->imports.free)(gc, nameNode);
+        gcmOS_SAFE_FREE(gcvNULL, nameNode);
 
         nameNode = *ppNameNode;
     }
@@ -333,7 +341,11 @@ GLvoid APIENTRY __glim_NewList(__GLcontext *gc, GLuint list, GLenum mode)
     */
     gc->dlist.enableConcatListCache = GL_FALSE;
 
-    __glMarkNameUsed(gc, gc->dlist.shared, list);
+    if (__glMarkNameUsed(gc, gc->dlist.shared, list) < 0)
+    {
+        __glSetError(gc, GL_OUT_OF_MEMORY);
+        return;
+    }
 
     if (gc->dlist.arena == NULL)
     {
@@ -346,6 +358,7 @@ GLvoid APIENTRY __glim_NewList(__GLcontext *gc, GLuint list, GLenum mode)
         }
     }
 
+    gc->pSavedModeDispatch = gc->pModeDispatch;
     gc->pModeDispatch = &gc->dlCompileDispatch;
     if (!gc->apiProfile)
     {
@@ -395,11 +408,16 @@ GLvoid APIENTRY __glim_EndList(__GLcontext *gc)
     __GL_DLIST_SEMAPHORE_LOCK();
 
     /* Insert the compiled dlist to the display list lookup table */
-    __glAddObject(gc, gc->dlist.shared, gc->dlist.currentList, dlist);
+    if (__glAddObject(gc, gc->dlist.shared, gc->dlist.currentList, dlist) == GL_FALSE)
+    {
+        __GL_DLIST_SEMAPHORE_UNLOCK();
+        __glSetError(gc, GL_OUT_OF_MEMORY);
+        return;
+    }
 
     __GL_DLIST_SEMAPHORE_UNLOCK();
 
-    gc->pModeDispatch = &gc->immedModeDispatch;
+    gc->pModeDispatch = gc->pSavedModeDispatch;
     if (!gc->apiProfile)
     {
         gc->pEntryDispatch = gc->pModeDispatch;

@@ -1210,7 +1210,7 @@ static gceSTATUS using_vClipPlane(
         vName[ClipPlane],
         gcSHADER_FLOAT_X1,
         1,
-        gcvTRUE,
+        gcvFALSE,
         &glmATTRIBUTE_WRAP_INDEXED(FS, vClipPlane0, ClipPlane),
         gcSHADER_SHADER_DEFAULT
         );
@@ -1418,6 +1418,7 @@ static gceSTATUS processClipPlane(
     do
     {
         GLint i;
+        GLuint clipPlaneMask;
 
         /* Ignore clip planes if DrawTex extension is in use. */
         if (chipCtx->drawTexOESEnabled)
@@ -1431,9 +1432,13 @@ static gceSTATUS processClipPlane(
             break;
         }
 
-        for (i = 0; i < glvMAX_CLIP_PLANES; i++)
+        clipPlaneMask = gc->state.enables.transform.clipPlanesMask;
+
+        i = 0;
+
+        while ((i < glvMAX_CLIP_PLANES) && clipPlaneMask)
         {
-            if (gc->state.enables.transform.clipPlanesMask & (1 << i))
+            if (clipPlaneMask & 1)
             {
                 /* Allocate resources. */
                 glmUSING_INDEXED_VARYING(vClipPlane, i);
@@ -1443,6 +1448,8 @@ static gceSTATUS processClipPlane(
                     glmVARYING_INDEXED(FS, vClipPlane0, i, XXXX);
                     glmCONST(0);
             }
+            clipPlaneMask >>= 1;
+            i++;
         }
     }
     while (gcvFALSE);
@@ -3957,12 +3964,12 @@ static gceSTATUS processTexture(
 **
 **  Fog blends a fog color with a rasterized fragment's post-texturing
 **  color using a blending factor. The blending factor is computed and passed
-**  on to FS from VS. If Cr represents a rasterized fragment’s R, G, or B
+**  on to FS from VS. If Cr represents a rasterized fragment's R, G, or B
 **  value, then the corresponding value produced by fog is
 **
 **      C = f * Cr + (1 - f) * Cf,
 **
-**  The rasterized fragment’s A value is not changed by fog blending.
+**  The rasterized fragment's A value is not changed by fog blending.
 **  The R, G, B, and A values of Cf are specified by calling Fog with name
 **  equal to FOG_COLOR.
 **

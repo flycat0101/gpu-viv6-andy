@@ -27,19 +27,19 @@ __GL_INLINE GLvoid __glFreeListConcatDraw(__GLcontext *gc, __GLDlistConcatDraw *
 
     if (listConcatDraw->concatDlistPtrs)
     {
-        (*gc->imports.free)(gc, listConcatDraw->concatDlistPtrs);
+        gcmOS_SAFE_FREE(gcvNULL, listConcatDraw->concatDlistPtrs);
         listConcatDraw->concatDlistPtrs = NULL;
     }
 
     if (listConcatDraw->concatVertexCount)
     {
-        (*gc->imports.free)(gc, listConcatDraw->concatVertexCount);
+        gcmOS_SAFE_FREE(gcvNULL, listConcatDraw->concatVertexCount);
         listConcatDraw->concatVertexCount = NULL;
     }
 
     if (listConcatDraw->concatIndexCount)
     {
-        (*gc->imports.free)(gc, listConcatDraw->concatIndexCount);
+        gcmOS_SAFE_FREE(gcvNULL, listConcatDraw->concatIndexCount);
         listConcatDraw->concatIndexCount = NULL;
     }
 
@@ -47,37 +47,28 @@ __GL_INLINE GLvoid __glFreeListConcatDraw(__GLcontext *gc, __GLDlistConcatDraw *
     {
         if (listConcatDraw->primBegin->indexBuffer)
         {
-            (*gc->imports.free)(gc, listConcatDraw->primBegin->indexBuffer);
+            gcmOS_SAFE_FREE(gcvNULL, listConcatDraw->primBegin->indexBuffer);
             listConcatDraw->primBegin->indexBuffer = NULL;
         }
 
         if (listConcatDraw->primBegin->privateData)
         {
             /* Notify Dp to delete cached vertex buffer */
-            /* to do */
-            /*(*gc->dp.deletePrimData)(gc, listConcatDraw->primBegin->privateData);*/
+            (*gc->dp.deletePrimData)(gc, listConcatDraw->primBegin->privateData);
             listConcatDraw->primBegin->privateData = NULL;
         }
 
         if (listConcatDraw->primBegin->ibPrivateData)
         {
-            /* to do */
-            /*(*gc->dp.deletePrimData)(gc, listConcatDraw->primBegin->ibPrivateData);*/
+            (*gc->dp.deletePrimData)(gc, listConcatDraw->primBegin->ibPrivateData);
             listConcatDraw->primBegin->ibPrivateData = NULL;
         }
 
-        if (listConcatDraw->primBegin->privStreamInfo)
-        {
-            /* to do */
-            /*(*gc->dp.deleteStreamInfo)(gc, listConcatDraw->primBegin->privStreamInfo);*/
-            listConcatDraw->primBegin->privStreamInfo = NULL;
-        }
-
-        (*gc->imports.free)(gc, listConcatDraw->primBegin);
+        gcmOS_SAFE_FREE(gcvNULL, listConcatDraw->primBegin);
         listConcatDraw->primBegin = NULL;
     }
 
-    (*gc->imports.free)(gc, listConcatDraw);
+    gcmOS_SAFE_FREE(gcvNULL, listConcatDraw);
 }
 
 GLvoid __glFreeConcatDlistCache(__GLcontext *gc)
@@ -138,7 +129,7 @@ GLvoid __glFreeDlistState(__GLcontext *gc)
         /* Free the remaining first block */
         DeleteBlock(gc, gc->dlist.arena->firstBlock);
         /* Free the arena structure */
-        (*gc->imports.free)(gc, gc->dlist.arena);
+        gcmOS_SAFE_FREE(gcvNULL, gc->dlist.arena);
         gc->dlist.arena = NULL;
     }
 
@@ -169,7 +160,7 @@ GLboolean __glDeleteDlist(__GLcontext *gc, GLvoid *obj)
             freeRec++;
         }
 
-        (*gc->imports.free)(gc, dlist->freefunc);
+        gcmOS_SAFE_FREE(gcvNULL, dlist->freefunc);
         dlist->freefunc = NULL;
     }
 
@@ -179,7 +170,7 @@ GLboolean __glDeleteDlist(__GLcontext *gc, GLvoid *obj)
     */
     if (dlist->segment)
     {
-        (*gc->imports.free)(gc, dlist->segment);
+        gcmOS_SAFE_FREE(gcvNULL, dlist->segment);
         dlist->segment = NULL;
     }
 
@@ -196,14 +187,14 @@ GLboolean __glDeleteDlist(__GLcontext *gc, GLvoid *obj)
             {
                 nextNode = nameNode->next;
                 __glFreeConcatDlistDrawBatch(gc, nameNode->name);
-                (*gc->imports.free)(gc, nameNode);
+                gcmOS_SAFE_FREE(gcvNULL, nameNode);
                 nameNode = nextNode;
             }
             break;
         }
     }
 
-    (*gc->imports.free)(gc, dlist);
+    gcmOS_SAFE_FREE(gcvNULL, dlist);
 
     return GL_TRUE;
 }
@@ -226,13 +217,15 @@ GLvoid __glShareDlists(__GLcontext *dst, __GLcontext *src)
 /*
 *** Initialize display list, this function is called in context initialization stage.
 */
-GLvoid __glInitDlistState(__GLcontext *gc)
+GLboolean __glInitDlistState(__GLcontext *gc)
 {
     __GLdlistMachine *dlist = &gc->dlist;
 
-    /* Disable dlist concatCache if videoMemorySize >= 64MB and systemMemorySize >= 512 MB.
+    /*
+    ** Add code to check video memory size, if it is too small we can turn off video memory cache
+    ** but still leave cancatlist on. will add code later.
     */
-    dlist->origConcatListCacheFlag = dlist->enableConcatListCache = GL_FALSE;
+    dlist->origConcatListCacheFlag = dlist->enableConcatListCache = __GL_DLIST_CACHE_ENABLE;
 
     dlist->maxConcatListCacheIdx = -1;
 
@@ -240,14 +233,25 @@ GLvoid __glInitDlistState(__GLcontext *gc)
     {
         __GL_DLIST_SEMAPHORE_LOCK();
 
-        dlist->shared = (__GLsharedObjectMachine *)
-            (*gc->imports.calloc)(gc, 1, sizeof(__GLsharedObjectMachine) );
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+            sizeof(__GLsharedObjectMachine),
+            (gctPOINTER*)&dlist->shared)))
+        {
+             return GL_FALSE;
+        }
+        gcoOS_ZeroMemory(dlist->shared, sizeof(__GLsharedObjectMachine));
 
         /* Initialize a linear lookup table for display lists */
         dlist->shared->maxLinearTableSize = __GL_MAX_DLIST_LINEAR_TABLE_SIZE;
         dlist->shared->linearTableSize = __GL_DEFAULT_DLIST_LINEAR_TABLE_SIZE;
-        dlist->shared->linearTable = (GLvoid **)
-            (*gc->imports.calloc)(gc, 1, dlist->shared->linearTableSize * sizeof(GLvoid *) );
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+            dlist->shared->linearTableSize * sizeof(GLvoid *),
+            (gctPOINTER*)&dlist->shared->linearTable)))
+        {
+            gcmOS_SAFE_FREE(gcvNULL, dlist->shared);
+             return GL_FALSE;
+        }
+        gcoOS_ZeroMemory(dlist->shared->linearTable, dlist->shared->linearTableSize * sizeof(GLvoid *));
 
         dlist->shared->hashSize = __GL_MAX_DLIST_HASH_TABLE_SIZE;
         dlist->shared->hashMask = __GL_MAX_DLIST_HASH_TABLE_SIZE - 1;
@@ -256,4 +260,6 @@ GLvoid __glInitDlistState(__GLcontext *gc)
 
         __GL_DLIST_SEMAPHORE_UNLOCK();
     }
+
+    return GL_TRUE;
 }

@@ -137,22 +137,34 @@ gcChipUtilsHashCreate(
     gcmHEADER_ARG("gc=0x%x tbEntryNum=%d maxEntryObjs=%d pfnDeleteUserData=0x%x",
                    gc, tbEntryNum, maxEntryObjs, pfnDeleteUserData);
 
-    pHash = (__GLchipUtilsHash*)(*gc->imports.calloc)(gc, 1, sizeof(__GLchipUtilsHash));
-    gcmASSERT(pHash != gcvNULL);
-    if (pHash == gcvNULL)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLchipUtilsHash), (gctPOINTER*)&pHash)))
     {
         gcmFOOTER_ARG("return=0x%x", pHash);
         return gcvNULL;
     }
+    gcoOS_ZeroMemory(pHash, sizeof(__GLchipUtilsHash));
 
     pHash->tbEntryNum = tbEntryNum;
     pHash->maxEntryObjs = maxEntryObjs;
     pHash->year = 0;
     pHash->pfnDeleteUserData = pfnDeleteUserData;
 
-    pHash->ppHashTable = (__GLchipUtilsObject**)(*gc->imports.calloc)(gc, tbEntryNum, sizeof(__GLchipUtilsObject*));
-    pHash->pEntryCounts = (GLuint*)(*gc->imports.calloc)(gc, tbEntryNum, sizeof(GLuint));
-    gcmASSERT(pHash->ppHashTable && pHash->pEntryCounts);
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, tbEntryNum * sizeof(__GLchipUtilsObject*), (gctPOINTER*)&pHash->ppHashTable)))
+    {
+        gcmOS_SAFE_FREE(gcvNULL, pHash);
+        gcmFOOTER_ARG("return=0x%x", pHash->ppHashTable);
+        return gcvNULL;
+    }
+    gcoOS_ZeroMemory(pHash->ppHashTable, tbEntryNum * sizeof(__GLchipUtilsObject*));
+
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, tbEntryNum * sizeof(GLuint), (gctPOINTER*)&pHash->pEntryCounts)))
+    {
+        gcmOS_SAFE_FREE(gcvNULL, pHash->ppHashTable);
+        gcmOS_SAFE_FREE(gcvNULL, pHash);
+        gcmFOOTER_ARG("return=0x%x", pHash->pEntryCounts);
+        return gcvNULL;
+    }
+    gcoOS_ZeroMemory(pHash->pEntryCounts, tbEntryNum * sizeof(GLuint));
 
     gcmFOOTER_ARG("return=0x%x", pHash);
     return pHash;
@@ -167,9 +179,20 @@ gcChipUtilsHashDestory(
     gcmHEADER_ARG("gc=0x%x pHash=0x%x ",gc, pHash);
 
     gcChipUtilsHashDeleteAllObjects(gc, pHash);
-    (*gc->imports.free)(gc, pHash->pEntryCounts);
-    (*gc->imports.free)(gc, pHash->ppHashTable);
-    (*gc->imports.free)(gc, pHash);
+    if (pHash->pEntryCounts)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, pHash->pEntryCounts);
+    }
+
+    if (pHash->ppHashTable)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, pHash->ppHashTable);
+    }
+
+    if (pHash)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, pHash);
+    }
 
     gcmFOOTER_NO();
 }
@@ -212,7 +235,7 @@ gcChipUtilsHashDeleteObject(
 
     --pHash->pEntryCounts[entryId];
     pHash->pfnDeleteUserData(gc, pCurObj->pUserData);
-    (*gc->imports.free)(gc, pCurObj);
+    gcmOS_SAFE_FREE(gcvNULL, pCurObj);
 
     gcmFOOTER_NO();
 }
@@ -250,13 +273,12 @@ gcChipUtilsHashAddObject(
 
     gcmHEADER_ARG("gc=0x%x pHash=0x%x pUserData=0x%x key=%u bPerpetual=%d",gc, pHash, pUserData, key, bPerpetual);
 
-    pNewObj = (__GLchipUtilsObject*)(*gc->imports.calloc)(gc, 1, sizeof(__GLchipUtilsObject));
-    gcmASSERT(pNewObj);
-    if (pNewObj == gcvNULL)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLchipUtilsObject), (gctPOINTER*)&pNewObj)))
     {
         gcmFOOTER_ARG("return=0x%x", gcvNULL);
         return gcvNULL;
     }
+    gcoOS_ZeroMemory(pNewObj, sizeof(__GLchipUtilsObject));
 
     pNewObj->pUserData = pUserData;
     pNewObj->key = key;
@@ -1043,7 +1065,7 @@ gcChipUtilsDumpTexture(
     drawCount--;
 
      /* Allocate memory for output file name string. */
-    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, __GLES_MAX_FILENAME_LEN, (gctPOINTER *) &fileName));
+    gcmONERROR(gcoOS_Allocate(gcvNULL, __GLES_MAX_FILENAME_LEN, (gctPOINTER *) &fileName));
     do
     {
         gctUINT slice = 0;
@@ -1090,7 +1112,8 @@ gcChipUtilsDumpTexture(
         gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, fileName));
     }
 
-    return gcvSTATUS_OK;
+OnError:
+    return status;
 }
 
 gceSTATUS
@@ -1106,6 +1129,7 @@ gcChipUtilsDumpRT(
     GLuint index;
     gctUINT32 frameCount, drawCount;
     GLuint pID, ppID;
+    gceSTATUS status = gcvSTATUS_OK;
     static char *txTypeStr[] = {
         "2D",
         "3D",
@@ -1119,7 +1143,7 @@ gcChipUtilsDumpRT(
     gcsSURF_VIEW *dsView = chipCtx->drawDepthView.surf ? &chipCtx->drawDepthView : &chipCtx->drawStencilView;
 
     /* Allocate memory for output file name string. */
-    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, __GLES_MAX_FILENAME_LEN, (gctPOINTER *) &fileName));
+    gcmONERROR(gcoOS_Allocate(gcvNULL, __GLES_MAX_FILENAME_LEN, (gctPOINTER *) &fileName));
 
     gcoHAL_FrameInfoOps(chipCtx->hal,
                             gcvFRAMEINFO_FRAME_NUM,
@@ -1269,7 +1293,8 @@ gcChipUtilsDumpRT(
     }
     gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, fileName));
 
-    return gcvSTATUS_OK;
+OnError:
+    return status;
 }
 
 #endif

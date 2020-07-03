@@ -19,10 +19,8 @@
 #include "gc_es_context.h"
 #include "gc_chip_context.h"
 #include "gc_es_device.h"
-#if defined(_LINUX_) && defined(GL4_DRI_BUILD)
-#elif defined(_WINDOWS)
+#if defined(_WINDOWS)
 #include "vvtpfdtypes.h"
-#include "wintogl.h"
 #endif
 
 #define _GC_OBJ_ZONE    gcdZONE_GL40_DEVICE
@@ -272,7 +270,7 @@ GLboolean __glDpInitPixelFormats(GLvoid)
     GLint i;
 
     if (dpGlobalInfo.__glPFDTable) {
-        (*imports.free)(NULL, dpGlobalInfo.__glPFDTable);
+        gcmOS_SAFE_FREE(gcvNULL, dpGlobalInfo.__glPFDTable);
     }
 
     dpGlobalInfo.__glPFDTable = NULL;
@@ -281,9 +279,9 @@ GLboolean __glDpInitPixelFormats(GLvoid)
                               GL_TRUE);
     dpGlobalInfo.dPFDSizeNonDisplay= constructNoneDislayablePixelFormatTable(NULL,dpGlobalInfo.bpp,
                               GL_TRUE);
-    dpGlobalInfo.__glPFDTable = (*imports.malloc)(NULL, dpGlobalInfo.dPFDSize + dpGlobalInfo.dPFDSizeNonDisplay );
-
-    if (!dpGlobalInfo.__glPFDTable) {
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+        dpGlobalInfo.dPFDSize + dpGlobalInfo.dPFDSizeNonDisplay, (gctPOINTER*)&dpGlobalInfo.__glPFDTable)))
+    {
         return GL_FALSE;
     }
 

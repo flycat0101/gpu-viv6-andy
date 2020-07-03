@@ -439,6 +439,23 @@ GLvoid APIENTRY __glim_LineStipple(__GLcontext *gc, GLint factor, GLushort stipp
 
     /* flip attribute dirty bit */
     __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_2, __GL_LINESTIPPLE_BIT);
+
+    /* lineStipple pattern also affects the defered lineStipple enable state.
+    */
+    if (gc->state.enables.line.stippleRequested && gc->state.line.stipple != 0xFFFF) {
+        gc->state.deferredAttribMask |= __GL_ATTRIB_LINE_STIPPLE_BIT;
+    } else {
+        gc->state.deferredAttribMask &= ~(__GL_ATTRIB_LINE_STIPPLE_BIT);
+    }
+
+    /* Set gc->input.deferredAttribDirty bit if deferred states are different
+    ** from current states.
+    */
+    if (gc->state.deferredAttribMask ^ gc->state.currentAttribMask) {
+        gc->input.deferredAttribDirty |= __GL_DEFERED_ATTRIB_BIT;
+    } else {
+        gc->input.deferredAttribDirty &= ~(__GL_DEFERED_ATTRIB_BIT);
+    }
 }
 
 GLvoid APIENTRY __glim_PolygonStipple(__GLcontext *gc, const GLubyte *mask)

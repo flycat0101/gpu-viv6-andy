@@ -1997,7 +1997,7 @@ __glChipDeleteRenderbuffer(
             chipRBO->shadow.surface  = gcvNULL;
         }
 
-        (gc->imports.free)(NULL, chipRBO);
+        gcmOS_SAFE_FREE(gcvNULL, chipRBO);
         rbo->privateData = NULL;
     }
 
@@ -2210,6 +2210,7 @@ __glChipRenderbufferStorage(
                 gcmONERROR(gcoOS_Allocate(gcvNULL,
                                           gcmSIZEOF(__GLchipStencilOpt),
                                           (gctPOINTER*)&chipRBO->stencilOpt));
+                gcoOS_ZeroMemory(chipRBO->stencilOpt, gcmSIZEOF(__GLchipStencilOpt));
             }
 
             gcChipPatchStencilOptReset(chipRBO->stencilOpt,
@@ -2591,7 +2592,7 @@ OnError:
     return GL_FALSE;
 }
 
-GLvoid
+GLboolean
 __glChipBindRenderbuffer(
     __GLcontext *gc,
     __GLrenderbufferObject *renderbuf
@@ -2602,10 +2603,17 @@ __glChipBindRenderbuffer(
     gcmHEADER_ARG("gc=0x%x renderbuf=0x%x", gc, renderbuf);
     if (chipRBO == gcvNULL)
     {
-        chipRBO = (__GLchipRenderbufferObject*)gc->imports.calloc(gc, 1, sizeof(__GLchipRenderbufferObject));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLchipRenderbufferObject), (gctPOINTER*)&chipRBO)))
+        {
+            gcmFOOTER_ARG("return=%d", GL_FALSE);
+            return GL_FALSE;
+        }
+        gcoOS_ZeroMemory(chipRBO, sizeof(__GLchipRenderbufferObject));
+
         renderbuf->privateData = chipRBO;
     }
-    gcmFOOTER_NO();
+    gcmFOOTER_ARG("return=%d", GL_TRUE);
+    return GL_TRUE;
 }
 
 

@@ -72,6 +72,8 @@ GLvoid __glEnableDisable(__GLcontext *gc, GLenum cap, GLboolean val)
             }
             if (i < gc->constants.shaderCaps.maxDrawBuffers)
             {
+                __GL_VERTEX_BUFFER_FLUSH(gc);
+
                 for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
                 {
                     es->colorBuffer.blend[i] = val;
@@ -84,22 +86,43 @@ GLvoid __glEnableDisable(__GLcontext *gc, GLenum cap, GLboolean val)
     case GL_CULL_FACE:
         if (es->polygon.cullFace ^ val)
         {
+            __GL_VERTEX_BUFFER_FLUSH(gc);
             es->polygon.cullFace = val;
             __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_1, __GL_CULLFACE_ENDISABLE_BIT);
         }
         break;
 
     case GL_DEPTH_TEST:
-        if (es->depthTest ^ val)
+        __GL_DLIST_BUFFER_FLUSH(gc);
+
+        /* Defer this attribute setting to the next glBegin so that
+        ** we can determine if this attribute is really changed for the next primitive.
+        */
+        if (val)
         {
-            es->depthTest = val;
-            __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_1,  __GL_DEPTHTEST_ENDISABLE_BIT);
+            gc->state.deferredAttribMask |= __GL_ATTRIB_DEPTH_TEST_BIT;
+        }
+        else
+        {
+            gc->state.deferredAttribMask &= ~(__GL_ATTRIB_DEPTH_TEST_BIT);
+        }
+
+        /* Set gc->input.deferredAttribDirty bit if deferred states are different
+        ** from current states.
+        */
+        if (gc->state.deferredAttribMask ^ gc->state.currentAttribMask) {
+            gc->input.deferredAttribDirty |= __GL_DEFERED_ATTRIB_BIT;
+         }
+        else
+        {
+            gc->input.deferredAttribDirty &= ~(__GL_DEFERED_ATTRIB_BIT);
         }
         break;
 
     case GL_DITHER:
         if (es->colorBuffer.dither ^ val)
         {
+            __GL_VERTEX_BUFFER_FLUSH(gc);
             es->colorBuffer.dither = val;
             __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_2, __GL_DITHER_ENDISABLE_BIT);
         }
@@ -108,6 +131,7 @@ GLvoid __glEnableDisable(__GLcontext *gc, GLenum cap, GLboolean val)
     case GL_SCISSOR_TEST:
         if (es->scissorTest ^ val)
         {
+            __GL_VERTEX_BUFFER_FLUSH(gc);
             es->scissorTest = val;
             __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_2, __GL_SCISSORTEST_ENDISABLE_BIT);
         }
@@ -116,16 +140,37 @@ GLvoid __glEnableDisable(__GLcontext *gc, GLenum cap, GLboolean val)
     case GL_STENCIL_TEST:
         if (es->stencilTest ^ val)
         {
+            __GL_VERTEX_BUFFER_FLUSH(gc);
             es->stencilTest = val;
             __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_1, __GL_STENCILTEST_ENDISABLE_BIT);
         }
         break;
 
     case GL_POLYGON_OFFSET_FILL:
-        if (es->polygon.polygonOffsetFill ^ val)
+        __GL_DLIST_BUFFER_FLUSH(gc);
+
+        /* Defer this attribute setting to the next glBegin so that
+        ** we can determine if this attribute is really changed for the next primitive.
+        */
+        if (val)
         {
-            es->polygon.polygonOffsetFill = val;
-            __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_1, __GL_POLYGONOFFSET_FILL_ENDISABLE_BIT);
+            gc->state.deferredAttribMask |= __GL_ATTRIB_POLYGON_OFFSET_FILL_BIT;
+        }
+        else
+        {
+            gc->state.deferredAttribMask &= ~(__GL_ATTRIB_POLYGON_OFFSET_FILL_BIT);
+        }
+
+        /* Set gc->input.deferredAttribDirty bit if deferred states are different
+        ** from current states.
+        */
+        if (gc->state.deferredAttribMask ^ gc->state.currentAttribMask)
+        {
+            gc->input.deferredAttribDirty |= __GL_DEFERED_ATTRIB_BIT;
+        }
+        else
+        {
+            gc->input.deferredAttribDirty &= ~(__GL_DEFERED_ATTRIB_BIT);
         }
         break;
 
@@ -205,11 +250,17 @@ GLvoid __glEnableDisable(__GLcontext *gc, GLenum cap, GLboolean val)
         if (es->lighting.colorMaterial ^ val) {
             __GL_VERTEX_BUFFER_FLUSH(gc);
 
+            if (es->lighting.colorMaterial &&
+                gc->input.deferredAttribDirty & __GL_DEFERED_COLOR_BIT)
+            {
+                gc->state.current.color = gc->input.shadowCurrent.color;
+                gc->input.deferredAttribDirty &= ~__GL_DEFERED_COLOR_BIT;
+                __glUpdateMaterialfv(gc, gc->state.light.colorMaterialFace,
+                    gc->state.light.colorMaterialParam, (GLfloat *)&gc->state.current.color);
+            }
+
             es->lighting.colorMaterial = val;
             __GL_SET_ATTR_DIRTY_BIT(gc, __GL_LIGHTING_ATTRS, __GL_COLORMATERIAL_ENDISABLE_BIT);
-
-            /* Also notify DP immediately to start tracking the Material changes */
-  //          (*gc->dp.colorMaterialEndisable)(gc);
 
             __GL_INPUTMASK_CHANGED(gc);
         }
@@ -481,10 +532,33 @@ GLvoid __glEnableDisable(__GLcontext *gc, GLenum cap, GLboolean val)
 
     case GL_LINE_STIPPLE:
         if (es->line.stippleRequested ^ val) {
-          __GL_DLIST_BUFFER_FLUSH(gc);
-          es->line.stippleRequested = val;
-          es->line.stipple = val;
-          __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_2, __GL_LINESTIPPLE_ENDISABLE_BIT);
+           __GL_DLIST_BUFFER_FLUSH(gc);
+
+           es->line.stippleRequested = val;
+
+           /* Defer this attribute setting to the next glBegin so that
+           ** we can determine if this attribute is really changed for the next primitive.
+           */
+           if (es->line.stippleRequested && gc->state.line.stipple != 0xFFFF)
+           {
+               gc->state.deferredAttribMask |= __GL_ATTRIB_LINE_STIPPLE_BIT;
+           }
+           else
+           {
+               gc->state.deferredAttribMask &= ~(__GL_ATTRIB_LINE_STIPPLE_BIT);
+           }
+
+           /* Set gc->input.deferredAttribDirty bit if deferred states are different
+           ** from current states.
+           */
+           if (gc->state.deferredAttribMask ^ gc->state.currentAttribMask)
+           {
+               gc->input.deferredAttribDirty |= __GL_DEFERED_ATTRIB_BIT;
+           }
+           else
+           {
+               gc->input.deferredAttribDirty &= ~(__GL_DEFERED_ATTRIB_BIT);
+           }
         }
         break;
 
@@ -631,6 +705,14 @@ GLboolean GL_APIENTRY __glim_IsEnabled(__GLcontext *gc, GLenum cap)
     GLboolean ret;
 
     __GL_HEADER();
+    __GL_VERTEX_BUFFER_FLUSH(gc);
+
+    /* Copy the deferred attribute states to current attribute states.
+    */
+    if (gc->input.deferredAttribDirty)
+    {
+        __glCopyDeferedAttribToCurrent(gc);
+    }
 
     switch (cap)
     {
@@ -946,6 +1028,15 @@ GLvoid GL_APIENTRY __glim_Clear(__GLcontext *gc, GLbitfield mask)
         __GL_EXIT();
     }
 
+    __GL_VERTEX_BUFFER_FLUSH(gc);
+
+    /* Copy the deferred attribute states to current attribute states.
+    */
+    if (gc->input.deferredAttribDirty)
+    {
+        __glCopyDeferedAttribToCurrent(gc);
+    }
+
     /* Make sure the clear include color buffer and all channel masked. */
     if ((mask & GL_COLOR_BUFFER_BIT) &&
         gc->state.raster.colorMask[0].redMask   &&
@@ -1183,6 +1274,8 @@ GLvoid GL_APIENTRY __glim_Finish(__GLcontext *gc)
 
     __GL_HEADER();
 
+    __GL_VERTEX_BUFFER_FLUSH(gc);
+
     retVal = (*gc->dp.finish)(gc);
 
     if (!retVal)
@@ -1197,6 +1290,8 @@ GLvoid GL_APIENTRY __glim_Finish(__GLcontext *gc)
 GLvoid GL_APIENTRY __glim_Flush(__GLcontext *gc)
 {
     __GL_HEADER();
+
+    __GL_VERTEX_BUFFER_FLUSH(gc);
 
     (*gc->dp.flush)(gc);
 
@@ -1299,7 +1394,7 @@ GLboolean __glDeleteSyncObj(__GLcontext *gc, __GLsyncObject *syncObj)
 
     if (syncObj->label)
     {
-        gc->imports.free(gc, syncObj->label);
+        gcmOS_SAFE_FREE(gcvNULL, syncObj->label);
     }
 
     retVal = (*gc->dp.deleteSync)(gc, syncObj);
@@ -1309,12 +1404,12 @@ GLboolean __glDeleteSyncObj(__GLcontext *gc, __GLsyncObject *syncObj)
         __GL_ERROR((*gc->dp.getError)(gc));
     }
 
-    (*gc->imports.free)(gc, syncObj);
+    gcmOS_SAFE_FREE(gcvNULL, syncObj);
 
     return GL_TRUE;
 }
 
-GLvoid __glInitSyncState(__GLcontext *gc)
+GLboolean __glInitSyncState(__GLcontext *gc)
 {
     /* Sync objects can be shared across contexts */
     if (gc->shareCtx)
@@ -1327,7 +1422,12 @@ GLvoid __glInitSyncState(__GLcontext *gc)
         /* Allocate VEGL lock */
         if (gcvNULL == gc->sync.shared->lock)
         {
-            gc->sync.shared->lock = (*gc->imports.calloc)(gc, 1, sizeof(VEGLLock));
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(VEGLLock), (gctPOINTER*)&gc->sync.shared->lock)))
+            {
+                return GL_FALSE;
+            }
+            gcoOS_ZeroMemory(gc->sync.shared->lock, sizeof(VEGLLock));
+
             (*gc->imports.createMutex)(gc->sync.shared->lock);
         }
         gcoOS_UnLockPLS();
@@ -1336,13 +1436,21 @@ GLvoid __glInitSyncState(__GLcontext *gc)
     {
         GL_ASSERT(gcvNULL == gc->sync.shared);
 
-        gc->sync.shared = (__GLsharedObjectMachine*)(*gc->imports.calloc)(gc, 1, sizeof(__GLsharedObjectMachine));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLsharedObjectMachine), (gctPOINTER*)&gc->sync.shared)))
+        {
+            return GL_FALSE;
+        }
+        gcoOS_ZeroMemory(gc->sync.shared, sizeof(__GLsharedObjectMachine));
 
         /* Initialize a linear lookup table for sync object */
         gc->sync.shared->maxLinearTableSize = __GL_MAX_SYNCOBJ_LINEAR_TABLE_SIZE;
         gc->sync.shared->linearTableSize = __GL_DEFAULT_SYNCOBJ_LINEAR_TABLE_SIZE;
-        gc->sync.shared->linearTable = (GLvoid **)
-            (*gc->imports.calloc)(gc, 1, gc->sync.shared->linearTableSize * sizeof(GLvoid*));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, gc->sync.shared->linearTableSize * sizeof(GLvoid*), (gctPOINTER*)&gc->sync.shared->linearTable)))
+        {
+            gcmOS_SAFE_FREE(gcvNULL, gc->sync.shared);
+            return GL_FALSE;
+        }
+        gcoOS_ZeroMemory(gc->sync.shared->linearTable, gc->sync.shared->linearTableSize * sizeof(GLvoid*));
 
         gc->sync.shared->hashSize = __GL_SYNC_HASH_TABLE_SIZE;
         gc->sync.shared->hashMask = __GL_SYNC_HASH_TABLE_SIZE - 1;
@@ -1350,6 +1458,8 @@ GLvoid __glInitSyncState(__GLcontext *gc)
         gc->sync.shared->deleteObject = (__GLdeleteObjectFunc)__glDeleteSyncObj;
         gc->sync.shared->immediateInvalid = GL_TRUE;
     }
+
+    return GL_TRUE;
 }
 
 GLvoid __glFreeSyncState(__GLcontext *gc)
@@ -1377,23 +1487,31 @@ GLsync GL_APIENTRY __glim_FenceSync(__GLcontext *gc, GLenum condition, GLbitfiel
 
     GL_ASSERT(gc->sync.shared);
     sync = __glGenerateNames(gc, gc->sync.shared, 1);
-    __glMarkNameUsed(gc, gc->sync.shared, sync);
+    if (__glMarkNameUsed(gc, gc->sync.shared, sync) < 0)
+    {
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
 
-    syncObject = (__GLsyncObject *)(*gc->imports.calloc)(gc, 1, sizeof(__GLsyncObject));
-    if (!syncObject)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLsyncObject), (gctPOINTER*)&syncObject)))
     {
         sync = 0;
         __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
     }
+    gcoOS_ZeroMemory(syncObject, sizeof(__GLsyncObject));
 
     __glInitSyncObj(gc, syncObject, sync, condition, flags);
-    __glAddObject(gc, gc->sync.shared, sync, syncObject);
+    if (__glAddObject(gc, gc->sync.shared, sync, syncObject) == GL_FALSE)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, syncObject);
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
 
     retVal = (*gc->dp.createSync)(gc, syncObject);
 
     if (!retVal)
     {
-        __GL_ERROR((*gc->dp.getError)(gc));
+        __glDeleteObject(gc, gc->sync.shared, (GLuint)(gctUINTPTR_T)sync);
+        __GL_ERROR_EXIT((*gc->dp.getError)(gc));
     }
 
 OnError:
@@ -1629,7 +1747,7 @@ GLvoid GL_APIENTRY __glim_BlendBarrier(__GLcontext *gc)
 }
 
 
-GLvoid __glInitDebugState(__GLcontext *gc)
+GLboolean __glInitDebugState(__GLcontext *gc)
 {
     __GLdbgSrc srcIdx;
     __GLdbgType typeIdx;
@@ -1647,8 +1765,19 @@ GLvoid __glInitDebugState(__GLcontext *gc)
     dbgMachine->userParam = NULL;
 
     dbgMachine->current = 0;
-    dbgMachine->msgCtrlStack = (__GLdbgGroupCtrl**)gc->imports.calloc(gc, dbgMachine->maxStackDepth, sizeof(__GLdbgGroupCtrl*));
-    groupCtrl = (__GLdbgGroupCtrl*)gc->imports.calloc(gc, 1, sizeof(__GLdbgGroupCtrl));
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, dbgMachine->maxStackDepth * sizeof(__GLdbgGroupCtrl*), (gctPOINTER*)&dbgMachine->msgCtrlStack)))
+    {
+        return GL_FALSE;
+    }
+    gcoOS_ZeroMemory(dbgMachine->msgCtrlStack, dbgMachine->maxStackDepth * sizeof(__GLdbgGroupCtrl*));
+
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLdbgGroupCtrl), (gctPOINTER*)&groupCtrl)))
+    {
+        gcmOS_SAFE_FREE(gcvNULL, dbgMachine->msgCtrlStack);
+        return GL_FALSE;
+    }
+    gcoOS_ZeroMemory(groupCtrl, sizeof(__GLdbgGroupCtrl));
+
     groupCtrl->message = NULL; /* No message for default group */
 
     for (srcIdx = 0; srcIdx < __GL_DEBUG_SRC_NUM; ++srcIdx)
@@ -1664,6 +1793,7 @@ GLvoid __glInitDebugState(__GLcontext *gc)
         }
     }
     dbgMachine->msgCtrlStack[dbgMachine->current] = groupCtrl;
+    return GL_TRUE;
 }
 
 GLvoid __glFreeDebugState(__GLcontext *gc)
@@ -1678,27 +1808,34 @@ GLvoid __glFreeDebugState(__GLcontext *gc)
         __GLdbgType typeIdx;
         __GLdbgGroupCtrl *groupCtrl = dbgMachine->msgCtrlStack[stackIdx];
 
-        for (srcIdx = 0; srcIdx < __GL_DEBUG_SRC_NUM; ++srcIdx)
+        if (groupCtrl)
         {
-            for (typeIdx = 0; typeIdx < __GL_DEBUG_TYPE_NUM; ++typeIdx)
+            for (srcIdx = 0; srcIdx < __GL_DEBUG_SRC_NUM; ++srcIdx)
             {
-                __GLdbgMsgCtrl *msgCtrl = groupCtrl->spaces[srcIdx][typeIdx].msgs;
-                while (msgCtrl)
+                for (typeIdx = 0; typeIdx < __GL_DEBUG_TYPE_NUM; ++typeIdx)
                 {
-                    __GLdbgMsgCtrl *next = msgCtrl->next;
-                    gc->imports.free(gc, msgCtrl);
-                    msgCtrl = next;
+                    __GLdbgMsgCtrl *msgCtrl = groupCtrl->spaces[srcIdx][typeIdx].msgs;
+                    while (msgCtrl)
+                    {
+                        __GLdbgMsgCtrl *next = msgCtrl->next;
+                        gcmOS_SAFE_FREE(gcvNULL, msgCtrl);
+                        msgCtrl = next;
+                    }
                 }
             }
-        }
 
-        if (groupCtrl->message)
-        {
-            gc->imports.free(gc, groupCtrl->message);
+            if (groupCtrl->message)
+            {
+                gcmOS_SAFE_FREE(gcvNULL, groupCtrl->message);
+            }
+            gcmOS_SAFE_FREE(gcvNULL, groupCtrl);
         }
-        gc->imports.free(gc, groupCtrl);
     }
-    gc->imports.free(gc, dbgMachine->msgCtrlStack);
+
+    if (dbgMachine->msgCtrlStack)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, dbgMachine->msgCtrlStack);
+    }
 
 
     while (msgLog)
@@ -1706,9 +1843,9 @@ GLvoid __glFreeDebugState(__GLcontext *gc)
         __GLdbgMsgLog *next = msgLog->next;
         if (msgLog->message)
         {
-            gc->imports.free(gc, msgLog->message);
+            gcmOS_SAFE_FREE(gcvNULL, msgLog->message);
         }
-        gc->imports.free(gc, msgLog);
+        gcmOS_SAFE_FREE(gcvNULL, msgLog);
         msgLog = next;
     }
     dbgMachine->msgLogHead = NULL;
@@ -1853,8 +1990,12 @@ GLboolean __glDebugInsertLogMessage(__GLcontext *gc, GLenum source, GLenum type,
         /* If the message log is not full */
         else if (dbgMachine->loggedMsgs < dbgMachine->maxLogMsgs)
         {
-            __GLdbgMsgLog *msgLog = (__GLdbgMsgLog*)gc->imports.malloc(gc, sizeof(__GLdbgMsgLog));
+            __GLdbgMsgLog *msgLog;
             GLsizei msgLen = (length < 0 || needCopy) ? (GLsizei)strlen(message) : length;
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLdbgMsgLog), (gctPOINTER*)&msgLog)))
+            {
+                break;
+            }
 
             msgLen = __GL_MIN(dbgMachine->maxMsgLen - 1, msgLen);
 
@@ -1865,7 +2006,12 @@ GLboolean __glDebugInsertLogMessage(__GLcontext *gc, GLenum source, GLenum type,
             msgLog->length = msgLen + 1;
             if (needCopy)
             {
-                msgLog->message = (GLchar*)gc->imports.malloc(gc, (msgLen + 1) * sizeof(GLchar));
+                if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, (msgLen + 1) * sizeof(GLchar), (gctPOINTER*)&msgLog->message)))
+                {
+                    gcmOS_SAFE_FREE(gcvNULL, msgLog);
+                    break;
+                }
+
                 __GL_MEMCOPY(msgLog->message, message, msgLen * sizeof(GLchar));
                 msgLog->message[msgLen] = '\0';
             }
@@ -1904,17 +2050,19 @@ GLvoid __glDebugPrintLogMessage(__GLcontext *gc, GLenum source, GLenum type, GLu
         GLuint offset = 0;
         gctARGUMENTS args;
 
-        GLchar *message = (GLchar*)gc->imports.malloc(gc, dbgMachine->maxLogMsgs);
-
-        /* format the message string */
-        gcmARGUMENTS_START(args, format);
-        gcoOS_PrintStrVSafe(message, (gctSIZE_T)dbgMachine->maxLogMsgs, &offset, format, args);
-        gcmARGUMENTS_END(args);
-
-        if (!__glDebugInsertLogMessage(gc, source, type, id, severity, -1, message, GL_FALSE))
+        GLchar *message;
+        if (gcmIS_SUCCESS(gcoOS_Allocate(gcvNULL, dbgMachine->maxLogMsgs, (gctPOINTER*)&message)))
         {
-            /* If inserting message to list failed, free it here to avoid memory leak. */
-            gc->imports.free(gc, message);
+            /* format the message string */
+            gcmARGUMENTS_START(args, format);
+            gcoOS_PrintStrVSafe(message, (gctSIZE_T)dbgMachine->maxLogMsgs, &offset, format, args);
+            gcmARGUMENTS_END(args);
+
+            if (!__glDebugInsertLogMessage(gc, source, type, id, severity, -1, message, GL_FALSE))
+            {
+                /* If inserting message to list failed, free it here to avoid memory leak. */
+                gcmOS_SAFE_FREE(gcvNULL, message);
+            }
         }
     }
 }
@@ -1981,7 +2129,10 @@ GLvoid GL_APIENTRY __glim_DebugMessageControl(__GLcontext *gc, GLenum source, GL
 
             if (!msgCtrl)
             {
-                msgCtrl = (__GLdbgMsgCtrl*)gc->imports.malloc(gc, sizeof(__GLdbgMsgCtrl));
+                if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLdbgMsgCtrl), (gctPOINTER*)&msgCtrl)))
+                {
+                    __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+                }
 
                 msgCtrl->id = ids[i];
                 msgCtrl->src = source;
@@ -2157,8 +2308,12 @@ GLuint GL_APIENTRY __glim_GetDebugMessageLog(__GLcontext *gc, GLuint count, GLsi
             dbgMachine->msgLogTail = NULL;
         }
 
-        gc->imports.free(gc, msgLog->message);
-        gc->imports.free(gc, msgLog);
+        if (msgLog->message)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, msgLog->message);
+        }
+
+        gcmOS_SAFE_FREE(gcvNULL, msgLog);
         --dbgMachine->loggedMsgs;
 
         msgLog = next;
@@ -2228,8 +2383,12 @@ GLvoid GL_APIENTRY __glim_PushDebugGroup(__GLcontext *gc, GLenum source, GLuint 
     }
 
     groupCtrlPrev = dbgMachine->msgCtrlStack[dbgMachine->current];
-    dbgMachine->msgCtrlStack[++dbgMachine->current] = groupCtrl
-                                                    = (__GLdbgGroupCtrl*)gc->imports.calloc(gc, 1, sizeof(__GLdbgGroupCtrl));
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLdbgGroupCtrl), (gctPOINTER*)&groupCtrl)))
+    {
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
+    gcoOS_ZeroMemory(groupCtrl, sizeof(__GLdbgGroupCtrl));
+    dbgMachine->msgCtrlStack[++dbgMachine->current] = groupCtrl;
 
     /* Inherit the control volume from previous group */
     for (srcIdx = 0; srcIdx < __GL_DEBUG_SRC_NUM; ++srcIdx)
@@ -2240,7 +2399,12 @@ GLvoid GL_APIENTRY __glim_PushDebugGroup(__GLcontext *gc, GLenum source, GLuint 
 
             while (msgCtrlPrev)
             {
-                __GLdbgMsgCtrl *msgCtrl = (__GLdbgMsgCtrl*)gc->imports.malloc(gc, sizeof(__GLdbgMsgCtrl));
+                __GLdbgMsgCtrl *msgCtrl;
+                if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLdbgMsgCtrl), (gctPOINTER*)&msgCtrl)))
+                {
+                    __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+                }
+
                 __GL_MEMCOPY(msgCtrl, msgCtrlPrev, sizeof(__GLdbgMsgCtrl));
 
                 /* Insert to head of new group */
@@ -2259,7 +2423,11 @@ GLvoid GL_APIENTRY __glim_PushDebugGroup(__GLcontext *gc, GLenum source, GLuint 
     groupCtrl->source = source;
     groupCtrl->id = id;
     msgLen = (length < 0) ? (GLsizei)strlen(message) : length;
-    groupCtrl->message = (GLchar*)gc->imports.malloc(gc, (msgLen + 1) * sizeof(GLchar));
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, (msgLen + 1) * sizeof(GLchar), (gctPOINTER*)&groupCtrl->message)))
+    {
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
+
     __GL_MEMCOPY(groupCtrl->message, message, msgLen);
     groupCtrl->message[msgLen] = '\0';
 
@@ -2296,7 +2464,7 @@ GLvoid GL_APIENTRY __glim_PopDebugGroup(__GLcontext *gc)
             while (msgCtrl)
             {
                 __GLdbgMsgCtrl *next = msgCtrl->next;
-                gc->imports.free(gc, msgCtrl);
+                gcmOS_SAFE_FREE(gcvNULL, msgCtrl);
                 msgCtrl = next;
             }
         }
@@ -2304,9 +2472,9 @@ GLvoid GL_APIENTRY __glim_PopDebugGroup(__GLcontext *gc)
 
     if (groupCtrl->message)
     {
-        gc->imports.free(gc, groupCtrl->message);
+        gcmOS_SAFE_FREE(gcvNULL, groupCtrl->message);
     }
-    gc->imports.free(gc, groupCtrl);
+    gcmOS_SAFE_FREE(gcvNULL, groupCtrl);
 
 OnError:
     __GL_FOOTER();
@@ -2461,7 +2629,7 @@ GLvoid GL_APIENTRY __glim_ObjectLabel(__GLcontext *gc, GLenum identifier, GLuint
 
     if (*pLabel)
     {
-        gc->imports.free(gc, *pLabel);
+        gcmOS_SAFE_FREE(gcvNULL, *pLabel);
         *pLabel = NULL;
     }
 
@@ -2470,9 +2638,15 @@ GLvoid GL_APIENTRY __glim_ObjectLabel(__GLcontext *gc, GLenum identifier, GLuint
         GLsizei msgLen = (length < 0) ? (GLsizei)strlen(label) : length;
         msgLen = __GL_MIN(gc->debug.maxMsgLen - 1, msgLen);
 
-        *pLabel = (GLchar*)gc->imports.malloc(gc, (msgLen + 1) * sizeof(GLchar));
-        __GL_MEMCOPY(*pLabel, label, msgLen * sizeof(GLchar));
-        (*pLabel)[msgLen] = '\0';
+        if (gcmIS_SUCCESS(gcoOS_Allocate(gcvNULL, (msgLen + 1) * sizeof(GLchar), (gctPOINTER*)pLabel)))
+        {
+            __GL_MEMCOPY(*pLabel, label, msgLen * sizeof(GLchar));
+            (*pLabel)[msgLen] = '\0';
+        }
+        else
+        {
+            __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+        }
     }
 
 OnError:
@@ -2667,7 +2841,7 @@ GLvoid GL_APIENTRY __glim_ObjectPtrLabel(__GLcontext *gc, const GLvoid* ptr, GLs
 
     if (syncObj->label)
     {
-        gc->imports.free(gc, syncObj->label);
+        gcmOS_SAFE_FREE(gcvNULL, syncObj->label);
         syncObj->label = NULL;
     }
 
@@ -2676,9 +2850,15 @@ GLvoid GL_APIENTRY __glim_ObjectPtrLabel(__GLcontext *gc, const GLvoid* ptr, GLs
         GLsizei msgLen = (length < 0) ? (GLsizei)strlen(label) : length;
         msgLen = __GL_MIN(gc->debug.maxMsgLen - 1, msgLen);
 
-        syncObj->label = (GLchar*)gc->imports.malloc(gc, (msgLen + 1) * sizeof(GLchar));
-        __GL_MEMCOPY(syncObj->label, label, msgLen * sizeof(GLchar));
-        syncObj->label[msgLen] = '\0';
+        if (gcmIS_SUCCESS(gcoOS_Allocate(gcvNULL, (msgLen + 1) * sizeof(GLchar), (gctPOINTER*)&syncObj->label)))
+        {
+            __GL_MEMCOPY(syncObj->label, label, msgLen * sizeof(GLchar));
+            syncObj->label[msgLen] = '\0';
+        }
+        else
+        {
+            __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+        }
     }
 
 OnError:

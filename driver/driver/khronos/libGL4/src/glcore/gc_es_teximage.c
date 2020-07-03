@@ -3431,6 +3431,7 @@ GLvoid GL_APIENTRY __glim_TexImage3D(__GLcontext *gc,
     __GLtextureObject *tex;
     __GLbufferObject *unpackBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_UNPACK_BUFFER_INDEX].boundBufObj;
     __GLpixelTransferInfo transferInfo;
+    gctPOINTER pointer;
 
     __GL_HEADER();
 
@@ -3585,7 +3586,9 @@ GLvoid GL_APIENTRY __glim_TexImage3D(__GLcontext *gc,
 
 OnExit:
     if ((GL_TRUE == transferInfo.dstNeedFree) && (gcvNULL != transferInfo.dstImage)){
-        (*gc->imports.free)(gc, (void*)transferInfo.dstImage);
+        /* Fixed build warning from gcmOS_SAFE_FREE */
+        pointer = (gctPOINTER)transferInfo.dstImage;
+        gcmOS_SAFE_FREE(gcvNULL, pointer);
         transferInfo.dstImage = gcvNULL;
     }
     __GL_FOOTER();
@@ -3608,6 +3611,7 @@ GLvoid GL_APIENTRY __glim_TexImage2D(__GLcontext *gc,
     __GLtextureObject *tex;
     __GLbufferObject *unpackBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_UNPACK_BUFFER_INDEX].boundBufObj;
     __GLpixelTransferInfo transferInfo;
+    gctPOINTER pointer;
 
     __GL_HEADER();
 
@@ -3789,7 +3793,9 @@ GLvoid GL_APIENTRY __glim_TexImage2D(__GLcontext *gc,
 
 OnExit:
     if ((GL_TRUE == transferInfo.dstNeedFree) && (gcvNULL != transferInfo.dstImage)){
-        (*gc->imports.free)(gc, (void*)transferInfo.dstImage);
+        /* Fixed build warning from gcmOS_SAFE_FREE */
+        pointer = (gctPOINTER)transferInfo.dstImage;
+        gcmOS_SAFE_FREE(gcvNULL, pointer);
         transferInfo.dstImage = gcvNULL;
     }
     __GL_FOOTER();
@@ -4006,6 +4012,7 @@ GLvoid GL_APIENTRY __glim_TexImage1D( __GLcontext *gc,
     __GLtextureObject *tex;
     __GLbufferObject *unpackBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_UNPACK_BUFFER_INDEX].boundBufObj;
     __GLpixelTransferInfo transferInfo;
+    gctPOINTER pointer;
 
     __GL_HEADER();
 
@@ -4102,7 +4109,9 @@ GLvoid GL_APIENTRY __glim_TexImage1D( __GLcontext *gc,
 
 OnExit:
     if ((GL_TRUE == transferInfo.dstNeedFree) && (gcvNULL != transferInfo.dstImage)){
-        (*gc->imports.free)(gc, (void*)transferInfo.dstImage);
+        /* Fixed build warning from gcmOS_SAFE_FREE */
+        pointer = (gctPOINTER)transferInfo.dstImage;
+        gcmOS_SAFE_FREE(gcvNULL, pointer);
         transferInfo.dstImage = gcvNULL;
     }
     __GL_FOOTER();
@@ -4127,6 +4136,7 @@ GLvoid GL_APIENTRY __glim_TexSubImage1D(__GLcontext *gc,
     __GLtextureObject *tex;
     __GLbufferObject *unpackBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_UNPACK_BUFFER_INDEX].boundBufObj;
     __GLpixelTransferInfo transferInfo;
+    gctPOINTER pointer;
 
     __GL_HEADER();
 
@@ -4199,7 +4209,9 @@ GLvoid GL_APIENTRY __glim_TexSubImage1D(__GLcontext *gc,
 
 OnExit:
     if ((GL_TRUE == transferInfo.dstNeedFree) && (gcvNULL != transferInfo.dstImage)){
-        (*gc->imports.free)(gc, (void*)transferInfo.dstImage);
+        /* Fixed build warning from gcmOS_SAFE_FREE */
+        pointer = (gctPOINTER)transferInfo.dstImage;
+        gcmOS_SAFE_FREE(gcvNULL, pointer);
         transferInfo.dstImage = gcvNULL;
     }
     __GL_FOOTER();
@@ -4292,7 +4304,11 @@ GLvoid APIENTRY __glim_CopyTexImage1D(__GLcontext *gc,
             GLenum baseType = (GL_DEPTH_COMPONENT != texFormatInfo->dataFormat) ? texFormatInfo->dataType : GL_FLOAT;
 
             nBytes = __glPixelSize(gc, texFormatInfo->dataFormat, baseType);
-            data = (*gc->imports.malloc)(gc, width * 1 * nBytes);
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, width * 1 * nBytes, (gctPOINTER*)&data)))
+            {
+                __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+            }
+
             (*gc->immedModeDispatch.ReadPixels)(gc, x, y, width, 1, texFormatInfo->dataFormat, baseType, data);
             __GL_SAVE_AND_SET_SCALE_BIAS(gc,transferInfo);
             (*gc->immedModeDispatch.TexImage1D)(gc, target, lod, internalFormat, width, border, texFormatInfo->dataFormat, baseType, data);
@@ -4318,9 +4334,10 @@ GLvoid APIENTRY __glim_CopyTexImage1D(__GLcontext *gc,
     }
 
 OnExit:
+OnError:
     if (data)
     {
-        (*gc->imports.free)(gc, data);
+        gcmOS_SAFE_FREE(gcvNULL, data);
         data = gcvNULL;
     }
     __GL_FOOTER();
@@ -4404,7 +4421,10 @@ GLvoid GL_APIENTRY __glim_CopyTexSubImage1D(__GLcontext *gc,
             GLenum baseType = (GL_DEPTH_COMPONENT != texFormatInfo->dataFormat) ? texFormatInfo->dataType : GL_FLOAT;
 
             nBytes = __glPixelSize(gc, texFormatInfo->dataFormat, baseType);
-            data = (*gc->imports.malloc)(gc, width * 1 * nBytes);
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, width * 1 * nBytes, (gctPOINTER*)&data)))
+            {
+                __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+            }
             (*gc->immedModeDispatch.ReadPixels)(gc, x, y, width, 1, texFormatInfo->dataFormat, baseType, data);
             __GL_SAVE_AND_SET_SCALE_BIAS(gc,transferInfo);
             (*gc->immedModeDispatch.TexSubImage1D)(gc, target, lod, xoffset, width, texFormatInfo->dataFormat, baseType, data);
@@ -4429,9 +4449,10 @@ GLvoid GL_APIENTRY __glim_CopyTexSubImage1D(__GLcontext *gc,
     }
 
 OnExit:
+OnError:
     if (data)
     {
-        (*gc->imports.free)(gc, data);
+        gcmOS_SAFE_FREE(gcvNULL, data);
         data = gcvNULL;
     }
     __GL_FOOTER();
@@ -4890,6 +4911,7 @@ GLvoid GL_APIENTRY __glim_TexSubImage3D(__GLcontext *gc,
     GLuint activeUnit = gc->state.texture.activeTexIndex;
     __GLbufferObject *unpackBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_UNPACK_BUFFER_INDEX].boundBufObj;
     __GLpixelTransferInfo transferInfo;
+    gctPOINTER pointer;
 
     __GL_HEADER();
 
@@ -4976,7 +4998,9 @@ GLvoid GL_APIENTRY __glim_TexSubImage3D(__GLcontext *gc,
 
 OnExit:
     if ((GL_TRUE == transferInfo.dstNeedFree) && (gcvNULL != transferInfo.dstImage)){
-        (*gc->imports.free)(gc, (void*)transferInfo.dstImage);
+        /* Fixed build warning from gcmOS_SAFE_FREE */
+        pointer = (gctPOINTER)transferInfo.dstImage;
+        gcmOS_SAFE_FREE(gcvNULL, pointer);
         transferInfo.dstImage = gcvNULL;
     }
     __GL_FOOTER();
@@ -5000,6 +5024,7 @@ GLvoid GL_APIENTRY __glim_TexSubImage2D(__GLcontext *gc,
     __GLtextureObject *tex;
     __GLbufferObject *unpackBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_UNPACK_BUFFER_INDEX].boundBufObj;
     __GLpixelTransferInfo transferInfo;
+    gctPOINTER pointer;
 
     __GL_HEADER();
 
@@ -5072,7 +5097,9 @@ GLvoid GL_APIENTRY __glim_TexSubImage2D(__GLcontext *gc,
 
 OnExit:
     if ((GL_TRUE == transferInfo.dstNeedFree) && (gcvNULL != transferInfo.dstImage)){
-        (*gc->imports.free)(gc, (void*)transferInfo.dstImage);
+        /* Fixed build warning from gcmOS_SAFE_FREE */
+        pointer = (gctPOINTER)transferInfo.dstImage;
+        gcmOS_SAFE_FREE(gcvNULL, pointer);
         transferInfo.dstImage = gcvNULL;
     }
     __GL_FOOTER();
@@ -5173,7 +5200,10 @@ GLvoid GL_APIENTRY __glim_CopyTexImage2D(__GLcontext *gc,
             GLenum baseType = (GL_DEPTH_COMPONENT != texFormatInfo->dataFormat) ? texFormatInfo->dataType : GL_FLOAT;
 
             nBytes = __glPixelSize(gc, texFormatInfo->dataFormat, baseType);
-            data = (*gc->imports.malloc)(gc, width * height * nBytes);
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, width * height * nBytes, (gctPOINTER*)&data)))
+            {
+                __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+            }
             (*gc->immedModeDispatch.ReadPixels)(gc, x, y, width, height, texFormatInfo->dataFormat, baseType, data);
             __GL_SAVE_AND_SET_SCALE_BIAS(gc,transferInfo);
             (*gc->immedModeDispatch.TexImage2D)(gc, target, lod, internalFormat, width, height, border, texFormatInfo->dataFormat, baseType, data);
@@ -5199,9 +5229,10 @@ GLvoid GL_APIENTRY __glim_CopyTexImage2D(__GLcontext *gc,
     }
 
 OnExit:
+OnError:
     if (data)
     {
-        (*gc->imports.free)(gc, data);
+        gcmOS_SAFE_FREE(gcvNULL, data);
         data = gcvNULL;
     }
     __GL_FOOTER();
@@ -5302,7 +5333,10 @@ GLvoid GL_APIENTRY __glim_CopyTexSubImage3D(__GLcontext *gc,
             GLenum baseType = (GL_DEPTH_COMPONENT != texFormatInfo->dataFormat) ? texFormatInfo->dataType : GL_FLOAT;
 
             nBytes = __glPixelSize(gc, texFormatInfo->dataFormat, baseType);
-            data = (*gc->imports.malloc)(gc, width * height * nBytes);
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, width * height * nBytes, (gctPOINTER*)&data)))
+            {
+                __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+            }
             (*gc->immedModeDispatch.ReadPixels)(gc, x, y, width, height, texFormatInfo->dataFormat, baseType, data);
             __GL_SAVE_AND_SET_SCALE_BIAS(gc,transferInfo);
             (*gc->immedModeDispatch.TexSubImage3D)(gc, target, lod, xoffset, yoffset, zoffset, width, height, 1, texFormatInfo->dataFormat, baseType, data);
@@ -5323,9 +5357,10 @@ GLvoid GL_APIENTRY __glim_CopyTexSubImage3D(__GLcontext *gc,
     }
 
 OnExit:
+OnError:
     if (data)
     {
-        (*gc->imports.free)(gc, data);
+        gcmOS_SAFE_FREE(gcvNULL, data);
         data = gcvNULL;
     }
     __GL_FOOTER();
@@ -5410,7 +5445,10 @@ GLvoid GL_APIENTRY __glim_CopyTexSubImage2D(__GLcontext *gc,
             GLenum baseType = (GL_DEPTH_COMPONENT != texFormatInfo->dataFormat) ? texFormatInfo->dataType : GL_FLOAT;
 
             nBytes = __glPixelSize(gc, texFormatInfo->dataFormat, baseType);
-            data = (*gc->imports.malloc)(gc, width * height * nBytes);
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, width * height * nBytes, (gctPOINTER*)&data)))
+            {
+                __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+            }
             (*gc->immedModeDispatch.ReadPixels)(gc, x, y, width, height, texFormatInfo->dataFormat, baseType, data);
             __GL_SAVE_AND_SET_SCALE_BIAS(gc,transferInfo);
             (*gc->immedModeDispatch.TexSubImage2D)(gc, target, lod, xoffset, yoffset, width, height, texFormatInfo->dataFormat, baseType, data);
@@ -5435,9 +5473,10 @@ GLvoid GL_APIENTRY __glim_CopyTexSubImage2D(__GLcontext *gc,
     }
 
 OnExit:
+OnError:
     if (data)
     {
-        (*gc->imports.free)(gc, data);
+        gcmOS_SAFE_FREE(gcvNULL, data);
         data = gcvNULL;
     }
     __GL_FOOTER();

@@ -187,6 +187,11 @@ __GL_INLINE GLvoid __glRasterPos4fv(__GLcontext* gc, GLfloat *fv4)
     __GL_SETUP_NOT_IN_BEGIN(gc);
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
+    if (gc->input.deferredAttribDirty)
+    {
+        __glCopyDeferedAttribToCurrent(gc);
+    }
+
     if (__glCanDoFastRasterPos(gc))
     {
         __glRasterPos4fvFast(gc, fv4);
@@ -429,6 +434,11 @@ __GL_INLINE GLvoid __glWindowPos3fv(__GLcontext* gc, GLfloat *v)
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
     __GL_VERTEX_BUFFER_FLUSH(gc);
+
+    if(gc->input.deferredAttribDirty & __GL_DEFERED_COLOR_BIT)
+    {
+        __glCopyDeferedAttribToCurrent(gc);
+    }
 
     /*Window coordinate*/
     rp = &gc->state.rasterPos;

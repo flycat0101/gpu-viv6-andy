@@ -297,6 +297,39 @@ gcChipUtilConvertDSMode(
     return ret;
 }
 
+__GL_INLINE gceTEXTURE_DS_TEX_MODE
+gcChipUtilConvertDSTexMode(
+    GLenum depthStencilTextureMode
+    )
+{
+    gceTEXTURE_DS_TEX_MODE ret;
+    gcmHEADER_ARG("depthStencilTextureMode=0x%04x", depthStencilTextureMode);
+    switch (depthStencilTextureMode)
+    {
+    case GL_LUMINANCE:
+        ret = gcvTEXTURE_DS_TEXTURE_MODE_LUMINANCE;
+        break;
+
+    case GL_INTENSITY:
+        ret = gcvTEXTURE_DS_TEXTURE_MODE_INTENSITY;
+        break;
+
+    case GL_ALPHA:
+        ret = gcvTEXTURE_DS_TEXTURE_MODE_ALPHA;
+        break;
+
+    case GL_RED:
+        ret = gcvTEXTURE_DS_TEXTURE_MODE_RED;
+        break;
+
+    default:
+        GL_ASSERT(0);
+        ret = gcvTEXTURE_DS_TEXTURE_MODE_INVALID;
+        break;
+    }
+    gcmFOOTER_ARG("return=%d", ret);
+    return ret;
+}
 
 __GL_INLINE gceTEXTURE_SRGBDECODE
 gcChipUtilConvertSRGB(
@@ -1394,6 +1427,10 @@ gcChipSetTextureParameters(
         halTexture->compareFunc = gcChipUtilConvertCompareFunc(samplerStates->compareFunc);
     }
 
+    if (localMask & __GL_TEXPARAM_DEPTH_TEX_MODE_BIT)
+    {
+        halTexture->dsTextureMode = gcChipUtilConvertDSTexMode(samplerStates->depthTexMode);
+    }
 
     if (localMask & __GL_TEXPARAM_MAX_ANISOTROPY_BIT)
     {
@@ -2052,7 +2089,7 @@ GLvoid updateColorSum(__GLcontext *gc,
     }
     else
     {
-        glmSETHASH_1BIT(hasColorSum, 1, 0);
+        glmSETHASH_1BIT(hasColorSum, 0, 0);
     }
 
     if (gc->state.enables.lighting.lighting &&
@@ -2638,8 +2675,10 @@ gcChipValidateGL4FixState(
                 (gc->vertexStreams.primMode == GL_POINTS),
                 0);
 
+        }
     }
-    }
+
+    chipCtx->hashKey.hashClipPlaneEnabled = gc->state.enables.transform.clipPlanesMask;
 
     gcmONERROR(gcChipValidateAttribGroup3(gc, chipCtx));
     gcmONERROR(gcChipValidateLightingAttrib(gc, chipCtx));
@@ -3365,7 +3404,7 @@ gcChipBindFixSamplers(
         else
         {
             if (chipCtx->hashKey.hasPolygonStippleEnabled) {
-                texInfoX = chipCtx->texture.sampler[chipCtx->polygonStippleTextureStage].binding;
+                texInfoX = chipCtx->polygonStippleSampler.binding;
                 if (texInfoX->dirty)
                 {
                     gcoTEXTURE_Flush(texInfoX->object);
@@ -3398,7 +3437,7 @@ gcChipBindFixSamplers(
             }
 
             if (chipCtx->hashKey.hasLineStippleEnabled) {
-                texInfoX = chipCtx->texture.sampler[chipCtx->lineStippleTextureStage].binding;
+                texInfoX = chipCtx->lineStippleSampler.binding;
                 if (texInfoX->dirty)
                 {
                     gcoTEXTURE_Flush(texInfoX->object);
@@ -3850,12 +3889,10 @@ static gceSTATUS updateTextureStates(
     }
 
     if ((chipCtx->hashKey.hasPolygonStippleEnabled) && (lastAvailableSlot != -1)) {
-        chipCtx->texture.sampler[lastAvailableSlot] = chipCtx->polygonStippleSampler;
         chipCtx->polygonStippleTextureStage = lastAvailableSlot++;
     }
 
     if ((chipCtx->hashKey.hasLineStippleEnabled) && (lastAvailableSlot != -1)) {
-        chipCtx->texture.sampler[lastAvailableSlot] = chipCtx->lineStippleSampler;
         chipCtx->lineStippleTextureStage = lastAvailableSlot;
     }
     gcmFOOTER();
@@ -4023,8 +4060,8 @@ gcChipValidateXFB(
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
 
 #ifdef OPENGL40
-    if (gc->imports.conformGLSpec &&
-        (gc->input.beginMode == __GL_IN_BEGIN || gc->input.beginMode == __GL_SMALL_LIST_BATCH))
+    if (gc->input.beginMode == __GL_IN_BEGIN || gc->input.beginMode == __GL_SMALL_LIST_BATCH ||
+        gc->input.beginMode == __GL_SMALL_DRAW_BATCH)
     {
         gcmFOOTER();
         return status;
