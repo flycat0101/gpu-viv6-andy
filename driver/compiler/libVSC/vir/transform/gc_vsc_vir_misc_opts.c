@@ -3818,7 +3818,7 @@ static VSC_ErrCode vscVIR_PrecisionUpdateDst(VIR_Instruction* inst)
 
         if(VIR_Operand_GetPrecision(dst) == VIR_PRECISION_ANY)
         {
-            VIR_Precision precision = VIR_Inst_GetExpectedResultPrecision(inst, gcvTRUE);
+            VIR_Precision precision = VIR_Inst_GetExpectedResultPrecision(inst);
             VIR_Symbol* sym = VIR_Operand_GetSymbol(dst);
 
             if(VIR_Inst_GetOpcode(inst) == VIR_OP_LDARR)
@@ -11397,7 +11397,7 @@ _vscVIR_CheckSymbolUsedByHighpOpnd(
     )
 {
     VIR_Symbol*             pOpndSym = gcvNULL;
-    VIR_Precision           symPrecision, opndPrecision;
+    VIR_Precision           opndPrecision;
     VIR_OperandInfo         opndInfo;
 
     /* Skip non-symbol operand. */
@@ -11414,7 +11414,6 @@ _vscVIR_CheckSymbolUsedByHighpOpnd(
     }
 
     pOpndSym = VIR_Operand_GetSymbol(pOpnd);
-    symPrecision = VIR_Symbol_GetPrecision(pOpndSym);
     opndPrecision = VIR_Operand_GetPrecision(pOpnd);
 
     /* If the operand precision is HIGHP and the symbol precision is ANYP, we need to mark this flag. */

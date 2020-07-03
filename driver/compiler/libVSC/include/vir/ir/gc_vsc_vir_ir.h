@@ -1051,8 +1051,11 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Shader_GetAdjustedWorkGroupSize(Shader)         ((Shader)->shaderLayout.compute.adjustedWorkGroupSize)
 #define VIR_Shader_SetAdjustedWorkGroupSize(Shader, V)      do { (Shader)->shaderLayout.compute.adjustedWorkGroupSize = (V); } while (0)
 
-#define VIR_Shader_GetWorkGroupSizeFactor(Shader, idx)       ((Shader)->shaderLayout.compute.workGroupSizeFactor[(idx)])
-#define VIR_Shader_SetWorkGroupSizeFactor(Shader, idx, V)    do { (Shader)->shaderLayout.compute.workGroupSizeFactor[(idx)] = (V); } while (0)
+#define VIR_Shader_GetWorkGroupSizeFactor(Shader, idx)      ((Shader)->shaderLayout.compute.workGroupSizeFactor[(idx)])
+#define VIR_Shader_SetWorkGroupSizeFactor(Shader, idx, V)   do { (Shader)->shaderLayout.compute.workGroupSizeFactor[(idx)] = (V); } while (0)
+
+#define VIR_Shader_GetMinWorkGroupSizeSetByDriver(Shader)   ((Shader)->shaderLayout.compute.minWorkGroupSizeSetByDriver)
+#define VIR_Shader_SetMinWorkGroupSizeSetByDriver(Shader, V)do { (Shader)->shaderLayout.compute.minWorkGroupSizeSetByDriver = (V); } while (0)
 
 #define VIR_Shader_SetTCShaderLayout(s, outVertices, inVertices)            \
         do {                                                                \
@@ -1193,13 +1196,14 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 
 #define VIR_Symbol_isPerPatchInput(Sym)   ((VIR_Symbol_isVariable(Sym) ||      \
                                             VIR_Symbol_isField(Sym))        && \
-                                            ((Sym)->_storageClass == VIR_STORAGE_PERPATCH_INPUT) )
+                                            ((Sym)->_storageClass == VIR_STORAGE_PERPATCH_INPUT || (Sym)->_storageClass == VIR_STORAGE_PERPATCH_INOUT))
 #define VIR_Symbol_isPerPatchOutput(Sym)  ((Sym) && (VIR_Symbol_isVariable(Sym) ||           \
                                                      VIR_Symbol_isField(Sym)      )  &&      \
-                                           ((Sym)->_storageClass == VIR_STORAGE_PERPATCH_OUTPUT))
+                                           ((Sym)->_storageClass == VIR_STORAGE_PERPATCH_OUTPUT || (Sym)->_storageClass == VIR_STORAGE_PERPATCH_INOUT))
 #define VIR_Symbol_isPerPatch(Sym)       ((Sym) && (VIR_Symbol_isVariable(Sym) ||           \
                                                      VIR_Symbol_isField(Sym)      )  &&      \
                                            ((Sym)->_storageClass == VIR_STORAGE_PERPATCH_OUTPUT || \
+                                            (Sym)->_storageClass == VIR_STORAGE_PERPATCH_INOUT || \
                                             (Sym)->_storageClass == VIR_STORAGE_PERPATCH_INPUT))
 #define VIR_Symbol_isInputOrOutput(sym) (VIR_Symbol_isAttribute((sym)) || \
                                          VIR_Symbol_isInput((sym)) || \
@@ -4958,6 +4962,8 @@ typedef enum _VIR_SHADERFLAGS_EXT1
     VIR_SHFLAG_EXT1_USE_EVIS_INST               = 0x00000200, /* Whether use EVIS instruction. */
     VIR_SHFLAG_EXT1_COMPATIBILITY_PROFILR       = 0x00000400, /* Whether the shader version is compatibility profile. */
     VIR_SHFLAG_EXT1_ENABLE_PRECISION_UPDATE     = 0x00008000, /* Whether shader need update precision */
+
+    VIR_SHFLAG_EXT1_SET_MIN_WORKGROUPSIZE       = 0x00010000, /* Whether driver sets the minimum workGroupSize. */
 } VIR_ShaderFlagsExt1;
 
 /* Get the flags. */
@@ -5022,6 +5028,7 @@ typedef enum _VIR_SHADERFLAGS_EXT1
 #define VIR_Shader_UseEvisInst(Shader)              (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_USE_EVIS_INST) != 0)
 #define VIR_Shader_IsCompatibilityProfile(Shader)   (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_COMPATIBILITY_PROFILR) != 0)
 #define VIR_Shader_NeedUpdatePrecision(Shader)      (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_ENABLE_PRECISION_UPDATE) != 0)
+#define VIR_Shader_DriverSetMinWorkGroupSize(Shader)(((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_SET_MIN_WORKGROUPSIZE) != 0)
 
 typedef struct _VIR_LIBRARYLIST VIR_LibraryList;
 
@@ -5127,6 +5134,9 @@ typedef struct _VIR_COMPUTELAYOUT
 
     /* The factor of reducing WorkGroupSize, the default value is 0. */
     gctUINT16           workGroupSizeFactor[3];
+
+    /* The minimum workGroupSize which is set by driver.*/
+    gctUINT32           minWorkGroupSizeSetByDriver;
 } VIR_ComputeLayout;
 
 /* tcs and tes layout are defined in same struct */
@@ -7117,8 +7127,7 @@ VIR_Inst_GetExpressionTypeID(
 
 VIR_Precision
 VIR_Inst_GetExpectedResultPrecision(
-    IN VIR_Instruction  *Inst,
-    IN gctBOOL          bSkipSpecificClientDriver
+    IN VIR_Instruction  *Inst
     );
 
 VSC_ErrCode
@@ -7963,6 +7972,15 @@ VIR_IntrinsicGetKind(
 gctUINT
 VIR_Shader_GetWorkGroupSize(
     IN VIR_Shader      *pShader
+    );
+
+VSC_ErrCode
+VIR_Shader_GetWorkGroupSizeInfo(
+    VIR_Shader      *pShader,
+    VSC_HW_CONFIG   *pHwCfg,
+    gctUINT         *pMinWorkGroupSize,
+    gctUINT         *pMaxWorkGroupSize,
+    gctUINT         *pInitWorkGroupSizeToCalcRegCount
     );
 
 VIR_Uniform *

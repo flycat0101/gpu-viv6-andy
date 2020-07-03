@@ -3440,7 +3440,6 @@ sloCOMPILER_CreateAuxiliaryName(
     else
     {
         gctUINT       offset = 0;
-        gctUINT64     curTime;
         sloEXTENSION  extension = {0};
 
         status = gcoOS_Allocate(
@@ -3451,8 +3450,7 @@ sloCOMPILER_CreateAuxiliaryName(
 
         tempSymbol = pointer;
 
-        gcoOS_GetTime(&curTime);
-        gcoOS_PrintStrSafe(tempSymbol, 256, &offset, "%llu_scalarArray", curTime);
+        gcoOS_PrintStrSafe(tempSymbol, 256, &offset, "%d_%d_scalarArray", LineNo, StringNo);
 
         gcmONERROR(sloCOMPILER_AllocatePoolString(Compiler,
                                                   tempSymbol,

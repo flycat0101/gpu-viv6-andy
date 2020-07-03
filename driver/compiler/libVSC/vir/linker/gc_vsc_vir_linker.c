@@ -7622,6 +7622,37 @@ VIR_Lib_UpdateImageFormat(
     return errCode;
 }
 
+VSC_ErrCode
+VIR_Lib_SetMinWorkGroupSize(
+    IN gctUINT                      minWorkGroupSize,
+    IN OUT VIR_Shader*              pShader
+    )
+{
+    VSC_ErrCode                     errCode = VSC_ERR_NONE;
+    gctUINT                         workGroupSize = VIR_Shader_GetWorkGroupSize(pShader);
+
+    if (minWorkGroupSize == 0)
+    {
+        minWorkGroupSize = 1;
+    }
+
+    /*
+    ** If the workGroupSize is fixed(set in shader source),
+    ** then we need to make sure that the minmum workGroupSize is the same as the fixed workGroupSize.
+    */
+    if (VIR_Shader_CheckWorkGroupSizeFixed(pShader) && (minWorkGroupSize != workGroupSize))
+    {
+        errCode = VSC_ERR_INVALID_DATA;
+        ON_ERROR(errCode, "Can't set the workGroupSize if it is fixed.");
+    }
+
+    VIR_Shader_SetMinWorkGroupSizeSetByDriver(pShader, minWorkGroupSize);
+    VIR_Shader_SetFlagExt1(pShader, VIR_SHFLAG_EXT1_SET_MIN_WORKGROUPSIZE);
+
+OnError:
+    return errCode;
+}
+
 static void
 _InitializeLibLinkEntryData(
     IN VSC_MM                   *pMM,
@@ -7734,6 +7765,7 @@ VIR_LinkLibLibrary(
         for (j = 0; j < libEntry->linkPointCount; j++)
         {
             VSC_LIB_LINK_POINT *linkPoint = &libEntry->linkPoint[j];
+            gctBOOL             bTransFunc = gcvTRUE;
 
             switch(linkPoint->libLinkType)
             {
@@ -7753,6 +7785,7 @@ VIR_LinkLibLibrary(
                         _GetIntrinsicOrextFuncName,
                         _InsertIntrinsicFunc);
                 break;
+
             case VSC_LIB_LINK_TYPE_IMAGE_READ_WRITE:
                 /* initialize the image desc and sampler value first */
                 _InitImageSamplerValue(pShader, &linkPoint->u.imageReadWrite);
@@ -7771,6 +7804,7 @@ VIR_LinkLibLibrary(
                         _GetIntrinsicOrextFuncName,
                         _InsertIntrinsicFunc);
                 break;
+
             case VSC_LIB_LINK_TYPE_COLOR_OUTPUT:
                 _LinkLibContext_Initialize(
                         &vContext,
@@ -7809,25 +7843,37 @@ VIR_LinkLibLibrary(
             case VSC_LIB_LINK_TYPE_FRONTFACING_CCW:
                 errCode = VIR_Lib_ReverseFacingValue(pShader);
                 ON_ERROR(errCode, "VIR_LinkLibLibrary: FRONTFACING_CCW");
-                continue;
+                bTransFunc = gcvFALSE;
+                break;
 
             case VSC_LIB_LINK_TYPE_FRONTFACING_ALWAY_FRONT:
                 errCode = VIR_Lib_FacingValueAlwaysFront(pShader);
                 ON_ERROR(errCode, "VIR_LinkLibLibrary: FRONTFACING_ALWAY_FRONT");
-                continue;
+                bTransFunc = gcvFALSE;
+                break;
 
             case VSC_LIB_LINK_TYPE_IMAGE_FORMAT:
                 errCode = VIR_Lib_UpdateImageFormat(&linkPoint->u.imageFormat, pShader);
                 ON_ERROR(errCode, "VIR_LinkLibLibrary: set image format");
-                continue;
+                bTransFunc = gcvFALSE;
+                break;
+
+            case VSC_LIB_LINK_TYPE_SET_MIN_WORK_GROUP_SIZE:
+                errCode = VIR_Lib_SetMinWorkGroupSize(linkPoint->u.minWorkGroupSize, pShader);
+                ON_ERROR(errCode, "Fail to set the WorkGroupSize.");
+                bTransFunc = gcvFALSE;
+                break;
 
             default:
                 gcmASSERT(gcvFALSE);
                 break;
             }
 
-            errCode = _LinkLib_Transform(&vContext, isInternalLib);
-            ON_ERROR(errCode, "VIR_LinkLibLibrary");
+            if (bTransFunc)
+            {
+                errCode = _LinkLib_Transform(&vContext, isInternalLib);
+                ON_ERROR(errCode, "VIR_LinkLibLibrary");
+            }
         }
 
         _FinalizeLibLinkEntryData(pMM, libEntry);

@@ -2602,13 +2602,16 @@ VIR_Shader_Construct0(
     /* initialize the default workGroupSize. */
     if (VIR_Shader_GetKind(Shader) == VIR_SHADER_COMPUTE)
     {
+        gctUINT maxWorkGroupSize = 1;
+
+        VIR_Shader_GetWorkGroupSizeInfo(Shader, gcvNULL, gcvNULL, &maxWorkGroupSize, gcvNULL);
         /*
         ** 1) Use the DEVICE_MAX_WORK_GROUP_SIZE as the default workGroupSize for a shader.
         ** 2) When we need to use the workGroupSize to calculate the maxRegCount(e.g., use BARRIER in shader),
         **    use initWorkGroupSizeToCalcRegCount as the workGroupSize. And we may also reduce it to use more HW registers.
         */
         VIR_Shader_SetWorkGroupSizeAdjusted(Shader, gcvFALSE);
-        VIR_Shader_SetAdjustedWorkGroupSize(Shader, GetHWMaxWorkGroupSize());
+        VIR_Shader_SetAdjustedWorkGroupSize(Shader, maxWorkGroupSize);
 
         /* Default, for CS, WorkGroupSize is fixed, for OCL, it is floating. */
         if (VIR_Shader_IsGlCompute(Shader))
@@ -13372,8 +13375,7 @@ VIR_Inst_GetExpressionTypeID(
 
 VIR_Precision
 VIR_Inst_GetExpectedResultPrecision(
-    IN VIR_Instruction  *Inst,
-    IN gctBOOL          bSkipSpecificClientDriver
+    IN VIR_Instruction  *Inst
     )
 {
     VIR_Precision result = VIR_PRECISION_MEDIUM;
@@ -19885,6 +19887,52 @@ VIR_Shader_GetWorkGroupSize(
     return workGroupSize;
 }
 
+VSC_ErrCode
+VIR_Shader_GetWorkGroupSizeInfo(
+    VIR_Shader      *pShader,
+    VSC_HW_CONFIG   *pHwCfg,
+    gctUINT         *pMinWorkGroupSize,
+    gctUINT         *pMaxWorkGroupSize,
+    gctUINT         *pInitWorkGroupSizeToCalcRegCount
+    )
+{
+    VSC_ErrCode     errCode = VSC_ERR_NONE;
+    gctUINT         minWorkGroupSize = 1, maxWorkGroupSize = 1, initWorkGroupSize = 1;
+
+    /*
+    ** If driver set a minimum workGroupSize, then we need to match this requirement.
+    ** Otherwise use the HW size as the limitation.
+    */
+    if (VIR_Shader_DriverSetMinWorkGroupSize(pShader))
+    {
+        minWorkGroupSize = VIR_Shader_GetMinWorkGroupSizeSetByDriver(pShader);
+    }
+    else
+    {
+        minWorkGroupSize = pHwCfg ? pHwCfg->minWorkGroupSize : 1;
+    }
+
+    maxWorkGroupSize = vscMAX(minWorkGroupSize, pHwCfg ? pHwCfg->maxWorkGroupSize : 1024);
+    initWorkGroupSize = vscMAX(minWorkGroupSize, pHwCfg ? pHwCfg->initWorkGroupSizeToCalcRegCount : 128);
+
+    if (pMinWorkGroupSize)
+    {
+        *pMinWorkGroupSize = minWorkGroupSize;
+    }
+
+    if (pMaxWorkGroupSize)
+    {
+        *pMaxWorkGroupSize = maxWorkGroupSize;
+    }
+
+    if (pInitWorkGroupSizeToCalcRegCount)
+    {
+        *pInitWorkGroupSizeToCalcRegCount = initWorkGroupSize;
+    }
+
+    return errCode;
+}
+
 gctUINT
 VIR_Shader_GetMaxFreeRegCountPerThread(
     VIR_Shader      *pShader,
@@ -19910,8 +19958,11 @@ VIR_Shader_GetMaxFreeRegCountPerThread(
             if (!VIR_Shader_IsWorkGroupSizeAdjusted(pShader) &&
                 !VIR_Shader_IsWorkGroupSizeFixed(pShader))
             {
+                gctUINT         initWorkGroupSize = 1;
+                VIR_Shader_GetWorkGroupSizeInfo(pShader, pHwCfg, gcvNULL, gcvNULL, &initWorkGroupSize);
+
                 VIR_Shader_SetWorkGroupSizeAdjusted(pShader, gcvTRUE);
-                VIR_Shader_SetAdjustedWorkGroupSize(pShader, GetHWInitWorkGroupSizeToCalcRegCount());
+                VIR_Shader_SetAdjustedWorkGroupSize(pShader, initWorkGroupSize);
             }
             workGroupSize = (gctFLOAT)VIR_Shader_GetWorkGroupSize(pShader);
             maxFreeReg = maxFreeReg / (gctUINT)(ceil(workGroupSize / threadCount));
@@ -20103,8 +20154,10 @@ VIR_Shader_AdjustWorkGroupSize(
 {
     gctBOOL             adjusted = gcvFALSE;
     gctUINT             workGroupSize = 0;
-    gctUINT             maxWorkGroupSize = pHwCfg->maxWorkGroupSize;
-    gctUINT             minWorkGroupSize = pHwCfg->minWorkGroupSize;
+    gctUINT             maxWorkGroupSize = 1;
+    gctUINT             minWorkGroupSize = 1;
+
+    VIR_Shader_GetWorkGroupSizeInfo(pShader, pHwCfg, &minWorkGroupSize, &maxWorkGroupSize, gcvNULL);
 
     /* Adjust the workGroupSize only it is not fixed. */
     if (!VIR_Shader_CheckWorkGroupSizeFixed(pShader))

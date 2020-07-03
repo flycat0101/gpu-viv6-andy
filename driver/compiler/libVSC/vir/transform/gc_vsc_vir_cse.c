@@ -456,7 +456,8 @@ static gctBOOL _VIR_LCSE_isDefOutput(
 {
     VIR_Symbol *sym = VIR_Operand_GetUnderlyingSymbol(VIR_Inst_GetDest(pInst));
 
-    if (sym && VIR_Symbol_isOutput(sym))
+    if (sym &&
+        (VIR_Symbol_isOutput(sym) || VIR_Symbol_isPerPatchOutput(sym)))
     {
         return gcvTRUE;
     }
@@ -469,12 +470,13 @@ static void _VSC_LCSE_ExpMap_MultiKill(
     IN VIR_Instruction*     killingInst
     )
 {
-    VSC_OPTN_LCSEOptions* options = VSC_LCSE_ExpMap_GetOptions(expMap);
-    VIR_Dumper* dumper = VSC_LCSE_ExpMap_GetDumper(expMap);
-    VSC_UNI_LIST* keyList = VSC_LCSE_ExpMap_GetKeyList(expMap);
-    VSC_UL_ITERATOR iter;
-    VSC_LCSE_Key* key;
-    VIR_OpCode  killOpcode = VIR_Inst_GetOpcode(killingInst);
+    VIR_Shader*             pShader = VSC_LCSE_ExpMap_GetShader(expMap);
+    VSC_OPTN_LCSEOptions*   options = VSC_LCSE_ExpMap_GetOptions(expMap);
+    VIR_Dumper*             dumper = VSC_LCSE_ExpMap_GetDumper(expMap);
+    VSC_UNI_LIST*           keyList = VSC_LCSE_ExpMap_GetKeyList(expMap);
+    VSC_UL_ITERATOR         iter;
+    VSC_LCSE_Key*           key;
+    VIR_OpCode              killOpcode = VIR_Inst_GetOpcode(killingInst);
 
     gcmASSERT(VIR_OPCODE_hasDest(killOpcode) ||
               VIR_OPCODE_isMemSt(killOpcode) ||
@@ -486,10 +488,10 @@ static void _VSC_LCSE_ExpMap_MultiKill(
     for(key = (VSC_LCSE_Key*)vscULIterator_First(&iter);
         key != gcvNULL; key = (VSC_LCSE_Key*)vscULIterator_Next(&iter))
     {
-        VIR_Instruction* keyInst = VSC_LCSE_Key_GetInst(key);
-        VIR_OpCode       keyOpcode = VIR_Inst_GetOpcode(keyInst);
-        gctUINT i;
-        gctBOOL kills = gcvFALSE;
+        VIR_Instruction*    keyInst = VSC_LCSE_Key_GetInst(key);
+        VIR_OpCode          keyOpcode = VIR_Inst_GetOpcode(keyInst);
+        gctUINT             i;
+        gctBOOL             kills = gcvFALSE;
 
         if (killOpcode == VIR_OP_EMIT0 ||
             killOpcode == VIR_OP_EMIT)
@@ -527,40 +529,39 @@ static void _VSC_LCSE_ExpMap_MultiKill(
                     kills = VIR_Operand_Identical(VIR_Inst_GetSource(killingInst, 1), VIR_Inst_GetSource(keyInst, 1), VSC_LCSE_ExpMap_GetShader(expMap), gcvFALSE);
                 }
             }
+            /* A ATTR_ST only affects a ATTR_LD instruction. */
             else if (VIR_OPCODE_isAttrSt(killOpcode) && VIR_OPCODE_isAttrLd(keyOpcode))
             {
-                if(!VIR_Operand_Identical(VIR_Inst_GetSource(killingInst, 0), VIR_Inst_GetSource(keyInst, 0), VSC_LCSE_ExpMap_GetShader(expMap), gcvFALSE))
+                VIR_Operand*    pStOutputOpnd = VIR_Inst_GetDest(killingInst);
+                VIR_Operand*    pStInvocationIndexOpnd = VIR_Inst_GetSource(killingInst, 0);
+                VIR_Operand*    pStOffsetOpnd = VIR_Inst_GetSource(killingInst, 1);
+                VIR_Operand*    pLdOutputOpnd = VIR_Inst_GetSource(keyInst, 0);
+                VIR_Operand*    pLdInvocationIndexOpnd = VIR_Inst_GetSource(keyInst, 1);
+                VIR_Operand*    pLdOffsetOpnd = VIR_Inst_GetSource(keyInst, 2);
+
+                /* Do not kill this key only if we can guarantee that these ATTR_ST and ATTR_LD are processing two different memory. */
+                /* Different output variables, no need to kill. */
+                if (!VIR_Operand_Defines(pStOutputOpnd, pLdOutputOpnd))
                 {
-                    /* different base means no overlap */
-                    kills = gcvFALSE;
+                    continue;
                 }
-                else if(VIR_Operand_isSymbol(VIR_Inst_GetSource(killingInst, 1)) ||
-                        VIR_Operand_isSymbol(VIR_Inst_GetSource(keyInst, 1)))
+
+                if ((VIR_Operand_isImm(pStInvocationIndexOpnd) || VIR_Operand_isConst(pStInvocationIndexOpnd))
+                    &&
+                    (VIR_Operand_isImm(pStOffsetOpnd) || VIR_Operand_isConst(pStOffsetOpnd))
+                    &&
+                    (VIR_Operand_isImm(pLdInvocationIndexOpnd) || VIR_Operand_isConst(pLdInvocationIndexOpnd))
+                    &&
+                    (VIR_Operand_isImm(pLdOffsetOpnd) || VIR_Operand_isConst(pLdOffsetOpnd))
+                    &&
+                    VIR_Operand_Identical(pStInvocationIndexOpnd, pLdInvocationIndexOpnd, pShader, gcvFALSE)
+                    &&
+                    VIR_Operand_Identical(pStOffsetOpnd, pLdOffsetOpnd, pShader, gcvFALSE))
                 {
-                    /* same base and invocation id is symbol. we have to assume they overlaps */
-                    kills = gcvTRUE;
+                    continue;
                 }
-                else
-                {
-                    /* same base, constant offset. see whether the constant values are the same */
-                    if (VIR_Operand_Identical(VIR_Inst_GetSource(killingInst, 1), VIR_Inst_GetSource(keyInst, 1), VSC_LCSE_ExpMap_GetShader(expMap), gcvFALSE))
-                    {
-                        if(VIR_Operand_isSymbol(VIR_Inst_GetSource(killingInst, 2)) ||
-                           VIR_Operand_isSymbol(VIR_Inst_GetSource(keyInst, 2)))
-                        {
-                            /* same base, same invocation id and offset is symbol. we have to assume they overlaps */
-                            kills = gcvTRUE;
-                        }
-                        else
-                        {
-                            kills = VIR_Operand_Identical(VIR_Inst_GetSource(killingInst, 2), VIR_Inst_GetSource(keyInst, 2), VSC_LCSE_ExpMap_GetShader(expMap), gcvFALSE);
-                        }
-                    }
-                    else
-                    {
-                        kills = gcvFALSE;
-                    }
-                }
+
+                kills = gcvTRUE;
             }
             else
             {

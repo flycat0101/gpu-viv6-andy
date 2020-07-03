@@ -9414,17 +9414,19 @@ done:
 /* This is for fixing a bug about indexed implicit array, such as float[](in0.x, in0.y)[f]. I need
    to construct a temperate identifier to call _ParseVariableDeclWithInitializerAndAssign(). See
    bug 8008 */
-gceSTATUS _CreateTempIdentifier(
-                                IN sloCOMPILER Compiler,
-                                IN OUT sltPOOL_STRING *auxiArraySymbol
-                                )
+static gceSTATUS
+_CreateTempIdentifier(
+    IN sloCOMPILER Compiler,
+    IN gctUINT LineNo,
+    IN gctUINT StringNo,
+    IN OUT sltPOOL_STRING *auxiArraySymbol
+    )
 {
     gceSTATUS           status          = gcvSTATUS_OK;
     sltPOOL_STRING      tempSymbol      = gcvNULL;
     gctPOINTER          pointer         = gcvNULL;
 
     gctUINT             offset          = 0;
-    gctUINT64           curTime         = 0;
 
     gcmHEADER_ARG("Compiler=0x%x", Compiler);
 
@@ -9436,8 +9438,7 @@ gceSTATUS _CreateTempIdentifier(
 
     tempSymbol = pointer;
 
-    gcoOS_GetTime(&curTime);
-    gcoOS_PrintStrSafe(tempSymbol, 256, &offset, "%llu_scalarArray", curTime);
+    gcoOS_PrintStrSafe(tempSymbol, 256, &offset, "%d_%d_scalarArray", LineNo, StringNo);
 
     status = sloCOMPILER_AllocatePoolString(
         Compiler,
@@ -9489,7 +9490,7 @@ _ParseFuncCallExprAsExpr(
     identifier.stringNo = Expr->base.stringNo;
     identifier.type = slvVARIABLE_NAME;
 
-    status = _CreateTempIdentifier(Compiler, &(identifier.u.identifier));
+    status = _CreateTempIdentifier(Compiler, identifier.lineNo, identifier.stringNo, &(identifier.u.identifier));
     if(gcmIS_ERROR(status)) {
         gcmFOOTER_ARG("<return>=%s", "<nil>");
         return gcvNULL;
