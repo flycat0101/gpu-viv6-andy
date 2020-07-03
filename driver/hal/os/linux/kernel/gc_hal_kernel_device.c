@@ -59,6 +59,7 @@
 #include <linux/seq_file.h>
 #include <linux/mman.h>
 #include <linux/slab.h>
+#include <linux/io.h>
 
 #define _GC_OBJ_ZONE    gcvZONE_DEVICE
 
@@ -2017,8 +2018,11 @@ gckGALDEVICE_Construct(
                     gcmkONERROR(gcvSTATUS_OUT_OF_RESOURCES);
                 }
 
-                device->registerBases[i] = (gctPOINTER)ioremap_nocache(
-                        physical, device->requestedRegisterMemSizes[i]);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,5,0)
+                device->registerBases[i] = (gctPOINTER)memremap(physical, device->requestedRegisterMemSizes[i], MEMREMAP_WT);
+#else
+                device->registerBases[i] = (gctPOINTER)ioremap_nocache(physical, device->requestedRegisterMemSizes[i]);
+#endif
 
                 if (device->registerBases[i] == gcvNULL)
                 {
@@ -2487,7 +2491,11 @@ gckGALDEVICE_Destroy(
                 /* Unmap register memory. */
                 if (Device->requestedRegisterMemBases[i] != 0)
                 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,5,0)
+                    memunmap(Device->registerBases[i]);
+#else
                     iounmap(Device->registerBases[i]);
+#endif
                     release_mem_region(Device->requestedRegisterMemBases[i],
                             Device->requestedRegisterMemSizes[i]);
                 }
