@@ -2623,7 +2623,7 @@ OnError:
 #define NORMALIZE_UNROUNDED( v, max ) ( v < 0 ? 0 : ( v > 1.f ? max :  v * max ) )
 #define NORMALIZE_SIGNED( v, min, max ) ( v  < -1.0f ? min : ( v > 1.f ? max : clfRound2Even( v * max ) ) )
 #define NORMALIZE_SIGNED_UNROUNDED( v, min, max ) ( v  < -1.0f ? min : ( v > 1.f ? max : v * max ) )
-#define CONVERT_INT( v, min, max, max_val)  ( v < min ? min : ( v > max ? max_val : clfRound2Even( v ) ) )
+#define CONVERT_INT( v, min, max, max_val) ConvertInt( v, min, max, max_val)
 #define CONVERT_UINT( v, max, max_val)  ( v < 0 ? 0 : ( v > max ? max_val : clfRound2Even( v ) ) )
 #define MAKE_HEX_FLOAT(x,y,z)  ((float)ldexp( (float)(y), z))
 #define MAKE_HEX_DOUBLE(x,y,z) ldexp( (double)(y), z)
@@ -2742,6 +2742,24 @@ static int clfRound2Even( float v )
     }
 
     return (int) v;
+}
+
+static int ConvertInt(float v, float min, float max, int max_val)
+{
+    int retVal = max_val;
+    if (v < min)
+    {
+        retVal = (int)min;
+    }
+    else
+    {
+        if (v <= max)
+        {
+            retVal = (int)clfRound2Even(v);
+        }
+    }
+
+    return retVal;
 }
 
 static cl_ushort clfFloat2halfRTE( float f )
