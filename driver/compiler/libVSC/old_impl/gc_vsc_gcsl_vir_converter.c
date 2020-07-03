@@ -3858,8 +3858,9 @@ _ConvShaderFunction2Vir(
         {
             VIR_Function_SetFlag(virFunction, VIR_FUNCFLAG_ALWAYSINLINE);
         }
+
         /* make parameter name */
-        virStorage = _gcmConvParamQualifier2Vir (argument->qualifier);
+        virStorage = _gcmConvParamQualifier2Vir(argument->qualifier);
         gcoOS_PrintStrSafe(parameterName, sizeof(parameterName), &offset, "@param_%d", i);
         virErrCode = VIR_Function_AddParameter(virFunction,
                                                parameterName,
@@ -3871,6 +3872,12 @@ _ConvShaderFunction2Vir(
 
         param = VIR_Function_GetSymFromId(virFunction, paramId);
         param->u2.tempIndex = argument->index;
+
+        if (argument->flags & gceFUNCTION_ARGUMENT_FLAG_IS_RETURN_VARIABLE)
+        {
+            VIR_Symbol_SetFlagExt(param, VIR_SYMFLAGEXT_FUNCTION_RET_VARIABLE);
+        }
+
         VIR_Symbol_SetPrecision(param, _gcmConvPrecision2Vir(argument->precision));
         VIR_Symbol_SetIndexRange(param, (gctINT)endIndex);
 
@@ -4163,8 +4170,9 @@ _ConvShaderKernelFunction2Vir(
         }
 
         rowTypeId = _getRowTypeId(typeId);
+
         /* make parameter name */
-        virStorage = _gcmConvParamQualifier2Vir (argument->qualifier);
+        virStorage = _gcmConvParamQualifier2Vir(argument->qualifier);
         gcoOS_PrintStrSafe(parameterName, sizeof(parameterName), &offset, "@param_%d", i);
         virErrCode = VIR_Function_AddParameter(virFunction,
                                                parameterName,
@@ -4176,6 +4184,12 @@ _ConvShaderKernelFunction2Vir(
 
         param = VIR_Function_GetSymFromId(virFunction, paramId);
         param->u2.tempIndex = argument->index;
+
+        if (argument->flags & gceFUNCTION_ARGUMENT_FLAG_IS_RETURN_VARIABLE)
+        {
+            VIR_Symbol_SetFlagExt(param, VIR_SYMFLAGEXT_FUNCTION_RET_VARIABLE);
+        }
+
         virErrCode = VIR_Shader_AddSymbol(VirShader,
                                           VIR_SYM_VIRREG,
                                           argument->index,
@@ -7553,27 +7567,33 @@ gcSHADER_Conv2VIR(
         {
             VIR_Symbol_SetFlag(sym, VIR_SYMFLAG_STATICALLY_USED);
         }
-        if (isUniformLodMinMax(uniform) || isUniformLevelBaseSize(uniform))
+
+        if (isUniformLodMinMax(uniform) || isUniformLevelBaseSize(uniform) || isUniformImageExtraLayer(uniform))
         {
-            gcUNIFORM gcslSampler = gcvNULL;
-            VIR_Uniform* child = VIR_Symbol_GetUniform(sym);
-            VIR_Uniform* virSampler;
+            gcUNIFORM       gcslSampler = gcvNULL;
+            VIR_Uniform*    pChildUniform = VIR_Symbol_GetUniformPointer(VirShader, sym);
+            VIR_Uniform*    pParentUniform;
 
             gcmASSERT(uniform->parent != -1);
-
             gcSHADER_GetUniform(Shader, uniform->parent, &gcslSampler);
-            virSampler = VIR_Shader_GetUniformFromGCSLIndex(VirShader, gcslSampler->index);
-            gcmASSERT(virSampler);
-            if(isUniformLodMinMax(uniform))
+            pParentUniform = VIR_Shader_GetUniformFromGCSLIndex(VirShader, gcslSampler->index);
+            gcmASSERT(pParentUniform);
+
+            if (isUniformLodMinMax(uniform))
             {
-                virSampler->u.samplerOrImageAttr.lodMinMax = VIR_Symbol_GetIndex(sym);
+                pParentUniform->u.samplerOrImageAttr.lodMinMax = VIR_Symbol_GetIndex(sym);
             }
-            if(isUniformLevelBaseSize(uniform))
+            else if (isUniformLevelBaseSize(uniform))
             {
-                virSampler->u.samplerOrImageAttr.levelBaseSize = VIR_Symbol_GetIndex(sym);
+                pParentUniform->u.samplerOrImageAttr.levelBaseSize = VIR_Symbol_GetIndex(sym);
             }
-            child->u.samplerOrImageAttr.parentSamplerSymId = VIR_Uniform_GetSymID(virSampler);
-            child->u.samplerOrImageAttr.arrayIdxInParent = NOT_ASSIGNED;
+            else if (isUniformImageExtraLayer(uniform))
+            {
+                pParentUniform->u.samplerOrImageAttr.extraImageLayer = VIR_Symbol_GetIndex(sym);
+            }
+
+            pChildUniform->u.samplerOrImageAttr.parentSamplerSymId = VIR_Uniform_GetSymID(pParentUniform);
+            pChildUniform->u.samplerOrImageAttr.arrayIdxInParent = NOT_ASSIGNED;
         }
     }
 

@@ -2944,7 +2944,8 @@ gctBOOL _VIR_RA_LS_removableLDARR(
     return retValue;
 }
 
-void _VIR_RA_LS_ChangeMovaType(
+#if gcmIS_DEBUG(gcdDEBUG_ASSERT)
+void _VIR_RA_LS_CheckMovaType(
     VIR_RA_LS           *pRA,
     VIR_Instruction     *pInst)
 {
@@ -2955,6 +2956,8 @@ void _VIR_RA_LS_ChangeMovaType(
     VIR_USAGE_KEY       usageKey;
     VIR_USAGE           *pUsage;
     gctUINT             usageIdx, defIdx, i;
+    VIR_TypeId          movaDestTypeId = VIR_Operand_GetTypeId(VIR_Inst_GetDest(pInst));
+    VIR_TypeId          defDestTypeId = VIR_TYPE_VOID;
 
     usageKey.pUsageInst = pInst;
     usageKey.pOperand = pInst->src[0];
@@ -2971,18 +2974,23 @@ void _VIR_RA_LS_ChangeMovaType(
             if (VIR_INVALID_USAGE_INDEX != defIdx)
             {
                 pDef = GET_DEF_BY_IDX(&pLvInfo->pDuInfo->defTable, defIdx);
-                if (VIR_IS_IMPLICIT_DEF_INST(pDef->defKey.pDefInst) ||
-                    pDef->defKey.pDefInst == VIR_UNDEF_INST)
+                if (VIR_IS_IMPLICIT_DEF_INST(pDef->defKey.pDefInst) || pDef->defKey.pDefInst == VIR_UNDEF_INST)
                 {
                     continue;
                 }
                 gcmASSERT(pDef->defKey.pDefInst->dest);
-                VIR_Operand_SetTypeId(pInst->dest, VIR_Operand_GetTypeId(pDef->defKey.pDefInst->dest));
+
+                defDestTypeId = VIR_Operand_GetTypeId(VIR_Inst_GetDest(pDef->defKey.pDefInst));
+                if (VIR_GetTypeComponentType(movaDestTypeId) != VIR_GetTypeComponentType(defDestTypeId))
+                {
+                    WARNING_REPORT(VSC_ERR_INVALID_TYPE, "Data type mismatch between MOVA and its def-inst.");
+                }
                 break;
             }
         }
     }
 }
+#endif
 
 void _VIR_RA_LS_MarkDef(
     VIR_RA_LS       *pRA,
@@ -3045,7 +3053,9 @@ void _VIR_RA_LS_MarkDef(
 
                         if (instOpcode == VIR_OP_MOVA)
                         {
-                            _VIR_RA_LS_ChangeMovaType(pRA, pInst);
+#if gcmIS_DEBUG(gcdDEBUG_ASSERT)
+                            _VIR_RA_LS_CheckMovaType(pRA, pInst);
+#endif
 
                             _VIR_RA_LS_SetHwRegType(pRA, defIdx, VIR_RA_HWREG_A0);
 

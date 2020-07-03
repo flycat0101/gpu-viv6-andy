@@ -4888,6 +4888,7 @@ static gctBOOL __SpvTreatPushConstantAsBuffer(gcSPV spv, VIR_Shader * virShader,
     **  1) Contain any 8bit/16bit variables.
     **  2) Contain any variable that need multiple-regs(matrix and array) and whose basic aligment is N/2N.
     **      including array of float/vec2/mat2/mat3x2/mat4x2, and mat2/mat3x2/mat4x2.
+    **  3) Any memory gap or overlapping between two consecutive field elements.
     */
 #if VIV_TREAT_8BIT_16BIT_PUSH_CONSTANT_AS_BUFFER
     if (SPV_ID_TYPE_HAS_8BIT_TYPE(typeId) || SPV_ID_TYPE_HAS_16BIT_TYPE(typeId))
@@ -6604,6 +6605,7 @@ VSC_ErrCode __SpvEmitFunction(gcSPV spv, VIR_Shader * virShader)
 
         sym = VIR_Function_GetSymFromId(spv->virFunction, symId);
         VIR_Symbol_SetFlag(sym,VIR_SYMFLAG_WITHOUT_REG);
+        VIR_Symbol_SetFlagExt(sym, VIR_SYMFLAGEXT_FUNCTION_RET_VARIABLE);
         VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
         SPV_ID_FUNC_VIR_RET_SYM(spv->resultId) = sym;
     }

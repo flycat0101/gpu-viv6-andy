@@ -6390,6 +6390,71 @@ static void halti5_helper_convertHwBorderColor(
     return;
 }
 
+static void halti5_helper_CalculateFakedTexImgWidthHeight(
+    uint32_t    texelSize,
+    uint32_t    maxWidth,
+    uint32_t*   pWidth,
+    uint32_t*   pHeight
+    )
+{
+    /*
+    ** When calculating the width/height for an image buffer or a sampler buffer,
+    ** we need to make sure that the width/height are two prime factors of the texel size,
+    ** otherwise the allocate size is larger than expected, which may execute a invalid memory access.
+    */
+    /* Try to find two prime factors which is smaller than 0xFFFF. */
+    uint32_t imageWidth = 1, imageHeight = 1;
+    uint32_t primeIndex, primeFactor = 0;
+
+    for (primeIndex = maxWidth; primeIndex > 1; primeIndex--)
+    {
+        if ((texelSize % primeIndex) == 0)
+        {
+            primeFactor = primeIndex;
+
+            if ((primeIndex <= 0xFFFF) && ((texelSize / primeIndex) <= 0xFFFF))
+            {
+                break;
+            }
+        }
+    }
+
+    if (primeFactor != 0)
+    {
+        __VK_ASSERT(texelSize % primeFactor == 0);
+
+        /* Put the bigger prime factor to the width. */
+        imageWidth = __VK_MAX(texelSize / primeFactor, primeFactor);
+        imageHeight = __VK_MIN(texelSize / primeFactor, primeFactor);
+    }
+    else
+    {
+        imageWidth = maxWidth;
+        imageHeight = (uint32_t)gcoMATH_Ceiling(((float)texelSize / maxWidth));
+
+        __VK_DEBUG_PRINT(__VK_DBG_LEVEL_WARNING,
+            "The allocated buffer size is %d, which is larger than input %d!!!\n", imageWidth * imageHeight, texelSize);
+    }
+
+    if ((imageWidth > 0xFFFF) || (imageHeight > 0xFFFF))
+    {
+        __VK_DEBUG_PRINT(__VK_DBG_LEVEL_WARNING,
+            "The width/heigth (%d, %d) is larger than 0xFFFF!!!\n", imageWidth, imageHeight);
+    }
+
+    if (pWidth)
+    {
+        *pWidth = imageWidth;
+    }
+
+    if (pHeight)
+    {
+        *pHeight = imageHeight;
+    }
+
+    return;
+}
+
 VkResult halti5_helper_convertHwTxDesc(
     __vkDevContext *devCtx,
     __vkImageView *imgv,
@@ -6530,9 +6595,14 @@ VkResult halti5_helper_convertHwTxDesc(
         }
         else
         {
-            fakedImageLevel.requestW = fakedImageLevel.allocedW = __VK_FAKED_TEX_MAX_WIDTH;
-            fakedImageLevel.requestH = fakedImageLevel.allocedH = (uint32_t)gcoMATH_Ceiling(((float)texelSize / __VK_FAKED_TEX_MAX_WIDTH));
+            uint32_t imageWidth = 1, imageHeight = 1;
+
+            halti5_helper_CalculateFakedTexImgWidthHeight(texelSize, __VK_FAKED_TEX_MAX_WIDTH, &imageWidth, &imageHeight);
+
+            fakedImageLevel.requestW = fakedImageLevel.allocedW = imageWidth;
+            fakedImageLevel.requestH = fakedImageLevel.allocedH = imageHeight;
         }
+
         fakedImageLevel.stride = (uint32_t)(fakedImageLevel.allocedW * (residentFormatInfo->bitsPerBlock >> 3));
         fakedImageLevel.requestD = texelSize;
         fakedImageLevel.sliceSize = (VkDeviceSize)sizeInByte;
@@ -7489,8 +7559,7 @@ VkResult halti5_helper_convertHwImgDesc(
             }
             else
             {
-                width = __VK_FAKED_IMG_MAX_WIDTH;
-                height = (uint32_t)gcoMATH_Ceiling(((float)texelSize / __VK_FAKED_IMG_MAX_WIDTH));
+                halti5_helper_CalculateFakedTexImgWidthHeight(texelSize, __VK_FAKED_IMG_MAX_WIDTH, &width, &height);
             }
         }
         stride = (uint32_t)(width / residentFormatInfo->blockSize.width) * residentFormatInfo->bitsPerBlock / 8;

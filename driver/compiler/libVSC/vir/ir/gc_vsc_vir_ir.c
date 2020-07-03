@@ -9439,42 +9439,27 @@ VIR_Shader_AddSymbolContents(
                 VIR_Uniform_SetPhysical(uniform, -1);
                 VIR_Uniform_SetSamplerPhysical(uniform, -1);
 
-                if (VIR_Symbol_isImage(Sym) || VIR_Symbol_isImageT(Sym))
+                /* Initialize the sampler/image attributes. */
+                if (VIR_Symbol_isImage(Sym) || VIR_Symbol_isImageT(Sym)
+                    ||
+                    VIR_Symbol_isSampler(Sym) || VIR_Symbol_isSamplerT(Sym))
                 {
-                    VSC_ImageDesc desc = { { 0 } };
-                    uniform->u.imageAttr.imageTSymId = VIR_INVALID_ID;
-                    uniform->u.imageAttr.samplerTSymId = VIR_INVALID_ID;
-                    uniform->u.imageAttr.samplerTValue = VSC_IMG_SAMPLER_INVALID_VALUE; /* not paired yet */
-                    uniform->u.imageAttr.nextTandemSymId = VIR_INVALID_ID;
-                    uniform->u.imageAttr.libFuncName = gcvNULL;
-                    VIR_Uniform_SetImageDesc(uniform, desc);
-                    uniform->isImage = gcvTRUE;
-                }
-                else if (VIR_Symbol_isSampler(Sym) || VIR_Symbol_isSamplerT(Sym))
-                {
-                    VIR_Uniform_SetImageSymId(uniform, VSC_IMG_SAMPLER_UNKNOWN_VALUE);
-                    uniform->isSampler = gcvTRUE;
-                    if (VIR_Symbol_isSampler(Sym))
+                    VIR_UNIFORM_SamplerImageAttr_Initialize(&uniform->u.samplerOrImageAttr);
+
+                    if (VIR_Symbol_isImage(Sym) || VIR_Symbol_isImageT(Sym))
                     {
-                        uniform->u.samplerOrImageAttr.lodMinMax = VIR_INVALID_ID;
-                        uniform->u.samplerOrImageAttr.levelBaseSize = VIR_INVALID_ID;
-                        uniform->u.samplerOrImageAttr.levelsSamples = VIR_INVALID_ID;
-                        uniform->u.samplerOrImageAttr.extraImageLayer = VIR_INVALID_ID;
-                        uniform->u.samplerOrImageAttr.texelBufferToImageSymId   = VIR_INVALID_ID;
-                        uniform->u.samplerOrImageAttr.sampledImageSymId   = VIR_INVALID_ID;
-                        uniform->u.samplerOrImageAttr.pYcbcrPlaneSymId = gcvNULL;
+                        VSC_ImageDesc desc = { { 0 } };
+                        VIR_Uniform_SetImageDesc(uniform, desc);
+                        VIR_Uniform_SetImageSamplerValue(uniform, VSC_IMG_SAMPLER_INVALID_VALUE);
+                        uniform->isImage = gcvTRUE;
+                    }
+                    else if (VIR_Symbol_isSampler(Sym) || VIR_Symbol_isSamplerT(Sym))
+                    {
+                        VIR_Uniform_SetImageSymId(uniform, VSC_IMG_SAMPLER_UNKNOWN_VALUE);
+                        uniform->isSampler = gcvTRUE;
                     }
                 }
-                else
-                {
-                    uniform->u.samplerOrImageAttr.lodMinMax = VIR_INVALID_ID;
-                    uniform->u.samplerOrImageAttr.levelBaseSize = VIR_INVALID_ID;
-                    uniform->u.samplerOrImageAttr.levelsSamples = VIR_INVALID_ID;
-                    uniform->u.samplerOrImageAttr.extraImageLayer = VIR_INVALID_ID;
-                    uniform->u.samplerOrImageAttr.texelBufferToImageSymId   = VIR_INVALID_ID;
-                    uniform->u.samplerOrImageAttr.sampledImageSymId   = VIR_INVALID_ID;
-                    uniform->u.samplerOrImageAttr.pYcbcrPlaneSymId = gcvNULL;
-                }
+
                 uniform->u1.baseAddrSymId = VIR_INVALID_ID;
                 uniform->u1.virtualUniformSymId = VIR_INVALID_ID;
                 uniform->auxAddrSymId = VIR_INVALID_ID;
@@ -10424,6 +10409,82 @@ VIR_Shader_BubbleSortSymIdList(
     }
 }
 
+/* Collect the sampled image information. */
+VSC_ErrCode
+VIR_Shader_CollectSampledImageInfo(
+    IN VSC_SHADER_RESOURCE_LAYOUT*  pResLayout,
+    IN VIR_Shader*                  pShader,
+    IN VSC_MM *                     pMM
+    )
+{
+    VSC_ErrCode                     errCode = VSC_ERR_NONE;
+    gctUINT                         i;
+
+    for (i = 0; i < VIR_IdList_Count(&pShader->uniforms); i++)
+    {
+        VIR_Id                      id  = VIR_IdList_GetId(&pShader->uniforms, i);
+        VIR_Symbol*                 pUniformSym = VIR_Shader_GetSymFromId(pShader, id);
+        VIR_Uniform*                pUniform = gcvNULL;
+        VIR_Type*                   pUniformType = VIR_Symbol_GetType(pUniformSym);
+        gctUINT                     physicalCount = VIR_Type_isArray(pUniformType) ? VIR_Type_GetArrayLength(pUniformType) : 1;
+        VIR_Symbol*                 pSeparateSamplerSym;
+        VIR_Uniform*                pSeparateSamplerUniform = gcvNULL;
+        VIR_IdList*                 pSymIdList = gcvNULL;
+
+        /* Check sampled_image only. */
+        if (VIR_Symbol_GetUniformKind(pUniformSym) != VIR_UNIFORM_SAMPLED_IMAGE)
+        {
+            continue;
+        }
+
+        /* Check active uniforms only. */
+        if (!isSymUniformUsedInShader(pUniformSym)      &&
+            !isSymUniformUsedInLTC(pUniformSym)         &&
+            !isSymUniformImplicitlyUsed(pUniformSym)    &&
+            !VIR_Uniform_AlwaysAlloc(pShader, pUniformSym))
+        {
+            continue;
+        }
+
+        /* Get the sampled image uniform. */
+        pUniform = VIR_Symbol_GetUniformPointer(pShader, pUniformSym);
+
+        /* Get the separate sampler uniform. */
+        pSeparateSamplerUniform = VIR_Symbol_GetHwMappingSeparateSamplerUniform(pResLayout, pShader, pUniformSym);
+        if (pSeparateSamplerUniform == gcvNULL)
+        {
+            pSeparateSamplerSym =  VIR_Symbol_GetSeparateSampler(pShader, pUniformSym);
+            pSeparateSamplerUniform = VIR_Symbol_GetUniformPointer(pShader, pSeparateSamplerSym);
+        }
+        gcmASSERT(pSeparateSamplerUniform != gcvNULL);
+
+        /* Get the sampled image list. */
+        pSymIdList = pSeparateSamplerUniform->u.samplerOrImageAttr.sampledImageInfo.pSampledImageSymIdList;
+        if (pSymIdList == gcvNULL)
+        {
+            errCode = VIR_IdList_Init(pMM, 8, &pSymIdList);
+            ON_ERROR(errCode, "Initialize the list.");
+
+            pSeparateSamplerUniform->u.samplerOrImageAttr.sampledImageInfo.pSampledImageSymIdList = pSymIdList;
+        }
+        gcmASSERT(pSymIdList != gcvNULL);
+
+        /* Insert this symbol ID. */
+        errCode = VIR_IdList_Add(pSymIdList, id);
+        ON_ERROR(errCode, "Add a new sym ID.");
+
+        /* Set the physical offset. */
+        pUniform->u.samplerOrImageAttr.sampledImageInfo.physicalOffset =
+            pSeparateSamplerUniform->u.samplerOrImageAttr.sampledImageInfo.totalPhysicalCount;
+
+        /* Update the total physical count. */
+        pSeparateSamplerUniform->u.samplerOrImageAttr.sampledImageInfo.totalPhysicalCount += physicalCount;
+    }
+
+OnError:
+    return errCode;
+}
+
 /* setters */
 void
 VIR_Symbol_SetName(
@@ -10557,11 +10618,13 @@ VIR_Shader_TreatPushConstantAsBuffer(
     )
 {
     VIR_SymIdList*          pFields;
-    VIR_Id                  fieldSymId;
+    VIR_Id                  fieldSymId, nextFieldSymId;
     VIR_Symbol*             pFieldSym;
     VIR_Type*               pFieldType;
+    VIR_Symbol*             pNextFieldSym;
     gctBOOL                 bIsArray;
-    gctUINT                 i;
+    gctUINT                 i, fieldSize;
+    gctUINT                 fieldOffset, nextFieldOffset;
 
     pFields = VIR_Type_GetFields(pPushConstType);
 
@@ -10571,6 +10634,26 @@ VIR_Shader_TreatPushConstantAsBuffer(
         pFieldSym = VIR_Shader_GetSymFromId(pShader, fieldSymId);
         pFieldType = VIR_Symbol_GetType(pFieldSym);
         bIsArray = VIR_Type_isArray(pFieldType);
+
+        /* Any memory gap or overlapping between two consecutive field elements */
+        if ((i + 1) < VIR_IdList_Count(pFields))
+        {
+            nextFieldSymId = VIR_IdList_GetId(pFields, i + 1);
+            pNextFieldSym = VIR_Shader_GetSymFromId(pShader, nextFieldSymId);
+
+            fieldSize = VIR_Type_GetTypeByteSize(pShader, pFieldType);
+            fieldOffset = VIR_FieldInfo_GetOffset(VIR_Symbol_GetFieldInfo(pFieldSym));
+            nextFieldOffset = VIR_FieldInfo_GetOffset(VIR_Symbol_GetFieldInfo(pNextFieldSym));
+
+            if (nextFieldOffset < fieldOffset)
+            {
+                return gcvTRUE;
+            }
+            else if (fieldOffset + fieldSize != nextFieldOffset)
+            {
+                return gcvTRUE;
+            }
+        }
 
         /* Use the non-array struct type to calc and check if it is an arrays of arrays. */
         while (VIR_Type_isArray(pFieldType))

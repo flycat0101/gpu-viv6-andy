@@ -1692,6 +1692,14 @@ _AllocLogicalRegOrArray(
                 gcmFOOTER();
                 return status;
             }
+
+            if (Name->type == slvFUNC_NAME)
+            {
+                gcsFUNCTION_ARGUMENT_PTR functionArgument = gcvNULL;
+
+                functionArgument = &Name->context.function->arguments[Name->context.function->argumentCount - 1];
+                functionArgument->flags |= gceFUNCTION_ARGUMENT_FLAG_IS_RETURN_VARIABLE;
+            }
         }
         else
         {

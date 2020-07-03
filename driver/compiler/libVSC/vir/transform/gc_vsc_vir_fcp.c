@@ -2933,7 +2933,7 @@ OnError:
 DEF_QUERY_PASS_PROP(vscVIR_PostCGCleanup)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
-
+    pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
     pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
 }
 

@@ -1538,30 +1538,30 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Uniform_SetRealUseArraySize(Uniform, r)     ((Uniform)->realUseArraySize = (r))
 
 #define VIR_Uniform_GetResOpBitsArraySize(Uniform)      ((Uniform)->u0.samplerRes.resOpBitsArraySize)
+#define VIR_Uniform_SetResOpBitsArraySize(Uniform, V)   ((Uniform)->u0.samplerRes.resOpBitsArraySize = (V))
 #define VIR_Uniform_GetResOpBitsArray(Uniform)          ((Uniform)->u0.samplerRes.resOpBitsArray)
+#define VIR_Uniform_SetResOpBitsArray(Uniform, V)       ((Uniform)->u0.samplerRes.resOpBitsArray = (V))
 #define VIR_Uniform_GetResOpBits(Uniform, Idx)          ((Uniform)->u0.samplerRes.resOpBitsArray[Idx])
 #define VIR_Uniform_SetResOpBits(Uniform, Idx, V)       ((Uniform)->u0.samplerRes.resOpBitsArray[Idx] = (V))
 #define VIR_Uniform_GetImageDesc(Uniform)               ((Uniform)->u0.imageDesc)
-#define VIR_Uniform_SetResOpBitsArraySize(Uniform, V)   ((Uniform)->u0.samplerRes.resOpBitsArraySize = (V))
-#define VIR_Uniform_SetResOpBitsArray(Uniform, V)       ((Uniform)->u0.samplerRes.resOpBitsArray = (V))
 #define VIR_Uniform_SetImageDesc(Uniform, V)            ((Uniform)->u0.imageDesc = (V))
 
 #define VIR_Uniform_GetInitializer(Uniform)             ((Uniform)->u.initializer)
 #define VIR_Uniform_SetInitializer(Uniform, i)          ((Uniform)->u.initializer = (i))
 #define VIR_Uniform_GetInitializerPtr(Uniform)          ((Uniform)->u.initializerPtr)
 #define VIR_Uniform_SetInitializerPtr(Uniform, p)       ((Uniform)->u.initializerPtr = (p))
-#define VIR_Uniform_GetImageSamplerValue(Uniform)       ((Uniform)->u.imageAttr.samplerTValue)
-#define VIR_Uniform_SetImageSamplerValue(Uniform, Val)  ((Uniform)->u.imageAttr.samplerTValue = (Val))
-#define VIR_Uniform_GetImageSamplerSymId(Uniform)       ((Uniform)->u.imageAttr.samplerTSymId)
-#define VIR_Uniform_SetImageSamplerSymId(Uniform, Val)  ((Uniform)->u.imageAttr.samplerTSymId = (Val))
-#define VIR_Uniform_GetImageSymId(Uniform)              ((Uniform)->u.imageAttr.imageTSymId)
-#define VIR_Uniform_SetImageSymId(Uniform, Val)         ((Uniform)->u.imageAttr.imageTSymId = (Val))
-#define VIR_Uniform_GetImageNextTandemSymId(Uniform)    ((Uniform)->u.imageAttr.nextTandemSymId)
-#define VIR_Uniform_SetImageNextTandemSymId(Uniform, V) ((Uniform)->u.imageAttr.nextTandemSymId = (V))
-#define VIR_Uniform_GetImageLibFuncName(Uniform)        ((Uniform)->u.imageAttr.libFuncName)
-#define VIR_Uniform_SetImageLibFuncName(Uniform, Val)   ((Uniform)->u.imageAttr.libFuncName = (Val))
-#define VIR_Uniform_GetSamplerValue(Uniform)            ((Uniform)->u.samplerValue)
-#define VIR_Uniform_SetSamplerValue(Uniform, Val)       ((Uniform)->u.samplerValue = (Val))
+#define VIR_Uniform_GetImageSamplerValue(Uniform)       ((Uniform)->u.samplerOrImageAttr.oclInfo.samplerTValue)
+#define VIR_Uniform_SetImageSamplerValue(Uniform, Val)  ((Uniform)->u.samplerOrImageAttr.oclInfo.samplerTValue = (Val))
+#define VIR_Uniform_GetImageSamplerSymId(Uniform)       ((Uniform)->u.samplerOrImageAttr.oclInfo.samplerTSymId)
+#define VIR_Uniform_SetImageSamplerSymId(Uniform, Val)  ((Uniform)->u.samplerOrImageAttr.oclInfo.samplerTSymId = (Val))
+#define VIR_Uniform_GetImageSymId(Uniform)              ((Uniform)->u.samplerOrImageAttr.oclInfo.imageTSymId)
+#define VIR_Uniform_SetImageSymId(Uniform, Val)         ((Uniform)->u.samplerOrImageAttr.oclInfo.imageTSymId = (Val))
+#define VIR_Uniform_GetImageNextTandemSymId(Uniform)    ((Uniform)->u.samplerOrImageAttr.oclInfo.nextTandemSymId)
+#define VIR_Uniform_SetImageNextTandemSymId(Uniform, V) ((Uniform)->u.samplerOrImageAttr.oclInfo.nextTandemSymId = (V))
+#define VIR_Uniform_GetImageLibFuncName(Uniform)        ((Uniform)->u.samplerOrImageAttr.oclInfo.libFuncName)
+#define VIR_Uniform_SetImageLibFuncName(Uniform, Val)   ((Uniform)->u.samplerOrImageAttr.oclInfo.libFuncName = (Val))
+#define VIR_Uniform_GetSamplerValue(Uniform)            ((Uniform)->u.samplerOrImageAttr.samplerValue)
+#define VIR_Uniform_SetSamplerValue(Uniform, Val)       ((Uniform)->u.samplerOrImageAttr.samplerValue = (Val))
 
 
 #define VIR_UniformBlock_GetBlockSize(UB)               ((UB)->blockSize)
@@ -3128,6 +3128,7 @@ typedef enum VIR_SYMFLAGEXT
     /* General flags */
     VIR_SYMFLAGEXT_NONE                         = 0x00000000, /* no flag */
     VIR_SYMFLAGEXT_NOPERSPECTIVE                = 0x00000001, /* noperspective */
+    VIR_SYMFLAGEXT_FUNCTION_RET_VARIABLE        = 0x00000002, /* The return value of a function. */
 
     /* TransformFeedback next buffer flag */
     VIR_SYMFLAGEXT_ENDOFINTERLEAVEDBUF          = 0x00001000,
@@ -3140,8 +3141,6 @@ typedef enum VIR_SYMFLAGEXT
 #define isSymEnabled(sym)                       (((sym)->flags & VIR_SYMFLAG_ENABLED) != 0)
 #define isSymInactive(sym)                      (((sym)->flags & VIR_SYMFLAG_INACTIVE) != 0)
 #define isSymFlat(sym)                          (((sym)->flags & VIR_SYMFLAG_FLAT) != 0)
-#define isSymNoperspective(sym)                 (((sym)->flagsExt & VIR_SYMFLAGEXT_NOPERSPECTIVE) != 0)
-#define isSymbeBeEndOfInterleavedBuffer(sym)    (((sym)->flagsExt & VIR_SYMFLAGEXT_ENDOFINTERLEAVEDBUF) != 0)
 #define isSymInvariant(sym)                     (((sym)->flags & VIR_SYMFLAG_INVARIANT) != 0)
 #define isSymField(sym)                         (((sym)->flags & VIR_SYMFLAG_IS_FIELD) != 0)
 #define isSymLocal(sym)                         (((sym)->flags & VIR_SYMFLAG_LOCAL) != 0)
@@ -3156,6 +3155,10 @@ typedef enum VIR_SYMFLAGEXT
 #define isSymCombinedSampler(sym)               (((sym)->flags & VIR_SYMFLAG_COMBINED_SAMPLER) != 0)
 #define isSymSkipNameCheck(sym)                 (((sym)->flags & VIR_SYMFLAG_SKIP_NAME_CHECK) != 0)
 #define isSymPassByReference(sym)               (((sym)->flags & VIR_SYMFLAG_PASS_BY_REFERENCE) != 0)
+
+#define isSymNoperspective(sym)                 (((sym)->flagsExt & VIR_SYMFLAGEXT_NOPERSPECTIVE) != 0)
+#define isSymbeBeEndOfInterleavedBuffer(sym)    (((sym)->flagsExt & VIR_SYMFLAGEXT_ENDOFINTERLEAVEDBUF) != 0)
+#define isSymFunctionReturnVariable(sym)        (((sym)->flagsExt & VIR_SYMFLAGEXT_FUNCTION_RET_VARIABLE) != 0)
 
 #define isSymUBODUBO(sym)                       (VIR_Symbol_isUBO(sym) && ((sym)->flags & VIR_SYMUBOFLAG_IS_DUBO) != 0)
 #define isSymUBOCUBO(sym)                       (VIR_Symbol_isUBO(sym) && ((sym)->flags & VIR_SYMUBOFLAG_IS_CUBO) != 0)
@@ -4376,6 +4379,82 @@ typedef enum VIR_UNIFORMFLAG
 #define VIR_Uniform_IsPushConstantBaseAddr(u)   (((u)->flags & VIR_UNIFORMFLAG_PUSH_CONSTANT_BASE_ADDR) != 0)
 #define VIR_Uniform_IsUseConstRegForUbo(u)      (((u)->flags & VIR_UNIFORMFLAG_USE_CONST_REG_FOR_UBO) != 0)
 
+typedef struct _VIR_UNIFORM_SAMPLER_IMAGE_ATTR
+{
+    VIR_SymId               lodMinMax;          /* The lodMinMax uniform for this sampler/image. */
+    VIR_SymId               levelBaseSize;      /* The levelBaseSize uniform for this sampler/image. */
+    VIR_SymId               levelsSamples;      /* The levels samples uniform for this sampler/image. */
+    VIR_SymId               extraImageLayer;    /* The extraImageLayer uniform for this image. */
+    VIR_SymId               parentSamplerSymId; /* indicating this attribute uniform belongs to which sampler/image. */
+
+    /*
+    ** Indicating this attribute uniform belongs to which sampler/image.
+    ** So far it is used for vulkan-recompiler only.
+    */
+    VIR_SymId               texelBufferToImageSymId;
+
+    /*
+    ** Pointer to array of plane image uniform for a ycbcr sampler.
+    ** Size of the array is sampler array size * __YCBCR_PLANE_COUNT__
+    ** If sampler is not an array, the sampler array size is 1
+    */
+    VIR_SymId*              pYcbcrPlaneSymId;
+
+    gctUINT                 arrayIdxInParent;
+
+    /*
+    ** The sampled image information for both a sampled-image and a sampler.
+    ** So far it is for vulkan only.
+    */
+    struct
+    {
+        /* For a parent sampler only. */
+        /* Record the sampled image associated to this sampler. */
+        VIR_IdList*         pSampledImageSymIdList;
+        /* Record the total physical for the sampled image list. */
+        gctUINT             totalPhysicalCount;
+
+        /* For a sampled image only. */
+        /* Record the physical offset.*/
+        gctUINT             physicalOffset;
+    } sampledImageInfo;
+
+    /* The imageT/samplerT information, for OCL only. */
+    struct
+    {
+        VIR_SymId           imageTSymId;     /* The orginal image symbol for this image uniform. */
+        VIR_SymId           samplerTSymId;   /* The sampler_t uniform for this image. */
+        VSC_SamplerValue    samplerTValue;   /* will be set if samplerTSymId is invalid id */
+        VIR_SymId           nextTandemSymId; /* next symbol with the same image but different sampler value */
+        gctSTRING           libFuncName;     /* for the image/sampler pair, the image read will
+                                                * use the libFuncName for its target HW platform,
+                                                * it is NULL if there is no lib func needed */
+    } oclInfo;
+    VSC_SamplerValue        samplerValue;    /* OCL sampler value assigned to sampler kernel arg */
+} VIR_UNIFORM_SAMPLER_IMAGE_ATTR;
+
+#define VIR_UNIFORM_SamplerImageAttr_Initialize(Info)                           \
+    do {                                                                        \
+        gcoOS_ZeroMemory((Info), gcmSIZEOF(VIR_UNIFORM_SAMPLER_IMAGE_ATTR));    \
+        (Info)->lodMinMax = VIR_INVALID_ID;                                     \
+        (Info)->levelBaseSize = VIR_INVALID_ID;                                 \
+        (Info)->levelsSamples = VIR_INVALID_ID;                                 \
+        (Info)->extraImageLayer = VIR_INVALID_ID;                               \
+        (Info)->parentSamplerSymId = VIR_INVALID_ID;                            \
+        (Info)->texelBufferToImageSymId = VIR_INVALID_ID;                       \
+        (Info)->pYcbcrPlaneSymId = gcvNULL;                                     \
+        (Info)->arrayIdxInParent = NOT_ASSIGNED;                                \
+        (Info)->sampledImageInfo.pSampledImageSymIdList = gcvNULL;              \
+        (Info)->sampledImageInfo.totalPhysicalCount = 0;                        \
+        (Info)->sampledImageInfo.physicalOffset = 0;                            \
+        (Info)->oclInfo.imageTSymId = VIR_INVALID_ID;                           \
+        (Info)->oclInfo.samplerTSymId = VIR_INVALID_ID;                         \
+        (Info)->oclInfo.samplerTValue = VIR_INVALID_ID;                         \
+        (Info)->oclInfo.nextTandemSymId = VIR_INVALID_ID;                       \
+        (Info)->oclInfo.libFuncName = gcvNULL;                                  \
+        (Info)->samplerValue = VSC_IMG_SAMPLER_INVALID_VALUE;                   \
+    } while(0)
+
 /* Structure that defines an uniform (constant register) for a shader. */
 struct _VIR_UNIFORM
 {
@@ -4445,51 +4524,12 @@ struct _VIR_UNIFORM
 
     union
     {
-        VIR_ConstId         initializer;    /* Compile-time constant value, */
-        VIR_ConstId         *initializerPtr; /* Pointer to compile-time constant values
-                                              * when constant is an array */
-        struct
-        {
-            VIR_SymId       lodMinMax; /* The lodMinMax uniform for this sampler/image. */
-            VIR_SymId       levelBaseSize; /* The levelBaseSize uniform for this sampler/image. */
-            VIR_SymId       levelsSamples; /* The levels samples uniform for this sampler/image. */
-            VIR_SymId       extraImageLayer; /* The extraImageLayer uniform for this image. */
-
-            VIR_SymId       parentSamplerSymId;  /* indicating this attribute uniform belongs
-                                                  * to which sampler/image. */
-
-            /*
-            ** Indicating this attribute uniform belongs to which sampler/image.
-            ** So far it is used for vulkan-recompiler only.
-            */
-            VIR_SymId       texelBufferToImageSymId;
-
-            /*
-            ** Pointer to array of plane image uniform for a ycbcr sampler.
-            ** Size of the array is sampler array size * __YCBCR_PLANE_COUNT__
-            ** If sampler is not an array, the sampler array size is 1
-            */
-            VIR_SymId       *pYcbcrPlaneSymId;
-
-            /* The sampled image symbol ID. */
-            VIR_SymId       sampledImageSymId;
-
-            gctUINT         arrayIdxInParent;
-        } samplerOrImageAttr;
-        struct
-        {
-            VIR_SymId       imageTSymId;     /* The orginal image symbol for this image uniform. */
-            VIR_SymId       samplerTSymId;          /* The sampler_t uniform for this image. */
-            VSC_SamplerValue samplerTValue;  /* will be set if samplerTSymId is invalid id */
-            VIR_SymId       nextTandemSymId; /* next symbol with the same image but
-                                              * different sampler value */
-            gctSTRING       libFuncName;     /* for the image/sampler pair, the image read will
-                                              * use the libFuncName for its target HW platform,
-                                              * it is NULL if there is no lib func needed */
-        } imageAttr;
-        VIR_SymId           parentSSBOOrUBO; /* if the uniform is base addr of SSBO, indicating which
-                                              * SSBO it represents. */
-        VSC_SamplerValue    samplerValue;  /* OCL sampler value assigned to sampler kernel arg */
+        VIR_ConstId                     initializer;        /* Compile-time constant value, */
+        VIR_ConstId                     *initializerPtr;    /* Pointer to compile-time constant values
+                                                             * when constant is an array */
+        VIR_UNIFORM_SAMPLER_IMAGE_ATTR  samplerOrImageAttr; /* sampler or image attributes. */
+        VIR_SymId                       parentSSBOOrUBO;    /* if the uniform is base addr of SSBO, indicating which
+                                                             * SSBO it represents. */
     } u;
 
     union
@@ -6566,6 +6606,13 @@ VIR_Shader_BubbleSortSymIdList(
     IN VIR_IdList*      pIdList,
     IN SortCompartFunc  pFunc,
     IN gctUINT          length
+    );
+
+VSC_ErrCode
+VIR_Shader_CollectSampledImageInfo(
+    IN VSC_SHADER_RESOURCE_LAYOUT*  pResLayout,
+    IN VIR_Shader*                  pShader,
+    IN VSC_MM *                     pMM
     );
 
 /* setters */

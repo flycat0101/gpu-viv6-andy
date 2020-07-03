@@ -15,6 +15,137 @@
 #include "vir/transform/gc_vsc_vir_misc_opts.h"
 #include "vir/transform/gc_vsc_vir_loop.h"
 
+/***************************************Misc functions***************************************/
+VSC_ErrCode _ConvertRetToJmpForFunction(
+    IN OUT VIR_Shader* pShader,
+    IN OUT VIR_Function* pFunc,
+    IN OUT gctBOOL*    pInvalidCfg
+    )
+{
+    VSC_ErrCode        errCode = VSC_ERR_NONE;
+    VIR_Instruction*   pInst;
+    VIR_Instruction*   pNewInst;
+    VIR_InstIterator   instIter;
+    VIR_Instruction*   pInstLabel = gcvNULL;
+    VIR_LabelId        labelId = VIR_INVALID_ID;
+    VIR_Label*         pLabel = gcvNULL;
+    VIR_Link*          pLink;
+    gctBOOL            isMainFunc = (VIR_Function_GetFlags(pFunc) & VIR_FUNCFLAG_MAIN);
+
+    if (VIR_Function_GetInstCount(pFunc) == 0)
+    {
+        return errCode;
+    }
+
+    /* Make sure that the last instruction of this function is a RET. */
+    pInst = VIR_Function_GetInstEnd(pFunc);
+    if (VIR_Inst_GetOpcode(pInst) != VIR_OP_RET)
+    {
+        errCode = VIR_Function_AddInstructionAfter(pFunc, VIR_OP_RET,
+                                                   VIR_TYPE_VOID,
+                                                   pInst,
+                                                   gcvTRUE,
+                                                   &pNewInst);
+        ON_ERROR(errCode, "VIR_Function_AddInstructionAfter");
+    }
+
+    VIR_InstIterator_Init(&instIter, &pFunc->instList);
+    for (pInst = VIR_InstIterator_First(&instIter); pInst != gcvNULL; pInst = VIR_InstIterator_Next(&instIter))
+    {
+        /* Skip non-RET instruction. */
+        if (VIR_Inst_GetOpcode(pInst) != VIR_OP_RET)
+        {
+            continue;
+        }
+
+        if (pFunc->instList.pTail == pInst)
+        {
+            if (isMainFunc)
+            {
+                errCode = VIR_Pass_DeleteInstruction(pFunc, pInst, pInvalidCfg);
+                ON_ERROR(errCode, "delete instruction");
+            }
+            break;
+        }
+        else
+        {
+            /* Create a label for the tail instruction of this function. */
+            if (pLabel == gcvNULL)
+            {
+                VIR_Function_AddLabel(pFunc, "#sh_FuncEnd", &labelId);
+
+                errCode = VIR_Function_AddInstructionBefore(pFunc,
+                                                            VIR_OP_LABEL,
+                                                            VIR_TYPE_UNKNOWN,
+                                                            pFunc->instList.pTail,
+                                                            gcvTRUE,
+                                                            &pInstLabel);
+                ON_ERROR(errCode, "Add label failed.");
+
+                pLabel = VIR_GetLabelFromId(pFunc, labelId);
+                pLabel->defined = pInstLabel;
+                VIR_Operand_SetLabel(VIR_Inst_GetDest(pInstLabel), pLabel);
+            }
+
+            /* Insert a JMP to the tail instruction label. */
+            errCode = VIR_Function_AddInstructionAfter(pFunc, VIR_OP_JMP,
+                                                       VIR_TYPE_VOID,
+                                                       pInst,
+                                                       gcvTRUE,
+                                                       &pNewInst);
+            ON_ERROR(errCode, "Add instruction failed.");
+
+            VIR_Operand_SetLabel(VIR_Inst_GetDest(pNewInst), pLabel);
+            VIR_Function_NewLink(pFunc, &pLink);
+            VIR_Link_SetReference(pLink, (gctUINTPTR_T)pNewInst);
+            VIR_Link_AddLink(&(pLabel->referenced), pLink);
+
+            /* Let iterator go on one step to pNewInst */
+            pNewInst = VIR_InstIterator_Next(&instIter);
+
+            /* Remove the RET instruction. */
+            errCode = VIR_Pass_DeleteInstruction(pFunc, pInst, pInvalidCfg);
+            ON_ERROR(errCode, "delete instruction");
+
+            pInst = pNewInst;
+        }
+    }
+
+OnError:
+    return errCode;
+}
+
+/* Change all RETs to JMPs and only keep one RET at the end of the function. */
+VSC_ErrCode
+vscVIR_ConvertRetToJmpForFunctions(
+    IN OUT VIR_Shader*              pShader,
+    OUT gctBOOL*                    pInvalidCfg
+    )
+{
+    VSC_ErrCode        errCode = VSC_ERR_NONE;
+    VIR_FuncIterator   func_iter;
+    VIR_FunctionNode*  func_node;
+    VIR_Function*      func;
+
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+    for (func_node = VIR_FuncIterator_First(&func_iter);
+         func_node != gcvNULL;
+         func_node = VIR_FuncIterator_Next(&func_iter))
+    {
+        func = func_node->function;
+
+        errCode = _ConvertRetToJmpForFunction(pShader,
+                                              func,
+                                              pInvalidCfg);
+        ON_ERROR(errCode, "convert ret to jmp");
+
+    }
+
+OnError:
+    return errCode;
+}
+
+/***************************************Misc passes***************************************/
 DEF_QUERY_PASS_PROP(vscVIR_RemoveNop)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_PRE;
@@ -5996,130 +6127,6 @@ OnError:
     return errCode;
 }
 
-VSC_ErrCode _ConvertRetToJmpForFunction(
-    IN OUT VIR_Shader* pShader,
-    IN OUT VIR_Function* pFunc,
-    IN OUT gctBOOL*    pInvalidCfg
-    )
-{
-    VSC_ErrCode        errCode = VSC_ERR_NONE;
-    VIR_Instruction*   pInst;
-    VIR_Instruction*   pNewInst;
-    VIR_InstIterator   instIter;
-    VIR_Instruction*   pInstLabel = gcvNULL;
-    VIR_LabelId        labelId = VIR_INVALID_ID;
-    VIR_Label*         pLabel = gcvNULL;
-    VIR_Link*          pLink;
-    gctBOOL            isMainFunc = (VIR_Function_GetFlags(pFunc) & VIR_FUNCFLAG_MAIN);
-
-    if (VIR_Function_GetInstCount(pFunc) == 0)
-    {
-        return errCode;
-    }
-
-    /* Make sure that the last instruction of this function is a RET. */
-    pInst = VIR_Function_GetInstEnd(pFunc);
-    if (VIR_Inst_GetOpcode(pInst) != VIR_OP_RET)
-    {
-        errCode = VIR_Function_AddInstructionAfter(pFunc, VIR_OP_RET,
-                                                   VIR_TYPE_VOID,
-                                                   pInst,
-                                                   gcvTRUE,
-                                                   &pNewInst);
-        ON_ERROR(errCode, "VIR_Function_AddInstructionAfter");
-    }
-
-    VIR_InstIterator_Init(&instIter, &pFunc->instList);
-    pInst = VIR_InstIterator_First(&instIter);
-
-    for (; pInst != gcvNULL; pInst = VIR_InstIterator_Next(&instIter))
-    {
-        if (VIR_Inst_GetOpcode(pInst) == VIR_OP_RET)
-        {
-            if (pFunc->instList.pTail == pInst)
-            {
-                if (isMainFunc)
-                {
-                    errCode = VIR_Pass_DeleteInstruction(pFunc, pInst, pInvalidCfg);
-                    ON_ERROR(errCode, "delete instruction");
-                }
-                break;
-            }
-            else
-            {
-                /* Create a label for the tail instruction of this function. */
-                if (pLabel == gcvNULL)
-                {
-                    VIR_Function_AddLabel(pFunc, "#sh_FuncEnd", &labelId);
-
-                    errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_LABEL,
-                                                                VIR_TYPE_UNKNOWN,
-                                                                pFunc->instList.pTail,
-                                                                gcvTRUE,
-                                                                &pInstLabel);
-                    ON_ERROR(errCode, "VIR_Function_AddInstructionBefore");
-                    pLabel = VIR_GetLabelFromId(pFunc, labelId);
-                    pLabel->defined = pInstLabel;
-                    VIR_Operand_SetLabel(VIR_Inst_GetDest(pInstLabel), pLabel);
-                }
-
-                /* Insert a JMP to the tail instruction label. */
-                errCode = VIR_Function_AddInstructionAfter(pFunc, VIR_OP_JMP,
-                                                           VIR_TYPE_VOID,
-                                                           pInst,
-                                                           gcvTRUE,
-                                                           &pNewInst);
-                ON_ERROR(errCode, "VIR_Function_AddInstructionAfter");
-                VIR_Operand_SetLabel(VIR_Inst_GetDest(pNewInst), pLabel);
-                VIR_Function_NewLink(pFunc, &pLink);
-                VIR_Link_SetReference(pLink, (gctUINTPTR_T)pNewInst);
-                VIR_Link_AddLink(&(pLabel->referenced), pLink);
-
-                /* Let iterator go on one step to pNewInst */
-                pNewInst = VIR_InstIterator_Next(&instIter);
-
-                /* Remove the RET instruction. */
-                errCode = VIR_Pass_DeleteInstruction(pFunc, pInst, pInvalidCfg);
-                ON_ERROR(errCode, "delete instruction");
-
-                pInst = pNewInst;
-            }
-        }
-    }
-
-OnError:
-    return errCode;
-}
-
-VSC_ErrCode _ConvertRetToJmpForFunctions(
-    IN OUT VIR_Shader* pShader,
-    IN OUT gctBOOL*    pInvalidCfg
-    )
-{
-    VSC_ErrCode        errCode = VSC_ERR_NONE;
-    VIR_FuncIterator   func_iter;
-    VIR_FunctionNode*  func_node;
-    VIR_Function*      func;
-
-    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
-
-    for (func_node = VIR_FuncIterator_First(&func_iter);
-         func_node != gcvNULL;
-         func_node = VIR_FuncIterator_Next(&func_iter))
-    {
-        func = func_node->function;
-
-        errCode = _ConvertRetToJmpForFunction(pShader,
-                                              func,
-                                              pInvalidCfg);
-        ON_ERROR(errCode, "convert ret to jmp");
-
-    }
-
-OnError:
-    return errCode;
-}
-
 VSC_ErrCode _MergeConstantOffsetForArrayInst(
     IN OUT VIR_Shader* pShader,
     IN OUT VIR_Instruction* pInst
@@ -6608,7 +6615,7 @@ VSC_ErrCode vscVIR_PreprocessLLShader(VSC_SH_PASS_WORKER* pPassWorker)
     ON_ERROR(errCode, "Update precision and pack mode.");
 
     /* Change all RETs to JMPs and only keep one RET at the end of the function. */
-    errCode = _ConvertRetToJmpForFunctions(pShader, &bInvalidCfg);
+    errCode = vscVIR_ConvertRetToJmpForFunctions(pShader, &bInvalidCfg);
     ON_ERROR(errCode, "Convert RET to JMP for functions");
 
     if (VIR_Shader_IsVulkan(pShader))
@@ -11763,7 +11770,7 @@ _GenCombinedSamplerOpnd(
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VIR_Symbol  *pSymbol = gcvNULL;
-    VIR_Uniform *pUniform = gcvNULL, *pSeparateImageUniform = gcvNULL, *pSeparateSamplerUniform = gcvNULL;
+    VIR_Uniform *pUniform = gcvNULL;
     VIR_Id      id ;
     VIR_Symbol  *uniformSym = gcvNULL, *separateImage = gcvNULL, *separateSampler = gcvNULL;
     gctUINT i;
@@ -11838,16 +11845,9 @@ _GenCombinedSamplerOpnd(
 
         gcmASSERT(separateSampler && separateImage);
 
-        pSeparateSamplerUniform = VIR_Symbol_GetUniformPointer(pShader, separateSampler);
-        pSeparateImageUniform = VIR_Symbol_GetUniformPointer(pShader, separateImage);
-
         /* clear the flag */
         VIR_Symbol_ClrFlag(separateSampler, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
         VIR_Symbol_ClrFlag(separateImage, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
-
-        /* Save the sampledImage symbol ID. */
-        pSeparateSamplerUniform->u.samplerOrImageAttr.sampledImageSymId = id;
-        pSeparateImageUniform->u.samplerOrImageAttr.sampledImageSymId = id;
     }
 
     VIR_Operand_SetSym(pOpnd, VIR_Shader_GetSymFromId(pShader, pUniform->sym));
