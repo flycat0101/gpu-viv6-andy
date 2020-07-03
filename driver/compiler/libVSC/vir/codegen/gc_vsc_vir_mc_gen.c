@@ -170,7 +170,8 @@ _VSC_MC_GEN_GenOpcode(
     OUT gctUINT         *ExternOpcode
     )
 {
-    VIR_OpCode opcode = VIR_Inst_GetOpcode(Inst);
+    VIR_Shader*         pShader = Gen->Shader;
+    VIR_OpCode          opcode = VIR_Inst_GetOpcode(Inst);
 
     *ExternOpcode = 0;
 
@@ -475,6 +476,8 @@ _VSC_MC_GEN_GenOpcode(
                 (workgrpSize <= (Gen->pComCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg.maxCoreCount * 4)))
             {
                 *BaseOpcode = 0x00;
+
+                VIR_Shader_SetFlagExt1(pShader, VIR_SHFLAG_EXT1_DEPEND_ON_WORK_GROUP_SIZE);
             }
             else
             {
