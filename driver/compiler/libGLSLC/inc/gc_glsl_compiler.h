@@ -196,6 +196,11 @@ sloCOMPILER_SetLanguageVersion(
     IN gctBOOL  IsGLVersion
     );
 
+gceSTATUS
+sloCOMPILER_CleanLanguageVersion(
+    IN sloCOMPILER Compiler
+    );
+
 gctUINT32
 sloCOMPILER_GetLanguageVersion(
     IN sloCOMPILER Compiler

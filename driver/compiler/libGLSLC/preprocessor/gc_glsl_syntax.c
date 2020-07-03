@@ -1667,6 +1667,7 @@ gceSTATUS ppoPREPROCESSOR_Version(ppoPREPROCESSOR PP)
 
         /* Set the version. */
         PP->version = langVersion;
+        sloCOMPILER_CleanLanguageVersion(PP->compiler);
         sloCOMPILER_SetLanguageVersion(PP->compiler, langVersion, versionInfo->isGLVersion);
 
         gcmONERROR(ppoTOKEN_Destroy(PP, nextToken));
