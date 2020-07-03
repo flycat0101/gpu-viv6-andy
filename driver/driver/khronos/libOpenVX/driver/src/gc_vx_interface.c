@@ -3165,11 +3165,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianPyramid_Initializer(vx_node nod
 
         upSamplePaddingNode = vxUpSamplePaddingNode(graph, gauss_next, tmp);
 
-#if defined(VX_VERSION ) && (VX_VERSION == VX_VERSION_1_3 )
         upSampleConvolveNode  = vxConvolve5x5Node(graph, tmp, conv, upsample_tmp);
-#else
-        upSampleConvolveNode  = vxConvolveNode(graph, tmp, conv, upsample_tmp);
-#endif
 
         status |= vxSetNodeAttribute(upSampleConvolveNode, VX_NODE_ATTRIBUTE_BORDER_MODE, &border, sizeof(border));
         upSampleConvertNode = vxUpSampleConvertNode(graph, upsample_tmp, pyr_gauss_curr_level_filtered);
@@ -3434,9 +3430,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianReconstruct_Initializer(vx_node
     status |= vxQueryImage(input, VX_IMAGE_HEIGHT, &height, sizeof(height));
 
     status |= vxQueryPyramid(laplacian, VX_PYRAMID_LEVELS, &levels, sizeof(levels));
-#if defined(VX_VERSION ) && (VX_VERSION == VX_VERSION_1_3 )
+
     status |= vxQueryPyramid(laplacian, VX_PYRAMID_FORMAT, &format, sizeof(vx_df_image));
-#endif
+
     status |= vxQueryNode(node, VX_NODE_BORDER, &border, sizeof(border));
     border.mode = VX_BORDER_REPLICATE;
     conv = vxCreateGaussian5x5Convolution(context);
@@ -3460,17 +3456,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianReconstruct_Initializer(vx_node
         }
 
         upsample_tmp = vxCreateImage(context, level_width, level_height, VX_DF_IMAGE_S16);
-#if defined(VX_VERSION ) && (VX_VERSION == VX_VERSION_1_3 )
+
         tmp = vxCreateImage(context, level_width, level_height, format);
-#else
-        tmp = vxCreateImage(context, level_width, level_height, VX_DF_IMAGE_U8);
-#endif
+
         upSamplePaddingNode = vxUpSamplePaddingNode(graph, filling, tmp);
-#if defined(VX_VERSION ) && (VX_VERSION == VX_VERSION_1_3 )
+
         upSampleConvolveNode  = vxConvolve5x5Node(graph, tmp, conv, upsample_tmp);
-#else
-        upSampleConvolveNode  = vxConvolveNode(graph, tmp, conv, upsample_tmp);
-#endif
+
 
         status |= vxSetNodeAttribute(upSampleConvolveNode, VX_NODE_ATTRIBUTE_BORDER_MODE, &border, sizeof(border));
 
