@@ -4317,6 +4317,7 @@ _SetLongUlongInstTypeOnly(
     VIR_PrimitiveTypeId  format;
     VIR_TypeId typeId;
     gctUINT components;
+    VIR_Symbol    *sym;
 
     typeId = VIR_Lower_GetBaseType(Context->shader, dest);
     format = VIR_GetTypeComponentType(typeId);
@@ -4326,6 +4327,9 @@ _SetLongUlongInstTypeOnly(
     typeId = VIR_TypeId_ComposeNonOpaqueType(format, components, 1);
     VIR_Operand_SetTypeId(dest, typeId);
     VIR_Inst_SetInstType(Inst, typeId);
+    sym = VIR_Operand_GetSymbol(dest);
+    if (sym)
+        VIR_Symbol_SetTypeId(sym, typeId);
     return gcvTRUE;
 }
 
@@ -5263,6 +5267,8 @@ _long_ulong_second_mov(
                                     VIR_Inst_GetFunction(Inst),
                                     symId,
                                     VIR_Operand_GetTypeId(dest));
+        sym = VIR_Operand_GetSymbol(dest);
+        VIR_Symbol_SetTypeId(sym, VIR_Operand_GetTypeId(dest));
         return gcvTRUE;
     }
     return gcvFALSE;
