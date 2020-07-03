@@ -302,7 +302,7 @@ gcCompileKernel(
     locked = gcvTRUE;
 
     debugLevel = gcmOPT_GetDebugLevel();
-    if (Options && *Options != 0 && gcmOPT_hasFeature(FE_GENERATED_OFFLINE_COMPILER))
+    if (Options && *Options != 0 && gcmOPT_hasFeature(FB_GENERATED_OFFLINE_COMPILER))
     {
         gctSTRING pos = gcvNULL;
         gcoOS_StrStr(Options, "-", &pos);

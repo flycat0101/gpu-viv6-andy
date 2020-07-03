@@ -1874,7 +1874,9 @@ extern gctBOOL gcDoTriageForShaderId(gctINT shaderId, gctINT startId, gctINT end
                                                        it can decrease the temp registers but increases the constant registers. */
 #define FB_DISABLE_GL_LOOP_UNROLLING        0x40000 /* Disable loop unrolling for GL FE. */
 
-#define FE_GENERATED_OFFLINE_COMPILER       0x80000 /* Enable Offline Compile . */
+#define FB_GENERATED_OFFLINE_COMPILER       0x80000 /* Enable Offline Compile . */
+
+#define FB_VSIMULATOR_RUNNING_MODE          0x100000 /* VSimulator running mode. */
 
 #define gcmOPT_SetPatchTexld(m,n) (gcmGetOptimizerOption()->patchEveryTEXLDs = (m),\
                                    gcmGetOptimizerOption()->patchDummyTEXLDs = (n))
