@@ -60,6 +60,7 @@
 #include <linux/mman.h>
 #include <linux/slab.h>
 #include <linux/io.h>
+#include <linux/sched.h>
 
 #define _GC_OBJ_ZONE    gcvZONE_DEVICE
 
@@ -1890,6 +1891,8 @@ _StartThread(
 
         device->threadCtxts[Core]         = task;
         device->threadInitializeds[Core] = device->kernels[Core]->threadInitialized = gcvTRUE;
+
+        set_user_nice(task, -20);
     }
     else
     {
