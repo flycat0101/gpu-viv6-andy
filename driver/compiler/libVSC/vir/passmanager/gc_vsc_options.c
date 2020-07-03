@@ -1013,8 +1013,7 @@ void VSC_OPTN_PHOptions_SetDefault(
                       VSC_OPTN_PHOptions_OPTS_RSQ       |
                       VSC_OPTN_PHOptions_OPTS_RUC       |
                       VSC_OPTN_PHOptions_OPTS_MOV_LDARR |
-                      VSC_OPTN_PHOptions_OPTS_LSHIFT_LS |
-                      VSC_OPTN_PHOptions_OPTS_MERGE_ADD;
+                      VSC_OPTN_PHOptions_OPTS_LSHIFT_LS;
 
     if(optLevel >= 2)
     {
@@ -3907,6 +3906,7 @@ void VSC_OPTN_Options_SetSpecialOptions(
         VSC_OPTN_MCGenOptions_SetSwitchOn(mc_options, gcvTRUE);
         VSC_OPTN_ISOptions_SetSwitchOn(prera_is_options, gcvTRUE);
         VSC_OPTN_ISOptions_SetSwitchOn(postra_is_options, gcvTRUE);
+
     }
     else
     {

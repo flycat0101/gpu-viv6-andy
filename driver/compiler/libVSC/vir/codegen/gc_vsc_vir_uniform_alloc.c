@@ -1204,30 +1204,153 @@ _VIR_CG_UniformListDequeue(
     vscMM_Free(pMM, worklistNode);
 }
 
-static gctBOOL
-_VIR_CG_IsUniformRestricted(
-    IN VIR_Symbol       *pSymbol
+static void
+_VIR_CG_GetRowComponentForUniform(
+    IN VIR_Shader*                  pShader,
+    IN VIR_Symbol*                  pUniformSym,
+    IN VIR_Uniform*                 pUniform,
+    IN OUT gctUINT*                 pComponents,
+    IN OUT gctUINT*                 pRows
     )
 {
-    gctBOOL restricted = gcvFALSE;
-    VIR_UniformKind uniformKind = VIR_Symbol_GetUniformKind(pSymbol);
+    VIR_Type            *symType = VIR_Symbol_GetType(pUniformSym);
+    VIR_Type            *baseType = gcvNULL;
+    gctUINT32           components = 0, rows = 0;
 
-    /*
-    ** 1) for #num_group, it must be c.xyz
-    ** 2) for #base_instance, it must be c.x
-    */
-    if (uniformKind == VIR_UNIFORM_NUM_GROUPS    ||
-        uniformKind == VIR_UNIFORM_NUM_GROUPS_FOR_SINGLE_GPU ||
-        uniformKind == VIR_UNIFORM_BASE_INSTANCE)
+    baseType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(symType));
+    components = VIR_Symbol_GetComponents(pUniformSym);
+    rows = VIR_Uniform_GetRealUseArraySize(pUniform) * VIR_Type_GetVirRegCount(pShader, baseType, -1);
+
+    if (pComponents)
     {
-        restricted = gcvTRUE;
-    }
-    else if (VIR_Symbol_GetCannotShift(pSymbol))
-    {
-        restricted = gcvTRUE;
+        *pComponents = components;
     }
 
-    return restricted;
+    if (pRows)
+    {
+        *pRows = rows;
+    }
+}
+
+static VIR_Symbol*
+_VIR_CG_FindVectorizeUniform(
+    IN VIR_Shader*                  pShader,
+    IN VIR_Symbol*                  pUniformSym
+    )
+{
+    VSC_HASH_TABLE*                 pWorkingUniformSet = VIR_Shader_GetVectorizeUniformSet(pShader);
+    VSC_HASH_TABLE*                 pUniformVecSet1 = gcvNULL;
+    VIR_Symbol*                     pVectorizedUniformSym = gcvNULL;
+    gctUINT                         maxInstCount = 0;
+    VSC_HASH_ITERATOR               iter;
+    VSC_DIRECT_HNODE_PAIR           pair;
+
+    if (pWorkingUniformSet == gcvNULL)
+    {
+        return gcvNULL;
+    }
+
+    if (!vscHTBL_DirectTestAndGet(pWorkingUniformSet, (void *)pUniformSym, (void **)&pUniformVecSet1))
+    {
+        return gcvFALSE;
+    }
+
+    if (pUniformVecSet1 == gcvNULL)
+    {
+        return gcvFALSE;
+    }
+
+    vscHTBLIterator_Init(&iter, pUniformVecSet1);
+    for (pair = vscHTBLIterator_DirectFirst(&iter);
+         IS_VALID_DIRECT_HNODE_PAIR(&pair);
+         pair = vscHTBLIterator_DirectNext(&iter))
+    {
+        VIR_Symbol*                 pUniformSymCandidate = (VIR_Symbol *)VSC_DIRECT_HNODE_PAIR_FIRST(&pair);
+        gctUINT                     currentInstCount = (gctUINT)(gctPTRDIFF_T)VSC_DIRECT_HNODE_PAIR_SECOND(&pair);
+
+        if (currentInstCount > maxInstCount)
+        {
+            pVectorizedUniformSym = pUniformSymCandidate;
+            maxInstCount = currentInstCount;
+        }
+    }
+
+    if (pVectorizedUniformSym == gcvNULL)
+    {
+        return gcvNULL;
+    }
+
+    /* Only one uniform can be restricted. */
+    if (VIR_Uniform_IsRestricted(pUniformSym) && VIR_Uniform_IsRestricted(pVectorizedUniformSym))
+    {
+        return gcvNULL;
+    }
+
+    return pVectorizedUniformSym;
+}
+
+static void
+_VIR_CG_SetUniformPhysical(
+    IN VIR_Shader*                  pShader,
+    IN VIR_Symbol*                  pUniformSym,
+    IN VIR_Uniform*                 pUniform,
+    IN gctBOOL                      bTreatSamplerAsConst,
+    IN gctUINT                      uniformBaseAddress,
+    IN gctINT*                      pStartPhysical,
+    IN gctUINT8                     startSwizzle,
+    IN gctUINT                      startShift
+    )
+{
+    gctINT                          physical = *pStartPhysical;
+    gctUINT8                        swizzle = startSwizzle;
+    gctUINT                         shift = startShift;
+    gctUINT32                       rows = 0;
+    VIR_Type*                       pSymType = gcvNULL;
+    VIR_Type*                       pBaseType = gcvNULL;
+
+    if (VIR_Symbol_HasFlag(pUniformSym, VIR_SYMUNIFORMFLAG_ATOMIC_COUNTER))
+    {
+        VIR_Symbol*                 pBaseUniformSym = VIR_Shader_GetSymFromId(pShader, pUniform->baseBindingUniform);
+        VIR_Uniform*                pBaseUniform    = VIR_Symbol_GetUniform(pBaseUniformSym);
+
+        gcmASSERT(pUniform->baseBindingUniform != VIR_INVALID_ID);
+
+        if (pBaseUniform->physical == -1)
+        {
+            pSymType = VIR_Symbol_GetType(pBaseUniformSym);
+            pBaseType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(pSymType));
+
+            pBaseUniform->swizzle  = swizzle;
+            pBaseUniform->physical = physical;
+            pBaseUniform->address  = uniformBaseAddress + pBaseUniform->physical * 16 + shift * 4;
+
+            rows = VIR_Uniform_GetRealUseArraySize(pBaseUniform) * VIR_Type_GetVirRegCount(pShader, pBaseType, -1);
+            physical += rows;
+        }
+
+        pUniform->swizzle  = pBaseUniform->swizzle;
+        pUniform->physical = pBaseUniform->physical;
+        pUniform->address  = pBaseUniform->address;
+    }
+    else
+    {
+        pSymType = VIR_Symbol_GetType(pUniformSym);
+        pBaseType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(pSymType));
+
+        gcmASSERT(!VIR_Symbol_isSampler(pUniformSym) || bTreatSamplerAsConst);
+
+        pUniform->swizzle = swizzle;
+        pUniform->physical = physical;
+        pUniform->address = uniformBaseAddress + pUniform->physical * 16 + shift * 4;
+
+        rows = VIR_Uniform_GetRealUseArraySize(pUniform) * VIR_Type_GetVirRegCount(pShader, pBaseType, -1);
+        physical += rows;
+    }
+
+    if (pStartPhysical)
+    {
+        *pStartPhysical = physical;
+    }
 }
 
 VSC_ErrCode _VIR_CG_MapNonSamplerUniforms(
@@ -1253,33 +1376,34 @@ VSC_ErrCode _VIR_CG_MapNonSamplerUniforms(
     gctINT      UniformIndex = VIR_Uniform_GetID(pUniform);
     gctINT      lastUniformIndex = UniformIndex;
 
-    gctINT      shift = 0, arraySize = 0, physical = 0;
+    gctINT      shift = 0, mainShift = 0, arraySize = 0, physical = 0, mainPhysical = 0;
     VIR_TypeId  type = VIR_TYPE_FLOAT_X4;
-    gctSIZE_T   maxComp = 0;
-    gctUINT8    swizzle = 0;
+    gctUINT32   maxComp = 0, maxVectorizedComp = 0, maxTotalComp = 0;
+    gctUINT8    swizzle = 0, mainSwizzle = 0;
     gctBOOL     restricted = gcvFALSE;
     VSC_SIMPLE_QUEUE    uniformList;
-    gctINT     i;
+    gctUINT     i;
+
+    VIR_Symbol *pVectorizedUniformSym = gcvNULL;
+    VIR_Uniform *pVectorizedUniform = gcvNULL;
+    gctBOOL bHasVectorizedUniform = gcvFALSE;
+    gctBOOL bVectorizedRestricted = gcvFALSE;
 
     /* Determine base address for uniforms. */
     const gctUINT32 uniformBaseAddress = codeGenUniformBase * 4;
 
     if (!singleUniform && !TreatSamplerAsConst)
     {
-        VSC_GetUniformIndexingRange(pShader,
-                                UniformIndex,
-                                &lastUniformIndex);
+        VSC_GetUniformIndexingRange(pShader, UniformIndex, &lastUniformIndex);
     }
 
     QUEUE_INITIALIZE(&uniformList);
 
-    for (i = UniformIndex; i <= lastUniformIndex; i ++)
+    for (i = (gctUINT)UniformIndex; i <= (gctUINT)lastUniformIndex; i ++)
     {
         /* Get uniform. */
         VIR_Id      id  = VIR_IdList_GetId(&pShader->uniforms, i);
         VIR_Symbol  *sym = VIR_Shader_GetSymFromId(pShader, id);
-        VIR_Type    *symType = VIR_Symbol_GetType(sym);
-        VIR_Type    *baseType = gcvNULL;
         VIR_Uniform *symUniform = gcvNULL;
         gctUINT32 components = 0, rows = 0;
 
@@ -1296,20 +1420,20 @@ VSC_ErrCode _VIR_CG_MapNonSamplerUniforms(
             continue;
         }
 
-        restricted = _VIR_CG_IsUniformRestricted(sym);
-
         /* skip samplers */
         if(VIR_Symbol_isSampler(sym) && !TreatSamplerAsConst)
         {
             continue;
         }
 
-        baseType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(symType));
-        components = VIR_Symbol_GetComponents(sym);
-        rows = VIR_Uniform_GetRealUseArraySize(symUniform) * VIR_Type_GetVirRegCount(pShader, baseType, -1);
+        restricted = VIR_Uniform_IsRestricted(sym);
+
+        _VIR_CG_GetRowComponentForUniform(pShader, sym, symUniform, &components, &rows);
 
         if (maxComp < components)
+        {
             maxComp = components;
+        }
 
         arraySize += rows;
 
@@ -1317,7 +1441,36 @@ VSC_ErrCode _VIR_CG_MapNonSamplerUniforms(
         _VIR_CG_UniformListQueue(pMM, &uniformList, symUniform);
     }
 
-    switch (maxComp)
+    /* Try to get a uniform which can be vectorized with this working uniform. */
+    pVectorizedUniformSym = _VIR_CG_FindVectorizeUniform(pShader, pSym);
+    if (pVectorizedUniformSym != gcvNULL)
+    {
+        gctUINT32 rows = 0;
+
+        pVectorizedUniform = VIR_Symbol_GetUniformPointer(pShader, pVectorizedUniformSym);
+        _VIR_CG_GetRowComponentForUniform(pShader, pVectorizedUniformSym, pVectorizedUniform, (gctUINT*)(&maxVectorizedComp), &rows);
+
+        if (pVectorizedUniform->physical == -1)
+        {
+            _VIR_CG_GetRowComponentForUniform(pShader, pVectorizedUniformSym, pVectorizedUniform, &maxVectorizedComp, &rows);
+
+            bHasVectorizedUniform = gcvTRUE;
+
+            if (maxVectorizedComp + maxComp > 4 || rows > 1)
+            {
+                gcmASSERT(gcvFALSE);
+                bHasVectorizedUniform = gcvFALSE;
+            }
+
+            if (VIR_Uniform_IsRestricted(pVectorizedUniformSym))
+            {
+                bVectorizedRestricted = gcvTRUE;
+            }
+        }
+    }
+    maxTotalComp = maxComp + maxVectorizedComp;
+
+    switch (maxTotalComp)
     {
     case 1:
         type = VIR_TYPE_FLOAT32;
@@ -1347,20 +1500,19 @@ VSC_ErrCode _VIR_CG_MapNonSamplerUniforms(
 
     if (arraySize > 0)
     {
-        if (Initialized)
+        if (Initialized && !bHasVectorizedUniform)
         {
             gcmASSERT(lastUniformIndex == UniformIndex);
 
             if (!VIR_CG_ConstUniformExistBefore(pShader, pSym, pUniform))
             {
                 retValue = VIR_CG_FindUniformUse(uniformColorMap,
-                                        type,
-                                        arraySize,
-                                        restricted,
-                                        &physical,
-                                        &swizzle,
-                                        &shift);
-
+                                                 type,
+                                                 arraySize,
+                                                 restricted,
+                                                 &physical,
+                                                 &swizzle,
+                                                 &shift);
                 ON_ERROR(retValue, "Failed to Allocate Uniform");
 
                 pUniform->swizzle  = swizzle;
@@ -1372,68 +1524,107 @@ VSC_ErrCode _VIR_CG_MapNonSamplerUniforms(
         else
         {
             retValue = VIR_CG_FindUniformUse(uniformColorMap,
-                                        type,
-                                        arraySize,
-                                        restricted,
-                                        &physical,
-                                        &swizzle,
-                                        &shift);
+                                             type,
+                                             arraySize,
+                                             restricted,
+                                             &physical,
+                                             &swizzle,
+                                             &shift);
             ON_ERROR(retValue, "Failed to Allocate Uniform");
+
+            mainPhysical = physical;
+
+            /* Remap the shift/swizzle. */
+            if (bHasVectorizedUniform)
+            {
+                if (bVectorizedRestricted)
+                {
+                    mainSwizzle = 0;
+                    for (i = 0; i < maxComp; i++)
+                    {
+                        VIR_Swizzle_SetChannel(mainSwizzle, i, VIR_Swizzle_GetChannel(swizzle, maxVectorizedComp + i));
+                    }
+                    for (i = maxComp; i < 4; i++)
+                    {
+                        VIR_Swizzle_SetChannel(mainSwizzle, i, VIR_Swizzle_GetChannel(swizzle, maxVectorizedComp + maxComp - 1));
+                    }
+
+                    mainShift += maxVectorizedComp;
+                }
+                else
+                {
+                    mainSwizzle = swizzle;
+                    for (i = maxComp; i < 4; i++)
+                    {
+                        VIR_Swizzle_SetChannel(mainSwizzle, i, VIR_Swizzle_GetChannel(swizzle, maxComp - 1));
+                    }
+                    mainShift = shift;
+                }
+            }
+            else
+            {
+                mainSwizzle = swizzle;
+                mainShift = shift;
+            }
 
             /* Set physical address for each uniform in the queue. */
             while(!QUEUE_CHECK_EMPTY(&uniformList))
             {
                 VIR_Uniform *symUniform = gcvNULL;
                 VIR_Symbol  *sym;
-                VIR_Type    *baseType;
 
                 _VIR_CG_UniformListDequeue(pMM, &uniformList, &symUniform);
 
                 sym = VIR_Shader_GetSymFromId(pShader, VIR_Uniform_GetSymID(symUniform));
 
-                if (VIR_Symbol_HasFlag(sym, VIR_SYMUNIFORMFLAG_ATOMIC_COUNTER))
+                _VIR_CG_SetUniformPhysical(pShader,
+                                           sym,
+                                           symUniform,
+                                           TreatSamplerAsConst,
+                                           uniformBaseAddress,
+                                           &mainPhysical,
+                                           mainSwizzle,
+                                           mainShift);
+            }
+
+            /* Set physical address for the vectorized uniform. */
+            if (bHasVectorizedUniform)
+            {
+                mainPhysical = physical;
+
+                /* Remap the shift/swizzle. */
+                if (!bVectorizedRestricted)
                 {
-                    VIR_Symbol  *baseUniformSym = VIR_Shader_GetSymFromId(pShader, symUniform->baseBindingUniform);
-                    VIR_Uniform *baseUniform    = VIR_Symbol_GetUniform(baseUniformSym);
-                    gcmASSERT(symUniform->baseBindingUniform != VIR_INVALID_ID);
-
-                    if(baseUniform->physical == -1)
+                    mainSwizzle = 0;
+                    for (i = 0; i < maxVectorizedComp; i++)
                     {
-                        gctUINT32    rows           = 0;
-                        VIR_Type    *symType        = VIR_Symbol_GetType(baseUniformSym);
-
-                        baseType = VIR_Shader_GetTypeFromId(pShader,
-                                                            VIR_Type_GetBaseTypeId(symType));
-
-                        baseUniform->swizzle  = swizzle;
-                        baseUniform->physical = physical;
-                        baseUniform->address  = uniformBaseAddress + baseUniform->physical * 16 + shift * 4;
-
-                        rows = VIR_Uniform_GetRealUseArraySize(baseUniform) * VIR_Type_GetVirRegCount(pShader, baseType, -1);
-                        physical += rows;
+                        VIR_Swizzle_SetChannel(mainSwizzle, i, VIR_Swizzle_GetChannel(swizzle, maxComp + i));
+                    }
+                    for (i = maxVectorizedComp; i < 4; i++)
+                    {
+                        VIR_Swizzle_SetChannel(mainSwizzle, i, VIR_Swizzle_GetChannel(swizzle, maxComp + maxVectorizedComp - 1));
                     }
 
-                    symUniform->swizzle  = baseUniform->swizzle;
-                    symUniform->physical = baseUniform->physical;
-                    symUniform->address  = baseUniform->address;
+                    mainShift += maxComp;
                 }
                 else
                 {
-                    gctUINT32 rows = 0;
-                    VIR_Type  *symType = VIR_Symbol_GetType(sym);
-
-                    baseType = VIR_Shader_GetTypeFromId(pShader,
-                                                        VIR_Type_GetBaseTypeId(symType));
-
-                    gcmASSERT(!VIR_Symbol_isSampler(sym) || TreatSamplerAsConst);
-
-                    symUniform->swizzle = swizzle;
-                    symUniform->physical = physical;
-                    symUniform->address = uniformBaseAddress + symUniform->physical * 16 + shift * 4;
-
-                    rows = VIR_Uniform_GetRealUseArraySize(symUniform) * VIR_Type_GetVirRegCount(pShader, baseType, -1);
-                    physical += rows;
+                    mainSwizzle = swizzle;
+                    for (i = maxVectorizedComp; i < 4; i++)
+                    {
+                        VIR_Swizzle_SetChannel(mainSwizzle, i, VIR_Swizzle_GetChannel(swizzle, maxVectorizedComp - 1));
+                    }
+                    mainShift = shift;
                 }
+
+                _VIR_CG_SetUniformPhysical(pShader,
+                                           pVectorizedUniformSym,
+                                           pVectorizedUniform,
+                                           TreatSamplerAsConst,
+                                           uniformBaseAddress,
+                                           &mainPhysical,
+                                           mainSwizzle,
+                                           mainShift);
             }
         }
     }
@@ -1691,22 +1882,30 @@ VSC_ErrCode VIR_CG_MapUniforms(
                 continue;
             }
 
-            retValue = _VIR_CG_MapNonSamplerUniforms(pShader,
-                pHwConfig,
-                symUniform,
-                isSymUniformCompiletimeInitialized(sym),
-                &uniformColorMap,
-                codeGenUniformBase,
-                handleDefaultUBO,
-                unblockUniformBlock,
-                gcvFALSE, /* treat sampler as const */
-                gcvFALSE, /* single uniform */
-                gcvFALSE, /* always allocate */
-                pMM,
-                gcvNULL,
-                &nextUniformIndex);
-            ON_ERROR(retValue, "Failed to Allocate Uniform");
+            if (symUniform->physical != -1)
+            {
+                if (!_VIR_CG_FindVectorizeUniform(pShader, sym))
+                {
+                    gcmASSERT(gcvFALSE);
+                }
+                continue;
+            }
 
+            retValue = _VIR_CG_MapNonSamplerUniforms(pShader,
+                                                     pHwConfig,
+                                                     symUniform,
+                                                     isSymUniformCompiletimeInitialized(sym),
+                                                     &uniformColorMap,
+                                                     codeGenUniformBase,
+                                                     handleDefaultUBO,
+                                                     unblockUniformBlock,
+                                                     gcvFALSE, /* treat sampler as const */
+                                                     gcvFALSE, /* single uniform */
+                                                     gcvFALSE, /* always allocate */
+                                                     pMM,
+                                                     gcvNULL,
+                                                     &nextUniformIndex);
+            ON_ERROR(retValue, "Failed to Allocate Uniform");
         }
     }
 
@@ -2719,10 +2918,10 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
 
         if (isSymCompilerGen(sym))
         {
-            gcmASSERT(symUniform->physical == -1);
-
             if (VIR_Symbol_isSampler(sym))
             {
+                gcmASSERT(symUniform->physical == -1);
+
                 retValue = _VIR_CG_MapSamplerUniforms(pShader,
                     pHwConfig,
                     symUniform,
@@ -2741,6 +2940,14 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
             }
             else
             {
+                if (symUniform->physical != -1)
+                {
+                    if (!_VIR_CG_FindVectorizeUniform(pShader, sym))
+                    {
+                        gcmASSERT(gcvFALSE);
+                    }
+                }
+
                 retValue = _VIR_CG_MapNonSamplerUniforms(pShader,
                     pHwConfig,
                     symUniform,
@@ -2992,13 +3199,20 @@ VSC_ErrCode VIR_RA_PerformUniformAlloc(
     VSC_SHADER_RESOURCE_LAYOUT        *pShResourceLayout = pPassWorker->pCompilerParam->pShResourceLayout;
     VSC_HASH_TABLE                    *pUnbindUniformHash = gcvNULL;
     gctBOOL                           allocUniform = gcvFALSE;
+    gctBOOL                           bOptCstRegReadPort = VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetOPTS(pOption), VSC_OPTN_RAOptions_OPTIMIZE_CST_REG_READ_PORT);
 
-    if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetOPTS(pOption),
-        VSC_OPTN_RAOptions_ALLOC_UNIFORM))
+    if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetOPTS(pOption), VSC_OPTN_RAOptions_ALLOC_UNIFORM))
     {
         if (!VIR_Shader_isConstRegAllocated(pShader))
         {
             allocUniform = gcvTRUE;
+
+            /* Analysis the constant register read port to optimize them. */
+            if (bOptCstRegReadPort)
+            {
+                retValue = VIR_Shader_AnalysisCstRegReadPort(pShader, pHwCfg, pMM);
+                ON_ERROR(retValue, "Fail to analysis the constant register read port.");
+            }
 
             if (pShResourceLayout)
             {
@@ -3032,6 +3246,12 @@ VSC_ErrCode VIR_RA_PerformUniformAlloc(
                 ON_ERROR(retValue, "VIR_CG_MapUniforms");
             }
 
+            if (bOptCstRegReadPort)
+            {
+                retValue = VIR_Shader_DestroyVectorizeUniformSet(pShader);
+                ON_ERROR(retValue, "Fail to destroy the vectorzie uniform set.");
+            }
+
             /* set const register allocated to shader */
             VIR_Shader_SetConstRegAllocated(pShader, gcvTRUE);
         }
@@ -3049,6 +3269,11 @@ OnError:
     if (pUnbindUniformHash)
     {
         vscHTBL_Destroy(pUnbindUniformHash);
+    }
+
+    if (bOptCstRegReadPort)
+    {
+        VIR_Shader_DestroyVectorizeUniformSet(pShader);
     }
 
     return retValue;

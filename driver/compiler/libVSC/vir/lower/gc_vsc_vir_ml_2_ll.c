@@ -63,8 +63,8 @@ VIR_Lower_MiddleLevel_To_LowLevel_Pre(
     errCode = VIR_Lower_ArraryIndexing_To_LDARR_STARR(shader, hwCfg, gcvNULL);
     CHECK_ERROR(errCode, "VIR_Lower_ArraryIndexing_To_LDARR_STARR failed.");
 
-    errCode = VIR_Lower_MiddleLevel_To_LowLevel_Expand(shader, &pPassWorker->pCompilerParam->cfg.ctx, &context);
-    CHECK_ERROR(errCode, "VIR_Lower_MiddleLevel_To_LowLevel_Expand failed.");
+    errCode = VIR_Lower_MiddleLevel_To_LowLevel_Expand_Pre(shader, &pPassWorker->pCompilerParam->cfg.ctx, &context);
+    CHECK_ERROR(errCode, "ML to LL expand pre failed.");
 
     errCode = VIR_Lower_MiddleLevel_To_LowLevel_Scalar(shader, &pPassWorker->pCompilerParam->cfg.ctx, &context);
     CHECK_ERROR(errCode, "VIR_Lower_MiddleLevel_To_LowLevel_Scalar failed.");
@@ -126,6 +126,9 @@ VIR_Lower_MiddleLevel_To_LowLevel_Post(
     VIR_Shader_SetRAEnabled(shader, bRAEnabled);
 
     VIR_Lower_Initialize(shader, &context, hwCfg, pPassWorker->basePassWorker.pMM);
+
+    errCode = VIR_Lower_MiddleLevel_To_LowLevel_Expand_Post(shader, &pPassWorker->pCompilerParam->cfg.ctx, &context);
+    CHECK_ERROR(errCode, "ML to LL expand post failed.");
 
     if (gcUseFullNewLinker(hwCfg->hwFeatureFlags.hasHalti2))
     {

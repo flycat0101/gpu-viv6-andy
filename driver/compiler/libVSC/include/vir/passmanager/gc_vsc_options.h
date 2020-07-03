@@ -851,6 +851,7 @@ typedef struct _VSC_OPTN_RAOPTIONS
 #define VSC_OPTN_RAOptions_MAX_LS_EXTENED_END_POINT     0x0004
 #define VSC_OPTN_RAOptions_SPILL_DEST_OPT               0x0008
 #define VSC_OPTN_RAOptions_DISABLE_DUAL16_FOR_A0B0      0x0010
+#define VSC_OPTN_RAOptions_OPTIMIZE_CST_REG_READ_PORT   0x0020
 
 #define VSC_OPTN_RAOptions_GetTrace(option)             VSC_OPTN_GetTrace(&(option)->optnBase)
 #define VSC_OPTN_RAOptions_SetTrace(option, t)          VSC_OPTN_SetTrace(&(option)->optnBase, (t))
