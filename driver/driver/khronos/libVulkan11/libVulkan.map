@@ -203,6 +203,10 @@
         vkGetSwapchainImagesKHR;
         vkAcquireNextImageKHR;
         vkQueuePresentKHR;
+        vkGetDeviceGroupPresentCapabilitiesKHR;
+        vkGetDeviceGroupSurfacePresentModesKHR;
+        vkGetPhysicalDevicePresentRectanglesKHR;
+        vkAcquireNextImage2KHR;
         vkGetPhysicalDeviceDisplayPropertiesKHR;
         vkGetPhysicalDeviceDisplayPlanePropertiesKHR;
         vkGetDisplayPlaneSupportedDisplaysKHR;
@@ -211,6 +215,14 @@
         vkGetDisplayPlaneCapabilitiesKHR;
         vkCreateDisplayPlaneSurfaceKHR;
         vkCreateSharedSwapchainsKHR;
+        vkCreateDebugReportCallbackEXT;
+        vkDestroyDebugReportCallbackEXT;
+        vkDebugReportMessageEXT;
+        vkGetSemaphoreFdKHR;
+        vkImportSemaphoreFdKHR;
+        vkGetFenceFdKHR;
+        vkImportFenceFdKH;
+
         vkCreateXlibSurfaceKHR*;
         vkGetPhysicalDeviceXlibPresentationSupportKHR*;
         vkCreateXcbSurfaceKHR*;
@@ -218,10 +230,6 @@
         vkCreateWaylandSurfaceKHR*;
         vkGetPhysicalDeviceWaylandPresentationSupportKHR*;
         vkCreateAndroidSurfaceKHR*;
-
-        vkCreateDebugReportCallbackEXT;
-        vkDestroyDebugReportCallbackEXT;
-        vkDebugReportMessageEXT;
 
         vkGetSwapchainGrallocUsageANDROID*;
         vkAcquireImageANDROID*;

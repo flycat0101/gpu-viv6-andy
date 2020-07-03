@@ -219,6 +219,10 @@ EXPORTS
         vkGetSwapchainImagesKHR
         vkAcquireNextImageKHR
         vkQueuePresentKHR
+        vkGetDeviceGroupPresentCapabilitiesKHR
+        vkGetDeviceGroupSurfacePresentModesKHR
+        vkGetPhysicalDevicePresentRectanglesKHR
+        vkAcquireNextImage2KHR
         vkGetPhysicalDeviceDisplayPropertiesKHR
         vkGetPhysicalDeviceDisplayPlanePropertiesKHR
         vkGetDisplayPlaneSupportedDisplaysKHR
@@ -227,10 +231,16 @@ EXPORTS
         vkGetDisplayPlaneCapabilitiesKHR
         vkCreateDisplayPlaneSurfaceKHR
         vkCreateSharedSwapchainsKHR
-        vkCreateWin32SurfaceKHR
-        vkGetPhysicalDeviceWin32PresentationSupportKHR
         vkCreateDebugReportCallbackEXT
         vkDestroyDebugReportCallbackEXT
         vkDebugReportMessageEXT
+        vkGetSemaphoreFdKHR
+        vkImportSemaphoreFdKHR
+        vkGetFenceFdKHR
+        vkImportFenceFdKH
+
+        vkCreateWin32SurfaceKHR
+        vkGetPhysicalDeviceWin32PresentationSupportKHR
+
         vk_icdGetInstanceProcAddr
         vk_icdNegotiateLoaderICDInterfaceVersion
