@@ -664,7 +664,7 @@ static gceSTATUS _LockVideoNode(
     gcmASSERT(Memory != gcvNULL);
     gcmASSERT(Node != 0);
 
-    memset(&iface, 0, sizeof(gcsHAL_INTERFACE));
+    gcoOS_ZeroMemory(&iface, sizeof(gcsHAL_INTERFACE));
 
     iface.engine = gcvENGINE_RENDER;
     iface.command = gcvHAL_LOCK_VIDEO_MEMORY;
@@ -689,7 +689,7 @@ static gceSTATUS _UnlockVideoNode(
 
     gcmASSERT(Node != 0);
 
-    memset(&iface, 0, sizeof(gcsHAL_INTERFACE));
+    gcoOS_ZeroMemory(&iface, sizeof(gcsHAL_INTERFACE));
     iface.ignoreTLS = gcvFALSE;
     iface.engine = gcvENGINE_RENDER;
     iface.command = gcvHAL_UNLOCK_VIDEO_MEMORY;
@@ -1329,15 +1329,23 @@ static gctBOOL _setPixmapMapped(Drawable pixmap, gctPOINTER destLogicalAddr, gct
 
     if ( _vpixmaphead == gcvNULL )
     {
-        _vpixmaphead = (PMPIXMAP)malloc(sizeof(MPIXMAP));
-        _vpixmaphead->mapped = 1;
-        _vpixmaphead->pixmap = pixmap;
-        _vpixmaphead->dpy= dpy;
-        _vpixmaphead->destLogicalAddr = destLogicalAddr;
-        _vpixmaphead->phyAddr = phyAddr;
-        _vpixmaphead->stride = stride;
-        _vpixmaphead->next = gcvNULL;
-        return gcvTRUE;
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+                              sizeof (MPIXMAP),
+                              (gctPOINTER *)&_vpixmaphead)))
+        {
+            return gcvFALSE;
+        }
+        else
+        {
+            _vpixmaphead->mapped = 1;
+            _vpixmaphead->pixmap = pixmap;
+            _vpixmaphead->dpy= dpy;
+            _vpixmaphead->destLogicalAddr = destLogicalAddr;
+            _vpixmaphead->phyAddr = phyAddr;
+            _vpixmaphead->stride = stride;
+            _vpixmaphead->next = gcvNULL;
+            return gcvTRUE;
+        }
     }
 
     pixmapnode = _vpixmaphead;
@@ -1354,16 +1362,22 @@ static gctBOOL _setPixmapMapped(Drawable pixmap, gctPOINTER destLogicalAddr, gct
         }
         pixmapnode = (PMPIXMAP)pixmapnode->next;
     }
-    pixmapnode = (PMPIXMAP)malloc(sizeof(MPIXMAP));
-    pixmapnode->mapped = 1;
-    pixmapnode->pixmap = pixmap;
-    pixmapnode->dpy= dpy;
-    pixmapnode->destLogicalAddr = destLogicalAddr;
-    pixmapnode->phyAddr = phyAddr;
-    pixmapnode->stride = stride;
-    pixmapnode->next = gcvNULL;
-    prepixmapnode->next = pixmapnode;
-    return gcvTRUE;
+    if (gcmIS_SUCCESS(gcoOS_Allocate(gcvNULL,
+            sizeof (MPIXMAP),
+            (gctPOINTER *)&pixmapnode)))
+    {
+        pixmapnode->mapped = 1;
+        pixmapnode->pixmap = pixmap;
+        pixmapnode->dpy= dpy;
+        pixmapnode->destLogicalAddr = destLogicalAddr;
+        pixmapnode->phyAddr = phyAddr;
+        pixmapnode->stride = stride;
+        pixmapnode->next = gcvNULL;
+        prepixmapnode->next = pixmapnode;
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
 }
 
 static gctBOOL _unSetPixmapMapped(Drawable pixmap)
@@ -1387,7 +1401,7 @@ static gctBOOL _unSetPixmapMapped(Drawable pixmap)
             _vpixmaphead = pixmapnode->next;
             else
             prepixmapnode->next = pixmapnode->next;
-            free(pixmapnode);
+            gcmOS_SAFE_FREE(gcvNULL, pixmapnode);
             return gcvTRUE;
         }
         prepixmapnode = pixmapnode;
@@ -2050,12 +2064,9 @@ dri_CreateContext(IN gctPOINTER localDisplay, IN gctPOINTER Context)
 
     display = (__DRIDisplay*)localDisplay;
 
-    context = (__DRIcontextPriv *)malloc(sizeof(__DRIcontextPriv));
-    if (!context) {
-        gcmONERROR(gcvSTATUS_OUT_OF_RESOURCES);
-    }
+    gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof (__DRIcontextPriv), (gctPOINTER *)&context));
 
-    memset(context, 0, sizeof(__DRIcontextPriv));
+    gcoOS_ZeroMemory(context, sizeof(__DRIcontextPriv));
 
     if (!XF86DRICreateContextWithConfig(display->dpy, display->screen, 0/*modes->fbconfigID*/,
                                         &context->contextID, &context->hHWContext)) {
@@ -2118,7 +2129,7 @@ dri_DestroyContext(IN gctPOINTER localDisplay, IN gctPOINTER Context)
         } else {
             prev->next = cur->next;
         }
-        free(cur);
+        gcmOS_SAFE_FREE(gcvNULL, cur);
     }
     _DestroyOnScreenSurfaceWrapper(display);
 
@@ -2213,14 +2224,11 @@ dri_CreateDrawable(IN gctPOINTER localDisplay, IN PlatformWindowType Drawable)
 
     display = (__DRIDisplay*)localDisplay;
 
-    drawable = (__DRIdrawablePriv *)malloc(sizeof(__DRIdrawablePriv));
-    if (!drawable) {
-        gcmONERROR(gcvSTATUS_OUT_OF_RESOURCES);
-    }
+    gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof (__DRIdrawablePriv), (gctPOINTER *)&drawable));
 
-    memset(drawable, 0, sizeof(__DRIdrawablePriv));
+    gcoOS_ZeroMemory(drawable, sizeof(__DRIdrawablePriv));
     if (!XF86DRICreateDrawable(display->dpy, display->screen, Drawable, &drawable->hHWDrawable)) {
-        free(drawable);
+        gcmOS_SAFE_FREE(gcvNULL, drawable);
         gcmONERROR(gcvSTATUS_OUT_OF_RESOURCES);
     }
 
@@ -2332,7 +2340,7 @@ dri_DestroyDrawable(IN gctPOINTER localDisplay, IN PlatformWindowType Drawable)
         } else {
             prev->next = cur->next;
         }
-        free(cur);
+        gcmOS_SAFE_FREE(gcvNULL, cur);
     }
 
 OnError:
@@ -3713,14 +3721,9 @@ dri_InitLocalDisplayInfo(
 
     do
     {
-        display = (__DRIDisplay*) malloc(sizeof(__DRIDisplay));
+        gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof (__DRIDisplay), (gctPOINTER *)&display));
 
-        if (display == gcvNULL)
-        {
-            status = gcvSTATUS_OUT_OF_RESOURCES;
-            break;
-        }
-        memset(display, 0, sizeof(__DRIDisplay));
+        gcoOS_ZeroMemory(display, sizeof(__DRIDisplay));
 
         display->dpy = Display;
         display->contextStack = NULL;
@@ -3736,6 +3739,7 @@ dri_InitLocalDisplayInfo(
     }
     while (0);
 
+OnError:
     gcmFOOTER();
     return status;
 }
@@ -3754,7 +3758,7 @@ dri_DeinitLocalDisplayInfo(
         drmUnmap((drmAddress)display->pSAREA, SAREA_MAX);
         drmUnmap((drmAddress)display->linearAddr, display->fbSize);
         drmClose(display->drmFd);
-        free(display);
+        gcmOS_SAFE_FREE(gcvNULL, display);
         *localDisplay = gcvNULL;
     }
     return gcvSTATUS_OK;

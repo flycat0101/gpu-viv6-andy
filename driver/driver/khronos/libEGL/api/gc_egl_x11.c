@@ -556,8 +556,7 @@ x11_DrawImage(
 
             Height = -Height;
 
-            bits = malloc(bitmapSize);
-            if (bits == gcvNULL)
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, bitmapSize, (gctPOINTER *)&bits)))
             {
                 status = gcvSTATUS_INVALID_ARGUMENT;
                 break;
@@ -622,7 +621,7 @@ x11_DrawImage(
 
     if ((bits != Bits) && (bits != gcvNULL))
     {
-        free(bits);
+        gcmOS_SAFE_FREE(gcvNULL, bits);
     }
 
     gcmFOOTER();

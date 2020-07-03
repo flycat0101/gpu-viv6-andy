@@ -18,6 +18,8 @@
 
 #include "gc_egl_platform.h"
 #include "gc_egl_fb.h"
+#include "gc_hal.h"
+#include "gc_hal_user.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,6 +50,20 @@
 #define GC_FB_MAX_SWAP_INTERVAL     10
 #define GC_FB_MIN_SWAP_INTERVAL     0
 
+struct _FBFunctions
+{
+    gceSTATUS (*OpenDevice)(IN gctINT index, IN char* dev, OUT gctINT *file);
+    gceSTATUS (*ReleaseDevice)(gctINT file);
+    gceSTATUS (*MemoryMap)(gctPOINTER start, gctSIZE_T len, gctINT prot, gctINT flags, gctINT fd, gctUINT offset, gctPOINTER *addr);
+    gceSTATUS (*MemoryUnmap)(gctPOINTER addr, gctSIZE_T len);
+    gceSTATUS (*GetFix)(gctINT file, struct fb_fix_screeninfo *fixInfo);
+    gceSTATUS (*GetVar)(gctINT file, struct fb_var_screeninfo *varInfo);
+    gceSTATUS (*SetVar)(gctINT file, struct fb_var_screeninfo *varInfo);
+#ifdef FBIO_WAITFORVSYNC
+    gceSTATUS (*WaitForVsync)(gctINT file, gctINT val);
+#endif
+    gceSTATUS (*PanDisplay)(gctINT file, struct fb_var_screeninfo *varInfo);
+};
 
 /* Structure that defines a display. */
 struct _FBDisplay
@@ -85,6 +101,9 @@ struct _FBDisplay
 
     struct _FBDisplay *     next;
     gctBOOL                 serverSide;
+    struct _FBFunctions     functions;
+    gctBOOL                 useVFB;
+    
     /* FSL: external resolve and special PAN timing. */
     gctBOOL                 fbPrefetch;
     gctUINT32               bufferStatus;
@@ -125,8 +144,802 @@ struct _FBPixmap
 #endif
 };
 
+struct _FBMode
+{
+    const char* name;
+    gctUINT32 refresh;
+    gctUINT32 xres;
+    gctUINT32 yres;
+    gctUINT32 pixclock;
+    gctUINT32 left_margin;
+    gctUINT32 right_margin;
+    gctUINT32 upper_margin;
+    gctUINT32 lower_margin;
+    gctUINT32 hsync_len;
+    gctUINT32 vsync_len;
+    gctUINT32 sync;
+    gctUINT32 vmode;
+    gctUINT32 flag;
+};
+
+struct vfbdev_info {
+    gctINT                      file;
+    struct fb_fix_screeninfo    fixInfo;
+    struct fb_var_screeninfo    varInfo;
+    struct _FBMode              *videoMode;
+    struct vfbdev_info          *next;
+    gctINT                      refCount;
+    gcoSURF                     surface;
+    gctPOINTER                  memory;
+};
+
+/* standard mode definitions */
+static const struct _FBMode modelist[] = {
+    /* 640x480 @ 60Hz */
+    {NULL, 60, 640, 480, 39721, 40, 24, 32, 11, 96, 2, 0,
+        FB_VMODE_NONINTERLACED},
+    /* 800x600 @ 60hz */
+    {NULL, 60, 800, 600, 25000, 88, 40, 23, 1, 128, 4,
+        FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+        FB_VMODE_NONINTERLACED},
+    /* 1024x768 @ 60Hz */
+    {NULL, 60, 1024, 768, 15384, 168, 8, 29, 3, 144, 6, 0,
+        FB_VMODE_NONINTERLACED},
+    /* 1920x1080 @ 60Hz */
+    {NULL, 60, 1920, 1080, 6734, 148, 88, 36, 4, 44, 5,
+        FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+        FB_VMODE_NONINTERLACED},
+    /* 1920x1200 @ 60Hz */
+    {NULL, 60, 1920, 1200, 5177, 128, 336, 1, 38, 208, 3,
+        FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+        FB_VMODE_NONINTERLACED},
+};
+
 static struct _FBDisplay *displayStack = gcvNULL;
 static pthread_mutex_t displayMutex;
+static struct vfbdev_info *vfbDevStack = gcvNULL;
+
+static gceSTATUS fbfunc_OpenDevice(IN gctINT index, IN char* dev, OUT gctINT *file)
+{
+    unsigned char i = 0;
+    char fbDevName[256];
+    char const * const fbDevicePath[] =
+    {
+        "/dev/fb%d",
+        "/dev/graphics/fb%d",
+        gcvNULL
+    };
+
+    if ((index < 0 && dev == gcvNULL) || file == gcvNULL)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    /* Create a handle to the device. */
+    *file = -1;
+    if (index >= 0 && dev == gcvNULL)
+    {
+        while ((*file == -1) && fbDevicePath[i])
+        {
+            sprintf(fbDevName, fbDevicePath[i], index);
+            *file = open(fbDevName, O_RDWR);
+            i++;
+        }
+    }
+    else if (index < 0 && dev != gcvNULL)
+    {
+            *file = open(fbDevName, O_RDWR);
+    }
+
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS fbfunc_ReleaseDevice(IN gctINT file)
+{
+    if (file >= 0)
+    {
+        close(file);
+    }
+
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS fbfunc_MemoryMap(
+    gctPOINTER start,
+    gctSIZE_T len,
+    gctINT prot,
+    gctINT flags,
+    gctINT fd,
+    gctUINT offset,
+    gctPOINTER *addr)
+{
+    if (len <= 0 || fd < 0 || addr == gcvNULL)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    *addr = mmap(start, len, prot, flags, fd, offset);
+
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS fbfunc_MemoryUnmap(gctPOINTER addr, gctSIZE_T len)
+{
+    if (addr == gcvNULL || len <= 0)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+    munmap(addr, len);
+    addr = gcvNULL;
+
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS fbfunc_GetFix(gctINT file, struct fb_fix_screeninfo *fixInfo)
+{
+    if (file < 0 || fixInfo == gcvNULL)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    if (ioctl(file, FBIOGET_FSCREENINFO, fixInfo) < 0)
+    {
+        return gcvSTATUS_GENERIC_IO;
+    }
+
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS fbfunc_GetVar(gctINT file, struct fb_var_screeninfo *varInfo)
+{
+    if (file < 0 || varInfo == gcvNULL)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+    if (ioctl(file, FBIOGET_VSCREENINFO, varInfo) < 0)
+    {
+        return gcvSTATUS_GENERIC_IO;
+    }
+
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS fbfunc_SetVar(gctINT file, struct fb_var_screeninfo *varInfo)
+{
+    if (file < 0 || varInfo == gcvNULL)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    if (ioctl(file, FBIOPUT_VSCREENINFO, varInfo) < 0)
+    {
+        return gcvSTATUS_GENERIC_IO;
+    }
+
+    return gcvSTATUS_OK;
+}
+
+#ifdef FBIO_WAITFORVSYNC
+static gceSTATUS fbfunc_WaitForVsync(gctINT file, int val)
+{
+    if (file < 0)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    if (ioctl(file, FBIO_WAITFORVSYNC, &val) < 0)
+    {
+        return gcvSTATUS_GENERIC_IO;
+    }
+
+    return gcvSTATUS_OK;
+}
+#endif
+
+static gceSTATUS fbfunc_PanDisplay(gctINT file, struct fb_var_screeninfo *varInfo)
+{
+    if (file < 0 || varInfo == gcvNULL)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    if (ioctl(file, FBIOPAN_DISPLAY, varInfo) < 0)
+    {
+        return gcvSTATUS_GENERIC_IO;
+    }
+
+    return gcvSTATUS_OK;
+}
+
+/* parse user mode setting eg. 640x480-32@60 */
+static gceSTATUS _vfb_ParseUserMode(gctINT index, gctINT *width, gctINT *height, gctINT *bpp, gctINT *refresh)
+{
+    char *m;
+    gctINT i;
+    gctUINT len;
+    gctINT yres_parsed = 0, bpp_parsed = 0, refresh_parsed = 0;
+    char vfbEnv[256];
+
+    if (index < 0)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    sprintf(vfbEnv,"VFB_FRAMEBUFFER%d_MODE", index);
+    m = getenv(vfbEnv);
+    if (m == gcvNULL)
+    {
+        *width = 640;
+        *height = 480;
+        *bpp = 32;
+        *refresh = 60;
+
+        return gcvSTATUS_OK;
+    }
+
+    len = strlen(m);
+    for (i = len - 1; i >= 0; i--)
+    {
+        switch(m[i])
+        {
+        case '@':
+            len = i;
+            if (!yres_parsed && !bpp_parsed && !refresh_parsed)
+            {
+                *refresh = strtol(&m[i + 1], NULL, 10);
+                refresh_parsed = 1;
+            }
+            else
+            {
+                goto done;
+            }
+            break;
+        case '-':
+            len = i;
+            if (!yres_parsed && !bpp_parsed)
+            {
+                *bpp = strtol(&m[i + 1], NULL, 10);
+                bpp_parsed = 1;
+            }
+            else
+            {
+                goto done;
+            }
+            break;
+        case 'x':
+            if (!yres_parsed)
+            {
+                *height = strtol(&m[i + 1], NULL, 10);
+                yres_parsed = 1;
+            }
+            else
+            {
+                goto done;
+            }
+            break;
+        default:
+            break;
+        }
+    }
+
+    if (i < 0 && yres_parsed)
+    {
+        *width = strtol(&m[0], NULL, 10);
+    }
+done:
+    if (!refresh_parsed)
+    {
+        *refresh = 60;
+    }
+
+    if (!bpp_parsed)
+    {
+        *bpp = 32;
+    }
+
+    return gcvSTATUS_OK;
+}
+
+static struct _FBMode* vfb_FindBestMode(gctINT width, gctINT height, gctINT refresh)
+{
+    gctUINT i;
+    struct _FBMode *mode = (struct _FBMode*)&modelist[0];
+
+    for (i = 0; i < sizeof(modelist)/sizeof(struct _FBMode); i++)
+    {
+        if (modelist[i].xres == width && modelist[i].yres == height &&
+            modelist[i].refresh == refresh)
+        {
+            mode = (struct _FBMode*)&modelist[i];
+            break;
+        }
+    }
+
+    return mode;
+}
+
+static gceSTATUS vfbfunc_OpenDevice(IN gctINT index, IN char* dev, OUT gctINT *file)
+{
+    struct vfbdev_info *vfbdev;
+    gctINT xres = 0, yres = 0, bpp = 0, refresh = 0;
+    gceSTATUS status;
+    gceSURF_FORMAT format;
+    gctUINT32 address[3] = {0};
+    gctPOINTER memory[3] = {gcvNULL};
+
+    if (index < 0)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    for (vfbdev = vfbDevStack; vfbdev != NULL; vfbdev = vfbdev->next)
+    {
+        if (vfbdev->file - 0xfb == index)
+        {
+            /* Find display.*/
+            vfbdev->refCount++;
+            *file = vfbdev->file;
+
+            return gcvSTATUS_OK;
+        }
+    }
+
+    gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof (struct vfbdev_info), (gctPOINTER *)&vfbdev));
+
+    gcoOS_ZeroMemory(vfbdev, sizeof (struct vfbdev_info));
+
+    status = _vfb_ParseUserMode(index, &xres, &yres, &bpp, &refresh);
+    if (status != gcvSTATUS_OK)
+    {
+        return status;
+    }
+
+    vfbdev->file = 0xfb + index;
+    vfbdev->videoMode = vfb_FindBestMode(xres, yres, refresh);
+    vfbdev->varInfo.xres = vfbdev->videoMode->xres;
+    vfbdev->varInfo.yres = vfbdev->videoMode->yres;
+    vfbdev->varInfo.pixclock = vfbdev->videoMode->pixclock;
+    vfbdev->varInfo.bits_per_pixel = bpp;
+    vfbdev->varInfo.vmode = vfbdev->videoMode->vmode;
+    vfbdev->varInfo.nonstd = 0;
+    vfbdev->varInfo.activate = FB_ACTIVATE_NOW;
+    vfbdev->varInfo.accel_flags = 0;
+    if (vfbdev->varInfo.vmode & FB_VMODE_CONUPDATE)
+    {
+        vfbdev->varInfo.vmode |= FB_VMODE_YWRAP;
+    }
+
+    vfbdev->varInfo.xoffset = 0;
+    vfbdev->varInfo.yoffset = 0;
+
+    if (vfbdev->varInfo.xres > vfbdev->varInfo.xres_virtual)
+    {
+        vfbdev->varInfo.xres_virtual = vfbdev->varInfo.xres;
+    }
+    if (vfbdev->varInfo.yres > vfbdev->varInfo.yres_virtual)
+    {
+        vfbdev->varInfo.yres_virtual = vfbdev->varInfo.yres;
+    }
+    if (vfbdev->varInfo.bits_per_pixel <= 1)
+    {
+        vfbdev->varInfo.bits_per_pixel = 1;
+    }
+    else if (vfbdev->varInfo.bits_per_pixel <= 8)
+    {
+        vfbdev->varInfo.bits_per_pixel = 8;
+    }
+    else if (vfbdev->varInfo.bits_per_pixel <= 16)
+    {
+        vfbdev->varInfo.bits_per_pixel = 16;
+    }
+    else if (vfbdev->varInfo.bits_per_pixel <= 24)
+    {
+        vfbdev->varInfo.bits_per_pixel = 24;
+    }
+    else if (vfbdev->varInfo.bits_per_pixel <= 32)
+    {
+        vfbdev->varInfo.bits_per_pixel = 32;
+    }
+    else
+    {
+        gcmOS_SAFE_FREE(gcvNULL, vfbdev);
+        return gcvSTATUS_NOT_SUPPORTED;
+    }
+
+    if (vfbdev->varInfo.xres_virtual < vfbdev->varInfo.xoffset + vfbdev->varInfo.xres)
+    {
+        vfbdev->varInfo.xres_virtual = vfbdev->varInfo.xoffset + vfbdev->varInfo.xres;
+    }
+    if (vfbdev->varInfo.yres_virtual < vfbdev->varInfo.yoffset + vfbdev->varInfo.yres)
+    {
+        vfbdev->varInfo.yres_virtual = vfbdev->varInfo.yoffset + vfbdev->varInfo.yres;
+    }
+
+    switch(vfbdev->varInfo.bits_per_pixel)
+    {
+    case 1:
+    case 8:
+        vfbdev->varInfo.red.offset = 0;
+        vfbdev->varInfo.red.length = 8;
+        vfbdev->varInfo.green.offset = 0;
+        vfbdev->varInfo.green.length = 8;
+        vfbdev->varInfo.blue.offset = 0;
+        vfbdev->varInfo.blue.length = 8;
+        vfbdev->varInfo.transp.offset = 0;
+        vfbdev->varInfo.transp.length = 0;
+        break;
+    case 16:
+        vfbdev->varInfo.red.offset = 0;
+        vfbdev->varInfo.red.length = 5;
+        vfbdev->varInfo.green.offset = 5;
+        vfbdev->varInfo.green.length = 6;
+        vfbdev->varInfo.blue.offset = 11;
+        vfbdev->varInfo.blue.length = 5;
+        vfbdev->varInfo.transp.offset = 0;
+        vfbdev->varInfo.transp.length = 0;
+        break;
+    case 24:
+        vfbdev->varInfo.red.offset = 0;
+        vfbdev->varInfo.red.length = 8;
+        vfbdev->varInfo.green.offset = 8;
+        vfbdev->varInfo.green.length = 8;
+        vfbdev->varInfo.blue.offset = 16;
+        vfbdev->varInfo.blue.length = 8;
+        vfbdev->varInfo.transp.offset = 0;
+        vfbdev->varInfo.transp.length = 0;
+        break;
+    case 32:
+        vfbdev->varInfo.red.offset = 0;
+        vfbdev->varInfo.red.length = 8;
+        vfbdev->varInfo.green.offset = 8;
+        vfbdev->varInfo.green.length = 8;
+        vfbdev->varInfo.blue.offset = 16;
+        vfbdev->varInfo.blue.length = 8;
+        vfbdev->varInfo.transp.offset = 24;
+        vfbdev->varInfo.transp.length = 8;
+        break;
+    default:
+        vfbdev->varInfo.red.offset = 0;
+        vfbdev->varInfo.red.length = 8;
+        vfbdev->varInfo.green.offset = 8;
+        vfbdev->varInfo.green.length = 8;
+        vfbdev->varInfo.blue.offset = 16;
+        vfbdev->varInfo.blue.length = 8;
+        vfbdev->varInfo.transp.offset = 24;
+        vfbdev->varInfo.transp.length = 8;
+
+        break;
+    }
+    vfbdev->varInfo.red.msb_right = 0;
+    vfbdev->varInfo.green.msb_right = 0;
+    vfbdev->varInfo.blue.msb_right = 0;
+    vfbdev->varInfo.transp.msb_right = 0;
+    vfbdev->varInfo.left_margin = vfbdev->videoMode->left_margin;
+    vfbdev->varInfo.right_margin = vfbdev->videoMode->right_margin;
+    vfbdev->varInfo.upper_margin = vfbdev->videoMode->upper_margin;
+    vfbdev->varInfo.lower_margin = vfbdev->videoMode->lower_margin;
+    vfbdev->varInfo.sync = vfbdev->videoMode->sync;
+    vfbdev->varInfo.hsync_len = vfbdev->videoMode->hsync_len;
+    vfbdev->varInfo.vsync_len = vfbdev->videoMode->vsync_len;
+
+    sprintf(vfbdev->fixInfo.id,"VFB%d", index);
+    vfbdev->fixInfo.type = FB_TYPE_PACKED_PIXELS;
+
+    switch(vfbdev->varInfo.bits_per_pixel)
+    {
+    case 1:
+        vfbdev->fixInfo.visual = FB_VISUAL_MONO01;
+        break;
+    case 8:
+        vfbdev->fixInfo.visual = FB_VISUAL_PSEUDOCOLOR;
+        break;
+    case 16:
+    case 24:
+    case 32:
+        vfbdev->fixInfo.visual = FB_VISUAL_TRUECOLOR;
+        break;
+    default:
+        vfbdev->fixInfo.visual = FB_VISUAL_TRUECOLOR;
+        break;
+    }
+
+    vfbdev->fixInfo.xpanstep = 0;
+    vfbdev->fixInfo.ypanstep = 0;
+    vfbdev->fixInfo.ywrapstep = 0;
+    vfbdev->fixInfo.accel = FB_ACCEL_NONE;
+    vfbdev->fixInfo.line_length = ((vfbdev->varInfo.xres_virtual * bpp + 31) & ~31) >> 3;
+    vfbdev->fixInfo.smem_len = vfbdev->fixInfo.line_length * vfbdev->varInfo.yres_virtual;
+
+    vfbdev->next = vfbDevStack;
+    vfbDevStack = vfbdev;
+    vfbdev->refCount++;
+    *file = vfbdev->file;
+
+    if (vfbdev->varInfo.bits_per_pixel <= 16)
+    {
+        format = gcvSURF_R5G6B5;
+    }
+    else if(vfbdev->varInfo.bits_per_pixel == 24)
+    {
+        format = gcvSURF_X8R8G8B8;
+    }
+    else
+    {
+        format = gcvSURF_A8R8G8B8;
+    }
+
+    gcmONERROR(gcoSURF_Construct(
+        gcvNULL,
+        vfbdev->varInfo.xres_virtual,
+        vfbdev->varInfo.yres_virtual,
+        1,
+        gcvSURF_BITMAP,
+        format,
+        gcvPOOL_DEFAULT,
+        &vfbdev->surface
+    ));
+
+    gcmONERROR(gcoSURF_Lock(
+        vfbdev->surface,
+        address,
+        memory
+    ));
+
+    vfbdev->fixInfo.smem_start = address[0];
+    vfbdev->memory = memory[0];
+
+    return gcvSTATUS_OK;
+OnError:
+    if (vfbdev)
+    {
+        if (vfbdev->surface)
+        {
+            gcmVERIFY_OK(gcoSURF_Destroy(vfbdev->surface));
+            vfbdev->surface = gcvNULL;
+        }
+        gcmOS_SAFE_FREE(gcvNULL, vfbdev);
+    }
+    return status;
+}
+
+static gceSTATUS vfbfunc_ReleaseDevice(IN gctINT file)
+{
+    struct vfbdev_info *vfbdev;
+
+    for (vfbdev = vfbDevStack; vfbdev != NULL; vfbdev = vfbdev->next)
+    {
+        if (vfbdev->file == file)
+        {
+            /* Find display.*/
+            vfbdev->refCount--;
+            if (!vfbdev->refCount)
+            {
+                if (vfbdev == vfbDevStack)
+                {
+                    vfbDevStack = vfbdev->next;
+                }
+                else
+                {
+                    struct vfbdev_info *prev = vfbDevStack;
+
+                    while (prev->next != vfbdev)
+                    {
+                        prev = prev->next;
+                    }
+                    prev->next = vfbdev->next;
+                }
+
+                gcmVERIFY_OK(gcoSURF_Unlock(vfbdev->surface, vfbdev->memory));
+                gcmVERIFY_OK(gcoSURF_Destroy(vfbdev->surface));
+                gcmOS_SAFE_FREE(gcvNULL, vfbdev);
+
+                return gcvSTATUS_OK;
+            }
+        }
+    }
+
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS vfbfunc_MemoryMap(
+    gctPOINTER start,
+    gctSIZE_T len,
+    gctINT prot,
+    gctINT flags,
+    gctINT fd,
+    gctUINT offset,
+    gctPOINTER *addr)
+{
+    struct vfbdev_info *vfbdev = gcvNULL;
+
+    if (len <= 0 || fd < 0 || addr == gcvNULL)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    for (vfbdev = vfbDevStack; vfbdev != gcvNULL; vfbdev = vfbdev->next)
+    {
+        if (vfbdev->file == fd)
+        {
+            *addr = vfbdev->memory + offset;
+            return gcvSTATUS_OK;
+        }
+    }
+
+    return gcvSTATUS_GENERIC_IO;
+}
+
+static gceSTATUS vfbfunc_MemoryUnmap(gctPOINTER addr, gctSIZE_T len)
+{
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS vfbfunc_GetFix(gctINT file, struct fb_fix_screeninfo *fixInfo)
+{
+    struct vfbdev_info *vfbdev = gcvNULL;
+
+    if (file < 0 || fixInfo == gcvNULL)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    for (vfbdev = vfbDevStack; vfbdev != NULL; vfbdev = vfbdev->next)
+    {
+        if (vfbdev->file == file)
+        {
+            *fixInfo = vfbdev->fixInfo;
+            return gcvSTATUS_OK;
+        }
+    }
+
+    return gcvSTATUS_GENERIC_IO;
+}
+
+static gceSTATUS vfbfunc_GetVar(gctINT file, struct fb_var_screeninfo *varInfo)
+{
+    struct vfbdev_info *vfbdev = gcvNULL;
+
+    if (file < 0 || varInfo == gcvNULL)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    for (vfbdev = vfbDevStack; vfbdev != NULL; vfbdev = vfbdev->next)
+    {
+        if (vfbdev->file == file)
+        {
+            *varInfo = vfbdev->varInfo;
+            return gcvSTATUS_OK;
+        }
+    }
+
+    return gcvSTATUS_GENERIC_IO;
+}
+
+static gceSTATUS vfbfunc_SetVar(gctINT file, struct fb_var_screeninfo *varInfo)
+{
+    struct vfbdev_info *vfbdev = gcvNULL;
+
+    if (file < 0 || varInfo == gcvNULL)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    for (vfbdev = vfbDevStack; vfbdev != NULL; vfbdev = vfbdev->next)
+    {
+        if (vfbdev->file == file)
+        {
+            vfbdev->varInfo = *varInfo;
+            switch(vfbdev->varInfo.bits_per_pixel)
+            {
+            case 1:
+                vfbdev->fixInfo.visual = FB_VISUAL_MONO01;
+                break;
+            case 8:
+                vfbdev->fixInfo.visual = FB_VISUAL_PSEUDOCOLOR;
+                break;
+            case 16:
+            case 24:
+            case 32:
+                vfbdev->fixInfo.visual = FB_VISUAL_TRUECOLOR;
+                break;
+            default:
+                vfbdev->fixInfo.visual = FB_VISUAL_TRUECOLOR;
+                break;
+            }
+            vfbdev->fixInfo.line_length = ((vfbdev->varInfo.xres_virtual *
+                                            vfbdev->varInfo.bits_per_pixel + 31) & ~31) >> 3;
+            return gcvSTATUS_OK;
+        }
+    }
+
+    return gcvSTATUS_GENERIC_IO;
+}
+
+#ifdef FBIO_WAITFORVSYNC
+static gceSTATUS vfbfunc_WaitForVsync(gctINT file, int val)
+{
+    return gcvSTATUS_OK;
+}
+#endif
+
+static gceSTATUS vfbfunc_PanDisplay(gctINT file, struct fb_var_screeninfo *varInfo)
+{
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS getFBFunctions(struct _FBDisplay* display)
+{
+    char *vdev, *dev;
+    char fbEnv[256];
+    char vfbEnv[256];
+
+    if (display == gcvNULL)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    display->useVFB = gcvFALSE;
+    sprintf(fbEnv,"FB_FRAMEBUFFER_%d", display->index);
+    dev = getenv(fbEnv);
+    sprintf(vfbEnv,"VFB_ENABLE");
+    vdev = getenv(vfbEnv);
+
+    if (dev && vdev)
+    {
+        printf("cannot enable both FB%d and VFB simultaneously.", display->index);
+        return gcvSTATUS_NOT_SUPPORTED;
+    }
+
+    if (dev)
+    {
+        display->useVFB = gcvFALSE;
+    }
+    else if (vdev)
+    {
+        gctUINT p = strtol(vdev, NULL, 10);
+
+        if (p != 0)
+        {
+            display->useVFB = gcvTRUE;
+        }
+        else
+        {
+            display->useVFB = gcvFALSE;
+        }
+    }
+
+    if (!display->useVFB)
+    {
+        display->functions.OpenDevice = fbfunc_OpenDevice;
+        display->functions.ReleaseDevice = fbfunc_ReleaseDevice;
+        display->functions.MemoryMap = fbfunc_MemoryMap;
+        display->functions.MemoryUnmap = fbfunc_MemoryUnmap;
+        display->functions.GetFix = fbfunc_GetFix;
+        display->functions.GetVar = fbfunc_GetVar;
+        display->functions.SetVar = fbfunc_SetVar;
+#ifdef FBIO_WAITFORVSYNC
+        display->functions.WaitForVsync = fbfunc_WaitForVsync;
+#endif
+        display->functions.PanDisplay = fbfunc_PanDisplay;
+    }
+    else
+    {
+        display->functions.OpenDevice = vfbfunc_OpenDevice;
+        display->functions.ReleaseDevice = vfbfunc_ReleaseDevice;
+        display->functions.MemoryMap = vfbfunc_MemoryMap;
+        display->functions.MemoryUnmap = vfbfunc_MemoryUnmap;
+        display->functions.GetFix = vfbfunc_GetFix;
+        display->functions.GetVar = vfbfunc_GetVar;
+        display->functions.SetVar = vfbfunc_SetVar;
+#ifdef FBIO_WAITFORVSYNC
+        display->functions.WaitForVsync = vfbfunc_WaitForVsync;
+#endif
+        display->functions.PanDisplay = vfbfunc_PanDisplay;
+    }
+
+    return gcvSTATUS_OK;
+}
 
 static void
 destroyDisplays(
@@ -142,7 +955,7 @@ destroyDisplays(
 
         if (display->memory != NULL)
         {
-            munmap(display->memory, display->size);
+            display->functions.MemoryUnmap(display->memory, display->size);
             display->memory = NULL;
         }
 
@@ -151,9 +964,8 @@ destroyDisplays(
             display->bufferStatus = 0;
             pthread_cond_broadcast(&display->cond);
 
-            ioctl(display->file, FBIOPUT_VSCREENINFO, &display->orgVarInfo);
-
-            close(display->file);
+            display->functions.SetVar(display->file, &display->orgVarInfo);
+            display->functions.ReleaseDevice(display->file);
             display->file = -1;
         }
 
@@ -161,7 +973,7 @@ destroyDisplays(
         pthread_mutex_destroy(&(display->condMutex));
         pthread_cond_destroy(&(display->cond));
          */
-        free(display);
+        gcmOS_SAFE_FREE(gcvNULL, display);
     }
 
     pthread_mutex_unlock(&displayMutex);
@@ -232,7 +1044,7 @@ onceInit(
     /* Register atexit callback. */
     atexit(halOnExit);
 
-    memset(&newSigHandler, 0, sizeof(newSigHandler));
+    gcoOS_ZeroMemory(&newSigHandler, sizeof(newSigHandler));
     sigemptyset(&newSigHandler.sa_mask);
     newSigHandler.sa_handler = sig_handler;
 
@@ -302,9 +1114,7 @@ fbdev_GetDisplayByIndex(
             return gcvSTATUS_OK;
         }
 
-        display = (struct _FBDisplay*) malloc(sizeof(struct _FBDisplay));
-
-        if (display == gcvNULL)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(struct _FBDisplay), (gctPOINTER *)&display)))
         {
             break;
         }
@@ -338,31 +1148,19 @@ fbdev_GetDisplayByIndex(
 
         }
 
+        getFBFunctions(display);
+
         sprintf(fbDevName,"FB_FRAMEBUFFER_%d",DisplayIndex);
         dev = getenv(fbDevName);
 
         if (dev != gcvNULL)
         {
-            display->file = open(dev, O_RDWR);
+            display->functions.OpenDevice(-1, dev, &display->file);
         }
 
         if (display->file < 0)
         {
-            unsigned char i = 0;
-            char const * const fbDevicePath[] =
-            {
-                "/dev/fb%d",
-                "/dev/graphics/fb%d",
-                gcvNULL
-            };
-
-            /* Create a handle to the device. */
-            while ((display->file == -1) && fbDevicePath[i])
-            {
-                sprintf(fbDevName, fbDevicePath[i], DisplayIndex);
-                display->file = open(fbDevName, O_RDWR);
-                i++;
-            }
+            display->functions.OpenDevice(DisplayIndex, gcvNULL, &display->file);
         }
 
         if (display->file < 0)
@@ -371,7 +1169,7 @@ fbdev_GetDisplayByIndex(
         }
 
         /* Get variable framebuffer information. */
-        if (ioctl(display->file, FBIOGET_VSCREENINFO, &display->varInfo) < 0)
+        if (display->functions.GetVar(display->file, &display->varInfo) != gcvSTATUS_OK)
         {
             break;
         }
@@ -435,19 +1233,19 @@ fbdev_GetDisplayByIndex(
             /* Try setting up multi buffering. */
             display->varInfo.yres_virtual = display->alignedHeight * i;
 
-            if (ioctl(display->file, FBIOPUT_VSCREENINFO, &display->varInfo) >= 0)
+            if (display->functions.SetVar(display->file, &display->varInfo) == gcvSTATUS_OK)
             {
                 break;
             }
         }
 
         /* Get current virtual screen size. */
-        if (ioctl(display->file, FBIOGET_VSCREENINFO, &(display->varInfo)) < 0)
+        if (display->functions.GetVar(display->file, &display->varInfo) != gcvSTATUS_OK)
         {
             break;
         }
 
-        if (ioctl(display->file, FBIOGET_FSCREENINFO, &display->fixInfo) < 0)
+        if (display->functions.GetFix(display->file, &display->fixInfo) != gcvSTATUS_OK)
         {
             break;
         }
@@ -592,12 +1390,16 @@ fbdev_GetDisplayByIndex(
         /* Find a way to detect if pan display is with vsync. */
         display->panVsync = gcvTRUE;
 
-        display->memory = mmap(0,
-                               display->size,
-                               PROT_READ | PROT_WRITE,
-                               MAP_SHARED,
-                               display->file,
-                               0);
+        if (display->functions.MemoryMap(0,
+                                         display->size,
+                                         PROT_READ | PROT_WRITE,
+                                         MAP_SHARED,
+                                         display->file,
+                                         0,
+                                         &display->memory) != gcvSTATUS_OK)
+        {
+            break;
+        }
 
         if (display->memory == MAP_FAILED)
         {
@@ -625,16 +1427,17 @@ fbdev_GetDisplayByIndex(
     {
         if (display->memory != gcvNULL)
         {
-            munmap(display->memory, display->size);
+            display->functions.MemoryUnmap(display->memory, display->size);
+            display->memory = gcvNULL;
         }
 
         if (display->file >= 0)
         {
-            ioctl(display->file, FBIOPUT_VSCREENINFO, &(display->orgVarInfo));
-            close(display->file);
+            display->functions.SetVar(display->file, &display->orgVarInfo);
+            display->functions.ReleaseDevice(display->file);
         }
 
-        free(display);
+        gcmOS_SAFE_FREE(gcvNULL, display);
         display = gcvNULL;
     }
 
@@ -721,7 +1524,7 @@ typedef struct _fbdevDISPLAY_INFO
 
     /* The physical address of the display memory buffer. ~0 is returned
     ** if the address is not known for the specified display. */
-    gctPHYS_ADDR_T               physical;
+    gctPHYS_ADDR_T              physical;
 
     /* Can be wraped as surface. */
     int                         wrapFB;
@@ -1007,7 +1810,7 @@ fbdev_SetDisplayVirtual(
             /* wait for swap interval  * vsync */
             while (swapInterval--)
             {
-                ioctl(display->file, FBIO_WAITFORVSYNC, (void *)0);
+                display->functions.WaitForVsync(display->file, 0);
             }
 #endif
 
@@ -1025,7 +1828,7 @@ fbdev_SetDisplayVirtual(
                 display->varInfo.vmode &= ~FB_VMODE_YWRAP;
             }
 
-            ioctl(display->file, FBIOPAN_DISPLAY, &display->varInfo);
+            display->functions.PanDisplay(display->file, &display->varInfo);
             {
                 /* FSL: buffer PAN'ed. */
                 gctINT index;
@@ -1249,7 +2052,7 @@ fbdev_DestroyDisplay(
     {
         if (display->memory != NULL)
         {
-            munmap(display->memory, display->size);
+            display->functions.MemoryUnmap(display->memory, display->size);
             display->memory = NULL;
         }
 
@@ -1258,18 +2061,16 @@ fbdev_DestroyDisplay(
             display->bufferStatus = 0;
             pthread_cond_broadcast(&display->cond);
 
-            ioctl(display->file, FBIOPUT_VSCREENINFO, &(display->orgVarInfo));
-
-            close(display->file);
+            display->functions.SetVar(display->file, &display->orgVarInfo);
+            display->functions.ReleaseDevice(display->file);
             display->file = -1;
         }
 
         pthread_mutex_destroy(&(display->condMutex));
         pthread_cond_destroy(&(display->cond));
 
-        free(display);
+        gcmOS_SAFE_FREE(gcvNULL, display);
         display = gcvNULL;
-        Display = gcvNULL;
     }
     return gcvSTATUS_OK;
 }
@@ -1414,8 +2215,8 @@ fbdev_CreateWindow(
 
     do
     {
-        struct _FBWindow *window = (struct _FBWindow *) malloc(gcmSIZEOF(struct _FBWindow));
-        if (window == gcvNULL)
+        struct _FBWindow *window;
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(struct _FBWindow), (gctPOINTER *)&window)))
         {
             status = gcvSTATUS_OUT_OF_RESOURCES;
             break;
@@ -1504,7 +2305,7 @@ fbdev_DestroyWindow(
 {
     if (Window != gcvNULL)
     {
-        free(Window);
+        gcmOS_SAFE_FREE(gcvNULL, Window);
     }
     return gcvSTATUS_OK;
 }
@@ -1630,13 +2431,12 @@ fbdev_CreatePixmap(
 
     do
     {
-        pixmap = (struct _FBPixmap*) malloc(sizeof (struct _FBPixmap));
-        memset(pixmap, 0, sizeof (struct _FBPixmap));
-
-        if (pixmap == gcvNULL)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof (struct _FBPixmap), (gctPOINTER *)&pixmap)))
         {
             break;
         }
+        gcoOS_ZeroMemory(pixmap, sizeof (struct _FBPixmap));
+
 #if gcdUSE_PIXMAP_SURFACE
         if (BitsPerPixel <= 16)
         {
@@ -1685,10 +2485,9 @@ fbdev_CreatePixmap(
 #else
         alignedWidth   = (Width + 0x0F) & (~0x0F);
         alignedHeight  = (Height + 0x3) & (~0x03);
-        pixmap->original = malloc(alignedWidth * alignedHeight * (BitsPerPixel + 7) / 8 + 64);
-        if (pixmap->original == gcvNULL)
+        gcmIS_ERROR(gcoOS_Allocate(gcvNULL, alignedWidth * alignedHeight * (BitsPerPixel + 7) / 8 + 64, (gctPOINTER *)&pixmap->original))
         {
-            free(pixmap);
+            gcmOS_SAFE_FREE(gcvNULL, pixmap);
             pixmap = gcvNULL;
 
             break;
@@ -1720,7 +2519,7 @@ fbdev_CreatePixmap(
         {
             gcoSURF_Destroy(pixmap->surface);
         }
-        free(pixmap);
+        gcmOS_SAFE_FREE(gcvNULL, pixmap);
     }
 #endif
 
@@ -1802,10 +2601,10 @@ fbdev_DestroyPixmap(
 #else
         if (pixmap->original != NULL)
         {
-            free(pixmap->original);
+            gcmOS_SAFE_FREE(gcvNULL, pixmap->original);
         }
 #endif
-        free(pixmap);
+        gcmOS_SAFE_FREE(gcvNULL, pixmap);
         pixmap = gcvNULL;
         Pixmap = gcvNULL;
     }
@@ -2331,6 +3130,7 @@ fbdev_SynchronousFlip(
         if (display->serverSide)
             return gcvTRUE;
     }
+
     return gcvFALSE;
 }
 gceSTATUS
@@ -2974,7 +3774,7 @@ _QueryWindowInfo(
                                      sizeof (fbdevDISPLAY_INFO),
                                      &dInfo);
 
-#ifdef EMULATOR
+#if defined(EMULATOR) || gcdCAPTURE_ONLY_MODE
     if (gcvTRUE)
 #else
     if (gcmIS_ERROR(status))
@@ -4629,7 +5429,6 @@ void fbdev_UnSetServerTag(VEGLDisplay Display)
     fbdisplay=(struct _FBDisplay *)Display->hdc;
     fbdisplay->serverSide = gcvFALSE;
 }
-
 
 static struct eglFbPlatform fbdevBackend =
 {
