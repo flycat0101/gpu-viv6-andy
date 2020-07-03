@@ -443,3 +443,91 @@ TENSOR_TRANSCENDENTAL_BF16_2D(softRelu)
 //SQUARE
 TENSOR_TRANSCENDENTAL_BF16_2D(square)
 
+#define TENSOR_TRANSCENDENTAL_F32TOBF16(funcName) \
+    __kernel void vxTensorTR_##funcName##_F32toBF16( \
+    __read_only  image2d_array_t  input, \
+    __write_only image2d_array_t  output \
+    ) \
+{ \
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0); \
+    vxc_ushort8   src0, src1, dst; \
+    float4 vecA; \
+    float4 vecB; \
+    vecA = read_imagef(input, coord); \
+    vecB = read_imagef(input, (int4)(coord.x + 4, coord.yzw)); \
+ \
+    vecA = funcName##_(vecA); \
+    vecB = funcName##_(vecB); \
+ \
+    _viv_asm(COPY, src0, vecA, 16); \
+    _viv_asm(COPY, src1, vecB, 16); \
+ \
+    VXC_DP2x8(dst, src0, src1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExtractOddData_2x8); \
+    VXC_WriteImage2DArray(output, coord, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+}
+
+#ifdef VX_NN_SUPPORT_EXP_LOG_SIN_OP
+//EXP
+TENSOR_TRANSCENDENTAL_F32TOBF16(exp)
+//LOG
+TENSOR_TRANSCENDENTAL_F32TOBF16(log)
+//SIN
+TENSOR_TRANSCENDENTAL_F32TOBF16(sin)
+#endif
+//SIGMOID
+TENSOR_TRANSCENDENTAL_F32TOBF16(sigmoid)
+//SQRT
+TENSOR_TRANSCENDENTAL_F32TOBF16(sqrt)
+//RSQRT
+TENSOR_TRANSCENDENTAL_F32TOBF16(rsqrt)
+//TANH
+TENSOR_TRANSCENDENTAL_F32TOBF16(tanh)
+//SOFTRELU
+TENSOR_TRANSCENDENTAL_F32TOBF16(softRelu)
+//SQUARE
+TENSOR_TRANSCENDENTAL_F32TOBF16(square)
+
+#define TENSOR_TRANSCENDENTAL_F32TOBF16_2D(funcName) \
+    __kernel void vxTensorTR_##funcName##_F32toBF16_2D( \
+    __read_only  image2d_t  input, \
+    __write_only image2d_t  output \
+    ) \
+{ \
+    int2 coord = (int2)(get_global_id(0), get_global_id(1)); \
+    vxc_ushort8   src0, src1, dst; \
+    float4 vecA; \
+    float4 vecB; \
+    vecA = read_imagef(input, coord); \
+    vecB = read_imagef(input, (int2)(coord.x + 4, coord.y)); \
+    vecA = funcName##_(vecA); \
+    vecB = funcName##_(vecB); \
+ \
+    _viv_asm(COPY, src0, vecA, 16); \
+    _viv_asm(COPY, src1, vecB, 16); \
+ \
+    VXC_DP2x8(dst, src0, src1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExtractOddData_2x8); \
+    VXC_WriteImage(output, coord, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+}
+
+
+#ifdef VX_NN_SUPPORT_EXP_LOG_SIN_OP
+//EXP
+TENSOR_TRANSCENDENTAL_F32TOBF16_2D(exp)
+//LOG
+TENSOR_TRANSCENDENTAL_F32TOBF16_2D(log)
+//SIN
+TENSOR_TRANSCENDENTAL_F32TOBF16_2D(sin)
+#endif
+//SIGMOID
+TENSOR_TRANSCENDENTAL_F32TOBF16_2D(sigmoid)
+//SQRT
+TENSOR_TRANSCENDENTAL_F32TOBF16_2D(sqrt)
+//RSQRT
+TENSOR_TRANSCENDENTAL_F32TOBF16_2D(rsqrt)
+//TANH
+TENSOR_TRANSCENDENTAL_F32TOBF16_2D(tanh)
+//SOFTRELU
+TENSOR_TRANSCENDENTAL_F32TOBF16_2D(softRelu)
+//SQUARE
+TENSOR_TRANSCENDENTAL_F32TOBF16_2D(square)
+

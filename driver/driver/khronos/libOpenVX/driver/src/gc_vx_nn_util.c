@@ -6006,6 +6006,46 @@ vx_bool vx_nn_kernel_optimize_element_shape
     return ret;
 } /* vx_nn_kernel_optimize_element_shape() */
 
+
+/** Map data type to gpu internal dtype. */
+vx_sh_kernel_type_e getSHKernelType
+    (
+    vx_enum dtype
+    )
+{
+    switch(dtype )
+    {
+    case VX_TYPE_INVALID:
+        return INVALID;
+    case VX_TYPE_INT8:
+        return I8;
+    case VX_TYPE_BOOL8:
+        return BOOL8;
+    case VX_TYPE_INT16:
+        return I16;
+    case VX_TYPE_INT32:
+        return I32;
+    case VX_TYPE_INT64:
+        return I64;
+    case VX_TYPE_UINT8:
+        return U8;
+    case VX_TYPE_UINT16:
+        return U16;
+    case VX_TYPE_UINT32:
+        return U32;
+    case VX_TYPE_FLOAT16:
+        return F16;
+    case VX_TYPE_BFLOAT16:
+        return BF16;
+    case VX_TYPE_FLOAT32:
+        return F32;
+    default:
+        vxError("error data type %d\n", dtype);
+        break;
+    }
+    return I8;
+} /* getSHKernelType() */
+
 vx_bool IsTPSupport_CheckOutPixel(vx_context context, vx_tensor inputs, vx_tensor outputs)
 {
     vx_bool support = vx_true_e;
