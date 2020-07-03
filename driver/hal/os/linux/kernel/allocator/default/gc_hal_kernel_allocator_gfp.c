@@ -401,6 +401,7 @@ _NonContiguous1MPagesAlloc(
             gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
         }
     }
+    memset(MdlPriv->isExact, 0, size);
 
     size = *NumPages * sizeof(struct page *);
     pages = kmalloc(size, GFP_KERNEL | gcdNOWARN);
