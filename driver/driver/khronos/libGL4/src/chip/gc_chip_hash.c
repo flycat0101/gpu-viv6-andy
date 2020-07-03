@@ -204,11 +204,14 @@ static gceSTATUS freeShaderEntry(
 
     gcFreeProgramState(Entry->program.programState);
 
-    /* Free the entry. */
-    last = gcmOS_SAFE_FREE(gcvNULL, Entry);
-    if (gcmIS_ERROR(last))
+    if (Entry)
     {
-        status = last;
+        /* Free the entry. */
+        last = gcmOS_SAFE_FREE(gcvNULL, Entry);
+        if (gcmIS_ERROR(last))
+        {
+            status = last;
+        }
     }
 
     gcmFOOTER();
@@ -361,10 +364,13 @@ gceSTATUS deinitializeHashTable(
         }
 
         /* Free table. */
-        last = gcmOS_SAFE_FREE(gcvNULL, chipCtx->hashTable);
-        if (gcmIS_ERROR(last))
+        if (chipCtx->hashTable)
         {
-            status = last;
+            last = gcmOS_SAFE_FREE(gcvNULL, chipCtx->hashTable);
+            if (gcmIS_ERROR(last))
+            {
+                status = last;
+            }
         }
     }
 

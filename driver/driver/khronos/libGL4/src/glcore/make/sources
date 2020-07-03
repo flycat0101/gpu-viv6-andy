@@ -52,6 +52,7 @@ SOURCES= \
 ../gc_gl_math.o \
 ../gc_gl_memmgr.o \
 ../gc_gl_prim.o \
+../gc_gl_primcache.o \
 ../gc_gl_px_util.o \
 ../gc_gl_pushpop.o \
 ../gc_gl_rect.o \

@@ -137,27 +137,6 @@ __vivImpFatal(void *gc, const void* msg)
     abort();
 }
 
-GLuint
-__vivImpGetMemoryStatus(__GLmemoryStatus option)
-{
-    switch(option)
-    {
-        case __GL_MMUSAGE_PHYS_TOTAL:
-            return 0x200000;
-            break;
-        case __GL_MMUSAGE_PHYS_AVAIL:
-            return 0x200000;
-            break;
-        case __GL_MMUSAGE_VIRTUAL_TOTAL:
-            return 0x200000;
-            break;
-        case __GL_MMUSAGE_VIRTUAL_AVAIL:
-            return 0x200000;
-            break;
-    }
-    return 0;
-}
-
 GLvoid *__vivImpGetHWND(void *gc)
 {
     return NULL;
@@ -329,7 +308,7 @@ VEGLimports imports = {
     0,
     gcvNULL,
 #endif
-    __vivImpGetMemoryStatus,
+    gcvNULL,
     __vivImpWarning,
     __vivImpFatal,
     (void (*)(void *, void *))__vivImpNoop,

@@ -16,13 +16,15 @@
 #include "g_asmoff.h"
 #include "api/gc_gl_api_inline.c"
 
-extern GLuint fmtIndex2InputIndex[];
 extern GLvoid __glSwitchToNorVertEntriesFunc(__GLcontext *gc);
 
 /**/
 extern GLvoid APIENTRY __glim_End_Material (__GLcontext *gc);
 
 extern GLvoid  __glDrawImmedPrimitive(__GLcontext *gc);
+extern GLvoid APIENTRY __glImmedDrawArrays_Normal_V3F(__GLcontext *gc, GLenum mode, GLint first, GLsizei count);
+extern GLvoid APIENTRY __glImmedDrawArrays_V3F_Select(__GLcontext *gc, GLenum mode, GLint first, GLsizei count);
+extern GLvoid APIENTRY __glImmedDrawArrays_Color_V3F(__GLcontext *gc, GLenum mode, GLint first, GLsizei count);
 
 /*
 ** Lookup table from input index to maximum element size (number of words).
@@ -295,6 +297,27 @@ GLuint edgeFlagInputMask[] =
 };
 
 /*
+** Internal batch end flag for each primitive type.
+*/
+GLboolean internalEndTable[] =
+{
+    GL_FALSE,                                 /* GL_POINTS             */
+    GL_FALSE,                                 /* GL_LINES              */
+    GL_TRUE,                                  /* GL_LINE_LOOP          */
+    GL_TRUE,                                  /* GL_LINE_STRIP         */
+    GL_FALSE,                                 /* GL_TRIANGLES          */
+    GL_TRUE,                                  /* GL_TRIANGLE_STRIP     */
+    GL_TRUE,                                  /* GL_TRIANGLE_FAN       */
+    GL_FALSE,                                 /* GL_QUADS              */
+    GL_TRUE,                                  /* GL_QUAD_STRIP         */
+    GL_TRUE,                                  /* GL_POLYGON            */
+    GL_TRUE,                                  /* GL_LINES_ADJACENCY_EXT */
+    GL_TRUE,                                  /* GL_LINE_STRIP_ADJACENCY_EXT */
+    GL_TRUE,                                  /* GL_TRIANGLES_ADJACENCY_EXT */
+    GL_TRUE,                                  /* GL_TRIANGLE_STRIP_ADJACENCY_EXT */
+};
+
+/*
 ** Lookup Table inputTag = inputTagTable[__GL_INPUT_*_INDEX][sizeDW-1]
 */
 GLenum inputTagTable[32][4] =
@@ -333,6 +356,19 @@ GLenum inputTagTable[32][4] =
     {0, 0, 0, __GL_AT4F_I15_TAG},                       /* __GL_INPUT_ATT15_INDEX */
 };
 
+GLvoid __glSwitchImmediateDispatch(__GLcontext *gc, __GLdispatchTable *pDispatch)
+{
+    gc->currentImmediateDispatch = pDispatch;
+    if (gc->dlist.mode == 0)
+    {
+        gc->pModeDispatch = pDispatch;
+        if (!gc->apiProfile)
+        {
+            gc->pEntryDispatch = gc->pModeDispatch;
+        }
+    }
+}
+
 GLvoid __glValidateImmedBegin(__GLcontext *gc, GLenum mode)
 {
     /* Compute the required primitive input mask */
@@ -345,6 +381,23 @@ GLvoid __glValidateImmedBegin(__GLcontext *gc, GLenum mode)
 
     /* Enable indexed primitive only for joint primitives in GL_FILL mode */
     gc->input.indexPrimEnabled = GL_FALSE;
+
+    switch (mode)
+    {
+    case GL_LINE_STRIP:
+    case GL_LINE_LOOP:
+        gc->input.indexPrimEnabled = GL_TRUE;
+        break;
+    case GL_TRIANGLE_STRIP:
+    case GL_TRIANGLE_FAN:
+    case GL_QUAD_STRIP:
+    case GL_POLYGON:
+        if (gc->state.polygon.bothFaceFill)
+        {
+            gc->input.indexPrimEnabled = GL_TRUE;
+        }
+        break;
+    }
 }
 
 __GL_INLINE GLuint64 __glInputMask2InconsisFormat(GLuint64 mask)
@@ -390,7 +443,8 @@ GLvoid __glComputePrimitiveData(__GLcontext *gc)
     {
         inputMask = gc->input.requiredInputMask;
     }
-    else {
+    else
+    {
         inputMask = __glVertexFormat2InputMask(gc->input.primitiveFormat);
         if (inputMask & __GL_INPUT_EDGEFLAG)
         {
@@ -403,7 +457,8 @@ GLvoid __glComputePrimitiveData(__GLcontext *gc)
     inputMask &= ~__GL_INPUT_EDGEFLAG;
     i = 0;
     vE = 0;
-    while (inputMask) {
+    while (inputMask)
+    {
         if (inputMask & 0x1) {
             vE += 1;
         }
@@ -413,22 +468,592 @@ GLvoid __glComputePrimitiveData(__GLcontext *gc)
     gc->input.numberOfElements = vE;
 }
 
-GLvoid __glResetImmedVertexBuffer(__GLcontext *gc)
+__GL_INLINE void __glRestoreVertexInputMachine(__GLcontext *gc, __GLvertexDataCache *vtxCache, GLint index)
 {
-    /* Set the input buffer to the default vertex buffer */
+    GLuint mask, i;
+
+    gc->input.primMode = vtxCache->primMode;
+    gc->input.connectPrimMode = vtxCache->connectPrimMode;
+    gc->input.vertTotalStrideDW = vtxCache->vertTotalStrideDW;
+    gc->input.primitiveFormat = vtxCache->primitiveFormat;
+    gc->input.primElemSequence = vtxCache->primElemSequence;
+    gc->input.primInputMask = vtxCache->primInputMask;
+    gc->input.numberOfElements = vtxCache->numberOfElements;
+    gc->input.indexPrimEnabled = vtxCache->indexPrimEnabled;
+
+    i = 0;
+    mask = gc->input.primInputMask & (~__GL_INPUT_EDGEFLAG);
+    while (mask)
+    {
+        if (mask & 0x1)
+        {
+            gc->input.currentInput[i].offsetDW = vtxCache->elemOffsetDW[i];
+            gc->input.currentInput[i].sizeDW = vtxCache->elemSizeDW[i];
+            gc->input.currentInput[i].pointer =
+                (GLubyte *)(gc->input.defaultDataBuffer + gc->input.currentInput[i].offsetDW);
+            gc->input.currentInput[i].currentPtrDW =
+                (GLfloat *)gc->input.currentInput[i].pointer + gc->input.vertTotalStrideDW * index;
+        }
+        mask >>= 1;
+        i += 1;
+    }
+}
+
+void __glComputeCacheBufVertexCount(__GLcontext *gc)
+{
+    GLuint vertexCount, vertexIndex, indexCount, lastVtxIndex;
+    GLuint currentBeginTag;
+    __GLvertexInfo *vtxinfo;
+    GLuint64 vertexFormat;
+
+    /* Compute vertexCount and indexCount from gc->input.vertexInfoBuffer */
+    vtxinfo = gc->input.vertexInfoBuffer;
+    if ((vtxinfo->inputTag & __GL_VERTEX_DATA_TAG_MASK) || (vtxinfo->inputTag == __GL_END_TAG))
+    {
+        /* For continued primitive batch that start with a vertex data tag or glEnd tag */
+        vertexIndex = vtxinfo->offsetDW / gc->input.vertTotalStrideDW;
+        lastVtxIndex = indexCount = 0;
+        vertexFormat = 0;
+        currentBeginTag = (gc->input.connectPrimMode | 0x10);
+    }
+    else
+    {
+        /* For primitive batch that start with a __GL_BEGIN_*_TAG */
+        vertexIndex = lastVtxIndex = indexCount = 0;
+        vertexFormat = 0;
+        currentBeginTag = 0;
+    }
+
+    while (vtxinfo < gc->input.currentInfoBufPtr)
+    {
+        switch (vtxinfo->inputTag) {
+        case __GL_BEGIN_TRIANGLES_TAG:
+        case __GL_BEGIN_TRIANGLE_STRIP_TAG:
+        case __GL_BEGIN_TRIANGLE_FAN_TAG:
+        case __GL_BEGIN_POLYGON_TAG:
+        case __GL_BEGIN_QUADS_TAG:
+        case __GL_BEGIN_QUAD_STRIP_TAG:
+        case __GL_BEGIN_LINES_TAG:
+        case __GL_BEGIN_LINE_STRIP_TAG:
+        case __GL_BEGIN_LINE_LOOP_TAG:
+        case __GL_BEGIN_POINTS_TAG:
+            currentBeginTag = vtxinfo->inputTag;
+            break;
+        case __GL_END_TAG:
+            vertexCount = vertexIndex - lastVtxIndex;
+            lastVtxIndex = vertexIndex;
+            if (vertexCount) {
+                switch (currentBeginTag) {
+                  case __GL_BEGIN_TRIANGLES_TAG:
+                    indexCount += vertexCount;
+                    break;
+                  case __GL_BEGIN_TRIANGLE_STRIP_TAG:
+                  case __GL_BEGIN_TRIANGLE_FAN_TAG:
+                  case __GL_BEGIN_POLYGON_TAG:
+                    indexCount += (vertexCount - 2) * 3;
+                    break;
+                  case __GL_BEGIN_QUADS_TAG:
+                    indexCount += (vertexCount >> 1) * 3;
+                    break;
+                  case __GL_BEGIN_QUAD_STRIP_TAG:
+                    indexCount += (vertexCount - 2) * 3;
+                    break;
+                  case __GL_BEGIN_LINES_TAG:
+                    indexCount += vertexCount;
+                    break;
+                  case __GL_BEGIN_LINE_STRIP_TAG:
+                    indexCount += (vertexCount - 1) * 2;
+                    break;
+                  case __GL_BEGIN_LINE_LOOP_TAG:
+                    indexCount += vertexCount * 2;
+                    break;
+                  case __GL_BEGIN_POINTS_TAG:
+                    indexCount += vertexCount;
+                    break;
+
+                  default:
+                    GL_ASSERT(0);
+                    break;
+                }
+            }
+            break;
+        case __GL_V2F_TAG:
+            vertexFormat = 0;
+            vertexIndex++;
+            break;
+        case __GL_V3F_TAG:
+            vertexFormat = 0;
+            vertexIndex++;
+            break;
+        case __GL_V4F_TAG:
+            vertexFormat = 0;
+            vertexIndex++;
+            break;
+        case __GL_N3F_V3F_TAG:
+            vertexFormat = 0;
+            vertexIndex++;
+            break;
+        case __GL_C4F_V3F_TAG:
+            vertexFormat = 0;
+            vertexIndex++;
+            break;
+        case __GL_C3F_TAG:
+            vertexFormat |= __GL_C3F_BIT;
+            break;
+        case __GL_C4F_TAG:
+            vertexFormat |= __GL_C4F_BIT;
+            break;
+        case __GL_C4UB_TAG:
+            vertexFormat |= __GL_C4UB_BIT;
+            break;
+        case __GL_N3F_TAG:
+            vertexFormat |= __GL_N3F_BIT;
+            break;
+        case __GL_TC2F_TAG:
+            vertexFormat |= __GL_TC2F_BIT;
+            break;
+        case __GL_TC2F_U1_TAG:
+            vertexFormat |= __GL_TC2F_U1_BIT;
+            break;
+        case __GL_TC2F_U2_TAG:
+            vertexFormat |= __GL_TC2F_U2_BIT;
+            break;
+        case __GL_TC2F_U3_TAG:
+            vertexFormat |= __GL_TC2F_U3_BIT;
+            break;
+        case __GL_TC2F_U4_TAG:
+            vertexFormat |= __GL_TC2F_U4_BIT;
+            break;
+        case __GL_TC2F_U5_TAG:
+            vertexFormat |= __GL_TC2F_U5_BIT;
+            break;
+        case __GL_TC2F_U6_TAG:
+            vertexFormat |= __GL_TC2F_U6_BIT;
+            break;
+        case __GL_TC2F_U7_TAG:
+            vertexFormat |= __GL_TC2F_U7_BIT;
+            break;
+        case __GL_TC3F_TAG:
+            vertexFormat |= __GL_TC3F_BIT;
+            break;
+        case __GL_TC3F_U1_TAG:
+            vertexFormat |= __GL_TC3F_U1_BIT;
+            break;
+        case __GL_TC3F_U2_TAG:
+            vertexFormat |= __GL_TC3F_U2_BIT;
+            break;
+        case __GL_TC3F_U3_TAG:
+            vertexFormat |= __GL_TC3F_U3_BIT;
+            break;
+        case __GL_TC3F_U4_TAG:
+            vertexFormat |= __GL_TC3F_U4_BIT;
+            break;
+        case __GL_TC3F_U5_TAG:
+            vertexFormat |= __GL_TC3F_U5_BIT;
+            break;
+        case __GL_TC3F_U6_TAG:
+            vertexFormat |= __GL_TC3F_U6_BIT;
+            break;
+        case __GL_TC3F_U7_TAG:
+            vertexFormat |= __GL_TC3F_U7_BIT;
+            break;
+        case __GL_TC4F_TAG:
+            vertexFormat |= __GL_TC4F_BIT;
+            break;
+        case __GL_TC4F_U1_TAG:
+            vertexFormat |= __GL_TC4F_U1_BIT;
+            break;
+        case __GL_TC4F_U2_TAG:
+            vertexFormat |= __GL_TC4F_U2_BIT;
+            break;
+        case __GL_TC4F_U3_TAG:
+            vertexFormat |= __GL_TC4F_U3_BIT;
+            break;
+        case __GL_TC4F_U4_TAG:
+            vertexFormat |= __GL_TC4F_U4_BIT;
+            break;
+        case __GL_TC4F_U5_TAG:
+            vertexFormat |= __GL_TC4F_U5_BIT;
+            break;
+        case __GL_TC4F_U6_TAG:
+            vertexFormat |= __GL_TC4F_U6_BIT;
+            break;
+        case __GL_TC4F_U7_TAG:
+            vertexFormat |= __GL_TC4F_U7_BIT;
+            break;
+        case __GL_EDGEFLAG_TAG:
+            vertexFormat |= __GL_EDGEFLAG_BIT;
+            break;
+        case __GL_SC3F_TAG:
+            vertexFormat |= __GL_SC3F_BIT;
+            break;
+        case __GL_FOG1F_TAG:
+            vertexFormat |= __GL_FOG1F_BIT;
+            break;
+        case __GL_AT4F_I0_TAG:
+            vertexFormat |= __GL_AT4F_I0_BIT;
+            break;
+        case __GL_AT4F_I1_TAG:
+            vertexFormat |= __GL_AT4F_I1_BIT;
+            break;
+        case __GL_AT4F_I2_TAG:
+            vertexFormat |= __GL_AT4F_I2_BIT;
+            break;
+        case __GL_AT4F_I3_TAG:
+            vertexFormat |= __GL_AT4F_I3_BIT;
+            break;
+        case __GL_AT4F_I4_TAG:
+            vertexFormat |= __GL_AT4F_I4_BIT;
+            break;
+        case __GL_AT4F_I5_TAG:
+            vertexFormat |= __GL_AT4F_I5_BIT;
+            break;
+        case __GL_AT4F_I6_TAG:
+            vertexFormat |= __GL_AT4F_I6_BIT;
+            break;
+        case __GL_AT4F_I7_TAG:
+            vertexFormat |= __GL_AT4F_I7_BIT;
+            break;
+        case __GL_AT4F_I8_TAG:
+            vertexFormat |= __GL_AT4F_I8_BIT;
+            break;
+        case __GL_AT4F_I9_TAG:
+            vertexFormat |= __GL_AT4F_I9_BIT;
+            break;
+        case __GL_AT4F_I10_TAG:
+            vertexFormat |= __GL_AT4F_I10_BIT;
+            break;
+        case __GL_AT4F_I11_TAG:
+            vertexFormat |= __GL_AT4F_I11_BIT;
+            break;
+        case __GL_AT4F_I12_TAG:
+            vertexFormat |= __GL_AT4F_I12_BIT;
+            break;
+        case __GL_AT4F_I13_TAG:
+            vertexFormat |= __GL_AT4F_I13_BIT;
+            break;
+        case __GL_AT4F_I14_TAG:
+            vertexFormat |= __GL_AT4F_I14_BIT;
+            break;
+        case __GL_AT4F_I15_TAG:
+            vertexFormat |= __GL_AT4F_I15_BIT;
+            break;
+        case __GL_DRAWARRAYS_POINTS_TAG:
+        case __GL_DRAWARRAYS_LINES_TAG:
+        case __GL_DRAWARRAYS_LINE_LOOP_TAG:
+        case __GL_DRAWARRAYS_LINE_STRIP_TAG:
+        case __GL_DRAWARRAYS_TRIANGLES_TAG:
+        case __GL_DRAWARRAYS_TRIANGLE_STRIP_TAG:
+        case __GL_DRAWARRAYS_TRIANGLE_FAN_TAG:
+        case __GL_DRAWARRAYS_QUADS_TAG:
+        case __GL_DRAWARRAYS_QUAD_STRIP_TAG:
+        case __GL_DRAWARRAYS_POLYGON_TAG:
+            currentBeginTag = vtxinfo->inputTag;
+            vertexIndex += (GLuint)vtxinfo->count;
+            break;
+        case __GL_DRAWARRAYS_END_TAG:
+            vertexCount = vertexIndex - lastVtxIndex;
+            lastVtxIndex = vertexIndex;
+            if (vertexCount) {
+                switch (currentBeginTag) {
+                  case __GL_DRAWARRAYS_TRIANGLES_TAG:
+                    indexCount += vertexCount;
+                    break;
+                  case __GL_DRAWARRAYS_TRIANGLE_STRIP_TAG:
+                  case __GL_DRAWARRAYS_TRIANGLE_FAN_TAG:
+                  case __GL_DRAWARRAYS_POLYGON_TAG:
+                    indexCount += (vertexCount - 2) * 3;
+                    break;
+                  case __GL_DRAWARRAYS_QUADS_TAG:
+                    indexCount += (vertexCount >> 1) * 3;
+                    break;
+                  case __GL_DRAWARRAYS_QUAD_STRIP_TAG:
+                    indexCount += (vertexCount - 2) * 3;
+                    break;
+                  case __GL_DRAWARRAYS_LINES_TAG:
+                    indexCount += vertexCount;
+                    break;
+                  case __GL_DRAWARRAYS_LINE_STRIP_TAG:
+                    indexCount += (vertexCount - 1) * 2;
+                    break;
+                  case __GL_DRAWARRAYS_LINE_LOOP_TAG:
+                    indexCount += vertexCount * 2;
+                    break;
+                  case __GL_DRAWARRAYS_POINTS_TAG:
+                    indexCount += vertexCount;
+                    break;
+
+                  default:
+                    GL_ASSERT(0);
+                    break;
+                }
+            }
+            break;
+        case __GL_ARRAY_V2F_TAG:
+        case __GL_ARRAY_V3F_TAG:
+        case __GL_ARRAY_V4F_TAG:
+        case __GL_ARRAY_C3F_TAG:
+        case __GL_ARRAY_C4F_TAG:
+        case __GL_ARRAY_C4UB_TAG:
+        case __GL_ARRAY_N3F_TAG:
+        case __GL_ARRAY_TC2F_TAG:
+        case __GL_ARRAY_TC3F_TAG:
+        case __GL_ARRAY_TC4F_TAG:
+        case __GL_ARRAY_N3F_V3F_TAG:
+        case __GL_ARRAY_C4F_V3F_TAG:
+        case __GL_ARRAY_INDEX_TAG:
+        case __GL_BATCH_END_TAG:
+            break;
+        default:
+            GL_ASSERT(0);
+            break;
+        }
+
+        vtxinfo++;
+    }
+    gc->input.vertex.index = vertexIndex;
+    gc->input.lastVertexIndex = lastVtxIndex;
+    gc->input.indexCount = (gc->input.indexPrimEnabled) ? indexCount : 0;
+    gc->input.vertexFormat = vertexFormat;
+}
+
+void __glSwitchToDefaultVertexBuffer(__GLcontext *gc, GLuint inputTag)
+{
+    GLuint beginOffsetDW = 0;
+    GLuint infoOffsetDW = 0;
+    GLuint dataOffsetDW = 0;
+    GLint dataSize, mask, i, j;
+    GLboolean continuedPrim;
+
+    /* Copy the global variable gc->pCurrentInfoBufPtr back to gc->input.currentInfoBufPtr.
+    */
+    gc->input.currentInfoBufPtr = gc->pCurrentInfoBufPtr;
+
+    /* If the first inputTag in vertexInfoBuffer is a vertex data tag then this
+    ** is a continued primitive which is a continuation of last primitive batch.
+    */
+    continuedPrim = (gc->input.vertexInfoBuffer->inputTag == inputTag &&
+                    ((inputTag & __GL_VERTEX_DATA_TAG_MASK) || inputTag == __GL_END_TAG));
+
+    infoOffsetDW = (GLuint)((GLuint *)gc->input.currentInfoBufPtr - (GLuint *)gc->input.vertexInfoBuffer);
+    if (infoOffsetDW || continuedPrim)
+    {
+        dataOffsetDW = gc->input.currentInfoBufPtr->offsetDW;
+
+        /* Compute vertexCount and indexCount from vertexInfoBuffer and dataOffsetDW */
+        __glComputeCacheBufVertexCount(gc);
+    }
+
+    /* Copy the partially compared vertex info buffer from cache to the default info buffer */
+    dataSize = infoOffsetDW << 2;
+    if (dataSize)
+    {
+        __GL_MEMCOPY(gc->input.defaultInfoBuffer, gc->input.vertexInfoBuffer, dataSize);
+    }
+
+    /* Copy the partially compared vertex data from cache to the default data buffer */
+    dataSize = dataOffsetDW << 2;
+    if (dataSize)
+    {
+        __GL_MEMCOPY(gc->input.defaultDataBuffer, gc->input.vertexDataBuffer, dataSize);
+    }
+
+    /* Copy the partially compared indices from the cache index buffer to the default index buffer */
+    dataSize = gc->input.indexCount * sizeof(GLushort);
+    if (dataSize)
+    {
+        __GL_MEMCOPY(gc->input.defaultIndexBuffer, gc->input.indexBuffer, dataSize);
+    }
+
+    /* Restore the vertex input machine from __GLvertexDataCache if there is partial vertex data match */
+    if (dataOffsetDW)
+    {
+        /* Do not set cacheCompareFailed flag for vertex arrays because we want to
+         * do data comparision in __glCheckCachedImmedPrimtive() function.
+         */
+        if ((inputTag & __GL_DRAWARRAYS_TAG_MASK) == 0)
+        {
+            gc->input.cacheCompareFailed = GL_TRUE;
+        }
+
+        __glRestoreVertexInputMachine(gc, gc->input.currentVertexCache, (gc->input.vertex.index - 1));
+
+        /* Update currentPtrDW pointers based on the partial vertex data */
+        i = j = 0;
+        mask = __glVertexFormat2InputMask(gc->input.vertexFormat);
+        mask &= (~__GL_INPUT_EDGEFLAG);
+        while (mask)
+        {
+            if (mask & 0x1)
+            {
+                gc->input.currentInput[i].currentPtrDW += gc->input.vertTotalStrideDW;
+                j += 1;
+            }
+            mask >>= 1;
+            i += 1;
+        }
+
+        gc->input.preVertexFormat = gc->input.primitiveFormat;
+        if (gc->input.vertex.index == 0)
+        {
+            /* Compute the partial primElemSequence for the attributes of the first vertex */
+            i = ((gc->input.numberOfElements - j) * __GL_PRIM_ELEMENT_SHIFT);
+            gc->input.primElemSequence = (gc->input.primElemSequence >> i);
+
+            /*
+            ** Before the first glVertex, gc->input.preVertexFormat equals gc->input.vertexFormat
+            ** We must recalculate the preVertexFormat and only reserve attributes that have been
+            ** copied to the default data buffer.
+            */
+
+            i = 0;
+            mask = __glVertexFormat2InputMask(gc->input.primitiveFormat);
+            mask &= ~(__GL_INPUT_EDGEFLAG);
+            while(mask)
+            {
+                if((mask & 0x1) && gc->input.currentInput[i].offsetDW >= dataOffsetDW)
+                {
+                    gc->input.primitiveFormat &= ~(input2VertexFormat[i]);
+                }
+                mask >>= 1;
+                i += 1;
+            }
+            gc->input.preVertexFormat = gc->input.primitiveFormat;
+            gc->input.vertexFormat = gc->input.preVertexFormat;
+        }
+    }
+    else
+    {
+        /* Reset primMode since this is a new beginning of primitive */
+        gc->input.primMode = gc->input.currentPrimMode;
+        gc->input.primElemSequence = 0;
+        gc->input.preVertexFormat = 0;
+
+        __glValidateImmedBegin(gc, gc->input.primMode);
+    }
+
+    /* Reset all the vertex data pointers to the default buffer */
+    gc->input.currentInfoBufPtr = (__GLvertexInfo *)((GLuint *)gc->input.defaultInfoBuffer + infoOffsetDW);
+    gc->input.currentDataBufPtr = gc->input.defaultDataBuffer + dataOffsetDW;
+    gc->input.primBeginAddr = gc->input.defaultDataBuffer + beginOffsetDW;
+
+    /* Finally switch the data and index buffers from the cache buffers to the default buffers */
+    gc->input.vertexInfoBuffer = gc->input.defaultInfoBuffer;
     gc->input.vertexDataBuffer = gc->input.defaultDataBuffer;
     gc->input.indexBuffer = gc->input.defaultIndexBuffer;
 
-    gc->input.primElemSequence = 0;
+    gc->input.cacheBufferUsed = GL_FALSE;
 
+    gc->immedModeOutsideDispatch.DrawArrays = __glim_DrawArrays_Validate;
+    gc->immedModeOutsideDispatch.DrawElements = __glim_DrawElements_Validate;
+    __GL_SET_VARRAY_STOP_CACHE_BIT(gc);
+
+    /* Switch back to the immediate mode dispatch table.
+    */
+    gc->input.pCurrentImmedModeDispatch = &gc->immedModeDispatch;
+    gc->immedModeOutsideDispatch.Begin = __glim_Begin_Info;
+
+    /* Reset immediateDispatchTable Vertex3fv entry according to CacheDispatchTable Vertex3fv entry.
+    */
+    if (gc->immedModeCacheDispatch.Vertex3fv == __glim_Vertex3fv_Cache)
+    {
+        gc->immedModeDispatch.Vertex3fv = __glim_Vertex3fv_Info;
+    }
+    else if (gc->immedModeCacheDispatch.Vertex3fv == __glim_Normal_Vertex3fv_Cache) {
+        __glSwitchToNorVertEntriesFunc(gc);
+    }
+
+    /* Switch to inside or outside Begin/End dispatch table based on beginMode.
+    */
+    if (gc->input.beginMode == __GL_IN_BEGIN)
+    {
+        __glSwitchImmediateDispatch(gc, &gc->immedModeDispatch);
+    }
+    else
+    {
+        __glSwitchImmediateDispatch(gc, &gc->immedModeOutsideDispatch);
+    }
+}
+
+GLvoid __glResetImmedVertexBuffer(__GLcontext *gc, GLboolean enableCache)
+{
+    __GLvertexDataCache *vtxCache = gc->input.currentVertexCache;
+    GLuint prevBufferUsed = gc->input.cacheBufferUsed;
+
+    /* Cache the primInputMask for the just rendered primitive batch */
+    gc->input.prevPrimInputMask = gc->input.primInputMask;
+
+    /* If the vertex cache has been setup in previous frame */
+    if (vtxCache && enableCache && gc->input.currentFrameIndex > vtxCache->frameIndex &&
+        vtxCache->cacheStatus == __GL_CHECK_FULL_VERTEX_CACHE &&
+        !( vtxCache->primInputMask & __GL_INPUT_EDGEFLAG ))
+    {
+        /* Set the input buffers to the corresponding vertex buffer and index buffer in vertexCache */
+        gc->pCurrentInfoBufPtr = gc->input.vertexInfoBuffer = vtxCache->vertexInfoBuffer;
+        gc->pVertexDataBufPtr = gc->input.vertexDataBuffer = vtxCache->vertexDataBuffer;
+        gc->input.indexBuffer = vtxCache->indexBuffer;
+
+        gc->input.cacheBufferUsed = GL_TRUE;
+        gc->input.cacheCompareFailed = GL_FALSE;
+
+        __glRestoreVertexInputMachine(gc, vtxCache, -1);
+        gc->input.pCurrentImmedModeDispatch = &gc->immedModeCacheDispatch;
+        gc->immedModeOutsideDispatch.Begin = __glim_Begin_Cache_First;
+    }
+    else
+    {
+        /* Set the input buffer to the default vertex buffer */
+        gc->input.vertexInfoBuffer = gc->input.defaultInfoBuffer;
+        gc->input.vertexDataBuffer = gc->input.defaultDataBuffer;
+        gc->input.indexBuffer = gc->input.defaultIndexBuffer;
+
+        gc->input.cacheBufferUsed = GL_FALSE;
+        gc->input.cacheCompareFailed = GL_FALSE;
+
+        gc->input.primElemSequence = 0;
+
+        gc->input.pCurrentImmedModeDispatch = &gc->immedModeDispatch;
+        if (gc->immedModeOutsideDispatch.Begin == __glim_Begin_Cache_First)
+        {
+            gc->immedModeOutsideDispatch.Begin = __glim_Begin_Info;
+        }
+    }
+
+    gc->input.currentInfoBufPtr = gc->input.vertexInfoBuffer;
     gc->input.currentDataBufPtr = gc->input.vertexDataBuffer;
 
     gc->input.vertex.index = 0;
+    gc->input.vertexTrimCount = 0;
+    gc->input.connectVertexCount = 0;
     gc->input.edgeflag.index = 0;
     gc->input.lastVertexIndex = 0;
     gc->input.indexCount = 0;
     gc->input.primBeginAddr = NULL;
     gc->input.preVertexFormat = 0;
+
+    /* Reset dispatch table
+    */
+    if (gc->input.beginMode == __GL_IN_BEGIN)
+    {
+        __glSwitchImmediateDispatch(gc, gc->input.pCurrentImmedModeDispatch);
+    }
+    else
+    {
+        __glSwitchImmediateDispatch(gc, &gc->immedModeOutsideDispatch);
+        /* Clear __GL_SMALL_DRAW_BATCH flag since all primitives have been flushed */
+        gc->input.beginMode = __GL_NOT_IN_BEGIN;
+    }
+
+    if (prevBufferUsed != gc->input.cacheBufferUsed) {
+        gc->immedModeOutsideDispatch.DrawArrays = __glim_DrawArrays_Validate;
+        gc->immedModeOutsideDispatch.DrawElements = __glim_DrawElements_Validate;
+        __GL_SET_VARRAY_STOP_CACHE_BIT(gc);
+    }
+
+    /* Turn on vertex data caching for the next drawPrimitive
+    ** only if it's not in display list compilation and execution.
+    */
+    gc->input.vertexCacheEnabled = gc->input.enableVertexCaching;
 }
 
 GLvoid __glComputeRequiredInputMask(__GLcontext *gc)
@@ -469,15 +1094,19 @@ GLvoid __glComputeRequiredInputMask(__GLcontext *gc)
 
         vsInputMask = __GL_INPUT_VERTEX;
 
-        if (gc->state.enables.lighting.lighting) {
+        if (gc->state.enables.lighting.lighting)
+        {
             vsInputMask |= __GL_INPUT_NORMAL;
-            if (gc->state.enables.lighting.colorMaterial) {
+            if (gc->state.enables.lighting.colorMaterial)
+            {
                 vsInputMask |= __GL_INPUT_DIFFUSE;
             }
         }
-        else {
+        else
+        {
             vsInputMask |= __GL_INPUT_DIFFUSE;
-            if (gc->state.enables.colorSum) {
+            if (gc->state.enables.colorSum)
+            {
                 vsInputMask |= __GL_INPUT_SPECULAR;
             }
         }
@@ -540,23 +1169,28 @@ GLvoid __glComputeRequiredInputMask(__GLcontext *gc)
         {
             texUnitEnable = &gc->state.enables.texUnits[unit];
             texUnitState = &gc->state.texture.texUnits[unit];
-            if (texUnitEnable->texGen[0]) {
+            if (texUnitEnable->texGen[0])
+            {
                 if ((texUnitState->s.mode == GL_SPHERE_MAP) ||
                     (texUnitState->s.mode == GL_REFLECTION_MAP) ||
-                    (texUnitState->s.mode == GL_NORMAL_MAP)) {
+                    (texUnitState->s.mode == GL_NORMAL_MAP))
+                {
                         totalInputMask |= __GL_INPUT_NORMAL;
                 }
             }
-            if (texUnitEnable->texGen[1]) {
+            if (texUnitEnable->texGen[1])
+            {
                 if ((texUnitState->t.mode == GL_SPHERE_MAP) ||
                     (texUnitState->t.mode == GL_REFLECTION_MAP) ||
                     (texUnitState->t.mode == GL_NORMAL_MAP)) {
                         totalInputMask |= __GL_INPUT_NORMAL;
                 }
             }
-            if (texUnitEnable->texGen[2]) {
+            if (texUnitEnable->texGen[2])
+            {
                 if ((texUnitState->r.mode == GL_REFLECTION_MAP) ||
-                    (texUnitState->r.mode == GL_NORMAL_MAP)) {
+                    (texUnitState->r.mode == GL_NORMAL_MAP))
+                {
                         totalInputMask |= __GL_INPUT_NORMAL;
                 }
             }
@@ -565,7 +1199,8 @@ GLvoid __glComputeRequiredInputMask(__GLcontext *gc)
         unit++;
     }
 
-    if (!gc->state.polygon.bothFaceFill) {
+    if (!gc->state.polygon.bothFaceFill)
+    {
         totalInputMask |= __GL_INPUT_EDGEFLAG;
     }
 
@@ -579,12 +1214,13 @@ GLvoid __glComputeRequiredInputMask(__GLcontext *gc)
     }
 
     /*
-        For select mode, we only need position, so use inputMask calculated before is enough.
-        For feedback mode, if app want texcoord0, we need input it whether texture is enable.
+    * For select mode, we only need position, so use inputMask calculated before is enough.
+    * For feedback mode, if app want texcoord0, we need input it whether texture is enable.
     */
     if (gc->renderMode == GL_FEEDBACK)
     {
-        switch(gc->feedback.type){
+        switch(gc->feedback.type)
+        {
             case GL_3D_COLOR_TEXTURE:
             case GL_4D_COLOR_TEXTURE:
                 totalInputMask |= __GL_INPUT_TEX0;
@@ -594,7 +1230,45 @@ GLvoid __glComputeRequiredInputMask(__GLcontext *gc)
         }
     }
 
-    gc->input.currentInputMask = totalInputMask;
+    if (gc->input.path == __GL_VERTEXINPUT_PATH_NORMAL)
+    {
+        gc->input.currentInputMask = totalInputMask;
+    }
+    else
+    {
+        if (gc->input.path == __GL_VERTEXINPUT_PATH_MANUAL)
+        {
+            gc->input.currentInputMask = gc->input.manualInputMask;
+        }
+    }
+
+    if ((totalInputMask & __GL_INPUT_NORMAL) == 0)
+    {
+        if (gc->input.origVertexCacheFlag)
+        {
+            gc->immedModeDispatch.Vertex3fv = __glim_Vertex3fv_Info;
+            gc->immedModeCacheDispatch.Vertex3fv = __glim_Vertex3fv_Cache;
+        }
+        else
+        {
+            gc->immedModeDispatch.Vertex3fv = __glim_Vertex3fv;
+            gc->immedModeCacheDispatch.Vertex3fv = __glim_Vertex3fv_Cache;
+        }
+
+        /* If normal is not needed then restore the original DrawArray_V3F entry functions. */
+        if (gc->immedModeOutsideDispatch.DrawArrays == __glImmedDrawArrays_Normal_V3F)
+        {
+            gc->immedModeOutsideDispatch.DrawArrays = __glImmedDrawArrays_V3F_Select;
+        }
+    }
+    if ((totalInputMask & __GL_INPUT_DIFFUSE) == 0)
+    {
+        /* If color is not needed then restore the original DrawArray_V3F entry functions. */
+        if (gc->immedModeOutsideDispatch.DrawArrays == __glImmedDrawArrays_Color_V3F)
+        {
+            gc->immedModeOutsideDispatch.DrawArrays = __glImmedDrawArrays_V3F_Select;
+        }
+    }
 }
 
 /*
@@ -638,13 +1312,15 @@ GLvoid __glComputeRequiredInputMaskInstancedEXT(__GLcontext *gc)
 
         vsInputMask = __GL_INPUT_VERTEX;
 
-        if (gc->state.enables.lighting.lighting) {
+        if (gc->state.enables.lighting.lighting)
+        {
             vsInputMask |= __GL_INPUT_NORMAL;
             if (gc->state.enables.lighting.colorMaterial) {
                 vsInputMask |= __GL_INPUT_DIFFUSE;
             }
         }
-        else {
+        else
+        {
             vsInputMask |= __GL_INPUT_DIFFUSE;
             if (gc->state.enables.colorSum) {
                 vsInputMask |= __GL_INPUT_SPECULAR;
@@ -748,10 +1424,13 @@ GLvoid __glComputeRequiredInputMaskInstancedEXT(__GLcontext *gc)
         }
     }
 
-    gc->input.currentInputMask = totalInputMask;
+    if (gc->input.path == __GL_VERTEXINPUT_PATH_NORMAL)
+        gc->input.currentInputMask = totalInputMask;
+    else if (gc->input.path == __GL_VERTEXINPUT_PATH_MANUAL)
+        gc->input.currentInputMask = gc->input.manualInputMask;
 }
 
-/* Fill in the missing attribures for the current vertex (only one vertex) */
+/* Fill in the missing attributes for the current vertex (only one vertex) */
 
 GLvoid __glFillMissingAttributes(__GLcontext *gc)
 {
@@ -822,7 +1501,8 @@ GLvoid __glFillMissingAttributes(__GLcontext *gc)
             if (index > 0) {
                 flag = edgeaddr[index - 1];
             }
-            else {
+            else
+            {
                 flag = gc->state.current.edgeflag;
             }
             edgeaddr[index++] = flag;
@@ -991,20 +1671,35 @@ Skip_UpdateVertexState:
         gc->state.current.edgeflag = gc->input.edgeflag.pointer[gc->input.edgeflag.index - 1];
     }
 
+    /* Copy the cached current state in gc->input to gc->state.current */
+    if (gc->input.deferredAttribDirty & __GL_DEFERED_NORMAL_BIT)
+    {
+        gc->state.current.normal = gc->input.shadowCurrent.normal;
+    }
+    if (gc->input.deferredAttribDirty & __GL_DEFERED_COLOR_BIT)
+    {
+        gc->state.current.color = gc->input.shadowCurrent.color;
+    }
+
     /* Use the current color to update material state if color material is enabled */
     if (gc->state.enables.lighting.colorMaterial &&
-        (gc->input.primInputMask & __GL_INPUT_DIFFUSE))
+        ((gc->input.primInputMask & __GL_INPUT_DIFFUSE) ||
+         (gc->input.deferredAttribDirty & __GL_DEFERED_COLOR_BIT)))
     {
         __glUpdateMaterialfv(gc, gc->state.light.colorMaterialFace,
             gc->state.light.colorMaterialParam, (GLfloat *)&gc->state.current.color);
     }
+
+    /* Clear Normal and Color bits in deferedAttribDirty since the deferred Normal/Color
+    ** have been copied to current states. Note: __GL_DEFERED_ATTRIB_BIT could still be dirty.
+    */
+    gc->input.deferredAttribDirty &= ~(__GL_DEFERED_NORMAL_BIT | __GL_DEFERED_COLOR_BIT);
 }
 
 GLvoid __glGenerateVertexIndex(__GLcontext *gc)
 {
     GLushort *idxBuf;
     GLuint i, indexCount, startIndex, index, vertexCount;
-
 
     vertexCount = gc->input.vertex.index - gc->input.lastVertexIndex;
     if (vertexCount == 0) {
@@ -1154,7 +1849,7 @@ GLvoid __glImmedFlushBuffer_Material(__GLcontext *gc)
 
     __glImmedFlushPrim_Material(gc, GL_FALSE);
 
-    __glResetImmedVertexBuffer(gc);
+    __glResetImmedVertexBuffer(gc, GL_FALSE);
     gc->tnlAccum.preVertexIndex = gc->input.vertex.index;
 
     /* There is no need to offset gc->input.currentInfoBufPtr like gc->input.currentDataBufPtr */
@@ -1192,10 +1887,8 @@ GLvoid __glSwitchToNewPrimtiveFormat_Material(__GLcontext *gc, GLuint attFmtIdx)
     origTotalStrideDW = gc->input.vertTotalStrideDW;
 
     /* Save data of last vertex */
-    lastVertexBlock = (GLfloat*)(*gc->imports.malloc)(gc, origTotalStrideDW<<2 );
-    if (!lastVertexBlock)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, origTotalStrideDW<<2, (gctPOINTER*)&lastVertexBlock)))
     {
-        GL_ASSERT(0);
         return;
     }
 
@@ -1205,11 +1898,10 @@ GLvoid __glSwitchToNewPrimtiveFormat_Material(__GLcontext *gc, GLuint attFmtIdx)
     __GL_MEMCOPY(lastVertexBlock, src, origTotalStrideDW<<2);
 
     __glImmedFlushPrim_Material(gc, GL_FALSE);
-    __glResetImmedVertexBuffer(gc);
+    __glResetImmedVertexBuffer(gc, GL_FALSE);
     gc->tnlAccum.preVertexIndex = gc->input.vertex.index;
 
     gc->input.primBeginAddr = gc->input.currentDataBufPtr;
-
 
     /* Change the primitive format to include the new attribute */
     gc->input.primInputMask |= (__GL_ONE_64 << attInpIdx);
@@ -1217,12 +1909,13 @@ GLvoid __glSwitchToNewPrimtiveFormat_Material(__GLcontext *gc, GLuint attFmtIdx)
     gc->input.primitiveFormat = gc->input.preVertexFormat;
     gc->input.currentInput[attInpIdx].sizeDW = fmtIndex2DWSize[attFmtIdx];
 
-    /* Reset the new offsetDW and pointersfor  all the attributes already accumulated (including new attrib)*/
+    /* Reset the new offsetDW and pointers for all the attributes already accumulated (including new attrib)*/
     inputMask = gc->input.primInputMask & ~(__GL_INPUT_VERTEX | __GL_INPUT_EDGEFLAG);
     j = 0;
     while (inputMask)
     {
-        if (inputMask & 0x1) {
+        if (inputMask & 0x1)
+        {
             inputSize[j] = gc->input.currentInput[j].sizeDW;
             inputOffsetDW[j] = gc->input.currentInput[j].offsetDW;
             gc->input.currentInput[j].pointer = (GLubyte*)gc->input.currentDataBufPtr;
@@ -1260,7 +1953,8 @@ GLvoid __glSwitchToNewPrimtiveFormat_Material(__GLcontext *gc, GLuint attFmtIdx)
                 *(dst + 2) = __GL_UB_TO_FLOAT(*(ubcolor + 2));      /* B */
                 *(dst + 3) = __GL_UB_TO_FLOAT(*(ubcolor + 3));      /* A */
             }
-            else {
+            else
+            {
                 if (dataSize == 4)
                 {
                     *(dst) = 0.0;
@@ -1288,8 +1982,10 @@ GLvoid __glSwitchToNewPrimtiveFormat_Material(__GLcontext *gc, GLuint attFmtIdx)
     }
 
     /* Free the scratch memory */
-    (*gc->imports.free)(gc, lastVertexBlock);
+    gcmOS_SAFE_FREE(gcvNULL, lastVertexBlock);
 
+    /* Turn off vertex data caching if the primitive has changed its original format */
+    gc->input.vertexCacheEnabled = GL_FALSE;
 }
 
 /* The vertex format is changed in the middle of glBegin/glEnd. */
@@ -1306,12 +2002,16 @@ GLvoid __glSwitchToInconsistentFormat_Material(__GLcontext *gc)
 
     lastVertexIndex = gc->input.vertex.index;
     /* Copy the current vertex  to a scratch area */
-    LastVert = (GLfloat*)(*gc->imports.malloc)(gc, origTotalStrideDW<<2 );
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, origTotalStrideDW, (gctPOINTER*)&LastVert)))
+    {
+        return;
+    }
+
     src = (GLfloat *)(gc->input.primBeginAddr + origTotalStrideDW * (gc->input.vertex.index - gc->input.lastVertexIndex + 1));
     __GL_MEMCOPY(LastVert, src, origTotalStrideDW<<2);
 
     __glImmedFlushPrim_Material(gc, GL_FALSE);
-    __glResetImmedVertexBuffer(gc);
+    __glResetImmedVertexBuffer(gc, GL_FALSE);
     gc->tnlAccum.preVertexIndex = gc->input.vertex.index;
 
     gc->input.primBeginAddr = gc->input.currentDataBufPtr;
@@ -1392,11 +2092,14 @@ GLvoid __glSwitchToInconsistentFormat_Material(__GLcontext *gc)
     }
 
     /* Free the scratch memory */
-    (*gc->imports.free)(gc, LastVert);
+    gcmOS_SAFE_FREE(gcvNULL, LastVert);
 
     gc->input.preVertexFormat = 0;
     gc->input.primitiveFormat = __glInputMask2InconsisFormat(gc->input.requiredInputMask);
     gc->input.inconsistentFormat = GL_TRUE;
+
+    /* Turn off vertex data caching if the primitive has inconsistent format */
+    gc->input.vertexCacheEnabled = GL_FALSE;
 }
 
 /* Flush the immediate mode vertex buffer when it is full.
@@ -1405,14 +2108,15 @@ GLvoid __glImmediateFlushBuffer(__GLcontext *gc)
 {
     GLuint64 primElemSequence, inputMask;
     GLuint startIndex, endIndex;
-    GLint vertexCount, connectCount = 0, i;
+    GLint vertexCount;
+    GLint connectCount = 0, i;
+    GLboolean enableCache;
 
-    if (gc->immedModeDispatch.End == __glim_End_Material)
+    if (gc->currentImmediateDispatch->End == __glim_End_Material)
     {
         __glImmedFlushBuffer_Material(gc);
         return;
     }
-
 
     /* Cache current primElemSequence and preVertexFormat in gc->input */
     primElemSequence = gc->input.primElemSequence;
@@ -1531,6 +2235,8 @@ GLvoid __glImmediateFlushBuffer(__GLcontext *gc)
         break;
     }
     gc->input.vertex.index = startIndex + vertexCount;
+    gc->input.connectVertexCount = connectCount;
+    gc->input.vertexTrimCount = endIndex - gc->input.vertex.index;
 
     if (gc->input.indexPrimEnabled &&
         vertexCount >= minVertexNumber[gc->input.currentPrimMode])
@@ -1538,15 +2244,60 @@ GLvoid __glImmediateFlushBuffer(__GLcontext *gc)
         __glGenerateVertexIndex(gc);
     }
 
-    if (gc->input.vertex.index > 0) {
+    if (gc->input.vertex.index > 0)
+    {
         __glDrawImmedPrimitive(gc);
     }
     __glImmedUpdateVertexState(gc);
 
-    __glResetImmedVertexBuffer(gc);
+    /* If the cached vertex format is different from the current vertex format
+    ** then there is no need to enable cache buffer for the continued batch.
+    */
+    enableCache = GL_FALSE;
+    if (gc->input.enableVertexCaching &&
+        gc->input.inconsistentFormat == GL_FALSE &&
+        gc->input.currentVertexCache->primitiveFormat == gc->input.primitiveFormat)
+    {
+        enableCache = GL_TRUE;
+    }
+
+    __glResetImmedVertexBuffer(gc, enableCache);
+
+    /* If next primitive uses cached buffer then we have to check if the connection vertices are
+    ** the same as the current primitive batch.
+    */
+    if (gc->input.cacheBufferUsed)
+    {
+        GLuint result = 0;
+        if (connectCount > 0)
+        {
+            if (((gc->input.currentVertexCache->vertexInfoBuffer->inputTag & __GL_VERTEX_DATA_TAG_MASK) ||
+                 (gc->input.currentVertexCache->vertexInfoBuffer->inputTag == __GL_END_TAG)) &&
+                 (gc->input.currentVertexCache->vertexInfoBuffer->offsetDW == connectCount * gc->input.vertTotalStrideDW))
+            {
+                for (i = 0; i < connectCount; i++)
+                {
+                    result |= __GL_MEMCMP(gc->input.currentVertexCache->vertexDataBuffer + i * gc->input.vertTotalStrideDW,
+                        gc->input.defaultDataBuffer + gc->input.connectVertexIndex[i] * gc->input.vertTotalStrideDW,
+                        (gc->input.vertTotalStrideDW << 2));
+                }
+            }
+            else
+            {
+                result = 1;
+            }
+        }
+        if (result == 0)
+        {
+            return;
+        }
+        /* If the connection vertices are different then reset to default vertex buffer */
+        __glResetImmedVertexBuffer(gc, GL_FALSE);
+    }
 
     /* Copy the batch connection vertices to the beginnig of vertexDataBuffer */
-    for (i = 0; i < connectCount; i++) {
+    for (i = 0; i < connectCount; i++)
+    {
         __GL_MEMCOPY(gc->input.defaultDataBuffer + i * gc->input.vertTotalStrideDW,
             gc->input.defaultDataBuffer + gc->input.connectVertexIndex[i] * gc->input.vertTotalStrideDW,
             (gc->input.vertTotalStrideDW << 2));
@@ -1567,19 +2318,22 @@ GLvoid __glImmediateFlushBuffer(__GLcontext *gc)
     }
 
     /* There is no need to offset gc->input.currentInfoBufPtr like gc->input.currentDataBufPtr */
+    gc->input.connectPrimMode = gc->input.currentPrimMode;
     gc->input.primBeginAddr = gc->input.defaultDataBuffer;
     gc->input.currentDataBufPtr = gc->input.defaultDataBuffer + connectCount * gc->input.vertTotalStrideDW;
 
     /* Restore the previous primElemSequence and preVertexFormat to continue vertex accumulation */
     gc->input.primElemSequence = primElemSequence;
-    if (gc->input.inconsistentFormat == GL_FALSE) {
+    if (gc->input.inconsistentFormat == GL_FALSE)
+    {
         gc->input.preVertexFormat = gc->input.primitiveFormat;
     }
 
     /* Reset all the input pointers to the new locations */
     i = 0;
     inputMask = gc->input.primInputMask & (~__GL_INPUT_EDGEFLAG);
-    while (inputMask) {
+    while (inputMask)
+    {
         if (inputMask & 0x1)
         {
             gc->input.currentInput[i].pointer =
@@ -1598,21 +2352,43 @@ GLvoid __glConsistentFormatChange(__GLcontext *gc)
     GLfloat *src, *dst;
     GLuint i, j, lastVertexIndex, dataSize;
     GLuint inputMask, formatMask, inputTag;
+    __GLvertexInfo *vtxinfo = NULL;
 
-    if (gc->immedModeDispatch.End == __glim_End_Material)
+    if (gc->currentImmediateDispatch->End == __glim_End_Material)
     {
         GL_ASSERT(0);
+    }
+
+    if (gc->input.currentInfoBufPtr > gc->input.vertexInfoBuffer)
+    {
+        /* Back track vtxinfo until we find the __GL_BEGIN_*_TAG */
+        vtxinfo = (gc->input.currentInfoBufPtr - 1);
+        while (vtxinfo->inputTag > __GL_END_TAG && vtxinfo > gc->input.vertexInfoBuffer) {
+            vtxinfo--;
+        }
+
+        /* Move gc->input.currentInfoBufPtr pointer back to the end of last primitive */
+        gc->input.currentInfoBufPtr = vtxinfo;
     }
 
     __glComputePrimitiveData(gc);
 
     lastVertexIndex = gc->input.lastVertexIndex;
 
-    if (gc->input.vertex.index > 0) {
+    if (gc->input.vertex.index > 0)
+    {
         __glDrawImmedPrimitive(gc);
     }
     __glImmedUpdateVertexState(gc);
-    __glResetImmedVertexBuffer(gc);
+    __glResetImmedVertexBuffer(gc, GL_FALSE);
+
+    /* Copy the __GL_BEGIN_*_TAG to the beginning of gc->input.defaultInfoBuffer */
+    if (gc->input.currentInfoBufPtr && vtxinfo)
+    {
+        *gc->input.currentInfoBufPtr = *vtxinfo;
+        gc->input.currentInfoBufPtr->offsetDW = 0;
+        gc->input.currentInfoBufPtr++;
+    }
 
     j = 0;
     gc->input.primBeginAddr = gc->input.currentDataBufPtr;
@@ -1636,6 +2412,16 @@ GLvoid __glConsistentFormatChange(__GLcontext *gc)
             gc->input.currentDataBufPtr += dataSize;
             inputTag = inputTagTable[j][dataSize - 1];
             __GL_PRIM_ELEMENT(gc->input.primElemSequence, inputTag);
+
+            /* Fill in the corresponding vertex info to gc->input.defaultInfoBuffer */
+            if (gc->input.currentInfoBufPtr)
+            {
+                gc->input.currentInfoBufPtr->inputTag = (GLushort) inputTag;
+                gc->input.currentInfoBufPtr->offsetDW = (GLushort) gc->input.currentInput[j].offsetDW;
+                gc->input.currentInfoBufPtr->appDataPtr = NULL;
+                gc->input.currentInfoBufPtr->ptePointer = NULL;
+                gc->input.currentInfoBufPtr++;
+            }
         }
         inputMask >>= 1;
         j += 1;
@@ -1659,12 +2445,26 @@ GLvoid __glSwitchToNewPrimtiveFormat(__GLcontext *gc, GLuint attFmtIdx)
     GLuint formatMask, lastVertexIndex, inputTag, col4ub = 0;
     GLuint64 inputMask;
     GLfloat *curPrimPtr, *src, *dst, *cur;
+    __GLvertexInfo *vtxinfo;
 
-    if (gc->immedModeDispatch.End == __glim_End_Material)
+    if (gc->currentImmediateDispatch->End == __glim_End_Material)
     {
         __glSwitchToNewPrimtiveFormat_Material(gc, attFmtIdx);
         return;
     }
+
+    if (gc->input.currentInfoBufPtr > gc->input.vertexInfoBuffer)
+    {
+        /* Back track vtxinfo until we find the __GL_BEGIN_*_TAG */
+        vtxinfo = (gc->input.currentInfoBufPtr - 1);
+        while (vtxinfo->inputTag > __GL_END_TAG && vtxinfo > gc->input.vertexInfoBuffer) {
+            vtxinfo--;
+        }
+
+        /* Move gc->input.currentInfoBufPtr pointer back to the end of last primitive */
+        gc->input.currentInfoBufPtr = vtxinfo;
+    }
+
 
     gc->input.primitiveFormat = gc->input.preVertexFormat;
 
@@ -1675,17 +2475,21 @@ GLvoid __glSwitchToNewPrimtiveFormat(__GLcontext *gc, GLuint attFmtIdx)
     lastVertexIndex = gc->input.lastVertexIndex;
 
     /* Copy the current primitive date to a scratch area */
-    curPrimPtr = (GLfloat*)(*gc->imports.malloc)(gc, dataSize );
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, dataSize, (gctPOINTER*)&curPrimPtr)))
+    {
+        return;
+    }
     __GL_MEMCOPY(curPrimPtr, gc->input.primBeginAddr, dataSize);
 
     /* Roll back the vertex index to the previous consistent primitive */
     gc->input.vertex.index = gc->input.lastVertexIndex;
 
-    if (gc->input.vertex.index > 0) {
+    if (gc->input.vertex.index > 0)
+    {
         __glDrawImmedPrimitive(gc);
     }
     __glImmedUpdateVertexState(gc);
-    __glResetImmedVertexBuffer(gc);
+    __glResetImmedVertexBuffer(gc, GL_FALSE);
     gc->input.preVertexFormat = gc->input.primitiveFormat;
 
     /* Mark in begin */
@@ -1778,7 +2582,8 @@ GLvoid __glSwitchToNewPrimtiveFormat(__GLcontext *gc, GLuint attFmtIdx)
     /* Reset primitive element current pointers */
     i = 0;
     inputMask = gc->input.primInputMask & (~__GL_INPUT_EDGEFLAG);
-    while (inputMask) {
+    while (inputMask)
+    {
         if (inputMask & 0x1)
         {
             gc->input.currentInput[i].currentPtrDW =
@@ -1816,7 +2621,10 @@ GLvoid __glSwitchToNewPrimtiveFormat(__GLcontext *gc, GLuint attFmtIdx)
     }
 
     /* Free the scratch memory */
-    (*gc->imports.free)(gc, curPrimPtr);
+    gcmOS_SAFE_FREE(gcvNULL, curPrimPtr);
+
+    /* Turn off vertex data caching if the primitive has changed its original format */
+    gc->input.vertexCacheEnabled = GL_FALSE;
 }
 
 GLvoid __glSwitchToInconsistentFormat(__GLcontext *gc)
@@ -1827,11 +2635,24 @@ GLvoid __glSwitchToInconsistentFormat(__GLcontext *gc)
     GLfloat *curPrimPtr, *src, *dst;
     GLuint inputOffsetDW[__GL_TOTAL_VERTEX_ATTRIBUTES] = {0};
     GLuint inputSize[__GL_TOTAL_VERTEX_ATTRIBUTES] = {0};
+    __GLvertexInfo *vtxinfo;
 
     if (gc->immedModeDispatch.End == __glim_End_Material)
     {
          __glSwitchToInconsistentFormat_Material(gc);
          return;
+    }
+
+    if (gc->input.currentInfoBufPtr > gc->input.vertexInfoBuffer)
+    {
+        /* Back track vtxinfo until we find the __GL_BEGIN_*_TAG */
+        vtxinfo = (gc->input.currentInfoBufPtr - 1);
+        while (vtxinfo->inputTag > __GL_END_TAG && vtxinfo > gc->input.vertexInfoBuffer) {
+            vtxinfo--;
+        }
+
+        /* Move gc->input.currentInfoBufPtr pointer back to the end of last primitive */
+        gc->input.currentInfoBufPtr = vtxinfo;
     }
 
     gc->input.primitiveFormat = gc->input.preVertexFormat;
@@ -1843,17 +2664,21 @@ GLvoid __glSwitchToInconsistentFormat(__GLcontext *gc)
     lastVertexIndex = gc->input.lastVertexIndex;
 
     /* Copy the current primitive date to a scratch area */
-    curPrimPtr = (GLfloat*)(*gc->imports.malloc)(gc, dataSize );
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, dataSize, (gctPOINTER*)&curPrimPtr)))
+    {
+        return;
+    }
     __GL_MEMCOPY(curPrimPtr, gc->input.primBeginAddr, dataSize);
 
     /* Roll back the vertex index to the previous consistent primitive */
     gc->input.vertex.index = gc->input.lastVertexIndex;
 
-    if (gc->input.vertex.index > 0) {
+    if (gc->input.vertex.index > 0)
+    {
         __glDrawImmedPrimitive(gc);
     }
     __glImmedUpdateVertexState(gc);
-    __glResetImmedVertexBuffer(gc);
+    __glResetImmedVertexBuffer(gc, GL_FALSE);
 
     gc->input.primBeginAddr = gc->input.currentDataBufPtr;
 
@@ -1908,7 +2733,8 @@ GLvoid __glSwitchToInconsistentFormat(__GLcontext *gc)
                     dst += newTotalStrideDW;
                 }
             }
-            else {
+            else
+            {
                 for (k = 0; k < numVertex; k++)
                 {
                     if (dataSize == 4)
@@ -1999,15 +2825,56 @@ GLvoid __glSwitchToInconsistentFormat(__GLcontext *gc)
     __glDuplicateVertexAttributes(gc);
 
     /* Free the scratch memory */
-    (*gc->imports.free)(gc, curPrimPtr);
+    gcmOS_SAFE_FREE(gcvNULL, curPrimPtr);
 
     gc->input.preVertexFormat = 0;
     gc->input.primitiveFormat = __glInputMask2InconsisFormat(gc->input.requiredInputMask);
     gc->input.inconsistentFormat = GL_TRUE;
+
+    /* Turn off vertex data caching if the primitive has inconsistent format */
+    gc->input.vertexCacheEnabled = GL_FALSE;
+}
+
+void __glPrimitiveBatchEnd(__GLcontext *gc)
+{
+    if (gc->input.cacheBufferUsed)
+    {
+        /* Copy the global variable gc->pCurrentInfoBufPtr back to gc->input.currentInfoBufPtr.
+        */
+        gc->input.currentInfoBufPtr = gc->pCurrentInfoBufPtr;
+
+        if (gc->input.currentInfoBufPtr->inputTag == __GL_BATCH_END_TAG)
+        {
+            gc->input.vertex.index = gc->input.currentVertexCache->vertexCount;
+            gc->input.indexCount = gc->input.currentVertexCache->indexCount;
+            __glDrawImmedPrimitive(gc);
+            __glImmedUpdateVertexState(gc);
+        }
+        else if (gc->input.currentInfoBufPtr > gc->input.vertexInfoBuffer &&
+                 gc->input.currentInfoBufPtr->offsetDW > 0)
+        {
+            __glComputeCacheBufVertexCount(gc);
+            __glDrawImmedPrimitive(gc);
+            __glImmedUpdateVertexState(gc);
+        }
+    }
+    else
+    {
+        __glComputePrimitiveData(gc);
+        if (gc->input.vertex.index > 0)
+        {
+            __glDrawImmedPrimitive(gc);
+        }
+        __glImmedUpdateVertexState(gc);
+    }
+
+    __glResetImmedVertexBuffer(gc, gc->input.enableVertexCaching);
 }
 
 GLvoid APIENTRY __glim_Begin(__GLcontext *gc, GLenum mode)
 {
+    GLint lastIndex;
+
     if (gc->conditionalRenderDiscard)
     {
         return;
@@ -2022,21 +2889,156 @@ GLvoid APIENTRY __glim_Begin(__GLcontext *gc, GLenum mode)
     switch (gc->input.beginMode)
     {
     case __GL_NOT_IN_BEGIN:
+
+        if (gc->input.deferredAttribDirty) {
+            __glCopyDeferedAttribToCurrent(gc);
+        }
         break;
 
     case __GL_IN_BEGIN:
-        __glSetError(gc,GL_INVALID_OPERATION);
+
+        __glSetError(gc, GL_INVALID_OPERATION);
         return;
 
-    /* add next step
     case __GL_SMALL_LIST_BATCH:
+
         __glDisplayListBatchEnd(gc);
         break;
-    */
+
+    case __GL_SMALL_DRAW_BATCH:
+
+        if (gc->input.deferredAttribDirty)
+        {
+            /* If there are deferred attribute changes, we have to flush the vertex buffer
+            ** and then copy the deferred attribute states to current attribute state.
+            */
+            if (gc->input.deferredAttribDirty & (__GL_DEFERED_ATTRIB_BIT | __GL_DEFERED_COLOR_MASK_BIT))
+            {
+                __glPrimitiveBatchEnd(gc);
+                __glUpdateDeferedAttributes(gc);
+                goto New_Begin;
+            }
+
+            if (gc->input.deferredAttribDirty & __GL_DEFERED_NORMAL_BIT &&
+                !(gc->input.primitiveFormat & __GL_N3F_BIT))
+            {
+                /* If previous primitive has no normal (but needs it) in glBegin/glEnd
+                ** and normal is really changed after glEnd then the vertex buffer has to be
+                ** flushed before the current normal is set.
+                */
+                if (gc->state.current.normal.f.x != gc->input.shadowCurrent.normal.f.x ||
+                    gc->state.current.normal.f.y != gc->input.shadowCurrent.normal.f.y ||
+                    gc->state.current.normal.f.z != gc->input.shadowCurrent.normal.f.z)
+                {
+                    __glPrimitiveBatchEnd(gc);
+                    goto New_Begin;
+                }
+
+                gc->input.deferredAttribDirty &= ~(__GL_DEFERED_NORMAL_BIT);
+            }
+
+            if (gc->input.deferredAttribDirty & __GL_DEFERED_COLOR_BIT &&
+                !(gc->input.primitiveFormat & (__GL_C3F_BIT | __GL_C4F_BIT | __GL_C4UB_BIT)))
+            {
+                /* If previous primitive has no color (but needs it) in glBegin/glEnd
+                ** and color is really changed after glEnd then the verex buffer has to be
+                ** flushed before the current color is set.
+                */
+                if (gc->state.current.color.r != gc->input.shadowCurrent.color.r ||
+                    gc->state.current.color.g != gc->input.shadowCurrent.color.g ||
+                    gc->state.current.color.b != gc->input.shadowCurrent.color.b ||
+                    gc->state.current.color.a != gc->input.shadowCurrent.color.a)
+                {
+                    __glPrimitiveBatchEnd(gc);
+                    goto New_Begin;
+                }
+
+                gc->input.deferredAttribDirty &= ~(__GL_DEFERED_COLOR_BIT);
+            }
+        }
+
+        if (gc->input.primMode == mode) {
+            goto Continue_Begin;
+        }
+
+        switch (gc->input.primMode)
+        {
+        case GL_TRIANGLE_STRIP:
+        case GL_TRIANGLE_FAN:
+        case GL_QUAD_STRIP:
+        case GL_POLYGON:
+            if (mode >= GL_TRIANGLES && gc->state.polygon.bothFaceFill) {
+                goto Continue_Begin;
+            }
+            __glPrimitiveBatchEnd(gc);
+            goto New_Begin;
+
+        case GL_TRIANGLES:
+        case GL_QUADS:
+            if (gc->input.vertex.index < 200 && gc->input.indexBuffer &&
+                mode >= GL_TRIANGLES && gc->state.polygon.bothFaceFill)
+            {
+                gc->input.currentPrimMode = gc->input.primMode;
+                gc->input.indexPrimEnabled = GL_TRUE;
+                lastIndex = gc->input.lastVertexIndex;
+                gc->input.lastVertexIndex = 0;
+                __glGenerateVertexIndex(gc);
+                gc->input.lastVertexIndex = lastIndex;
+                gc->input.primMode = GL_TRIANGLE_STRIP;
+
+                goto Continue_Begin;
+            }
+            __glPrimitiveBatchEnd(gc);
+            goto New_Begin;
+
+        case GL_LINE_STRIP:
+        case GL_LINE_LOOP:
+            if (mode >= GL_LINES && mode <= GL_LINE_STRIP) {
+                goto Continue_Begin;
+            }
+            __glPrimitiveBatchEnd(gc);
+            goto New_Begin;
+
+        case GL_LINES:
+            if (gc->input.vertex.index < 200 && gc->input.indexBuffer &&
+                mode >= GL_LINE_LOOP && mode <= GL_LINE_STRIP)
+            {
+                gc->input.currentPrimMode = GL_LINES;
+                gc->input.indexPrimEnabled = GL_TRUE;
+                lastIndex = gc->input.lastVertexIndex;
+                gc->input.lastVertexIndex = 0;
+                __glGenerateVertexIndex(gc);
+                gc->input.lastVertexIndex = lastIndex;
+                gc->input.primMode = GL_LINE_STRIP;
+
+                goto Continue_Begin;
+            }
+            __glPrimitiveBatchEnd(gc);
+            goto New_Begin;
+
+        default:
+            __glPrimitiveBatchEnd(gc);
+            goto New_Begin;
+        }
+
+Continue_Begin:
+
+        gc->input.currentPrimMode = mode;
+        gc->input.beginMode = __GL_IN_BEGIN;
+        gc->input.preVertexFormat = gc->input.primitiveFormat;
+        gc->input.primBeginAddr = gc->input.currentDataBufPtr;
+
+        /* Switch to inside Begin/End dispatch table.
+        */
+        __glSwitchImmediateDispatch(gc, gc->input.pCurrentImmedModeDispatch);
+        return;
+
     default:
 
         GL_ASSERT(0);
     }
+
+New_Begin:
 
     gc->input.primMode = gc->input.currentPrimMode = mode;
     gc->input.beginMode = __GL_IN_BEGIN;
@@ -2045,10 +3047,18 @@ GLvoid APIENTRY __glim_Begin(__GLcontext *gc, GLenum mode)
     gc->input.primBeginAddr = gc->input.currentDataBufPtr;
 
     __glValidateImmedBegin(gc, mode);
+
+    /* Switch to inside Begin/End dispatch table.
+    */
+    __glSwitchImmediateDispatch(gc, gc->input.pCurrentImmedModeDispatch);
 }
 
 GLvoid APIENTRY __glim_End(__GLcontext *gc )
 {
+    GLuint internalEnd = GL_FALSE;
+    GLuint discardVertexNum, i, mask;
+    GLint vertexCount;
+
     if (gc->conditionalRenderDiscard)
     {
         return;
@@ -2060,36 +3070,404 @@ GLvoid APIENTRY __glim_End(__GLcontext *gc )
         gc->input.preVertexFormat = 0;
     }
 
-    if (gc->input.indexPrimEnabled) {
+    vertexCount = gc->input.vertex.index - gc->input.lastVertexIndex;
+
+    /* Discard the primitive if its vertex number is less than the minimum number.
+     */
+    discardVertexNum = 0;
+    if (vertexCount < minVertexNumber[gc->input.currentPrimMode])
+    {
+        discardVertexNum = vertexCount;
+    }
+    else
+    {
+        switch (gc->input.currentPrimMode)
+        {
+        case GL_TRIANGLES:
+            discardVertexNum = vertexCount % 3;
+            break;
+        case GL_LINES:
+            discardVertexNum = vertexCount % 2;
+            break;
+        case GL_QUADS:
+            discardVertexNum = vertexCount % 4;
+            break;
+        case GL_QUAD_STRIP:
+            discardVertexNum = vertexCount % 2;
+            break;
+        }
+    }
+
+    if (discardVertexNum)
+    {
+        /* Roll back the vertex index and currentPtrs by "discardVertexNum" */
+        gc->input.vertex.index -= discardVertexNum;
+
+        /* Compute gc->input.primInputMask */
+        __glComputePrimitiveData(gc);
+
+        i = 0;
+        mask = gc->input.primInputMask & (~__GL_INPUT_EDGEFLAG);
+        while (mask) {
+            if (mask & 0x1) {
+                gc->input.currentInput[i].currentPtrDW -= discardVertexNum * gc->input.vertTotalStrideDW;
+            }
+            mask >>= 1;
+            i += 1;
+        }
+    }
+
+    if (gc->input.indexPrimEnabled)
+    {
         __glGenerateVertexIndex(gc);
     }
-
-    __glComputePrimitiveData(gc);
-    if (gc->input.vertex.index > 0)
+    else
     {
-        __glDrawImmedPrimitive(gc);
+        internalEnd = internalEndTable[gc->input.primMode];
     }
-    __glImmedUpdateVertexState(gc);
 
-    __glResetImmedVertexBuffer(gc);
+    if (gc->input.inconsistentFormat || internalEnd || gc->input.vertexFormat)
+    {
+        __glPrimitiveBatchEnd(gc);
+    }
 
     gc->input.primBeginAddr = NULL;
     gc->input.inconsistentFormat = GL_FALSE;
     gc->input.currentDataBufPtr = gc->input.vertexDataBuffer + gc->input.vertex.index * gc->input.vertTotalStrideDW;
     gc->input.lastVertexIndex = gc->input.vertex.index;
-    if (gc->input.vertex.index == 0) {
+    if (gc->input.vertex.index == 0)
+    {
         gc->input.primElemSequence = 0;
     }
 
-    gc->input.beginMode = __GL_NOT_IN_BEGIN;
+    /* Switch to outside Begin/End dispatch table.
+    */
+    __glSwitchImmediateDispatch(gc, &gc->immedModeOutsideDispatch);
+
+    if (gc->input.beginMode == __GL_IN_BEGIN && gc->input.vertex.index)
+    {
+        gc->input.beginMode = __GL_SMALL_DRAW_BATCH;
+    }
+    else
+    {
+        gc->input.beginMode = __GL_NOT_IN_BEGIN;
+    }
 }
 
-GLvoid APIENTRY __glim_End_Error(__GLcontext *gc)
+void APIENTRY __glim_Begin_Info(__GLcontext *gc, GLenum mode)
 {
-    if (gc->input.beginMode != __GL_IN_BEGIN)
+    GLint lastIndex;
+    __GLvertexInfo *vtxinfo;
+
+    if (gc->conditionalRenderDiscard)
     {
-        __glSetError(gc,GL_INVALID_OPERATION);
         return;
+    }
+
+    if (mode > GL_TRIANGLE_STRIP_ADJACENCY_EXT)
+    {
+        __glSetError(gc, GL_INVALID_ENUM);
+        return;
+    }
+
+    switch (gc->input.beginMode)
+    {
+    case __GL_NOT_IN_BEGIN:
+
+        if (gc->input.deferredAttribDirty) {
+            __glCopyDeferedAttribToCurrent(gc);
+        }
+        break;
+
+    case __GL_IN_BEGIN:
+
+        __glSetError(gc, GL_INVALID_OPERATION);
+        return;
+
+    case __GL_SMALL_LIST_BATCH:
+
+        __glDisplayListBatchEnd(gc);
+        break;
+
+    case __GL_SMALL_DRAW_BATCH:
+
+        if (gc->input.deferredAttribDirty)
+        {
+            /* If there are deferred attribute changes, we have to flush the vertex buffer
+            ** and then copy the deferred attribute states to current attribute state.
+            */
+            if (gc->input.deferredAttribDirty & (__GL_DEFERED_ATTRIB_BIT | __GL_DEFERED_COLOR_MASK_BIT))
+            {
+                __glPrimitiveBatchEnd(gc);
+                __glUpdateDeferedAttributes(gc);
+                goto New_Begin;
+            }
+
+            if (gc->input.deferredAttribDirty & __GL_DEFERED_NORMAL_BIT &&
+                !(gc->input.primitiveFormat & __GL_N3F_BIT))
+            {
+                /* If previous primitive has no normal (but needs it) in glBegin/glEnd
+                ** and normal is really changed after glEnd then the vertex buffer has to be
+                ** flushed before the current normal is set.
+                */
+                if (gc->state.current.normal.f.x != gc->input.shadowCurrent.normal.f.x ||
+                    gc->state.current.normal.f.y != gc->input.shadowCurrent.normal.f.y ||
+                    gc->state.current.normal.f.z != gc->input.shadowCurrent.normal.f.z)
+                {
+                    __glPrimitiveBatchEnd(gc);
+                    goto New_Begin;
+                }
+
+                gc->input.deferredAttribDirty &= ~(__GL_DEFERED_NORMAL_BIT);
+            }
+
+            if (gc->input.deferredAttribDirty & __GL_DEFERED_COLOR_BIT &&
+                !(gc->input.primitiveFormat & (__GL_C3F_BIT | __GL_C4F_BIT | __GL_C4UB_BIT)))
+            {
+                /* If previous primitive has no color (but needs it) in glBegin/glEnd
+                ** and color is really changed after glEnd then the vertex buffer has to be
+                ** flushed before the current color is set.
+                */
+                if (gc->state.current.color.r != gc->input.shadowCurrent.color.r ||
+                    gc->state.current.color.g != gc->input.shadowCurrent.color.g ||
+                    gc->state.current.color.b != gc->input.shadowCurrent.color.b ||
+                    gc->state.current.color.a != gc->input.shadowCurrent.color.a)
+                {
+                    __glPrimitiveBatchEnd(gc);
+                    goto New_Begin;
+                }
+
+                gc->input.deferredAttribDirty &= ~(__GL_DEFERED_COLOR_BIT);
+            }
+        }
+
+        if (gc->input.primMode == mode)
+        {
+            goto Continue_Begin;
+        }
+
+        switch (gc->input.primMode)
+        {
+        case GL_TRIANGLE_STRIP:
+        case GL_TRIANGLE_FAN:
+        case GL_QUAD_STRIP:
+        case GL_POLYGON:
+            if (mode >= GL_TRIANGLES && gc->state.polygon.bothFaceFill) {
+                goto Continue_Begin;
+            }
+            __glPrimitiveBatchEnd(gc);
+            goto New_Begin;
+
+        case GL_TRIANGLES:
+        case GL_QUADS:
+            if (gc->input.vertex.index < 200 && gc->input.indexBuffer &&
+                mode >= GL_TRIANGLES && gc->state.polygon.bothFaceFill)
+            {
+                gc->input.currentPrimMode = gc->input.primMode;
+                gc->input.indexPrimEnabled = GL_TRUE;
+                lastIndex = gc->input.lastVertexIndex;
+                gc->input.lastVertexIndex = 0;
+                __glGenerateVertexIndex(gc);
+                gc->input.lastVertexIndex = lastIndex;
+                gc->input.primMode = GL_TRIANGLE_STRIP;
+
+                goto Continue_Begin;
+            }
+            __glPrimitiveBatchEnd(gc);
+            goto New_Begin;
+
+        case GL_LINE_STRIP:
+        case GL_LINE_LOOP:
+            if (mode >= GL_LINES && mode <= GL_LINE_STRIP) {
+                goto Continue_Begin;
+            }
+            __glPrimitiveBatchEnd(gc);
+            goto New_Begin;
+
+        case GL_LINES:
+            if (gc->input.vertex.index < 200 && gc->input.indexBuffer &&
+                mode >= GL_LINE_LOOP && mode <= GL_LINE_STRIP)
+            {
+                gc->input.currentPrimMode = GL_LINES;
+                gc->input.indexPrimEnabled = GL_TRUE;
+                lastIndex = gc->input.lastVertexIndex;
+                gc->input.lastVertexIndex = 0;
+                __glGenerateVertexIndex(gc);
+                gc->input.lastVertexIndex = lastIndex;
+                gc->input.primMode = GL_LINE_STRIP;
+
+                goto Continue_Begin;
+            }
+            __glPrimitiveBatchEnd(gc);
+            goto New_Begin;
+
+        default:
+            __glPrimitiveBatchEnd(gc);
+            goto New_Begin;
+        }
+
+Continue_Begin:
+
+        gc->input.currentPrimMode = mode;
+        gc->input.beginMode = __GL_IN_BEGIN;
+        gc->input.preVertexFormat = gc->input.primitiveFormat;
+        gc->input.primBeginAddr = gc->input.currentDataBufPtr;
+        gc->input.vertexFormat = 0;
+
+        /* Save the __GL_BEGIN_PRIM_TAG in gc->input.vertexInfoBuffer.
+        */
+        vtxinfo = gc->input.currentInfoBufPtr++;
+        vtxinfo->inputTag = (mode | 0x10);
+        vtxinfo->offsetDW = (GLuint)(gc->input.currentDataBufPtr - gc->input.vertexDataBuffer);
+        vtxinfo->appDataPtr = NULL;
+        vtxinfo->ptePointer = NULL;
+
+        /* Switch to inside Begin/End dispatch table.
+        */
+        __glSwitchImmediateDispatch(gc, gc->input.pCurrentImmedModeDispatch);
+
+        return;
+
+    default:
+
+        GL_ASSERT(0);
+    }
+
+New_Begin:
+
+    /* Jump to __glim_Begin_Cache function if cache buffer is used.
+    */
+    if (gc->input.cacheBufferUsed) {
+        (*gc->currentImmediateDispatch->Begin)(gc, mode);
+        return;
+    }
+
+    gc->input.primMode = gc->input.currentPrimMode = mode;
+    gc->input.beginMode = __GL_IN_BEGIN;
+    gc->input.vertexFormat = 0;
+    gc->input.preVertexFormat = 0;
+    gc->input.primBeginAddr = gc->input.currentDataBufPtr;
+    gc->input.primElemSequence = 0;
+
+    __glValidateImmedBegin(gc, mode);
+
+    /* Save the __GL_BEGIN_PRIM_TAG in gc->input.vertexInfoBuffer.
+    */
+    vtxinfo = gc->input.currentInfoBufPtr++;
+    vtxinfo->inputTag = (mode | 0x10);
+    vtxinfo->offsetDW = (GLushort)(gc->input.currentDataBufPtr - gc->input.vertexDataBuffer);
+    vtxinfo->appDataPtr = NULL;
+    vtxinfo->ptePointer = NULL;
+
+    /* Switch to inside Begin/End dispatch table.
+    */
+    __glSwitchImmediateDispatch(gc, gc->input.pCurrentImmedModeDispatch);
+}
+
+void APIENTRY __glim_End_Info(__GLcontext *gc)
+{
+    GLuint internalEnd = GL_FALSE;
+    GLuint discardVertexNum, i, mask;
+    GLint vertexCount;
+    __GLvertexInfo *vtxinfo;
+
+    if (gc->input.inconsistentFormat == GL_FALSE)
+    {
+        gc->input.primitiveFormat = gc->input.preVertexFormat;
+        gc->input.preVertexFormat = 0;
+    }
+
+    vertexCount = gc->input.vertex.index - gc->input.lastVertexIndex;
+
+    /* Discard the primitive if its vertex number is less than the minimum number.
+     */
+    discardVertexNum = 0;
+    if (vertexCount < minVertexNumber[gc->input.currentPrimMode])
+    {
+        discardVertexNum = vertexCount;
+    }
+    else
+    {
+        switch (gc->input.currentPrimMode)
+        {
+        case GL_TRIANGLES:
+            discardVertexNum = vertexCount % 3;
+            break;
+        case GL_LINES:
+            discardVertexNum = vertexCount % 2;
+            break;
+        case GL_QUADS:
+            discardVertexNum = vertexCount % 4;
+            break;
+        case GL_QUAD_STRIP:
+            discardVertexNum = vertexCount % 2;
+            break;
+        }
+    }
+    if (discardVertexNum)
+    {
+         /* Roll back the vertex index and currentPtrs by "discardVertexNum" */
+        gc->input.vertex.index -= discardVertexNum;
+
+        /* Compute gc->input.primInputMask */
+        __glComputePrimitiveData(gc);
+
+        i = 0;
+        mask = gc->input.primInputMask & (~__GL_INPUT_EDGEFLAG);
+        while (mask)
+        {
+            if (mask & 0x1)
+            {
+                gc->input.currentInput[i].currentPtrDW -= discardVertexNum * gc->input.vertTotalStrideDW;
+            }
+            mask >>= 1;
+            i += 1;
+        }
+    }
+
+    gc->input.currentDataBufPtr = gc->input.vertexDataBuffer + gc->input.vertex.index * gc->input.vertTotalStrideDW;
+
+    /* Save the __GL_END_TAG in gc->input.vertexInfoBuffer.
+    */
+    vtxinfo = gc->input.currentInfoBufPtr++;
+    vtxinfo->inputTag = __GL_END_TAG;
+    vtxinfo->offsetDW = (GLushort)(gc->input.currentDataBufPtr - gc->input.vertexDataBuffer);
+    vtxinfo->appDataPtr = NULL;
+    vtxinfo->ptePointer = NULL;
+
+    if (gc->input.indexPrimEnabled)
+    {
+        __glGenerateVertexIndex(gc);
+    }
+    else
+    {
+        internalEnd = internalEndTable[gc->input.primMode];
+    }
+
+    if (gc->input.inconsistentFormat || internalEnd || gc->input.vertexFormat)
+    {
+        __glPrimitiveBatchEnd(gc);
+    }
+
+    gc->input.primBeginAddr = NULL;
+    gc->input.inconsistentFormat = GL_FALSE;
+    gc->input.lastVertexIndex = gc->input.vertex.index;
+    if (gc->input.vertex.index == 0)
+    {
+        gc->input.primElemSequence = 0;
+    }
+
+    /* Switch to outside Begin/End dispatch table.
+    */
+    __glSwitchImmediateDispatch(gc, &gc->immedModeOutsideDispatch);
+
+    if (gc->input.beginMode == __GL_IN_BEGIN && gc->input.vertex.index)
+    {
+        gc->input.beginMode = __GL_SMALL_DRAW_BATCH;
+    }
+    else
+    {
+        gc->input.beginMode = __GL_NOT_IN_BEGIN;
     }
 }
 
@@ -2098,8 +3476,11 @@ GLuint __glInitVertexInputState(__GLcontext *gc)
 {
     if (!gc->input.defaultDataBuffer)
     {
-        gc->input.defaultDataBuffer = (GLfloat *)(*gc->imports.malloc)
-            (0, __GL_DEFAULT_VERTEX_BUFFER_SIZE );
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, __GL_DEFAULT_VERTEX_BUFFER_SIZE, (gctPOINTER*)&gc->input.defaultDataBuffer)))
+        {
+            goto Failed;
+        }
+
         gc->input.defaultDataBufEnd = gc->input.defaultDataBuffer +
             ((__GL_DEFAULT_VERTEX_BUFFER_SIZE - __GL_DEFAULT_BUFFER_END_ZONE) >> 2);
         gc->input.vertexDataBuffer = gc->input.defaultDataBuffer;
@@ -2107,117 +3488,293 @@ GLuint __glInitVertexInputState(__GLcontext *gc)
 
     if (!gc->input.defaultIndexBuffer)
     {
-        gc->input.defaultIndexBuffer = (GLushort *)(*gc->imports.malloc)
-            (0, 3 * __GL_MAX_VERTEX_NUMBER * sizeof(GLushort) );
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, 3 * __GL_MAX_VERTEX_NUMBER * sizeof(GLushort), (gctPOINTER*)&gc->input.defaultIndexBuffer)))
+        {
+            goto Failed;
+        }
         gc->input.indexBuffer = gc->input.defaultIndexBuffer;
     }
 
     if (!gc->input.edgeflag.pointer)
     {
-        gc->input.edgeflag.pointer = (GLubyte *)(*gc->imports.malloc)
-            (0, __GL_MAX_VERTEX_NUMBER * sizeof(GLubyte) );
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, __GL_MAX_VERTEX_NUMBER * sizeof(GLubyte), (gctPOINTER*)&gc->input.edgeflag.pointer)))
+        {
+            goto Failed;
+        }
     }
 
-    if (!gc->input.defaultDataBuffer ||
-        !gc->input.defaultIndexBuffer ||
-        !gc->input.edgeflag.pointer) {
-        __glSetError(gc,GL_OUT_OF_MEMORY);
-        return GL_FALSE;
+    if (gc->input.origVertexCacheFlag == GL_TRUE)
+    {
+        if (!gc->input.defaultInfoBuffer)
+        {
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, __GL_MAX_VERTEX_NUMBER * sizeof(__GLvertexInfo) * 10, (gctPOINTER*)&gc->input.defaultInfoBuffer)))
+            {
+                goto Failed;
+            }
+            gcoOS_ZeroMemory(gc->input.defaultInfoBuffer, __GL_MAX_VERTEX_NUMBER * sizeof(__GLvertexInfo) * 10);
+            gc->input.vertexInfoBuffer = gc->input.defaultInfoBuffer;
+        }
+
+        if (!gc->input.vertexCacheBlock)
+        {
+            /* Allocate one extra cache slot to avoid out-of-bound read error in __glResetImmedVertexBuffer.
+            */
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLvertexCacheBlock), (gctPOINTER*)&gc->input.vertexCacheBlock)))
+            {
+                goto Failed;
+            }
+            gcoOS_ZeroMemory(gc->input.vertexCacheBlock, sizeof(__GLvertexCacheBlock));
+        }
+
+        if (!gc->input.pteInfo.hashTable)
+        {
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, __GL_MAX_PTE_HASH_TABLE_SIZE * sizeof(void *), (gctPOINTER*)&gc->input.pteInfo.hashTable)))
+            {
+                goto Failed;
+            }
+            gcoOS_ZeroMemory(gc->input.pteInfo.hashTable, __GL_MAX_PTE_HASH_TABLE_SIZE * sizeof(void *));
+        }
+
+        if (!gc->input.tempPteInfo.hashTable)
+        {
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, __GL_MAX_PTE_HASH_TABLE_SIZE * sizeof(void *), (gctPOINTER*)&gc->input.tempPteInfo.hashTable)))
+            {
+                goto Failed;
+            }
+            gcoOS_ZeroMemory(gc->input.tempPteInfo.hashTable, __GL_MAX_PTE_HASH_TABLE_SIZE * sizeof(void *));
+        }
+
+        gc->input.vertexCacheEnabled = GL_TRUE;
+        gc->input.vertexCacheBlock->maxVertexCacheIdx = -1;
+        gc->input.currentCacheBlock = gc->input.vertexCacheBlock;
+        gc->input.currentVertexCache = &gc->input.vertexCacheBlock->cache[0];
+        gc->input.vtxCacheNeedReset = GL_TRUE;
+        gc->input.maxCacheDrawIndex = __GL_VERTEX_CACHE_BLOCK_SIZE;
     }
 
+    gc->input.currentInfoBufPtr = gc->input.vertexInfoBuffer;
     gc->input.currentDataBufPtr = gc->input.vertexDataBuffer;
+    gc->input.cacheBufferUsed = GL_FALSE;
+    gc->input.cacheCompareFailed = GL_FALSE;
+
+    gc->input.pCurrentImmedModeDispatch = &gc->immedModeDispatch;
 
     return GL_TRUE;
 
+Failed:
+    if (gc->input.defaultDataBuffer)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, gc->input.defaultDataBuffer);
+    }
+
+    if (gc->input.defaultIndexBuffer)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, gc->input.defaultIndexBuffer);
+    }
+
+    if (gc->input.edgeflag.pointer)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, gc->input.edgeflag.pointer);
+    }
+
+    if (gc->input.defaultInfoBuffer)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, gc->input.defaultInfoBuffer);
+    }
+
+    if (gc->input.vertexCacheBlock)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, gc->input.vertexCacheBlock);
+    }
+
+    if (gc->input.pteInfo.hashTable)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, gc->input.pteInfo.hashTable);
+    }
+
+    if (gc->input.tempPteInfo.hashTable)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, gc->input.tempPteInfo.hashTable);
+    }
+
+    __glSetError(gc, GL_OUT_OF_MEMORY);
+
+    return GL_FALSE;
+}
+
+void __glFreeImmedVertexCacheBlocks(__GLcontext *gc)
+{
+    __GLvertexCacheBlock *cacheBlock = gc->input.vertexCacheBlock;
+    __GLvertexDataCache *vertexCache;
+    GLint i;
+
+    /* Free all the vertex cache buffers of each cache slot */
+    while (cacheBlock)
+    {
+        for (i = 0; i <= cacheBlock->maxVertexCacheIdx; i++)
+        {
+            vertexCache = &cacheBlock->cache[i];
+
+            if (vertexCache->privateData)
+            {
+                (*gc->dp.deletePrimData)(gc, vertexCache->privateData);
+                vertexCache->privateData = NULL;
+            }
+            if (vertexCache->ibPrivateData)
+            {
+                (*gc->dp.deletePrimData)(gc, vertexCache->ibPrivateData);
+                vertexCache->ibPrivateData = NULL;
+            }
+            if (vertexCache->vertexInfoBuffer)
+            {
+                gcmOS_SAFE_FREE(gcvNULL, vertexCache->vertexInfoBuffer);
+                vertexCache->vertexInfoBuffer = NULL;
+                vertexCache->infoBufSize = 0;
+            }
+            if (vertexCache->vertexDataBuffer)
+            {
+                gcmOS_SAFE_FREE(gcvNULL, vertexCache->vertexDataBuffer);
+                vertexCache->vertexDataBuffer = NULL;
+                vertexCache->dataBufSize = 0;
+            }
+            if (vertexCache->indexBuffer)
+            {
+                gcmOS_SAFE_FREE(gcvNULL, vertexCache->indexBuffer);
+                vertexCache->indexBuffer = NULL;
+                vertexCache->indexBufSize = 0;
+            }
+
+            vertexCache->vertexCount = 0;
+            vertexCache->indexCount = 0;
+            vertexCache->connectVertexCount = 0;
+            vertexCache->cacheStatus = __GL_FILL_QUICK_VERTEX_CACHE;
+        }
+
+        cacheBlock = cacheBlock->next;
+    }
+
+    /* Free the vertex cache block linked list except the first cache block */
+    cacheBlock = gc->input.vertexCacheBlock->next;
+    while (cacheBlock)
+    {
+        gc->input.vertexCacheBlock->next = cacheBlock->next;
+        gcmOS_SAFE_FREE(gcvNULL, cacheBlock);
+        cacheBlock = gc->input.vertexCacheBlock->next;
+    }
+
+    gc->input.vertexCacheBlock->maxVertexCacheIdx = -1;
+
+    gc->input.vertexCacheStatus = 0;
+    gc->input.vertexCacheHistory = 0;
+    gc->input.totalCacheMemSize = 0;
+    gc->input.vtxCacheNeedReset = GL_TRUE;
+    gc->input.maxCacheDrawIndex = __GL_VERTEX_CACHE_BLOCK_SIZE;
+    gc->input.cacheHitFrameIndex = gc->input.currentFrameIndex;
+}
+
+/* Free IM vertex cache if it is in video memory and system memory */
+GLvoid __glFreeImmedVertexCacheBuffer( __GLcontext *gc )
+{
+    /* Free vertex cache buffers that are already allocated */
+    if (gc->input.defaultInfoBuffer)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, gc->input.defaultInfoBuffer);
+        gc->input.defaultInfoBuffer = NULL;
+        gc->input.currentInfoBufPtr = NULL;
+        gc->input.vertexInfoBuffer = NULL;
+    }
+
+    if (gc->input.vertexCacheBlock)
+    {
+        __glFreeImmedVertexCacheBlocks(gc);
+        GL_ASSERT(gc->input.vertexCacheBlock->next == NULL);
+        gcmOS_SAFE_FREE(gcvNULL, gc->input.vertexCacheBlock);
+        gc->input.vertexCacheBlock = NULL;
+        gc->input.currentVertexCache = NULL;
+        gc->input.currentCacheBlock = NULL;
+    }
+
+    if (gc->input.pteInfo.hashTable)
+    {
+        __glClearPteInfoHashTable(gc, &gc->input.pteInfo, 1);
+        gcmOS_SAFE_FREE(gcvNULL, gc->input.pteInfo.hashTable);
+        gc->input.pteInfo.hashTable = NULL;
+    }
+
+    if (gc->input.tempPteInfo.hashTable)
+    {
+        __glClearPteInfoHashTable(gc, &gc->input.tempPteInfo, 0);
+        gcmOS_SAFE_FREE(gcvNULL, gc->input.tempPteInfo.hashTable);
+        gc->input.tempPteInfo.hashTable = NULL;
+    }
 }
 
 GLvoid __glFreeVertexInputState(__GLcontext *gc)
 {
     if ( gc->input.defaultDataBuffer )
     {
-        (*gc->imports.free)(gc, gc->input.defaultDataBuffer);
+        gcmOS_SAFE_FREE(gcvNULL, gc->input.defaultDataBuffer);
         gc->input.defaultDataBuffer = NULL;
     }
 
     if ( gc->input.defaultIndexBuffer )
     {
-        (*gc->imports.free)(gc, gc->input.defaultIndexBuffer);
+        gcmOS_SAFE_FREE(gcvNULL, gc->input.defaultIndexBuffer);
         gc->input.defaultIndexBuffer = NULL;
     }
 
 
     if ( gc->input.edgeflag.pointer )
     {
-        (*gc->imports.free)(gc, gc->input.edgeflag.pointer);
+        gcmOS_SAFE_FREE(gcvNULL, gc->input.edgeflag.pointer);
         gc->input.edgeflag.pointer = NULL;
     }
+
+    __glFreeImmedVertexCacheBuffer( gc );
+    __GL_SET_VARRAY_STOP_CACHE_BIT(gc);
 }
 
 /* Allocate twice the size of the maximum vertices to facilitate the clipping */
 GLuint __glInitVertexOutputState(__GLcontext *gc)
 {
-/*    __GL_MEMSET(&gc->vsOutputContainer, 0, sizeof(__GLVSOutput));
-
-    if ( !gc->vsOutputContainer.clipCodeBuffer )
-    {
-        gc->vsOutputContainer.clipCodeBuffer = (GLubyte *)(*gc->imports.malloc)
-            (gc, 2 * __GL_MAX_VERTEX_NUMBER * sizeof(GLuint) );
-    }
-
-    if (!gc->vsOutputContainer.clipCodeBuffer)
-    {
-        __glSetError(GL_OUT_OF_MEMORY);
-        return GL_FALSE;
-    }
-    else
-    {
-        gc->vsOutputContainer.incClipSize =
-        gc->vsOutputContainer.outClipSize = 2 * __GL_MAX_VERTEX_NUMBER * sizeof(GLuint);
-    }
-
-    if ( !gc->vsOutputContainer.vertexOutputBuffer )
-    {
-        gc->vsOutputContainer.vertexOutputBuffer = (GLubyte *)(*gc->imports.malloc)
-            (gc, 2 * __GL_MAX_VERTEX_NUMBER * sizeof(__GLvertex4) );
-    }
-
-    if (!gc->vsOutputContainer.vertexOutputBuffer)
-    {
-        __glSetError(GL_OUT_OF_MEMORY);
-        return GL_FALSE;
-    }
-    else
-    {
-        gc->vsOutputContainer.incVBSize =
-        gc->vsOutputContainer.outVBSize = 2 * __GL_MAX_VERTEX_NUMBER * sizeof(__GLvertex4);
-    }
-*/
     return GL_TRUE;
 }
 
 GLvoid __glFreeVertexOutputState(__GLcontext *gc)
 {
-    /*
-    if (gc->vsOutputContainer.vertexOutputBuffer)
-        (*gc->imports.free)(gc, gc->vsOutputContainer.vertexOutputBuffer);
-    gc->vsOutputContainer.outVBSize = 0;
-    gc->vsOutputContainer.vertexOutputBuffer = NULL;
-
-    if (gc->vsOutputContainer.clipCodeBuffer)
-        (*gc->imports.free)(gc, gc->vsOutputContainer.clipCodeBuffer);
-    gc->vsOutputContainer.clipCodeBuffer = NULL;
-    gc->vsOutputContainer.outClipSize = 0;
-
-    if (gc->vsOutputContainer.clipSpacePosBuffer)
-        (*gc->imports.free)(gc, gc->vsOutputContainer.clipSpacePosBuffer);
-    gc->vsOutputContainer.clipSpacePosBuffer = NULL;
-    gc->vsOutputContainer.outClipSpacePosSize = 0;
-*/
 }
 
 /* Free vertex data cache if it is in video memory when mode changes */
 GLboolean __glFreeImmedCacheInVideoMemory(__GLcontext *gc)
 {
+    __GLvertexCacheBlock *cacheBlock = gc->input.vertexCacheBlock;
+    __GLvertexDataCache *vertexCache;
+    GLint i;
+
+    /* Free all IM cache memory */
+    while (cacheBlock)
+    {
+        for (i = 0; i <= cacheBlock->maxVertexCacheIdx; i++)
+        {
+            vertexCache = &cacheBlock->cache[i];
+
+            if (vertexCache->privateData)
+            {
+                (*gc->dp.deletePrimData)(gc, vertexCache->privateData);
+            }
+
+            if (vertexCache->ibPrivateData)
+            {
+                (*gc->dp.deletePrimData)(gc, vertexCache->ibPrivateData);
+            }
+
+            vertexCache->cacheStatus = __GL_FILL_QUICK_VERTEX_CACHE;
+        }
+
+        cacheBlock = cacheBlock->next;
+    }
+
+
     return GL_TRUE;
 }
 #endif

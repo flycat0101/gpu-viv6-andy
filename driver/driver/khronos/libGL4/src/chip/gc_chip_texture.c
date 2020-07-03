@@ -566,10 +566,49 @@ gcChipUtilGetEndianHint(
         return gcvENDIAN_NO_SWAP;
 
     case GL_UNSIGNED_SHORT_5_6_5:
+    case GL_UNSIGNED_SHORT_5_6_5_REV:
     case GL_UNSIGNED_SHORT_4_4_4_4:
+    case GL_UNSIGNED_SHORT_4_4_4_4_REV:
     case GL_UNSIGNED_SHORT_5_5_5_1:
+    case GL_UNSIGNED_SHORT_1_5_5_5_REV:
         gcmFOOTER_ARG("result=0x%04x", gcvENDIAN_SWAP_WORD);
         return gcvENDIAN_SWAP_WORD;
+
+    case GL_UNSIGNED_INT_8_8_8_8:
+    case GL_UNSIGNED_INT_8_8_8_8_REV:
+    case GL_UNSIGNED_INT_10_10_10_2:
+    case GL_UNSIGNED_INT_2_10_10_10_REV:
+    case GL_UNSIGNED_INT_24_8:
+    case GL_UNSIGNED_INT_10F_11F_11F_REV:
+    case GL_UNSIGNED_INT_5_9_9_9_REV:
+        gcmFOOTER_ARG("result=0x%04x", gcvENDIAN_SWAP_DWORD);
+        return gcvENDIAN_SWAP_DWORD;
+
+    case GL_UNSIGNED_SHORT:
+        switch (internalFormat)
+        {
+        case GL_DEPTH_COMPONENT:
+            gcmFOOTER_ARG("result=0x%04x", gcvENDIAN_SWAP_WORD);
+            return gcvENDIAN_SWAP_WORD;
+
+        default:
+            gcmFOOTER_ARG("result=0x%04x", gcvENDIAN_NO_SWAP);
+            return gcvENDIAN_NO_SWAP;
+        }
+
+    case GL_UNSIGNED_INT:
+    case GL_FLOAT:
+        switch (internalFormat)
+        {
+        case GL_DEPTH_COMPONENT:
+        case GL_DEPTH_STENCIL:
+            gcmFOOTER_ARG("result=0x%04x", gcvENDIAN_SWAP_DWORD);
+            return gcvENDIAN_SWAP_DWORD;
+
+        default:
+            gcmFOOTER_ARG("result=0x%04x", gcvENDIAN_NO_SWAP);
+            return gcvENDIAN_NO_SWAP;
+        }
 
     default:
         gcmFOOTER_ARG("result=0x%04x", gcvENDIAN_NO_SWAP);
@@ -2201,11 +2240,9 @@ gcChipCreateTexture(
         return gcvSTATUS_OK;
     }
 
-    texInfo = (__GLchipTextureInfo *)gc->imports.calloc(gc, 1, sizeof(__GLchipTextureInfo));
-    if (!texInfo)
-    {
-        gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
-    }
+    gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLchipTextureInfo), (gctPOINTER*)&texInfo));
+    gcoOS_ZeroMemory(texInfo, sizeof(__GLchipTextureInfo));
+
     texObj->privateData = texInfo;
 
     texInfo->rendered = GL_FALSE;
@@ -2213,11 +2250,8 @@ gcChipCreateTexture(
     size = texObj->maxLevels * sizeof(__GLchipMipmapInfo)
          + texObj->maxLevels * texObj->maxSlices * sizeof(__GLchipResourceShadow);
 
-    pointer = gc->imports.calloc(gc, 1, size);
-    if (!pointer)
-    {
-        gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
-    }
+    gcmONERROR(gcoOS_Allocate(gcvNULL, size, (gctPOINTER*)&pointer));
+    gcoOS_ZeroMemory(pointer, size);
 
     texInfo->mipLevels = (__GLchipMipmapInfo*)pointer;
     shadows = (__GLchipResourceShadow*)(texInfo->mipLevels + texObj->maxLevels);
@@ -2247,6 +2281,14 @@ gcChipCreateTexture(
 #endif
 
 OnError:
+    if (gcmIS_ERROR(status))
+    {
+        if (texObj->privateData)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, texObj->privateData);
+        }
+    }
+
     gcmFOOTER();
     return status;
 }
@@ -4238,9 +4280,11 @@ __glChipDeleteTexture(
             mipLevel->astcData = gcvNULL;
         }
     }
-    gc->imports.free(gc, texInfo->mipLevels);
-    texInfo->mipLevels = gcvNULL;
-
+    if (texInfo->mipLevels)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, texInfo->mipLevels);
+        texInfo->mipLevels = gcvNULL;
+    }
 
 #if __GL_CHIP_PATCH_ENABLED
     if (chipCtx->patchId == gcvPATCH_GTFES30 && texObj->immutable)
@@ -4300,7 +4344,7 @@ __glChipDeleteTexture(
     }
 #endif
 
-    gc->imports.free(gc, texObj->privateData);
+    gcmOS_SAFE_FREE(gcvNULL, texObj->privateData);
     texObj->privateData = gcvNULL;
 
     gcmFOOTER_NO();
@@ -4331,11 +4375,15 @@ __glChipDetachTexture(
         return;
     }
 
-    surfList = (gcoSURF*)(*gc->imports.calloc)(gc, __GL_CHIP_SURF_COUNT, sizeof(GLuint*));
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, __GL_CHIP_SURF_COUNT * sizeof(GLuint*), (gctPOINTER*)&surfList)))
+    {
+        gcmFOOTER_NO();
+        return;
+    }
+    gcoOS_ZeroMemory(surfList, __GL_CHIP_SURF_COUNT * sizeof(GLuint*));
 
     /* collect all surface which could be RT surface*/
     /* step1: collect shadow surface if exist */
-    GL_ASSERT(texInfo->mipLevels);
     for (level = 0; level < texObj->maxLevels; ++level)
     {
         __GLchipMipmapInfo *mipLevel = &texInfo->mipLevels[level];
@@ -4365,7 +4413,7 @@ __glChipDetachTexture(
         gcChipDetachSurface(gc, chipCtx, surfList, surfCount);
     }
 
-    (*gc->imports.free)(gc, surfList);
+    gcmOS_SAFE_FREE(gcvNULL, surfList);
 
     gcmFOOTER_NO();
     return;
@@ -5398,6 +5446,7 @@ __glChipGenerateMipMap(
                     gcmONERROR(gcoOS_Allocate(gcvNULL,
                                               numSlices * gcmSIZEOF(__GLchipStencilOpt),
                                               (gctPOINTER*)&chipMipLevel->stencilOpt));
+                    gcoOS_ZeroMemory(chipMipLevel->stencilOpt, numSlices * gcmSIZEOF(__GLchipStencilOpt));
                 }
 
                 for (slice = 0; slice < numSlices; ++slice)
@@ -5531,6 +5580,7 @@ __glChipGetTexImage(
     gctUINT32 srcShift, srcMax, dstMax;
     GLint dx, dy, sx, sy;
     GLuint width;
+    gctPOINTER pointer;
 
     gcmHEADER_ARG("gc=0x%x, texObj=0x%x, face=%d, level=%d, buf=0x%x",
         gc, texObj, face, level, buf);
@@ -5853,8 +5903,10 @@ __glChipGetTexImage(
         }
 
         if ((GL_TRUE == transferInfo.srcNeedFree) && (gcvNULL != transferInfo.srcImage)){
-        (*gc->imports.free)(gc, (void*)transferInfo.srcImage);
-        transferInfo.srcImage = gcvNULL;
+            /* Fix a build warning from gcmOS_SAFE_FREE */
+            pointer = (gctPOINTER)transferInfo.srcImage;
+            gcmOS_SAFE_FREE(gcvNULL, pointer);
+            transferInfo.srcImage = gcvNULL;
         }
         if (dstView.surf)
         {

@@ -23,6 +23,12 @@ GLvoid APIENTRY __glim_PushAttrib(__GLcontext *gc, GLuint mask)
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
     __GL_VERTEX_BUFFER_FLUSH(gc);
+    /* Copy the deferred attribute states to current attribute states.
+    */
+    if (gc->input.deferredAttribDirty)
+    {
+        __glCopyDeferedAttribToCurrent(gc);
+    }
 
     spp = gc->attribute.stackPointer;
     if (spp < &gc->attribute.stack[gc->constants.maxAttribStackDepth])
@@ -30,7 +36,13 @@ GLvoid APIENTRY __glim_PushAttrib(__GLcontext *gc, GLuint mask)
         sp = *spp;
         if (!sp)
         {
-            sp = (__GLattributeStack*)(*gc->imports.calloc)(gc, 1, sizeof(__GLattributeStack));
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLattributeStack), (gctPOINTER*)&sp)))
+            {
+                __glSetError(gc, GL_OUT_OF_MEMORY);
+                return;
+            }
+            gcoOS_ZeroMemory(sp, sizeof(__GLattributeStack));
+
             *spp = sp;
         }
         gc->attribute.stackPointer = spp + 1;
@@ -40,6 +52,10 @@ GLvoid APIENTRY __glim_PushAttrib(__GLcontext *gc, GLuint mask)
         /* Always save enables and deferred attribute masks.
         */
         sp->state.enables = gc->state.enables;
+        sp->state.currentAttribMask = gc->state.currentAttribMask;
+        sp->state.deferredAttribMask = gc->state.deferredAttribMask;
+        sp->state.currentColorMask = gc->state.currentColorMask;
+        sp->state.deferredColorMask = gc->state.deferredColorMask;
 
         if (mask & GL_ACCUM_BUFFER_BIT)
         {
@@ -58,6 +74,27 @@ GLvoid APIENTRY __glim_PushAttrib(__GLcontext *gc, GLuint mask)
         }
         if (mask & GL_CURRENT_BIT)
         {
+            /*
+            ** Sync up gc->state.current NORMAL/DIFFUSE states with gc->input.shadowCurrent states.
+            */
+            if (gc->input.deferredAttribDirty) {
+                if (gc->input.deferredAttribDirty & __GL_DEFERED_NORMAL_BIT) {
+                    gc->state.current.normal = gc->input.shadowCurrent.normal;
+                    gc->input.deferredAttribDirty &= ~(__GL_DEFERED_NORMAL_BIT);
+                }
+                if (gc->input.deferredAttribDirty & __GL_DEFERED_COLOR_BIT) {
+                    gc->state.current.color = gc->input.shadowCurrent.color;
+                    gc->input.deferredAttribDirty &= ~(__GL_DEFERED_COLOR_BIT);
+
+                    /* Use the current color to update material state if color material is enabled */
+                    if (gc->state.enables.lighting.colorMaterial)
+                    {
+                        __glUpdateMaterialfv(gc, gc->state.light.colorMaterialFace,
+                            gc->state.light.colorMaterialParam, (GLfloat *)&gc->state.current.color);
+                    }
+                }
+            }
+
             sp->state.current = gc->state.current;
             sp->state.rasterPos = gc->state.rasterPos;
         }
@@ -191,6 +228,11 @@ GLvoid APIENTRY __glim_PopAttrib(__GLcontext *gc)
 
             gc->state.enables.colorBuffer = sp->state.enables.colorBuffer;
 
+            /* Restore the deferred attribute masks.
+            */
+            gc->state.currentColorMask = sp->state.currentColorMask;
+            gc->state.deferredColorMask = sp->state.currentColorMask;
+
             /* Notify attribute changes to SWP.
             */
             __GL_SET_SWP_DIRTY_ATTR(gc, __GL_SWP_DRAWBUFFER_BIT);
@@ -209,12 +251,26 @@ GLvoid APIENTRY __glim_PopAttrib(__GLcontext *gc)
         if (mask & GL_CURRENT_BIT) {
             gc->state.current = sp->state.current;
             gc->state.rasterPos = sp->state.rasterPos;
+            /* Clear NORMAL/DIFFUSE bits in deferredAttribDirty to discard NORMAL/DIFFUSE in shadowCurrent.
+            */
+            gc->input.shadowCurrent.normal = sp->state.current.normal;
+            gc->input.shadowCurrent.color = sp->state.current.color;
+            gc->input.deferredAttribDirty &= ~(__GL_DEFERED_NORMAL_BIT | __GL_DEFERED_COLOR_BIT);
 
         }
 
         if (mask & GL_DEPTH_BUFFER_BIT) {
             gc->state.depth = sp->state.depth;
-            gc->state.enables.depthBuffer = sp->state.enables.depthBuffer;
+            gc->state.enables.depthTest = sp->state.enables.depthTest;
+
+            /* Restore the deferred attribute masks.
+            */
+            attribMask = (__GL_ATTRIB_DEPTH_MASK_BIT |
+                          __GL_ATTRIB_DEPTH_TEST_BIT);
+            gc->state.currentAttribMask &= ~(attribMask);
+            gc->state.currentAttribMask |= (sp->state.currentAttribMask & attribMask);
+            gc->state.deferredAttribMask &= ~(attribMask);
+            gc->state.deferredAttribMask |= (sp->state.currentAttribMask & attribMask);
 
 #if GL_EXT_depth_bounds_test
             gc->state.depthBoundTest = sp->state.depthBoundTest;
@@ -229,6 +285,17 @@ GLvoid APIENTRY __glim_PopAttrib(__GLcontext *gc)
 
         if (mask & GL_ENABLE_BIT) {
             gc->state.enables = sp->state.enables;
+
+            /* Restore the deferred attribute masks.
+            */
+            attribMask = (__GL_ATTRIB_POLYGON_OFFSET_FILL_BIT |
+                          __GL_ATTRIB_DEPTH_TEST_BIT |
+                          __GL_ATTRIB_LINE_STIPPLE_BIT);
+            gc->state.currentAttribMask &= ~(attribMask);
+            gc->state.currentAttribMask |= (sp->state.currentAttribMask & attribMask);
+            gc->state.deferredAttribMask &= ~(attribMask);
+            gc->state.deferredAttribMask |= (sp->state.currentAttribMask & attribMask);
+
 
             /* Immediately notify attribute changes to DP.
             */
@@ -358,6 +425,13 @@ GLvoid APIENTRY __glim_PopAttrib(__GLcontext *gc)
         if (mask & GL_POLYGON_BIT) {
             gc->state.polygon = sp->state.polygon;
             gc->state.enables.polygon = sp->state.enables.polygon;
+            /* Restore the deferred attribute masks.
+            */
+            attribMask = (__GL_ATTRIB_POLYGON_OFFSET_FILL_BIT);
+            gc->state.currentAttribMask &= ~(attribMask);
+            gc->state.currentAttribMask |= (sp->state.currentAttribMask & attribMask);
+            gc->state.deferredAttribMask &= ~(attribMask);
+            gc->state.deferredAttribMask |= (sp->state.currentAttribMask & attribMask);
 
             __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_1,
                             __GL_POLYGON_ATTR_BITS & (~__GL_POLYGONSTIPPLE_BIT));
@@ -502,6 +576,20 @@ GLvoid APIENTRY __glim_PopAttrib(__GLcontext *gc)
             __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_2, __GL_MULTISAMPLE_ATTR_BITS);
         }
 
+        /* Set gc->input.deferredAttribDirty bit if deferred states are different from current states.
+        */
+        if (gc->state.deferredAttribMask ^ gc->state.currentAttribMask) {
+            gc->input.deferredAttribDirty |= __GL_DEFERED_ATTRIB_BIT;
+        } else {
+            gc->input.deferredAttribDirty &= ~(__GL_DEFERED_ATTRIB_BIT);
+        }
+
+        if(gc->state.deferredColorMask ^ gc->state.currentColorMask) {
+            gc->input.deferredAttribDirty |= __GL_DEFERED_COLOR_MASK_BIT;
+        } else {
+            gc->input.deferredAttribDirty &= ~(__GL_DEFERED_COLOR_MASK_BIT);
+        }
+
         /* Re-compute the core clip rectangle.
         */
 
@@ -528,6 +616,16 @@ GLuint __glCopyContext(__GLcontext *dst, __GLcontext *src, GLuint mask)
     __GL_VERTEX_BUFFER_FLUSH(src);
     __GL_VERTEX_BUFFER_FLUSH(dst);
 
+    /* Copy the deferred attribute states to current attribute states.
+    */
+    if (src->input.deferredAttribDirty) {
+        __glCopyDeferedAttribToCurrent(src);
+    }
+    if (dst->input.deferredAttribDirty) {
+        __glCopyDeferedAttribToCurrent(dst);
+    }
+
+
     if (mask & GL_ACCUM_BUFFER_BIT) {
         dst->state.accum = src->state.accum;
 
@@ -540,6 +638,12 @@ GLuint __glCopyContext(__GLcontext *dst, __GLcontext *src, GLuint mask)
         dst->state.raster = src->state.raster;
         dst->state.enables.colorBuffer = src->state.enables.colorBuffer;
 
+        /* Copy the deferred attribute masks.
+        */
+
+        dst->state.currentColorMask = src->state.currentColorMask;
+        dst->state.deferredColorMask = dst->state.currentColorMask;
+
         /* Notify attribute changes to SWP.
         */
         __GL_SET_SWP_DIRTY_ATTR(dst, __GL_SWP_DRAWBUFFER_BIT);
@@ -551,13 +655,38 @@ GLuint __glCopyContext(__GLcontext *dst, __GLcontext *src, GLuint mask)
     }
 
     if (mask & GL_CURRENT_BIT) {
+        /* Sync up src->state.current NORMAL/DIFFUSE states with src->input.shadowCurrent states.
+        */
+        if (src->input.deferredAttribDirty) {
+            if (src->input.deferredAttribDirty & __GL_DEFERED_NORMAL_BIT) {
+                src->state.current.normal = src->input.shadowCurrent.normal;
+                src->input.deferredAttribDirty &= ~(__GL_DEFERED_NORMAL_BIT);
+            }
+            if (src->input.deferredAttribDirty & __GL_DEFERED_COLOR_BIT) {
+                src->state.current.color = src->input.shadowCurrent.color;
+                src->input.deferredAttribDirty &= ~(__GL_DEFERED_COLOR_BIT);
+            }
+        }
+
         dst->state.current = src->state.current;
         dst->state.rasterPos = src->state.rasterPos;
+        /* Clear NORMAL/DIFFUSE bits in dst->deferredAttribDirty to discard NORMAL/DIFFUSE in shadowCurrent.
+        */
+        dst->input.deferredAttribDirty &= ~(__GL_DEFERED_NORMAL_BIT | __GL_DEFERED_COLOR_BIT);
     }
 
     if (mask & GL_DEPTH_BUFFER_BIT) {
         dst->state.depth = src->state.depth;
-        dst->state.enables.depthBuffer = src->state.enables.depthBuffer;
+        dst->state.enables.depthTest = src->state.enables.depthTest;
+
+        /* Copy the deferred attribute masks.
+        */
+        attribMask = (__GL_ATTRIB_DEPTH_MASK_BIT |
+                      __GL_ATTRIB_DEPTH_TEST_BIT);
+        dst->state.currentAttribMask &= ~(attribMask);
+        dst->state.currentAttribMask |= (src->state.currentAttribMask & attribMask);
+        dst->state.deferredAttribMask = dst->state.currentAttribMask;
+
 
         __GL_SET_ATTR_DIRTY_BIT(dst, __GL_DIRTY_ATTRS_1, __GL_DEPTHBUF_ATTR_BITS);
         __GL_SET_ATTR_DIRTY_BIT(dst, __GL_DIRTY_ATTRS_2, __GL_DEPTHBUF_ATTR2_BITS);
@@ -565,6 +694,15 @@ GLuint __glCopyContext(__GLcontext *dst, __GLcontext *src, GLuint mask)
 
     if (mask & GL_ENABLE_BIT) {
         dst->state.enables = src->state.enables;
+
+        /* Copy the deferred attribute masks.
+        */
+        attribMask = (__GL_ATTRIB_POLYGON_OFFSET_FILL_BIT |
+                      __GL_ATTRIB_DEPTH_TEST_BIT |
+                      __GL_ATTRIB_LINE_STIPPLE_BIT);
+        dst->state.currentAttribMask &= ~(attribMask);
+        dst->state.currentAttribMask |= (src->state.currentAttribMask & attribMask);
+        dst->state.deferredAttribMask = dst->state.currentAttribMask;
 
         /* Immediately notify attribute changes to DP.
         */
@@ -652,6 +790,12 @@ GLuint __glCopyContext(__GLcontext *dst, __GLcontext *src, GLuint mask)
     if (mask & GL_LINE_BIT) {
         dst->state.line = src->state.line;
         dst->state.enables.line = src->state.enables.line;
+        /* Copy the deferred attribute masks.
+        */
+        attribMask = (__GL_ATTRIB_LINE_STIPPLE_BIT);
+        dst->state.currentAttribMask &= ~(attribMask);
+        dst->state.currentAttribMask |= (src->state.currentAttribMask & attribMask);
+        dst->state.deferredAttribMask = dst->state.currentAttribMask;
 
         __GL_SET_ATTR_DIRTY_BIT(dst, __GL_DIRTY_ATTRS_2, __GL_LINE_ATTR_BITS);
     }
@@ -691,6 +835,12 @@ GLuint __glCopyContext(__GLcontext *dst, __GLcontext *src, GLuint mask)
     if (mask & GL_POLYGON_BIT) {
         dst->state.polygon = src->state.polygon;
         dst->state.enables.polygon = src->state.enables.polygon;
+        /* Copy the deferred attribute masks.
+        */
+        attribMask = (__GL_ATTRIB_POLYGON_OFFSET_FILL_BIT);
+        dst->state.currentAttribMask &= ~(attribMask);
+        dst->state.currentAttribMask |= (src->state.currentAttribMask & attribMask);
+        dst->state.deferredAttribMask = dst->state.currentAttribMask;
 
         __GL_SET_ATTR_DIRTY_BIT(dst, __GL_DIRTY_ATTRS_1, __GL_POLYGON_ATTR_BITS);
     }
@@ -813,7 +963,13 @@ GLvoid APIENTRY __glim_PushClientAttrib(__GLcontext *gc, GLbitfield mask)
         sp = *spp;
         if (!sp)
         {
-            sp = (__GLclientAttribStack*)(*gc->imports.calloc)(gc, 1, sizeof(__GLclientAttribStack));
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLclientAttribStack), (gctPOINTER*)&sp)))
+            {
+                __glSetError(gc, GL_OUT_OF_MEMORY);
+                return;
+            }
+            gcoOS_ZeroMemory(sp, sizeof(__GLclientAttribStack));
+
             *spp = sp;
         }
         sp->mask = mask;
@@ -895,7 +1051,6 @@ GLvoid APIENTRY __glim_PopClientAttrib(__GLcontext *gc)
             /* Save the current ARRAY_BUFFER binding because the following
             ** __glBindBuffer() will change it.
             */
-//            arrayBufBinding = gc->clientState.vertexArray.arrayBufBinding;
             arrayBufBinding = vertexArrayState->arrayBufBinding;
 
             /* Restore the per-array binding points according to just poped
@@ -903,12 +1058,10 @@ GLvoid APIENTRY __glim_PopClientAttrib(__GLcontext *gc)
             */
             for (i = 0; i < __GL_TOTAL_VERTEX_ATTRIBUTES; i++)
             {
-//                buffer = gc->clientState.vertexArray.currentArrays[i].bufBinding;
                 pAttrib = &vertexArrayState->attribute[i];
                 pAttribBinding = &vertexArrayState->attributeBinding[pAttrib->attribBinding];
                 buffer = pAttribBinding->boundArrayName;
                 __glBindBufferToGeneralPoint(gc, __GL_ARRAY_BUFFER_INDEX, buffer);
-//                gc->bufferObject.boundArrays[i] = gc->bufferObject.boundTarget[__GL_ARRAY_BUFFER_INDEX];
 
 
                 /* Set all the vertex array dirty bits */
@@ -935,9 +1088,6 @@ GLvoid APIENTRY __glim_PopClientAttrib(__GLcontext *gc)
                     vertexArrayState->boundIdxName);
             }
 
-            /* Notify the new clientActiveUnit to DP.
-            */
-//            (*gc->dp.clientActiveTexture)(gc, gc->clientState.vertexArray.clientActiveUnit);
         }
 
         /*
@@ -965,60 +1115,69 @@ GLvoid __glFreeAttribStackState(__GLcontext *gc)
     ** Need to pop all pushed attributes to free storage.
     ** Then it will be safe to delete stack entries
     */
-    for (spp = (GLvoid **)&gc->attribute.stack[0];
-         spp < (GLvoid **)&gc->attribute.stack[gc->constants.maxAttribStackDepth];
-         spp++)
+    if (gc->attribute.stack)
     {
-        sp = *spp;
-        if (sp)
+        for (spp = (GLvoid **)&gc->attribute.stack[0];
+             spp < (GLvoid **)&gc->attribute.stack[gc->constants.maxAttribStackDepth];
+             spp++)
         {
-            (*gc->imports.free)(gc, sp);
+            sp = *spp;
+            if (sp)
+            {
+                gcmOS_SAFE_FREE(gcvNULL, sp);
+            }
+            else
+            {
+                break;
+            }
         }
-        else
-        {
-            break;
-        }
+        gcmOS_SAFE_FREE(gcvNULL, gc->attribute.stack);
+        gc->attribute.stack = gc->attribute.stackPointer = NULL;
     }
-    (*gc->imports.free)(gc, gc->attribute.stack);
-    gc->attribute.stack = gc->attribute.stackPointer = NULL;
 
     /* Free clientStack.
     */
-    for (spp = (GLvoid **)&gc->attribute.clientStack[0];
-        spp < (GLvoid **)&gc->attribute.clientStack[gc->constants.maxClientAttribStackDepth];
-        spp++)
+    if (gc->attribute.clientStack)
     {
-        sp = *spp;
-        if (sp)
+        for (spp = (GLvoid **)&gc->attribute.clientStack[0];
+            spp < (GLvoid **)&gc->attribute.clientStack[gc->constants.maxClientAttribStackDepth];
+            spp++)
         {
-            (*gc->imports.free)(gc, sp);
+            sp = *spp;
+            if (sp)
+            {
+                gcmOS_SAFE_FREE(gcvNULL, sp);
+            }
+            else
+            {
+                break;
+            }
         }
-        else
-        {
-            break;
-        }
+        gcmOS_SAFE_FREE(gcvNULL, gc->attribute.clientStack);
+        gc->attribute.clientStack = gc->attribute.clientStackPointer = NULL;
     }
-    (*gc->imports.free)(gc, gc->attribute.clientStack);
-    gc->attribute.clientStack = gc->attribute.clientStackPointer = NULL;
 }
 
-GLvoid __glInitAttribStackState(__GLcontext *gc)
+GLboolean __glInitAttribStackState(__GLcontext *gc)
 {
-    gc->attribute.stack = (__GLattributeStack **)
-        (*gc->imports.calloc)(gc, gc->constants.maxAttribStackDepth,
-                              sizeof(__GLattributeStack *) );
-    gc->attribute.stackPointer = gc->attribute.stack;
-    if (gc->attribute.stack == NULL) {
-        __glSetError(gc, GL_OUT_OF_MEMORY);
-        return;
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+        gc->constants.maxAttribStackDepth * sizeof(__GLattributeStack *),
+        (gctPOINTER*)&gc->attribute.stack)))
+    {
+         return GL_FALSE;
     }
+    gcoOS_ZeroMemory(gc->attribute.stack, gc->constants.maxAttribStackDepth * sizeof(__GLattributeStack *));
 
-    gc->attribute.clientStack = (__GLclientAttribStack **)
-        (*gc->imports.calloc)(gc, gc->constants.maxClientAttribStackDepth,
-                              sizeof(__GLclientAttribStack *) );
-    gc->attribute.clientStackPointer = gc->attribute.clientStack;
-    if (gc->attribute.stack == NULL) {
-        __glSetError(gc, GL_OUT_OF_MEMORY);
-        return;
+    gc->attribute.stackPointer = gc->attribute.stack;
+
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+        gc->constants.maxClientAttribStackDepth * sizeof(__GLclientAttribStack *),
+        (gctPOINTER*)&gc->attribute.clientStack)))
+    {
+         __glSetError(gc, GL_OUT_OF_MEMORY);
+         return GL_FALSE;
     }
+    gcoOS_ZeroMemory(gc->attribute.clientStack, gc->constants.maxClientAttribStackDepth * sizeof(__GLclientAttribStack *));
+    gc->attribute.clientStackPointer = gc->attribute.clientStack;
+    return GL_TRUE;
 }

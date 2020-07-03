@@ -25,23 +25,22 @@ extern GLvoid __glConvertResult(__GLcontext *gc, GLint fromType, const GLvoid *r
 
 #define __GL_VERTEX_BUFFER_FLUSH_MATERIAL(gc)               \
     switch (gc->input.beginMode) {                          \
-    /*                                                      \
+      case __GL_SMALL_DRAW_BATCH:                           \
+        __glPrimitiveBatchEnd(gc);                          \
+        break;                                              \
       case __GL_SMALL_LIST_BATCH:                           \
         __glDisplayListBatchEnd(gc);                        \
         break;                                              \
-        */                                                  \
       case __GL_IN_BEGIN:                                   \
-        __glImmediateFlushBuffer(gc);                       \
+        __glImmedFlushPrim_Material(gc, GL_FALSE);          \
         break;                                              \
-      default: ;                                            \
-    }                                                       \
-
-
+      default:                                              \
+        break;                                              \
+    }
 
 /* s_prim.c */
 extern GLvoid __glComputePrimitiveData(__GLcontext *gc);
-extern GLvoid __glConfigImmedVertexStream(__GLcontext *gc, GLenum mode);
-
+extern GLvoid __glConfigImmedVertexStream(__GLcontext *gc, GLenum mode, GLvoid **privDataPtrAddr, GLvoid **ibPrivateData);
 
 /* For glMaterial in begin/end
 ** This Function calls Swp to do TnL and accumulate TnLed vertices in Swp pipeline.
@@ -52,6 +51,10 @@ GLvoid __glImmedFlushPrim_Material(__GLcontext *gc, GLboolean bFlushPipe)
 {
     GLint vertexCount;
 
+    if (gc->input.cacheBufferUsed)
+    {
+        __glSwitchToDefaultVertexBuffer(gc, 0);
+    }
     vertexCount = gc->input.vertex.index - gc->tnlAccum.preVertexIndex;
     /* First glMaterial inside begin/end */
     if (gc->tnlAccum.vertexCount == 0)
@@ -96,7 +99,7 @@ GLvoid __glImmedFlushPrim_Material(__GLcontext *gc, GLboolean bFlushPipe)
     /*
     ** Prepare gc stream for tnl emulation. Draw with none index mode.
     */
-    __glConfigImmedVertexStream(gc, gc->input.currentPrimMode);
+    __glConfigImmedVertexStream(gc, gc->input.currentPrimMode, NULL, NULL);
 
     /* Reset startVertex to last tnled one */
     gc->vertexStreams.startVertex = gc->tnlAccum.preVertexIndex;
@@ -155,7 +158,7 @@ GLvoid APIENTRY __glim_End_Material(__GLcontext *gc)
     /* Restore dispatchTable->End to the original function pointer */
     gc->immedModeDispatch.End = gc->tnlAccum.glimEnd ;
 
-    __glResetImmedVertexBuffer(gc);
+    __glResetImmedVertexBuffer(gc, gc->input.enableVertexCaching);
 
     gc->input.beginMode = __GL_NOT_IN_BEGIN;
 }

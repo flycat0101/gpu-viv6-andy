@@ -36,7 +36,12 @@ GLuint __glGenerateNames(__GLcontext *gc, __GLsharedObjectMachine *shared, GLsiz
         if (!allocated)
         {
             /* There is no IDs allocated yet */
-            allocated = (__GLnameAllocation *)(*gc->imports.malloc)(gc, sizeof(__GLnameAllocation));
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLnameAllocation), (gctPOINTER*)&allocated)))
+            {
+                __GL_ERROR_RET_VAL(GL_OUT_OF_MEMORY, 0);
+            }
+            gcoOS_ZeroMemory(allocated, sizeof(__GLnameAllocation));
+
             allocated->next = gcvNULL;
             allocated->start = 1;
             allocated->number = range;
@@ -57,7 +62,12 @@ GLuint __glGenerateNames(__GLcontext *gc, __GLsharedObjectMachine *shared, GLsiz
             }
             else
             {
-                temp = (__GLnameAllocation *)(*gc->imports.malloc)(gc, sizeof(__GLnameAllocation));
+                if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLnameAllocation), (gctPOINTER*)&temp)))
+                {
+                    __GL_ERROR_RET_VAL(GL_OUT_OF_MEMORY, 0);
+                }
+                gcoOS_ZeroMemory(temp, sizeof(__GLnameAllocation));
+
                 temp->next = allocated;
                 temp->start = 1;
                 temp->number = range;
@@ -96,7 +106,7 @@ GLuint __glGenerateNames(__GLcontext *gc, __GLsharedObjectMachine *shared, GLsiz
                 allocated->next = allocated->next->next;
                 if (temp)
                 {
-                    (*gc->imports.free)(gc, temp);
+                    gcmOS_SAFE_FREE(gcvNULL, temp);
                 }
                 genName = start;
                 break;
@@ -222,7 +232,12 @@ GLvoid __glDeleteNamesFrList(__GLcontext *gc, __GLsharedObjectMachine *shared, G
                     ** Need to create a new block for the second
                     ** half of this newly fragmented one.
                     */
-                    temp = (__GLnameAllocation*)(*gc->imports.malloc)(gc, sizeof(__GLnameAllocation));
+                    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLnameAllocation), (gctPOINTER*)&temp)))
+                    {
+                        break;
+                    }
+                    gcoOS_ZeroMemory(temp, sizeof(__GLnameAllocation));
+
                     temp->next = (*allocated)->next;
                     temp->start = delend;
                     temp->number = blend - delend;
@@ -246,7 +261,7 @@ GLvoid __glDeleteNamesFrList(__GLcontext *gc, __GLsharedObjectMachine *shared, G
                 *allocated = (*allocated)->next;
                 if (temp)
                 {
-                    (*gc->imports.free)(gc, temp);
+                    gcmOS_SAFE_FREE(gcvNULL, temp);
                 }
                 continue;
             }
@@ -323,11 +338,11 @@ __glFindObjItemNode(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint id)
         /*
         ** Create hash buckets on first use.
         */
-        buckets = (__GLobjItem**)(*gc->imports.calloc)(gc, 1, shared->hashSize * sizeof(GLvoid *));
-        if (!buckets)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, shared->hashSize * sizeof(GLvoid *), (gctPOINTER*)&buckets)))
         {
             goto _Done;
         }
+        gcoOS_ZeroMemory(buckets, shared->hashSize * sizeof(GLvoid *));
         shared->hashBuckets = buckets;
     }
 
@@ -348,8 +363,7 @@ __glFindObjItemNode(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint id)
     /*
     ** Create a new item and add it to the list if the item with "id" does not exist.
     */
-    item = (__GLobjItem *)(*gc->imports.malloc)(gc, sizeof(__GLobjItem));
-    if (item != gcvNULL)
+    if (gcmIS_SUCCESS(gcoOS_Allocate(gcvNULL, sizeof(__GLobjItem), (gctPOINTER*)&item)))
     {
         item->obj = gcvNULL;
         item->name = id;
@@ -390,7 +404,7 @@ GLvoid __glFreeSharedObjectState(__GLcontext *gc, __GLsharedObjectMachine *share
     while (name)
     {
         shared->nameArray = name->next;
-        (*gc->imports.free)(gc, name);
+        gcmOS_SAFE_FREE(gcvNULL, name);
         name = shared->nameArray;
     }
 
@@ -428,7 +442,7 @@ GLvoid __glFreeSharedObjectState(__GLcontext *gc, __GLsharedObjectMachine *share
     */
     if (shared->linearTable)
     {
-        (*gc->imports.free)(gc, shared->linearTable);
+        gcmOS_SAFE_FREE(gcvNULL, shared->linearTable);
     }
 
     if (buckets)
@@ -439,11 +453,11 @@ GLvoid __glFreeSharedObjectState(__GLcontext *gc, __GLsharedObjectMachine *share
             while (hdr)
             {
                 __GLobjItem *next = hdr->next;
-                (*gc->imports.free)(gc, hdr);
+                gcmOS_SAFE_FREE(gcvNULL, hdr);
                 hdr = next;
             }
         }
-        (*gc->imports.free)(gc, shared->hashBuckets);
+        gcmOS_SAFE_FREE(gcvNULL, shared->hashBuckets);
     }
 
     if (shared->lock)
@@ -453,17 +467,17 @@ GLvoid __glFreeSharedObjectState(__GLcontext *gc, __GLsharedObjectMachine *share
         (*gc->imports.destroyMutex)(shared->lock);
 
         /* Free lock */
-        (*gc->imports.free)(gc, shared->lock);
+        gcmOS_SAFE_FREE(gcvNULL, shared->lock);
     }
 
     /* Free the shared structure itself.
     */
-    (*gc->imports.free)(gc, shared);
+    gcmOS_SAFE_FREE(gcvNULL, shared);
 
     gcoOS_UnLockPLS();
 }
 
-GLvoid __glCheckLinearTableSize(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint size)
+GLboolean __glCheckLinearTableSize(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint size)
 {
     GLvoid **oldLinearTable, *obj;
     GLuint oldTableSize, i, allocSize;
@@ -486,14 +500,23 @@ GLvoid __glCheckLinearTableSize(__GLcontext *gc, __GLsharedObjectMachine *shared
             {
                 allocSize = shared->maxLinearTableSize;
             }
-            shared->linearTable = (GLvoid **)(*gc->imports.calloc)(gc, 1, allocSize * sizeof(GLvoid *));
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, allocSize * sizeof(GLvoid *), (gctPOINTER*)&shared->linearTable)))
+            {
+                if (shared->lock)
+                {
+                    (*gc->imports.unlockMutex)(shared->lock);
+                }
+                __GL_ERROR_RET_VAL(GL_OUT_OF_MEMORY, GL_FALSE);
+            }
+            gcoOS_ZeroMemory(shared->linearTable, allocSize * sizeof(GLvoid *));
+
             shared->linearTableSize = allocSize;
 
             /* Copy the data from the old linear table to the new linear table */
             __GL_MEMCOPY(shared->linearTable, oldLinearTable, oldTableSize * sizeof(GLvoid *));
 
             /* Free the old linear table */
-            (*gc->imports.free)(gc, oldLinearTable);
+            gcmOS_SAFE_FREE(gcvNULL, oldLinearTable);
         }
         else
         {
@@ -511,7 +534,7 @@ GLvoid __glCheckLinearTableSize(__GLcontext *gc, __GLsharedObjectMachine *shared
             }
 
             /* Free the old linear table and set shared->linearTable to NULL to indicates using hash table */
-            (*gc->imports.free)(gc, shared->linearTable);
+            gcmOS_SAFE_FREE(gcvNULL, shared->linearTable);
             shared->linearTable = gcvNULL;
             shared->linearTableSize = 0;
         }
@@ -521,4 +544,6 @@ GLvoid __glCheckLinearTableSize(__GLcontext *gc, __GLsharedObjectMachine *shared
     {
         (*gc->imports.unlockMutex)(shared->lock);
     }
+
+    return GL_TRUE;
 }

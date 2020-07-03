@@ -47,11 +47,14 @@ GLvoid APIENTRY __glim_AlphaFunc(__GLcontext *gc, GLenum func, GLfloat ref)
 GLvoid GL_APIENTRY __glim_StencilFunc(__GLcontext *gc, GLenum func, GLint ref, GLuint mask)
 {
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
 
     if ((func < GL_NEVER) || (func > GL_ALWAYS))
     {
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
+
+    __GL_VERTEX_BUFFER_FLUSH(gc);
 
     /* Clamped reference value */
     if (ref < 0)
@@ -83,10 +86,14 @@ GLvoid GL_APIENTRY __glim_StencilFuncSeparate(__GLcontext *gc, GLenum face, GLen
 {
     __GL_HEADER();
 
+    __GL_SETUP_NOT_IN_BEGIN(gc);
+
     if ((func < GL_NEVER) || (func > GL_ALWAYS))
     {
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
+
+    __GL_VERTEX_BUFFER_FLUSH(gc);
 
     /* Clamped reference value */
     if (ref < 0)
@@ -132,6 +139,9 @@ OnError:
 GLvoid GL_APIENTRY __glim_StencilMask(__GLcontext *gc, GLuint sm)
 {
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
+
+    __GL_VERTEX_BUFFER_FLUSH(gc);
     /* Update stencil state */
     gc->state.stencil.front.writeMask = sm;
     gc->state.stencil.back.writeMask  = sm;
@@ -145,7 +155,9 @@ GLvoid GL_APIENTRY __glim_StencilMask(__GLcontext *gc, GLuint sm)
 GLvoid GL_APIENTRY __glim_StencilMaskSeparate(__GLcontext *gc, GLenum face, GLuint sm)
 {
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
 
+    __GL_VERTEX_BUFFER_FLUSH(gc);
     switch (face)
     {
     case GL_FRONT:
@@ -177,6 +189,8 @@ GLvoid GL_APIENTRY __glim_StencilOp(__GLcontext *gc, GLenum fail, GLenum depthFa
 {
     __GL_HEADER();
 
+    __GL_SETUP_NOT_IN_BEGIN(gc);
+
     switch (fail)
     {
     case GL_KEEP: case GL_ZERO: case GL_REPLACE:
@@ -206,6 +220,8 @@ GLvoid GL_APIENTRY __glim_StencilOp(__GLcontext *gc, GLenum fail, GLenum depthFa
     default:
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
+
+    __GL_VERTEX_BUFFER_FLUSH(gc);
 
     /* Update stencil state */
     gc->state.stencil.front.fail = fail;
@@ -229,6 +245,8 @@ GLvoid GL_APIENTRY __glim_StencilOpSeparate(__GLcontext *gc, GLenum face, GLenum
 {
     __GL_HEADER();
 
+    __GL_SETUP_NOT_IN_BEGIN(gc);
+
     switch (fail)
     {
     case GL_KEEP: case GL_ZERO: case GL_REPLACE:
@@ -258,6 +276,8 @@ GLvoid GL_APIENTRY __glim_StencilOpSeparate(__GLcontext *gc, GLenum face, GLenum
     default:
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
+
+    __GL_VERTEX_BUFFER_FLUSH(gc);
 
     switch (face)
     {
@@ -297,6 +317,8 @@ OnError:
 GLvoid GL_APIENTRY __glim_DepthRangef(__GLcontext *gc, GLfloat zNear, GLfloat zFar)
 {
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
+
     /* Clamp depth range to legal values */
     if (zNear < __glZero)
     {
@@ -315,6 +337,8 @@ GLvoid GL_APIENTRY __glim_DepthRangef(__GLcontext *gc, GLfloat zNear, GLfloat zF
     {
         zFar = __glOne;
     }
+
+    __GL_VERTEX_BUFFER_FLUSH(gc);
 
     /* Update viewport state */
     gc->state.depth.zNear = zNear;
@@ -351,6 +375,7 @@ GLvoid GL_APIENTRY __glim_Scissor(__GLcontext *gc, GLint x, GLint y, GLint w, GL
     __GLscissor scissor = {x, y, w, h};
 
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
 
     if (!__GL_MEMCMP(&gc->state.scissor, &scissor, sizeof(__GLscissor)))
     {
@@ -361,6 +386,8 @@ GLvoid GL_APIENTRY __glim_Scissor(__GLcontext *gc, GLint x, GLint y, GLint w, GL
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
+
+    __GL_VERTEX_BUFFER_FLUSH(gc);
 
     __glScissor(gc, x, y, w, h);
 
@@ -374,6 +401,9 @@ OnExit:
 GLvoid GL_APIENTRY __glim_BlendColor(__GLcontext *gc, GLfloat r, GLfloat g, GLfloat b, GLfloat a)
 {
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
+
+    __GL_VERTEX_BUFFER_FLUSH(gc);
     /* Update blend state */
     gc->state.raster.blendColor.r = r;
     gc->state.raster.blendColor.g = g;
@@ -390,6 +420,7 @@ GLvoid GL_APIENTRY __glim_BlendEquation(__GLcontext *gc, GLenum mode)
     GLuint i;
 
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
 
     if (!gc->modes.rgbMode)
     {
@@ -424,6 +455,8 @@ GLvoid GL_APIENTRY __glim_BlendEquation(__GLcontext *gc, GLenum mode)
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
+    __GL_VERTEX_BUFFER_FLUSH(gc);
+
     /* Update blend state */
     for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; i++)
     {
@@ -446,6 +479,7 @@ GLvoid GL_APIENTRY __glim_BlendEquationSeparate(__GLcontext *gc, GLenum modeRGB,
     GLuint i;
 
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
 
     if (!gc->modes.rgbMode)
     {
@@ -476,6 +510,8 @@ GLvoid GL_APIENTRY __glim_BlendEquationSeparate(__GLcontext *gc, GLenum modeRGB,
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
+    __GL_VERTEX_BUFFER_FLUSH(gc);
+
     /* Update blend state */
     for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; i++)
     {
@@ -498,6 +534,7 @@ GLvoid GL_APIENTRY __glim_BlendFunc(__GLcontext *gc, GLenum sfactor, GLenum dfac
     GLuint i;
 
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
 
     if (!gc->modes.rgbMode)
     {
@@ -549,6 +586,9 @@ GLvoid GL_APIENTRY __glim_BlendFunc(__GLcontext *gc, GLenum sfactor, GLenum dfac
     default:
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
+
+    __GL_VERTEX_BUFFER_FLUSH(gc);
+
     for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; i++)
     {
         if ((gc->state.raster.blendSrcRGB[i] != sfactor) ||
@@ -579,6 +619,7 @@ GLvoid GL_APIENTRY __glim_BlendFuncSeparate(__GLcontext *gc, GLenum sfactorRGB, 
     GLuint i;
 
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
 
     if (!gc->modes.rgbMode)
     {
@@ -676,6 +717,9 @@ GLvoid GL_APIENTRY __glim_BlendFuncSeparate(__GLcontext *gc, GLenum sfactorRGB, 
     default:
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
+
+    __GL_VERTEX_BUFFER_FLUSH(gc);
+
     for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; i++)
     {
         /* Update blend state */
@@ -698,6 +742,7 @@ OnExit:
 GLvoid GL_APIENTRY __glim_BlendEquationi(__GLcontext * gc, GLuint buf, GLenum mode)
 {
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
 
     if (buf >= gc->constants.shaderCaps.maxDrawBuffers)
     {
@@ -735,6 +780,7 @@ GLvoid GL_APIENTRY __glim_BlendEquationi(__GLcontext * gc, GLuint buf, GLenum mo
     if ((gc->state.raster.blendEquationRGB[buf] != mode) ||
         (gc->state.raster.blendEquationAlpha[buf] != mode))
     {
+        __GL_VERTEX_BUFFER_FLUSH(gc);
         gc->state.raster.blendEquationRGB[buf] = mode;
         gc->state.raster.blendEquationAlpha[buf] = mode;
 
@@ -751,6 +797,7 @@ OnError:
 GLvoid GL_APIENTRY __glim_BlendEquationSeparatei(__GLcontext * gc, GLuint buf, GLenum modeRGB, GLenum modeAlpha)
 {
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
 
     if (buf >= gc->constants.shaderCaps.maxDrawBuffers)
     {
@@ -784,6 +831,7 @@ GLvoid GL_APIENTRY __glim_BlendEquationSeparatei(__GLcontext * gc, GLuint buf, G
     if ((gc->state.raster.blendEquationRGB[buf] != modeRGB) ||
         (gc->state.raster.blendEquationAlpha[buf] != modeAlpha))
     {
+        __GL_VERTEX_BUFFER_FLUSH(gc);
         /* Update blend state */
         gc->state.raster.blendEquationRGB[buf] = modeRGB;
         gc->state.raster.blendEquationAlpha[buf] = modeAlpha;
@@ -801,6 +849,7 @@ OnError:
 GLvoid GL_APIENTRY __glim_BlendFunci(__GLcontext * gc, GLuint buf, GLenum sfactor, GLenum dfactor)
 {
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
 
     if (buf >= gc->constants.shaderCaps.maxDrawBuffers)
     {
@@ -858,6 +907,7 @@ GLvoid GL_APIENTRY __glim_BlendFunci(__GLcontext * gc, GLuint buf, GLenum sfacto
         (gc->state.raster.blendDstRGB[buf] != dfactor)   ||
         (gc->state.raster.blendDstAlpha[buf] != dfactor))
     {
+        __GL_VERTEX_BUFFER_FLUSH(gc);
         /* Update blend state */
         gc->state.raster.blendSrcRGB[buf] = sfactor;
         gc->state.raster.blendSrcAlpha[buf] = sfactor;
@@ -876,6 +926,7 @@ OnError:
 GLvoid GL_APIENTRY __glim_BlendFuncSeparatei(__GLcontext * gc, GLuint buf, GLenum sfactorRGB,GLenum dfactorRGB,GLenum sfactorAlpha,GLenum dfactorAlpha)
 {
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
     if (buf >= gc->constants.shaderCaps.maxDrawBuffers)
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
@@ -978,6 +1029,7 @@ GLvoid GL_APIENTRY __glim_BlendFuncSeparatei(__GLcontext * gc, GLuint buf, GLenu
         (gc->state.raster.blendSrcAlpha[buf] != sfactorAlpha) ||
         (gc->state.raster.blendDstAlpha[buf] != dfactorAlpha))
     {
+        __GL_VERTEX_BUFFER_FLUSH(gc);
         /* Update blend state */
         gc->state.raster.blendSrcRGB[buf] = sfactorRGB;
         gc->state.raster.blendDstRGB[buf] = dfactorRGB;
@@ -996,25 +1048,56 @@ OnError:
 
 GLvoid GL_APIENTRY __glim_ColorMaski(__GLcontext * gc,GLuint buf, GLboolean r, GLboolean g, GLboolean b, GLboolean a)
 {
+    GLint shift;
     __GL_HEADER();
+
+    __GL_SETUP_NOT_IN_BEGIN(gc);
 
     if (buf >= gc->constants.shaderCaps.maxDrawBuffers)
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
+    __GL_VERTEX_BUFFER_FLUSH(gc);
 
-    if ((gc->state.raster.colorMask[buf].redMask != r)||
-        (gc->state.raster.colorMask[buf].greenMask != g) ||
-        (gc->state.raster.colorMask[buf].blueMask != b) ||
-        (gc->state.raster.colorMask[buf].alphaMask != a))
-    {
-        gc->state.raster.colorMask[buf].redMask = r;
-        gc->state.raster.colorMask[buf].greenMask = g;
-        gc->state.raster.colorMask[buf].blueMask = b;
-        gc->state.raster.colorMask[buf].alphaMask = a;
+    shift = buf << 2;
 
-        __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_1, __GL_COLORMASK_BIT);
-    }
+    if (r) {
+         gc->state.deferredColorMask |= (__GL_ATTRIB_COLOR_MASK_R_BIT << shift);
+     }
+     else
+     {
+         gc->state.deferredColorMask &= ~(__GL_ATTRIB_COLOR_MASK_R_BIT << shift);
+     }
+     if (g) {
+         gc->state.deferredColorMask |= (__GL_ATTRIB_COLOR_MASK_G_BIT << shift);
+     }
+     else
+     {
+         gc->state.deferredColorMask &= ~(__GL_ATTRIB_COLOR_MASK_G_BIT << shift);
+     }
+     if (b) {
+         gc->state.deferredColorMask |= (__GL_ATTRIB_COLOR_MASK_B_BIT << shift);
+     }
+     else
+     {
+         gc->state.deferredColorMask &= ~(__GL_ATTRIB_COLOR_MASK_B_BIT << shift);
+     }
+     if (a) {
+         gc->state.deferredColorMask |= (__GL_ATTRIB_COLOR_MASK_A_BIT << shift);
+     }
+     else
+     {
+         gc->state.deferredColorMask &= ~(__GL_ATTRIB_COLOR_MASK_A_BIT << shift);
+     }
+
+     /* Set gc->input.deferredAttribDirty bit if defered states are different
+     ** from current states.
+     */
+     if (gc->state.deferredColorMask ^ gc->state.currentColorMask) {
+         gc->input.deferredAttribDirty |= __GL_DEFERED_COLOR_MASK_BIT;
+     } else {
+         gc->input.deferredAttribDirty &= ~(__GL_DEFERED_COLOR_MASK_BIT);
+     }
 
 OnError:
     __GL_FOOTER();
@@ -1026,6 +1109,8 @@ GLvoid GL_APIENTRY __glim_DepthFunc(__GLcontext *gc, GLenum zfunc)
 {
     __GL_HEADER();
 
+    __GL_SETUP_NOT_IN_BEGIN(gc);
+
     if ((zfunc < GL_NEVER) || (zfunc > GL_ALWAYS))
     {
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
@@ -1033,6 +1118,7 @@ GLvoid GL_APIENTRY __glim_DepthFunc(__GLcontext *gc, GLenum zfunc)
 
     if (zfunc ^ gc->state.depth.testFunc)
     {
+        __GL_VERTEX_BUFFER_FLUSH(gc);
         /* Update depth state */
         gc->state.depth.testFunc = zfunc;
 
@@ -1048,6 +1134,9 @@ OnError:
 GLvoid GL_APIENTRY __glim_ClearColor(__GLcontext *gc, GLfloat r, GLfloat g, GLfloat b, GLfloat a)
 {
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
+    __GL_VERTEX_BUFFER_FLUSH(gc);
+
     /* Update clear state */
     gc->state.raster.clearColor.clear.r = r;
     gc->state.raster.clearColor.clear.g = g;
@@ -1059,18 +1148,57 @@ GLvoid GL_APIENTRY __glim_ClearColor(__GLcontext *gc, GLfloat r, GLfloat g, GLfl
 GLvoid GL_APIENTRY __glim_ColorMask(__GLcontext *gc, GLboolean r, GLboolean g, GLboolean b, GLboolean a)
 {
     GLuint i;
+    GLint shift;
 
     __GL_HEADER();
-    for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; i++)
+    __GL_SETUP_NOT_IN_BEGIN(gc);
+    __GL_VERTEX_BUFFER_FLUSH(gc);
+
+    /* Defer this attribute setting to the next glBegin so that
+    ** we can determine if this attribute is really changed for the next primitive.
+    */
+    for(i = 0; i < __GL_MAX_DRAW_BUFFERS; i++)
     {
-        gc->state.raster.colorMask[i].redMask = r;
-        gc->state.raster.colorMask[i].greenMask = g;
-        gc->state.raster.colorMask[i].blueMask = b;
-        gc->state.raster.colorMask[i].alphaMask = a;
+        shift = i << 2;
+
+        if (r) {
+            gc->state.deferredColorMask |= (__GL_ATTRIB_COLOR_MASK_R_BIT << shift);
+        }
+        else
+        {
+            gc->state.deferredColorMask &= ~(__GL_ATTRIB_COLOR_MASK_R_BIT << shift);
+        }
+        if (g) {
+            gc->state.deferredColorMask |= (__GL_ATTRIB_COLOR_MASK_G_BIT << shift);
+        }
+        else
+        {
+            gc->state.deferredColorMask &= ~(__GL_ATTRIB_COLOR_MASK_G_BIT << shift);
+        }
+        if (b) {
+            gc->state.deferredColorMask |= (__GL_ATTRIB_COLOR_MASK_B_BIT << shift);
+        }
+        else
+        {
+            gc->state.deferredColorMask &= ~(__GL_ATTRIB_COLOR_MASK_B_BIT << shift);
+        }
+        if (a) {
+            gc->state.deferredColorMask |= (__GL_ATTRIB_COLOR_MASK_A_BIT << shift);
+        }
+        else
+        {
+            gc->state.deferredColorMask &= ~(__GL_ATTRIB_COLOR_MASK_A_BIT << shift);
+        }
     }
 
-    /* Flip attribute dirty bit */
-    __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_1, __GL_COLORMASK_BIT);
+    /* Set gc->input.deferredAttribDirty bit if defered states are different
+    ** from current states.
+    */
+    if (gc->state.deferredColorMask ^ gc->state.currentColorMask) {
+        gc->input.deferredAttribDirty |= __GL_DEFERED_COLOR_MASK_BIT;
+    } else {
+        gc->input.deferredAttribDirty &= ~(__GL_DEFERED_COLOR_MASK_BIT);
+    }
 
     __GL_FOOTER();
 }
@@ -1078,14 +1206,35 @@ GLvoid GL_APIENTRY __glim_ColorMask(__GLcontext *gc, GLboolean r, GLboolean g, G
 GLvoid GL_APIENTRY __glim_DepthMask(__GLcontext *gc, GLboolean flag)
 {
     __GL_HEADER();
-    gc->state.depth.writeEnable = flag;
-    __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_1,  __GL_DEPTHMASK_BIT );
+    __GL_SETUP_NOT_IN_BEGIN(gc);
+    __GL_DLIST_BUFFER_FLUSH(gc);
+
+    /* Defer this attribute setting to the next glBegin so that
+    ** we can determine if this attribute is really changed for the next primitive.
+    */
+    if (flag) {
+        gc->state.deferredAttribMask |= __GL_ATTRIB_DEPTH_MASK_BIT;
+    } else {
+        gc->state.deferredAttribMask &= ~(__GL_ATTRIB_DEPTH_MASK_BIT);
+    }
+
+    /* Set gc->input.deferedAttribDirty bit if defered states are different
+    ** from current states.
+    */
+    if (gc->state.deferredAttribMask ^ gc->state.currentAttribMask) {
+        gc->input.deferredAttribDirty |= __GL_DEFERED_ATTRIB_BIT;
+    } else {
+        gc->input.deferredAttribDirty &= ~(__GL_DEFERED_ATTRIB_BIT);
+    }
+
     __GL_FOOTER();
 }
 
 GLvoid GL_APIENTRY __glim_ClearDepthf(__GLcontext *gc, GLfloat z)
 {
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
+    __GL_VERTEX_BUFFER_FLUSH(gc);
     /* Update clear state */
     gc->state.depth.clear = z;
     __GL_FOOTER();
@@ -1094,6 +1243,8 @@ GLvoid GL_APIENTRY __glim_ClearDepthf(__GLcontext *gc, GLfloat z)
 GLvoid GL_APIENTRY __glim_ClearStencil(__GLcontext *gc, GLint s)
 {
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
+    __GL_VERTEX_BUFFER_FLUSH(gc);
     gc->state.stencil.clear = s;
     __GL_FOOTER();
 }
@@ -1101,6 +1252,7 @@ GLvoid GL_APIENTRY __glim_ClearStencil(__GLcontext *gc, GLint s)
 GLvoid GL_APIENTRY __glim_SampleCoverage(__GLcontext *gc, GLclampf value, GLboolean invert)
 {
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
     if (value < __glZero)
     {
         value = __glZero;
@@ -1110,6 +1262,7 @@ GLvoid GL_APIENTRY __glim_SampleCoverage(__GLcontext *gc, GLclampf value, GLbool
         value = __glOne;
     }
 
+    __GL_VERTEX_BUFFER_FLUSH(gc);
     gc->state.multisample.coverageValue = value;
     gc->state.multisample.coverageInvert = invert;
 
@@ -1124,6 +1277,7 @@ GLvoid GL_APIENTRY __glim_GetMultisamplefv(__GLcontext *gc, GLenum pname, GLuint
     GLuint currentSamples = 0;
 
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
 
     if (pname != GL_SAMPLE_POSITION)
     {
@@ -1139,6 +1293,7 @@ GLvoid GL_APIENTRY __glim_GetMultisamplefv(__GLcontext *gc, GLenum pname, GLuint
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
+    __GL_VERTEX_BUFFER_FLUSH(gc);
 
     __glEvaluateDrawableChange(gc, __GL_BUFFER_DRAW_BIT);
 
@@ -1152,11 +1307,13 @@ OnError:
 GLvoid GL_APIENTRY __glim_SampleMaski(__GLcontext *gc, GLuint maskNumber, GLbitfield mask)
 {
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
+
     if (maskNumber >= gc->constants.maxSampleMaskWords)
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
-
+    __GL_VERTEX_BUFFER_FLUSH(gc);
     gc->state.multisample.sampleMaskValue = mask;
 
     __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_2, __GL_SAMPLE_MASK_BIT);
@@ -1168,6 +1325,7 @@ OnError:
 GLvoid GL_APIENTRY __glim_MinSampleShading(__GLcontext *gc, GLfloat value)
 {
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
     /* <value> is clamped to [0,1] when specified. */
     if (value < 0.0)
     {
@@ -1178,12 +1336,10 @@ GLvoid GL_APIENTRY __glim_MinSampleShading(__GLcontext *gc, GLfloat value)
         value = 1.0;
     }
 
+    __GL_VERTEX_BUFFER_FLUSH(gc);
     gc->state.multisample.minSampleShadingValue = value;
 
     __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_2, __GL_SAMPLE_MIN_SHADING_VALUE_BIT);
 
     __GL_FOOTER();
 }
-
-
-

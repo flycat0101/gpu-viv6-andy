@@ -462,7 +462,6 @@ typedef struct __GLenableStateRec
     __GLLightingEnableState    lighting;
     __GLEvalEnableState        eval;
     __GLTextureEnableState     texUnits[__GL_MAX_TEXTURE_UNITS];
-    __GLDepthEnableState       depthBuffer;
     __GLLineEnableState        line;
     __GLProgramEnableState     program;
     GLboolean                  pointSmooth;
@@ -533,6 +532,11 @@ typedef struct __GLattributeRec {
     __GLevaluatorState evaluator;
     __GLdlistState list;
 #endif
+
+    GLuint currentAttribMask;
+    GLuint deferredAttribMask;
+    GLuint currentColorMask;
+    GLuint deferredColorMask;
 } __GLattribute;
 
 typedef struct __GLclientAttributeRec
@@ -582,14 +586,13 @@ extern "C" {
 extern GLvoid __glOverturnCommitStates(__GLcontext *gc);
 extern GLvoid __glSetAttributeStatesDirty(__GLcontext *gc);
 
-#ifdef OPENGL40
 extern GLvoid __glInitCurrentState(__GLcontext *gc);
-extern GLvoid __glInitAttribStackState(__GLcontext *gc);
+extern GLboolean __glInitAttribStackState(__GLcontext *gc);
 extern GLvoid __glInitHintState(__GLcontext *gc);
 extern GLvoid __glInitRasterState(__GLcontext *gc);
 extern GLvoid __glInitStencilState(__GLcontext *gc);
 extern GLvoid __glInitDepthState(__GLcontext *gc);
-extern GLvoid __glInitTransformState(__GLcontext *gc);
+extern GLboolean __glInitTransformState(__GLcontext *gc);
 extern GLvoid __glInitFeedback(__GLcontext *gc);
 extern GLvoid __glInitSelect(__GLcontext *gc);
 extern GLvoid __glInitFogState(__GLcontext *gc);
@@ -597,19 +600,20 @@ extern GLvoid __glInitLightState(__GLcontext *gc);
 extern GLvoid __glInitPointState(__GLcontext *gc);
 extern GLvoid __glInitLineState(__GLcontext *gc);
 extern GLvoid __glInitPolygonState(__GLcontext *gc);
-extern GLvoid __glInitEvaluatorState(__GLcontext *gc);
-extern GLvoid __glInitVertexArrayState(__GLcontext *gc);
+extern GLboolean __glInitEvaluatorState(__GLcontext *gc);
+extern GLboolean __glInitVertexArrayState(__GLcontext *gc);
 extern GLvoid __glInitPixelState(__GLcontext *gc);
-extern GLvoid __glInitAccumState(__GLcontext *gc);
+extern GLboolean __glInitAccumState(__GLcontext *gc);
 extern GLvoid __glInitMultisampleState(__GLcontext *gc);
-extern GLvoid __glInitDlistState(__GLcontext *gc);
-extern GLvoid __glInitTextureState(__GLcontext *gc);
-extern GLvoid __glInitBufferObjectState(__GLcontext *gc);
-extern GLvoid __glInitProgramState(__GLcontext *gc);
-extern GLvoid __glInitShaderProgramState(__GLcontext *gc);
-extern GLvoid __glInitQueryState(__GLcontext *gc);
+extern GLboolean __glInitDlistState(__GLcontext *gc);
+extern GLboolean __glInitTextureState(__GLcontext *gc);
+extern GLboolean __glInitBufferObjectState(__GLcontext *gc);
+extern GLboolean __glInitProgramState(__GLcontext *gc);
+extern GLboolean __glInitShaderProgramState(__GLcontext *gc);
+extern GLboolean __glInitQueryState(__GLcontext *gc);
 extern GLvoid __glEvaluateAttributeChange(__GLcontext *gc);
-#endif
+extern GLvoid __glUpdateDeferedAttributes(__GLcontext *gc);
+extern GLvoid __glCopyDeferedAttribToCurrent(__GLcontext *gc);
 
 #ifdef __cplusplus
 }

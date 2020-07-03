@@ -48,6 +48,7 @@
 #include "gc_gl_dlist.h"
 #include "gc_gl_select.h"
 #include "gc_gl_image.h"
+#include "g_imfncs.h"
 #endif
 #include "gc_es_attrib.h"
 #include "gc_es_devicepipe.h"
@@ -55,7 +56,6 @@
 #include "gc_egl.h"
 #include "gc_egl_common.h"
 #ifdef OPENGL40
-#include "wintogl.h"
 #include "viv_lock.h"
 #endif
 
@@ -208,23 +208,6 @@ enum {
 #define __GL_LIGHTSRC_VERTEXPROGRAM_BITS    0xFFFFFFFF
 #define __GL_LIGHTSRC_FRAGMENTPROGRAM_BITS  0
 
-/*
-** Current glBegin mode.
-*/
-typedef enum __GLbeginModeEnum {
-    __GL_NOT_IN_BEGIN        = 0,
-    __GL_IN_BEGIN            = 1,
-    __GL_SMALL_LIST_BATCH    = 2,
-} __GLbeginMode;
-
-typedef struct __GLvertexInputRec {
-    GLubyte *pointer;
-    GLfloat *currentPtrDW;
-    GLuint offsetDW;
-    GLuint index;
-    GLuint sizeDW;
-} __GLvertexInput;
-
 /* use for extra tex env, define it same as GL_POLYGON_STIPPLE, and it will not conflict with existing one */
 #define __GL_STIPPLE GL_POLYGON_STIPPLE
 
@@ -232,12 +215,69 @@ typedef struct __GLvertexInputRec {
 ** State for managing the vertex machinery.
 */
 typedef struct __GLvertexMachineRec {
+    /*
+    ** Performance improvement related variables begin
+    */
+    GLuint currentDrawIndex;
+    GLuint currentFrameIndex;
+    GLuint64 currentInputMask;
+    GLuint requiredInputMask;
+    GLuint64 primInputMask;
+    GLuint64 prevPrimInputMask;
+    __GLdispatchTable *pCurrentImmedModeDispatch;
+    /*
+    ** Original flag of vertex cache, once glContext is created never changed,
+    ** unless we want to turn off vertex cache permanantely.
+    */
+    GLboolean origVertexCacheFlag;
+    GLboolean enableVertexCaching;
+    GLboolean vertexCacheEnabled;
+    GLboolean cacheCompareFailed;
+    GLboolean cacheBufferUsed;
+
+    GLenum connectPrimMode;
+    GLint  vertexTrimCount;
+    GLint  connectVertexCount;
+
+    __GLvertexInfo *vertexInfoBuffer;
+    __GLvertexInfo *defaultInfoBuffer;
+    __GLvertexInfo *currentInfoBufPtr;
+
+    /* Pointer to a link list of __GLvertexCacheBlock structures */
+    __GLvertexCacheBlock *vertexCacheBlock;
+    __GLvertexCacheBlock *currentCacheBlock;
+    __GLvertexDataCache  *currentVertexCache;
+
+#if __GL_VERTEX_CACHE_STATISTIC
+    FILE *vtxCacheStatFile;
+    /* The interested draws of every frame */
+    GLuint canCacheDraws;
+    GLuint cacheHitDraws;
+    GLuint cacheMissDraws;
+    GLuint disabledDraws;
+#endif
+    GLboolean vtxCacheNeedReset;
+    GLuint maxCacheDrawIndex;
+    GLuint vtxCacheDrawIndex;
+    GLuint vertexCacheStatus;
+    GLuint vertexCacheHistory;
+    GLuint cacheHitFrameIndex;
+    GLuint totalCacheMemSize;
+    __GLpteInfoHashTable pteInfo;
+    __GLpteInfoHashTable tempPteInfo;
+
+    /* select manual path to setup required input data,
+    ** manualInputMask to indicate the inputMask the manual path need
+    */
+    __GLvertexInputPath path;
+    GLuint manualInputMask;
+    /*
+    ** Performance improvement related variables end
+    */
+
     GLuint indexCount;
     GLuint lastVertexIndex;
-    GLuint64 currentInputMask;
     GLuint inputMaskChanged;
-    GLuint64 requiredInputMask;
-    GLuint64 primInputMask;
     GLuint numberOfElements;
     __GLbeginMode beginMode;
     GLuint64 primElemSequence;
@@ -245,6 +285,7 @@ typedef struct __GLvertexMachineRec {
     GLuint64 preVertexFormat;
     GLuint64 vertexFormat;
     GLushort deferredAttribDirty;
+    GLushort shadowAttribUsage;
 
     GLboolean inconsistentFormat;
     GLboolean indexPrimEnabled;
@@ -288,8 +329,7 @@ typedef struct __GLvertexMachineRec {
     __GLcurrentState shadowCurrent;
 
     /* instance number for drawArrayInstanceEXT or drawElementInstanceEXT */
-   GLsizei primCount;
-
+    GLsizei primCount;
 } __GLvertexMachine;
 
 #endif
@@ -1155,13 +1195,27 @@ struct __GLcontextRec
     __GLdlistMachine dlist;
     __GLattributeMachine attribute;
     __GLdispatchTable dlCompileDispatch;
+    /*
+    ** They are used to be globals, since this is the thread safe driver, all globals are moved
+    ** to gc context.
+    */
+    GLuint64 *pageDirectoryBase;
+    GLuint64 fakePageTableEntry;
+    __GLvertexInfo *pCurrentInfoBufPtr;
+    GLfloat *pVertexDataBufPtr;
+
+    __GLdispatchTable immedModeOutsideDispatch;
+    __GLdispatchTable immedModeCacheDispatch;
 #endif
+    __GLdispatchTable *currentImmediateDispatch;
+    /* For info and no info dispatch table */
     __GLdispatchTable immedModeDispatch;
 
     /* Enabled API level profiling? */
     GLboolean apiProfile;
     /* Current mode dispatch table:  can point to immediate or dlist-compile dispatch table */
     __GLdispatchTable *pModeDispatch;
+    __GLdispatchTable *pSavedModeDispatch;
     /* Current entry dispatch table: can point to mode, profiler or nop dispatch table. */
     __GLdispatchTable *pEntryDispatch;
 
@@ -1264,9 +1318,10 @@ extern GLvoid __glSetError(__GLcontext *gc, GLenum code);
 #define __GL_VALIDATE_VERTEX_ARRAYS(gc) \
     (gc)->vertexArray.formatChanged = GL_TRUE; \
     (gc)->immedModeDispatch.ArrayElement = __glim_ArrayElement_Validate; \
-    (gc)->immedModeDispatch.DrawArrays = __glim_DrawArrays_Validate; \
-    (gc)->immedModeDispatch.DrawElements = __glim_DrawElements_Validate; \
-
+    (gc)->immedModeCacheDispatch.ArrayElement = __glim_ArrayElement_Validate; \
+    (gc)->immedModeOutsideDispatch.ArrayElement = __glim_ArrayElement_Validate; \
+    (gc)->immedModeOutsideDispatch.DrawArrays = __glim_DrawArrays_Validate; \
+    (gc)->immedModeOutsideDispatch.DrawElements = __glim_DrawElements_Validate; \
 
 /* Macro to set inputMaskChanged */
 #define __GL_INPUTMASK_CHANGED(gc) \
@@ -1274,8 +1329,10 @@ extern GLvoid __glSetError(__GLcontext *gc, GLenum code);
     { \
         (gc)->input.inputMaskChanged = GL_TRUE; \
         (gc)->immedModeDispatch.ArrayElement = __glim_ArrayElement_Validate; \
-        (gc)->immedModeDispatch.DrawArrays = __glim_DrawArrays_Validate; \
-        (gc)->immedModeDispatch.DrawElements = __glim_DrawElements_Validate; \
+        (gc)->immedModeCacheDispatch.ArrayElement = __glim_ArrayElement_Validate; \
+        (gc)->immedModeOutsideDispatch.ArrayElement = __glim_ArrayElement_Validate; \
+        (gc)->immedModeOutsideDispatch.DrawArrays = __glim_DrawArrays_Validate; \
+        (gc)->immedModeOutsideDispatch.DrawElements = __glim_DrawElements_Validate; \
     } \
 
 #endif

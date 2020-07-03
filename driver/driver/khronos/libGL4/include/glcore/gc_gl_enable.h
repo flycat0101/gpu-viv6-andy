@@ -51,11 +51,6 @@ typedef struct {
 } __GLTextureEnableState;
 
 typedef struct {
-    GLboolean test;
-} __GLDepthEnableState;
-
-
-typedef struct {
     GLboolean smooth;
     GLboolean stipple;
     GLboolean stippleRequested;
@@ -67,7 +62,6 @@ typedef struct  {
     GLboolean vertexProgram;
     GLboolean fragmentProgram;
 }__GLProgramEnableState;
-
 
 #endif /* __gc_gl_enable_h_ */
 

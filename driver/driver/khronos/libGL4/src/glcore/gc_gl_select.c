@@ -243,9 +243,10 @@ GLvoid __glInitSelect(__GLcontext *gc)
     }
 
     /* Allocate Name stack depth based on maxNameStackDepth */
-    gc->select.stack = (GLuint*)(*gc->imports.malloc)
-        (gc, gc->constants.maxNameStackDepth * sizeof(GLuint) );
-
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, gc->constants.maxNameStackDepth * sizeof(GLuint), (gctPOINTER*)&gc->select.stack)))
+    {
+        return;
+    }
     gc->select.overFlowed = GL_FALSE;
     gc->select.hitFlag = GL_FALSE;
     gc->select.buffer = 0;
@@ -257,6 +258,6 @@ GLvoid __glInitSelect(__GLcontext *gc)
 GLvoid __glFreeSelectState(__GLcontext *gc)
 {
     if (gc->select.stack) {
-        (*gc->imports.free)(gc, gc->select.stack);
+        gcmOS_SAFE_FREE(gcvNULL, gc->select.stack);
     }
 }

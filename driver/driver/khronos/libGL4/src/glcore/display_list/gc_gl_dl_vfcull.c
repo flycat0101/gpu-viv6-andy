@@ -15,12 +15,9 @@
 #include "g_lcomp.h"
 #include "gc_es_debug.h"
 
-/* Macro to check if privateData.resource.handle is NULL */
-#define __GL_DP_RESOURCE_HANDLE(privateData)   (*(GLuint*)(privateData))
-
 extern const GLubyte *__glle_Sentinel(__GLcontext *gc, const GLubyte *PC);
 /* To add the next */
-extern GLvoid __glDrawDlistPrimitive(__GLcontext *gc, __GLPrimBegin *primBegin);
+extern GLvoid __glDrawDlistPrimitive(__GLcontext *gc, __GLPrimBegin *primBegin, GLboolean cacheDataInDevice);
 extern GLvoid __glAddNameToNameList(__GLcontext *gc, __GLdlistNameNode **nameListHead, GLuint name);
 extern GLvoid __glGeneratePrimIndexStream(__GLcontext *gc, GLuint vertexCount, GLuint currentIndex,
                                         __GLPrimBegin *primBegin, GLenum currentPrimType);
@@ -113,7 +110,7 @@ const GLubyte *__glle_Primitive(__GLcontext *gc, const GLubyte *PC)
     GLuint dataSize = primBegin->vertexCount * (primBegin->totalStrideDW << 2);
 
     /* Draw the consistent primitive */
-    __glDrawDlistPrimitive(gc, primBegin);
+    __glDrawDlistPrimitive(gc, primBegin, GL_TRUE);
 
     /* Use the last vertex's data to update current vertex attributes in gc */
     __glDlistUpdateVertexState(gc, primBegin);
@@ -158,13 +155,13 @@ __GL_INLINE GLvoid __glConcatListBatchEnd(__GLcontext *gc)
         /* Flush the concatenated dlists and use the last vertex's data
         ** to update current vertex attributes in gc.
         */
-        __glDrawDlistPrimitive(gc, primBegin);
+        __glDrawDlistPrimitive(gc, primBegin, GL_TRUE);
         __glDlistUpdateVertexState(gc, primBegin);
 
         /* Cache the concatenated dlist's info if the batch is successfully cached in device memory.
         ** If fail, cache the concatenated dlist's info and the vertex data in system memory.
         */
-        if (primBegin->privateData && __GL_DP_RESOURCE_HANDLE(primBegin->privateData))
+        if (__GL_VALID_DEVICE_RESOURCE(primBegin->privateData))
         {
             dataSize = sizeof(__GLPrimBegin);
         }
@@ -174,16 +171,12 @@ __GL_INLINE GLvoid __glConcatListBatchEnd(__GLcontext *gc)
         }
 
         /* Allocate and initialize a listConcatDraw structure */
-        listConcatDraw = (__GLDlistConcatDraw *)(*gc->imports.malloc)(gc, sizeof(__GLDlistConcatDraw) );
-
-        if (listConcatDraw == NULL)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLDlistConcatDraw), (gctPOINTER*)&listConcatDraw)))
         {
             goto cache_fail;
         }
 
-        listConcatDraw->primBegin = (__GLPrimBegin *)(*gc->imports.malloc)(gc, dataSize );
-
-        if (listConcatDraw->primBegin == NULL)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, dataSize, (gctPOINTER*)&listConcatDraw->primBegin)))
         {
             goto cache_fail;
         }
@@ -192,21 +185,28 @@ __GL_INLINE GLvoid __glConcatListBatchEnd(__GLcontext *gc)
 
         if (primBegin->indexCount)
         {
-            /* Allocate and copy indexBuffer to listConcatDraw->primBegin.indexBuffer */
-            dataSize = primBegin->indexCount * sizeof(GLushort);
-            listConcatDraw->primBegin->indexBuffer = (GLushort *)(*gc->imports.malloc)(gc, dataSize );
-
-            if (listConcatDraw->primBegin->indexBuffer == NULL)
+            /* If indexBuffer is not cached in device memory, so allocate and copy indexBuffer to system cache
+             * listConcatDraw->primBegin.indexBuffer
+             **/
+            if (!__GL_VALID_DEVICE_RESOURCE(primBegin->ibPrivateData))
             {
-                goto cache_fail;
-            }
 
-            __GL_MEMCOPY(listConcatDraw->primBegin->indexBuffer, gc->input.defaultIndexBuffer, dataSize);
+                dataSize = primBegin->indexCount * sizeof(GLushort);
+                if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, dataSize, (gctPOINTER*)&listConcatDraw->primBegin->indexBuffer)))
+                {
+                    goto cache_fail;
+                }
+
+                __GL_MEMCOPY(listConcatDraw->primBegin->indexBuffer, gc->input.defaultIndexBuffer, dataSize);
+            }
+            else
+            {
+                listConcatDraw->primBegin->indexBuffer = NULL;
+            }
 
             /* Allocate and copy concatIndexCount[] to listConcatDraw->concatIndexCount */
             dataSize = gc->dlist.concatListCount * sizeof(GLint);
-            listConcatDraw->concatIndexCount = (GLint *)(*gc->imports.malloc)(gc, dataSize );
-            if (listConcatDraw->concatIndexCount == NULL)
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, dataSize, (gctPOINTER*)&listConcatDraw->concatIndexCount)))
             {
                 goto cache_fail;
             }
@@ -223,20 +223,20 @@ __GL_INLINE GLvoid __glConcatListBatchEnd(__GLcontext *gc)
 
         /* Allocate and copy concatDlistPtrs[] to listConcatDraw->concatDlistPtrs */
         dataSize = gc->dlist.concatListCount * sizeof(__GLdlist *);
-        listConcatDraw->concatDlistPtrs = (__GLdlist **)(*gc->imports.malloc)(gc, dataSize );
-        if (listConcatDraw->concatDlistPtrs == NULL)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, dataSize, (gctPOINTER*)&listConcatDraw->concatDlistPtrs)))
         {
             goto cache_fail;
         }
+
         __GL_MEMCOPY(listConcatDraw->concatDlistPtrs, gc->dlist.concatDlistPtrs, dataSize);
 
         /* Allocate and copy concatVertexCount[] to listConcatDraw->concatVertexCount */
         dataSize = gc->dlist.concatListCount * sizeof(GLint);
-        listConcatDraw->concatVertexCount = (GLint *)(*gc->imports.malloc)(gc, dataSize );
-        if (listConcatDraw->concatVertexCount == NULL)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, dataSize, (gctPOINTER*)&listConcatDraw->concatVertexCount)))
         {
             goto cache_fail;
         }
+
         __GL_MEMCOPY(listConcatDraw->concatVertexCount, gc->dlist.concatVertexCount, dataSize);
 
         /* Use the first list's name as the concatenate list batch name */
@@ -279,7 +279,7 @@ __GL_INLINE GLvoid __glConcatListBatchEnd(__GLcontext *gc)
         /* Draw the previous single list without caching it.
         */
         primBegin = (__GLPrimBegin *)(dlist->segment + sizeof(__GLlistExecFunc *));
-        __glDrawDlistPrimitive(gc, primBegin);
+        __glDrawDlistPrimitive(gc, primBegin, GL_FALSE);
         __glDlistUpdateVertexState(gc, primBegin);
 
         /* Set dlist->concatenatable to FALSE so it never comes into this function again */
@@ -297,32 +297,32 @@ cache_fail:
 
     if (listConcatDraw && listConcatDraw->concatVertexCount)
     {
-        (*gc->imports.free)(gc, listConcatDraw->concatVertexCount);
+        gcmOS_SAFE_FREE(gcvNULL, listConcatDraw->concatVertexCount);
     }
 
     if (listConcatDraw && listConcatDraw->concatDlistPtrs)
     {
-        (*gc->imports.free)(gc, listConcatDraw->concatDlistPtrs);
+        gcmOS_SAFE_FREE(gcvNULL, listConcatDraw->concatDlistPtrs);
     }
 
     if (listConcatDraw && listConcatDraw->concatIndexCount)
     {
-        (*gc->imports.free)(gc, listConcatDraw->concatIndexCount);
+        gcmOS_SAFE_FREE(gcvNULL, listConcatDraw->concatIndexCount);
     }
 
     if (listConcatDraw && listConcatDraw->primBegin && listConcatDraw->primBegin->indexBuffer)
     {
-        (*gc->imports.free)(gc, listConcatDraw->primBegin->indexBuffer);
+        gcmOS_SAFE_FREE(gcvNULL, listConcatDraw->primBegin->indexBuffer);
     }
 
     if (listConcatDraw && listConcatDraw->primBegin)
     {
-        (*gc->imports.free)(gc, listConcatDraw->primBegin);
+        gcmOS_SAFE_FREE(gcvNULL, listConcatDraw->primBegin);
     }
 
     if (listConcatDraw)
     {
-        (*gc->imports.free)(gc, listConcatDraw);
+        gcmOS_SAFE_FREE(gcvNULL, listConcatDraw);
     }
 
     /* Reset everything */
@@ -355,7 +355,7 @@ __GL_INLINE GLvoid __glConcatListCacheEnd(__GLcontext *gc)
         lastDlist = listConcatDraw->concatDlistPtrs[gc->dlist.concatListCount - 1];
 
         /* Draw the concatenated dlists using the cached vertex buffer */
-        __glDrawDlistPrimitive(gc, primBegin);
+        __glDrawDlistPrimitive(gc, primBegin, GL_FALSE);
 
         /* Restore the original vertexCount and indexCount */
         primBegin->vertexCount = vertCount;
@@ -372,8 +372,8 @@ __GL_INLINE GLvoid __glConcatListCacheEnd(__GLcontext *gc)
     gc->input.beginMode = __GL_NOT_IN_BEGIN;
 
     /* Restore the generic CallList dispatch entry function */
-    gc->immedModeDispatch.CallList = __glim_CallList;
-    gc->immedModeDispatch.CallLists = __glim_CallLists;
+    gc->currentImmediateDispatch->CallList = __glim_CallList;
+    gc->currentImmediateDispatch->CallLists = __glim_CallLists;
 }
 
 GLvoid __glDisplayListBatchEnd(__GLcontext *gc)
@@ -404,7 +404,7 @@ GLvoid __glConcatenateDlistPrims(__GLcontext *gc, __GLdlist *dlist)
         __GL_DLIST_BUFFER_FLUSH(gc);
 
         /* Draw the dlist and then update current vertex attributes */
-        __glDrawDlistPrimitive(gc, newBegin);
+        __glDrawDlistPrimitive(gc, newBegin, GL_FALSE);
         __glDlistUpdateVertexState(gc, newBegin);
 
         return;
@@ -434,9 +434,8 @@ Restart:
                 gc->input.beginMode = __GL_SMALL_LIST_BATCH;
 
                 /* Overwrite CallList dispatch entry with __glim_CallList_Cache function */
-                gc->immedModeDispatch.CallList = __glim_CallList_Cache;
-                gc->immedModeDispatch.CallLists = __glim_CallLists_Cache;
-
+                gc->currentImmediateDispatch->CallList = __glim_CallList_Cache;
+                gc->currentImmediateDispatch->CallLists = __glim_CallLists_Cache;
                 return;
             }
         }

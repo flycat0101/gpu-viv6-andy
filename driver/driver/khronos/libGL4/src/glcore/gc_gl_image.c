@@ -260,9 +260,6 @@ GLvoid __glFillImage3D(__GLcontext *gc,
             }
             start += rowsize;
         }
-        gc->clientState.pixel.unpackModes.skipLines = 0;
-        gc->clientState.pixel.unpackModes.skipPixels = 0;
-        gc->clientState.pixel.unpackModes.lineLength = width;
     }
     else
     {

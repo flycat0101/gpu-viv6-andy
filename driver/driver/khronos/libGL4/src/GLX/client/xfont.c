@@ -23,7 +23,6 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-
 /* xfonts.c -- glXUseXFont() for Mesa written by
  * Copyright (C) 1995 Thorsten.Ohl @ Physik.TH-Darmstadt.de
  */
@@ -33,7 +32,6 @@
   It provides a fully client side implementation of glXUseXFont and is
   called by that routine when direct rendering is enabled.
 */
-
 
 #include "glxclient.h"
 

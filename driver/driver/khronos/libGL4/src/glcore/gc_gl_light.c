@@ -401,6 +401,14 @@ GLvoid APIENTRY __glim_ColorMaterial(__GLcontext *gc, GLenum face, GLenum p)
     */
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
+    /* Update color material before change face and material type if defered attribute is dirty */
+    if ((gc->state.enables.lighting.colorMaterial) && (gc->input.deferredAttribDirty & __GL_DEFERED_COLOR_BIT))
+    {
+        gc->state.current.color = gc->input.shadowCurrent.color;
+        gc->input.deferredAttribDirty &= ~__GL_DEFERED_COLOR_BIT;
+        __glUpdateMaterialfv(gc, gc->state.light.colorMaterialFace, gc->state.light.colorMaterialParam,
+            (GLfloat *)&gc->state.current.color);
+    }
     gc->state.light.colorMaterialFace = face;
     gc->state.light.colorMaterialParam = p;
 

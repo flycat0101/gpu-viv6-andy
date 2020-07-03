@@ -155,7 +155,7 @@ typedef struct __GLdevicePipelineRec
     GLboolean (*clearValidateState)(__GLcontext *, GLbitfield);
     GLboolean (*clearEnd)(__GLcontext *, GLbitfield);
 #ifdef OPENGL40
-    GLvoid  (*createAccumBufferInfo)(__GLcontext *, gcoSURF, __GLdrawablePrivate *);
+    GLboolean  (*createAccumBufferInfo)(__GLcontext *, gcoSURF, __GLdrawablePrivate *);
     GLvoid (*bindFragDataLocation)(__GLcontext*, __GLprogramObject*, GLuint,  const GLchar*);
 #endif
 
@@ -194,7 +194,7 @@ typedef struct __GLdevicePipelineRec
     /* RBO & FBO */
     GLboolean (*bindDrawFramebuffer)(__GLcontext*, __GLframebufferObject*, __GLframebufferObject*);
     GLvoid (*bindReadFramebuffer)(__GLcontext*, __GLframebufferObject*, __GLframebufferObject*);
-    GLvoid (*bindRenderbuffer)(__GLcontext*, __GLrenderbufferObject*);
+    GLboolean (*bindRenderbuffer)(__GLcontext*, __GLrenderbufferObject*);
     GLvoid (*deleteRenderbuffer)(__GLcontext*, __GLrenderbufferObject*);
     GLvoid (*detachRenderbuffer)(__GLcontext*, __GLrenderbufferObject*);
     GLboolean (*renderbufferStorage)(__GLcontext*, __GLrenderbufferObject*);
@@ -217,7 +217,7 @@ typedef struct __GLdevicePipelineRec
     GLboolean (*syncImage)(__GLcontext*);
 
     /* Transform feedback */
-    GLvoid (*bindXFB)(__GLcontext*, __GLxfbObject*);
+    GLboolean (*bindXFB)(__GLcontext*, __GLxfbObject*);
     GLvoid (*deleteXFB)(__GLcontext*, __GLxfbObject*);
     GLvoid (*beginXFB)(__GLcontext*, __GLxfbObject*);
     GLvoid (*pauseXFB)(__GLcontext *);
@@ -256,7 +256,10 @@ typedef struct __GLdevicePipelineRec
     GLvoid (*blendBarrier)(__GLcontext *);
     GLboolean (*drawPattern)(__GLcontext*);
     /* Accumulation functions */
-    GLvoid (*accum)(__GLcontext*, GLenum , GLfloat);
+    GLboolean (*accum)(__GLcontext*, GLenum , GLfloat);
+
+    /* Used to delete cached primitive data (vertex buffers) */
+    GLvoid (*deletePrimData)(__GLcontext*, GLvoid*);
 
 #if defined(OPENGL40) && defined(GL4_DRI_BUILD)
     /* Device private context management functions */

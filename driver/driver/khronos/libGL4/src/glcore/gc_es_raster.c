@@ -73,6 +73,8 @@ GLvoid GL_APIENTRY GL_APIENTRY __glim_Viewport(__GLcontext *gc, GLint x, GLint y
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
+    __GL_VERTEX_BUFFER_FLUSH(gc);
+
     __glViewport(gc, x, y, w, h);
 
 OnError:

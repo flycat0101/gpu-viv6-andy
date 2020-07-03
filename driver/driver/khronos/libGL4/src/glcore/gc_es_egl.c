@@ -14,10 +14,6 @@
 #include "EGL/egl.h"
 #include "gc_es_context.h"
 #include "gc_es_device.h"
-#ifdef OPENGL40
-#include "wintogl.h"
-#endif
-
 
 __GLdeviceStruct __glDevicePipe;
 
@@ -34,6 +30,8 @@ extern GLboolean __glMakeCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable,
 extern GLboolean __glLoseCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdrawablePrivate* readable);
 extern EGLenum __glCreateEglImageTexture(__GLcontext* gc, EGLenum target, GLint texture, GLint level, GLint depth, GLvoid* image);
 extern EGLenum __glCreateEglImageRenderbuffer(__GLcontext* gc, GLuint renderbuffer, GLvoid* image);
+extern GLvoid __glFreeImmedVertexCacheBuffer( __GLcontext *gc );
+extern void __glInitImmedNoVertInfoEntries(__GLdispatchTable *dispatch);
 
 extern GLboolean
 __glBindTexImage(
@@ -187,8 +185,107 @@ static EGLBoolean veglSetDrawable_es3(void *thrData, void *pCtxPriv, VEGLDrawabl
     __GLcontext* gc = (__GLcontext*)pCtxPriv;
     __GLdrawablePrivate* glDrawable = __glGetDrawable(drawable);
     __GLdrawablePrivate* glReadable = __glGetDrawable(readable);
+    GLuint i;
 
     __glSetDrawable(gc, glDrawable, glReadable);
+
+
+    /*
+    ** Application is using immediate mode path.
+    ** This function is called by EGL in eglSwapBuffers so sue this to determine cache hit.
+    ** will move following code to veglSwapBuffers_es3 after this call is enabled in EGL
+    */
+    if (gc->input.vtxCacheDrawIndex)
+    {
+        /*
+        ** Stop vertex caching if there is no cache hit at all in 4 consecutive frames.
+        */
+        if ((gc->input.enableVertexCaching == GL_TRUE) &&
+            (gc->input.currentFrameIndex - gc->input.cacheHitFrameIndex) > 3 &&
+            !(gc->input.vertexCacheHistory & __GL_IMMED_VERTEX_CACHE_HIT))
+        {
+             /* Overwrite immediate vertex entries with no-vertex-info entries */
+             __glInitImmedNoVertInfoEntries(&gc->immedModeDispatch);
+             gc->pModeDispatch = &gc->immedModeOutsideDispatch; /* immediate mode by default. */
+             gc->currentImmediateDispatch = gc->pModeDispatch;
+             gc->currentImmediateDispatch->Begin = __glim_Begin;
+
+             __glFreeImmedVertexCacheBuffer(gc);
+             gc->input.enableVertexCaching = gc->input.origVertexCacheFlag = GL_FALSE;
+
+#if __GL_VERTEX_CACHE_STATISTIC
+            fprintf(gc->input.vtxCacheStatFile, "Frame:%3d, Disable vertex cache for continuous cache miss!\n",
+                gc->input.currentFrameIndex);
+#endif
+             /* Force re-validation of DrawArrays/DrawElements dispatch functions */
+             gc->currentImmediateDispatch->DrawArrays = __glim_DrawArrays_Validate;
+             gc->currentImmediateDispatch->DrawElements = __glim_DrawElements_Validate;
+             __GL_SET_VARRAY_STOP_CACHE_BIT(gc);
+        }
+    }
+    else
+    {
+        gc->input.cacheHitFrameIndex = gc->input.currentFrameIndex;
+
+        /*
+        ** Free vertex cache buffers if the application stop using immediate mode path.
+        */
+        if (gc->input.totalCacheMemSize > 0) {
+            __glFreeImmedVertexCacheBlocks(gc);
+        }
+    }
+
+#if __GL_VERTEX_CACHE_STATISTIC
+    if (gc->input.canCacheDraws != 0)
+    {
+        fprintf(gc->input.vtxCacheStatFile, "Frame:%3d, canCacheDraws:%5d  cacheHitDraw:%5d  cacheMissDraws:%5d  disabledDraws:%5d  cacheHitRatio:%3d%%;\n\n",
+            gc->input.currentFrameIndex, gc->input.canCacheDraws, gc->input.cacheHitDraws, gc->input.cacheMissDraws, gc->input.disabledDraws,
+            100*gc->input.cacheHitDraws/gc->input.canCacheDraws);
+    }
+    else
+    {
+        fprintf(gc->input.vtxCacheStatFile, "Frame:%3d, all the draws of this frame are too samll to do cache!\n\n", gc->input.currentFrameIndex);
+    }
+
+    gc->input.canCacheDraws = 0;
+    gc->input.cacheHitDraws = 0;
+    gc->input.cacheMissDraws = 0;
+    gc->input.disabledDraws = 0;
+#endif
+
+    /*
+    ** Reset vtxCacheDrawIndex so we can compare drawPrimitives
+    ** in this frame with the previous frame's drawPrimitives.
+    */
+    gc->input.vertexCacheHistory |= gc->input.vertexCacheStatus;
+    gc->input.vertexCacheStatus = 0;
+    gc->input.vtxCacheDrawIndex = 0;
+
+    /* Reset currentDrawIndex and increment currentFrameIndex */
+    gc->input.currentDrawIndex = 0;
+    gc->input.currentFrameIndex += 1;
+
+    /* Handle gc->input.currentFrameIndex UINT wrap around case */
+    if ((gc->input.currentFrameIndex ^ 0xffffffff) == 0)
+    {
+        __GLvertexCacheBlock *cacheBlock = gc->input.vertexCacheBlock;
+        while (cacheBlock)
+        {
+            for (i = 0; i < __GL_VERTEX_CACHE_BLOCK_SIZE; i++) {
+                cacheBlock->cache[i].frameIndex = 0;
+            }
+            cacheBlock = cacheBlock->next;
+        }
+        gc->input.cacheHitFrameIndex = gc->input.currentFrameIndex = 1;
+    }
+
+    /* Reset currentCacheBlock and currentVertexCache pointers */
+    gc->input.currentCacheBlock = gc->input.vertexCacheBlock;
+    gc->input.currentVertexCache = &gc->input.vertexCacheBlock->cache[0];
+
+    /* Reset immediate mode vertex buffer */
+    __glResetImmedVertexBuffer(gc, GL_FALSE);
+
 
     return EGL_TRUE;
 }

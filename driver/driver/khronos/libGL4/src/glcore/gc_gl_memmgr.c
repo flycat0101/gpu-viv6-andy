@@ -47,14 +47,17 @@ __GLarenaBlock *NewBlock(__GLcontext *gc, GLuint size)
 {
     __GLarenaBlock *block;
 
-    block = (__GLarenaBlock *)(*gc->imports.malloc)(gc, sizeof(__GLarenaBlock) );
-    if (block == NULL) return NULL;
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLarenaBlock), (gctPOINTER*)&block)))
+    {
+        return NULL;
+    }
+
     block->next = NULL;
     block->size = size;
     block->allocated = 0;
-    block->data = (*gc->imports.malloc)(gc, size );
-    if (block->data == NULL) {
-        (*gc->imports.free)(gc, block);
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, size, (gctPOINTER*)&block->data)))
+    {
+        gcmOS_SAFE_FREE(gcvNULL, block);
         return NULL;
     }
     return block;
@@ -62,8 +65,15 @@ __GLarenaBlock *NewBlock(__GLcontext *gc, GLuint size)
 
 GLvoid DeleteBlock(__GLcontext *gc, __GLarenaBlock *block)
 {
-    (*gc->imports.free)(gc, block->data);
-    (*gc->imports.free)(gc, block);
+    if (block->data)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, block->data);
+    }
+
+    if (block)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, block);
+    }
 }
 
 /*
@@ -74,12 +84,15 @@ __GLarena *__glNewArena(__GLcontext *gc)
     __GLarena *arena;
     __GLarenaBlock *block;
 
-    arena = (__GLarena *)(*gc->imports.malloc)(gc, sizeof(__GLarena) );
-    if (arena == NULL) return NULL;
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLarena), (gctPOINTER*)&arena)))
+    {
+        return NULL;
+    }
+
     arena->gc = gc;
     block = NewBlock(gc, MINBLOCKSIZE);
     if (block == NULL) {
-        (*gc->imports.free)(gc, arena);
+        gcmOS_SAFE_FREE(gcvNULL, arena);
         return NULL;
     }
     arena->firstBlock = arena->lastBlock = block;
@@ -98,7 +111,7 @@ GLvoid __glCondDeleteArena(__GLarena *arena)
        && !arena->firstBlock->allocated)
     {
         DeleteBlock(gc, arena->firstBlock);
-        (*gc->imports.free)(gc, arena);
+        gcmOS_SAFE_FREE(gcvNULL, arena);
     }
 }
 

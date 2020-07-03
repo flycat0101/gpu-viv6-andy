@@ -1658,7 +1658,11 @@ GLboolean __glConvert2Float(GLenum type,GLsizei numOfComponent, GLubyte componen
 GLboolean __glSwizzleSpecialFormat(__GLcontext *gc, GLsizei numOfComponent, GLsizei numOfComponents, GLubyte components, GLfloat* buf, GLubyte *compMask)
 {
     GLsizei i, j = 0;
-    GLfloat *tmpBuf = (GLfloat *)(*gc->imports.malloc)(gc, numOfComponents * sizeof(GLfloat));
+    GLfloat *tmpBuf;
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, numOfComponents * sizeof(GLfloat), (gctPOINTER*)&tmpBuf)))
+    {
+        return GL_FALSE;
+    }
 
     for (i = 0; i < numOfComponent; i++)
     {
@@ -1672,7 +1676,7 @@ GLboolean __glSwizzleSpecialFormat(__GLcontext *gc, GLsizei numOfComponent, GLsi
 
     if (tmpBuf != gcvNULL)
     {
-        (*gc->imports.free)(gc, (void*)tmpBuf);
+        gcmOS_SAFE_FREE(gcvNULL, tmpBuf);
         tmpBuf = gcvNULL;
     }
 
@@ -2352,7 +2356,10 @@ GLvoid __glConvertToFloatOfBufferType(__GLcontext *gc, GLenum format, GLenum *ty
 
         transferInfo->numOfPixel = height * depth * width;
         transferInfo->numOfComponents = transferInfo->numOfPixel * transferInfo->compNumber;
-        tmpBuf = (GLfloat *)(*gc->imports.malloc)(gc, transferInfo->numOfComponents * sizeof(GLfloat));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, transferInfo->numOfComponents * sizeof(GLfloat), (gctPOINTER*)&tmpBuf)))
+        {
+            return;
+        }
 
         switch (*type)
         {
@@ -2399,7 +2406,7 @@ GLvoid __glConvertToFloatOfBufferType(__GLcontext *gc, GLenum format, GLenum *ty
     else
     {
         transferInfo->srcImage = buf;
-        transferInfo->dstImage = buf;
+        transferInfo->dstImage = (GLvoid*)buf;
     }
 }
 
@@ -2438,7 +2445,11 @@ GLvoid __glGenericPixelTransferSubForIntegerFormat(__GLcontext *gc,
     /* Malloc a new buf to protect original buffer of glTex[Sub]Image* when using "pixel storage modes". */
     if ((__GL_TexImage == transferInfo->operaitonFlag) && (transferInfo->srcRowByteNeedAlign || transferInfo->srcIncreByteOfTotal || transferInfo->swapBytes || transferInfo->applySpecialSwizzle))
     {
-        dstShadowBuf = (GLubyte *)(*gc->imports.malloc)(gc, transferInfo->srcTotalBufSize);
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, transferInfo->srcTotalBufSize, (gctPOINTER*)&dstShadowBuf)))
+        {
+            __GL_EXIT();
+        }
+
         __GL_MEMCOPY((GLvoid *)dstShadowBuf, (GLvoid *)(transferInfo->srcImage), transferInfo->srcTotalBufSize);
         dstShadowBufNeedFree = GL_TRUE;
     }
@@ -2452,8 +2463,7 @@ GLvoid __glGenericPixelTransferSubForIntegerFormat(__GLcontext *gc,
 
     if (transferInfo->applySpecialSwizzle)
     {
-        tmpBuf = (GLfloat *)(*gc->imports.malloc)(gc, transferInfo->numOfComponents * sizeof(GLfloat));
-        if (gcvNULL == tmpBuf)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, transferInfo->numOfComponents * sizeof(GLfloat), (gctPOINTER*)&tmpBuf)))
         {
             __GL_EXIT();
         }
@@ -2474,12 +2484,12 @@ GLvoid __glGenericPixelTransferSubForIntegerFormat(__GLcontext *gc,
 OnExit:
     if (tmpBuf != gcvNULL)
     {
-        (*gc->imports.free)(gc, (void*)tmpBuf);
+        gcmOS_SAFE_FREE(gcvNULL, tmpBuf);
         tmpBuf = gcvNULL;
     }
     if (dstShadowBufNeedFree)
     {
-        (*gc->imports.free)(gc, (void*)dstShadowBuf);
+        gcmOS_SAFE_FREE(gcvNULL, dstShadowBuf);
         dstShadowBuf = gcvNULL;
     }
 }
@@ -2508,7 +2518,11 @@ GLvoid __glGenericPixelTransferSubForLuminanceIntensity(__GLcontext *gc,
     /* Malloc a new buf to protect original buffer of glTex[Sub]Image* when using "pixel storage modes". */
     if ((__GL_TexImage == transferInfo->operaitonFlag) && (transferInfo->srcRowByteNeedAlign || transferInfo->srcIncreByteOfTotal || transferInfo->swapBytes))
     {
-        srcShadowBuf = (GLubyte *)(*gc->imports.malloc)(gc, transferInfo->srcTotalBufSize);
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, transferInfo->srcTotalBufSize, (gctPOINTER*)&srcShadowBuf)))
+        {
+            __GL_EXIT();
+        }
+
         __GL_MEMCOPY((GLvoid *)srcShadowBuf, (GLvoid *)(transferInfo->srcImage), transferInfo->srcTotalBufSize);
         srcShadowBufNeedFree = GL_TRUE;
     }
@@ -2520,8 +2534,7 @@ GLvoid __glGenericPixelTransferSubForLuminanceIntensity(__GLcontext *gc,
     /* clear alignment place in the buffer before conversion*/
     __glClearAlignmentPlaceOfBuffer(transferInfo, srcShadowBuf);
 
-    tmpBuf = (GLfloat *)(*gc->imports.malloc)(gc, transferInfo->numOfComponents * sizeof(GLfloat));
-    if (gcvNULL == tmpBuf)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, transferInfo->numOfComponents * sizeof(GLfloat), (gctPOINTER*)&tmpBuf)))
     {
         __GL_EXIT();
     }
@@ -2555,7 +2568,10 @@ GLvoid __glGenericPixelTransferSubForLuminanceIntensity(__GLcontext *gc,
     /* Malloc a new buf to avoid modifying unconcerned content of original buffer for ReadPixels when using "pixel storage modes". */
     if ((__GL_ReadPixels == transferInfo->operaitonFlag) && (transferInfo->dstRowByteNeedAlign || transferInfo->dstIncreByteOfTotal))
     {
-        dstShadowBuf = (GLubyte *)(*gc->imports.malloc)(gc, transferInfo->dstTotalBufSize);
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, transferInfo->dstTotalBufSize, (gctPOINTER*)&dstShadowBuf)))
+        {
+            __GL_EXIT();
+        }
         dstShadowBufNeedFree = GL_TRUE;
     }
     else
@@ -2578,17 +2594,17 @@ GLvoid __glGenericPixelTransferSubForLuminanceIntensity(__GLcontext *gc,
 OnExit:
     if (tmpBuf != gcvNULL)
     {
-        (*gc->imports.free)(gc, (void*)tmpBuf);
+        gcmOS_SAFE_FREE(gcvNULL, tmpBuf);
         tmpBuf = gcvNULL;
     }
     if (srcShadowBufNeedFree)
     {
-        (*gc->imports.free)(gc, (void*)srcShadowBuf);
+        gcmOS_SAFE_FREE(gcvNULL, srcShadowBuf);
         srcShadowBuf = gcvNULL;
     }
     if (dstShadowBufNeedFree)
     {
-        (*gc->imports.free)(gc, (void*)dstShadowBuf);
+        gcmOS_SAFE_FREE(gcvNULL, dstShadowBuf);
         dstShadowBuf = gcvNULL;
     }
 }
@@ -2615,7 +2631,11 @@ GLvoid __glGenericPixelTransferSubForGBFormat(__GLcontext *gc,
     /* Malloc a new buf to protect original buffer of glTex[Sub]Image* when using "pixel storage modes". */
     if ((__GL_TexImage == transferInfo->operaitonFlag) && (transferInfo->srcRowByteNeedAlign || transferInfo->srcIncreByteOfTotal || transferInfo->swapBytes))
     {
-        srcShadowBuf = (GLubyte *)(*gc->imports.malloc)(gc, transferInfo->srcTotalBufSize);
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, transferInfo->srcTotalBufSize, (gctPOINTER*)&srcShadowBuf)))
+        {
+            __GL_EXIT();
+        }
+
         __GL_MEMCOPY((GLvoid *)srcShadowBuf, (GLvoid *)(transferInfo->srcImage), transferInfo->srcTotalBufSize);
         srcShadowBufNeedFree = GL_TRUE;
     }
@@ -2627,8 +2647,7 @@ GLvoid __glGenericPixelTransferSubForGBFormat(__GLcontext *gc,
     /* clear alignment place in the buffer before conversion*/
     __glClearAlignmentPlaceOfBuffer(transferInfo, srcShadowBuf);
 
-    tmpBuf = (GLfloat *)(*gc->imports.malloc)(gc, transferInfo->numOfComponents * sizeof(GLfloat));
-    if (gcvNULL == tmpBuf)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, transferInfo->numOfComponents * sizeof(GLfloat), (gctPOINTER*)&tmpBuf)))
     {
         __GL_EXIT();
     }
@@ -2648,7 +2667,11 @@ GLvoid __glGenericPixelTransferSubForGBFormat(__GLcontext *gc,
         numOfUnifyComponent = transferInfo->numOfComponents / transferInfo->compNumber * transferInfo->srcCompNumber;
     }
 
-    unifyBuf = (GLfloat *)(*gc->imports.malloc)(gc, numOfUnifyComponent * sizeof(GLfloat));
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, numOfUnifyComponent * sizeof(GLfloat), (gctPOINTER*)&unifyBuf)))
+    {
+        __GL_EXIT();
+    }
+
     __glConvertToUnifyBuffer(gc, tmpBuf, unifyBuf, numOfUnifyComponent, transferInfo);
 
     /* Scale, Bias, Clamp */
@@ -2661,7 +2684,11 @@ GLvoid __glGenericPixelTransferSubForGBFormat(__GLcontext *gc,
     /* Malloc a new buf to avoid modifying unconcerned content of original buffer for ReadPixels when using "pixel storage modes". */
     if ((__GL_ReadPixels == transferInfo->operaitonFlag) && (transferInfo->dstRowByteNeedAlign || transferInfo->dstIncreByteOfTotal))
     {
-        dstShadowBuf = (GLubyte *)(*gc->imports.malloc)(gc, transferInfo->dstTotalBufSize);
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, transferInfo->dstTotalBufSize, (gctPOINTER*)&dstShadowBuf)))
+        {
+            __GL_EXIT();
+        }
+
         dstShadowBufNeedFree = GL_TRUE;
     }
     else
@@ -2677,22 +2704,22 @@ GLvoid __glGenericPixelTransferSubForGBFormat(__GLcontext *gc,
 OnExit:
     if (tmpBuf != gcvNULL)
     {
-        (*gc->imports.free)(gc, (void*)tmpBuf);
+        gcmOS_SAFE_FREE(gcvNULL, tmpBuf);
         tmpBuf = gcvNULL;
     }
     if (unifyBuf != gcvNULL)
     {
-        (*gc->imports.free)(gc, (void*)unifyBuf);
+        gcmOS_SAFE_FREE(gcvNULL, unifyBuf);
         unifyBuf = gcvNULL;
     }
     if (srcShadowBufNeedFree)
     {
-        (*gc->imports.free)(gc, (void*)srcShadowBuf);
+        gcmOS_SAFE_FREE(gcvNULL, srcShadowBuf);
         srcShadowBuf = gcvNULL;
     }
     if (dstShadowBufNeedFree)
     {
-        (*gc->imports.free)(gc, (void*)dstShadowBuf);
+        gcmOS_SAFE_FREE(gcvNULL, dstShadowBuf);
         dstShadowBuf = gcvNULL;
     }
 }
@@ -2718,7 +2745,11 @@ GLvoid __glGenericPixelTransferSub(__GLcontext *gc,
     /* Malloc a new buf to protect original buffer of glTex[Sub]Image* when using "pixel storage modes". */
     if ((__GL_TexImage == transferInfo->operaitonFlag) && (transferInfo->srcRowByteNeedAlign || transferInfo->srcIncreByteOfTotal || transferInfo->swapBytes))
     {
-        srcShadowBuf = (GLubyte *)(*gc->imports.malloc)(gc, transferInfo->srcTotalBufSize);
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, transferInfo->srcTotalBufSize, (gctPOINTER*)&srcShadowBuf)))
+        {
+            __GL_EXIT();
+        }
+
         __GL_MEMCOPY((GLvoid *)srcShadowBuf, (GLvoid *)(transferInfo->srcImage), transferInfo->srcTotalBufSize);
         srcShadowBufNeedFree = GL_TRUE;
     }
@@ -2730,10 +2761,9 @@ GLvoid __glGenericPixelTransferSub(__GLcontext *gc,
     /* clear alignment place in the buffer before conversion*/
     __glClearAlignmentPlaceOfBuffer(transferInfo, srcShadowBuf);
 
-    tmpBuf = (GLfloat *)(*gc->imports.malloc)(gc, transferInfo->numOfComponents * sizeof(GLfloat));
-    if (gcvNULL == tmpBuf)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, transferInfo->numOfComponents * sizeof(GLfloat), (gctPOINTER*)&tmpBuf)))
     {
-        __GL_EXIT();
+            __GL_EXIT();
     }
 
     if (__glConvert2Float(transferInfo->srcType, transferInfo->numOfComponents, transferInfo->compNumber, tmpBuf, srcShadowBuf))
@@ -2760,7 +2790,11 @@ GLvoid __glGenericPixelTransferSub(__GLcontext *gc,
     /* Malloc a new buf to avoid modifying unconcerned content of original buffer for ReadPixels when using "pixel storage modes". */
     if ((__GL_ReadPixels == transferInfo->operaitonFlag) && (transferInfo->dstRowByteNeedAlign || transferInfo->dstIncreByteOfTotal))
     {
-        dstShadowBuf = (GLubyte *)(*gc->imports.malloc)(gc, transferInfo->dstTotalBufSize);
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, transferInfo->dstTotalBufSize, (gctPOINTER*)&dstShadowBuf)))
+        {
+            __GL_EXIT();
+        }
+
         dstShadowBufNeedFree = GL_TRUE;
     }
     else
@@ -2776,17 +2810,17 @@ GLvoid __glGenericPixelTransferSub(__GLcontext *gc,
 OnExit:
     if (tmpBuf != gcvNULL)
     {
-        (*gc->imports.free)(gc, (void*)tmpBuf);
+        gcmOS_SAFE_FREE(gcvNULL, tmpBuf);
         tmpBuf = gcvNULL;
     }
     if (srcShadowBufNeedFree)
     {
-        (*gc->imports.free)(gc, (void*)srcShadowBuf);
+        gcmOS_SAFE_FREE(gcvNULL, srcShadowBuf);
         srcShadowBuf = gcvNULL;
     }
     if (dstShadowBufNeedFree)
     {
-        (*gc->imports.free)(gc, (void*)dstShadowBuf);
+        gcmOS_SAFE_FREE(gcvNULL, dstShadowBuf);
         dstShadowBuf = gcvNULL;
     }
 }
@@ -2920,11 +2954,11 @@ GLvoid __glGenericPixelTransfer(__GLcontext *gc,
             __GL_EXIT();
         }
 
-        interBuf  = (gc->imports.malloc)(gc, transferInfo->dstTotalBufSize);
-        if (gcvNULL == interBuf)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, transferInfo->dstTotalBufSize, (gctPOINTER*)&interBuf)))
         {
             __GL_EXIT();
         }
+
         transferInfo->srcImage = buf;
         transferInfo->dstImage = interBuf;
         transferInfo->dstNeedFree = GL_TRUE;
@@ -2996,14 +3030,13 @@ GLvoid __glGenericPixelTransfer(__GLcontext *gc,
             __GL_EXIT();
         }
 
-        interBuf = (gc->imports.malloc)(gc, transferInfo->srcTotalBufSize);
-        if (gcvNULL == interBuf)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, transferInfo->srcTotalBufSize, (gctPOINTER*)&interBuf)))
         {
             __GL_EXIT();
         }
         transferInfo->srcImage = interBuf;
         transferInfo->srcNeedFree = GL_TRUE;
-        transferInfo->dstImage = buf;
+        transferInfo->dstImage = (GLvoid*)buf;
         if (__GL_transferIntegerFormat != transferInfo->configFlag)
         {
             *type = transferInfo->srcType;
@@ -3034,13 +3067,13 @@ OnExit:
             else
             {
                 transferInfo->srcImage = buf;
-                transferInfo->dstImage = buf;
+                transferInfo->dstImage = (GLvoid*)buf;
             }
         }
         else if ((pixelTransferOperations == __GL_ReadPixelsPre) || (pixelTransferOperations == __GL_GetTexImagePre))
         {
             transferInfo->srcImage = buf;
-            transferInfo->dstImage = buf;
+            transferInfo->dstImage = (GLvoid*)buf;
             transferInfo->applyPixelTransfer = GL_FALSE;
         }
     }

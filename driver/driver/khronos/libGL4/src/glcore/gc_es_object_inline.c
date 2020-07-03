@@ -48,9 +48,11 @@ __glGetObject(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint id)
     return result;
 }
 
-__GL_INLINE GLvoid
+__GL_INLINE GLboolean
 __glAddObject(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint id, GLvoid *obj)
 {
+    GLboolean ret = GL_TRUE;
+
     if (shared->lock)
     {
         (*gc->imports.lockMutex)(shared->lock);
@@ -58,26 +60,31 @@ __glAddObject(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint id, GLvoi
 
     if (shared->linearTable)
     {
-        __glCheckLinearTableSize(gc, shared, (id == ~0u) ? id : (id + 1));
+        ret = __glCheckLinearTableSize(gc, shared, (id == ~0u) ? id : (id + 1));
     }
 
-    if (shared->linearTable)
+    if (ret)
     {
-        /* Save object pointer to the linear table */
-        shared->linearTable[id] = obj;
-    }
-    else
-    {
-        /* Insert object to the hash table */
-        __GLobjItem *item = __glFindObjItemNode(gc, shared, id);
-        if (item != gcvNULL)
-            item->obj = obj;
+        if (shared->linearTable)
+        {
+            /* Save object pointer to the linear table */
+            shared->linearTable[id] = obj;
+        }
+        else
+        {
+            /* Insert object to the hash table */
+            __GLobjItem *item = __glFindObjItemNode(gc, shared, id);
+            if (item != gcvNULL)
+                item->obj = obj;
+        }
     }
 
     if (shared->lock)
     {
         (*gc->imports.unlockMutex)(shared->lock);
     }
+
+    return ret;
 }
 
 __GL_INLINE GLvoid
@@ -136,7 +143,10 @@ __glDeleteObject(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint id)
                 ** or the object is truly deleted.
                 */
                 __glDeleteNamesFrList(gc, shared, id, 1);
-                (*gc->imports.free)(gc, hp);
+                if (hp)
+                {
+                    gcmOS_SAFE_FREE(gcvNULL, hp);
+                }
                 *hpp = next;
             }
         }
@@ -152,7 +162,7 @@ __glDeleteObject(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint id)
     }
 }
 
-__GL_INLINE GLuint __glMarkNameUsed(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint id)
+__GL_INLINE GLint __glMarkNameUsed(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint id)
 {
     __GLnameAllocation *allocated;
     __GLnameAllocation *temp;
@@ -169,11 +179,17 @@ __GL_INLINE GLuint __glMarkNameUsed(__GLcontext *gc, __GLsharedObjectMachine *sh
     if (allocated == gcvNULL || id < allocated->start-1)
     {
         /* Id is now the first entry in idlist */
-        allocated = (__GLnameAllocation*)(*gc->imports.malloc)(gc, sizeof(__GLnameAllocation));
-        allocated->next = shared->nameArray;
-        allocated->start = id;
-        allocated->number = 1;
-        shared->nameArray = allocated;
+        if (gcmIS_SUCCESS(gcoOS_Allocate(gcvNULL, sizeof(__GLnameAllocation), (gctPOINTER*)&allocated)))
+        {
+            allocated->next = shared->nameArray;
+            allocated->start = id;
+            allocated->number = 1;
+            shared->nameArray = allocated;
+        }
+        else
+        {
+            return -1;
+        }
     }
     else
     {
@@ -209,7 +225,7 @@ __GL_INLINE GLuint __glMarkNameUsed(__GLcontext *gc, __GLsharedObjectMachine *sh
                         allocated->next = allocated->next->next;
                         if (temp)
                         {
-                            (*gc->imports.free)(gc, temp);
+                            gcmOS_SAFE_FREE(gcvNULL, temp);
                         }
                     }
                     break;
@@ -219,8 +235,11 @@ __GL_INLINE GLuint __glMarkNameUsed(__GLcontext *gc, __GLsharedObjectMachine *sh
                     /* Only other possibility is that id belongs in its own id
                     ** right after this one.
                     */
-                    temp = (__GLnameAllocation*)
-                    (*gc->imports.malloc)(gc, sizeof(__GLnameAllocation));
+                    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLnameAllocation), (gctPOINTER*)&temp)))
+                    {
+                        return -1;
+                    }
+
                     temp->next = allocated->next;
                     allocated->next = temp;
                     temp->start = id;
@@ -261,8 +280,7 @@ __GL_INLINE __GLimageUser * __glAddImageUser(__GLcontext *gc, __GLimageUser **pU
 
     /* Create the user if it is necessary */
 
-    user = (__GLimageUser *)(*gc->imports.malloc)(gc, sizeof(__GLimageUser));
-    if (user == gcvNULL)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLimageUser), (gctPOINTER*)&user)))
     {
         return gcvNULL;
     }
@@ -307,7 +325,7 @@ __GL_INLINE GLvoid __glRemoveImageUser(__GLcontext *gc, __GLimageUser **pUserLis
                     prevUser->next = user->next;
                 }
 
-                (*gc->imports.free)(gc, user);
+                gcmOS_SAFE_FREE(gcvNULL, user);
             }
             break;
         }
@@ -323,7 +341,7 @@ __GL_INLINE GLvoid  __glFreeImageUserList(__GLcontext *gc, __GLimageUser **pUser
     while (user)
     {
         next = user->next;
-        (*gc->imports.free)(gc, user);
+        gcmOS_SAFE_FREE(gcvNULL, user);
         user = next;
     }
 }

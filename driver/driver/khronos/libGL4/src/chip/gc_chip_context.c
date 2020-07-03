@@ -398,6 +398,8 @@ gcChipInitDevicePipeline(
     gc->dp.drawPattern = __glChipDrawPattern;
 #endif
 
+    gc->dp.deletePrimData = __glChipDeletePrimData;
+
 #ifdef OPENGL40
     gc->dp.texImage1D = __glChipTexImage1D;
     gc->dp.texSubImage1D = __glChipTexSubImage1D;
@@ -425,12 +427,13 @@ gcChipInitDevicePipeline(
     gcmFOOTER_NO();
 }
 
-static GLvoid
+static gceSTATUS
 gcChipInitExtension(
     __GLcontext *gc,
     __GLchipContext *chipCtx
     )
 {
+    gceSTATUS status                 = gcvSTATUS_OK;
     gctSIZE_T extLen = 0;
     gctSIZE_T extGLSLLen = 0;
     GLuint numExts = 0;
@@ -927,7 +930,8 @@ gcChipInitExtension(
 
     if (constants->numCompressedTextureFormats > 0)
     {
-        constants->pCompressedTexturesFormats = (GLint*)(*gc->imports.calloc)(NULL, 1, sizeof(GLint) * constants->numCompressedTextureFormats);
+        gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(GLint) * constants->numCompressedTextureFormats, (gctPOINTER*)&constants->pCompressedTexturesFormats));
+        gcoOS_ZeroMemory(constants->pCompressedTexturesFormats, sizeof(GLint) * constants->numCompressedTextureFormats);
         pCurFmt = (GLubyte*)constants->pCompressedTexturesFormats;
     }
 
@@ -983,13 +987,13 @@ gcChipInitExtension(
     extGLSLLen++;
 
     /* Allocate buffer to hold the extension string */
-    constants->extensions = (GLchar*)(*gc->imports.malloc)(gc, extLen);
-    GL_ASSERT(constants->extensions != gcvNULL);
+    gcmONERROR(gcoOS_Allocate(gcvNULL, extLen, (gctPOINTER*)&constants->extensions));
+
     constants->extensions[0] = '\0';
 
      /* Allocate buffer to hold the glsl extension string */
-    constants->shaderCaps.extensions = (GLchar*)(*gc->imports.malloc)(gc, extGLSLLen);
-    GL_ASSERT(constants->shaderCaps.extensions != gcvNULL);
+    gcmONERROR(gcoOS_Allocate(gcvNULL, extGLSLLen, (gctPOINTER*)&constants->shaderCaps.extensions));
+
     constants->shaderCaps.extensions[0] = '\0';
 
     /* Go through the extension table again to construct the extension string */
@@ -1013,7 +1017,27 @@ gcChipInitExtension(
     GL_ASSERT(extGLSLLen == gcoOS_StrLen(constants->shaderCaps.extensions, gcvNULL) + 1);
     constants->numExtensions = numExts;
 
-    gcmFOOTER_NO();
+    gcmFOOTER();
+    return status;
+
+OnError:
+    if (constants->shaderCaps.extensions)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, constants->shaderCaps.extensions);
+    }
+
+    if (constants->extensions)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, constants->extensions);
+    }
+
+    if (constants->pCompressedTexturesFormats)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, constants->pCompressedTexturesFormats);
+    }
+
+    gcmFOOTER();
+    return status;
 }
 
 static GLvoid
@@ -2032,13 +2056,13 @@ __glChipDestroyContext(
 
     if (gc->constants.extensions)
     {
-        (*gc->imports.free)(gc, gc->constants.extensions);
+        gcmOS_SAFE_FREE(gcvNULL, gc->constants.extensions);
         gc->constants.extensions = gcvNULL;
     }
 
     if (gc->constants.shaderCaps.extensions)
     {
-        (*gc->imports.free)(gc, gc->constants.shaderCaps.extensions);
+        gcmOS_SAFE_FREE(gcvNULL, gc->constants.shaderCaps.extensions);
         gc->constants.shaderCaps.extensions = gcvNULL;
     }
 
@@ -2056,7 +2080,10 @@ __glChipDestroyContext(
     gcmVERIFY_OK(gcChipDeinitializeDraw(gc, chipCtx));
     gcmVERIFY_OK(gcChipLTCReleaseResultArray(chipCtx, gcvNULL));
     gcmVERIFY_OK(gcChipReleaseCompiler(gc));
-    (*gc->imports.free)(0, gc->constants.pCompressedTexturesFormats);
+    if (gc->constants.pCompressedTexturesFormats)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, gc->constants.pCompressedTexturesFormats);
+    }
 
 #if VIVANTE_PROFILER
     gcmVERIFY_OK(gcChipProfilerDestroy(gc));
@@ -2069,7 +2096,7 @@ __glChipDestroyContext(
     /* Free index temporary buffer */
     if (chipCtx->tempIndexBuffer != gcvNULL)
     {
-        (*gc->imports.free)(0, chipCtx->tempIndexBuffer);
+        gcmOS_SAFE_FREE(gcvNULL, chipCtx->tempIndexBuffer);
 
     }
 
@@ -2113,7 +2140,7 @@ __glChipDestroyContext(
         gcmVERIFY_OK(gcoHAL_SetTimeOut(chipCtx->hal, gcdGPU_TIMEOUT));
     }
 
-    (*gc->imports.free)(0, chipCtx);
+    gcmOS_SAFE_FREE(gcvNULL, chipCtx);
 
     gc->dp.privateData = NULL;
 
@@ -2134,13 +2161,9 @@ __glChipCreateContext(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-//    GL_ASSERT(gc->imports.config);
+    gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLchipContext), (gctPOINTER*)&chipCtx));
+    gcoOS_ZeroMemory(chipCtx, sizeof(__GLchipContext));
 
-    chipCtx = (__GLchipContext*)(*gc->imports.calloc)(NULL, 1, sizeof(__GLchipContext));
-    if (!chipCtx)
-    {
-        gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
-    }
     gc->dp.privateData = chipCtx;
 
 #if defined(OPENGL40) && defined(GL4_DRI_BUILD)
@@ -2331,7 +2354,7 @@ __glChipCreateContext(
 
     chipCtx->depthMode = gcvDEPTH_NONE;
 
-    gcChipInitExtension(gc, chipCtx);
+    gcmONERROR(gcChipInitExtension(gc, chipCtx));
     gcmONERROR(gcChipPgStateKeyAlloc(gc, &chipCtx->pgKeyState));
     gcmONERROR(gcChipInitFormatMapInfo(gc));
     gcmONERROR(gcChipInitializeDraw(gc, chipCtx));
@@ -2425,7 +2448,7 @@ OnError:
             gcmVERIFY_OK(gcoOS_Destroy(chipCtx->os));
         }
 
-        (gc->imports.free)(NULL, chipCtx);
+        gcmOS_SAFE_FREE(gcvNULL, chipCtx);
         chipCtx = gcvNULL;
 
         gcmFOOTER_ARG("return=%d", GL_FALSE);

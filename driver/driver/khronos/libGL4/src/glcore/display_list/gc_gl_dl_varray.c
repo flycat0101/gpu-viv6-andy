@@ -114,8 +114,8 @@ GLvoid __glComputeArrayPrimBegin(__GLcontext *gc, GLenum mode, GLsizei count, __
     if ((mode == GL_TRIANGLES || mode == GL_QUADS || mode == GL_POLYGON || mode == GL_TRIANGLES_ADJACENCY_EXT) &&
         (pV->attribEnabled & __GL_VARRAY_EDGEFLAG))
     {
-        primBegin->edgeflagBuffer = (GLubyte *)(*gc->imports.malloc)(gc, count * sizeof(GLubyte) );
-        if (primBegin->edgeflagBuffer == NULL) {
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, count * sizeof(GLubyte), (gctPOINTER*)&primBegin->edgeflagBuffer)))
+        {
             __glSetError(gc, GL_OUT_OF_MEMORY);
             return;
         }
@@ -479,7 +479,14 @@ GLvoid APIENTRY __gllc_DrawElements(__GLcontext *gc, GLenum mode, GLsizei count,
         if (mergePrimNode)
         {
             dlop = __glDlistAllocOp(gc, vertexCount * primBegin.totalStrideDW * sizeof(GLfloat));
-            if (dlop == NULL) return;
+            if (dlop == NULL)
+            {
+                if (primBegin.edgeflagBuffer)
+                {
+                    gcmOS_SAFE_FREE(gcvNULL, primBegin.edgeflagBuffer);
+                }
+                return;
+            }
             dlop->opcode = __glop_PrimContinue;
             dlop->primType = mode;
             __glDlistAppendOp(gc, dlop);
@@ -496,7 +503,14 @@ GLvoid APIENTRY __gllc_DrawElements(__GLcontext *gc, GLenum mode, GLsizei count,
         {
             dlop = __glDlistAllocOp(gc,
                 (sizeof(__GLPrimBegin) + vertexCount * primBegin.totalStrideDW * sizeof(GLfloat)));
-            if (dlop == NULL) return;
+            if (dlop == NULL)
+            {
+                if (primBegin.edgeflagBuffer)
+                {
+                    gcmOS_SAFE_FREE(gcvNULL, primBegin.edgeflagBuffer);
+                }
+                return;
+            }
             dlop->opcode = __glop_Primitive;
             dlop->dlistFree = __glDlistFreePrimitive;
             dlop->dlistFreePrivateData = __glDlistFreePrivateData;
@@ -543,7 +557,12 @@ GLvoid APIENTRY __gllc_DrawElements(__GLcontext *gc, GLenum mode, GLsizei count,
                     error = __glArrayElement_Generic(gc, ((GLubyte *)indices)[i],
                                     &bufptr, &edgeptr, tagBuf);
                 }
-                if (error != GL_NO_ERROR) {
+                if (error != GL_NO_ERROR)
+                {
+                    if (primBegin.edgeflagBuffer)
+                    {
+                        gcmOS_SAFE_FREE(gcvNULL, primBegin.edgeflagBuffer);
+                    }
                     __gllc_Error(gc, error);
                     return;
                 }
@@ -564,7 +583,12 @@ GLvoid APIENTRY __gllc_DrawElements(__GLcontext *gc, GLenum mode, GLsizei count,
                     error = __glArrayElement_Generic(gc, ((GLushort *)indices)[i],
                                     &bufptr, &edgeptr, tagBuf);
                 }
-                if (error != GL_NO_ERROR) {
+                if (error != GL_NO_ERROR)
+                {
+                    if (primBegin.edgeflagBuffer)
+                    {
+                        gcmOS_SAFE_FREE(gcvNULL, primBegin.edgeflagBuffer);
+                    }
                     __gllc_Error(gc, error);
                     return;
                 }
@@ -585,7 +609,12 @@ GLvoid APIENTRY __gllc_DrawElements(__GLcontext *gc, GLenum mode, GLsizei count,
                     error = __glArrayElement_Generic(gc, ((GLuint *)indices)[i],
                                     &bufptr, &edgeptr, tagBuf);
                 }
-                if (error != GL_NO_ERROR) {
+                if (error != GL_NO_ERROR)
+                {
+                    if (primBegin.edgeflagBuffer)
+                    {
+                        gcmOS_SAFE_FREE(gcvNULL, primBegin.edgeflagBuffer);
+                    }
                     __gllc_Error(gc, error);
                     return;
                 }
@@ -694,7 +723,14 @@ GLvoid APIENTRY __gllc_DrawArrays(__GLcontext *gc, GLenum mode, GLint first, GLs
         if (mergePrimNode)
         {
             dlop = __glDlistAllocOp(gc, vertexCount * primBegin.totalStrideDW * sizeof(GLfloat));
-            if (dlop == NULL) return;
+            if (dlop == NULL)
+            {
+                if (primBegin.edgeflagBuffer)
+                {
+                    gcmOS_SAFE_FREE(gcvNULL, primBegin.edgeflagBuffer);
+                }
+                return;
+            }
             dlop->opcode = __glop_PrimContinue;
             dlop->primType = mode;
             __glDlistAppendOp(gc, dlop);
@@ -711,7 +747,14 @@ GLvoid APIENTRY __gllc_DrawArrays(__GLcontext *gc, GLenum mode, GLint first, GLs
         {
             dlop = __glDlistAllocOp(gc,
                 (sizeof(__GLPrimBegin) + vertexCount * primBegin.totalStrideDW * sizeof(GLfloat)));
-            if (dlop == NULL) return;
+            if (dlop == NULL)
+            {
+                if (primBegin.edgeflagBuffer)
+                {
+                    gcmOS_SAFE_FREE(gcvNULL, primBegin.edgeflagBuffer);
+                }
+                return;
+            }
             dlop->opcode = __glop_Primitive;
             dlop->dlistFree = __glDlistFreePrimitive;
             dlop->dlistFreePrivateData = __glDlistFreePrivateData;
@@ -738,7 +781,12 @@ GLvoid APIENTRY __gllc_DrawArrays(__GLcontext *gc, GLenum mode, GLint first, GLs
                 error = __glArrayElement_Generic(gc, first + i,
                                 &bufptr, &edgeptr, tagBuf);
             }
-            if (error != GL_NO_ERROR) {
+            if (error != GL_NO_ERROR)
+            {
+                if (primBegin.edgeflagBuffer)
+                {
+                    gcmOS_SAFE_FREE(gcvNULL, primBegin.edgeflagBuffer);
+                }
                 __gllc_Error(gc, error);
                 return;
             }

@@ -495,6 +495,7 @@ __glChipUpdateDrawable(
                 gcmONERROR(gcoOS_Allocate(gcvNULL,
                                           gcmSIZEOF(__GLchipStencilOpt),
                                           (gctPOINTER*)&chipDrawable->stencilOpt));
+                gcoOS_ZeroMemory(chipDrawable->stencilOpt, gcmSIZEOF(__GLchipStencilOpt));
             }
 
             gcChipPatchStencilOptReset(chipDrawable->stencilOpt,
@@ -529,7 +530,7 @@ __glChipDestroyDrawable(
 #if defined(OPENGL40) && defined(GL4_DRI_BUILD)
     if (drawable->dp.privateData)
     {
-        (*drawable->free)(drawable->dp.privateData);
+        gcmOS_SAFE_FREE(gcvNULL, drawable->dp.privateData);
     }
 
     drawable->dp.privateData = NULL;
@@ -882,7 +883,7 @@ GLvoid notifyChangeBufferSizeDrawable(__GLcontext * gc)
                 chipCreateInfo.surfType = gcvSURF_RENDER_TARGET;
                 chipCreateInfo.bufInfo = (GLvoid *)&draw->accumBuffer;
                 createRenderBuffer(gc, &chipCreateInfo, &accumSurf);
-                (*gc->dp.createAccumBufferInfo)(gc, accumSurf,draw);
+                retValue = (*gc->dp.createAccumBufferInfo)(gc, accumSurf,draw);
             }
 
             /* Initial Drawable */
@@ -1347,8 +1348,12 @@ void __glChipCreateDrawable(__GLdrawablePrivate *draw,void *window)
 {
     glsCHIPREADABLE * chipDraw;
 
-    chipDraw = (glsCHIPDRAWABLE*)(*draw->calloc)(1, sizeof(glsCHIPDRAWABLE));
-    GL_ASSERT(chipDraw);
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(glsCHIPDRAWABLE), (gctPOINTER*)&chipDraw)))
+    {
+        return;
+    }
+
+    gcoOS_ZeroMemory(chipDraw, sizeof(glsCHIPDRAWABLE));
 
     draw->dp.privateData = chipDraw;
 

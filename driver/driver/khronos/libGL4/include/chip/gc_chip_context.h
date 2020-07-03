@@ -1243,7 +1243,7 @@ extern GLboolean
     GLfloat value);
 
 
-extern GLvoid
+extern GLboolean
     __glChipCreateAccumBufferInfo(__GLcontext* gc,
     gcoSURF accumSurf,
     __GLdrawablePrivate *glDrawable);
@@ -1252,6 +1252,10 @@ extern gceSTATUS
     gcChipclearAccumBuffer(__GLcontext* gc,
     glsCHIPACCUMBUFFER *chipAccumBuffer);
 #endif
+
+extern GLvoid
+    __glChipDeletePrimData(__GLcontext* gc,
+    GLvoid * privData);
 
 #ifdef __cplusplus
 }

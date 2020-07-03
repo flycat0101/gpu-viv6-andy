@@ -458,7 +458,7 @@ typedef struct __GLformatInfoRec
 ****** Context flag bitmasks defined for gc->flags ***********
 */
 #define __GL_CONTEXT_UNINITIALIZED                          0x1
-
+#define __GL_USE_FAKE_PAGE_TABLE_ENTRY                      0x2
 
 
 #define __GL_CONTEXT_FULL_SCREEN                            0x2

@@ -211,7 +211,7 @@ gcChipBatchPlay(
             __GL_SET_TEX_UNIT_BIT(gc, 0, __GL_TEXPARAMETER_BITS | __GL_TEXIMAGE_BITS);
 
             /* Execute the batch. */
-            gc->immedModeDispatch.DrawElements(gc,
+            gc->currentImmediateDispatch->DrawElements(gc,
                                    batch->mode,
                                    (GLsizei)batch->count,
                                    batch->type,
@@ -29204,7 +29204,7 @@ gcChipPatchShadow(
 
         if (rtView.surf)
         {
-            __GLdispatchTable *dispatch = &gc->immedModeDispatch;
+            __GLdispatchTable *dispatch = gc->currentImmediateDispatch;
             __GLfboAttachPoint *attachPoint = &fbo->attachPoint[0];
             __GLtextureObject *bound = gc->texture.units[gc->state.texture.activeTexIndex].boundTextures[__GL_TEXTURE_2D_INDEX];
             __GLtextureObject *tex;
@@ -29394,6 +29394,7 @@ gcChipPatchDrawIndex(
                 {
                     /* Allocate a batch structure. */
                     gcmERR_BREAK(gcoOS_Allocate(gcvNULL, gcmSIZEOF(__GLchipPatchBatch), (gctPOINTER*)&batch));
+                    gcoOS_ZeroMemory(batch, gcmSIZEOF(__GLchipPatchBatch));
                 }
                 else
                 {
@@ -30078,8 +30079,8 @@ gcChipPatchClear(
                 gcmONERROR(gcoTEXTURE_ConstructEx(gcvNULL, __glChipTexTargetToHAL[texObj->targetIndex], &texInfo->object));
                 gcmONERROR(gcoTEXTURE_AddMipMap(texInfo->object, 0, 0, format, width/SCALE, height/SCALE, 1, 1, gcvPOOL_DEFAULT, gcvTRUE, &rtView0.surf));
                 /* Recall to update RT info */
-                gc->immedModeDispatch.FramebufferTexture2D(gc, GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
-                gc->immedModeDispatch.FramebufferTexture2D(gc, GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texName, 0);
+                gc->currentImmediateDispatch->FramebufferTexture2D(gc, GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+                gc->currentImmediateDispatch->FramebufferTexture2D(gc, GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texName, 0);
 
                 /* Resize depth surface */
                 gcoSURF_GetFormat(dView.surf, &type, &format);
@@ -30280,11 +30281,11 @@ gcChipPatchUpdateUniformData(
             boundTexObj = gc->texture.units[0].boundTextures[__GL_TEXTURE_2D_INDEX];
             if (boundTexObj->params.sampler.minFilter == GL_NEAREST && boundTexObj->params.sampler.magFilter == GL_NEAREST)
             {
-                gc->immedModeDispatch.Uniform1i(gc, enableFetch, 1);
+                gc->currentImmediateDispatch->Uniform1i(gc, enableFetch, 1);
             }
             else
             {
-                gc->immedModeDispatch.Uniform1i(gc, enableFetch, 0);
+                gc->currentImmediateDispatch->Uniform1i(gc, enableFetch, 0);
             }
         }
     }
@@ -30472,6 +30473,7 @@ gcChipPatchAllocClipInfo(
     {
         /* Allocate a new array of structures. */
         gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(*array), (gctPOINTER*)&array));
+        gcoOS_ZeroMemory(array, gcmSIZEOF(*array));
 
         /* Initialize array counters */
         array->next      = chipCtx->patchInfo.clipArray;
@@ -30623,6 +30625,8 @@ gcChipPatchInsertClipInfo(
         gcmONERROR(gcoOS_Allocate(gcvNULL,
                                   clipHash->maxSize * sizeof(__GLchipPatchClipInfo*),
                                   (gctPOINTER*)&clipHash->pArray));
+        gcoOS_ZeroMemory(clipHash->pArray, clipHash->maxSize * sizeof(__GLchipPatchClipInfo*));
+
         if (pOldArray)
         {
             GL_ASSERT(oldSize);
@@ -30648,6 +30652,8 @@ gcChipPatchInsertClipInfo(
         gcmONERROR(gcoOS_Allocate(gcvNULL,
                                   clipInfo->maxCount * sizeof(__GLchipPatchClipHashEntry*),
                                   (gctPOINTER*)&clipInfo->hashOwner));
+        gcoOS_ZeroMemory(clipInfo->hashOwner, clipInfo->maxCount * sizeof(__GLchipPatchClipHashEntry*));
+
         if (oldHash && oldCount > 0)
         {
             gcoOS_MemCopy(clipInfo->hashOwner, oldHash, oldCount * sizeof(__GLchipPatchClipHashEntry*));
@@ -31112,6 +31118,7 @@ gcChipPatchPackWorker(
 
     /* Allocate memory for the hash records. */
     gcmONERROR(gcoOS_Allocate(gcvNULL, vertexCount * gcmSIZEOF(__GLchipPatchVertexHash), (gctPOINTER*)&info.hashRecords));
+    gcoOS_ZeroMemory(info.hashRecords, vertexCount * gcmSIZEOF(__GLchipPatchVertexHash));
     info.hashIndex = 0;
 
     /* Allocate memory for the vertex hash. */

@@ -332,6 +332,16 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
 //    GLfloat sctemp[100], *scp = sctemp;       /* NOTE: for scaled colors */
     GLfloat *mp;
 #endif
+    __GL_SETUP_NOT_IN_BEGIN(gc);
+
+    __GL_VERTEX_BUFFER_FLUSH(gc);
+
+    /* Copy the deferred attribute states to current attribute states.
+    */
+    if (gc->input.deferredAttribDirty)
+    {
+        __glCopyDeferedAttribToCurrent(gc);
+    }
 
     switch (sq)
     {
@@ -1107,7 +1117,6 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
             *ip++ = 0;
         break;
     case GL_VERTEX_ARRAY_SIZE:
- //       *ip++ = gc->clientState.vertexArray.vertex.size;
         *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_VERTEX_INDEX].size;
         break;
     case GL_VERTEX_ARRAY_TYPE:
@@ -1211,7 +1220,6 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
 #endif
 
     case GL_VERTEX_ARRAY_BUFFER_BINDING:
-//        *ip++ = gc->clientState.vertexArray.vertex.bufBinding;
         *ip++ = gc->vertexArray.boundVAO->vertexArray.attributeBinding[__GL_VARRAY_VERTEX_INDEX].boundArrayName;
         break;
     case GL_NORMAL_ARRAY_BUFFER_BINDING:
@@ -2720,16 +2728,20 @@ static GLvoid __glBeginQueryIndexed(__GLcontext *gc, GLenum target, GLuint index
         ** If this is the first time this name has been bound,
         ** then create a new texture object and initialize it.
         */
-        queryObj = (__GLqueryObject *)(*gc->imports.calloc)(gc, 1, sizeof(__GLqueryObject));
-        if (queryObj == gcvNULL)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLqueryObject), (gctPOINTER*)&queryObj)))
         {
             __GL_ERROR_RET(GL_OUT_OF_MEMORY);
         }
+        gcoOS_ZeroMemory(queryObj, sizeof(__GLqueryObject));
 
         queryObj->name = id;
 
         /* Add this __GLoccluQueryObject to the "gc->occluQuery.noShare" structure. */
-        __glAddObject(gc, gc->query.noShare, id, queryObj);
+        if (__glAddObject(gc, gc->query.noShare, id, queryObj) == GL_FALSE)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, queryObj);
+            __GL_ERROR_RET(GL_OUT_OF_MEMORY);
+        }
     }
 
     /* If id refers to an existing query object whose type does not match target. */
@@ -3185,29 +3197,36 @@ GLboolean __glDeleteQueryObj(__GLcontext *gc, __GLqueryObject *queryObj)
 
     if (queryObj->label)
     {
-        gc->imports.free(gc, queryObj->label);
+        gcmOS_SAFE_FREE(gcvNULL, queryObj->label);
     }
 
     (*gc->dp.deleteQuery)(gc, queryObj);
 
-    (*gc->imports.free)(gc, queryObj);
+    gcmOS_SAFE_FREE(gcvNULL, queryObj);
 
     return GL_TRUE;
 }
 
-GLvoid __glInitQueryState(__GLcontext *gc)
+GLboolean __glInitQueryState(__GLcontext *gc)
 {
     /* Query object cannot be shared between contexts */
     if (gc->query.noShare == gcvNULL)
     {
-        gc->query.noShare = (__GLsharedObjectMachine *)
-            (*gc->imports.calloc)(gc, 1, sizeof(__GLsharedObjectMachine));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLsharedObjectMachine), (gctPOINTER*)&gc->query.noShare)))
+        {
+            return GL_FALSE;
+        }
+        gcoOS_ZeroMemory(gc->query.noShare, sizeof(__GLsharedObjectMachine));
 
         /* Initialize a linear lookup table for query object */
         gc->query.noShare->maxLinearTableSize = __GL_MAX_QUERYOBJ_LINEAR_TABLE_SIZE;
         gc->query.noShare->linearTableSize = __GL_DEFAULT_QUERYOBJ_LINEAR_TABLE_SIZE;
-        gc->query.noShare->linearTable = (GLvoid **)
-            (*gc->imports.calloc)(gc, 1, gc->query.noShare->linearTableSize * sizeof(GLvoid *));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, gc->query.noShare->linearTableSize * sizeof(GLvoid *), (gctPOINTER*)&gc->query.noShare->linearTable)))
+        {
+            gcmOS_SAFE_FREE(gcvNULL, gc->query.noShare);
+            return GL_FALSE;
+        }
+        gcoOS_ZeroMemory(gc->query.noShare->linearTable, gc->query.noShare->linearTableSize * sizeof(GLvoid *));
 
         gc->query.noShare->hashSize = __GL_QUERY_HASH_TABLE_SIZE;
         gc->query.noShare->hashMask = __GL_QUERY_HASH_TABLE_SIZE - 1;
@@ -3215,6 +3234,8 @@ GLvoid __glInitQueryState(__GLcontext *gc)
         gc->query.noShare->deleteObject = (__GLdeleteObjectFunc)__glDeleteQueryObj;
         gc->query.noShare->immediateInvalid = GL_TRUE;
     }
+
+    return GL_TRUE;
 }
 
 GLvoid __glFreeQueryState(__GLcontext *gc)

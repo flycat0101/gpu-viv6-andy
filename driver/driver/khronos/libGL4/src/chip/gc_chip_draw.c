@@ -1357,12 +1357,14 @@ gcChipPatchClaimIndexMemory (
         /* Free previous buffer */
         if (chipCtx->tempIndexBuffer != gcvNULL)
         {
-            (*gc->imports.free)(0, chipCtx->tempIndexBuffer);
+            gcmOS_SAFE_FREE(gcvNULL, chipCtx->tempIndexBuffer);
         }
 
         /* Reallocate buffer */
-        chipCtx->tempIndexBuffer = (*gc->imports.malloc)(gc, size);
-        chipCtx->tempIndexBufferSize = size;
+        if (gcmIS_SUCCESS(gcoOS_Allocate(gcvNULL, size, (gctPOINTER*)&chipCtx->tempIndexBuffer)))
+        {
+            chipCtx->tempIndexBufferSize = size;
+        }
     }
 
     gcmFOOTER_ARG("buffer=0x%x bufferSize=%u", chipCtx->tempIndexBuffer, chipCtx->tempIndexBufferSize);
@@ -5091,9 +5093,29 @@ gcChipValidateDrawPath(
 {
     gceSTATUS status = gcvSTATUS_OK;
     __GLbufferObject *idxBufObj = __glGetBoundBufObj(gc, __GL_ELEMENT_ARRAY_BUFFER_INDEX);
+    __GLchipVertexBufferInfo *idxBufInfo = NULL;
     __GLchipInstantDraw *defaultInstant = &chipCtx->instantDraw[__GL_DEFAULT_LOOP];
+    gctPOINTER indexBufPointer = NULL;
 
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
+
+    // will refactor this code later */
+    if (gc->vertexStreams.streamMode != VERTEXARRAY_STREAMMODE)
+    {
+        if (gc->vertexStreams.indexStream.ppIndexBufPriv)
+        {
+            idxBufInfo = *(__GLchipVertexBufferInfo **)gc->vertexStreams.indexStream.ppIndexBufPriv;
+        }
+        indexBufPointer = gc->vertexStreams.indexStream.streamAddr;
+    }
+    else
+    {
+        if (idxBufObj)
+        {
+            idxBufInfo = (__GLchipVertexBufferInfo*)idxBufObj->privateData;
+        }
+        indexBufPointer = gc->vertexArray.drawIndirect ? NULL : (gctPOINTER)gc->vertexArray.indices;
+    }
 
     /* Initialize all instant draw attributes */
     __GL_MEMZERO(chipCtx->instantDraw, __GL_MAX_DRAW_LOOPS * sizeof(__GLchipInstantDraw));
@@ -5189,12 +5211,11 @@ gcChipValidateDrawPath(
                 }
 
                 /* Get indices offset or pointer */
-                defaultInstant->indexMemory = gc->vertexArray.drawIndirect ? NULL : (gctPOINTER)gc->vertexArray.indices;
+                defaultInstant->indexMemory = indexBufPointer;
 
                 /* Get index buffer */
-                if (idxBufObj)
+                if (idxBufInfo)
                 {
-                    __GLchipVertexBufferInfo *idxBufInfo = (__GLchipVertexBufferInfo*)idxBufObj->privateData;
                     defaultInstant->indexBuffer = idxBufInfo->bufObj;
 
                     if (idxBufInfo->size == 0)
@@ -5778,7 +5799,8 @@ gcChipPatchFreeTmpAttibMem(
 
         if (attrPtr->tempMemory != gcvNULL)
         {
-            (*gc->imports.free)(0, (gctPOINTER)attrPtr->tempMemory);
+            gctPOINTER pointer = (gctPOINTER)attrPtr->tempMemory;
+            gcmOS_SAFE_FREE(gcvNULL, pointer);
             attrPtr->tempMemory = gcvNULL;
         }
     }
@@ -6186,7 +6208,8 @@ gcChipValidateFixShaderStream(
 
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
 
-    if (gc->input.beginMode == __GL_IN_BEGIN || gc->input.beginMode == __GL_SMALL_LIST_BATCH)
+    if (gc->input.beginMode == __GL_IN_BEGIN || gc->input.beginMode == __GL_SMALL_LIST_BATCH ||
+        gc->input.beginMode == __GL_SMALL_DRAW_BATCH)
     {
         gcmFOOTER();
         return gcvSTATUS_OK;
@@ -6201,6 +6224,166 @@ gcChipValidateFixShaderStream(
     gcmFOOTER();
     return status;
 }
+
+/*******************************************************************************
+**
+**  __glChipDeletePrimData
+**
+**  Free buffer info and its related buffer object.
+**
+**  INPUT:
+**
+**      gc
+**          Pointer to an __GLcontext
+**
+**      privData
+**          Pointer to an __GLchipVertexBufferInfo that needs to be freed.
+**
+**  OUTPUT:
+**
+**      Nothing
+*/
+GLvoid
+__glChipDeletePrimData(
+    __GLcontext* gc,
+    GLvoid * privData
+    )
+{
+    __GLbufferObject bufObj;
+
+    gcmHEADER_ARG("gc=0x%x, privData=0x%x", gc, privData);
+
+    __GL_MEMZERO(&bufObj, sizeof(__GLbufferObject));
+    bufObj.privateData = privData;
+
+    (*gc->dp.deleteBuffer)(gc, &bufObj);
+
+    gcmFOOTER_NO();
+
+    return;
+}
+
+/*******************************************************************************
+**
+**  glChipCacheVertexDataAndIndexData
+**
+** Create vertex and index buffer objects and upload bot data to buffer objects, these
+** buffer objects will be used as cache for display list concatication draw
+**
+**  INPUT:
+**
+**      gc
+**          Pointer to an __GLcontext
+**
+**  OUTPUT:
+**
+**      Nothing
+**
+**  RETURN:
+**  gcvStATUS_OK or error code.
+*/
+gceSTATUS
+glChipCacheVertexDataAndIndexData(
+    __GLcontext* gc
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+    __GLstreamDecl *stream;
+    GLuint elementSize = 0;
+    __GLchipVertexBufferInfo *bufInfo;
+    GLuint numberOfVertex = gc->vertexStreams.endVertex;
+    GLuint totalCopySize = 0;
+    GLboolean cached = GL_FALSE;
+
+    gcmHEADER_ARG("gc=0x%x", gc);
+
+    if (gc->vertexStreams.streamMode != VERTEXARRAY_STREAMMODE)
+    {
+        /* Only single stream is used which is the first one */
+        stream = &(gc->vertexStreams.streams[0]);
+
+        if (stream->privPtrAddr)
+        {
+            if (!(*stream->privPtrAddr))
+            {
+                /* It is not cached, create a buffer object and upload the vertex data */
+                gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLchipVertexBufferInfo), (gctPOINTER*)&bufInfo));
+                gcoOS_ZeroMemory(bufInfo, sizeof(__GLchipVertexBufferInfo));
+
+                *stream->privPtrAddr = bufInfo;
+
+                /* Construct bufobj */
+                gcmONERROR(gcoBUFOBJ_Construct(chipCtx->hal, gcvBUFOBJ_TYPE_ARRAY_BUFFER, &bufInfo->bufObj));
+
+                if (stream->streamAddr)
+                {
+                    totalCopySize = numberOfVertex * stream->stride;
+                    /* Upload vertex data to bufObj */
+                    gcmONERROR(gcoBUFOBJ_Upload(bufInfo->bufObj, stream->streamAddr, 0, totalCopySize, gcvBUFOBJ_USAGE_STATIC_DRAW));
+                    cached = GL_TRUE;
+                    bufInfo->size = totalCopySize;
+                }
+            }
+        }
+
+        if (gc->vertexStreams.indexStream.ppIndexBufPriv && (gc->vertexStreams.indexCount > 0))
+        {
+            if (!(*gc->vertexStreams.indexStream.ppIndexBufPriv))
+            {
+                /* It is not cached, create a buffer object and upload the index data */
+                gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLchipVertexBufferInfo), (gctPOINTER*)&bufInfo));
+                gcoOS_ZeroMemory(bufInfo, sizeof(__GLchipVertexBufferInfo));
+                *gc->vertexStreams.indexStream.ppIndexBufPriv = bufInfo;
+
+                /* Construct bufobj */
+                gcmONERROR(gcoBUFOBJ_Construct(chipCtx->hal, gcvBUFOBJ_TYPE_ELEMENT_ARRAY_BUFFER, &bufInfo->bufObj));
+
+                if (gc->vertexStreams.indexStream.streamAddr)
+                {
+                    if (gc->vertexStreams.indexStream.type == GL_UNSIGNED_SHORT)
+                    {
+                        elementSize = sizeof(GLushort);
+                    }
+
+                    /* Upload index data to bufObj */
+                    gcmONERROR(gcoBUFOBJ_Upload(bufInfo->bufObj, gc->vertexStreams.indexStream.streamAddr, 0,
+                        elementSize * gc->vertexStreams.indexCount, gcvBUFOBJ_USAGE_STATIC_DRAW));
+                    gc->vertexStreams.indexStream.streamAddr = NULL;
+                    bufInfo->size = elementSize * gc->vertexStreams.indexCount;
+                }
+            }
+        }
+
+        /* Reset streamAddr since it is used as an offset if bufObj is used in configStream */
+        if (cached)
+        {
+            stream = &(gc->vertexStreams.streams[0]);
+            stream->streamAddr = 0;
+        }
+    }
+
+    gcmFOOTER();
+    return status;
+
+OnError:
+    stream = &(gc->vertexStreams.streams[0]);
+
+    if (stream->privPtrAddr)
+    {
+        (*gc->dp.deletePrimData)(gc, *stream->privPtrAddr);
+        *(stream->privPtrAddr) = NULL;
+    }
+
+    if (gc->vertexStreams.indexStream.ppIndexBufPriv)
+    {
+        (*gc->dp.deletePrimData)(gc, *gc->vertexStreams.indexStream.ppIndexBufPriv);
+        *(gc->vertexStreams.indexStream.ppIndexBufPriv) = NULL;
+    }
+    gcmFOOTER();
+    return status;
+}
+
 
 GLvoid configStream(__GLcontext* gc)
 {
@@ -6244,6 +6427,9 @@ GLvoid configStream(__GLcontext* gc)
     GLuint elementIdx;
     GLuint64 missingAttr;
     GLuint attrIndex = 0;
+
+    /* Cache vertex and index buffers in device memory */
+    glChipCacheVertexDataAndIndexData(gc);
 
     for (streamIdx = 0; streamIdx < gcmCOUNTOF(chipCtx->attributeInfo); streamIdx++) {
         chipCtx->attributeInfo[streamIdx].streamEnabled = GL_FALSE;
@@ -7034,7 +7220,8 @@ gcChipValidateChipDirty(
                 /* If the cmd instance never linked before */
                 if (hashObj == gcvNULL)
                 {
-                    pCmdInstance = (gcsPROGRAM_STATE_PTR)gc->imports.calloc(gc, 1, sizeof(gcsPROGRAM_STATE));
+                    gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(gcsPROGRAM_STATE), (gctPOINTER*)&pCmdInstance));
+                    gcoOS_ZeroMemory(pCmdInstance, sizeof(gcsPROGRAM_STATE));
 
                     gcmONERROR(gcLinkProgramPipeline(shaderCount,
                                                      shaderArray,
@@ -7302,7 +7489,7 @@ gcChipSplitDrawStipple(
     gctSIZE_T j2 = 0;
 
     GLfloat x1,y1,z1,x2,y2,z2,clipX1,clipY1,clipX2,clipY2;
-    gcsATTRIBUTE_PTR vertexPtr;
+    gcsATTRIBUTE_PTR vertexPtr = gcvNULL;
 
     gctSIZE_T indexSize     = 0;
     gctSIZE_T requiredSize  = 0;
@@ -7314,6 +7501,8 @@ gcChipSplitDrawStipple(
     gcoBUFOBJ oldIndexBuffer = instantDraw->indexBuffer;
     gctBOOL indexLocked = gcvFALSE;
     gctSIZE_T primCount = instantDraw->primCount;
+    GLvoid * vertexMemory;
+    gctBOOL vertexLocked = gcvFALSE;
 
     gcmHEADER();
 
@@ -7329,19 +7518,22 @@ gcChipSplitDrawStipple(
     }
 
     /* Allocate a temporary buffer. */
-    tempXIndices = (*gc->imports.malloc)(gc, requiredSize);
-    if (!tempXIndices)
-    {
-        gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
-    }
-
-    tempYIndices = (*gc->imports.malloc)(gc, requiredSize);
-    if (!tempYIndices)
-    {
-        gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
-    }
+    gcmONERROR(gcoOS_Allocate(gcvNULL, requiredSize, (gctPOINTER*)&tempXIndices));
+    gcmONERROR(gcoOS_Allocate(gcvNULL, requiredSize, (gctPOINTER*)&tempYIndices));
 
     vertexPtr = &chipCtx->attributeArray[0];
+
+    vertexMemory = (GLvoid *)vertexPtr->pointer;
+
+    if (vertexPtr->stream)
+    {
+        /* If vertex is in device memory, lock the surface */
+        gctPOINTER vertexBase = gcvNULL;
+        gcmONERROR(gcoBUFOBJ_Lock(vertexPtr->stream, gcvNULL, &vertexBase));
+        vertexMemory = (gctUINT8_PTR)vertexBase + gcmPTR2SIZE(vertexMemory);
+        vertexLocked = gcvTRUE;
+    }
+
 
     for (i = 0; i < primCount; i++)
     {
@@ -7364,15 +7556,15 @@ gcChipSplitDrawStipple(
         }
 
 
-        x1 = *((GLfloat *)(vertexPtr->pointer) + vertexPtr->size * j1);
-        y1 = *((GLfloat *)(vertexPtr->pointer) + vertexPtr->size * j1 + 1);
-        z1 = vertexPtr->size > 2 ? *((GLfloat *)(vertexPtr->pointer) + vertexPtr->size * j1 + 2) : 1.0f;
+        x1 = *((GLfloat *)(vertexMemory) + vertexPtr->size * j1);
+        y1 = *((GLfloat *)(vertexMemory) + vertexPtr->size * j1 + 1);
+        z1 = vertexPtr->size > 2 ? *((GLfloat *)(vertexMemory) + vertexPtr->size * j1 + 2) : 1.0f;
         clipX1 = x1 * gc->transform.modelView->mvp.matrix[0][0] + y1 * gc->transform.modelView->mvp.matrix[0][1] + z1 * gc->transform.modelView->mvp.matrix[0][2];
         clipY1 = x1 * gc->transform.modelView->mvp.matrix[1][0] + y1 * gc->transform.modelView->mvp.matrix[1][1] + z1 * gc->transform.modelView->mvp.matrix[1][2];
 
-        x2 = *((GLfloat *)(vertexPtr->pointer) + vertexPtr->size * j2);
-        y2 = *((GLfloat *)(vertexPtr->pointer) + vertexPtr->size * j2 + 1);
-        z2 = vertexPtr->size > 2 ? *((GLfloat *)(vertexPtr->pointer) + vertexPtr->size * j2 + 2) : 1.0f;
+        x2 = *((GLfloat *)(vertexMemory) + vertexPtr->size * j2);
+        y2 = *((GLfloat *)(vertexMemory) + vertexPtr->size * j2 + 1);
+        z2 = vertexPtr->size > 2 ? *((GLfloat *)(vertexMemory) + vertexPtr->size * j2 + 2) : 1.0f;
         clipX2 = x2 * gc->transform.modelView->mvp.matrix[0][0] + y2 * gc->transform.modelView->mvp.matrix[0][1] + z2 * gc->transform.modelView->mvp.matrix[0][2];
         clipY2 = x2 * gc->transform.modelView->mvp.matrix[1][0] + y2 * gc->transform.modelView->mvp.matrix[1][1] + z2 * gc->transform.modelView->mvp.matrix[1][2];
         if ((clipY2 - clipY1) * (clipY2 - clipY1) > (clipX2 - clipX1) * (clipX2 - clipX1))
@@ -7463,6 +7655,7 @@ gcChipSplitDrawStipple(
         tmpInstantDraw.primCount = tempXCount / 2;
         tmpInstantDraw.count = tempXCount;
         tmpInstantDraw.indexMemory = tempXIndices;
+        tmpInstantDraw.indexBuffer = gcvNULL;
 
 
         chipCtx->yMajor = 0.0;
@@ -7492,6 +7685,7 @@ gcChipSplitDrawStipple(
         tmpInstantDraw.primCount = tempYCount / 2;
         tmpInstantDraw.count = tempYCount;
         tmpInstantDraw.indexMemory = tempYIndices;
+        tmpInstantDraw.indexBuffer = gcvNULL;
 
         chipCtx->yMajor = 1.0;
 
@@ -7520,14 +7714,21 @@ OnError:
         gcmVERIFY_OK(gcoBUFOBJ_Unlock(oldIndexBuffer));
     }
 
+    if (vertexLocked)
+    {
+        /* Unlock index buffer */
+        gcmVERIFY_OK(gcoBUFOBJ_Unlock(vertexPtr->stream));
+    }
+
+
     if (tempXIndices)
     {
-         (*gc->imports.free)(gc, tempXIndices);
+         gcmOS_SAFE_FREE(gcvNULL, tempXIndices);
     }
 
     if (tempYIndices)
     {
-         (*gc->imports.free)(gc, tempYIndices);
+         gcmOS_SAFE_FREE(gcvNULL, tempYIndices);
     }
 
     gcmFOOTER();
@@ -10153,15 +10354,16 @@ __gl4ChipFlush(
     /* Freon requires sync to external in Flush api. */
     gcmONERROR(gcChipFboSyncFromShadowFreon(gc, gc->frameBuffer.drawFramebufObj));
 
-    if (chipCtx->drawRtViews[0].surf) {
-        /* Flush the cache. */
-        gcmONERROR(gcoSURF_Flush(chipCtx->drawRtViews[0].surf));
-
-        /* Commit command buffer. */
-        gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvFALSE));
-
-        if (!gc->imports.fromEGL && (gc->flags & __GL_CONTEXT_DRAW_TO_FRONT))
+    if (!gc->imports.fromEGL && (gc->flags & __GL_CONTEXT_DRAW_TO_FRONT))
+    {
+        if (chipCtx->drawRtViews[0].surf)
         {
+            /* Flush the cache. */
+            gcmONERROR(gcoSURF_Flush(chipCtx->drawRtViews[0].surf));
+
+            /* Commit command buffer. */
+            gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvFALSE));
+
             (*gc->imports.internalSwapBuffers)(gc,GL_TRUE, GL_FALSE);
         }
     }

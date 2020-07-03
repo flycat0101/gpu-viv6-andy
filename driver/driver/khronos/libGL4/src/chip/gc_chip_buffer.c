@@ -833,15 +833,17 @@ __glChipBindBufferObject(
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     __GLchipVertexBufferInfo *bufInfo = gcvNULL;
     gceSTATUS status = gcvSTATUS_OK;
+    GLboolean needFreePrivateData = GL_FALSE;
 
     gcmHEADER_ARG("gc=0x%x bufObj=0x%x targetIndex=%u",gc, bufObj, targetIndex);
 
     /* If this is the first time that the buffer object is bound */
     if (bufObj->privateData == gcvNULL)
     {
-        bufInfo = (__GLchipVertexBufferInfo*)gc->imports.calloc(gcvNULL, 1, sizeof(__GLchipVertexBufferInfo));
-        GL_ASSERT(bufInfo);
+        gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLchipVertexBufferInfo), (gctPOINTER*)&bufInfo));
+        gcoOS_ZeroMemory(bufInfo, sizeof(__GLchipVertexBufferInfo));
         bufObj->privateData = bufInfo;
+        needFreePrivateData = GL_TRUE;
     }
     else
     {
@@ -867,6 +869,10 @@ __glChipBindBufferObject(
     return GL_TRUE;
 
 OnError:
+    if (needFreePrivateData)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, bufObj->privateData);
+    }
     gcChipSetError(chipCtx, status);
     gcmFOOTER_ARG("return=%d", GL_FALSE);
     return GL_FALSE;
@@ -916,12 +922,12 @@ __glChipDeleteBufferObject(
 
         if (bufInfo->cache)
         {
-            gc->imports.free(gc, bufInfo->cache);
+            gcmOS_SAFE_FREE(gcvNULL, bufInfo->cache);
             bufInfo->cache = gcvNULL;
         }
 #endif
 
-        gc->imports.free(gc, bufInfo);
+        gcmOS_SAFE_FREE(gcvNULL, bufInfo);
         bufObj->privateData = gcvNULL;
     } while (GL_FALSE);
 
@@ -1185,13 +1191,13 @@ __glChipBufferData(
         {
             if (resized && bufInfo->cache)
             {
-                gc->imports.free(gc, bufInfo->cache);
+                gcmOS_SAFE_FREE(gcvNULL, bufInfo->cache);
                 bufInfo->cache = gcvNULL;
             }
 
             if (newSize > 0 && !bufInfo->cache)
             {
-                bufInfo->cache = gc->imports.malloc(gc, newSize);
+                gcmONERROR(gcoOS_Allocate(gcvNULL, newSize, (gctPOINTER*)&bufInfo->cache));
             }
 
             if (data)

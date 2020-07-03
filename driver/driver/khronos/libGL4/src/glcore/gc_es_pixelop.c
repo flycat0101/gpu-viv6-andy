@@ -13,6 +13,7 @@
 
 #include "gc_es_context.h"
 #include "gc_es_object_inline.c"
+#include "api/gc_gl_api_inline.c"
 
 #define _GC_OBJ_ZONE gcdZONE_GL40_CORE
 
@@ -43,10 +44,10 @@ GLvoid __glInitDefaultPixelMap(__GLcontext *gc, GLenum map)
           /*
           ** Allocate single-entry map for index type.
           */
-          pMap[index].base.mapI = (GLint*)(*gc->imports.malloc)(gc, sizeof(GLint));
-          if (!pMap[index].base.mapI)
+          if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(GLint), (gctPOINTER*)&pMap[index].base.mapI)))
           {
-            return;
+              __glSetError(gc, GL_OUT_OF_MEMORY);
+              return;
           }
           else
           {
@@ -61,10 +62,10 @@ GLvoid __glInitDefaultPixelMap(__GLcontext *gc, GLenum map)
           /*
           ** Allocate single-entry map for component type.
           */
-          pMap[index].base.mapF = (__GLfloat*)(*gc->imports.malloc)(gc, sizeof(__GLfloat));
-          if (!pMap[index].base.mapF)
+          if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLfloat), (gctPOINTER*)&pMap[index].base.mapF)))
           {
-                  return;
+              __glSetError(gc, GL_OUT_OF_MEMORY);
+              return;
           }
           else
           {
@@ -1043,10 +1044,12 @@ __GL_INLINE GLvoid __glReadPixelsEnd(__GLcontext *gc)
 GLvoid GL_APIENTRY __glim_ReadPixels(__GLcontext *gc, GLint x, GLint y, GLsizei width, GLsizei height,
                                      GLenum format, GLenum type, GLvoid* pixels)
 {
+    GLuint cacheHistory;
     GLboolean retVal;
     __GLbufferObject *packBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_PACK_BUFFER_INDEX].boundBufObj;
     __GLpixelTransferInfo transferInfo;
     __GLformatInfo *formatInfo;
+    gctPOINTER pointer;
 
     __GL_HEADER();
 
@@ -1055,6 +1058,41 @@ GLvoid GL_APIENTRY __glim_ReadPixels(__GLcontext *gc, GLint x, GLint y, GLsizei 
     if (!__glCheckReadPixelArgs(gc, width, height, format, type))
     {
         __GL_EXIT();
+    }
+
+    __GL_VERTEX_BUFFER_FLUSH(gc);
+
+    /* Copy the deferred attribute states to current attribute states.
+    */
+    if (gc->input.deferredAttribDirty)
+    {
+        __glCopyDeferedAttribToCurrent(gc);
+    }
+
+    /* Since Viewperf is run in batch mode that multiple tests are run through one GL context,
+    ** we have to reset vertex cache between tests to maintain a high cache hit ratio, and
+    ** reset gc->input.cacheHitFrameIndex to avoid stopping vertex caching.
+    */
+    gc->input.cacheHitFrameIndex = gc->input.currentFrameIndex;
+    if (gc->input.totalCacheMemSize > 0) {
+        cacheHistory = gc->input.vertexCacheHistory;
+        __glFreeImmedVertexCacheBlocks(gc);
+
+        /* Reset currentCacheBlock and currentVertexCache pointers */
+        gc->input.currentCacheBlock = gc->input.vertexCacheBlock;
+        gc->input.currentVertexCache = &gc->input.vertexCacheBlock->cache[0];
+
+#if __GL_VERTEX_CACHE_STATISTIC
+        fprintf(gc->input.vtxCacheStatFile, "Frame:%3d, vertex cache will be reset next frame!\n", gc->input.currentFrameIndex);
+#endif
+
+        __glResetImmedVertexBuffer(gc, GL_FALSE);
+        gc->input.vertexCacheHistory = cacheHistory;
+    }
+    /* Reset pteInfo hashTable so that __glClearPageTableEntryDirty can clear PTE dirty bit in next test.
+    */
+    if (gc->readablePrivate->width == width && gc->readablePrivate->height == height) {
+        __glClearPteInfoHashTable(gc, &gc->input.pteInfo, 1);
     }
 
     if (gcvNULL == packBufObj)
@@ -1156,7 +1194,9 @@ GLvoid GL_APIENTRY __glim_ReadPixels(__GLcontext *gc, GLint x, GLint y, GLsizei 
 
 OnExit:
     if ((GL_TRUE == transferInfo.srcNeedFree) && (gcvNULL != transferInfo.srcImage)){
-        (*gc->imports.free)(gc, (void*)transferInfo.srcImage);
+        /* Fix a build warning from gcmOS_SAFE_FREE */
+        pointer = (gctPOINTER)transferInfo.srcImage;
+        gcmOS_SAFE_FREE(gcvNULL, pointer);
         transferInfo.srcImage = gcvNULL;
     }
     __GL_FOOTER();
@@ -1350,6 +1390,10 @@ GLvoid APIENTRY __glim_Accum(__GLcontext *gc, GLenum op, GLfloat value)
 
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
+    if (gc->input.deferredAttribDirty)
+    {
+        __glCopyDeferedAttribToCurrent(gc);
+    }
     /* Get the latest drawable information */
 //    LINUX_LOCK_FRAMEBUFFER(gc);
 
@@ -1360,7 +1404,10 @@ GLvoid APIENTRY __glim_Accum(__GLcontext *gc, GLenum op, GLfloat value)
     __glEvaluateDrawableChange(gc, __GL_BUFFER_DRAW_READ_BITS);
 
     if (gc->renderMode == GL_RENDER) {
-        (*gc->dp.accum)(gc, op, value);
+        if ((*gc->dp.accum)(gc, op, value) == GL_FALSE)
+        {
+            __glSetError(gc, (*gc->dp.getError)(gc));
+        }
     }
 
 //    LINUX_UNLOCK_FRAMEBUFFER(gc);
@@ -1517,12 +1564,12 @@ GLvoid APIENTRY __glim_PixelMapfv(__GLcontext *gc, GLenum map, GLint mapSize,
               return;
           }
           if (pMap[index].base.mapI) {
-              (*gc->imports.free)(gc, pMap[index].base.mapI);
+              gcmOS_SAFE_FREE(gcvNULL, pMap[index].base.mapI);
               pMap[index].base.mapI = 0;
           }
-          pMap[index].base.mapI = (GLint*)
-              (*gc->imports.malloc)(gc, (size_t) (mapSize * sizeof(GLint)) );
-          if (!pMap[index].base.mapI) {
+          if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, (mapSize * sizeof(GLint)), (gctPOINTER*)&pMap[index].base.mapI)))
+          {
+              __glSetError(gc, GL_OUT_OF_MEMORY);
               pMap[index].size = 0;
               return;
           }
@@ -1562,15 +1609,15 @@ GLvoid APIENTRY __glim_PixelMapfv(__GLcontext *gc, GLenum map, GLint mapSize,
               return;
           }
           if (pMap[index].base.mapF) {
-              (*gc->imports.free)(gc, pMap[index].base.mapF);
+              gcmOS_SAFE_FREE(gcvNULL, pMap[index].base.mapF);
               pMap[index].base.mapF = 0;
           }
           if (mapSize == 0) {
               __glInitDefaultPixelMap(gc, map);
           } else {
-              pMap[index].base.mapF = (__GLfloat*)
-                  (*gc->imports.malloc)(gc,(size_t) (mapSize * sizeof(__GLfloat)) );
-              if (!pMap[index].base.mapF) {
+              if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, (mapSize * sizeof(__GLfloat)), (gctPOINTER*)&pMap[index].base.mapF)))
+              {
+                  __glSetError(gc, GL_OUT_OF_MEMORY);
                   pMap[index].size = 0;
                   return;
               }
@@ -1620,12 +1667,12 @@ GLvoid APIENTRY __glim_PixelMapuiv(__GLcontext *gc, GLenum map, GLint mapSize,
               return;
           }
           if (pMap[index].base.mapI) {
-              (*gc->imports.free)(gc, pMap[index].base.mapI);
+              gcmOS_SAFE_FREE(gcvNULL, pMap[index].base.mapI);
               pMap[index].base.mapI = 0;
           }
-          pMap[index].base.mapI = (GLint*)
-              (*gc->imports.malloc)(gc, (size_t) (mapSize * sizeof(GLint)) );
-          if (!pMap[index].base.mapI) {
+          if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, (mapSize * sizeof(GLint)), (gctPOINTER*)&pMap[index].base.mapI)))
+          {
+              __glSetError(gc, GL_OUT_OF_MEMORY);
               pMap[index].size = 0;
               return;
           }
@@ -1658,15 +1705,15 @@ GLvoid APIENTRY __glim_PixelMapuiv(__GLcontext *gc, GLenum map, GLint mapSize,
               return;
           }
           if (pMap[index].base.mapF) {
-              (*gc->imports.free)(gc, pMap[index].base.mapF);
+              gcmOS_SAFE_FREE(gcvNULL, pMap[index].base.mapF);
               pMap[index].base.mapF = 0;
           }
           if (mapSize == 0) {
               __glInitDefaultPixelMap(gc, map);
           } else {
-              pMap[index].base.mapF = (__GLfloat*)
-                  (*gc->imports.malloc)(gc, (size_t) (mapSize * sizeof(GLfloat)) );
-              if (!pMap[index].base.mapF) {
+              if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, (mapSize * sizeof(GLfloat)), (gctPOINTER*)&pMap[index].base.mapF)))
+              {
+                  __glSetError(gc, GL_OUT_OF_MEMORY);
                   pMap[index].size = 0;
                   return;
               }
@@ -1714,12 +1761,12 @@ GLvoid APIENTRY __glim_PixelMapusv(__GLcontext *gc, GLenum map, GLint mapSize,
               return;
           }
           if (pMap[index].base.mapI) {
-              (*gc->imports.free)(gc, pMap[index].base.mapI);
+              gcmOS_SAFE_FREE(gcvNULL, pMap[index].base.mapI);
               pMap[index].base.mapI = 0;
           }
-          pMap[index].base.mapI = (GLint*)
-              (*gc->imports.malloc)(gc, (size_t) (mapSize * sizeof(GLint)) );
-          if (!pMap[index].base.mapI) {
+          if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, (mapSize * sizeof(GLint)), (gctPOINTER*)&pMap[index].base.mapI)))
+          {
+              __glSetError(gc, GL_OUT_OF_MEMORY);
               pMap[index].size = 0;
               return;
           }
@@ -1752,15 +1799,15 @@ GLvoid APIENTRY __glim_PixelMapusv(__GLcontext *gc, GLenum map, GLint mapSize,
               return;
           }
           if (pMap[index].base.mapF) {
-              (*gc->imports.free)(gc, pMap[index].base.mapF);
+              gcmOS_SAFE_FREE(gcvNULL, pMap[index].base.mapF);
               pMap[index].base.mapF = 0;
           }
           if (mapSize == 0) {
               __glInitDefaultPixelMap(gc, map);
           } else {
-              pMap[index].base.mapF = (__GLfloat*)
-                  (*gc->imports.malloc)(gc, (size_t) (mapSize * sizeof(GLfloat)) );
-              if (!pMap[index].base.mapF) {
+              if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, (mapSize * sizeof(GLfloat)), (gctPOINTER*)&pMap[index].base.mapF)))
+              {
+                  __glSetError(gc, GL_OUT_OF_MEMORY);
                   pMap[index].size = 0;
                   return;
               }
@@ -1858,6 +1905,12 @@ GLvoid APIENTRY __glim_DrawPixels(__GLcontext *gc, GLsizei width, GLsizei height
 
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
+    /* Copy the deferred attribute states to current attribute states.
+    */
+    if (gc->input.deferredAttribDirty) {
+        __glCopyDeferedAttribToCurrent(gc);
+    }
+
     if ( (format == GL_DEPTH_COMPONENT &&  !gc->state.depth.writeEnable) ||
          (format == GL_STENCIL_INDEX && !gc->state.stencil.StencilArbFront.writeMask) ||
          (format == GL_DEPTH_STENCIL_EXT && !gc->state.depth.writeEnable && !gc->state.stencil.StencilArbFront.writeMask))
@@ -1954,6 +2007,13 @@ GLvoid APIENTRY __glim_CopyPixels(__GLcontext *gc, GLint x, GLint y, GLsizei wid
 
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
+    /* Copy the deferred attribute states to current attribute states.
+    */
+    if (gc->input.deferredAttribDirty)
+    {
+        __glCopyDeferedAttribToCurrent(gc);
+    }
+
     if ((format == GL_DEPTH_COMPONENT &&  !gc->state.depth.writeEnable) ||
         (format == GL_STENCIL_INDEX && !gc->state.stencil.StencilArbFront.writeMask) ||
         (format == GL_DEPTH_STENCIL_EXT && !gc->state.depth.writeEnable && !gc->state.stencil.StencilArbFront.writeMask))
@@ -2001,6 +2061,12 @@ GLvoid APIENTRY __glim_Bitmap(__GLcontext *gc, GLsizei w, GLsizei h, GLfloat xOr
     }
 
     __GL_VERTEX_BUFFER_FLUSH(gc);
+
+    /* Copy the deferred attribute states to current attribute states.
+    */
+    if (gc->input.deferredAttribDirty) {
+        __glCopyDeferedAttribToCurrent(gc);
+    }
 
     /* Get the latest drawable information */
 //    LINUX_LOCK_FRAMEBUFFER(gc);

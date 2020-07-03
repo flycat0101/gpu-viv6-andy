@@ -74,7 +74,7 @@ const GLubyte *__glle_Begin(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Begin_Rec *data;
 
     data = (struct __gllc_Begin_Rec *) PC;
-    (*gc->immedModeDispatch.Begin)(gc, data->primType);
+    (*gc->currentImmediateDispatch->Begin)(gc, data->primType);
     return PC + sizeof(struct __gllc_Begin_Rec);
 }
 
@@ -84,7 +84,7 @@ const GLubyte *__glle_Color3fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Color3fv_Rec *data;
 
     data = (struct __gllc_Color3fv_Rec *) PC;
-    (*gc->immedModeDispatch.Color3fv)(gc, data->v);
+    (*gc->currentImmediateDispatch->Color3fv)(gc, data->v);
     return PC + sizeof(struct __gllc_Color3fv_Rec);
 }
 
@@ -94,7 +94,7 @@ const GLubyte *__glle_Color4fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Color4fv_Rec *data;
 
     data = (struct __gllc_Color4fv_Rec *) PC;
-    (*gc->immedModeDispatch.Color4fv)(gc, data->v);
+    (*gc->currentImmediateDispatch->Color4fv)(gc, data->v);
     return PC + sizeof(struct __gllc_Color4fv_Rec);
 }
 
@@ -104,7 +104,7 @@ const GLubyte *__glle_Color4ubv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Color4ubv_Rec *data;
 
     data = (struct __gllc_Color4ubv_Rec *) PC;
-    (*gc->immedModeDispatch.Color4ubv)(gc, data->v);
+    (*gc->currentImmediateDispatch->Color4ubv)(gc, data->v);
     return PC + sizeof(struct __gllc_Color4ubv_Rec);
 }
 
@@ -114,7 +114,7 @@ const GLubyte *__glle_EdgeFlag(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_EdgeFlag_Rec *data;
 
     data = (struct __gllc_EdgeFlag_Rec *) PC;
-    (*gc->immedModeDispatch.EdgeFlag)(gc, data->flag);
+    (*gc->currentImmediateDispatch->EdgeFlag)(gc, data->flag);
     return PC + sizeof(struct __gllc_EdgeFlag_Rec);
 }
 
@@ -122,7 +122,7 @@ const GLubyte *__glle_End(__GLcontext *gc, const GLubyte *PC)
 {
 
 
-    (*gc->immedModeDispatch.End)(gc);
+    (*gc->currentImmediateDispatch->End)(gc);
     return PC;
 }
 
@@ -141,7 +141,7 @@ const GLubyte *__glle_Normal3fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Normal3fv_Rec *data;
 
     data = (struct __gllc_Normal3fv_Rec *) PC;
-    (*gc->immedModeDispatch.Normal3fv)(gc, data->v);
+    (*gc->currentImmediateDispatch->Normal3fv)(gc, data->v);
     return PC + sizeof(struct __gllc_Normal3fv_Rec);
 }
 
@@ -187,7 +187,7 @@ const GLubyte *__glle_TexCoord2fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_TexCoord2fv_Rec *data;
 
     data = (struct __gllc_TexCoord2fv_Rec *) PC;
-    (*gc->immedModeDispatch.TexCoord2fv)(gc, data->v);
+    (*gc->currentImmediateDispatch->TexCoord2fv)(gc, data->v);
     return PC + sizeof(struct __gllc_TexCoord2fv_Rec);
 }
 
@@ -197,7 +197,7 @@ const GLubyte *__glle_TexCoord3fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_TexCoord3fv_Rec *data;
 
     data = (struct __gllc_TexCoord3fv_Rec *) PC;
-    (*gc->immedModeDispatch.TexCoord3fv)(gc, data->v);
+    (*gc->currentImmediateDispatch->TexCoord3fv)(gc, data->v);
     return PC + sizeof(struct __gllc_TexCoord3fv_Rec);
 }
 
@@ -207,7 +207,7 @@ const GLubyte *__glle_TexCoord4fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_TexCoord4fv_Rec *data;
 
     data = (struct __gllc_TexCoord4fv_Rec *) PC;
-    (*gc->immedModeDispatch.TexCoord4fv)(gc, data->v);
+    (*gc->currentImmediateDispatch->TexCoord4fv)(gc, data->v);
     return PC + sizeof(struct __gllc_TexCoord4fv_Rec);
 }
 
@@ -217,7 +217,7 @@ const GLubyte *__glle_Vertex2fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Vertex2fv_Rec *data;
 
     data = (struct __gllc_Vertex2fv_Rec *) PC;
-    (*gc->immedModeDispatch.Vertex2fv)(gc, data->v);
+    (*gc->currentImmediateDispatch->Vertex2fv)(gc, data->v);
     return PC + sizeof(struct __gllc_Vertex2fv_Rec);
 }
 
@@ -227,7 +227,7 @@ const GLubyte *__glle_Vertex3fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Vertex3fv_Rec *data;
 
     data = (struct __gllc_Vertex3fv_Rec *) PC;
-    (*gc->immedModeDispatch.Vertex3fv)(gc, data->v);
+    (*gc->currentImmediateDispatch->Vertex3fv)(gc, data->v);
     return PC + sizeof(struct __gllc_Vertex3fv_Rec);
 }
 
@@ -237,7 +237,7 @@ const GLubyte *__glle_Vertex4fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Vertex4fv_Rec *data;
 
     data = (struct __gllc_Vertex4fv_Rec *) PC;
-    (*gc->immedModeDispatch.Vertex4fv)(gc, data->v);
+    (*gc->currentImmediateDispatch->Vertex4fv)(gc, data->v);
     return PC + sizeof(struct __gllc_Vertex4fv_Rec);
 }
 
@@ -265,7 +265,7 @@ const GLubyte *__glle_CullFace(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_CullFace_Rec *) PC;
     /*__glim_CullFace(gc, data->mode);*/
-    gc->immedModeDispatch.CullFace(gc, data->mode);
+    gc->currentImmediateDispatch->CullFace(gc, data->mode);
     return PC + sizeof(struct __gllc_CullFace_Rec);
 }
 
@@ -303,7 +303,7 @@ const GLubyte *__glle_FrontFace(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_FrontFace_Rec *) PC;
     /*__glim_FrontFace(gc, data->mode);*/
-    gc->immedModeDispatch.FrontFace(gc, data->mode);
+    gc->currentImmediateDispatch->FrontFace(gc, data->mode);
     return PC + sizeof(struct __gllc_FrontFace_Rec);
 }
 
@@ -313,7 +313,7 @@ const GLubyte *__glle_Hint(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_Hint_Rec *) PC;
     /*__glim_Hint(gc, data->target, data->mode);*/
-    gc->immedModeDispatch.Hint(gc, data->target, data->mode);
+    gc->currentImmediateDispatch->Hint(gc, data->target, data->mode);
     return PC + sizeof(struct __gllc_Hint_Rec);
 }
 
@@ -443,7 +443,7 @@ const GLubyte *__glle_Scissor(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_Scissor_Rec *) PC;
     /*__glim_Scissor(gc, data->x, data->y, data->width, data->height);*/
-    gc->immedModeDispatch.Scissor(gc, data->x, data->y, data->width, data->height);
+    gc->currentImmediateDispatch->Scissor(gc, data->x, data->y, data->width, data->height);
     return PC + sizeof(struct __gllc_Scissor_Rec);
 }
 
@@ -465,7 +465,7 @@ const GLubyte *__glle_TexParameterfv(__GLcontext *gc, const GLubyte *PC)
     data = (struct __gllc_TexParameterfv_Rec *) PC;
     /*__glim_TexParameterfv(gc, data->target, data->pname,
             (GLfloat *) (PC + sizeof(struct __gllc_TexParameterfv_Rec)));*/
-    gc->immedModeDispatch.TexParameterfv(gc, data->target, data->pname,
+    gc->currentImmediateDispatch->TexParameterfv(gc, data->target, data->pname,
             (GLfloat *) (PC + sizeof(struct __gllc_TexParameterfv_Rec)));
     arraySize = __GL64PAD(__glTexParameter_size(data->pname) * 4);
     size = sizeof(struct __gllc_TexParameterfv_Rec) + arraySize;
@@ -481,7 +481,7 @@ const GLubyte *__glle_TexParameteriv(__GLcontext *gc, const GLubyte *PC)
     data = (struct __gllc_TexParameteriv_Rec *) PC;
     /*__glim_TexParameteriv(gc, data->target, data->pname,
             (GLint *) (PC + sizeof(struct __gllc_TexParameteriv_Rec)));*/
-    gc->immedModeDispatch.TexParameteriv(gc, data->target, data->pname,
+    gc->currentImmediateDispatch->TexParameteriv(gc, data->target, data->pname,
             (GLint *) (PC + sizeof(struct __gllc_TexParameteriv_Rec)));
     arraySize = __GL64PAD(__glTexParameter_size(data->pname) * 4);
     size = sizeof(struct __gllc_TexParameteriv_Rec) + arraySize;
@@ -613,7 +613,7 @@ const GLubyte *__glle_Clear(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_Clear_Rec *) PC;
     /*__glim_Clear(gc, data->mask);*/
-    gc->immedModeDispatch.Clear(gc, data->mask);
+    gc->currentImmediateDispatch->Clear(gc, data->mask);
     return PC + sizeof(struct __gllc_Clear_Rec);
 }
 
@@ -641,7 +641,7 @@ const GLubyte *__glle_ClearColor(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_ClearColor_Rec *) PC;
     /*__glim_ClearColor(gc, data->red, data->green, data->blue, data->alpha);*/
-    gc->immedModeDispatch.ClearColor(gc, data->red, data->green, data->blue, data->alpha);
+    gc->currentImmediateDispatch->ClearColor(gc, data->red, data->green, data->blue, data->alpha);
     return PC + sizeof(struct __gllc_ClearColor_Rec);
 }
 
@@ -651,7 +651,7 @@ const GLubyte *__glle_ClearStencil(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_ClearStencil_Rec *) PC;
     /*__glim_ClearStencil(gc, data->s);*/
-    gc->immedModeDispatch.ClearStencil(gc, data->s);
+    gc->currentImmediateDispatch->ClearStencil(gc, data->s);
     return PC + sizeof(struct __gllc_ClearStencil_Rec);
 }
 
@@ -661,7 +661,7 @@ const GLubyte *__glle_ClearDepth(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_ClearDepth_Rec *) PC;
     /*__glim_ClearDepth(gc, data->depth);*/
-    gc->immedModeDispatch.ClearDepthf(gc, (GLfloat)data->depth);
+    gc->currentImmediateDispatch->ClearDepthf(gc, (GLfloat)data->depth);
     return PC + sizeof(struct __gllc_ClearDepth_Rec);
 }
 
@@ -671,7 +671,7 @@ const GLubyte *__glle_StencilMask(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_StencilMask_Rec *) PC;
     /*__glim_StencilMask(gc, data->mask);*/
-    gc->immedModeDispatch.StencilMask(gc, data->mask);
+    gc->currentImmediateDispatch->StencilMask(gc, data->mask);
     return PC + sizeof(struct __gllc_StencilMask_Rec);
 }
 
@@ -681,7 +681,7 @@ const GLubyte *__glle_StencilMaskSeparate(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_StencilMaskSeparate_Rec *) PC;
     /*__glim_StencilMaskSeparate(gc, data->face, data->mask);*/
-    gc->immedModeDispatch.StencilMaskSeparate(gc, data->face, data->mask);
+    gc->currentImmediateDispatch->StencilMaskSeparate(gc, data->face, data->mask);
     return PC + sizeof(struct __gllc_StencilMaskSeparate_Rec);
 }
 
@@ -691,7 +691,7 @@ const GLubyte *__glle_ColorMask(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_ColorMask_Rec *) PC;
     /*__glim_ColorMask(gc, data->red, data->green, data->blue, data->alpha);*/
-    gc->immedModeDispatch.ColorMask(gc, data->red, data->green, data->blue, data->alpha);
+    gc->currentImmediateDispatch->ColorMask(gc, data->red, data->green, data->blue, data->alpha);
     return PC + sizeof(struct __gllc_ColorMask_Rec);
 }
 
@@ -701,7 +701,7 @@ const GLubyte *__glle_DepthMask(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_DepthMask_Rec *) PC;
     /*__glim_DepthMask(gc, data->flag);*/
-    gc->immedModeDispatch.DepthMask(gc, data->flag);
+    gc->currentImmediateDispatch->DepthMask(gc, data->flag);
     return PC + sizeof(struct __gllc_DepthMask_Rec);
 }
 
@@ -865,7 +865,7 @@ const GLubyte *__glle_BlendColor(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_BlendColor_Rec *) PC;
     /*__glim_BlendColor(gc, data->r, data->g, data->b, data->a);*/
-    gc->immedModeDispatch.BlendColor(gc, data->r, data->g, data->b, data->a);
+    gc->currentImmediateDispatch->BlendColor(gc, data->r, data->g, data->b, data->a);
     return PC + sizeof(struct __gllc_BlendColor_Rec);
 }
 
@@ -875,7 +875,7 @@ const GLubyte *__glle_BlendFunc(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_BlendFunc_Rec *) PC;
     /*__glim_BlendFunc(gc, data->sfactor, data->dfactor);*/
-    gc->immedModeDispatch.BlendFunc(gc, data->sfactor, data->dfactor);
+    gc->currentImmediateDispatch->BlendFunc(gc, data->sfactor, data->dfactor);
     return PC + sizeof(struct __gllc_BlendFunc_Rec);
 }
 
@@ -885,7 +885,7 @@ const GLubyte *__glle_BlendFuncSeparate(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_BlendFuncSeparate_Rec *) PC;
     /*__glim_BlendFuncSeparate(gc, data->sfactorRGB, data->dfactorRGB, data->sfactorAlpha, data->dfactorAlpha);*/
-    gc->immedModeDispatch.BlendFuncSeparate(gc, data->sfactorRGB, data->dfactorRGB, data->sfactorAlpha, data->dfactorAlpha);
+    gc->currentImmediateDispatch->BlendFuncSeparate(gc, data->sfactorRGB, data->dfactorRGB, data->sfactorAlpha, data->dfactorAlpha);
     return PC + sizeof(struct __gllc_BlendFuncSeparate_Rec);
 }
 
@@ -895,7 +895,7 @@ const GLubyte *__glle_BlendEquation(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_BlendEquation_Rec *) PC;
     /*__glim_BlendEquation(gc, data->mode);*/
-    gc->immedModeDispatch.BlendEquation(gc, data->mode);
+    gc->currentImmediateDispatch->BlendEquation(gc, data->mode);
     return PC + sizeof(struct __gllc_BlendEquation_Rec);
 }
 
@@ -905,7 +905,7 @@ const GLubyte *__glle_BlendEquationSeparate(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_BlendEquationSeparate_Rec *) PC;
     /*__glim_BlendEquationSeparate(gc, data->modeRGB, data->modeAlpha);*/
-    gc->immedModeDispatch.BlendEquationSeparate(gc, data->modeRGB, data->modeAlpha);
+    gc->currentImmediateDispatch->BlendEquationSeparate(gc, data->modeRGB, data->modeAlpha);
     return PC + sizeof(struct __gllc_BlendEquationSeparate_Rec);
 }
 
@@ -924,7 +924,7 @@ const GLubyte *__glle_StencilFunc(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_StencilFunc_Rec *) PC;
     /*__glim_StencilFunc(gc, data->func, data->ref, data->mask);*/
-    gc->immedModeDispatch.StencilFunc(gc, data->func, data->ref, data->mask);
+    gc->currentImmediateDispatch->StencilFunc(gc, data->func, data->ref, data->mask);
     return PC + sizeof(struct __gllc_StencilFunc_Rec);
 }
 
@@ -934,7 +934,7 @@ const GLubyte *__glle_StencilFuncSeparate(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_StencilFuncSeparate_Rec *) PC;
     /*__glim_StencilFuncSeparate(gc, data->face, data->func, data->ref, data->mask);*/
-    gc->immedModeDispatch.StencilFuncSeparate(gc, data->face, data->func, data->ref, data->mask);
+    gc->currentImmediateDispatch->StencilFuncSeparate(gc, data->face, data->func, data->ref, data->mask);
     return PC + sizeof(struct __gllc_StencilFuncSeparate_Rec);
 }
 
@@ -944,7 +944,7 @@ const GLubyte *__glle_StencilOp(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_StencilOp_Rec *) PC;
     /*__glim_StencilOp(gc, data->fail, data->zfail, data->zpass);*/
-    gc->immedModeDispatch.StencilOp(gc, data->fail, data->zfail, data->zpass);
+    gc->currentImmediateDispatch->StencilOp(gc, data->fail, data->zfail, data->zpass);
     return PC + sizeof(struct __gllc_StencilOp_Rec);
 }
 
@@ -954,7 +954,7 @@ const GLubyte *__glle_StencilOpSeparate(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_StencilOpSeparate_Rec *) PC;
     /*__glim_StencilOpSeparate(gc, data->face, data->fail, data->zfail, data->zpass);*/
-    gc->immedModeDispatch.StencilOpSeparate(gc, data->face, data->fail, data->zfail, data->zpass);
+    gc->currentImmediateDispatch->StencilOpSeparate(gc, data->face, data->fail, data->zfail, data->zpass);
     return PC + sizeof(struct __gllc_StencilOpSeparate_Rec);
 }
 
@@ -964,7 +964,7 @@ const GLubyte *__glle_DepthFunc(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_DepthFunc_Rec *) PC;
     /*__glim_DepthFunc(gc, data->func);*/
-    gc->immedModeDispatch.DepthFunc(gc, data->func);
+    gc->currentImmediateDispatch->DepthFunc(gc, data->func);
     return PC + sizeof(struct __gllc_DepthFunc_Rec);
 }
 
@@ -1043,7 +1043,7 @@ const GLubyte *__glle_ReadBuffer(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_ReadBuffer_Rec *) PC;
     /*__glim_ReadBuffer(gc, data->mode);*/
-    gc->immedModeDispatch.ReadBuffer(gc, data->mode);
+    gc->currentImmediateDispatch->ReadBuffer(gc, data->mode);
     return PC + sizeof(struct __gllc_ReadBuffer_Rec);
 }
 
@@ -1063,7 +1063,7 @@ const GLubyte *__glle_DepthRange(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_DepthRange_Rec *) PC;
     /*__glim_DepthRange(gc, data->zNear, data->zFar);*/
-    gc->immedModeDispatch.DepthRangef(gc, (GLfloat)data->zNear, (GLfloat)data->zFar);
+    gc->currentImmediateDispatch->DepthRangef(gc, (GLfloat)data->zNear, (GLfloat)data->zFar);
     return PC + sizeof(struct __gllc_DepthRange_Rec);
 }
 
@@ -1258,7 +1258,7 @@ const GLubyte *__glle_Viewport(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_Viewport_Rec *) PC;
     /*__glim_Viewport(gc, data->x, data->y, data->width, data->height);*/
-    gc->immedModeDispatch.Viewport(gc, data->x, data->y, data->width, data->height);
+    gc->currentImmediateDispatch->Viewport(gc, data->x, data->y, data->width, data->height);
     return PC + sizeof(struct __gllc_Viewport_Rec);
 }
 
@@ -1286,7 +1286,7 @@ const GLubyte *__glle_CopyTexImage2D(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_CopyTexImage2D_Rec *data;
 
     data = (struct __gllc_CopyTexImage2D_Rec *) PC;
-    gc->immedModeDispatch.CopyTexImage2D(gc, data->target, data->level, data->internalformat, data->x,
+    gc->currentImmediateDispatch->CopyTexImage2D(gc, data->target, data->level, data->internalformat, data->x,
             data->y, data->width, data->height, data->border);
     return PC + sizeof(struct __gllc_CopyTexImage2D_Rec);
 }
@@ -1306,7 +1306,7 @@ const GLubyte *__glle_CopyTexSubImage2D(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_CopyTexSubImage2D_Rec *data;
 
     data = (struct __gllc_CopyTexSubImage2D_Rec *) PC;
-    gc->immedModeDispatch.CopyTexSubImage2D(gc, data->target, data->level, data->xoffset, data->yoffset,
+    gc->currentImmediateDispatch->CopyTexSubImage2D(gc, data->target, data->level, data->xoffset, data->yoffset,
             data->x, data->y, data->width, data->height);
     return PC + sizeof(struct __gllc_CopyTexSubImage2D_Rec);
 }
@@ -1316,7 +1316,7 @@ const GLubyte *__glle_BindTexture(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_BindTexture_Rec *data;
 
     data = (struct __gllc_BindTexture_Rec *) PC;
-    gc->immedModeDispatch.BindTexture(gc, data->target, data->texture);
+    gc->currentImmediateDispatch->BindTexture(gc, data->target, data->texture);
     return PC + sizeof(struct __gllc_BindTexture_Rec);
 }
 
@@ -1342,7 +1342,7 @@ const GLubyte *__glle_ActiveTexture(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_ActiveTexture_Rec *data;
 
     data = (struct __gllc_ActiveTexture_Rec *) PC;
-    gc->immedModeDispatch.ActiveTexture(gc, data->texture);
+    gc->currentImmediateDispatch->ActiveTexture(gc, data->texture);
     return PC + sizeof( struct __gllc_ActiveTexture_Rec );
 }
 
@@ -1352,7 +1352,7 @@ const GLubyte *__glle_MultiTexCoord2fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_MultiTexCoord2fv_Rec *data;
 
     data = (struct __gllc_MultiTexCoord2fv_Rec *) PC;
-    (*gc->immedModeDispatch.MultiTexCoord2fv)(gc, data->texture, data->v);
+    (*gc->currentImmediateDispatch->MultiTexCoord2fv)(gc, data->texture, data->v);
     return PC + sizeof(struct __gllc_MultiTexCoord2fv_Rec);
 }
 
@@ -1362,7 +1362,7 @@ const GLubyte *__glle_MultiTexCoord3fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_MultiTexCoord3fv_Rec *data;
 
     data = (struct __gllc_MultiTexCoord3fv_Rec *) PC;
-    (*gc->immedModeDispatch.MultiTexCoord3fv)(gc, data->texture, data->v);
+    (*gc->currentImmediateDispatch->MultiTexCoord3fv)(gc, data->texture, data->v);
     return PC + sizeof(struct __gllc_MultiTexCoord3fv_Rec);
 }
 
@@ -1372,7 +1372,7 @@ const GLubyte *__glle_MultiTexCoord4fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_MultiTexCoord4fv_Rec *data;
 
     data = (struct __gllc_MultiTexCoord4fv_Rec *) PC;
-    (*gc->immedModeDispatch.MultiTexCoord4fv)(gc, data->texture, data->v);
+    (*gc->currentImmediateDispatch->MultiTexCoord4fv)(gc, data->texture, data->v);
     return PC + sizeof(struct __gllc_MultiTexCoord4fv_Rec);
 }
 
@@ -1381,7 +1381,7 @@ const GLubyte *__glle_FogCoordf(__GLcontext *gc, const GLubyte *PC)
 
     struct __gllc_FogCoordf_Rec *data;
     data = (struct __gllc_FogCoordf_Rec *)PC;
-    (*gc->immedModeDispatch.FogCoordf)(gc, data->coord);
+    (*gc->currentImmediateDispatch->FogCoordf)(gc, data->coord);
     return PC + sizeof(struct __gllc_FogCoordf_Rec);
 }
 
@@ -1391,7 +1391,7 @@ const GLubyte *__glle_VertexAttrib4fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_VertexAttrib4fv_Rec *data;
 
     data = (struct __gllc_VertexAttrib4fv_Rec *)PC;
-    (*gc->immedModeDispatch.VertexAttrib4fv)(gc, data->index, data->v);
+    (*gc->currentImmediateDispatch->VertexAttrib4fv)(gc, data->index, data->v);
 
     return PC + sizeof(struct __gllc_VertexAttrib4fv_Rec);
 }
@@ -1516,7 +1516,7 @@ const GLubyte *__glle_TexImage2D(__GLcontext *gc, const GLubyte *PC)
 
     data = (const struct __gllc_TexImage2D_Rec *) PC;
 
-    gc->immedModeDispatch.TexImage2D(gc,
+    gc->currentImmediateDispatch->TexImage2D(gc,
             data->target, data->level, data->components,
             data->width, data->height, data->border, data->format, data->type,
             (const GLubyte *)(PC + sizeof(struct __gllc_TexImage2D_Rec)));
@@ -1544,7 +1544,7 @@ const GLubyte *__glle_TexSubImage2D(__GLcontext *gc, const GLubyte *PC)
 
     data = (const struct __gllc_TexSubImage2D_Rec *) PC;
 
-    gc->immedModeDispatch.TexSubImage2D(gc,
+    gc->currentImmediateDispatch->TexSubImage2D(gc,
             data->target, data->level, data->xoffset, data->yoffset,
             data->width, data->height, data->format, data->type,
             (const GLubyte *)(PC + sizeof(struct __gllc_TexSubImage2D_Rec)));
@@ -1557,7 +1557,7 @@ const GLubyte *__glle_Disable(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Disable_Rec *data;
 
     data = (struct __gllc_Disable_Rec *) PC;
-    gc->immedModeDispatch.Disable(gc, data->cap);
+    gc->currentImmediateDispatch->Disable(gc, data->cap);
     return (PC + sizeof(struct __gllc_Disable_Rec));
 }
 
@@ -1566,7 +1566,7 @@ const GLubyte *__glle_Enable(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Enable_Rec *data;
 
     data = (struct __gllc_Enable_Rec *) PC;
-    gc->immedModeDispatch.Enable(gc, data->cap);
+    gc->currentImmediateDispatch->Enable(gc, data->cap);
     return (PC + sizeof(struct __gllc_Enable_Rec));
 }
 
@@ -1575,7 +1575,7 @@ const GLubyte *__glle_SampleCoverage(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_SampleCoverage_Rec *data;
 
     data = (struct __gllc_SampleCoverage_Rec *) PC;
-    gc->immedModeDispatch.SampleCoverage(gc, data->v, data->invert);
+    gc->currentImmediateDispatch->SampleCoverage(gc, data->v, data->invert);
     return PC + sizeof(struct __gllc_SampleCoverage_Rec);
 }
 
@@ -1590,7 +1590,7 @@ const GLubyte *__glle_CompressedTexImage2D(__GLcontext *gc, const GLubyte *PC)
 
     data = (const struct __gllc_CompressedTexImage2D_Rec *) PC;
 
-    gc->immedModeDispatch.CompressedTexImage2D(gc,
+    gc->currentImmediateDispatch->CompressedTexImage2D(gc,
             data->target, data->lod, data->components,
             data->width, data->height, data->border, data->imageSize,
             (const GLubyte *)(PC + sizeof(struct __gllc_CompressedTexImage2D_Rec)));
@@ -1614,7 +1614,7 @@ const GLubyte *__glle_CompressedTexSubImage2D(__GLcontext *gc, const GLubyte *PC
 
     data = (const struct __gllc_CompressedTexSubImage2D_Rec *) PC;
 
-    gc->immedModeDispatch.CompressedTexSubImage2D(gc,
+    gc->currentImmediateDispatch->CompressedTexSubImage2D(gc,
             data->target, data->lod, data->xoffset, data->yoffset,
             data->width, data->height, data->format, data->imageSize,
             (const GLubyte *)(PC + sizeof(struct __gllc_CompressedTexSubImage2D_Rec)));
@@ -1633,7 +1633,7 @@ const GLubyte *__glle_TexImage3D(__GLcontext *gc, const GLubyte *PC)
 
     data = (const struct __gllc_TexImage3D_Rec *) PC;
 
-    gc->immedModeDispatch.TexImage3D(gc,
+    gc->currentImmediateDispatch->TexImage3D(gc,
             data->target, data->lod, data->components, data->width, data->height,
             data->depth, data->border, data->format, data->type,
             (const GLubyte *)(PC + sizeof(struct __gllc_TexImage3D_Rec)));
@@ -1647,7 +1647,7 @@ const GLubyte *__glle_TexSubImage3D(__GLcontext *gc, const GLubyte *PC)
 
     data = (const struct __gllc_TexSubImage3D_Rec *) PC;
 
-    gc->immedModeDispatch.TexSubImage3D(gc,
+    gc->currentImmediateDispatch->TexSubImage3D(gc,
             data->target, data->lod, data->xoffset, data->yoffset, data->zoffset,
             data->width, data->height, data->depth, data->format, data->type,
             (const GLubyte *)(PC + sizeof(struct __gllc_TexSubImage3D_Rec)));
@@ -1660,7 +1660,7 @@ const GLubyte *__glle_CopyTexSubImage3D(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_CopyTexSubImage3D_Rec *data;
 
     data = (struct __gllc_CopyTexSubImage3D_Rec *) PC;
-    gc->immedModeDispatch.CopyTexSubImage3D(gc, data->target, data->level, data->xoffset, data->yoffset,
+    gc->currentImmediateDispatch->CopyTexSubImage3D(gc, data->target, data->level, data->xoffset, data->yoffset,
             data->zoffset, data->x, data->y, data->width, data->height);
     return (PC + sizeof(struct __gllc_CopyTexSubImage3D_Rec));
 }
@@ -1707,7 +1707,7 @@ const  GLubyte *__glle_SecondaryColor3fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_SecondaryColor3fv_Rec *data;
 
     data = (struct __gllc_SecondaryColor3fv_Rec *) PC;
-    (*gc->immedModeDispatch.SecondaryColor3fv)(gc, data->v);
+    (*gc->currentImmediateDispatch->SecondaryColor3fv)(gc, data->v);
     return (PC + sizeof(struct __gllc_SecondaryColor3fv_Rec));
 }
 
@@ -1716,7 +1716,7 @@ const GLubyte *__glle_BeginQuery(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_BeginQuery_Rec *data;
 
     data = (struct __gllc_BeginQuery_Rec *) PC;
-    gc->immedModeDispatch.BeginQuery(gc, data->target, data->id);
+    gc->currentImmediateDispatch->BeginQuery(gc, data->target, data->id);
     return (PC + sizeof(struct __gllc_BeginQuery_Rec));
 }
 
@@ -1725,7 +1725,7 @@ const GLubyte *__glle_EndQuery(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_EndQuery_Rec *data;
 
     data = (struct __gllc_EndQuery_Rec *) PC;
-    gc->immedModeDispatch.EndQuery(gc, data->target);
+    gc->currentImmediateDispatch->EndQuery(gc, data->target);
     return (PC + sizeof(struct __gllc_EndQuery_Rec));
 }
 
@@ -1750,7 +1750,7 @@ const GLubyte * __glle_Uniform4f(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Uniform4f_Rec *data;
 
     data = (struct __gllc_Uniform4f_Rec *) PC;
-    gc->immedModeDispatch.Uniform4f(gc, data->location, data->x, data->y, data->z, data->w);
+    gc->currentImmediateDispatch->Uniform4f(gc, data->location, data->x, data->y, data->z, data->w);
     return (PC + sizeof(struct __gllc_Uniform4f_Rec));
 }
 
@@ -1759,7 +1759,7 @@ const GLubyte * __glle_Uniform3f(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Uniform3f_Rec *data;
 
     data = (struct __gllc_Uniform3f_Rec *) PC;
-    gc->immedModeDispatch.Uniform3f(gc, data->location, data->x, data->y, data->z);
+    gc->currentImmediateDispatch->Uniform3f(gc, data->location, data->x, data->y, data->z);
     return (PC + sizeof(struct __gllc_Uniform3f_Rec));
 }
 
@@ -1768,7 +1768,7 @@ const GLubyte * __glle_Uniform2f(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Uniform2f_Rec *data;
 
     data = (struct __gllc_Uniform2f_Rec *) PC;
-    gc->immedModeDispatch.Uniform2f(gc, data->location, data->x, data->y);
+    gc->currentImmediateDispatch->Uniform2f(gc, data->location, data->x, data->y);
     return (PC + sizeof(struct __gllc_Uniform2f_Rec));
 }
 
@@ -1777,7 +1777,7 @@ const GLubyte * __glle_Uniform1f(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Uniform1f_Rec *data;
 
     data = (struct __gllc_Uniform1f_Rec *) PC;
-    gc->immedModeDispatch.Uniform1f(gc, data->location, data->x);
+    gc->currentImmediateDispatch->Uniform1f(gc, data->location, data->x);
     return (PC + sizeof(struct __gllc_Uniform1f_Rec));
 }
 
@@ -1786,7 +1786,7 @@ const GLubyte * __glle_Uniform4i(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Uniform4i_Rec *data;
 
     data = (struct __gllc_Uniform4i_Rec *) PC;
-    gc->immedModeDispatch.Uniform4i(gc, data->location, data->x, data->y, data->z, data->w);
+    gc->currentImmediateDispatch->Uniform4i(gc, data->location, data->x, data->y, data->z, data->w);
     return (PC + sizeof(struct __gllc_Uniform4i_Rec));
 }
 
@@ -1795,7 +1795,7 @@ const GLubyte * __glle_Uniform3i(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Uniform3i_Rec *data;
 
     data = (struct __gllc_Uniform3i_Rec *) PC;
-    gc->immedModeDispatch.Uniform3i(gc, data->location, data->x, data->y, data->z);
+    gc->currentImmediateDispatch->Uniform3i(gc, data->location, data->x, data->y, data->z);
     return (PC + sizeof(struct __gllc_Uniform3i_Rec));
 }
 
@@ -1804,7 +1804,7 @@ const GLubyte * __glle_Uniform2i(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Uniform2i_Rec *data;
 
     data = (struct __gllc_Uniform2i_Rec *) PC;
-    gc->immedModeDispatch.Uniform2i(gc, data->location, data->x, data->y);
+    gc->currentImmediateDispatch->Uniform2i(gc, data->location, data->x, data->y);
     return (PC + sizeof(struct __gllc_Uniform2i_Rec));
 }
 
@@ -1813,7 +1813,7 @@ const GLubyte * __glle_Uniform1i(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Uniform1i_Rec *data;
 
     data = (struct __gllc_Uniform1i_Rec *) PC;
-    gc->immedModeDispatch.Uniform1i(gc, data->location, data->x);
+    gc->currentImmediateDispatch->Uniform1i(gc, data->location, data->x);
     return (PC + sizeof(struct __gllc_Uniform1i_Rec));
 }
 
@@ -1823,7 +1823,7 @@ const GLubyte * __glle_Uniform4fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_Uniform4fv_Rec *) PC;
-    gc->immedModeDispatch.Uniform4fv(gc, data->location, data->count,
+    gc->currentImmediateDispatch->Uniform4fv(gc, data->location, data->count,
                     (GLfloat *)(PC + sizeof(struct __gllc_Uniform4fv_Rec)));
     arraySize = __GL64PAD(data->count * 4 * sizeof(GLfloat));
     size = sizeof(struct __gllc_Uniform4fv_Rec) + arraySize;
@@ -1836,7 +1836,7 @@ const GLubyte * __glle_Uniform3fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_Uniform3fv_Rec *) PC;
-    gc->immedModeDispatch.Uniform3fv(gc, data->location, data->count,
+    gc->currentImmediateDispatch->Uniform3fv(gc, data->location, data->count,
                     (GLfloat *)(PC + sizeof(struct __gllc_Uniform3fv_Rec)));
     arraySize = __GL64PAD(data->count * 3 * sizeof(GLfloat));
     size = sizeof(struct __gllc_Uniform3fv_Rec) + arraySize;
@@ -1849,7 +1849,7 @@ const GLubyte * __glle_Uniform2fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_Uniform2fv_Rec *) PC;
-    gc->immedModeDispatch.Uniform2fv(gc, data->location, data->count,
+    gc->currentImmediateDispatch->Uniform2fv(gc, data->location, data->count,
                     (GLfloat *)(PC + sizeof(struct __gllc_Uniform2fv_Rec)));
     arraySize = __GL64PAD(data->count * 2 * sizeof(GLfloat));
     size = sizeof(struct __gllc_Uniform2fv_Rec) + arraySize;
@@ -1862,7 +1862,7 @@ const GLubyte * __glle_Uniform1fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_Uniform1fv_Rec *) PC;
-    gc->immedModeDispatch.Uniform1fv(gc, data->location, data->count,
+    gc->currentImmediateDispatch->Uniform1fv(gc, data->location, data->count,
                     (GLfloat *)(PC + sizeof(struct __gllc_Uniform1fv_Rec)));
     arraySize = __GL64PAD(data->count * sizeof(GLfloat));
     size = sizeof(struct __gllc_Uniform1fv_Rec) + arraySize;
@@ -1875,7 +1875,7 @@ const GLubyte * __glle_Uniform4iv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_Uniform4iv_Rec *) PC;
-    gc->immedModeDispatch.Uniform4iv(gc, data->location, data->count,
+    gc->currentImmediateDispatch->Uniform4iv(gc, data->location, data->count,
                     (GLint *)(PC + sizeof(struct __gllc_Uniform4iv_Rec)));
     arraySize = __GL64PAD(data->count * 4 * sizeof(GLint));
     size = sizeof(struct __gllc_Uniform4iv_Rec) + arraySize;
@@ -1888,7 +1888,7 @@ const GLubyte * __glle_Uniform3iv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_Uniform3iv_Rec *) PC;
-    gc->immedModeDispatch.Uniform3iv(gc, data->location, data->count,
+    gc->currentImmediateDispatch->Uniform3iv(gc, data->location, data->count,
                     (GLint *)(PC + sizeof(struct __gllc_Uniform3iv_Rec)));
     arraySize = __GL64PAD(data->count * 3 * sizeof(GLint));
     size = sizeof(struct __gllc_Uniform3iv_Rec) + arraySize;
@@ -1901,7 +1901,7 @@ const GLubyte * __glle_Uniform2iv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_Uniform2iv_Rec *) PC;
-    gc->immedModeDispatch.Uniform2iv(gc, data->location, data->count,
+    gc->currentImmediateDispatch->Uniform2iv(gc, data->location, data->count,
                     (GLint *)(PC + sizeof(struct __gllc_Uniform2iv_Rec)));
     arraySize = __GL64PAD(data->count * 2 * sizeof(GLint));
     size = sizeof(struct __gllc_Uniform2iv_Rec) + arraySize;
@@ -1914,7 +1914,7 @@ const GLubyte * __glle_Uniform1iv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_Uniform1iv_Rec *) PC;
-    gc->immedModeDispatch.Uniform1iv(gc, data->location, data->count,
+    gc->currentImmediateDispatch->Uniform1iv(gc, data->location, data->count,
                     (GLint *)(PC + sizeof(struct __gllc_Uniform1iv_Rec)));
     arraySize = __GL64PAD(data->count * sizeof(GLint));
     size = sizeof(struct __gllc_Uniform1iv_Rec) + arraySize;
@@ -1927,7 +1927,7 @@ const GLubyte * __glle_UniformMatrix4fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_UniformMatrix4fv_Rec *) PC;
-    gc->immedModeDispatch.UniformMatrix4fv(gc, data->location, data->count,
+    gc->currentImmediateDispatch->UniformMatrix4fv(gc, data->location, data->count,
         data->transpose, (GLfloat *)(PC + sizeof(struct __gllc_UniformMatrix4fv_Rec)));
     arraySize = __GL64PAD(data->count * 16 * sizeof(GLfloat));
     size = sizeof(struct __gllc_UniformMatrix4fv_Rec) + arraySize;
@@ -1940,7 +1940,7 @@ const GLubyte * __glle_UniformMatrix3fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_UniformMatrix3fv_Rec *) PC;
-    gc->immedModeDispatch.UniformMatrix3fv(gc, data->location, data->count,
+    gc->currentImmediateDispatch->UniformMatrix3fv(gc, data->location, data->count,
         data->transpose, (GLfloat *)(PC + sizeof(struct __gllc_UniformMatrix3fv_Rec)));
     arraySize = __GL64PAD(data->count * 9 * sizeof(GLfloat));
     size = sizeof(struct __gllc_UniformMatrix3fv_Rec) + arraySize;
@@ -1953,7 +1953,7 @@ const GLubyte * __glle_UniformMatrix2fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_UniformMatrix2fv_Rec *) PC;
-    gc->immedModeDispatch.UniformMatrix2fv(gc, data->location, data->count,
+    gc->currentImmediateDispatch->UniformMatrix2fv(gc, data->location, data->count,
         data->transpose, (GLfloat *)(PC + sizeof(struct __gllc_UniformMatrix2fv_Rec)));
     arraySize = __GL64PAD(data->count * 4 * sizeof(GLfloat));
     size = sizeof(struct __gllc_UniformMatrix2fv_Rec) + arraySize;
@@ -1966,7 +1966,7 @@ const GLubyte * __glle_UniformMatrix2x3fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_UniformMatrix2x3fv_Rec *) PC;
-    gc->immedModeDispatch.UniformMatrix2x3fv(gc, data->location, data->count,
+    gc->currentImmediateDispatch->UniformMatrix2x3fv(gc, data->location, data->count,
         data->transpose, (GLfloat *)(PC + sizeof(struct __gllc_UniformMatrix2x3fv_Rec)));
     arraySize = __GL64PAD(data->count * 6 * sizeof(GLfloat));
     size = sizeof(struct __gllc_UniformMatrix2x3fv_Rec) + arraySize;
@@ -1979,7 +1979,7 @@ const GLubyte * __glle_UniformMatrix2x4fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_UniformMatrix2x4fv_Rec *) PC;
-    gc->immedModeDispatch.UniformMatrix2x4fv(gc, data->location, data->count,
+    gc->currentImmediateDispatch->UniformMatrix2x4fv(gc, data->location, data->count,
         data->transpose, (GLfloat *)(PC + sizeof(struct __gllc_UniformMatrix2x4fv_Rec)));
     arraySize = __GL64PAD(data->count * 8 * sizeof(GLfloat));
     size = sizeof(struct __gllc_UniformMatrix2x4fv_Rec) + arraySize;
@@ -1992,7 +1992,7 @@ const GLubyte * __glle_UniformMatrix3x2fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_UniformMatrix3x2fv_Rec *) PC;
-    gc->immedModeDispatch.UniformMatrix3x2fv(gc, data->location, data->count,
+    gc->currentImmediateDispatch->UniformMatrix3x2fv(gc, data->location, data->count,
         data->transpose, (GLfloat *)(PC + sizeof(struct __gllc_UniformMatrix3x2fv_Rec)));
     arraySize = __GL64PAD(data->count * 6 * sizeof(GLfloat));
     size = sizeof(struct __gllc_UniformMatrix3x2fv_Rec) + arraySize;
@@ -2005,7 +2005,7 @@ const GLubyte * __glle_UniformMatrix3x4fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_UniformMatrix3x4fv_Rec *) PC;
-    gc->immedModeDispatch.UniformMatrix3x4fv(gc, data->location, data->count,
+    gc->currentImmediateDispatch->UniformMatrix3x4fv(gc, data->location, data->count,
         data->transpose, (GLfloat *)(PC + sizeof(struct __gllc_UniformMatrix3x4fv_Rec)));
     arraySize = __GL64PAD(data->count * 12 * sizeof(GLfloat));
     size = sizeof(struct __gllc_UniformMatrix3x4fv_Rec) + arraySize;
@@ -2018,7 +2018,7 @@ const GLubyte * __glle_UniformMatrix4x2fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_UniformMatrix4x2fv_Rec *) PC;
-    gc->immedModeDispatch.UniformMatrix4x2fv(gc, data->location, data->count,
+    gc->currentImmediateDispatch->UniformMatrix4x2fv(gc, data->location, data->count,
         data->transpose, (GLfloat *)(PC + sizeof(struct __gllc_UniformMatrix4x2fv_Rec)));
     arraySize = __GL64PAD(data->count * 8 * sizeof(GLfloat));
     size = sizeof(struct __gllc_UniformMatrix4x2fv_Rec) + arraySize;
@@ -2031,7 +2031,7 @@ const GLubyte * __glle_UniformMatrix4x3fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_UniformMatrix4x3fv_Rec *) PC;
-    gc->immedModeDispatch.UniformMatrix4x3fv(gc, data->location, data->count,
+    gc->currentImmediateDispatch->UniformMatrix4x3fv(gc, data->location, data->count,
         data->transpose, (GLfloat *)(PC + sizeof(struct __gllc_UniformMatrix4x3fv_Rec)));
     arraySize = __GL64PAD(data->count * 12 * sizeof(GLfloat));
     size = sizeof(struct __gllc_UniformMatrix4x3fv_Rec) + arraySize;
@@ -2044,7 +2044,7 @@ const GLubyte * __glle_DrawBuffers(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_DrawBuffers_Rec *) PC;
-    gc->immedModeDispatch.DrawBuffers(gc, data->count,
+    gc->currentImmediateDispatch->DrawBuffers(gc, data->count,
             (GLenum *)(PC + sizeof(struct __gllc_DrawBuffers_Rec)));
     arraySize = __GL64PAD(data->count * sizeof(GLenum));
     size = sizeof(struct __gllc_DrawBuffers_Rec) + arraySize;
@@ -2056,7 +2056,7 @@ const GLubyte * __glle_UseProgram(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_UseProgram_Rec *data;
 
     data = (struct __gllc_UseProgram_Rec *) PC;
-    gc->immedModeDispatch.UseProgram(gc, data->program);
+    gc->currentImmediateDispatch->UseProgram(gc, data->program);
     return (PC + sizeof(struct __gllc_UseProgram_Rec));
 }
 
