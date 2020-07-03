@@ -1009,15 +1009,17 @@ __glChipProfile_DeleteTexture(
 }
 
 
-GLvoid
+GLboolean
 __glChipProfile_DetachTexture(
     __GLcontext *gc,
     __GLtextureObject *texObj
     )
 {
+    GLboolean ret;
     __GLCHIP_PROFILER_HEADER();
-    __glChipDetachTexture(gc, texObj);
+    ret = __glChipDetachTexture(gc, texObj);
     __GLCHIP_PROFILER_FOOTER();
+    return ret;
 }
 
 GLboolean
