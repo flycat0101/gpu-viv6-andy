@@ -2746,7 +2746,7 @@ OnError:
     return GL_FALSE;
 }
 
-GLvoid
+GLboolean
 __glChipBindRenderbuffer(
     __GLcontext *gc,
     __GLrenderbufferObject *renderbuf
@@ -2757,10 +2757,20 @@ __glChipBindRenderbuffer(
     gcmHEADER_ARG("gc=0x%x renderbuf=0x%x", gc, renderbuf);
     if (chipRBO == gcvNULL)
     {
-        chipRBO = (__GLchipRenderbufferObject*)gc->imports.calloc(gc, 1, sizeof(__GLchipRenderbufferObject));
-        renderbuf->privateData = chipRBO;
+        if (gcmIS_SUCCESS(gcoOS_Allocate(gcvNULL, sizeof(__GLchipRenderbufferObject), (gctPOINTER*)&chipRBO)))
+        {
+            gcoOS_ZeroMemory(chipRBO, sizeof(__GLchipRenderbufferObject));
+
+            renderbuf->privateData = chipRBO;
+        }
+        else
+        {
+            gcmFOOTER_ARG("return=%d", GL_FALSE);
+            return GL_FALSE;
+        }
     }
-    gcmFOOTER_NO();
+    gcmFOOTER_ARG("return=%d", GL_TRUE);
+    return GL_TRUE;
 }
 
 

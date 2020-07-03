@@ -347,11 +347,12 @@ __glFindObjItemNode(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint id)
         /*
         ** Create hash buckets on first use.
         */
-        buckets = (__GLobjItem**)(*gc->imports.calloc)(gc, 1, shared->hashSize * sizeof(GLvoid *));
-        if (!buckets)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, shared->hashSize * sizeof(GLvoid *), (gctPOINTER*)&buckets)))
         {
             goto _Done;
         }
+        gcoOS_ZeroMemory(buckets, shared->hashSize * sizeof(GLvoid *));
+
         shared->hashBuckets = buckets;
     }
 
@@ -378,6 +379,10 @@ __glFindObjItemNode(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint id)
         item->name = id;
         item->next = *bucket;
         *bucket = item;
+    }
+    else
+    {
+        gcmOS_SAFE_FREE(gcvNULL, shared->hashBuckets);
     }
 
 _Done:
@@ -509,12 +514,15 @@ GLvoid __glCheckLinearTableSize(__GLcontext *gc, __GLsharedObjectMachine *shared
             {
                 allocSize = shared->maxLinearTableSize;
             }
-            shared->linearTable = (GLvoid **)(*gc->imports.calloc)(gc, 1, allocSize * sizeof(GLvoid *));
-            shared->linearTableSize = allocSize;
+            if (gcmIS_SUCCESS(gcoOS_Allocate(gcvNULL, allocSize * sizeof(GLvoid *), (gctPOINTER*)&shared->linearTable)))
+            {
+                gcoOS_ZeroMemory(shared->linearTable, allocSize * sizeof(GLvoid *));
 
-            /* Copy the data from the old linear table to the new linear table */
-            __GL_MEMCOPY(shared->linearTable, oldLinearTable, oldTableSize * sizeof(GLvoid *));
+                shared->linearTableSize = allocSize;
 
+                /* Copy the data from the old linear table to the new linear table */
+                __GL_MEMCOPY(shared->linearTable, oldLinearTable, oldTableSize * sizeof(GLvoid *));
+            }
             /* Free the old linear table */
             gcmOS_SAFE_FREE(gcvNULL, oldLinearTable);
         }

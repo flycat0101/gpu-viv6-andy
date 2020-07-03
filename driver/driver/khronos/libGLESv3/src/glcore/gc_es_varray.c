@@ -1713,7 +1713,11 @@ GLvoid __glBindVertexArray(__GLcontext *gc, GLuint array)
         vertexArrayObj = (__GLvertexArrayObject *)__glGetObject(gc, gc->vertexArray.noShare, array);
         if (vertexArrayObj == gcvNULL)
         {
-            vertexArrayObj = (__GLvertexArrayObject*)(*gc->imports.calloc)(gc, 1, sizeof(__GLvertexArrayObject));
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLvertexArrayObject), (gctPOINTER*)&vertexArrayObj)))
+            {
+                __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+            }
+            gcoOS_ZeroMemory(vertexArrayObj, sizeof(__GLvertexArrayObject));
 
             __glInitVertexArrayObject(gc,  vertexArrayObj, array);
             __glAddObject(gc, gc->vertexArray.noShare, array, vertexArrayObj);
@@ -1809,13 +1813,22 @@ void __glInitVertexArrayState(__GLcontext *gc)
     /* Vertex array object cannot be shared between contexts */
     if (gc->vertexArray.noShare == gcvNULL)
     {
-        gc->vertexArray.noShare = (__GLsharedObjectMachine*)(*gc->imports.calloc)(gc, 1, sizeof(__GLsharedObjectMachine));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLsharedObjectMachine), (gctPOINTER*)&gc->vertexArray.noShare)))
+        {
+            return;
+        }
+        gcoOS_ZeroMemory(gc->vertexArray.noShare, sizeof(__GLsharedObjectMachine));
 
         /* Initialize a linear lookup table for vertex array object */
         gc->vertexArray.noShare->maxLinearTableSize = __GL_MAX_VAO_LINEAR_TABLE_SIZE;
         gc->vertexArray.noShare->linearTableSize = __GL_DEFAULT_VAO_LINEAR_TABLE_SIZE;
-        gc->vertexArray.noShare->linearTable = (GLvoid **)
-            (*gc->imports.calloc)(gc, 1, gc->vertexArray.noShare->linearTableSize * sizeof(GLvoid *));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, gc->vertexArray.noShare->linearTableSize * sizeof(GLvoid *),
+            (gctPOINTER*)&gc->vertexArray.noShare->linearTable)))
+        {
+            gcmOS_SAFE_FREE(gcvNULL, gc->vertexArray.noShare);
+            return;
+        }
+        gcoOS_ZeroMemory(gc->vertexArray.noShare->linearTable, gc->vertexArray.noShare->linearTableSize * sizeof(GLvoid *));
 
         gc->vertexArray.noShare->hashSize = __GL_VAO_HASH_TABLE_SIZE;
         gc->vertexArray.noShare->hashMask = __GL_VAO_HASH_TABLE_SIZE - 1;
@@ -2024,12 +2037,12 @@ GLvoid GL_APIENTRY __gles_BindVertexBuffer(__GLcontext *gc, GLuint bindingindex,
 
         if (NULL == bufObj)
         {
-            bufObj = (__GLbufferObject *)(*gc->imports.calloc)(gc, 1, sizeof(__GLbufferObject));
-
-            if (!bufObj)
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLbufferObject),
+                (gctPOINTER*)&bufObj)))
             {
                 __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
             }
+            gcoOS_ZeroMemory(bufObj, sizeof(__GLbufferObject));
 
             __glInitBufferObject(gc, bufObj, buffer);
 

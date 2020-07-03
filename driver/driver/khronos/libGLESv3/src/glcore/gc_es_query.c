@@ -1938,12 +1938,12 @@ GLvoid GL_APIENTRY __gles_BeginQuery(__GLcontext *gc, GLenum target, GLuint id)
         ** If this is the first time this name has been bound,
         ** then create a new texture object and initialize it.
         */
-        queryObj = (__GLqueryObject *)(*gc->imports.calloc)(gc, 1, sizeof(__GLqueryObject));
-        if (queryObj == gcvNULL)
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLqueryObject), (gctPOINTER*)&queryObj)))
         {
             __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
         }
 
+        gcoOS_ZeroMemory(queryObj, sizeof(__GLqueryObject));
         queryObj->name = id;
 
         /* Add this __GLoccluQueryObject to the "gc->occluQuery.noShare" structure. */
@@ -2060,6 +2060,7 @@ OnError:
 __GL_INLINE GLboolean __glGetQueryObjectiv(__GLcontext *gc, GLuint id, GLenum pname, GLint64* params)
 {
     __GLqueryObject *queryObj;
+    GLboolean ret = GL_TRUE;
 
     GL_ASSERT(gc->query.noShare);
     queryObj = (__GLqueryObject *)__glGetObject(gc, gc->query.noShare, id);
@@ -2071,10 +2072,10 @@ __GL_INLINE GLboolean __glGetQueryObjectiv(__GLcontext *gc, GLuint id, GLenum pn
     switch (pname)
     {
     case GL_QUERY_RESULT:
-        while (!queryObj->resultAvailable)
+        while (!queryObj->resultAvailable && ret)
         {
             /* Query DP for the results of the query object */
-            (*gc->dp.getQueryObject)(gc, pname, queryObj);
+            ret = (*gc->dp.getQueryObject)(gc, pname, queryObj);
         }
 
         if ((queryObj->target == GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN) ||
@@ -2090,10 +2091,10 @@ __GL_INLINE GLboolean __glGetQueryObjectiv(__GLcontext *gc, GLuint id, GLenum pn
         break;
 
     case GL_QUERY_RESULT_AVAILABLE:
-        if (!queryObj->resultAvailable)
+        if (!queryObj->resultAvailable && ret)
         {
             /* Query DP for the results of the query object */
-            (*gc->dp.getQueryObject)(gc, pname, queryObj);
+            ret = (*gc->dp.getQueryObject)(gc, pname, queryObj);
         }
         *params = queryObj->resultAvailable;
         break;
@@ -2102,7 +2103,12 @@ __GL_INLINE GLboolean __glGetQueryObjectiv(__GLcontext *gc, GLuint id, GLenum pn
         __GL_ERROR_RET_VAL(GL_INVALID_ENUM, GL_FALSE);
     }
 
-    return GL_TRUE;
+    if (!ret)
+    {
+        __GL_ERROR((*gc->dp.getError)(gc));
+    }
+
+    return ret;
 }
 
 GLvoid GL_APIENTRY __gles_GetQueryObjectuiv(__GLcontext *gc, GLuint id, GLenum pname, GLuint *params)
@@ -2161,14 +2167,23 @@ GLvoid __glInitQueryState(__GLcontext *gc)
     /* Query object cannot be shared between contexts */
     if (gc->query.noShare == gcvNULL)
     {
-        gc->query.noShare = (__GLsharedObjectMachine *)
-            (*gc->imports.calloc)(gc, 1, sizeof(__GLsharedObjectMachine));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLsharedObjectMachine), (gctPOINTER*)&gc->query.noShare)))
+        {
+            return;
+        }
+
+        gcoOS_ZeroMemory(gc->query.noShare, sizeof(__GLsharedObjectMachine));
 
         /* Initialize a linear lookup table for query object */
         gc->query.noShare->maxLinearTableSize = __GL_MAX_QUERYOBJ_LINEAR_TABLE_SIZE;
         gc->query.noShare->linearTableSize = __GL_DEFAULT_QUERYOBJ_LINEAR_TABLE_SIZE;
-        gc->query.noShare->linearTable = (GLvoid **)
-            (*gc->imports.calloc)(gc, 1, gc->query.noShare->linearTableSize * sizeof(GLvoid *));
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, gc->query.noShare->linearTableSize * sizeof(GLvoid *),
+            (gctPOINTER*)&gc->query.noShare->linearTable)))
+        {
+            gcmOS_SAFE_FREE(gcvNULL, gc->query.noShare);
+            return;
+        }
+        gcoOS_ZeroMemory(gc->query.noShare->linearTable, gc->query.noShare->linearTableSize * sizeof(GLvoid *));
 
         gc->query.noShare->hashSize = __GL_QUERY_HASH_TABLE_SIZE;
         gc->query.noShare->hashMask = __GL_QUERY_HASH_TABLE_SIZE - 1;

@@ -1070,11 +1070,11 @@ GLvoid *__glCreateContext(GLint clientVersion, VEGLimports *imports, GLvoid* sha
 
     /* Allocate memory for core GL context.
     */
-    gc = (__GLcontext*)(*imports->calloc)(gc, 1, sizeof(__GLcontext));
-    if (!gc)
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLcontext), (gctPOINTER*)&gc)))
     {
         __GL_ERROR_EXIT2();
     }
+    gcoOS_ZeroMemory(gc, sizeof(__GLcontext));
 
     gc->imports = *imports;
 

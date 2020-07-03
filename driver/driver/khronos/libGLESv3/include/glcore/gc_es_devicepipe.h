@@ -44,7 +44,7 @@ typedef struct __GLdevicePipelineRec
     GLvoid (*detachDrawable)(__GLcontext*);
 
     /* Texture functions */
-    GLvoid (*bindTexture)(__GLcontext*, __GLtextureObject*);
+    GLboolean (*bindTexture)(__GLcontext*, __GLtextureObject*);
     GLvoid (*deleteTexture)(__GLcontext*, __GLtextureObject*);
     GLvoid (*detachTexture)(__GLcontext*,  __GLtextureObject*);
 
@@ -141,7 +141,7 @@ typedef struct __GLdevicePipelineRec
     /* RBO & FBO */
     GLboolean (*bindDrawFramebuffer)(__GLcontext*, __GLframebufferObject*, __GLframebufferObject*);
     GLvoid (*bindReadFramebuffer)(__GLcontext*, __GLframebufferObject*, __GLframebufferObject*);
-    GLvoid (*bindRenderbuffer)(__GLcontext*, __GLrenderbufferObject*);
+    GLboolean (*bindRenderbuffer)(__GLcontext*, __GLrenderbufferObject*);
     GLvoid (*deleteRenderbuffer)(__GLcontext*, __GLrenderbufferObject*);
     GLvoid (*detachRenderbuffer)(__GLcontext*, __GLrenderbufferObject*);
     GLboolean (*renderbufferStorage)(__GLcontext*, __GLrenderbufferObject*);
@@ -164,7 +164,7 @@ typedef struct __GLdevicePipelineRec
     GLboolean (*syncImage)(__GLcontext*);
 
     /* Transform feedback */
-    GLvoid (*bindXFB)(__GLcontext*, __GLxfbObject*);
+    GLboolean (*bindXFB)(__GLcontext*, __GLxfbObject*);
     GLvoid (*deleteXFB)(__GLcontext*, __GLxfbObject*);
     GLvoid (*beginXFB)(__GLcontext*, __GLxfbObject*);
     GLvoid (*pauseXFB)(__GLcontext *);

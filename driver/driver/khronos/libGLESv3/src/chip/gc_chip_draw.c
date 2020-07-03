@@ -5055,7 +5055,8 @@ gcChipValidateChipDirty(
                 /* If the cmd instance never linked before */
                 if (hashObj == gcvNULL)
                 {
-                    pCmdInstance = (gcsPROGRAM_STATE_PTR)gc->imports.calloc(gc, 1, sizeof(gcsPROGRAM_STATE));
+                    gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(gcsPROGRAM_STATE), (gctPOINTER*)&pCmdInstance));
+                    gcoOS_ZeroMemory(pCmdInstance, sizeof(gcsPROGRAM_STATE));
 
                     gcmONERROR(gcLinkProgramPipeline(shaderCount,
                                                      shaderArray,
