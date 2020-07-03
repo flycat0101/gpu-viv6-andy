@@ -5498,7 +5498,8 @@ static gctBOOL _VSC_PH_LocalVariable(
 
 static VSC_ErrCode _VSC_PH_LocalInst(
     IN OUT VSC_PH_Peephole  *ph,
-    IN VIR_Instruction      *lsInst
+    IN VIR_Instruction      *lsInst,
+    IN OUT gctBOOL          *useLocalMem
     )
 {
     VSC_ErrCode         errCode  = VSC_ERR_NONE;
@@ -5520,6 +5521,7 @@ static VSC_ErrCode _VSC_PH_LocalInst(
 
     if (_VSC_PH_LocalVariable(ph, lsInst, baseOpnd, visitSet))
     {
+        *useLocalMem = gcvTRUE;
         switch (opc)
         {
         case VIR_OP_LOAD:
@@ -6069,6 +6071,7 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
     {
         VIR_Shader      *pShader = ph->shader;
         gctUINT         localMemorySize = VIR_Shader_GetShareMemorySize(pShader);
+        gctBOOL         useLocalMem = VIR_Shader_UseLocalMem(pShader);
 
         if ((localMemorySize <= ph->hwCfg->maxLocalMemSizeInByte) &&
             (localMemorySize > 0))
@@ -6085,13 +6088,13 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
                     opc == VIR_OP_STORE ||
                     VIR_OPCODE_isAtom(opc))
                 {
-                    _VSC_PH_LocalInst(ph, inst);
+                    _VSC_PH_LocalInst(ph, inst, &useLocalMem);
                 }
 
                 inst = VIR_Inst_GetNext(inst);
             }
-
-            VIR_Shader_SetFlag(pShader, VIR_SHFLAG_USE_LOCAL_MEM);
+            if (useLocalMem)
+                VIR_Shader_SetFlag(pShader, VIR_SHFLAG_USE_LOCAL_MEM);
         }
     }
 
@@ -6307,6 +6310,9 @@ VSC_ErrCode VSC_PH_Peephole_PerformOnShader(
     {
         VIR_Shader_Dump(gcvNULL, "Before Peephole.", shader, gcvTRUE);
     }
+
+    /* clean up this flag, and it will be set during peephole on bb */
+    VIR_Shader_ClrFlag(shader, VIR_SHFLAG_USE_LOCAL_MEM);
 
     VSC_PH_Peephole_Init(&ph, shader, pPassWorker->pDuInfo, &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg,
                          options, pPassWorker->basePassWorker.pDumper, pPassWorker->basePassWorker.pMM);
