@@ -138,6 +138,7 @@ VIR_NameId  VIR_NAME_UNKNOWN,
     VIR_NAME_FRONT_SECONDARY_COLOR,
     VIR_NAME_BACK_SECONDARY_COLOR,
     VIR_NAME_TEX_COORD,
+    VIR_NAME_CLIP_VERTEX,
     VIR_NAME_INSTANCE_ID, /* gl_InstanceID, for ES. */
     VIR_NAME_INSTANCE_INDEX, /* gl_InstanceIndex, for Vulkan only, where the indexing is relative to some base offset. */
     VIR_NAME_DEVICE_INDEX, /* gl_DeviceIndex, for Vulkan only. */
@@ -2227,48 +2228,49 @@ static void
     /* initialize builtin names */
     _add_name(VIR_NAME_UNKNOWN, "__unknown");
 
-    VIR_NAME_POSITION       =
-        VIR_NAME_POINT_SIZE     =
-        VIR_NAME_CLIP_DISTANCE  =
-        VIR_NAME_CULL_DISTANCE  =
-        VIR_NAME_COLOR          =
-        VIR_NAME_FRONT_FACING   =
-        VIR_NAME_POINT_COORD    =
-        VIR_NAME_POSITION_W     =
-        VIR_NAME_DEPTH          =
-        VIR_NAME_FOG_FRAG_COORD      =
-        VIR_NAME_VERTEX_ID      =
-        VIR_NAME_FRONT_COLOR    =
-        VIR_NAME_BACK_COLOR     =
-        VIR_NAME_FRONT_SECONDARY_COLOR =
-        VIR_NAME_BACK_SECONDARY_COLOR  =
-        VIR_NAME_TEX_COORD      =
-        VIR_NAME_INSTANCE_ID    =
-        VIR_NAME_INSTANCE_INDEX     =
-        VIR_NAME_DEVICE_INDEX       =
-        VIR_NAME_HELPER_INVOCATION  =
-        VIR_NAME_SUBSAMPLE_DEPTH    =
-        VIR_NAME_PERVERTEX          =
-        VIR_NAME_IN                 =
-        VIR_NAME_OUT                =
-        VIR_NAME_INVOCATION_ID      =
-        VIR_NAME_PATCH_VERTICES_IN  =
-        VIR_NAME_PRIMITIVE_ID       =
-        VIR_NAME_TESS_LEVEL_OUTER   =
-        VIR_NAME_TESS_LEVEL_INNER   =
-        VIR_NAME_SECONDARY_COLOR    =
-        VIR_NAME_NORMAL             =
-        VIR_NAME_VERTEX             =
-        VIR_NAME_FOG_COORD          =
-        VIR_NAME_MULTI_TEX_COORD_0  =
-        VIR_NAME_MULTI_TEX_COORD_1  =
-        VIR_NAME_MULTI_TEX_COORD_2  =
-        VIR_NAME_MULTI_TEX_COORD_3  =
-        VIR_NAME_MULTI_TEX_COORD_4  =
-        VIR_NAME_MULTI_TEX_COORD_5  =
-        VIR_NAME_MULTI_TEX_COORD_6  =
-        VIR_NAME_MULTI_TEX_COORD_7  =
-        VIR_NAME_LAYER              = VIR_NAME_UNKNOWN;
+    VIR_NAME_POSITION              =
+    VIR_NAME_POINT_SIZE            =
+    VIR_NAME_CLIP_DISTANCE         =
+    VIR_NAME_CULL_DISTANCE         =
+    VIR_NAME_COLOR                 =
+    VIR_NAME_FRONT_FACING          =
+    VIR_NAME_POINT_COORD           =
+    VIR_NAME_POSITION_W            =
+    VIR_NAME_DEPTH                 =
+    VIR_NAME_FOG_FRAG_COORD        =
+    VIR_NAME_VERTEX_ID             =
+    VIR_NAME_FRONT_COLOR           =
+    VIR_NAME_BACK_COLOR            =
+    VIR_NAME_FRONT_SECONDARY_COLOR =
+    VIR_NAME_BACK_SECONDARY_COLOR  =
+    VIR_NAME_TEX_COORD             =
+    VIR_NAME_CLIP_VERTEX           =
+    VIR_NAME_INSTANCE_ID           =
+    VIR_NAME_INSTANCE_INDEX        =
+    VIR_NAME_DEVICE_INDEX          =
+    VIR_NAME_HELPER_INVOCATION     =
+    VIR_NAME_SUBSAMPLE_DEPTH       =
+    VIR_NAME_PERVERTEX             =
+    VIR_NAME_IN                    =
+    VIR_NAME_OUT                   =
+    VIR_NAME_INVOCATION_ID         =
+    VIR_NAME_PATCH_VERTICES_IN     =
+    VIR_NAME_PRIMITIVE_ID          =
+    VIR_NAME_TESS_LEVEL_OUTER      =
+    VIR_NAME_TESS_LEVEL_INNER      =
+    VIR_NAME_SECONDARY_COLOR       =
+    VIR_NAME_NORMAL                =
+    VIR_NAME_VERTEX                =
+    VIR_NAME_FOG_COORD             =
+    VIR_NAME_MULTI_TEX_COORD_0     =
+    VIR_NAME_MULTI_TEX_COORD_1     =
+    VIR_NAME_MULTI_TEX_COORD_2     =
+    VIR_NAME_MULTI_TEX_COORD_3     =
+    VIR_NAME_MULTI_TEX_COORD_4     =
+    VIR_NAME_MULTI_TEX_COORD_5     =
+    VIR_NAME_MULTI_TEX_COORD_6     =
+    VIR_NAME_MULTI_TEX_COORD_7     =
+    VIR_NAME_LAYER                 = VIR_NAME_UNKNOWN;
 
     _add_name(VIR_NAME_NUM_GROUPS, "gl_NumWorkGroups");
     _add_name(VIR_NAME_WORKGROUPSIZE, "gl_WorkGroupSize");
@@ -2308,6 +2310,7 @@ _initOpenGLBuiltinNames(VIR_Shader * Shader, VIR_StringTable *StrTable)
     _add_name(VIR_NAME_FRONT_SECONDARY_COLOR, "gl_FrontSecondaryColor");
     _add_name(VIR_NAME_BACK_SECONDARY_COLOR, "gl_BackSecondaryColor");
     _add_name(VIR_NAME_TEX_COORD, "gl_TexCoord");
+    _add_name(VIR_NAME_CLIP_VERTEX, "gl_ClipVertex");
     _add_name(VIR_NAME_INSTANCE_ID, "gl_InstanceID");
     _add_name(VIR_NAME_INSTANCE_INDEX, "gl_InstanceIndex");
     _add_name(VIR_NAME_DEVICE_INDEX, "gl_DeviceIndex");

@@ -242,6 +242,7 @@ gcSL_GetName(
     _print_name(gcSL_FRONT_SECONDARY_COLOR, "#FrontSecondaryColor");
     _print_name(gcSL_BACK_SECONDARY_COLOR, "#BackSecondaryColor");
     _print_name(gcSL_TEX_COORD, "#TexCoord");
+    _print_name(gcSL_CLIP_VERTEX, "#ClipVertex");
     _print_name(gcSL_SUBSAMPLE_DEPTH, "#Subsample_Depth");
     _print_name(gcSL_PERVERTEX, "#PerVertex");
     _print_name(gcSL_IN, "#in");

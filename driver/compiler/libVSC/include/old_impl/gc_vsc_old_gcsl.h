@@ -1546,7 +1546,8 @@ typedef enum _gceBuiltinNameKind
     gcSL_MULTI_TEX_COORD_5      = -53, /* gl_MultiTexCoord5 */
     gcSL_MULTI_TEX_COORD_6      = -54, /* gl_MultiTexCoord6 */
     gcSL_MULTI_TEX_COORD_7      = -55, /* gl_MultiTexCoord7 */
-    gcSL_BUILTINNAME_COUNT      = 56
+    gcSL_CLIP_VERTEX            = -56, /* gl_ClipVertex */
+    gcSL_BUILTINNAME_COUNT      = 57
 } gceBuiltinNameKind;
 
 /* Special code generation indices. */

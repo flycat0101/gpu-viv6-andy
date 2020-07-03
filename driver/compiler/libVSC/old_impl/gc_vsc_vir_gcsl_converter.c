@@ -816,6 +816,8 @@ _ConvVirNameIdToBuiltinNameKind(
         kind = gcSL_BACK_SECONDARY_COLOR;
     } else if (VirNameId == VIR_NAME_TEX_COORD) {
         kind = gcSL_TEX_COORD;
+    } else if (VirNameId == VIR_NAME_CLIP_VERTEX) {
+        kind = gcSL_CLIP_VERTEX;
     } else if (VirNameId == VIR_NAME_SUBSAMPLE_DEPTH) {
         kind = gcSL_SUBSAMPLE_DEPTH;
     } else if (VirNameId == VIR_NAME_PERVERTEX) {

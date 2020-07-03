@@ -217,6 +217,7 @@ typedef struct _gcBuiltinsTempIndex
    gctINT       BackColorTempIndex;
    gctINT       FrontColorSecondaryTempIndex;
    gctINT       BackColorSecondaryTempIndex;
+   gctINT       ClipVertexTempIndex;
    gctINT       SubsampleDepthTempIndex;
    gctINT       InvocationIDTempIndex;
    gctINT       PatchVerticesInTempIndex;

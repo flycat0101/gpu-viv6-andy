@@ -440,6 +440,7 @@ conv2VirsVirBuiltinMap _virBuiltinMap[] =
     { "gl_Front_secondary_color", {0, VIR_STORAGE_INPUT, 0,}},
     { "gl_Back_secondary_color", {0, VIR_STORAGE_INPUT, 0,}},
     { "gl_Tex_coord", {0, VIR_STORAGE_INPUT, 0,}},
+    { "gl_Clip_vertex", {0, VIR_STORAGE_OUTPUT, 0,}},
     { "#subsample_depth", {0, 0, VIR_STORAGE_INOUTPUT, 0,}},
     { "gl_PerVertex", {0, VIR_STORAGE_UNKNOWN, 0,}},
     { "gl_in", {0, VIR_STORAGE_INPUT, 0,}},
@@ -1468,6 +1469,7 @@ _ConvBuiltinNameKindToVirNameId(
     Case(gcSL_FRONT_SECONDARY_COLOR, VIR_NAME_FRONT_SECONDARY_COLOR);
     Case(gcSL_BACK_SECONDARY_COLOR, VIR_NAME_BACK_SECONDARY_COLOR);
     Case(gcSL_TEX_COORD, VIR_NAME_TEX_COORD);
+    Case(gcSL_CLIP_VERTEX, VIR_NAME_CLIP_VERTEX);
     Case(gcSL_WORK_GROUP_ID, VIR_NAME_WORK_GROUP_ID);
     Case(gcSL_LOCAL_INVOCATION_ID, VIR_NAME_LOCAL_INVOCATION_ID);
     Case(gcSL_GLOBAL_INVOCATION_ID, VIR_NAME_GLOBAL_INVOCATION_ID);
