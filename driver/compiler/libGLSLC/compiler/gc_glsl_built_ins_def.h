@@ -3844,18 +3844,85 @@ static slsBUILT_IN_VARIABLE PerVertexVariables[] =
 
 static slsBUILT_IN_VARIABLE LightSourceParameters[] =
 {
-    {{slvEXTENSION1_NONE},      "ambient",              "#LightSource.ambient",              slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,     0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},      "diffuse",              "#LightSource.diffuse",              slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,     0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},      "specular",             "#LightSource.specular",             slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,     0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},      "position",             "#LightSource.position",             slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,     0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},      "halfVector",           "#LightSource.halfVector",           slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,     0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},      "spotDirection",        "#LightSource.spotDirection",        slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC3,     0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},      "spotExponent",         "#LightSource.spotExponent",         slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},      "spotCutoff",           "#LightSource.spotCutoff",           slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},      "spotCosCutoff",        "#LightSource.spotCosCutoff",        slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},      "constantAttenuation",  "#LightSource.constantAttenuation",  slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},      "linearAttenuation",    "#LightSource.linearAttenuation",    slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {{slvEXTENSION1_NONE},      "quadraticAttenuation", "#LightSource.quadraticAttenuation", slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_SUPPORT_OGL},      "ambient",              "#LightSource.ambient",              slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,     0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_SUPPORT_OGL},      "diffuse",              "#LightSource.diffuse",              slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,     0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_SUPPORT_OGL},      "specular",             "#LightSource.specular",             slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,     0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_SUPPORT_OGL},      "position",             "#LightSource.position",             slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,     0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_SUPPORT_OGL},      "halfVector",           "#LightSource.halfVector",           slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,     0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_SUPPORT_OGL},      "spotDirection",        "#LightSource.spotDirection",        slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC3,     0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_SUPPORT_OGL},      "spotExponent",         "#LightSource.spotExponent",         slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_SUPPORT_OGL},      "spotCutoff",           "#LightSource.spotCutoff",           slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_SUPPORT_OGL},      "spotCosCutoff",        "#LightSource.spotCosCutoff",        slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_SUPPORT_OGL},      "constantAttenuation",  "#LightSource.constantAttenuation",  slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_SUPPORT_OGL},      "linearAttenuation",    "#LightSource.linearAttenuation",    slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_SUPPORT_OGL},      "quadraticAttenuation", "#LightSource.quadraticAttenuation", slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+};
+
+static slsBUILT_IN_VARIABLE PointParameters[] =
+{
+    {{slvEXTENSION1_NONE},      "size",                         "#Point.size",                          slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},      "sizeMin",                      "#Point.sizeMin",                       slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},      "sizeMax",                      "#Point.sizeMax",                       slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},      "fadeThresholdSize",            "#Point.fadeThresholdSize",             slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},      "distanceConstantAttenuation",  "#Point.distanceConstantAttenuation",   slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},      "distanceLinearAttenuation",    "#Point.distanceLinearAttenuation",     slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},      "distanceQuadraticAttenuation", "#Point.distanceQuadraticAttenuation",  slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+};
+
+static slsBUILT_IN_VARIABLE FrontMaterialParameters[] =
+{
+    {{slvEXTENSION1_NONE},      "emission",     "#FrontMaterial.emission",    slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},      "ambient",      "#FrontMaterial.ambient",     slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},      "diffuse",      "#FrontMaterial.diffuse",     slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},      "specular",     "#FrontMaterial.specular",    slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},      "shininess",    "#FrontMaterial.shininess",   slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,   0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+};
+
+static slsBUILT_IN_VARIABLE BackMaterialParameters[] =
+{
+    {{slvEXTENSION1_NONE},      "emission",     "#BackMaterial.emission",    slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},      "ambient",      "#BackMaterial.ambient",     slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},      "diffuse",      "#BackMaterial.diffuse",     slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},      "specular",     "#BackMaterial.specular",    slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},      "shininess",    "#BackMaterial.shininess",   slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,   0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+};
+
+static slsBUILT_IN_VARIABLE LightModelParameters[] =
+{
+    {{slvEXTENSION1_NONE},      "ambient",     "#LightModel.ambient",    slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+};
+
+static slsBUILT_IN_VARIABLE FrontLightModelProductParameters[] =
+{
+    {{slvEXTENSION1_NONE},      "sceneColor",  "#FrontLightModelProduct.sceneColor",    slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+};
+
+static slsBUILT_IN_VARIABLE BackLightModelProductParameters[] =
+{
+    {{slvEXTENSION1_NONE},      "sceneColor",  "#BackLightModelProduct.sceneColor",    slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+};
+
+static slsBUILT_IN_VARIABLE FrontLightProductParameters[] =
+{
+    {{slvEXTENSION1_NONE},      "ambient",      "#FrontLightProduct.ambient",     slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},      "diffuse",      "#FrontLightProduct.diffuse",     slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},      "specular",     "#FrontLightProduct.specular",    slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+};
+
+static slsBUILT_IN_VARIABLE BackLightProductParameters[] =
+{
+    {{slvEXTENSION1_NONE},      "ambient",      "#BackLightProduct.ambient",     slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},      "diffuse",      "#BackLightProduct.diffuse",     slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},      "specular",     "#BackLightProduct.specular",    slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+};
+
+static slsBUILT_IN_VARIABLE FogParameters[] =
+{
+    {{slvEXTENSION1_NONE},      "color",      "#Fog.color",    slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_VEC4,     0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},      "density",    "#Fog.density",  slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},      "start",      "#Fog.start",    slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},      "end",        "#Fog.end",      slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},      "scale",      "#Fog.scale",    slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
 };
 
 static slsBUILT_IN_VARIABLE VSBuiltInVariables[] =
@@ -3906,7 +3973,6 @@ static slsBUILT_IN_VARIABLE FSBuiltInVariables[] =
     {{slvEXTENSION1_FRAG_DEPTH},"gl_FragDepthEXT",     "#Depth",       slvPRECISION_QUALIFIER_HIGH,     slvSTORAGE_QUALIFIER_FRAGMENT_OUT,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_FRAGMENT_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_HALTI | slvEXTENSION1_SUPPORT_OGL},     "gl_FragDepth",        "#Depth",       slvPRECISION_QUALIFIER_HIGH,     slvSTORAGE_QUALIFIER_FRAGMENT_OUT,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_FRAGMENT_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
 
-    {{slvEXTENSION1_NONE},      "gl_LightSource",      "#LightSource", slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,          T_STRUCT,   8,    slvSTORAGE_QUALIFIER_UNIFORM, LightSourceParameters, "gl_LightSourceParameters", 12, gcvFALSE},
     {{slvEXTENSION1_NONE},      "gl_FrontColor",       "#FrontColor",  slvPRECISION_QUALIFIER_HIGH,     slvSTORAGE_QUALIFIER_VARYING_IN,    T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_NONE},      "gl_BackColor",        "#BackColor",   slvPRECISION_QUALIFIER_HIGH,     slvSTORAGE_QUALIFIER_VARYING_IN,    T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_NONE},      "gl_FrontSecondaryColor","#FrontSecondaryColor",slvPRECISION_QUALIFIER_HIGH, slvSTORAGE_QUALIFIER_VARYING_IN,  T_VEC4,  0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},

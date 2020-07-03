@@ -1279,10 +1279,20 @@ _LoadBuiltInVariablesForStructArrayUniform(
                                       structName->dataType,
                                       &instanceDataType));
 
-        gcmONERROR(sloCOMPILER_CreateArrayDataType(Compiler,
+        if(Variable.arrayLength > 0 )
+        {
+            gcmONERROR(sloCOMPILER_CreateArrayDataType(Compiler,
                                                    instanceDataType,
                                                    Variable.arrayLength,
                                                    &instanceDataType));
+        }
+
+        if (Variable.updateVarFunc != gcvNULL)
+        {
+            status = (*Variable.updateVarFunc)(Compiler,
+                                               &instanceDataType);
+            gcmONERROR(status);
+        }
 
         gcmONERROR(sloCOMPILER_AllocatePoolString(Compiler,
                                                   Variable.symbol,
@@ -1365,8 +1375,7 @@ _LoadBuiltInVariables(
 
         if (_DoesGLShaderSupportBuiltinUniform(Compiler) &&
             BuiltInVariables[i].qualifier == slvSTORAGE_QUALIFIER_UNIFORM &&
-            BuiltInVariables[i].fieldVariables != gcvNULL &&
-            BuiltInVariables[i].arrayLength > 0)
+            BuiltInVariables[i].fieldVariables != gcvNULL)
         {
             status = _LoadBuiltInVariablesForStructArrayUniform(Compiler,
                                                                 BuiltInVariables[i]);
