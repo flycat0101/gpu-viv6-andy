@@ -3029,6 +3029,7 @@ clCreateCommandQueue(
     gctPOINTER                     pointer=gcvNULL;
     gctUINT                        i;
     gctINT                         status;
+    gceHARDWARE_TYPE               savedHWType = gcvHARDWARE_INVALID;
 
     gcmHEADER_ARG("Context=0x%x Device=0x%x",
                   Context, Device);
@@ -3063,6 +3064,9 @@ clCreateCommandQueue(
             "OCL-003001: (clCreateCommandQueue) invalid Device.\n");
         clmRETURN_ERROR(CL_INVALID_DEVICE);
     }
+
+    gcoCL_ForceSetHardwareType(Device->hwType, &savedHWType);
+
     /* Allocate command queue. */
     clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsCommandQueue), &pointer), CL_OUT_OF_HOST_MEMORY);
     gcoOS_ZeroMemory(pointer, sizeof(clsCommandQueue));
@@ -3105,7 +3109,13 @@ clCreateCommandQueue(
     clmONERROR(gcoOS_CreateMutex(gcvNULL,
                                  &queue->syncPointListMutex),
                CL_OUT_OF_HOST_MEMORY);
-    gcmONERROR(gcoCL_CreateHW(queue->device->gpuId, &(queue->hardware)));
+
+    if (queue->device->hwType == gcvHARDWARE_3D)
+        gcmONERROR(gcoCL_CreateHWWithType(gcvHARDWARE_3D, queue->device->gpuId, &(queue->hardware)));
+    else if (queue->device->hwType == gcvHARDWARE_VIP)
+        gcmONERROR(gcoCL_CreateHWWithType(gcvHARDWARE_VIP, queue->device->vipId, &(queue->hardware)));
+    else
+        gcmONERROR(gcoCL_CreateHWWithType(gcvHARDWARE_3D2D, queue->device->gpu3d2dId, &(queue->hardware)));
 
     queue->workerStartSignal  = gcvNULL;
     queue->workerStopSignal   = gcvNULL;
@@ -3150,6 +3160,8 @@ clCreateCommandQueue(
     gcmFOOTER_ARG("%d queue=0x%x",
                   CL_SUCCESS, queue);
 
+    gcoCL_ForceRestoreHardwareType(savedHWType);
+
     return queue;
 
 OnError:
@@ -3169,6 +3181,8 @@ OnError:
 
         gcoOS_Free(gcvNULL, queue);
     }
+
+    gcoCL_ForceRestoreHardwareType(savedHWType);
 
     gcmFOOTER_ARG("%d", status);
 

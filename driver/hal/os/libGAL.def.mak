@@ -782,6 +782,7 @@ EXPORTS
     gcoCL_SetHardware
     gcoCL_RestoreContext
     gcoCL_CreateHW
+	gcoCL_CreateHWWithType
     gcoCL_DestroyHW
     gcoCL_GetHWConfigGpuCount
     gcoCL_AllocateMemory
@@ -801,6 +802,9 @@ EXPORTS
     gcoCL_SetupTexture
     gcoCL_QueryDeviceInfo
     gcoCL_QueryDeviceCount
+	gcoCL_QueryDeviceCountWithGPUType
+    gcoCL_QueryDeviceCountWithVIPType
+	gcoCL_QueryDeviceCountWith3D2DType
     gcoCL_Commit
     gcoCL_CreateSignal
     gcoCL_DestroySignal
@@ -815,6 +819,8 @@ EXPORTS
     gcoCL_MemWaitAndGetFence
     gcoCL_ChooseBltEngine
     gcoCL_SetHardwareType
+    gcoCL_ForceSetHardwareType
+    gcoCL_ForceRestoreHardwareType
 
     ; gcoPROFILER
     gcoPROFILER_Construct

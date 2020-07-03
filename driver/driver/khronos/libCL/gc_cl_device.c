@@ -140,14 +140,23 @@ clGetDeviceIDs(
     if (platform->devices == gcvNULL)
     {
         gctUINT32         numDevices;
+        gctUINT32         numDevicesTypes[3];
+        gceHARDWARE_TYPE  hwType[] = {gcvHARDWARE_3D, gcvHARDWARE_3D2D, gcvHARDWARE_VIP};
+        gctUINT32         deviceID = 0;
 
-        /* Query number GPUs. */
-        clmONERROR(gcoCL_QueryDeviceCount(&numDevices, gcvNULL),CL_INVALID_VALUE);
+        /* Query number devices in GPUs. */
+        clmONERROR(gcoCL_QueryDeviceCountWithGPUType(&numDevicesTypes[0], gcvNULL),CL_INVALID_VALUE);
+        /* Query number devices in 3D2Ds. */
+        clmONERROR(gcoCL_QueryDeviceCountWith3D2DType(&numDevicesTypes[1], gcvNULL),CL_INVALID_VALUE);
+        /* Query number devices in VIPs. */
+        clmONERROR(gcoCL_QueryDeviceCountWithVIPType(&numDevicesTypes[2], gcvNULL),CL_INVALID_VALUE);
+
+        numDevices = numDevicesTypes[0] + numDevicesTypes[1] + numDevicesTypes[2];
 
         if(clgDevices == gcvNULL)
         {
             gctPOINTER      pointer = gcvNULL;
-            gctUINT         i;
+            gctUINT         i, j;
             gctBOOL         version11 = gcvFALSE;
 
             /* Borrow compiler mutex for hardware initialization. */
@@ -200,75 +209,127 @@ clGetDeviceIDs(
             }
 
             clgDevices = (clsDeviceId_PTR) pointer;
-            for (i = 0; i < numDevices; i++)
+
+            for (j = 0; j < gcmCOUNTOF(hwType); j++)
             {
-                gceCHIPMODEL  chipModel;
-                gctUINT32 chipRevision;
-                gcePATCH_ID patchId = platform->patchId;
-                gctUINT offset;
-                gctSTRING productName = gcvNULL;
-                gctBOOL skipCLGLSharingExtension = gcvFALSE;
-                gctBOOL skipCLKhrFp16Extension = gcvFALSE;
-                const gctSTRING epProfile = "EMBEDDED_PROFILE";
-                gctBOOL chipEnableEP = gcvFALSE;
-                chipModel = clgDefaultDevice->deviceInfo.chipModel;
-                chipRevision = clgDefaultDevice->deviceInfo.chipRevision;
-
-                chipEnableEP = ((chipModel == gcv1500 && chipRevision == 0x5246) ||
-                                (chipModel == gcv2000 && chipRevision == 0x5108) ||
-                                (chipModel == gcv3000 && chipRevision == 0x5513) ||
-                                (chipModel == gcv5000));
-                if((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC) != gcvSTATUS_TRUE) ||
-                   (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE) != gcvSTATUS_TRUE)   ||
-                   chipEnableEP)
+                for (i = 0; i < numDevicesTypes[j]; i++)
                 {
-                    /*if the features on the device are not availble, still report embedded profile even if BUILD_OPENCL_FP is 1*/
-                    clgDefaultDevice->profile = epProfile;
-                }
+                    gceCHIPMODEL  chipModel;
+                    gctUINT32 chipRevision;
+                    gcePATCH_ID patchId = platform->patchId;
+                    gctUINT offset;
+                    gctSTRING productName = gcvNULL;
+                    gctBOOL skipCLGLSharingExtension = gcvFALSE;
+                    gctBOOL skipCLKhrFp16Extension = gcvFALSE;
+                    const gctSTRING epProfile = "EMBEDDED_PROFILE";
+                    gctBOOL chipEnableEP = gcvFALSE;
+                    gcoHARDWARE hardware = gcvNULL;
+                    gceHARDWARE_TYPE savedHWType = gcvHARDWARE_INVALID;
 
-                gcoOS_MemCopy(&clgDevices[i], clgDefaultDevice, sizeof(clsDeviceId));
-                clmONERROR(gcoOS_AtomIncrement(gcvNULL, clgGlobalId, (gctINT*)&clgDevices[i].id), CL_INVALID_VALUE);
+                    gcmDECLARE_SWITCHVARS;
 
-                if(patchId == gcvPATCH_COMPUTBENCH_CL)
-                {
+                    chipModel = clgDefaultDevice->deviceInfo.chipModel;
+                    chipRevision = clgDefaultDevice->deviceInfo.chipRevision;
+
+                    gcoCL_ForceSetHardwareType(hwType[j], &savedHWType);
+                    gcoCL_CreateHWWithType(hwType[j], i, &hardware);
+
+                    gcmSWITCH_TO_HW(hardware);
+
+                    gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
+
+                    if (gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_PIPE_CL))
+                    {
+                        if (savedHWType != gcvHARDWARE_INVALID)
+                            gcoCL_ForceRestoreHardwareType(savedHWType);
+
+                        gcmRESTORE_HW();
+
+                        gcoCL_DestroyHW(hardware);
+                        continue;
+                    }
+
+                    chipEnableEP = ((chipModel == gcv1500 && chipRevision == 0x5246) ||
+                                    (chipModel == gcv2000 && chipRevision == 0x5108) ||
+                                    (chipModel == gcv3000 && chipRevision == 0x5513) ||
+                                    (chipModel == gcv5000));
+                    if((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC) != gcvSTATUS_TRUE) ||
+                        (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE) != gcvSTATUS_TRUE)   ||
+                        chipEnableEP)
+                    {
+                        /*if the features on the device are not availble, still report embedded profile even if BUILD_OPENCL_FP is 1*/
+                        clgDefaultDevice->profile = epProfile;
+                    }
+
+                    gcoOS_MemCopy(&clgDevices[deviceID], clgDefaultDevice, sizeof(clsDeviceId));
+                    clmONERROR(gcoOS_AtomIncrement(gcvNULL, clgGlobalId, (gctINT*)&clgDevices[i].id), CL_INVALID_VALUE);
+
+                    if(patchId == gcvPATCH_COMPUTBENCH_CL)
+                    {
+                        skipCLGLSharingExtension = gcvTRUE;
+                    }
+
+                    if(patchId == gcvPATCH_OCLCTS)
+                    {
+                        skipCLKhrFp16Extension = gcvTRUE;
+                    }
+
+        #if defined (__QNXNTO__)
                     skipCLGLSharingExtension = gcvTRUE;
+        #endif
+                    clgDevices[deviceID].deviceId = deviceID;
+                    if (hwType[j] == gcvHARDWARE_3D)
+                    {
+                        clgDevices[deviceID].hwType = gcvHARDWARE_3D;
+                        clgDevices[deviceID].gpuId = i;
+                    }
+                    else if (hwType[j] == gcvHARDWARE_VIP)
+                    {
+                        clgDevices[deviceID].hwType = gcvHARDWARE_VIP;
+                        clgDevices[deviceID].vipId = i;
+                    }
+                    else
+                    {
+                        clgDevices[deviceID].hwType = gcvHARDWARE_3D2D;
+                        clgDevices[deviceID].gpu3d2dId = i;
+                    }
+
+                    if (clgDefaultDevice->deviceInfo.atomicSupport)
+                    {
+                        clgDevices[deviceID].extensions = skipCLGLSharingExtension ?
+                                                        (skipCLKhrFp16Extension ? extension_w_atomic_wo_glsharing
+                                                            : extension_w_atomic_fp16_wo_glsharing)
+                                                    : (skipCLKhrFp16Extension ? extension_w_atomic
+                                                            : extension_w_atomic_fp16);
+                    }
+                    else
+                    {
+                        clgDevices[deviceID].extensions = skipCLKhrFp16Extension ? extension_without_atomic
+                                                                            : extension_without_atomic_w_fp16;
+                    }
+
+                    gcoHAL_GetProductName(gcvNULL, &productName, gcvNULL);
+
+                    offset = 0;
+                    gcmVERIFY_OK(gcoOS_PrintStrSafe(clgDevices[deviceID].name,
+                                64,
+                                &offset,
+                                "Vivante OpenCL Device %s.%04x.%04d",
+                                productName,
+                                chipRevision,
+                                patchId));
+
+                    gcmOS_SAFE_FREE(gcvNULL, productName);
+
+                    if (savedHWType != gcvHARDWARE_INVALID)
+                        gcoCL_ForceRestoreHardwareType(savedHWType);
+
+                    gcmRESTORE_HW();
+
+                    gcoCL_DestroyHW(hardware);
+
+                    deviceID++;
                 }
-
-                if(patchId == gcvPATCH_OCLCTS)
-                {
-                    skipCLKhrFp16Extension = gcvTRUE;
-                }
-
-#if defined (__QNXNTO__)
-                skipCLGLSharingExtension = gcvTRUE;
-#endif
-                clgDevices[i].gpuId = i;
-                if (clgDefaultDevice->deviceInfo.atomicSupport)
-                {
-                    clgDevices[i].extensions = skipCLGLSharingExtension ?
-                                                  (skipCLKhrFp16Extension ? extension_w_atomic_wo_glsharing
-                                                      : extension_w_atomic_fp16_wo_glsharing)
-                                                : (skipCLKhrFp16Extension ? extension_w_atomic
-                                                      : extension_w_atomic_fp16);
-                }
-                else
-                {
-                    clgDevices[i].extensions = skipCLKhrFp16Extension ? extension_without_atomic
-                                                                      : extension_without_atomic_w_fp16;
-                }
-
-                gcoHAL_GetProductName(gcvNULL, &productName, gcvNULL);
-
-                offset = 0;
-                gcmVERIFY_OK(gcoOS_PrintStrSafe(clgDevices[i].name,
-                            64,
-                            &offset,
-                            "Vivante OpenCL Device %s.%04x.%04d",
-                            productName,
-                            chipRevision,
-                            patchId));
-
-                gcmOS_SAFE_FREE(gcvNULL, productName);
             }
         }
 

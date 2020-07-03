@@ -44,7 +44,11 @@ typedef struct _cl_device_id
 
     gcoCL_DEVICE_INFO       deviceInfo;
 
+    gctUINT                 deviceId;
+    gctUINT                 vipId;
     gctUINT                 gpuId;
+    gctUINT                 gpu3d2dId;
+    gceHARDWARE_TYPE        hwType;
 }
 clsDeviceId;
 
