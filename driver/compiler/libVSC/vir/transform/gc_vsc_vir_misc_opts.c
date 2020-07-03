@@ -11038,7 +11038,7 @@ _CollectSubGroupVariables(
         VIR_Symbol*         pLocalInvocationIndex = gcvNULL;
         VIR_Symbol*         pVregSym = gcvNULL;
 
-        pLocalInvocationIndex = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_LOCALINVOCATIONINDEX);
+        pLocalInvocationIndex = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_LOCAL_INVOCATION_INDEX);
 
         if (pLocalInvocationIndex == gcvNULL)
         {
@@ -11070,7 +11070,7 @@ _CollectSubGroupVariables(
             pLocalInvocationIndex = VIR_Shader_AddBuiltinAttribute(pShader,
                                                                    VIR_TYPE_UINT32,
                                                                    gcvFALSE,
-                                                                   VIR_NAME_LOCALINVOCATIONINDEX);
+                                                                   VIR_NAME_LOCAL_INVOCATION_INDEX);
             outRegId = VIR_Shader_NewVirRegId(pShader, 1);
             VIR_Shader_AddSymbol(pShader,
                                  VIR_SYM_VIRREG,
@@ -11086,9 +11086,6 @@ _CollectSubGroupVariables(
             VIR_Symbol_SetIndexRange(pLocalInvocationIndex, outRegId + 1);
             VIR_Symbol_SetIndexRange(pVregSym, outRegId + 1);
             VIR_Symbol_SetFirstSlot(pLocalInvocationIndex, nextAttrLlSlot);
-
-            /* gl_LocalInvocationIndex is never used before, we need to calculate it later. */
-            VIR_Shader_SetFlagExt1(pShader, VIR_SHFLAG_EXT1_CALC_LOCAL_INVOCATION_INDEX);
         }
         else
         {
