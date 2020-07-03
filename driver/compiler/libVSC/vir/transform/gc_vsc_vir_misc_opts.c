@@ -13963,6 +13963,7 @@ _vscVIR_DetectBarrierWithinLoop(
     VIR_LoopInfoMgr*    pLoopInfoMgr = gcvNULL;
     VIR_LoopInfo*       pLoopInfo = gcvNULL;
     VSC_UL_ITERATOR     iter;
+    gctBOOL             bDetectLoop;
 
     pLoopInfoWorkingSet = (VSC_HASH_TABLE*)vscHTBL_Create(pContext->pMM, vscHFUNC_Default, vscHKCMP_Default, 16);
     pBBWorkingSet = (VSC_HASH_TABLE*)vscHTBL_Create(pContext->pMM, vscHFUNC_Default, vscHKCMP_Default, 16);
@@ -13977,7 +13978,10 @@ _vscVIR_DetectBarrierWithinLoop(
         errCode = VSC_ERR_OUT_OF_MEMORY;
         ON_ERROR(errCode, "Fail to allocate NewLoopInfoMgr.");
     }
-    if (VIR_LoopOpts_DetectNaturalLoops(pLoopOpts))
+
+    errCode = VIR_LoopOpts_DetectNaturalLoops(pLoopOpts, &bDetectLoop);
+    ON_ERROR(errCode, "Fail to detect natural loops.");
+    if (bDetectLoop)
     {
         /* Compute the loop body and some other information, we need to call these after add a new loopInfo. */
         errCode = VIR_LoopOpts_ComputeLoopBodies(pLoopOpts);

@@ -3457,6 +3457,7 @@ _VSC_CPF_PerformOnFunction(
     VIR_LoopOpts        *pLoopOpts = &VSC_CPF_GetLoopOpts(pCPF);
     CFG_ITERATOR        cfgIter;
     VSC_OPTN_LoopOptsOptions loopOptions;
+    gctBOOL             bDetectLoop;
 
     memset(&loopOptions, 0, sizeof(VSC_OPTN_LoopOptsOptions));
 
@@ -3471,7 +3472,8 @@ _VSC_CPF_PerformOnFunction(
             errCode = VSC_ERR_OUT_OF_MEMORY;
             ON_ERROR(errCode, "Fail to allocate NewLoopInfoMgr.");
         }
-        VIR_LoopOpts_DetectNaturalLoops(pLoopOpts);
+        errCode = VIR_LoopOpts_DetectNaturalLoops(pLoopOpts, &bDetectLoop);
+        ON_ERROR(errCode, "Fail to detect natural loops.");
     }
 
     /* Two phases algorithm:

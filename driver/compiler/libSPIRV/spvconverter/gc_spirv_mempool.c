@@ -125,7 +125,9 @@ spvAllocate(
     /* not find usable pool, create one */
     if (findPool == gcvFALSE)
     {
-        spvInitializeMemPool((Bytes > SPV_MEMPOOL_PAGESIZE) ? (gctUINT)Bytes : SPV_MEMPOOL_PAGESIZE, &newMemPool);
+        status = spvInitializeMemPool((Bytes > SPV_MEMPOOL_PAGESIZE) ? (gctUINT)Bytes : SPV_MEMPOOL_PAGESIZE, &newMemPool);
+        if (status != gcvSTATUS_OK)
+            return status;
         lastNode->next = newMemPool;
 
         pointer = newMemPool->ptr;

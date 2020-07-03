@@ -42,7 +42,8 @@
     { \
         gctUINT pages = 1 + (testsize) / (pagesize); \
         (size) = (pages * (pagesize)); \
-        spvAllocate((memPool), (size) * gcmSIZEOF(ptrtype), (gctPOINTER *)(&(ptr))); \
+        if (gcmIS_ERROR(spvAllocate((memPool), (size) * gcmSIZEOF(ptrtype), (gctPOINTER *)(&(ptr))))) \
+            return VSC_ERR_OUT_OF_MEMORY; \
         gcoOS_ZeroMemory((ptr), (size) * gcmSIZEOF(ptrtype)); \
     } \
     else if ((testsize) >= (size)) \
@@ -50,7 +51,8 @@
         gctUINT pages = 1 + (((testsize) - (size))) / (pagesize); \
         ptrtype* oldPtr = (ptr); \
         (size) += (pages * (pagesize)); \
-        spvAllocate((memPool), (size) * gcmSIZEOF(ptrtype), (gctPOINTER *)(&(ptr))); \
+        if (gcmIS_ERROR(spvAllocate((memPool), (size) * gcmSIZEOF(ptrtype), (gctPOINTER *)(&(ptr))))) \
+            return VSC_ERR_OUT_OF_MEMORY; \
         gcoOS_ZeroMemory((ptr), (size) * gcmSIZEOF(ptrtype)); \
         gcoOS_MemCopy((ptr), oldPtr, ((size) - pages * (pagesize)) * gcmSIZEOF(ptrtype)); \
         spvFree(gcvNULL, oldPtr); \
