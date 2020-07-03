@@ -552,7 +552,9 @@ IN clsDECL * RDecl
        else if((!clmDECL_IsPointerType(RDecl)
                && clmDECL_IsArithmeticType(LDecl)) ||
                (clmDECL_IsIntegerType(RDecl) &&
-                clmIsElementTypeEvent(LDecl->dataType->elementType))) {/*implicit conversion */
+                clmIsElementTypeEvent(LDecl->dataType->elementType)) ||
+                (clmDECL_IsIntegerType(RDecl) &&
+                clmIsElementTypeSampler(LDecl->dataType->elementType))) {/*implicit conversion */
          return gcvTRUE;
        }
     }
@@ -3144,6 +3146,10 @@ OUT gctBOOL *HasImplicitConversion
               if(paramDecl->dataType->elementType == clvTYPE_BOOL) {
                   return gcvTRUE;
               }
+              else if (clmIsElementTypeSampler(paramDecl->dataType->elementType) &&
+                       rDecl->dataType->elementType == clvTYPE_UINT) {
+                  return gcvTRUE;
+              }
               else if(!clmDECL_IsPointerType(rDecl)
                       && !clmDECL_IsGenType(paramDecl)
                       && ParamName->u.variableInfo.builtinSpecific.s.isConvertibleType) {
@@ -3975,7 +3981,8 @@ IN clsDECL * RDecl
     }
   }
 
-  if((LDecl->dataType->elementType == RDecl->dataType->elementType) &&
+  if(((LDecl->dataType->elementType == RDecl->dataType->elementType) ||
+      (LDecl->dataType->elementType == clvTYPE_SAMPLER_T && RDecl->dataType->elementType == clvTYPE_UINT)) &&
      (clmDATA_TYPE_vectorSize_NOCHECK_GET(LDecl->dataType) == clmDATA_TYPE_vectorSize_NOCHECK_GET(RDecl->dataType)) &&
      (clmDATA_TYPE_matrixRowCount_GET(LDecl->dataType) == clmDATA_TYPE_matrixRowCount_GET(RDecl->dataType)) &&
      (clmDATA_TYPE_matrixColumnCount_GET(LDecl->dataType) == clmDATA_TYPE_matrixColumnCount_GET(RDecl->dataType)) &&

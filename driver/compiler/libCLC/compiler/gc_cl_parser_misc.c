@@ -11314,7 +11314,7 @@ IN OUT cloIR_LABEL *CaseHead
    curLoc = CaseHead;
    curCase = *curLoc;
    if(NewCase->type == clvCASE) {
-     gcmASSERT(clmDATA_TYPE_elementType_GET(NewCase->caseValue->exprBase.decl.dataType) == clvTYPE_INT);
+       gcmASSERT(clmIsElementTypeInteger(NewCase->caseValue->exprBase.decl.dataType->elementType));
    }
    while(curCase) {
       if(curCase->type == clvDEFAULT) {
@@ -11330,15 +11330,15 @@ IN OUT cloIR_LABEL *CaseHead
       if(NewCase->type == clvDEFAULT ||
          NewCase->caseValue->values[0].intValue < curCase->caseValue->values[0].intValue) {
          curLoc = &curCase->u.nextCase;
-     curCase = *curLoc;
+         curCase = *curLoc;
          continue;
       }
       if(NewCase->caseValue->values[0].intValue == curCase->caseValue->values[0].intValue) {
          gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                            NewCase->base.lineNo,
-                         NewCase->base.stringNo,
-                         clvREPORT_ERROR,
-                         "case value \"%d\" already used",
+                                         NewCase->base.lineNo,
+                                         NewCase->base.stringNo,
+                                         clvREPORT_ERROR,
+                                         "case value \"%d\" already used",
                                          NewCase->caseValue));
       }
       break;
