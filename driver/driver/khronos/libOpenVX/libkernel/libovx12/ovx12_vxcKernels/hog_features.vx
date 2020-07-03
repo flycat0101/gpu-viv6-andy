@@ -52,7 +52,7 @@ __kernel void hog_features(
         for (int x = 0; x < cells_per_block_w; x++)
         {
             int index = (blkH + y)*n_cellsx + (blkW + x);
-            void *mag_ptr = (short *)magnitudes_data + index;
+            void *mag_ptr = (char *)magnitudes_data + index;
             sum += (*(short *)mag_ptr) * (*(short *)mag_ptr);
         }
     }
@@ -69,9 +69,9 @@ __kernel void hog_features(
                 if(dataType == 1){
                     hist = min((char)(*((char *)bins_data + bins_index)) / sum, hog_params_t->threshold);
                 }else{
-                    hist = min((short)(*((short *)bins_data + bins_index)) / sum, hog_params_t->threshold);
+                    hist = min((short)(*((char *)bins_data + bins_index)) / sum, hog_params_t->threshold);
                 }
-                void *features_ptr = (short *)features_data + block_index;
+                void *features_ptr = (char *)features_data + block_index;
                 *(short *)features_ptr = *(short *)features_ptr + hist;
             }
         }

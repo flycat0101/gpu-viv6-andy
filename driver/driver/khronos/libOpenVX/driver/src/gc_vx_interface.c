@@ -61,7 +61,6 @@ static ovx12_vxc_kernel_enum getOvx12VXCKernelEnum(vx_enum kernelID)
         case VX_KERNEL_INTERNAL_PYRAMID_COPY_IMAGE:type = pyramid_copy_image;    break;
         case VX_KERNEL_INTERNAL_TRANSPOSE_2D_TENSOR:type = transpose_2d_tensor;    break;
         case VX_KERNEL_INTERNAL_MULTIPLY_2D_MATRIXES:type = multiply_2d_matrixes;    break;
-        case VX_KERNEL_INTERNAL_CONVOLVE5X5:            type = convolve5x5;             break;
         default:
             vxError("The kernelID, %d, is not supported", kernelID);
             return OVX12_VXC_KERNEL_NUM;
@@ -2294,12 +2293,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Threshold(vx_node node, const
         if(imageType == VX_DF_IMAGE_U8)
         {
             packedValue = ((value.U8) << 24) | ((value.U8) << 16) | ((value.U8) << 8) | (value.U8);
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_U8_Binary");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_U8_Binary");
         }
         else
         {
             packedValue = ((value.U16) << 16) | (value.U16);
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_S16_Binary");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_S16_Binary");
         }
 
         for (i = 0; i < 4; i++)
@@ -2326,11 +2325,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Threshold(vx_node node, const
 
             if (trueData == 0xFF && falseData == 0)
             {
-                vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_U8_Range_Opt");
+                vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_U8_Range_Opt");
             }
             else
             {
-                vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_U8_Range");
+                vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_U8_Range");
             }
         }
         else
@@ -2343,11 +2342,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Threshold(vx_node node, const
 
             if (trueData == 0xFF && falseData == 0)
             {
-                vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_S16_Range_Opt");
+                vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_S16_Range_Opt");
             }
             else
             {
-                vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_S16_Range");
+                vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_S16_Range");
             }
         }
 
@@ -3164,12 +3163,10 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianPyramid_Initializer(vx_node nod
         tmp = vxCreateImage(context, level_width, level_height, format);
 
         upSamplePaddingNode = vxUpSamplePaddingNode(graph, gauss_next, tmp);
-
-        upSampleConvolveNode  = vxConvolve5x5Node(graph, tmp, conv, upsample_tmp);
-
+        upSampleConvolveNode = vxConvolveNode(graph, tmp, conv, upsample_tmp);
         status |= vxSetNodeAttribute(upSampleConvolveNode, VX_NODE_ATTRIBUTE_BORDER_MODE, &border, sizeof(border));
-        upSampleConvertNode = vxUpSampleConvertNode(graph, upsample_tmp, pyr_gauss_curr_level_filtered);
 
+        upSampleConvertNode = vxUpSampleConvertNode(graph, upsample_tmp, pyr_gauss_curr_level_filtered);
         status |= vxReleaseImage(&tmp);
         status |= vxReleaseImage(&upsample_tmp);
 
@@ -3431,8 +3428,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianReconstruct_Initializer(vx_node
 
     status |= vxQueryPyramid(laplacian, VX_PYRAMID_LEVELS, &levels, sizeof(levels));
 
-    status |= vxQueryPyramid(laplacian, VX_PYRAMID_FORMAT, &format, sizeof(vx_df_image));
-
     status |= vxQueryNode(node, VX_NODE_BORDER, &border, sizeof(border));
     border.mode = VX_BORDER_REPLICATE;
     conv = vxCreateGaussian5x5Convolution(context);
@@ -3456,14 +3451,10 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianReconstruct_Initializer(vx_node
         }
 
         upsample_tmp = vxCreateImage(context, level_width, level_height, VX_DF_IMAGE_S16);
-
-        tmp = vxCreateImage(context, level_width, level_height, format);
+        tmp = vxCreateImage(context, level_width, level_height, VX_DF_IMAGE_U8);
 
         upSamplePaddingNode = vxUpSamplePaddingNode(graph, filling, tmp);
-
-        upSampleConvolveNode  = vxConvolve5x5Node(graph, tmp, conv, upsample_tmp);
-
-
+        upSampleConvolveNode = vxConvolveNode(graph, tmp, conv, upsample_tmp);
         status |= vxSetNodeAttribute(upSampleConvolveNode, VX_NODE_ATTRIBUTE_BORDER_MODE, &border, sizeof(border));
 
         upSampleConvertNode = vxUpSampleConvertNode(graph, upsample_tmp, filter);
@@ -10129,12 +10120,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoMax_Initialize(vx_node node, const vx_re
     if(imageType == VX_DF_IMAGE_U8)
     {
         shaderParam.globalWorkScale[0] = 16;
-        vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_U8toU8");
+        vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_U8toU8");
     }
     else if(imageType == VX_DF_IMAGE_S16)
     {
         shaderParam.globalWorkScale[0] = 8;
-        vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_S16toS16");
+        vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_S16toS16");
     }
     else
     {
@@ -10229,12 +10220,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoMin_Initialize(vx_node node, const vx_re
     if(imageType == VX_DF_IMAGE_U8)
     {
         shaderParam.globalWorkScale[0] = 16;
-        vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_U8toU8");
+        vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_U8toU8");
     }
     else if(imageType == VX_DF_IMAGE_S16)
     {
         shaderParam.globalWorkScale[0] = 8;
-        vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_S16toS16");
+        vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_S16toS16");
     }
     else
     {
@@ -10418,16 +10409,16 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNon_max_suppression_Initialize(vx_node n
     if(mask != NULL)
     {
         if (format == VX_DF_IMAGE_U8)
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_mask_u8");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_mask_u8");
         else
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_mask_s16");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_mask_s16");
     }
     else
     {
         if (format == VX_DF_IMAGE_U8)
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_nomask_u8");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_nomask_u8");
         else
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_nomask_s16");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_nomask_s16");
     }
 
     status = vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
@@ -10588,27 +10579,27 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoMatch_template_Initialize(vx_node node, 
     switch (format)
     {
         case VX_COMPARE_HAMMING:
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_hamming");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_hamming");
             break;
 
         case VX_COMPARE_L1:
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_l1");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_l1");
             break;
 
         case VX_COMPARE_L2:
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_l2");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_l2");
             break;
 
         case VX_COMPARE_L2_NORM:
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_l2_norm");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_l2_norm");
             break;
 
         case VX_COMPARE_CCORR_NORM:
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_ccorr_norm");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_ccorr_norm");
             break;
 
         default:
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_ccorr");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_ccorr");
             break;
     }
 
@@ -10810,28 +10801,28 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoLbp_Initialize(vx_node node, const vx_re
         case VX_LBP:
             if(ksize == 3)
             {
-                vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_Standard_3");
+                vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_Standard_3");
             }
             else
             {
-                vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_Standard_5");
+                vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_Standard_5");
             }
             shaderParam.globalWorkScale[0] = 16;
             break;
 
         case VX_MLBP:
-                vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_Modified_5");
+                vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_Modified_5");
                 shaderParam.globalWorkScale[0] = 8;
             break;
 
         default:
             if(ksize == 3)
             {
-                vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_Uniform_3");
+                vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_Uniform_3");
             }
             else
             {
-                vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_Uniform_5");
+                vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_Uniform_5");
             }
             shaderParam.globalWorkScale[0] = 16;
             break;
@@ -11366,7 +11357,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensorLUT_Initialize(vx_node node, const
 
     if(format == VX_TYPE_UINT8)
     {
-        vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_uchar");
+        vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_uchar");
     }
     else
     {
@@ -11374,7 +11365,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensorLUT_Initialize(vx_node node, const
 
         vxQueryLUT(lut, VX_LUT_COUNT, &lut_count, sizeof(lut_count));
         lut_count /= 2;
-        vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_short");
+        vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_short");
         vxSetNodeUniform(node, "lut_offset", 1, &lut_count);
     }
 
@@ -11656,7 +11647,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensor_convert_depth_Initialize(vx_node 
         break;
     }
 
-    vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, kernelName);
+    vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, kernelName);
 
     shaderParam.globalWorkScale[0] = 8;
     shaderParam.globalWorkSize[0]  = (width + shaderParam.globalWorkScale[0] - 1) / shaderParam.globalWorkScale[0];
@@ -12170,14 +12161,14 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoImageCopy_Initialize(vx_node node, const
         shaderParam.globalWorkScale[0] = 16;
         shaderParam.globalWorkScale[1] = 4;
 
-        vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_8Bits");
+        vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_8Bits");
     }
     else if(imageType == VX_DF_IMAGE_S16)
     {
         shaderParam.globalWorkScale[0] = 8;
         shaderParam.globalWorkScale[1] = 4;
 
-        vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_16Bits");
+        vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_16Bits");
     }
     else
     {
@@ -12364,23 +12355,23 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoArrayCopy_Initialize(vx_node node, const
 
     if (input->itemSize == 16 && output->itemSize == 16)
     {
-        vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_16Bto16B");
+        vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_16Bto16B");
     }
     else if (input->itemSize == 8 && output->itemSize == 8)
     {
-        vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_8Bto8B");
+        vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_8Bto8B");
     }
     else if (input->itemSize == 4 && output->itemSize == 4)
     {
-        vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_4Bto4B");
+        vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_4Bto4B");
     }
     else if (input->itemSize == 2 && output->itemSize == 2)
     {
-        vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_2Bto2B");
+        vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_2Bto2B");
     }
     else if (input->itemSize == 1 && output->itemSize == 1)
     {
-        vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_1Bto1B");
+        vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_1Bto1B");
     }
 
     if(status == vx_true_e){
@@ -14297,7 +14288,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoHog_features_ValidateInput(vx_node node,
             {
                 vx_enum format = -1;
                 vxQueryTensor(mag, VX_TENSOR_DATA_TYPE, &format, sizeof(format));
-                if ((format == VX_TYPE_INT8) || (format == VX_TYPE_INT16))
+                if (format == VX_TYPE_INT8)
                 {
 
                     status = VX_SUCCESS;
@@ -15287,16 +15278,16 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoUpSamplePadding_Initialize(vx_node node,
     if(src_format == VX_DF_IMAGE_U8)
     {
         if (dst_format == VX_DF_IMAGE_U8)
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_u8_to_u8");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_u8_to_u8");
         else
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_u8_to_s16");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_u8_to_s16");
     }
     else
     {
         if (dst_format == VX_DF_IMAGE_U8)
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_s16_to_u8");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_s16_to_u8");
         else
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_s16_to_s16");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_s16_to_s16");
     }
 
     if (src_format != dst_format)
@@ -15509,20 +15500,20 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoUpSampleConvert_Initialize(vx_node node,
         {
             shaderParam.globalWorkScale[0] = 16;
             shaderParam.globalWorkScale[1] = 2;
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_u8_to_u8");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_u8_to_u8");
         }
         else
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_u8_to_s16");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_u8_to_s16");
     }
     else
     {
         if (dst_format == VX_DF_IMAGE_U8)
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_s16_to_u8");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_s16_to_u8");
         else
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_s16_to_s16");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_s16_to_s16");
     }
 
-    if ((src_format != dst_format) || (src_format == dst_format && VX_DF_IMAGE_S16 == src_format))
+    if (src_format != dst_format)
     {
         vx_uint32 uniIntergeMul4_2x8[16] = {
             0x11111111, // TCfg
@@ -15579,17 +15570,17 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoPyramidCopyImage_Initialize(vx_node node
         {
             shaderParam.globalWorkScale[0] = 16;
             shaderParam.globalWorkScale[1] = 2;
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_u8_to_u8");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_u8_to_u8");
         }
         else
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_u8_to_s16");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_u8_to_s16");
     }
     else
     {
         if (dst_format == VX_DF_IMAGE_U8)
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_s16_to_u8");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_s16_to_u8");
         else
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_s16_to_s16");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_s16_to_s16");
     }
 
     if (src_format != dst_format)
@@ -15772,7 +15763,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTransPose2DTensor_Initialize(vx_node nod
         };
 
 
-        vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_8Bits");
+        vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_8Bits");
 
         status = vxSetNodeUniform(node, "uniExchangeStride1_part0_2x8", 1, uniExchangeStride1_part0_2x8);
         status |= vxSetNodeUniform(node, "uniExchangeStride1_part1_2x8", 1, uniExchangeStride1_part1_2x8);
@@ -15843,7 +15834,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTransPose2DTensor_Initialize(vx_node nod
             0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
         };
 
-        vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_16Bits");
+        vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_16Bits");
 
         status = vxSetNodeUniform(node, "uniExchangeStride1_part0_2x8", 1, uniExchangeStride1_part0_2x8);
         status |= vxSetNodeUniform(node, "uniExchangeStride1_part1_2x8", 1, uniExchangeStride1_part1_2x8);
@@ -15978,16 +15969,16 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoMultiply2DMatrixes_Initialize(vx_node no
         if (!enableC)
         {
             if (src_format == VX_TYPE_UINT8)
-                vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_u8_mul");
+                vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_u8_mul");
             else
-                vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_s8_mul");
+                vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_s8_mul");
         }
         else
         {
             if (src_format == VX_TYPE_UINT8)
-                vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_u8_mad");
+                vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_u8_mad");
             else
-                vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_s8_mad");
+                vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_s8_mad");
 
             status = vxSetNodeUniform(node, "uniCmulConstAddSum_4x4", 1, &uniCmulConstAddSum_4x4);
             if (status != VX_SUCCESS)
@@ -16036,7 +16027,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoMultiply2DMatrixes_Initialize(vx_node no
 
         if (!enableC)
         {
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_s16_mul");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_s16_mul");
 
             status = vxSetNodeUniform(node, "uniExtact8Bin_2x8", 1, uniExtact8Bin_2x8);
             if (status != VX_SUCCESS)
@@ -16047,7 +16038,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoMultiply2DMatrixes_Initialize(vx_node no
         }
         else
         {
-            vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_s16_mad");
+            vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, "_s16_mad");
 
             status = vxSetNodeUniform(node, "uniCmulConstAddSum_4x4", 1, &uniCmulConstAddSum_4x4);
             if (status != VX_SUCCESS)
@@ -16330,132 +16321,5 @@ VX_INTERNAL_API vx_bool isBuildInKernel(vx_context context, vx_enum enumeration)
 
     gcmFOOTER_ARG("build_in_kernel=0x%x", build_in_kernel);
     return build_in_kernel;
-}
-VX_PRIVATE_API vx_status VX_CALLBACK vxoConvolve5x5_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num)
-{
-                                                /*workdim, globel offset, globel scale  local size, globel size,*/
-    vx_kernel_execution_parameters_t shaderParam = {2, {0, 0, 0}, {1, 1, 0}, {0, 0, 0}, {0, 0, 0}};
-    vx_image       input         = (vx_image)parameters[0];
-    vx_convolution conv          = (vx_convolution)parameters[1];
-    vx_image       output        = (vx_image)parameters[2];
-    vx_uint32      width         = output->width;
-    vx_uint32      height        = output->height;
-    vx_uint32      in_width      = input->width;
-    vx_uint32      in_height     = input->height;
-    vx_df_image    src_format    = input->format;
-    vx_df_image    dst_format    = input->format;
-    vx_status      status        = VX_FAILURE;
-    vx_uint32      scale         = 1;
-    float          scale_inv     = 1.0f;
-
-    gcmHEADER_ARG("node=%p, parameters=%p, num=0x%x", node, parameters, num);
-    status = vxQueryConvolution(conv, VX_CONVOLUTION_SCALE, &scale, sizeof(scale));
-    if (status != VX_SUCCESS) return status;
-    status = vxoNode_setTensorVxcOptimize(node);
-    if (status != VX_SUCCESS) return status;
-
-    status = vxoLoadVxKernelShader(node->base.context, node, "convolve5x5.vx");
-    if (status != VX_SUCCESS) return status;
-
-    if (src_format == VX_DF_IMAGE_U8 && dst_format == VX_DF_IMAGE_U8 )
-    {
-        vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_u8tou8");
-    }
-    else if (src_format == VX_DF_IMAGE_U8 && dst_format == VX_DF_IMAGE_S16 )
-    {
-        vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_u8tos16");
-    }
-    else if (src_format == VX_DF_IMAGE_S16 && dst_format == VX_DF_IMAGE_S16 )
-    {
-        vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_s16tos16");
-    }
-    else if (src_format == VX_DF_IMAGE_S16 && dst_format == VX_DF_IMAGE_U8 )
-    {
-        vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, "_s16tou8");
-    }
-    scale_inv = 1.0f / (float)scale;
-    {
-        vx_uint32 uniConvolution5x5_8x2[16] = {
-            0x00000155, // TCfg
-            0x00000000, // ASelt
-            0x00043210, 0x00000000, // ABin
-            0x00000155, // BSelt
-            0x00001234, 0x00000000, // BBin
-            0x00000400, // AccumType, ConstantType, and PostShift
-            0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
-        };
-
-        status  = vxSetNodeUniform(node, "uniConvolution5x5_8x2", 1, uniConvolution5x5_8x2);
-        status |= vxSetNodeUniform(node, "scale_inv", 1, &scale_inv);
-        status |= vxSetNodeUniform(node, "in_width", 1, &in_width);
-        status |= vxSetNodeUniform(node, "in_height", 1, &in_height);
-        if (status != VX_SUCCESS) return status;
-    }
-
-    shaderParam.globalWorkScale[0]  = 1;
-    shaderParam.globalWorkScale[1]  = 1;
-    shaderParam.globalWorkSize[0]   = (width + shaderParam.globalWorkScale[0] - 1) / shaderParam.globalWorkScale[0];
-    shaderParam.globalWorkSize[1]   = (height + shaderParam.globalWorkScale[1] - 1) / shaderParam.globalWorkScale[1];
-
-    status = vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
-    gcmFOOTER_ARG("%d", status);
-    return status;
-}
-
-VX_PRIVATE_API vx_status VX_CALLBACK vxoConvolve5x5_ValidateInput(vx_node node, vx_uint32 index)
-{
-    vx_object_data_s objData = {0};
-
-    if (index != 0 && index != 1) return VX_ERROR_INVALID_PARAMETERS;
-
-    if (index == 0)
-    {
-        if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
-            return VX_ERROR_INVALID_PARAMETERS;
-
-        if ((objData.u.imageInfo.format != VX_DF_IMAGE_U8) &&
-            (objData.u.imageInfo.format != VX_DF_IMAGE_S16))
-        {
-            return VX_ERROR_INVALID_FORMAT;
-        }
-    }
-    else  if (index == 1)
-    {
-        if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_CONVOLUTION, &objData) != VX_SUCCESS)
-            return VX_ERROR_INVALID_PARAMETERS;
-        if (5 != objData.u.convolutionInfo.columns ||
-            5 != objData.u.convolutionInfo.rows)
-        {
-            return VX_ERROR_INVALID_PARAMETERS;
-        }
-
-    }
-
-    return VX_SUCCESS;
-}
-
-VX_PRIVATE_API vx_status VX_CALLBACK vxoConvolve5x5_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
-{
-    vx_object_data_s objData0 = {0};
-    vx_object_data_s objData2 = {0};
-
-    if (index != 2) return VX_ERROR_INVALID_PARAMETERS;
-
-    if (vxoGetObjAttributeByNodeIndex(node, 0, VX_TYPE_IMAGE, &objData0) != VX_SUCCESS)
-        return VX_ERROR_INVALID_PARAMETERS;
-
-    if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData2) != VX_SUCCESS)
-        return VX_ERROR_INVALID_PARAMETERS;
-
-    if (objData2.u.imageInfo.format == VX_DF_IMAGE_U8)
-    {
-        vxoFillMetaData(ptr, VX_TYPE_IMAGE, VX_DF_IMAGE_U8, objData0.u.imageInfo.width, objData0.u.imageInfo.height, 0);
-    }
-    else
-    {
-        vxoFillMetaData(ptr, VX_TYPE_IMAGE, VX_DF_IMAGE_S16, objData0.u.imageInfo.width, objData0.u.imageInfo.height, 0);
-    }
-
-    return VX_SUCCESS;
 }
 
