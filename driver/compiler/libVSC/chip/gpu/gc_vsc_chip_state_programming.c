@@ -2709,7 +2709,7 @@ static VSC_ErrCode _ProgramHS(SHADER_HW_INFO* pShHwInfo, SHADER_HW_INFO* pLowerS
         {
             dsMaxPatches--;
 
-            maxPatches = maxPatchesPerHwTG + dsMaxPatches;
+            maxPatches = maxPatchesPerHwTG + dsMaxPatches - 1;
             expectedTotalSize = maxPatches * (patchSize << 4);
             expectedPages = VSC_UTILS_ALIGN(expectedTotalSize, 1024);
 
