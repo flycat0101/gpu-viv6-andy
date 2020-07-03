@@ -423,7 +423,7 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_EVIS_Initialize(vxnne_layer 
 
     vx_uint32  batchCount = TENSOR_SIZE_INDEX(inputs, 3);
 
-    vx_enum  biasFormat = VX_TYPE_INT32;
+    /*vx_enum  biasFormat = VX_TYPE_INT32;*/
     vx_uint32  operation_idx = 0;
     vx_int32   strideXvalue  = 0;
     vx_int32   strideYvalue  = 0;
@@ -441,8 +441,6 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_EVIS_Initialize(vxnne_layer 
     vx_int32      padTopv = padYTop->value->n32;
     vx_int32      padBottomv = padYBottom->value->n32;
 
-    if (biases != VX_NULL)
-        biasFormat = TENSOR_DATA_TYPE(biases);
 
     if (strideX)
     {
@@ -572,7 +570,7 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_Initialize(vxnne_layer ops_l
     vx_tensor outputs = (vx_tensor)parameters[19];
 
     vx_enum  inputFormat = TENSOR_DATA_TYPE(inputs);
-    vx_enum  biasFormat = VX_TYPE_INT32;
+    /*vx_enum  biasFormat = VX_TYPE_INT32;*/
     vx_context context = vxGetContext((vx_reference)inputs);
     vx_uint32  operation_idx = 0;
     vx_uint32  numTmpTensor = 0;
@@ -584,8 +582,6 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_Initialize(vxnne_layer ops_l
     vx_tensor               newBiases = NULL;
     vx_tensor               tensorCopy = NULL;
 
-    if (biases != VX_NULL)
-        biasFormat = TENSOR_DATA_TYPE(biases);
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 

@@ -138,7 +138,7 @@ vx_int32 FindBestSubset(vx_int32 *runZeros, vx_int32 size, vx_int32 subSize, vx_
 
     /*Since it is a subset, we have to make the other length not in the subset to the sum of subset element*/
     for(i = size - 1; i >= 0; i--){ /*run-length  = i+1*/
-        if(runZeros[i]*runs[i]){
+        if(runZeros[i]&&runs[i]){
             k = i+1; /*runs*/
             while(k){
                 for(j = subSize - 1; j >= 0; j--){

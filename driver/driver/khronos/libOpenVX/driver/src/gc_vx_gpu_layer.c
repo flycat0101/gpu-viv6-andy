@@ -3346,7 +3346,7 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
     vx_bool     enable_small_kernel      = vx_false_e;
     vx_uint32   element_cnt_input        = 0;
     vx_uint32   element_cnt_kernel       = 0;
-    vx_float32  radio                    = 0;
+    /*vx_float32  radio                    = 0;*/
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input=%p, output=%p", context, kernelEnum, input, output);
 
@@ -3354,7 +3354,7 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
     status |= vxoTensor_GetTensorElementCount(weight, &element_cnt_kernel);
     if (status != VX_SUCCESS) goto OnError;
 
-    radio = (vx_float32)element_cnt_kernel / (vx_float32)element_cnt_input;
+    /*radio = (vx_float32)element_cnt_kernel / (vx_float32)element_cnt_input;*/
     enable_small_kernel = /*radio < 0.5 ? vx_true_e : */vx_false_e;
 
     is_static_weights_biases = (vx_bool)(TENSOR_DATA_LIFETIME(weight) == VX_TENSOR_LIFE_TIME_STATIC && TENSOR_DATA_LIFETIME(bias) == VX_TENSOR_LIFE_TIME_STATIC);

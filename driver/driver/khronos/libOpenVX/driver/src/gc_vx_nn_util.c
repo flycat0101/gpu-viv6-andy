@@ -4030,7 +4030,7 @@ VX_INTERNAL_API vx_status vxnnePreLoadWeightsBiases(
     vx_uint32  i = 0, nnCount = 0;
     vxnne_convolution_relu_pooling_operation convOperation;
     vx_weights_biases_parameter weightBiases, *wbTable = VX_NULL;
-    gctUINT8   *logical, *endAddrPlusOne;
+    gctUINT8   *logical, *endAddrPlusOne = VX_NULL;
     vx_uint32  physical;
 
     vxmASSERT ((vx_int32)size >= 0 && !(size & (PRELOAD_WB_ALIGNMENT - 1)));
@@ -4176,7 +4176,7 @@ vx_status vxnneOperation_InitializeCommand(
         {
             vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)operation;
             vxnne_mem_request requestList;
-            vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, kernelZ, inImageZ, inputDataFormat, imageTileSize, kernelbufferSize;
+            vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY/*, kernelZ*/, inImageZ, inputDataFormat, imageTileSize, kernelbufferSize;
             vxnne_operation_info_s opInfo;
             vx_uint32 transposeSize = 0;
             vx_uint32 count = 0;
@@ -4188,7 +4188,7 @@ vx_status vxnneOperation_InitializeCommand(
             interleaveMode = convOperation->resultInfo.interleaveMode;
             kernelX = opInfo.weightsBiases->weights_sizes[0];
             kernelY = opInfo.weightsBiases->weights_sizes[1];
-            kernelZ = opInfo.weightsBiases->weights_sizes[2];
+            /*kernelZ = opInfo.weightsBiases->weights_sizes[2];*/
             inImageZ = TENSOR_SIZE_INDEX(opInfo.input, 2);
             inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
 
@@ -4618,7 +4618,7 @@ void* nnGetNCHWStreamFromTanspose(vx_tensor input, vx_uint8 interleave)
     vx_type_e format;
     vx_uint32 dataSize;
     vx_uint32 dstSize;
-    vx_uint32 srcElementCount;
+    /*vx_uint32 srcElementCount;*/
     vx_uint32 dimCount;
 
     vx_uint8_ptr dataSrc;
@@ -4650,7 +4650,7 @@ void* nnGetNCHWStreamFromTanspose(vx_tensor input, vx_uint8 interleave)
 
         numOfInterleave = (vx_uint32)ceilf((vx_float32)inputDepth / (vx_float32)channelInterleave);
 
-        srcElementCount = inputWidth * inputHeight * channelInterleave * numOfInterleave;
+        /*srcElementCount = inputWidth * inputHeight * channelInterleave * numOfInterleave;*/
         dstElementCount = inputWidth * inputHeight * inputDepth;
         dstSize = dstElementCount * dataSize * inputBatch;
         transposeBasicLogical = vxAllocateAndZeroMemory(dstSize);
@@ -4841,7 +4841,7 @@ vx_bool vxnneIsNNSupportFormat(
 {
     vx_bool isNNSupportFormat = vx_false_e;
     vx_enum inputFormat, wbFormat, outputFormat;
-    vx_enum inputQuantFormat, wbQuantFormat, outputQuantFormat;
+    vx_enum inputQuantFormat/*, wbQuantFormat, outputQuantFormat*/;
 
     if (inputTensor == VX_NULL)
     {
@@ -4854,8 +4854,8 @@ vx_bool vxnneIsNNSupportFormat(
     outputFormat = (outputTensor != NULL) ? TENSOR_DATA_TYPE(outputTensor) : 0;
 
     inputQuantFormat = TENSOR_QUANT_TYPE(inputTensor);
-    wbQuantFormat = (wb != NULL) ? WB_WEIGHT_QUANT_FORMAT(wb) : 0;
-    outputQuantFormat = (outputTensor != NULL) ? TENSOR_QUANT_TYPE(outputTensor) : 0;
+    /*wbQuantFormat = (wb != NULL) ? WB_WEIGHT_QUANT_FORMAT(wb) : 0;*/
+    /*outputQuantFormat = (outputTensor != NULL) ? TENSOR_QUANT_TYPE(outputTensor) : 0;*/
 
     switch (inputFormat)
     {

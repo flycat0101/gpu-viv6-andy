@@ -1745,8 +1745,10 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeConvolutionNodes(vx_node nod
 
                 /*it is different, depending on the hal info*/
                 if(context->nnConfig.fixedFeature.nnInputBufferDepth)
+{
                     if(context->nnConfig.fixedFeature.nnInputBufferDepth - ceilf((float)weight->dims[1]/ stride[1]) + 1 < SCALAR_VALUE(nodes[i]->paramTable[PARAM_POOLING_POOL_SIZE_Y_INDEX], u32))
                         break;
+}
 
                     pool_type = VX_NN_POOLING_MAX;
                     pool_size[0] = SCALAR_VALUE(nodes[i]->paramTable[PARAM_POOLING_POOL_SIZE_X_INDEX], u32);

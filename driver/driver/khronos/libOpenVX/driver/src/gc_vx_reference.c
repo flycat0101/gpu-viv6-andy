@@ -658,14 +658,11 @@ VX_API_ENTRY vx_status VX_API_CALL vxReleaseReference(vx_reference* ref_ptr)
 VX_API_ENTRY vx_status VX_API_CALL vxSetReferenceName(vx_reference ref, const vx_char *name)
 {
     vx_status status = VX_ERROR_INVALID_REFERENCE;
-    vx_context context;
     gcmHEADER_ARG("ref=%p, name=%s", ref, name);
     gcmDUMP_API("$VX vxSetReferenceName: ref=%p, name=%s", ref, name);
 
     if (vxoReference_IsValidAndNoncontext(ref))
     {
-        context= vxGetContext(ref);
-
         strncpy(ref->name, name, strnlen(name, VX_MAX_REFERENCE_NAME));
         status = VX_SUCCESS;
     }
