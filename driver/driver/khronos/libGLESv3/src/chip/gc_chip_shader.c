@@ -1585,7 +1585,7 @@ gcChipProcessUniforms(
             if (!duplicate)
             {
                 /* Assign primary uniform. */
-                gcoOS_Allocate(gcvNULL, nameLen + 1, (gctPOINTER*)&slot->name);
+                gcmONERROR(gcoOS_Allocate(gcvNULL, nameLen + 1, (gctPOINTER*)&slot->name));
                 gcoOS_StrCopySafe(slot->name, nameLen + 1, tmpName);
 
                 slot->nameLen       = nameLen;
@@ -1603,7 +1603,7 @@ gcChipProcessUniforms(
                 slot->numArraySize  = uniform->arrayLengthCount;
                 if (slot->numArraySize > 0)
                 {
-                    gcoOS_Allocate(gcvNULL, slot->numArraySize * gcmSIZEOF(gctINT), (gctPOINTER*)&slot->arraySizes);
+                    gcmONERROR(gcoOS_Allocate(gcvNULL, slot->numArraySize * gcmSIZEOF(gctINT), (gctPOINTER*)&slot->arraySizes));
                     gcoOS_MemCopy(slot->arraySizes, uniform->arrayLengthList, slot->numArraySize * gcmSIZEOF(gctINT));
                 }
 
@@ -3263,7 +3263,7 @@ gcChipProcessBufferVariables(
                         bvSlot->numArraySize = variable->arrayLengthCount;
                         if (bvSlot->numArraySize > 0)
                         {
-                            gcoOS_Allocate(gcvNULL, bvSlot->numArraySize * gcmSIZEOF(gctINT), (gctPOINTER*)&bvSlot->arraySizes);
+                            gcmONERROR(gcoOS_Allocate(gcvNULL, bvSlot->numArraySize * gcmSIZEOF(gctINT), (gctPOINTER*)&bvSlot->arraySizes));
                             gcoOS_MemCopy(bvSlot->arraySizes, variable->arrayLengthList, bvSlot->numArraySize * gcmSIZEOF(gctINT));
                         }
 

@@ -151,7 +151,7 @@ __glChipDeleteTexture(
     __GLtextureObject *texObj
     );
 
-extern GLvoid
+extern GLboolean
 __glChipDetachTexture(
     __GLcontext *gc,
     __GLtextureObject *texObj

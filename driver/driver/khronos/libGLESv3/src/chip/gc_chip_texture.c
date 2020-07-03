@@ -2863,7 +2863,7 @@ __glChipDeleteTexture(
 ** Detach texture chip/HAL object reference from context when application try to delete it.
 ** NOTE: texture probably still exist in other context.
 */
-GLvoid
+GLboolean
 __glChipDetachTexture(
     __GLcontext *gc,
     __GLtextureObject *texObj
@@ -2880,14 +2880,15 @@ __glChipDetachTexture(
 
     if (!texInfo || !texInfo->object)
     {
-        gcmFOOTER_NO();
-        return;
+        gcmFOOTER_ARG("return=%d", gcvTRUE);
+        return gcvTRUE;
     }
 
     if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, __GL_CHIP_SURF_COUNT * sizeof(GLuint*), (gctPOINTER*)&surfList)))
     {
-        gcmFOOTER_NO();
-        return;
+        gcChipSetError(chipCtx, gcvSTATUS_OUT_OF_MEMORY);
+        gcmFOOTER_ARG("return=%d", gcvFALSE);
+        return gcvFALSE;
     }
 
     gcoOS_ZeroMemory(surfList, __GL_CHIP_SURF_COUNT * sizeof(GLuint*));
@@ -2927,8 +2928,8 @@ __glChipDetachTexture(
 
     gcmOS_SAFE_FREE(gcvNULL, surfList);
 
-    gcmFOOTER_NO();
-    return;
+    gcmFOOTER_ARG("return=%d", gcvTRUE);
+    return gcvTRUE;
 }
 
 

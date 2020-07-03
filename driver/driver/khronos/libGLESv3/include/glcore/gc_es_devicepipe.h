@@ -46,7 +46,7 @@ typedef struct __GLdevicePipelineRec
     /* Texture functions */
     GLboolean (*bindTexture)(__GLcontext*, __GLtextureObject*);
     GLvoid (*deleteTexture)(__GLcontext*, __GLtextureObject*);
-    GLvoid (*detachTexture)(__GLcontext*,  __GLtextureObject*);
+    GLboolean (*detachTexture)(__GLcontext*,  __GLtextureObject*);
 
     GLboolean (*texImage2D)(__GLcontext*, __GLtextureObject*, GLint, GLint, const GLvoid*);
     GLboolean (*texImage3D)(__GLcontext*, __GLtextureObject*, GLint, const GLvoid*);
