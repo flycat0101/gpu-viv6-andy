@@ -574,6 +574,8 @@ vx_kernel_description_s basekernel_pyramid = {
     vxoPyramid_Deinitializer,
 };
 
+#define OPENV_CTS_1_2_CONV5x5_ON 0
+
 static vx_param_description_s basekernel_laplacian_pyramid_params[] =
 {
     { VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e },
@@ -2706,6 +2708,28 @@ vx_kernel_description_s internalkernel_multiply_2d_matrixes = {
     vxoMultiply2DMatrixes_Initialize,
     NULL,
     {"multiply_2d_matrixes.vx"},
+};
+
+VX_PRIVATE_API vx_param_description_s internalkernel_convolve5x5_params[] = {
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_CONVOLUTION, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoConvolve5x5_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoConvolve5x5_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoConvolve5x5_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+vx_kernel_description_s internalkernel_convolve5x5 = {
+    VX_KERNEL_INTERNAL_CONVOLVE5X5,
+    "org.khronos.internal.convolve5x5",
+    NULL,
+    internalkernel_convolve5x5_params, vxmLENGTH_OF(internalkernel_convolve5x5_params),
+    NULL,
+    vxoConvolve5x5_ValidateInput,
+    vxoConvolve5x5_ValidateOutput,
+    vxoConvolve5x5_Initialize,
+    NULL,
+    {"convolve5x5.vx"},
 };
 #endif
 

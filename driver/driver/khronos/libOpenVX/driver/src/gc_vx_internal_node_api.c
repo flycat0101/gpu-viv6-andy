@@ -634,3 +634,14 @@ VX_INTERNAL_API vx_node vxROIPoolingReluLayer(
     }
 }
 
+VX_INTERNAL_API vx_node vxConvolve5x5Node(vx_graph graph, vx_image input, vx_convolution conv, vx_image output)
+{
+    vx_reference parameters[] = {
+        (vx_reference)input,
+        (vx_reference)conv,
+        (vx_reference)output
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_CONVOLVE5X5, parameters, vxmLENGTH_OF(parameters));
+}
+
