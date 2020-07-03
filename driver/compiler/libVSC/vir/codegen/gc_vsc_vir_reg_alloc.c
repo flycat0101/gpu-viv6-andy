@@ -13066,14 +13066,14 @@ void _VIR_RA_LS_UpdateWorkgroupIdAndBaseAddr(
             {
                 indexOpnd = VIR_Inst_GetSource(inst, 0);
                 localAddrOpnd = VIR_Inst_GetSource(inst, VIR_Operand_Src2);
-                localAddrSym = VIR_Operand_GetSymbol(localAddrOpnd);
             }
             else
             {
                 indexOpnd = gcvNULL;
                 localAddrOpnd = VIR_Inst_GetSource(inst, VIR_Operand_Src1);
-                localAddrSym = VIR_Operand_GetSymbol(localAddrOpnd);
             }
+
+            localAddrSym = VIR_Operand_isSymbol(localAddrOpnd) ? VIR_Operand_GetSymbol(localAddrOpnd) : gcvNULL;
 
             if (localAddrSym &&
                 VIR_Symbol_isUniform(localAddrSym) &&
