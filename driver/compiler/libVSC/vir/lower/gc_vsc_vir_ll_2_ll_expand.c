@@ -18588,13 +18588,9 @@ _InsertSTARR(
             VIR_Symbol_GetPrecision(VIR_Shader_GetSymFromId(Shader, relSymId)));
     }
 
-    if (sym &&
-        (isSymArrayedPerVertex(sym) ||
-         VIR_Symbol_isPerPatch(sym) ||
-         (VIR_Symbol_isOutput(sym) && Shader->shaderKind == VIR_SHADER_GEOMETRY)))
+    if (needAttrSt)
     {
         /* add immediate 0 to src[1] for ArrayedPerVertex ATTR_ST, src[0] for PerPatch ATTR_ST */
-        gcmASSERT(needAttrSt);
         VIR_Operand_SetImmediateInt(
             VIR_Symbol_isPerPatch(sym) ? VIR_Inst_GetSource(stArrInst, 0) : VIR_Inst_GetSource(stArrInst, 1),
             0);
