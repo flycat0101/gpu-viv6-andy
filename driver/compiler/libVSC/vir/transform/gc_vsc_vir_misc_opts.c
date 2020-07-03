@@ -3174,10 +3174,9 @@ _Inst_RequireHPDest(
     /* promoting to highp per HW requirements */
     {
         if (VIR_OPCODE_isMemSt(opcode)  ||
-            opcode == VIR_OP_IMG_STORE  ||
-            opcode == VIR_OP_VX_IMG_STORE  ||
-            opcode == VIR_OP_IMG_STORE_3D ||
-            opcode == VIR_OP_MOVA ||
+            VIR_OPCODE_isImgSt(opcode)  ||
+            VIR_OPCODE_isImgAddr(opcode)||
+            opcode == VIR_OP_MOVA       ||
             (VIR_OPCODE_isTexLd(opcode) && forceChange) ||
             (VIR_OPCODE_isImgLd(opcode) && forceChange) ||
             (VIR_OPCODE_BITWISE(opcode) && forceChange))
@@ -3790,7 +3789,6 @@ static VSC_ErrCode vscVIR_PrecisionUpdateSrc(VIR_Shader* shader, VIR_Operand* op
         case VIR_OPND_IMMEDIATE:
         case VIR_OPND_CONST:
         case VIR_OPND_ADDRESS_OF:
-            gcmASSERT(VIR_Operand_GetPrecision(operand) == VIR_PRECISION_HIGH);
             break;
         case VIR_OPND_NAME:
         case VIR_OPND_INTRINSIC:
@@ -3820,7 +3818,7 @@ static VSC_ErrCode vscVIR_PrecisionUpdateDst(VIR_Instruction* inst)
 
         if(VIR_Operand_GetPrecision(dst) == VIR_PRECISION_ANY)
         {
-            VIR_Precision precision = VIR_Inst_GetExpectedResultPrecision(inst);
+            VIR_Precision precision = VIR_Inst_GetExpectedResultPrecision(inst, gcvTRUE);
             VIR_Symbol* sym = VIR_Operand_GetSymbol(dst);
 
             if(VIR_Inst_GetOpcode(inst) == VIR_OP_LDARR)
@@ -11392,6 +11390,43 @@ VSC_ErrCode vscVIR_PreprocessMCShader(VSC_SH_PASS_WORKER* pPassWorker)
     return errCode;
 }
 
+static gctBOOL
+_vscVIR_CheckSymbolUsedByHighpOpnd(
+    IN VIR_Instruction*     pInst,
+    IN VIR_Operand*         pOpnd
+    )
+{
+    VIR_Symbol*             pOpndSym = gcvNULL;
+    VIR_Precision           symPrecision, opndPrecision;
+    VIR_OperandInfo         opndInfo;
+
+    /* Skip non-symbol operand. */
+    if (pOpnd == gcvNULL || !VIR_Operand_isSymbol(pOpnd))
+    {
+        return gcvFALSE;
+    }
+
+    /* Skip non-register operand. */
+    VIR_Operand_GetOperandInfo(pInst, pOpnd, &opndInfo);
+    if (!opndInfo.isVreg)
+    {
+        return gcvFALSE;
+    }
+
+    pOpndSym = VIR_Operand_GetSymbol(pOpnd);
+    symPrecision = VIR_Symbol_GetPrecision(pOpndSym);
+    opndPrecision = VIR_Operand_GetPrecision(pOpnd);
+
+    /* If the operand precision is HIGHP and the symbol precision is ANYP, we need to mark this flag. */
+    if (opndPrecision == VIR_PRECISION_HIGH)
+    {
+        VIR_Symbol_SetFlagExt(pOpndSym, VIR_SYMFLAGEXT_USED_BY_HIGHP_OPND);
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
 DEF_QUERY_PASS_PROP(vscVIR_PreprocessCGShader)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
@@ -11443,6 +11478,23 @@ VSC_ErrCode vscVIR_PreprocessCGShader(VSC_SH_PASS_WORKER* pPassWorker)
                 {
                     VIR_Inst_SetThreadMode(inst, VIR_THREAD_D16_DUAL_32);
                     bChanged = gcvTRUE;
+                }
+
+                if (VIR_Inst_GetThreadMode(inst) == VIR_THREAD_D16_DUAL_32)
+                {
+                    VIR_Operand*        pOpnd = gcvNULL;
+                    gctUINT             i;
+
+                    /* Check DEST. */
+                    pOpnd = VIR_Inst_GetDest(inst);
+                    _vscVIR_CheckSymbolUsedByHighpOpnd(inst, pOpnd);
+
+                    /* Check SOURCEs. */
+                    for (i = 0; i < VIR_Inst_GetSrcNum(inst); i++)
+                    {
+                        pOpnd = VIR_Inst_GetSource(inst, i);
+                        _vscVIR_CheckSymbolUsedByHighpOpnd(inst, pOpnd);
+                    }
                 }
             }
             else if (VIR_Inst_GetOpcode(inst) == VIR_OP_EMIT_STREAM ||
@@ -12028,7 +12080,8 @@ VSC_ErrCode vscVIR_GenCombinedSampler(VSC_SH_PASS_WORKER* pPassWorker)
             if (!VIR_Shader_IsVulkan(pShader))
             {
                 continue;
-                }
+            }
+
             VIR_SrcOperand_Iterator_Init(inst, &srcOpndIter);
             srcOpnd = VIR_SrcOperand_Iterator_First(&srcOpndIter);
 

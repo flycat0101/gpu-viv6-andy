@@ -737,15 +737,15 @@ VIR_IO_writeInst(VIR_Shader_IOBuffer *Buf, VIR_Instruction* pInst)
 
     /* Word 3. */
     val = VIR_Inst_GetConditionOp(pInst) << 27  |
-          VIR_Inst_GetFlags(pInst) << 24        |
-          VIR_Inst_GetSrcNum(pInst) << 21       |
-          VIR_Inst_GetThreadMode(pInst) << 18   |
-          VIR_Inst_GetParentUseBB(pInst) << 17  |
-          VIR_Inst_GetResOpType(pInst) << 11    |
-          VIR_Inst_IsPatternRep(pInst) << 10    |
-          VIR_Inst_IsLoopInvariant(pInst) << 9 |
-          VIR_Inst_IsEndOfBB(pInst) << 8        |
-          VIR_Inst_IsUSCUnallocate(pInst) << 7;
+          VIR_Inst_GetSrcNum(pInst) << 24       |
+          VIR_Inst_GetThreadMode(pInst) << 21   |
+          VIR_Inst_GetParentUseBB(pInst) << 20  |
+          VIR_Inst_GetResOpType(pInst) << 14    |
+          VIR_Inst_IsPatternRep(pInst) << 13    |
+          VIR_Inst_IsLoopInvariant(pInst) << 12 |
+          VIR_Inst_IsEndOfBB(pInst) << 11       |
+          VIR_Inst_IsUSCUnallocate(pInst) << 10 |
+          VIR_Inst_GetFlags(pInst) << 5;
     ON_ERROR0(VIR_IO_writeUint(Buf, val));
 
     ON_ERROR0(VIR_IO_writeUint(Buf, *(gctUINT *)&pInst->sourceLoc));
@@ -2412,22 +2412,22 @@ VIR_IO_readInst(VIR_Shader_IOBuffer *Buf, VIR_Instruction* pInst)
     /* Word 3. */
     ON_ERROR0(VIR_IO_readUint(Buf, &uVal));
     VIR_Inst_SetConditionOp(pInst, (uVal >> 27) & 0x1F);
-    VIR_Inst_SetFlags(pInst, (uVal >> 24) & 0x07);
 
-    VIR_Inst_SetSrcNum(pInst, (uVal >> 21) & 0x07);
+    VIR_Inst_SetSrcNum(pInst, (uVal >> 24) & 0x07);
     if (VIR_Inst_GetSrcNum(pInst) > VIR_MAX_SRC_NUM)
     {
         gcmASSERT(gcvFALSE);
         VIR_Inst_SetSrcNum(pInst, VIR_OPCODE_GetSrcOperandNum(VIR_Inst_GetOpcode(pInst)));
     }
 
-    VIR_Inst_SetThreadMode(pInst, (uVal >> 18) & 0x07);
-    VIR_Inst_SetParentUseBB(pInst, (uVal >> 17) & 0x1);
-    VIR_Inst_SetResOpType(pInst, (VIR_RES_OP_TYPE)((uVal >> 11) & 0x3F));
-    VIR_Inst_SetIsPatternRep(pInst, (uVal >> 10) & 0x1);
-    VIR_Inst_SetLoopInvariant(pInst, (uVal >> 9) & 0x1);
-    VIR_Inst_SetEndOfBB(pInst, (uVal >> 8) & 0x1);
-    VIR_Inst_SetUSCUnallocate(pInst, (uVal >> 7) & 0x1);
+    VIR_Inst_SetThreadMode(pInst, (uVal >> 21) & 0x07);
+    VIR_Inst_SetParentUseBB(pInst, (uVal >> 20) & 0x1);
+    VIR_Inst_SetResOpType(pInst, (VIR_RES_OP_TYPE)((uVal >> 14) & 0x3F));
+    VIR_Inst_SetIsPatternRep(pInst, (uVal >> 13) & 0x1);
+    VIR_Inst_SetLoopInvariant(pInst, (uVal >> 12) & 0x1);
+    VIR_Inst_SetEndOfBB(pInst, (uVal >> 11) & 0x1);
+    VIR_Inst_SetUSCUnallocate(pInst, (uVal >> 10) & 0x1);
+    VIR_Inst_SetFlags(pInst, (VIR_InstFlag)((uVal >> 5) & 0x1F));
 
     ON_ERROR0(VIR_IO_readUint(Buf, (gctUINT *)&pInst->sourceLoc));
 

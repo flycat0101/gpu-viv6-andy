@@ -60,8 +60,14 @@
 /* 0.0.1.37 Add the sampled image information on 03/11/2020 */
 /* 0.0.1.38 Saving the return variable to a argument 03/27/2020 */
 /* 0.0.1.39 Update the image addre for an image buffer 04/01/2020 */
-#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 39)
-#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 39)
+/* 0.0.1.40 Save the SPIR-V information to VIR shader 04/10/2020 */
+/* 0.0.1.41 Add a new opcode MOV_DUAL16 04/23/2020 */
+/* 0.0.1.42 Move SkpHp into the instruction flag 05/14/2020 */
+/* 0.0.1.43 Add a data precision in VIR_Symbol 05/14/2020 */
+/* 0.0.1.44 Add VIR_ModifierOrder in VIR_Operand on 05/14/2020 */
+/* 0.0.1.45 Add a new enumeration for VIR_SymFlagExt 05/15/2020 */
+#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 45)
+#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 45)
 
 #if !defined(gcdTARGETHOST_BIGENDIAN)
 #define gcdTARGETHOST_BIGENDIAN 0  /* default host little endian, to change the

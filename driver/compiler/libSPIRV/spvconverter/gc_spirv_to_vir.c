@@ -1325,8 +1325,9 @@ static VSC_ErrCode __SpvFillVirSymWithSymSpv(gcSPV spv, VIR_Symbol * sym, VIR_Sh
         VIR_Symbol_SetAddrSpace(sym, VIR_AS_CONSTANT);
         VIR_Symbol_SetTyQualifier(sym, VIR_TYQUAL_CONST);
         /* GLSL uniform and OCL constant memory */
-        /* TO_DO, more uniform flag in _ConvShaderUniformIdx2Vir */
-        VIR_Symbol_SetPrecision(sym, symSpv->virPrecision);
+        /* The precision of a uniform is always HIGHP because it is the address of a buffer. */
+        VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
+        VIR_Symbol_SetDataPrecision(sym, symSpv->virPrecision);
         VIR_Symbol_SetUniformKind(sym, symSpv->u1.uniformKind);
 
         if (VIR_Symbol_GetKind(sym) == VIR_SYM_UNIFORM)
@@ -1410,6 +1411,9 @@ static VSC_ErrCode __SpvFillVirSymWithSymSpv(gcSPV spv, VIR_Symbol * sym, VIR_Sh
         break;
 
     case SpvStorageClassStorageBuffer:
+        /* The precision of a storage buffer is always HIGHP because it is the address of a buffer. */
+        VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
+        VIR_Symbol_SetDataPrecision(sym, symSpv->virPrecision);
         VIR_Symbol_SetBinding(sym,  symSpv->binding);
         VIR_Symbol_SetOneLayoutQualifier(sym, VIR_LAYQUAL_BINDING);
 

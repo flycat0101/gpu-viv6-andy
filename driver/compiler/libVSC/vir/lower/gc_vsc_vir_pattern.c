@@ -734,7 +734,7 @@ _Pattern_ReplaceNormal(
                 {
                     if (Context->tmpRegSymbol[regNo] == gcvNULL)
                     {
-                        VIR_Precision expectedPrecision = VIR_Inst_GetExpectedResultPrecision(insertedInst);
+                        VIR_Precision expectedPrecision = VIR_Inst_GetExpectedResultPrecision(insertedInst, gcvFALSE);
                         Context->tmpRegSymbol[regNo] = _GetNewTempRegister(Context);
                         VIR_Symbol_SetPrecision(Context->tmpRegSymbol[regNo], expectedPrecision);
                     }

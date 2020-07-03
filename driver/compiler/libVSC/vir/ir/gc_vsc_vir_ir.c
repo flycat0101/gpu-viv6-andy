@@ -11551,6 +11551,21 @@ VIR_Symbol_GetUniformPointer(
     return pUniform;
 }
 
+VIR_Precision
+VIR_Symbol_GetRealPrecision(
+    IN VIR_Symbol*          pSym
+    )
+{
+    VIR_Precision           symPrecision = VIR_Symbol_GetPrecision(pSym);
+
+    if (symPrecision == VIR_PRECISION_ANY && isSymUsedByHighpOpnd(pSym))
+    {
+        symPrecision = VIR_PRECISION_HIGH;
+    }
+
+    return symPrecision;
+}
+
 gctBOOL
 VIR_Symbol_IsSymbolUnsupport(
     IN VIR_Shader*          pShader,
@@ -13357,13 +13372,15 @@ VIR_Inst_GetExpressionTypeID(
 
 VIR_Precision
 VIR_Inst_GetExpectedResultPrecision(
-    IN VIR_Instruction  *Inst
+    IN VIR_Instruction  *Inst,
+    IN gctBOOL          bSkipSpecificClientDriver
     )
 {
     VIR_Precision result = VIR_PRECISION_MEDIUM;
     VIR_OpCode opcode = VIR_Inst_GetOpcode(Inst);
 
     VIR_Shader *pShader = VIR_Inst_GetShader(Inst);
+
     /*
     ** Skip those shaders that don't care about the precision.
     */
@@ -15013,6 +15030,7 @@ VIR_Operand_SetTempRegister(
     VIR_Operand_SetOpKind(Operand, VIR_OPND_SYMBOL);
     VIR_Operand_SetTypeId(Operand, OperandType);
     VIR_Operand_SetSym(Operand, sym);
+    VIR_Operand_SetPrecision(Operand, VIR_Symbol_GetPrecision(sym));
 }
 
 /* for source operand only */
@@ -19329,11 +19347,6 @@ VIR_Operand_Check4Dual16(
                                          (VIR_GetTypeComponents(typeId) <= 2));
                     }
 
-                    /*
-                    ** To enable DUAL16:
-                    **  1) The SRC0 of a 2D/3D IMG instruction can't be a temp register.
-                    **  2) The SRC1 of a 3D IMG instruction can't be a temp register.
-                    */
                     if (VIR_OPCODE_isImgLd(opCode) || VIR_OPCODE_isImgSt(opCode) || VIR_OPCODE_isImgAddr(opCode))
                     {
                         VIR_OperandInfo opndInfo;
@@ -19414,19 +19427,18 @@ VIR_Opcode_Dual16NeedRunInSingleT(
     )
 {
     /* Supported single-t instructions which are unsupported dual-t instructions, by category:
-    -* load/store: LOAD, STORE, ATOM_ADD, ATOM_XCHG, ATOM_CMP_XCHG, ATOM_MIN,
-    *             ATOM_MAX, ATOM_OR, ATOM_AND, ATOM_XOR.
+    -* All memory related instructions:
+    *             LOAD, STORE.
+    *             ATOM_ADD, ATOM_XCHG, ATOM_CMP_XCHG, ATOM_MIN, ATOM_MAX, ATOM_OR, ATOM_AND, ATOM_XOR.
+    *             IMG-related.
     -* a0:         MOVAR, MOVAF, MOVAI
     -* OpenCL:     ADDLO, MULLO, SWIZZLE (Opcode=0x2b).
     *             (NOTE: Swizzling of source operands is still supported in dual-t instructions.)
     -* idiv/imod:  IDIV0, IMOD0
     */
     if (VIR_OPCODE_isMemLd(Opcode)    || Opcode == VIR_OP_ILOAD           ||
-        Opcode == VIR_OP_IMG_LOAD     || Opcode == VIR_OP_IMG_LOAD_3D     ||
-        Opcode == VIR_OP_VX_IMG_LOAD  || Opcode == VIR_OP_VX_IMG_LOAD_3D  ||
         VIR_OPCODE_isMemSt(Opcode)    || Opcode == VIR_OP_ISTORE          ||
-        Opcode == VIR_OP_IMG_STORE    || Opcode == VIR_OP_IMG_STORE_3D    ||
-        Opcode == VIR_OP_VX_IMG_STORE || Opcode == VIR_OP_VX_IMG_STORE_3D ||
+        VIR_OPCODE_isImgRelated(Opcode)||
         VIR_OPCODE_isAttrLd(Opcode)   ||
         VIR_OPCODE_isAtom(Opcode)     ||
         Opcode == VIR_OP_MOVA         ||

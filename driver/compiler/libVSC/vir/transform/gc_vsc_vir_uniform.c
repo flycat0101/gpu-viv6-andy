@@ -4836,6 +4836,7 @@ VSC_ErrCode VSC_UF_UseConstRegForUBO(
         VIR_Symbol_SetFlag(pVirtualUniformSym, VIR_SYMFLAG_COMPILER_GEN | VIR_SYMFLAG_STATICALLY_USED | VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
         VIR_Symbol_SetUniformKind(pVirtualUniformSym, VIR_UNIFORM_VIRTUAL_FOR_UBO);
         VIR_Symbol_SetAddrSpace(pVirtualUniformSym, VIR_AS_CONSTANT);
+        VIR_Symbol_SetPrecision(pVirtualUniformSym, VIR_PRECISION_ANY);
 
         pVirtualUniform = VIR_Symbol_GetUniformPointer(pShader, pVirtualUniformSym);
         pVirtualUniform->u1.baseAddrSymId = VIR_Symbol_GetIndex(pBaseAddrSym);

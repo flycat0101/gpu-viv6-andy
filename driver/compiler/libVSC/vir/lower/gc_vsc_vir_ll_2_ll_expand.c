@@ -18566,7 +18566,7 @@ _InsertSTARR(
         VIR_STORAGE_UNKNOWN,
         &symId);
     if(virErrCode != VSC_ERR_NONE) return virErrCode;
-    precision = VIR_Inst_GetExpectedResultPrecision(Inst);
+    precision = VIR_Inst_GetExpectedResultPrecision(Inst, gcvFALSE);
     if(precision == VIR_PRECISION_DEFAULT)
     {
         gcmASSERT(VIR_Inst_GetDest(Inst));
