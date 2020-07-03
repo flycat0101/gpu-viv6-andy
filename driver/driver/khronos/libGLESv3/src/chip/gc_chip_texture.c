@@ -4304,12 +4304,6 @@ __glChipTexDirectVIV(
         chipCtx->hal, width, height, 1, gcvSURF_BITMAP, sourceFormat, gcvPOOL_DEFAULT, &texInfo->direct.source));
 
     texInfo->direct.directRender = texInfo->direct.source->formatInfo.format == texInfo->direct.source->formatInfo.closestRenderFormat;
-    /*
-       We don't support direct rendering into linear surface with gcvSURF_X8R8G8B8/gcvSURF_R5G6B5.
-       If we create a texture with RGB565/XRGB8888, we should have to create shadow surface to make
-       hw to render into shadow surface firstly.
-       Todo: we should check with hw to include all format that cannot directly render in linear surface.
-    */
     if ((texInfo->direct.source->formatInfo.format == gcvSURF_X8R8G8B8 ||
          texInfo->direct.source->formatInfo.format == gcvSURF_R5G6B5)
          &&
