@@ -1375,19 +1375,6 @@ gctSTRING gcLibCL_ReadImage_With_IMGLD_Funcs =
     READ_IMAGEIUI_WITH_IMGLD_3D_COORD_TYPE_float3(uint4)
     ;
 
-gctSTRING gcLibCL_ReadImage_With_TEXLDU_Funcs =
-    READ_IMAGE_WITH_TEXLDU(float4, float3)
-    READ_IMAGE_WITH_TEXLDU(float4, int3)
-    READ_IMAGE_WITH_TEXLDU(int4, float3)
-    READ_IMAGE_WITH_TEXLDU(int4, int3)
-    READ_IMAGE_WITH_TEXLDU(uint4, float3)
-    READ_IMAGE_WITH_TEXLDU(uint4, int3);
-
-gctSTRING gcLibCL_ReadImage_With_V55_TEXLDU_Funcs =
-"";
-
-gctSTRING gcLibCL_ReadImage_With_TEXLD_Funcs =
-"";
 
 gctSTRING gcLibCL_WriteImage_With_IMGST_Funcs =
     WRITE_IMAGE_WITH_IMGST(1d, int4)

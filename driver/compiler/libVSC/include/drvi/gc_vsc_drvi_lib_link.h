@@ -210,6 +210,7 @@ typedef struct _VSC_LIB_LINK_POINT
     } u;
 }VSC_LIB_LINK_POINT;
 
+#define MAX_LIB_NUM 8
 typedef struct _VSC_SHADER_LIB_LINK_ENTRY
 {
     /* Which level this link entry should be applied. */
@@ -217,6 +218,7 @@ typedef struct _VSC_SHADER_LIB_LINK_ENTRY
 
     /* Lib shader */
     SHADER_HANDLE                     hShaderLib;
+    SHADER_HANDLE                     hShaderLibs[MAX_LIB_NUM];
 
     /* vreg map from libShader to the current shader */
     void*                             pTempHashTable;

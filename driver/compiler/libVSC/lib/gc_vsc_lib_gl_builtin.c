@@ -4391,7 +4391,7 @@ gctSTRING gcLibTextureGather_Func_21 =
 
 /* CubeArray sampler. */
 gctSTRING gcLibTextureGather_Func_22 =
-"vec4 _viv_textureGather_foat_CubeArray_NoComp(samplerCubeArray sampler, mediump ivec3 levelBaseSize, vec4 p)\n"
+"vec4 _viv_textureGather_float_CubeArray_NoComp(samplerCubeArray sampler, mediump ivec3 levelBaseSize, vec4 p)\n"
 "{\n"
 "    vec4 result;\n"
 "    _viv_asm(TEXGATHER, result, 0, 0.0);\n"
