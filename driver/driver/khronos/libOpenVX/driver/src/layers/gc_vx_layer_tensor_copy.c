@@ -137,6 +137,8 @@ OnError:
 
 VX_PRIVATE_API vx_bool vxoNNTensorCopy_SH_EVIS_Support_Ext(vx_node node, const vx_reference parameters[], vx_uint32 _num, vxnne_register_param reg_param, vx_bool evis)
 {
+#define _PACK_TENSOR_COPY_SH_KEY(IN_TYPE, OUT_TYPE, SAME_ELEMENT) \
+    (IN_TYPE | (OUT_TYPE << 8) | ((SAME_ELEMENT) << 16))
     vx_status status = VX_SUCCESS;
     vx_tensor  src = (vx_tensor)parameters[0];
     vx_tensor  dst = (vx_tensor)parameters[1];
@@ -146,8 +148,11 @@ VX_PRIVATE_API vx_bool vxoNNTensorCopy_SH_EVIS_Support_Ext(vx_node node, const v
     vx_bool    enable_dataConv2F32 = vx_false_e;
     vx_uint32  reshpTensor_Sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION] = { 1 };
     vx_uint32  reshpTensor_Dims = 2;
+    vx_sh_kernel_type_e input_type        = getSHKernelType(TENSOR_DATA_TYPE(src));
+    vx_sh_kernel_type_e output_type       = getSHKernelType(TENSOR_DATA_TYPE(dst));
     vx_uint32 src_elementCount = 0;
     vx_uint32 dst_elementCount = 0;
+    vx_uint32 key              = 0;
 
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
 
@@ -156,6 +161,7 @@ VX_PRIVATE_API vx_bool vxoNNTensorCopy_SH_EVIS_Support_Ext(vx_node node, const v
     vxmONERROR(vxoTensor_GetTensorElementCount(src, &src_elementCount));
     vxmONERROR(vxoTensor_GetTensorElementCount(dst, &dst_elementCount));
 
+    key = _PACK_TENSOR_COPY_SH_KEY(input_type, output_type, src_elementCount == dst_elementCount);
     if (evis)
     {
         if (src_elementCount < IMG_MAX_WIDTH)
@@ -186,35 +192,75 @@ VX_PRIVATE_API vx_bool vxoNNTensorCopy_SH_EVIS_Support_Ext(vx_node node, const v
                 && (reshpTensor_Sizes[0] % INPUT_SIZE_ALIGN_4 == 0))
                 enable_dataConv2F32 = vx_true_e;
         }
-        shExe_flag = (vx_bool)(((inputFormat == VX_TYPE_FLOAT16 && outputFormat != VX_TYPE_FLOAT32)
-            || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
-            || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
-            || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16)
-            || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT16)
-            || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
-            || (inputFormat == VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_FLOAT32)
-            || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16)
-            || (inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16)
-            || enable_dataConv2F32)
-            && src_elementCount == dst_elementCount);
+
+        switch (key)
+        {
+        case _PACK_TENSOR_COPY_SH_KEY(F16, F16, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F16, I8, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F16, U8, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F16, I16, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(I16, I16, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(I16, I32, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(I8, I8, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(I8, I16, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(I8, F16, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(U8, U8, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(U8, F16, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F32, F16, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F32, I8, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F32, U8, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F32, I16, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(I8, U8, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(U8, I8, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(BF16, BF16, 1):
+            shExe_flag = vx_true_e;
+            break;
+        default:
+            shExe_flag = vx_false_e;
+            break;
+        }
+
+        if (src_elementCount == dst_elementCount && enable_dataConv2F32)
+        {
+            shExe_flag = vx_true_e;
+        }
     }
     else
     {
         vxoElementOptimization_GetTensorShape(src, reshpTensor_Sizes, &reshpTensor_Dims);
-        shExe_flag = (vx_bool)(((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
-            || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
-            || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16)
-            || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT32)
-            || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_UINT8)
-            || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_UINT8)
-            || (inputFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT32)
-            || (inputFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT16)
-            || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT32)
-            || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
-            || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT32)
-            || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16))
-            && src_elementCount == dst_elementCount);
+
+        switch (key)
+        {
+        case _PACK_TENSOR_COPY_SH_KEY(F16, F16, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F16, F32, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F16, U8, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F16, I32, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F32, F32, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F32, F16, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F32, U8, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F32, I32, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(I32, I32, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(I32, I16, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(I16, I32, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(I8, I32, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(I8, I16, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(U8, F16, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(U8, F32, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(U8, U8, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(U8, I32, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(U8, I16, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F32, BF16, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F16, BF16, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(BF16, F32, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(BF16, F16, 1):
+            shExe_flag = vx_true_e;
+            break;
+        default:
+            shExe_flag = vx_false_e;
+            break;
+        }
     }
+#undef _PACK_TENSOR_COPY_SH_KEY
 
     support = support && shExe_flag;
 
@@ -566,8 +612,6 @@ OnError:
                                  || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
                                  || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16)
                                  || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT16)
-                                 || (inputFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT16)
-                                 || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT32)
                                  || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
                                  || (inputFormat == VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_FLOAT32)
                                  || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16)

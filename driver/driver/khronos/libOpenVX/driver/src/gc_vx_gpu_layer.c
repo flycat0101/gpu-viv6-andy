@@ -820,32 +820,96 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
         }
         if (status != VX_SUCCESS) goto OnError;
     }
-    else if((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT32) &&
-        (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_FLOAT32))
+    else if(((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT32) &&
+          (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_FLOAT32) )
+      || (inputFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT32)
+      || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_BFLOAT16)
+      || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_BFLOAT16)
+      )
     {
+#define _PACK_TENSOR_COPY_SH_KEY(IN_TYPE, OUT_TYPE, IMG_2D, IS_4X) \
+        (IN_TYPE | (OUT_TYPE << 8) | ((IMG_2D) << 16)| ((IS_4X) << 17))
+
+        vx_sh_kernel_type_e input_type        = getSHKernelType(inputFormat);
+        vx_sh_kernel_type_e output_type       = getSHKernelType(outputFormat);
         vx_reference parameters[2] = {(vx_reference)input_rs, (vx_reference)output_rs};
-        if (new_width % 4 == 0)
+        vx_uint32 _key = 0;
+        is_write_4x = (vx_bool)(new_width % 4 == 0);
+
+        _key = _PACK_TENSOR_COPY_SH_KEY(input_type, output_type, enable_2d_img, is_write_4x);
+
+        switch (_key)
         {
-            if (enable_2d_img)
-            {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp32_4X_2D", borderMode);
-            }
-            else
-            {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp32_4X", borderMode);
-            }
-            is_write_4x      = vx_true_e;
-        }
-        else
-        {
-            if (enable_2d_img)
-            {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp32_4S_2D", borderMode);
-            }
-            else
-            {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp32_4S", borderMode);
-            }
+        case _PACK_TENSOR_COPY_SH_KEY(F16, F16, 1, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F16, F32, 1, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F32, F32, 1, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F32, F16, 1, 1):
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F32toF32_4X_2D", borderMode);
+            break;
+        case _PACK_TENSOR_COPY_SH_KEY(F16, F16, 1, 0):
+        case _PACK_TENSOR_COPY_SH_KEY(F16, F32, 1, 0):
+        case _PACK_TENSOR_COPY_SH_KEY(F32, F32, 1, 0):
+        case _PACK_TENSOR_COPY_SH_KEY(F32, F16, 1, 0):
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F32toF32_4S_2D", borderMode);
+            break;
+        case _PACK_TENSOR_COPY_SH_KEY(F16, F16, 0, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F16, F32, 0, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F32, F32, 0, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F32, F16, 0, 1):
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F32toF32_4X", borderMode);
+            break;
+        case _PACK_TENSOR_COPY_SH_KEY(F16, F16, 0, 0):
+        case _PACK_TENSOR_COPY_SH_KEY(F16, F32, 0, 0):
+        case _PACK_TENSOR_COPY_SH_KEY(F32, F32, 0, 0):
+        case _PACK_TENSOR_COPY_SH_KEY(F32, F16, 0, 0):
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F32toF32_4S", borderMode);
+            break;
+        case _PACK_TENSOR_COPY_SH_KEY(I32, I32, 1, 1):
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I32toI32_4X_2D", borderMode);
+            break;
+        case _PACK_TENSOR_COPY_SH_KEY(I32, I32, 1, 0):
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I32toI32_4S_2D", borderMode);
+            break;
+        case _PACK_TENSOR_COPY_SH_KEY(I32, I32, 0, 1):
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I32toI32_4X", borderMode);
+            break;
+        case _PACK_TENSOR_COPY_SH_KEY(I32, I32, 0, 0):
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I32toI32_4S", borderMode);
+            break;
+        case _PACK_TENSOR_COPY_SH_KEY(F16, BF16, 1, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F32, BF16, 1, 1):
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F32toBF16_4X_2D", borderMode);
+            break;
+        case _PACK_TENSOR_COPY_SH_KEY(F16, BF16, 1, 0):
+        case _PACK_TENSOR_COPY_SH_KEY(F32, BF16, 1, 0):
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F32toBF16_4S_2D", borderMode);
+            break;
+        case _PACK_TENSOR_COPY_SH_KEY(F16, BF16, 0, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(F32, BF16, 0, 1):
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F32toBF16_4X", borderMode);
+            break;
+        case _PACK_TENSOR_COPY_SH_KEY(F16, BF16, 0, 0):
+        case _PACK_TENSOR_COPY_SH_KEY(F32, BF16, 0, 0):
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F32toBF16_4S", borderMode);
+            break;
+        case _PACK_TENSOR_COPY_SH_KEY(BF16, F16, 1, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(BF16, F32, 1, 1):
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_BF16toF32_4X_2D", borderMode);
+            break;
+        case _PACK_TENSOR_COPY_SH_KEY(BF16, F16, 1, 0):
+        case _PACK_TENSOR_COPY_SH_KEY(BF16, F32, 1, 0):
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_BF16toF32_4S_2D", borderMode);
+            break;
+        case _PACK_TENSOR_COPY_SH_KEY(BF16, F16, 0, 1):
+        case _PACK_TENSOR_COPY_SH_KEY(BF16, F32, 0, 1):
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_BF16toF32_4X", borderMode);
+            break;
+        case _PACK_TENSOR_COPY_SH_KEY(BF16, F16, 0, 0):
+        case _PACK_TENSOR_COPY_SH_KEY(BF16, F32, 0, 0):
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_BF16toF32_4S", borderMode);
+            break;
+        default:
+            break;
         }
         if (!shaderExecutable) goto OnError;
 
@@ -856,43 +920,7 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
             status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
         }
         if (status != VX_SUCCESS) goto OnError;
-    }
-    else if (inputFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT32)
-    {
-        vx_reference parameters[2] = {(vx_reference)input_rs, (vx_reference)output_rs};
-
-        if (new_width % 4 == 0)
-        {
-            if (enable_2d_img)
-            {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_INT32_4X_2D", borderMode);
-            }
-            else
-            {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_INT32_4X", borderMode);
-            }
-            is_write_4x      = vx_true_e;
-        }
-        else
-        {
-            if (enable_2d_img)
-            {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_INT32_4S_2D", borderMode);
-            }
-            else
-            {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_INT32_4S", borderMode);
-            }
-        }
-        if (!shaderExecutable) goto OnError;
-
-        status  = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 2);
-        status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-        if (is_write_4x)
-        {
-            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-        }
-        if (status != VX_SUCCESS) goto OnError;
+#undef _PACK_TENSOR_COPY_SH_KEY
     }
     else if (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
     {
@@ -1071,7 +1099,8 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
         if (status != VX_SUCCESS) goto OnError;
     }
     else if ((inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT32)
-            || (inputFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT16))
+          || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT32)
+          || (inputFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT16))
     {
         vx_int8 input_fixPointPos = 0;
         vx_float32 inScale =1.0;
@@ -1079,9 +1108,9 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
         vx_float32 outScale = 1.0;
         vx_reference parameters[3] = {(vx_reference)input_rs, (vx_reference)output_rs, (vx_reference)NULL};
 
-        if (inputFormat == VX_TYPE_INT16)
+        if (TENSOR_QUANT_TYPE(input) == VX_QUANT_DYNAMIC_FIXED_POINT)
         {
-            input_fixPointPos = TENSOR_POS(input_rs);
+            input_fixPointPos = TENSOR_POS(input);
             if (input_fixPointPos >= 0)
             {
                 inScale = 1.0f / (vx_float32) (1 << input_fixPointPos);
@@ -1092,9 +1121,9 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
             }
             scale = vxCreateScalar(context, VX_TYPE_FLOAT32, &inScale);
         }
-        else if (outputFormat == VX_TYPE_INT16)
+        else if (TENSOR_QUANT_TYPE(output) == VX_QUANT_DYNAMIC_FIXED_POINT)
         {
-            output_fixPointPos = TENSOR_POS(output_rs);
+            output_fixPointPos = TENSOR_POS(output);
             if (output_fixPointPos >= 0)
             {
                 outScale = (vx_float32) (1 << output_fixPointPos);
@@ -1138,6 +1167,80 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
         }
 
         status  = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 3);
+        status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        if (is_write_4x)
+        {
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        }
+        if (status != VX_SUCCESS) goto OnError;
+    }
+    else if ((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT32)
+          || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_INT32)
+          || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_INT32))
+    {
+        vx_float32 inscale =1.0;
+        vx_float32 tail = 0;
+        vx_reference parameters[4] = {(vx_reference)input_rs, (vx_reference)output_rs, (vx_reference)NULL, (vx_reference)NULL};
+
+        if (TENSOR_QUANT_TYPE(input) == VX_QUANT_AFFINE_SCALE)
+        {
+            vx_float32 inzp = 0;
+            inscale = TENSOR_TF_SCALE(input);
+            inzp = (vx_float32)TENSOR_TF_ZEROPOINT(input);
+
+            tail = 0 - inzp * inscale;
+        }
+        scale = vxCreateScalar(context, VX_TYPE_FLOAT32, &inscale);
+        zp = vxCreateScalar(context, VX_TYPE_FLOAT32, &tail);
+
+        parameters[2] = (vx_reference)scale;
+        parameters[3] = (vx_reference)zp;
+
+        if (enable_2d_img)
+        {
+            if (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT32)
+            {
+                if (new_width % 4 == 0)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F32toI32_2D_4X", borderMode);
+                    is_write_4x      = vx_true_e;
+                }
+                else
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F32toI32_2D_4S", borderMode);
+                }
+            }
+            else
+            {
+                if (new_width % 4 == 0)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8toI32_2D_4X", borderMode);
+                    is_write_4x      = vx_true_e;
+                }
+                else
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8toI32_2D_4S", borderMode);
+                }
+            }
+        }
+        else
+        {
+            if (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT32)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F32toI32", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8toI32", borderMode);
+            }
+        }
+
+        if (!shaderExecutable)
+        {
+            goto OnError;
+        }
+
+        status  = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
         status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
         if (is_write_4x)
         {
