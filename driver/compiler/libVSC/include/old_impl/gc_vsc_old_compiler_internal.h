@@ -203,7 +203,7 @@ typedef struct _gcBuiltinsTempIndex
    gctINT       PointCoordTempIndex;
    gctINT       PositionWTempIndex;
    gctINT       DepthTempIndex;
-   gctINT       FogCoordTempIndex;
+   gctINT       FogFragCoordTempIndex;
    gctINT       InstanceIDTempIndex;
    gctINT       VertexIDTempIndex;
    gctINT       NumWorkGroupsTempIndex;
@@ -236,6 +236,18 @@ typedef struct _gcBuiltinsTempIndex
    gctINT       LastFragDataTempIndex;
    gctINT       ClusterIDTempIndex;
    gctINT       ClipDistanceTempIndex;
+   gctINT       SecondaryColorTempIndex;
+   gctINT       NormalTempIndex;
+   gctINT       FogCoordTempIndex;
+   gctINT       VertexTempIndex;
+   gctINT       MultiTexCoord0TempIndex;
+   gctINT       MultiTexCoord1TempIndex;
+   gctINT       MultiTexCoord2TempIndex;
+   gctINT       MultiTexCoord3TempIndex;
+   gctINT       MultiTexCoord4TempIndex;
+   gctINT       MultiTexCoord5TempIndex;
+   gctINT       MultiTexCoord6TempIndex;
+   gctINT       MultiTexCoord7TempIndex;
 } gcBuiltinsTempIndex;
 
 typedef struct _gcShaderCodeInfo

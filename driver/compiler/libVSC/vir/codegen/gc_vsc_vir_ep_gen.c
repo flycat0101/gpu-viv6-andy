@@ -646,9 +646,9 @@ static SHADER_IO_USAGE _MapBuiltInNameIdToIoUsage(VIR_Symbol* pVirIoSym, gctBOOL
     {
         return SHADER_IO_USAGE_DEPTH;
     }
-    else if (virName == VIR_NAME_FOG_COORD)
+    else if (virName == VIR_NAME_FOG_FRAG_COORD)
     {
-        return SHADER_IO_USAGE_FOG_COORD;
+        return SHADER_IO_USAGE_FOG_FRAG_COORD;
     }
     else if (virName == VIR_NAME_VERTEX_ID ||
              virName == VIR_NAME_VERTEX_INDEX)

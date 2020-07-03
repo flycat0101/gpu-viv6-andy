@@ -169,7 +169,7 @@ typedef enum SHADER_IO_USAGE
 
     /* For gfx clients only, and only for GL */
     SHADER_IO_USAGE_POINT_COORD              = 36,
-    SHADER_IO_USAGE_FOG_COORD                = 37,
+    SHADER_IO_USAGE_FOG_FRAG_COORD           = 37,
     SHADER_IO_USAGE_HELPER_PIXEL             = 38,
 
     /* For gfx pixel-frequency only (sample-frequency will directly use SHADER_IO_USAGE_DEPTH),

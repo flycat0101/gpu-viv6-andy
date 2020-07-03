@@ -16928,7 +16928,7 @@ gcSHADER_GetBuiltinNameKind(
     }
     else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "FogFragCoord")))
     {
-        kind = gcSL_FOG_COORD;
+        kind = gcSL_FOG_FRAG_COORD;
     }
     else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "VertexID")))
     {
@@ -16994,6 +16994,54 @@ gcSHADER_GetBuiltinNameKind(
     else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "Subsample_Depth")))
     {
         kind = gcSL_SUBSAMPLE_DEPTH;
+    }
+    else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "SecondaryColor")))
+    {
+        kind = gcSL_SECONDARY_COLOR;
+    }
+    else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "Normal")))
+    {
+        kind = gcSL_NORMAL;
+    }
+    else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "Vertex")))
+    {
+        kind = gcSL_VERTEX;
+    }
+    else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "FogCoord")))
+    {
+        kind = gcSL_FOG_COORD;
+    }
+    else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "MultiTexCoord0")))
+    {
+        kind = gcSL_MULTI_TEX_COORD_0;
+    }
+    else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "MultiTexCoord1")))
+    {
+        kind = gcSL_MULTI_TEX_COORD_1;
+    }
+    else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "MultiTexCoord2")))
+    {
+        kind = gcSL_MULTI_TEX_COORD_2;
+    }
+    else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "MultiTexCoord3")))
+    {
+        kind = gcSL_MULTI_TEX_COORD_3;
+    }
+    else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "MultiTexCoord4")))
+    {
+        kind = gcSL_MULTI_TEX_COORD_4;
+    }
+    else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "MultiTexCoord5")))
+    {
+        kind = gcSL_MULTI_TEX_COORD_5;
+    }
+    else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "MultiTexCoord6")))
+    {
+        kind = gcSL_MULTI_TEX_COORD_6;
+    }
+    else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "MultiTexCoord7")))
+    {
+        kind = gcSL_MULTI_TEX_COORD_7;
     }
     /* TS built-in name. */
     else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "in")))
@@ -17108,7 +17156,7 @@ gcSHADER_GetBuiltinNameString(
         "gl_PointCoord", /* -5:  gcSL_POINT_COORD */
         "gl_Position.w", /* -6:  gcSL_POSITION_W */
         "gl_Depth", /* -7:  gcSL_DEPTH */
-        "gl_FogFragCoord", /* -8:  gcSL_FOG_COORD */
+        "gl_FogFragCoord", /* -8:  gcSL_FOG_FRAG_COORD */
         "gl_VertexID", /* -9:  gcSL_VERTEX_ID */
         "gl_InstanceID", /* -10: gcSL_INSTANCE_ID */
         "gl_WorkGroupID", /* -11: gcSL_WORK_GROUP_ID */
@@ -17142,6 +17190,18 @@ gcSHADER_GetBuiltinNameString(
         "gl_LastFragData", /* -39 gcSL_LAST_FRAG_DATA */
         "#cluster_id", /* -40 gcSL_CLUSTER_ID */
         "gl_ClipDistance", /* -41 gcSL_CLIP_DISTANCE */
+        "gl_SecondaryColor", /* -44 gcSL_SECONDARY_COLOR */
+        "gl_Normal", /* -45 gcSL_NOEMAL */
+        "gl_Vertex"                 /* -46 gcSL_VERTEX */
+        "gl_FogCoord", /* -47 gcSL_FOG_COORD */
+        "gl_MultiTexCoord0", /* -48 gcSL_MULTI_TEX_COORD_0 */
+        "gl_MultiTexCoord1", /* -49 gcSL_MULTI_TEX_COORD_1 */
+        "gl_MultiTexCoord2", /* -50 gcSL_MULTI_TEX_COORD_2 */
+        "gl_MultiTexCoord3", /* -51 gcSL_MULTI_TEX_COORD_3 */
+        "gl_MultiTexCoord4", /* -52 gcSL_MULTI_TEX_COORD_4 */
+        "gl_MultiTexCoord5", /* -53 gcSL_MULTI_TEX_COORD_5 */
+        "gl_MultiTexCoord6", /* -54 gcSL_MULTI_TEX_COORD_6 */
+        "gl_MultiTexCoord7", /* -55 gcSL_MULTI_TEX_COORD_7 */
     };
 
     if (Kind < 0 && Kind > (-1 - (gctINT)gcmCOUNTOF(sBuildinNames)))
@@ -30434,7 +30494,7 @@ _PredefinedName(
     case gcSL_DEPTH:
         return "gl_FragDepth";
 
-    case gcSL_FOG_COORD:
+    case gcSL_FOG_FRAG_COORD:
         return "gl_FogFragCoord";
 
     case gcSL_INSTANCE_ID:
@@ -30546,6 +30606,42 @@ _PredefinedName(
 
     case gcSL_LAST_FRAG_DATA:
         return "gl_LastFragData";
+
+    case gcSL_SECONDARY_COLOR:
+        return "gl_SecondaryColor";
+
+    case gcSL_NORMAL:
+        return "gl_Normal";
+
+    case gcSL_VERTEX:
+        return "gl_Vertex";
+
+    case gcSL_FOG_COORD:
+        return "gl_FogCoord";
+
+    case gcSL_MULTI_TEX_COORD_0:
+        return "gl_MultiTexCoord0";
+
+    case gcSL_MULTI_TEX_COORD_1:
+        return "gl_MultiTexCoord1";
+
+    case gcSL_MULTI_TEX_COORD_2:
+        return "gl_MultiTexCoord2";
+
+    case gcSL_MULTI_TEX_COORD_3:
+        return "gl_MultiTexCoord3";
+
+    case gcSL_MULTI_TEX_COORD_4:
+        return "gl_MultiTexCoord4";
+
+    case gcSL_MULTI_TEX_COORD_5:
+        return "gl_MultiTexCoord5";
+
+    case gcSL_MULTI_TEX_COORD_6:
+        return "gl_MultiTexCoord6";
+
+    case gcSL_MULTI_TEX_COORD_7:
+        return "gl_MultiTexCoord7";
     }
 
     /* Not a predefined name. */
@@ -34582,8 +34678,8 @@ _findBuiltinVariableTempIndex(
             case gcSL_POSITION_W:
                 BuiltinsTempIndex->PositionWTempIndex = attribute->index;
                 break;
-            case gcSL_FOG_COORD:
-                BuiltinsTempIndex->FogCoordTempIndex = attribute->index;
+            case gcSL_FOG_FRAG_COORD:
+                BuiltinsTempIndex->FogFragCoordTempIndex = attribute->index;
                 break;
             case gcSL_WORK_GROUP_ID:
                 BuiltinsTempIndex->WorkGroupIDTempIndex = attribute->index;
@@ -34663,6 +34759,42 @@ _findBuiltinVariableTempIndex(
             case gcSL_LAST_FRAG_DATA:
                 BuiltinsTempIndex->LastFragDataTempIndex = attribute->index;
                 break;
+            case gcSL_SECONDARY_COLOR:
+                BuiltinsTempIndex->SecondaryColorTempIndex = attribute->index;
+                break;
+            case gcSL_NORMAL:
+                BuiltinsTempIndex->NormalTempIndex = attribute->index;
+                break;
+            case gcSL_FOG_COORD:
+                BuiltinsTempIndex->FogCoordTempIndex = attribute->index;
+                break;
+            case gcSL_VERTEX:
+                BuiltinsTempIndex->VertexTempIndex = attribute->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_0:
+                BuiltinsTempIndex->MultiTexCoord0TempIndex = attribute->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_1:
+                BuiltinsTempIndex->MultiTexCoord1TempIndex = attribute->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_2:
+                BuiltinsTempIndex->MultiTexCoord2TempIndex = attribute->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_3:
+                BuiltinsTempIndex->MultiTexCoord3TempIndex = attribute->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_4:
+                BuiltinsTempIndex->MultiTexCoord4TempIndex = attribute->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_5:
+                BuiltinsTempIndex->MultiTexCoord5TempIndex = attribute->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_6:
+                BuiltinsTempIndex->MultiTexCoord6TempIndex = attribute->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_7:
+                BuiltinsTempIndex->MultiTexCoord7TempIndex = attribute->index;
+                break;
             default:
                 gcmASSERT(gcvFALSE);
                 break;
@@ -34691,8 +34823,8 @@ _findBuiltinVariableTempIndex(
             case gcSL_POSITION_W:
             case gcSL_POINT_COORD: /* do nothing as this is patched-in in PatchShaders() */
                 break;
-            case gcSL_FOG_COORD:
-                BuiltinsTempIndex->FogCoordTempIndex = output->tempIndex;
+            case gcSL_FOG_FRAG_COORD:
+                BuiltinsTempIndex->FogFragCoordTempIndex = output->tempIndex;
                 break;
             case gcSL_FRONT_COLOR:
                 BuiltinsTempIndex->FrontColorTempIndex = output->tempIndex;
@@ -34749,6 +34881,42 @@ _findBuiltinVariableTempIndex(
                 break;
             case gcSL_CLIP_DISTANCE:
                 BuiltinsTempIndex->ClipDistanceTempIndex = output->tempIndex;
+                break;
+            case gcSL_SECONDARY_COLOR:
+                BuiltinsTempIndex->SecondaryColorTempIndex = output->index;
+                break;
+            case gcSL_NORMAL:
+                BuiltinsTempIndex->NormalTempIndex = output->index;
+                break;
+            case gcSL_FOG_COORD:
+                BuiltinsTempIndex->FogCoordTempIndex = output->index;
+                break;
+            case gcSL_VERTEX:
+                BuiltinsTempIndex->VertexTempIndex = output->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_0:
+                BuiltinsTempIndex->MultiTexCoord0TempIndex = output->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_1:
+                BuiltinsTempIndex->MultiTexCoord1TempIndex = output->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_2:
+                BuiltinsTempIndex->MultiTexCoord2TempIndex = output->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_3:
+                BuiltinsTempIndex->MultiTexCoord3TempIndex = output->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_4:
+                BuiltinsTempIndex->MultiTexCoord4TempIndex = output->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_5:
+                BuiltinsTempIndex->MultiTexCoord5TempIndex = output->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_6:
+                BuiltinsTempIndex->MultiTexCoord6TempIndex = output->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_7:
+                BuiltinsTempIndex->MultiTexCoord7TempIndex = output->index;
                 break;
             default:
                 gcmASSERT(gcvFALSE);
@@ -34839,11 +35007,47 @@ _findBuiltinVariableTempIndex(
             case gcSL_BOUNDING_BOX:
                 BuiltinsTempIndex->BoundingBoxTempIndex = variable->tempIndex;
                 break;
-            case gcSL_FOG_COORD:
-                BuiltinsTempIndex->FogCoordTempIndex = variable->tempIndex;
+            case gcSL_FOG_FRAG_COORD:
+                BuiltinsTempIndex->FogFragCoordTempIndex = variable->tempIndex;
                 break;
             case gcSL_CLIP_DISTANCE:
                 BuiltinsTempIndex->ClipDistanceTempIndex = variable->tempIndex;
+                break;
+            case gcSL_SECONDARY_COLOR:
+                BuiltinsTempIndex->SecondaryColorTempIndex = variable->index;
+                break;
+            case gcSL_NORMAL:
+                BuiltinsTempIndex->NormalTempIndex = variable->index;
+                break;
+            case gcSL_FOG_COORD:
+                BuiltinsTempIndex->FogCoordTempIndex = variable->index;
+                break;
+            case gcSL_VERTEX:
+                BuiltinsTempIndex->VertexTempIndex = variable->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_0:
+                BuiltinsTempIndex->MultiTexCoord0TempIndex = variable->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_1:
+                BuiltinsTempIndex->MultiTexCoord1TempIndex = variable->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_2:
+                BuiltinsTempIndex->MultiTexCoord2TempIndex = variable->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_3:
+                BuiltinsTempIndex->MultiTexCoord3TempIndex = variable->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_4:
+                BuiltinsTempIndex->MultiTexCoord4TempIndex = variable->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_5:
+                BuiltinsTempIndex->MultiTexCoord5TempIndex = variable->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_6:
+                BuiltinsTempIndex->MultiTexCoord6TempIndex = variable->index;
+                break;
+            case gcSL_MULTI_TEX_COORD_7:
+                BuiltinsTempIndex->MultiTexCoord7TempIndex = variable->index;
                 break;
             default:
                 gcmASSERT(gcvFALSE);
@@ -34865,7 +35069,7 @@ _initBuiltinsTempIndex(
     BuiltinsTempIndex->PointCoordTempIndex  =
     BuiltinsTempIndex->PositionWTempIndex   =
     BuiltinsTempIndex->DepthTempIndex       =
-    BuiltinsTempIndex->FogCoordTempIndex    =
+    BuiltinsTempIndex->FogFragCoordTempIndex =
     BuiltinsTempIndex->InstanceIDTempIndex  =
     BuiltinsTempIndex->VertexIDTempIndex    =
     BuiltinsTempIndex->WorkGroupIDTempIndex  =
@@ -34877,6 +35081,18 @@ _initBuiltinsTempIndex(
     BuiltinsTempIndex->BackColorTempIndex   =
     BuiltinsTempIndex->FrontColorSecondaryTempIndex =
     BuiltinsTempIndex->BackColorSecondaryTempIndex  =
+    BuiltinsTempIndex->SecondaryColorTempIndex  =
+    BuiltinsTempIndex->NormalTempIndex  =
+    BuiltinsTempIndex->VertexTempIndex  =
+    BuiltinsTempIndex->FogCoordTempIndex  =
+    BuiltinsTempIndex->MultiTexCoord0TempIndex  =
+    BuiltinsTempIndex->MultiTexCoord1TempIndex  =
+    BuiltinsTempIndex->MultiTexCoord2TempIndex  =
+    BuiltinsTempIndex->MultiTexCoord3TempIndex  =
+    BuiltinsTempIndex->MultiTexCoord4TempIndex  =
+    BuiltinsTempIndex->MultiTexCoord5TempIndex  =
+    BuiltinsTempIndex->MultiTexCoord6TempIndex  =
+    BuiltinsTempIndex->MultiTexCoord7TempIndex  =
     BuiltinsTempIndex->SubsampleDepthTempIndex = -1;
 }
 

@@ -1931,20 +1931,20 @@ static slsBUILT_IN_FUNCTION FSBuiltInFunctions[] =
     {{slvEXTENSION1_TEXTURE_ARRAY}, "shadow1DArray", gcvNULL, _GenShadow1DArrayCode,  T_VEC4,     3, {T_SAMPLER1DARRAYSHADOW, T_VEC3,  T_FLOAT}, {0}, {0}},
 
     /* Derivative Functions */
-    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI)},     "dFdx", _EvaluateDerivatives, _GenDFdxCode, T_FLOAT,    1, {T_FLOAT}, {0}, {0}},
-    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI)},     "dFdx", _EvaluateDerivatives, _GenDFdxCode, T_VEC2,     1, {T_VEC2}, {0}, {0}},
-    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI)},     "dFdx", _EvaluateDerivatives, _GenDFdxCode, T_VEC3,     1, {T_VEC3}, {0}, {0}},
-    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI)},     "dFdx", _EvaluateDerivatives, _GenDFdxCode, T_VEC4,     1, {T_VEC4}, {0}, {0}},
+    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI | slvEXTENSION1_SUPPORT_OGL)},     "dFdx", _EvaluateDerivatives, _GenDFdxCode, T_FLOAT,    1, {T_FLOAT}, {0}, {0}},
+    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI | slvEXTENSION1_SUPPORT_OGL)},     "dFdx", _EvaluateDerivatives, _GenDFdxCode, T_VEC2,     1, {T_VEC2}, {0}, {0}},
+    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI | slvEXTENSION1_SUPPORT_OGL)},     "dFdx", _EvaluateDerivatives, _GenDFdxCode, T_VEC3,     1, {T_VEC3}, {0}, {0}},
+    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI | slvEXTENSION1_SUPPORT_OGL)},     "dFdx", _EvaluateDerivatives, _GenDFdxCode, T_VEC4,     1, {T_VEC4}, {0}, {0}},
 
-    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI)},     "dFdy", _EvaluateDerivatives, _GenDFdyCode, T_FLOAT,    1, {T_FLOAT}, {0}, {0}},
-    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI)},     "dFdy", _EvaluateDerivatives, _GenDFdyCode, T_VEC2,     1, {T_VEC2}, {0}, {0}},
-    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI)},     "dFdy", _EvaluateDerivatives, _GenDFdyCode, T_VEC3,     1, {T_VEC3}, {0}, {0}},
-    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI)},     "dFdy", _EvaluateDerivatives, _GenDFdyCode, T_VEC4,     1, {T_VEC4}, {0}, {0}},
+    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI | slvEXTENSION1_SUPPORT_OGL)},     "dFdy", _EvaluateDerivatives, _GenDFdyCode, T_FLOAT,    1, {T_FLOAT}, {0}, {0}},
+    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI | slvEXTENSION1_SUPPORT_OGL)},     "dFdy", _EvaluateDerivatives, _GenDFdyCode, T_VEC2,     1, {T_VEC2}, {0}, {0}},
+    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI | slvEXTENSION1_SUPPORT_OGL)},     "dFdy", _EvaluateDerivatives, _GenDFdyCode, T_VEC3,     1, {T_VEC3}, {0}, {0}},
+    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI | slvEXTENSION1_SUPPORT_OGL)},     "dFdy", _EvaluateDerivatives, _GenDFdyCode, T_VEC4,     1, {T_VEC4}, {0}, {0}},
 
-    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI)},     "fwidth", _EvaluateDerivatives, _GenFwidthCode, T_FLOAT,    1, {T_FLOAT}, {0}, {0}},
-    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI)},     "fwidth", _EvaluateDerivatives, _GenFwidthCode, T_VEC2,     1, {T_VEC2}, {0}, {0}},
-    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI)},     "fwidth", _EvaluateDerivatives, _GenFwidthCode, T_VEC3,     1, {T_VEC3}, {0}, {0}},
-    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI)},     "fwidth", _EvaluateDerivatives, _GenFwidthCode, T_VEC4,     1, {T_VEC4}, {0}, {0}},
+    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI | slvEXTENSION1_SUPPORT_OGL)},     "fwidth", _EvaluateDerivatives, _GenFwidthCode, T_FLOAT,    1, {T_FLOAT}, {0}, {0}},
+    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI | slvEXTENSION1_SUPPORT_OGL)},     "fwidth", _EvaluateDerivatives, _GenFwidthCode, T_VEC2,     1, {T_VEC2}, {0}, {0}},
+    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI | slvEXTENSION1_SUPPORT_OGL)},     "fwidth", _EvaluateDerivatives, _GenFwidthCode, T_VEC3,     1, {T_VEC3}, {0}, {0}},
+    {{(slvEXTENSION1_STANDARD_DERIVATIVES | slvEXTENSION1_HALTI | slvEXTENSION1_SUPPORT_OGL)},     "fwidth", _EvaluateDerivatives, _GenFwidthCode, T_VEC4,     1, {T_VEC4}, {0}, {0}},
 };
 
 static gctUINT FSBuiltInFunctionCount =
@@ -3867,7 +3867,6 @@ static slsBUILT_IN_VARIABLE VSBuiltInVariables[] =
     {{slvEXTENSION1_HALTI}, "gl_VertexID",              "#VertexID",         slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VERTEX_ID,    T_INT,      0,    slvSTORAGE_QUALIFIER_VERTEX_ID, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_HALTI}, "gl_InstanceID",            "#InstanceID",       slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_INSTANCE_ID,  T_INT,      0,    slvSTORAGE_QUALIFIER_INSTANCE_ID, gcvNULL, gcvNULL, 0, gcvFALSE},
 
-    {{slvEXTENSION1_NONE},  "gl_ModelViewProjectionMatrix",             "#ff_MVP_Matrix",      slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_UNIFORM,      T_MAT4,     0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_NONE},  "gl_Color",                 "#AttrColor",        slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_ATTRIBUTE,    T_VEC4,     0,    slvSTORAGE_QUALIFIER_ATTRIBUTE, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_NONE},  "gl_SecondaryColor",        "#AttrSecondaryColor",slvPRECISION_QUALIFIER_HIGH,   slvSTORAGE_QUALIFIER_ATTRIBUTE,    T_VEC4,     0,    slvSTORAGE_QUALIFIER_ATTRIBUTE, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_NONE},  "gl_Normal",                "#Normal",           slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_ATTRIBUTE,    T_VEC3,     0,    slvSTORAGE_QUALIFIER_ATTRIBUTE, gcvNULL, gcvNULL, 0, gcvFALSE},
@@ -3888,6 +3887,7 @@ static slsBUILT_IN_VARIABLE VSBuiltInVariables[] =
     {{slvEXTENSION1_NONE},  "gl_BackSecondaryColor",  "#BackSecondaryColor", slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_NONE},  "gl_TexCoord",            "#TexCoord",           slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     8,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE, updateForTexCoord},
     {{slvEXTENSION1_NONE},  "gl_FogFragCoord",        "#FogFragCoord",       slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
+
 #include "builtin_def/gc_glsl_general_vars.def.h"
 };
 

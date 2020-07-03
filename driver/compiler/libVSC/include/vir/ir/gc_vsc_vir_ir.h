@@ -2425,7 +2425,7 @@ extern VIR_NameId   VIR_NAME_UNKNOWN,
                     VIR_NAME_POINT_COORD,
                     VIR_NAME_POSITION_W,
                     VIR_NAME_DEPTH,
-                    VIR_NAME_FOG_COORD,
+                    VIR_NAME_FOG_FRAG_COORD,
                     VIR_NAME_VERTEX_ID,
                     VIR_NAME_VERTEX_INDEX,
                     VIR_NAME_FRONT_COLOR,
@@ -2476,6 +2476,18 @@ extern VIR_NameId   VIR_NAME_UNKNOWN,
                     VIR_NAME_SUBGROUP_ID, /* gl_SubgroupID */
                     VIR_NAME_SUBGROUP_INVOCATION_ID, /* gl_SubgroupInvocationID */
                     VIR_NAME_VIEW_INDEX, /* gl_ViewIndex */
+                    VIR_NAME_SECONDARY_COLOR,
+                    VIR_NAME_NORMAL,
+                    VIR_NAME_VERTEX, /* gl_Vertex */
+                    VIR_NAME_FOG_COORD, /* gl_FogCoord */
+                    VIR_NAME_MULTI_TEX_COORD_0, /* gl_MultiTexCoord0 */
+                    VIR_NAME_MULTI_TEX_COORD_1, /* gl_MultiTexCoord1 */
+                    VIR_NAME_MULTI_TEX_COORD_2, /* gl_MultiTexCoord2 */
+                    VIR_NAME_MULTI_TEX_COORD_3, /* gl_MultiTexCoord3 */
+                    VIR_NAME_MULTI_TEX_COORD_4, /* gl_MultiTexCoord4 */
+                    VIR_NAME_MULTI_TEX_COORD_5, /* gl_MultiTexCoord5 */
+                    VIR_NAME_MULTI_TEX_COORD_6, /* gl_MultiTexCoord6 */
+                    VIR_NAME_MULTI_TEX_COORD_7, /* gl_MultiTexCoord7 */
                     VIR_NAME_BUILTIN_LAST;
 
 typedef enum _VIR_ROUNDMODE
@@ -4849,9 +4861,21 @@ typedef struct _VIR_BUILTINSTEMPINDEX
    gctINT       PointCoordTempIndex;
    gctINT       PositionWTempIndex;
    gctINT       DepthTempIndex;
-   gctINT       FogCoordTempIndex;
+   gctINT       FogFragCoordTempIndex;
    gctINT       InstanceIDTempIndex;
    gctINT       VertexIDTempIndex;
+   gctINT       SecondaryColorTempIndex;
+   gctINT       NormalTempIndex;
+   gctINT       FogCoordTempIndex;
+   gctINT       VertexTempIndex;
+   gctINT       MultiTexCoord0TempIndex;
+   gctINT       MultiTexCoord1TempIndex;
+   gctINT       MultiTexCoord2TempIndex;
+   gctINT       MultiTexCoord3TempIndex;
+   gctINT       MultiTexCoord4TempIndex;
+   gctINT       MultiTexCoord5TempIndex;
+   gctINT       MultiTexCoord6TempIndex;
+   gctINT       MultiTexCoord7TempIndex;
 } VIR_BuiltinsTempIndex;
 
 typedef struct _VIR_SHADERCODEINFO

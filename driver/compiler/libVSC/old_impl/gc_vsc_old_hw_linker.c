@@ -20538,7 +20538,7 @@ _GenerateStates(
 
                 isTexture = gcmATTRIBUTE_isTexture(Tree->shader->attributes[i]);
                 isZWTexture = gcmATTRIBUTE_isZWTexture(Tree->shader->attributes[i]);
-                isFog = Tree->shader->attributes[i]->nameLength == gcSL_FOG_COORD;
+                isFog = Tree->shader->attributes[i]->nameLength == gcSL_FOG_FRAG_COORD;
                 isPointCoord = Tree->shader->attributes[i]->nameLength == gcSL_POINT_COORD;
 
                 for (j = 0; j < 4; j++)

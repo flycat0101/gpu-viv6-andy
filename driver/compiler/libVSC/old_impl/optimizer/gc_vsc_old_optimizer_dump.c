@@ -230,7 +230,7 @@ gcSL_GetName(
     _print_name(gcSL_FRONT_FACING, "#FrontFacing");
     _print_name(gcSL_POINT_COORD, "#PointCoord");
     _print_name(gcSL_POSITION_W, "#Position.w");
-    _print_name(gcSL_FOG_COORD, "#FogFragCoord");
+    _print_name(gcSL_FOG_FRAG_COORD, "#FogFragCoord");
     _print_name(gcSL_VERTEX_ID, "#VertexID");
     _print_name(gcSL_INSTANCE_ID, "#InstanceID");
     _print_name(gcSL_WORK_GROUP_ID, "#WorkGroupID");
@@ -266,6 +266,19 @@ gcSL_GetName(
     _print_name(gcSL_CLIP_DISTANCE, "gl_ClipDistance");
     _print_name(gcSL_LOCAL_INVOCATION_INDEX, "#LocalInvocationIndex");
     _print_name(gcSL_GLOBAL_INVOCATION_INDEX, "#GlobalInvocationIndex");
+    _print_name(gcSL_SECONDARY_COLOR, "#AttrSecondaryColor");
+    _print_name(gcSL_FOG_COORD, "#FogCoord");
+    _print_name(gcSL_NORMAL, "#Normal");
+    _print_name(gcSL_VERTEX, "#Vertex");
+    _print_name(gcSL_MULTI_TEX_COORD_0, "#MultiTexCoord0");
+    _print_name(gcSL_MULTI_TEX_COORD_1, "#MultiTexCoord1");
+    _print_name(gcSL_MULTI_TEX_COORD_2, "#MultiTexCoord2");
+    _print_name(gcSL_MULTI_TEX_COORD_3, "#MultiTexCoord3");
+    _print_name(gcSL_MULTI_TEX_COORD_4, "#MultiTexCoord4");
+    _print_name(gcSL_MULTI_TEX_COORD_5, "#MultiTexCoord5");
+    _print_name(gcSL_MULTI_TEX_COORD_6, "#MultiTexCoord6");
+    _print_name(gcSL_MULTI_TEX_COORD_7, "#MultiTexCoord7");
+
     default:
         gcmASSERT((gctINT)Length > 0);
         break;

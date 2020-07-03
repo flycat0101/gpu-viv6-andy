@@ -464,6 +464,18 @@ conv2VirsVirBuiltinMap _virBuiltinMap[] =
     { "gl_ClipDistance", {0, 0, 0, VIR_STORAGE_OUTPUT,}},
     { "gl_Local_invocation_index", {0, 0, 0, VIR_STORAGE_INPUT,}},
     { "gl_Global_invocation_index",{0, 0, 0, VIR_STORAGE_INPUT,}},
+    { "gl_SecondaryColor", {0, VIR_STORAGE_INPUT, 0,}},
+    { "gl_Normal", {0, VIR_STORAGE_INPUT, 0,}},
+    { "gl_Vertex", {0, VIR_STORAGE_INPUT, 0,}},
+    { "gl_FogCoord", {0, VIR_STORAGE_INPUT, 0,}},
+    { "gl_MultiTexCoord0", {0, VIR_STORAGE_INPUT, 0,}},
+    { "gl_MultiTexCoord1", {0, VIR_STORAGE_INPUT, 0,}},
+    { "gl_MultiTexCoord2", {0, VIR_STORAGE_INPUT, 0,}},
+    { "gl_MultiTexCoord3", {0, VIR_STORAGE_INPUT, 0,}},
+    { "gl_MultiTexCoord4", {0, VIR_STORAGE_INPUT, 0,}},
+    { "gl_MultiTexCoord5", {0, VIR_STORAGE_INPUT, 0,}},
+    { "gl_MultiTexCoord6", {0, VIR_STORAGE_INPUT, 0,}},
+    { "gl_MultiTexCoord7", {0, VIR_STORAGE_INPUT, 0,}},
 };
 
 #define _gcdBuiltinMapCount (sizeof(_virBuiltinMap)/sizeof(conv2VirsVirBuiltinMap))
@@ -1447,7 +1459,7 @@ _ConvBuiltinNameKindToVirNameId(
     Case(gcSL_FRONT_FACING, VIR_NAME_FRONT_FACING);
     Case(gcSL_POINT_COORD, VIR_NAME_POINT_COORD);
     Case(gcSL_POSITION_W, VIR_NAME_POSITION_W);
-    Case(gcSL_FOG_COORD, VIR_NAME_FOG_COORD);
+    Case(gcSL_FOG_FRAG_COORD, VIR_NAME_FOG_FRAG_COORD);
     Case(gcSL_VERTEX_ID, VIR_NAME_VERTEX_ID);
     Case(gcSL_INSTANCE_ID, VIR_NAME_INSTANCE_ID);
     Case(gcSL_DEPTH, VIR_NAME_DEPTH);
@@ -1484,6 +1496,19 @@ _ConvBuiltinNameKindToVirNameId(
     Case(gcSL_CLIP_DISTANCE, VIR_NAME_CLIP_DISTANCE);
     Case(gcSL_LOCAL_INVOCATION_INDEX, VIR_NAME_LOCAL_INVOCATION_INDEX);
     Case(gcSL_GLOBAL_INVOCATION_INDEX, VIR_NAME_GLOBAL_INVOCATION_INDEX);
+    Case(gcSL_SECONDARY_COLOR, VIR_NAME_SECONDARY_COLOR);
+    Case(gcSL_NORMAL, VIR_NAME_NORMAL);
+    Case(gcSL_VERTEX, VIR_NAME_VERTEX);
+    Case(gcSL_FOG_COORD, VIR_NAME_FOG_COORD);
+    Case(gcSL_MULTI_TEX_COORD_0, VIR_NAME_MULTI_TEX_COORD_0);
+    Case(gcSL_MULTI_TEX_COORD_1, VIR_NAME_MULTI_TEX_COORD_1);
+    Case(gcSL_MULTI_TEX_COORD_2, VIR_NAME_MULTI_TEX_COORD_2);
+    Case(gcSL_MULTI_TEX_COORD_3, VIR_NAME_MULTI_TEX_COORD_3);
+    Case(gcSL_MULTI_TEX_COORD_4, VIR_NAME_MULTI_TEX_COORD_4);
+    Case(gcSL_MULTI_TEX_COORD_5, VIR_NAME_MULTI_TEX_COORD_5);
+    Case(gcSL_MULTI_TEX_COORD_6, VIR_NAME_MULTI_TEX_COORD_6);
+    Case(gcSL_MULTI_TEX_COORD_7, VIR_NAME_MULTI_TEX_COORD_7);
+
     default:
         if((gctINT) Kind < 0) {
             gcmASSERT(0);

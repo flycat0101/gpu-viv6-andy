@@ -785,8 +785,8 @@ _ConvVirNameIdToBuiltinNameKind(
         kind = gcSL_POINT_COORD;
     } else if (VirNameId == VIR_NAME_POSITION_W) {
         kind = gcSL_POSITION_W;
-    } else if (VirNameId == VIR_NAME_FOG_COORD) {
-        kind = gcSL_FOG_COORD;
+    } else if (VirNameId == VIR_NAME_FOG_FRAG_COORD) {
+        kind = gcSL_FOG_FRAG_COORD;
     } else if (VirNameId == VIR_NAME_VERTEX_ID ||
                VirNameId == VIR_NAME_VERTEX_INDEX) {
         kind = gcSL_VERTEX_ID;
@@ -856,6 +856,30 @@ _ConvVirNameIdToBuiltinNameKind(
         kind = gcSL_BOUNDING_BOX;
     } else if (VirNameId == VIR_NAME_LAST_FRAG_DATA) {
         kind = gcSL_LAST_FRAG_DATA;
+    } else if (VirNameId == VIR_NAME_SECONDARY_COLOR) {
+        kind = gcSL_SECONDARY_COLOR;
+    } else if (VirNameId == VIR_NAME_NORMAL) {
+        kind = gcSL_NORMAL;
+    } else if (VirNameId == VIR_NAME_FOG_COORD) {
+        kind = gcSL_FOG_COORD;
+    } else if (VirNameId == VIR_NAME_VERTEX) {
+        kind = gcSL_VERTEX;
+    } else if (VirNameId == VIR_NAME_MULTI_TEX_COORD_0) {
+        kind = gcSL_MULTI_TEX_COORD_0;
+    } else if (VirNameId == VIR_NAME_MULTI_TEX_COORD_1) {
+        kind = gcSL_MULTI_TEX_COORD_1;
+    } else if (VirNameId == VIR_NAME_MULTI_TEX_COORD_2) {
+        kind = gcSL_MULTI_TEX_COORD_2;
+    } else if (VirNameId == VIR_NAME_MULTI_TEX_COORD_3) {
+        kind = gcSL_MULTI_TEX_COORD_3;
+    } else if (VirNameId == VIR_NAME_MULTI_TEX_COORD_4) {
+        kind = gcSL_MULTI_TEX_COORD_4;
+    } else if (VirNameId == VIR_NAME_MULTI_TEX_COORD_5) {
+        kind = gcSL_MULTI_TEX_COORD_5;
+    } else if (VirNameId == VIR_NAME_MULTI_TEX_COORD_6) {
+        kind = gcSL_MULTI_TEX_COORD_6;
+    } else if (VirNameId == VIR_NAME_MULTI_TEX_COORD_7) {
+        kind = gcSL_MULTI_TEX_COORD_7;
     } else {
         *Kind = gcSL_NONBUILTINGNAME;
         return gcvSTATUS_NOT_FOUND;
