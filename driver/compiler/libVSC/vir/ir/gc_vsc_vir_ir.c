@@ -21219,9 +21219,9 @@ VIR_Shader_NeedPutImmValue2Uniform(
 
 gctBOOL
 VIR_Shader_NeedToCheckDual16(
-    IN  VIR_Shader*         pShader,
-    IN  VSC_HW_CONFIG*      pHwCfg,
-    IN  VSC_COMPILER_CONFIG*pCompilerConfig
+    IN  VIR_Shader*          pShader,
+    IN  VSC_HW_CONFIG*       pHwCfg,
+    IN  VSC_COMPILER_CONFIG* pCompilerConfig
     )
 {
     /* only fragment shader or ocl with VC_OPTION=DUAL16:num>0 can be dual16 shader,
@@ -21243,7 +21243,7 @@ VIR_Shader_NeedToCheckDual16(
 
     if (VIR_Shader_IsVulkan(pShader))
     {
-        if ((pCompilerConfig->cFlags & VSC_COMPILER_FLAG_ENABLE_DUAL16_FOR_VK) == 0)
+        if (pCompilerConfig && ((pCompilerConfig->cFlags & VSC_COMPILER_FLAG_ENABLE_DUAL16_FOR_VK) == 0))
         {
             return gcvFALSE;
         }

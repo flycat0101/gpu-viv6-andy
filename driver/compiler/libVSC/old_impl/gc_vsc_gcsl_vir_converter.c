@@ -8138,6 +8138,11 @@ gcSHADER_Conv2VIR(
         VIR_PatternContext_Initialize(&context.header, &vscContext, VirShader, &mp.mmWrapper, VIR_PATN_CONTEXT_FLAG_NONE, _GetgcSL2VirPatterns, _CmpInstruction, 0);
         context.externOpcodeTable = externOpcodeTable;
         context.virRegMapArr = virRegMapArr;
+        /* check if update precision before transform patterns */
+        if (VIR_Shader_NeedToCheckDual16(VirShader, hwCfg, NULL))
+        {
+            VIR_Shader_SetFlagExt1(VirShader, VIR_SHFLAG_EXT1_ENABLE_PRECISION_UPDATE);
+        }
         if (gcSHADER_DumpCodeGenVerbose(Shader))
         {
             VIR_Shader_Dump(gcvNULL, "Converted VIR shader before patternMatch IR.", VirShader, gcvTRUE);
