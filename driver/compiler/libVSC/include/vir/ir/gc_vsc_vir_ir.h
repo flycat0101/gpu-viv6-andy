@@ -1016,6 +1016,9 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Shader_GetBaseSamplerId(Shader)         ((Shader)->baseSamplerId)
 #define VIR_Shader_SetBaseSamplerId(Shader, V)      do { (Shader)->baseSamplerId = (V); } while (0)
 
+#define VIR_Shader_GetVectorizeUniformSet(Shader)   ((Shader)->pVectorizeUniformSet)
+#define VIR_Shader_SetVectorizeUniformSet(Shader, V)do { (Shader)->pVectorizeUniformSet = (V); } while (0)
+
 #define VIR_Shader_isPackUnifiedSampler(Shader)     ((Shader)->packUnifiedSampler)
 #define VIR_Shader_SetPackUnifiedSampler(Shader, V) do { (Shader)->packUnifiedSampler = (V); } while (0)
 
@@ -5354,6 +5357,8 @@ struct _VIR_SHADER
 
     VIR_SymId           baseSamplerId;       /* Create a base sampler symbol, use it as the operand symbol of SAMLER. */
 
+    VSC_HASH_TABLE*     pVectorizeUniformSet;
+
     /* Sampler base offset. */
     gctINT              samplerBaseOffset;
 
@@ -6344,6 +6349,12 @@ VIR_Uniform_AlwaysAlloc(
     IN VIR_Symbol* pUniformSym
     );
 
+gctBOOL
+VIR_Uniform_NeedAllocateRes(
+    IN VIR_Shader*          pShader,
+    IN VIR_Symbol*          pUniformSym
+    );
+
 VSC_ErrCode
 VIR_Uniform_UpdateResOpBitFromSampledImage(
     IN VIR_Shader* Shader,
@@ -6364,6 +6375,11 @@ VSC_ErrCode
 VIR_Uniform_CheckImageFormatMismatch(
     IN VIR_Shader* Shader,
     IN VIR_Uniform* Uniform
+    );
+
+gctBOOL
+VIR_Uniform_IsRestricted(
+    IN VIR_Symbol*          pUniformSymbol
     );
 
 /* UBO-related functions. */
@@ -6656,6 +6672,19 @@ VIR_Shader_CollectSampledImageInfo(
     IN VSC_SHADER_RESOURCE_LAYOUT*  pResLayout,
     IN VIR_Shader*                  pShader,
     IN VSC_MM *                     pMM
+    );
+
+/* Analysis the constant register read port information. */
+VSC_ErrCode
+VIR_Shader_AnalysisCstRegReadPort(
+    IN VIR_Shader*                  pShader,
+    IN VSC_HW_CONFIG*               pHwCfg,
+    IN VSC_MM *                     pMM
+    );
+
+VSC_ErrCode
+VIR_Shader_DestroyVectorizeUniformSet(
+    IN VIR_Shader*                  pShader
     );
 
 /* setters */

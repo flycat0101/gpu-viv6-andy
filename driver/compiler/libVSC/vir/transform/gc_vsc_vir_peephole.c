@@ -4141,6 +4141,12 @@ static VSC_ErrCode _VSC_PH_MergeAddSubSameValue(
             /* Copy the source. */
             VIR_Inst_CopySource(pUsageInst, 0, VIR_Inst_GetSource(pFirstAddInst, (matchSrcIndex == 0 ? 1 : 0)), gcvFALSE);
 
+            /* If the replaced operand is the SOURCE1 of a SUB instruction, we need to inverse again. */
+            if (firstOpcode == VIR_OP_SUB && matchSrcIndex == 0)
+            {
+                bInverse = !bInverse;
+            }
+
             /* Get the operand information. */
             VIR_Operand_GetOperandInfo(pUsageInst, VIR_Inst_GetSource(pUsageInst, 0), &opndInfo);
 

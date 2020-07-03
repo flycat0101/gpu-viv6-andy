@@ -8589,6 +8589,17 @@ static VIR_PatternReplaceInst _cmpRepInst10[] = {
     { VIR_OP_COMPARE, VIR_PATTERN_ANYCOND, 0, { 6, 2, 3, 0 }, { 0, 0, 0, 0 } },
 };
 
+static VIR_PatternMatchInst _cmpPatInst11[] = {
+    { VIR_OP_COMPARE, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { all_source_float, VIR_Lower_IsDstBool }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_CSELECT, VIR_COP_SELMSB, 0, { 1, 1, 4, 5 }, { _isSrc1IntOne, _isSrc2IntZero }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_CSELECT, VIR_COP_NOT_ZERO, 0, { 6, 1, 7, 8 }, { VIR_Lower_IsDstFloat }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _cmpRepInst11[] = {
+    { VIR_OP_COMPARE, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0, 0, 0, 0 } },
+    { VIR_OP_CSELECT, VIR_COP_SELMSB, 0, { 6, 1, 7, 8 }, { 0, 0, 0, 0 } },
+};
+
 static VIR_Pattern _cmpPattern[] = {
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_cmp, 0) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_cmp, 1) },
@@ -8601,6 +8612,7 @@ static VIR_Pattern _cmpPattern[] = {
     { VIR_PATN_FLAG_RECURSIVE_SCAN_NEWINST, CODEPATTERN(_cmp, 8) },
     { VIR_PATN_FLAG_RECURSIVE_SCAN_NEWINST, CODEPATTERN(_cmp, 9) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_cmp, 10) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_cmp, 11) },
     { VIR_PATN_FLAG_NONE }
 };
 
@@ -18231,7 +18243,7 @@ _SplitPackedGT16ByteInst(
 }
 
 static VIR_Pattern*
-_GetLowerPatternPhaseExpand(
+_GetLowerPatternPhaseExpandPre(
     IN  VIR_PatternContext * Context,
     IN VIR_Instruction     * Inst
     )
@@ -18430,6 +18442,26 @@ _GetLowerPatternPhaseExpand(
     return gcvNULL;
 }
 
+static VIR_Pattern*
+_GetLowerPatternPhaseExpandPost(
+    IN  VIR_PatternContext * Context,
+    IN VIR_Instruction     * Inst
+    )
+{
+    VIR_OpCode opCode = VIR_Inst_GetOpcode(Inst);
+
+    switch(opCode)
+    {
+    case VIR_OP_COMPARE:
+        return _cmpPattern;
+
+    default:
+        break;
+    }
+
+    return gcvNULL;
+}
+
 static gctBOOL
 _CmpInstuction(
     IN VIR_PatternContext  *Context,
@@ -18441,7 +18473,7 @@ _CmpInstuction(
 }
 
 VSC_ErrCode
-VIR_Lower_MiddleLevel_To_LowLevel_Expand(
+VIR_Lower_MiddleLevel_To_LowLevel_Expand_Pre(
     IN  VIR_Shader              *Shader,
     IN  PVSC_CONTEXT            VscContext,
     IN  VIR_PatternLowerContext *Context
@@ -18450,10 +18482,30 @@ VIR_Lower_MiddleLevel_To_LowLevel_Expand(
     VSC_ErrCode errCode  = VSC_ERR_NONE;
 
     VIR_PatternContext_Initialize(&Context->header, VscContext, Shader, Context->pMM, VIR_PATN_CONTEXT_FLAG_NONE,
-                                  _GetLowerPatternPhaseExpand, _CmpInstuction, 512);
+                                  _GetLowerPatternPhaseExpandPre, _CmpInstuction, 512);
 
     errCode = VIR_Pattern_Transform((VIR_PatternContext *)Context);
-    CHECK_ERROR(errCode, "VIR_Lower_MiddleLevel_To_LowLevel_Expand failed.");
+    CHECK_ERROR(errCode, "ML to LL expand pre failed.");
+
+    VIR_PatternContext_Finalize(&Context->header);
+
+    return errCode;
+}
+
+VSC_ErrCode
+VIR_Lower_MiddleLevel_To_LowLevel_Expand_Post(
+    IN  VIR_Shader              *Shader,
+    IN  PVSC_CONTEXT            VscContext,
+    IN  VIR_PatternLowerContext *Context
+    )
+{
+    VSC_ErrCode errCode  = VSC_ERR_NONE;
+
+    VIR_PatternContext_Initialize(&Context->header, VscContext, Shader, Context->pMM, VIR_PATN_CONTEXT_FLAG_NONE,
+                                  _GetLowerPatternPhaseExpandPost, _CmpInstuction, 512);
+
+    errCode = VIR_Pattern_Transform((VIR_PatternContext *)Context);
+    CHECK_ERROR(errCode, "ML to LL expand post failed.");
 
     VIR_PatternContext_Finalize(&Context->header);
 

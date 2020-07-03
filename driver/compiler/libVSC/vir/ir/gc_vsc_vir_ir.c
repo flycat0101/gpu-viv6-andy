@@ -1752,6 +1752,32 @@ VIR_Uniform_CheckImageFormatMismatch(
 }
 
 gctBOOL
+VIR_Uniform_IsRestricted(
+    IN VIR_Symbol*          pUniformSymbol
+    )
+{
+    gctBOOL                 bRestricted = gcvFALSE;
+    VIR_UniformKind         uniformKind = VIR_Symbol_GetUniformKind(pUniformSymbol);
+
+    /*
+    ** 1) for #num_group, it must be c.xyz
+    ** 2) for #base_instance, it must be c.x
+    */
+    if (uniformKind == VIR_UNIFORM_NUM_GROUPS    ||
+        uniformKind == VIR_UNIFORM_NUM_GROUPS_FOR_SINGLE_GPU ||
+        uniformKind == VIR_UNIFORM_BASE_INSTANCE)
+    {
+        bRestricted = gcvTRUE;
+    }
+    else if (VIR_Symbol_GetCannotShift(pUniformSymbol))
+    {
+        bRestricted = gcvTRUE;
+    }
+
+    return bRestricted;
+}
+
+gctBOOL
 VIR_ConditionOp_Reversable(
     IN VIR_ConditionOp cond_op
     )
@@ -7468,6 +7494,26 @@ VIR_Uniform_AlwaysAlloc(
     return alwaysAlloc;
 }
 
+gctBOOL
+VIR_Uniform_NeedAllocateRes(
+    IN VIR_Shader*          pShader,
+    IN VIR_Symbol*          pUniformSym
+    )
+{
+    gctBOOL                 bNeedAlloc = gcvTRUE;
+
+    if (!isSymUniformUsedInShader(pUniformSym)      &&
+        !isSymUniformImplicitlyUsed(pUniformSym)    &&
+        !isSymUniformUsedInLTC(pUniformSym)         &&
+        !isSymUniformUsedInTextureSize(pUniformSym) &&
+        !VIR_Uniform_AlwaysAlloc(pShader, pUniformSym))
+    {
+        bNeedAlloc = gcvFALSE;
+    }
+
+    return bNeedAlloc;
+}
+
 /* UBO-related functions. */
 VSC_ErrCode
 VIR_UBO_Member_Identical(
@@ -10578,6 +10624,312 @@ VIR_Shader_CollectSampledImageInfo(
     }
 
 OnError:
+    return errCode;
+}
+
+/* Analysis the constant register read port information. */
+static gctBOOL
+_NeedToAnalysisThisUniform(
+    IN VIR_Shader*                  pShader,
+    IN VIR_Symbol*                  pUniformSym
+    )
+{
+    VIR_Type*                       pUniformType = VIR_Symbol_GetType(pUniformSym);
+    VIR_Uniform*                    pUniform = gcvNULL;
+
+    /* Skip those uniforms that don't need to allocated. */
+    if (!VIR_Uniform_NeedAllocateRes(pShader, pUniformSym))
+    {
+        return gcvFALSE;
+    }
+
+    /* Skip sampler. */
+    if (VIR_Symbol_isSampler(pUniformSym))
+    {
+        return gcvFALSE;
+    }
+
+    if (!VIR_Type_isPrimitive(pUniformType))
+    {
+        return gcvFALSE;
+    }
+
+    /* Skip vec4 or 64bit data type. */
+    if (VIR_GetTypeComponents(VIR_Type_GetIndex(pUniformType)) > 3
+        ||
+        VIR_GetTypeSize(VIR_GetTypeComponentType(VIR_Type_GetIndex(pUniformType))) > 4)
+    {
+        return gcvFALSE;
+    }
+
+    if (!isSymCompilerGen(pUniformSym) || isSymUniformWithResLayout(pUniformSym))
+    {
+        return gcvFALSE;
+    }
+
+    pUniform = VIR_Symbol_GetUniformPointer(pShader, pUniformSym);
+
+    if ((gctINT16)pUniform->index != pUniform->lastIndexingIndex
+        &&
+        pUniform->lastIndexingIndex != -1)
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
+static gctBOOL
+_CanVectorizeTwoUniforms(
+    IN VIR_Shader*                  pShader,
+    IN VIR_Symbol*                  pUniformSym1,
+    IN VIR_Symbol*                  pUniformSym2
+    )
+{
+    VIR_Type*                      pUniformType1 = VIR_Symbol_GetType(pUniformSym1);
+    VIR_Type*                      pUniformType2 = VIR_Symbol_GetType(pUniformSym2);
+
+    /* Get the basic type. */
+    while (VIR_Type_isArray(pUniformType1))
+    {
+        pUniformType1 = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(pUniformType1));
+    }
+
+    while (VIR_Type_isArray(pUniformType2))
+    {
+        pUniformType2 = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(pUniformType2));
+    }
+
+    if (VIR_GetTypeComponents(VIR_Type_GetIndex(pUniformType1)) + VIR_GetTypeComponents(VIR_Type_GetIndex(pUniformType2)) > 4)
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
+VSC_ErrCode
+VIR_Shader_AnalysisCstRegReadPort(
+    IN VIR_Shader*                  pShader,
+    IN VSC_HW_CONFIG*               pHwCfg,
+    IN VSC_MM *                     pMM
+    )
+{
+    VSC_ErrCode                     errCode = VSC_ERR_NONE;
+    gctBOOL                         bHasOneConstFix = pHwCfg->hwFeatureFlags.noOneConstLimit;
+    VIR_UniformIdList*              pUniformList = VIR_Shader_GetUniforms(pShader);
+    gctUINT                         i, j;
+    gctUINT                         uniformCount = VIR_IdList_Count(pUniformList);
+    VIR_Symbol*                     pSym;
+    VIR_FuncIterator                funcIter;
+    VIR_FunctionNode*               pFuncNode;
+    VSC_HASH_TABLE*                 pWorkingUniformSet = gcvNULL;
+    gctBOOL                         bFound = gcvFALSE;
+
+    /* Create before, destroy the previous hash table. */
+    if (VIR_Shader_GetVectorizeUniformSet(pShader) != gcvNULL)
+    {
+        VIR_Shader_DestroyVectorizeUniformSet(pShader);
+    }
+
+    /* Go through uniforms to find the candidates. */
+    for (i = 0; i < uniformCount; i++)
+    {
+        pSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pUniformList, i));
+
+        if (!_NeedToAnalysisThisUniform(pShader, pSym))
+        {
+            continue;
+        }
+
+        if (pWorkingUniformSet == gcvNULL)
+        {
+            pWorkingUniformSet = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 8);
+        }
+
+        vscHTBL_DirectSet(pWorkingUniformSet, (void *)pSym, gcvNULL);
+    }
+
+    /* Not matched uniform, just bail out. */
+    if (pWorkingUniformSet == gcvNULL)
+    {
+        return errCode;
+    }
+
+    /* Go through all instructions to analysis the uniform read port information. */
+    VIR_FuncIterator_Init(&funcIter, VIR_Shader_GetFunctions(pShader));
+    for (pFuncNode = VIR_FuncIterator_First(&funcIter);
+         pFuncNode != gcvNULL;
+         pFuncNode = VIR_FuncIterator_Next(&funcIter))
+    {
+        VIR_Function*               pFunc = pFuncNode->function;
+        VIR_InstIterator            instIter;
+        VIR_Instruction*            pInst;
+
+        VIR_InstIterator_Init(&instIter, VIR_Function_GetInstList(pFunc));
+        for (pInst = (VIR_Instruction*)VIR_InstIterator_First(&instIter);
+             pInst != gcvNULL;
+             pInst = (VIR_Instruction*)VIR_InstIterator_Next(&instIter))
+        {
+            VIR_OpCode              opCode = VIR_Inst_GetOpcode(pInst);
+            VIR_Operand*            pSrcOpnd = gcvNULL;
+            VIR_Symbol*             pSrcSymbol = gcvNULL;
+            VIR_Uniform*            pSrcUniform = gcvNULL;
+            VIR_SymId               srcSymId[VIR_MAX_SRC_NUM] = { VIR_INVALID_ID, VIR_INVALID_ID, VIR_INVALID_ID, VIR_INVALID_ID, VIR_INVALID_ID };
+            gctUINT                 srcUniformCount = 0;
+
+            opCode = VIR_Inst_GetOpcode(pInst);
+
+            /* This instruction has not a uniform512 source, just bail out. */
+            if (bHasOneConstFix && VIR_OPCODE_U512_SrcNo(opCode) == 0)
+            {
+                continue;
+            }
+
+            for (i = 0; i < VIR_Inst_GetSrcNum(pInst); i++)
+            {
+                pSrcOpnd = VIR_Inst_GetSource(pInst, i);
+
+                if (!VIR_Operand_isSymbol(pSrcOpnd))
+                {
+                    continue;
+                }
+
+                pSrcSymbol = VIR_Operand_GetSymbol(pSrcOpnd);
+                pSrcUniform = VIR_Symbol_GetUniformPointer(pShader, pSrcSymbol);
+                if (pSrcUniform == gcvNULL)
+                {
+                    continue;
+                }
+
+                /* Check if any previous source use this uniform. */
+                for (j = 0; j < srcUniformCount; j++)
+                {
+                    if (srcSymId[j] == VIR_Symbol_GetIndex(pSrcSymbol))
+                    {
+                        break;
+                    }
+                }
+
+                /* Record this uniform. */
+                if (j == srcUniformCount)
+                {
+                    srcSymId[srcUniformCount] = VIR_Symbol_GetIndex(pSrcSymbol);
+                    srcUniformCount++;
+                }
+            }
+
+            /* Update the working set. */
+            for (i = 0; i < srcUniformCount; i++)
+            {
+                gctUINT             usedInstCount = 0;
+                VIR_Symbol*         pUniformSymbol1 = gcvNULL;
+                VIR_Symbol*         pUniformSymbol2 = gcvNULL;
+                VSC_HASH_TABLE*     pUniformVecSet1 = gcvNULL;
+                VSC_HASH_TABLE*     pUniformVecSet2 = gcvNULL;
+
+                pUniformSymbol1 = VIR_Shader_GetSymFromId(pShader, srcSymId[i]);
+
+                /* Not a matched uniform. */
+                if (!vscHTBL_DirectTestAndGet(pWorkingUniformSet, pUniformSymbol1, (void **)&pUniformVecSet1))
+                {
+                    continue;
+                }
+
+                for (j = i + 1; j < srcUniformCount; j++)
+                {
+                    pUniformSymbol2 = VIR_Shader_GetSymFromId(pShader, srcSymId[j]);
+                    pUniformVecSet2 = gcvNULL;
+
+                    /* Not a matched uniform. */
+                    if (!vscHTBL_DirectTestAndGet(pWorkingUniformSet, pUniformSymbol2, (void **)&pUniformVecSet2))
+                    {
+                        continue;
+                    }
+
+                    if (!_CanVectorizeTwoUniforms(pShader, pUniformSymbol1, pUniformSymbol2))
+                    {
+                        continue;
+                    }
+
+                    /* Create the hash table if not existed. */
+                    if (pUniformVecSet1 == gcvNULL)
+                    {
+                        pUniformVecSet1 = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 8);
+                        vscHTBL_DirectSet(pWorkingUniformSet, (void *)pUniformSymbol1, pUniformVecSet1);
+                    }
+                    if (pUniformVecSet2 == gcvNULL)
+                    {
+                        pUniformVecSet2 = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 8);
+                        vscHTBL_DirectSet(pWorkingUniformSet, (void *)pUniformSymbol2, pUniformVecSet2);
+                    }
+
+                    /* Update the uniform symbol 1. */
+                    usedInstCount = 1;
+                    if (vscHTBL_DirectTestAndGet(pUniformVecSet1, (void *)pUniformSymbol2, (void **)&usedInstCount))
+                    {
+                        usedInstCount++;
+                    }
+                    vscHTBL_DirectSet(pUniformVecSet1, (void *)pUniformSymbol2, (void *)(gctUINTPTR_T)usedInstCount);
+
+                    /* Update the uniform symbol 2. */
+                    usedInstCount = 1;
+                    if (vscHTBL_DirectTestAndGet(pUniformVecSet2, (void *)pUniformSymbol1, (void **)&usedInstCount))
+                    {
+                        usedInstCount++;
+                    }
+                    vscHTBL_DirectSet(pUniformVecSet2, (void *)pUniformSymbol1, (void *)(gctUINTPTR_T)usedInstCount);
+
+                    bFound = gcvTRUE;
+                }
+            }
+        }
+    }
+
+    /* Save the results. */
+    if (!bFound)
+    {
+        vscHTBL_Destroy(pWorkingUniformSet);
+        pWorkingUniformSet = gcvNULL;
+    }
+    VIR_Shader_SetVectorizeUniformSet(pShader, pWorkingUniformSet);
+
+    return errCode;
+}
+
+VSC_ErrCode
+VIR_Shader_DestroyVectorizeUniformSet(
+    IN VIR_Shader*                  pShader
+    )
+{
+    VSC_ErrCode                     errCode = VSC_ERR_NONE;
+    VSC_HASH_TABLE*                 pWorkingUniformSet = VIR_Shader_GetVectorizeUniformSet(pShader);
+    VSC_HASH_ITERATOR               iter;
+    VSC_DIRECT_HNODE_PAIR           pair;
+
+    if (pWorkingUniformSet == gcvNULL)
+    {
+        return errCode;
+    }
+
+    vscHTBLIterator_Init(&iter, pWorkingUniformSet);
+    for (pair = vscHTBLIterator_DirectFirst(&iter);
+         IS_VALID_DIRECT_HNODE_PAIR(&pair);
+         pair = vscHTBLIterator_DirectNext(&iter))
+    {
+        VSC_HASH_TABLE*             pUniformVecSet = (VSC_HASH_TABLE*)VSC_DIRECT_HNODE_PAIR_SECOND(&pair);
+
+        if (pUniformVecSet != gcvNULL)
+        {
+            vscHTBL_Destroy(pUniformVecSet);
+            pUniformVecSet = gcvNULL;
+        }
+    }
+
+    vscHTBL_Destroy(pWorkingUniformSet);
+    pWorkingUniformSet = gcvNULL;
+
+    VIR_Shader_SetVectorizeUniformSet(pShader, gcvNULL);
     return errCode;
 }
 

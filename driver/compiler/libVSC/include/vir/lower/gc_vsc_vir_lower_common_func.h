@@ -35,7 +35,14 @@ VIR_Lower_ArraryIndexing_To_LDARR_STARR(
     );
 
 VSC_ErrCode
-VIR_Lower_MiddleLevel_To_LowLevel_Expand(
+VIR_Lower_MiddleLevel_To_LowLevel_Expand_Pre(
+    IN  VIR_Shader              *Shader,
+    IN  PVSC_CONTEXT            VscContext,
+    IN  VIR_PatternLowerContext *Context
+    );
+
+VSC_ErrCode
+VIR_Lower_MiddleLevel_To_LowLevel_Expand_Post(
     IN  VIR_Shader              *Shader,
     IN  PVSC_CONTEXT            VscContext,
     IN  VIR_PatternLowerContext *Context
