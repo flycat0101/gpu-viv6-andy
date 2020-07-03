@@ -1938,8 +1938,12 @@ static VSC_ErrCode _VSC_IS_BuildDAGForBB(
             return err_code;
         }
         err_code = _VSC_IS_DepDag_AddNode(dag, pseudo_end);
-        CHECK_ERROR(err_code, "Failed in _VSC_IS_DepDag_AddNode.");
-
+        if (err_code != VSC_ERR_NONE)
+        {
+            ERR_REPORT(err_code, "Failed in _VSC_IS_DepDag_AddNode.");
+            gcoOS_Free(gcvNULL, (gctPOINTER)tail_nodes);
+            return err_code;
+        }
         /* add the pseudo_end node */
         for(i = 0; i < tail_count; i++)
         {

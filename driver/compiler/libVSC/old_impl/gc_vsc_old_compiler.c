@@ -6453,6 +6453,11 @@ gcSHADER_MergeKernel(
                                       totalCodeCount* gcmSIZEOF(gctBOOL),
                                       &pointer));
             gcoOS_ZeroMemory(pointer, totalCodeCount * gcmSIZEOF(gctBOOL));
+            if(builtinIndex.instInKernelFuncPrep)
+            {
+                gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL,
+                                      builtinIndex.instInKernelFuncPrep));
+            }
             builtinIndex.instInKernelFuncPrep = pointer;
 
             gcmONERROR(gcSHADER_ReallocateUniforms(mergedKernel,

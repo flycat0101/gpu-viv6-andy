@@ -67,7 +67,12 @@ gceSTATUS spvInitializeMemPool(IN gctUINT memSize, INOUT SpvMemPool **memPool)
 
     /* Allocate first pool */
     status = gcoOS_Allocate(gcvNULL, memSize, &pointer);
-    if (gcmIS_ERROR(status)) return status;
+    if (gcmIS_ERROR(status))
+    {
+        gcoOS_Free(gcvNULL, *memPool);
+        *memPool = gcvNULL;
+        return status;
+    }
 
     (*memPool)->ptr = pointer;
     (*memPool)->poolSize = memSize;
@@ -127,7 +132,9 @@ spvAllocate(
     {
         status = spvInitializeMemPool((Bytes > SPV_MEMPOOL_PAGESIZE) ? (gctUINT)Bytes : SPV_MEMPOOL_PAGESIZE, &newMemPool);
         if (status != gcvSTATUS_OK)
+        {
             return status;
+        }
         lastNode->next = newMemPool;
 
         pointer = newMemPool->ptr;
