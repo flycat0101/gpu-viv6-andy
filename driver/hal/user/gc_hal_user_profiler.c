@@ -1231,6 +1231,8 @@ gcoPROFILER_Initialize(
         }
     }
 
+    gcoHAL_ConfigPowerManagement(gcvFALSE);
+
     /*do profile in new way by probe*/
     if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_PROBE) && !Profiler->disableProbe)
     {
@@ -1239,8 +1241,6 @@ gcoPROFILER_Initialize(
         gctUINT32 size;
         gctUINT32 clusterIDWidth = 0;
         gcoBUFOBJ counterBufobj;
-
-        gcoHAL_ConfigPowerManagement(gcvTRUE);
 
         /* disable old profiler in kernel. */
         iface.ignoreTLS = gcvFALSE;
@@ -1296,8 +1296,6 @@ gcoPROFILER_Initialize(
             gcmONERROR(gcoHARDWARE_QueryCoreIndex(gcvNULL, coreId, &coreIndex));
             /* Set it to TLS to find correct command queue. */
             gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, coreIndex));
-
-            gcoHAL_ConfigPowerManagement(gcvFALSE);
 
             /* Call the kernel. */
             gcmONERROR(gcoOS_DeviceControl(gcvNULL,
