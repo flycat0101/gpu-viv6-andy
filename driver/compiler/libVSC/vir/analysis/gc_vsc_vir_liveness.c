@@ -794,12 +794,13 @@ static VSC_ErrCode _DoLivenessAnalysis(VIR_CALL_GRAPH* pCg, VIR_LIVENESS_INFO* p
 #endif
                                             };
 
-    vscVIR_InitializeBaseTsDFA(&pLvInfo->baseTsDFA,
+    errCode = vscVIR_InitializeBaseTsDFA(&pLvInfo->baseTsDFA,
                                pCg,
                                VIR_DFA_TYPE_LIVE_VAR,
                                flowSize,
                                &pLvInfo->pmp.mmWrapper,
                                &tsDfaResolvers);
+    CHECK_ERROR(errCode, "failed to initialize base Ts DFA");
 
     /* Do analysis! */
     vscVIR_DoBackwardIterativeTsDFA(pCg,

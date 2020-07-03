@@ -112,8 +112,8 @@ typedef struct _VIR_TS_BLOCK_FLOW
     VSC_BIT_VECTOR               outFlow;
 }VIR_TS_BLOCK_FLOW;
 
-void vscVIR_InitializeTsBlockFlow(VIR_TS_BLOCK_FLOW* pTsBlkFlow, VIR_BASIC_BLOCK* pOwnerBB, VSC_MM* pMM, gctINT flowSize);
-void vscVIR_UpdateTsBlockFlowSize(VIR_TS_BLOCK_FLOW* pTsBlkFlow, gctINT newFlowSize);
+VSC_ErrCode vscVIR_InitializeTsBlockFlow(VIR_TS_BLOCK_FLOW* pTsBlkFlow, VIR_BASIC_BLOCK* pOwnerBB, VSC_MM* pMM, gctINT flowSize);
+VSC_ErrCode vscVIR_UpdateTsBlockFlowSize(VIR_TS_BLOCK_FLOW* pTsBlkFlow, gctINT newFlowSize);
 void vscVIR_FinalizeTsBlockFlow(VIR_TS_BLOCK_FLOW* pTsBlkFlow);
 
 typedef struct _VIR_TS_FUNC_FLOW
@@ -131,7 +131,7 @@ typedef struct _VIR_TS_FUNC_FLOW
 }VIR_TS_FUNC_FLOW;
 
 VSC_ErrCode vscVIR_InitializeTsFuncFlow(VIR_TS_FUNC_FLOW* pTsFuncFlow, VIR_FUNC_BLOCK* pOwnerFB, VSC_MM* pMM, gctINT flowSize);
-void vscVIR_UpdateTsFuncFlowSize(VIR_TS_FUNC_FLOW* pTsFuncFlow, gctINT newFlowSize);
+VSC_ErrCode vscVIR_UpdateTsFuncFlowSize(VIR_TS_FUNC_FLOW* pTsFuncFlow, gctINT newFlowSize);
 void vscVIR_FinalizeTsFuncFlow(VIR_TS_FUNC_FLOW* pTsFuncFlow);
 
 typedef struct _VIR_BASE_TS_DFA VIR_BASE_TS_DFA;
@@ -174,7 +174,7 @@ struct _VIR_BASE_TS_DFA
 
 VSC_ErrCode vscVIR_InitializeBaseTsDFA(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_CALL_GRAPH* pCg, VIR_DFA_TYPE dfaType,
                                 gctINT flowSize, VSC_MM* pMM, VIR_TS_DFA_RESOLVERS* pTsDfaResolvers);
-void vscVIR_UpdateBaseTsDFAFlowSize(VIR_BASE_TS_DFA* pBaseTsDFA, gctINT newFlowSize);
+VSC_ErrCode vscVIR_UpdateBaseTsDFAFlowSize(VIR_BASE_TS_DFA* pBaseTsDFA, gctINT newFlowSize);
 void vscVIR_FinalizeBaseTsDFA(VIR_BASE_TS_DFA* pBaseTsDFA);
 void vscVIR_UpdateTsFlow(VSC_BIT_VECTOR* pTsFlow, VSC_BIT_VECTOR* pDeltaTsFlow, gctBOOL bClearFlow);
 
@@ -203,9 +203,9 @@ typedef struct _VIR_MS_BLOCK_FLOW
     VSC_STATE_VECTOR             outFlow;
 }VIR_MS_BLOCK_FLOW;
 
-void vscVIR_InitializeMsBlockFlow(VIR_MS_BLOCK_FLOW* pMsBlkFlow, VIR_BASIC_BLOCK* pOwnerBB,
+VSC_ErrCode vscVIR_InitializeMsBlockFlow(VIR_MS_BLOCK_FLOW* pMsBlkFlow, VIR_BASIC_BLOCK* pOwnerBB,
                                   VSC_MM* pMM, gctINT flowSize, gctUINT stateCount);
-void vscVIR_UpdateMsBlockFlowSize(VIR_MS_BLOCK_FLOW* pMsBlkFlow, gctINT newFlowSize);
+VSC_ErrCode vscVIR_UpdateMsBlockFlowSize(VIR_MS_BLOCK_FLOW* pMsBlkFlow, gctINT newFlowSize);
 void vscVIR_FinalizeMsBlockFlow(VIR_MS_BLOCK_FLOW* pMsBlkFlow);
 
 typedef struct _VIR_MS_FUNC_FLOW
@@ -224,7 +224,7 @@ typedef struct _VIR_MS_FUNC_FLOW
 
 VSC_ErrCode vscVIR_InitializeMsFuncFlow(VIR_MS_FUNC_FLOW* pMsFuncFlow, VIR_FUNC_BLOCK* pOwnerFB,
                                  VSC_MM* pMM, gctINT flowSize, gctUINT stateCount);
-void vscVIR_UpdateMsFuncFlowSize(VIR_MS_FUNC_FLOW* pMsFuncFlow, gctINT newFlowSize);
+VSC_ErrCode vscVIR_UpdateMsFuncFlowSize(VIR_MS_FUNC_FLOW* pMsFuncFlow, gctINT newFlowSize);
 void vscVIR_FinalizeMsFuncFlow(VIR_MS_FUNC_FLOW* pMsFuncFlow);
 
 typedef struct _VIR_BASE_MS_DFA VIR_BASE_MS_DFA;
@@ -270,7 +270,7 @@ struct _VIR_BASE_MS_DFA
 
 VSC_ErrCode vscVIR_InitializeBaseMsDFA(VIR_BASE_MS_DFA* pBaseMsDFA, VIR_CALL_GRAPH* pCg, VIR_DFA_TYPE dfaType,
                                 gctINT flowSize, gctUINT stateCount, VSC_MM* pMM, VIR_MS_DFA_RESOLVERS* pMsDfaResolvers);
-void vscVIR_UpdateBaseMsDFAFlowSize(VIR_BASE_MS_DFA* pBaseMsDFA, gctINT newFlowSize);
+VSC_ErrCode vscVIR_UpdateBaseMsDFAFlowSize(VIR_BASE_MS_DFA* pBaseMsDFA, gctINT newFlowSize);
 void vscVIR_FinalizeBaseMsDFA(VIR_BASE_MS_DFA* pBaseMsDFA);
 
 /* General iterative ms-DFA routines */
