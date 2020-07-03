@@ -1120,7 +1120,7 @@ gcoHARDWARE_DisableTextureSampler(
             if (gcvNULL == Hardware->TXStates->nullTxDescNode[index])
             {
                 gcsTEXTUREDESCRIPTORREGS *nullTxDescPointer;
-                gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsSURF_NODE), (gctPOINTER *)&Hardware->TXStates->nullTxDescNode[index]);
+                gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsSURF_NODE), (gctPOINTER *)&Hardware->TXStates->nullTxDescNode[index]));
                 gcoOS_ZeroMemory((gctPOINTER)Hardware->TXStates->nullTxDescNode[index], gcmSIZEOF(gcsSURF_NODE));
                 gcmONERROR(gcsSURF_NODE_Construct(Hardware->TXStates->nullTxDescNode[index],
                                                   256,

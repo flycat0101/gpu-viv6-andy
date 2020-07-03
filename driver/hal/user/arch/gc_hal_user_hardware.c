@@ -35739,7 +35739,7 @@ gcoHARDWARE_DrawBlit(
 
             if (!pDescNode->descNode[i])
             {
-                gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsSURF_NODE), (gctPOINTER *)&pDescNode->descNode[i]);
+                gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsSURF_NODE), (gctPOINTER *)&pDescNode->descNode[i]));
                 gcoOS_ZeroMemory((gctPOINTER)pDescNode->descNode[i], gcmSIZEOF(gcsSURF_NODE));
                 gcmONERROR(gcsSURF_NODE_Construct(pDescNode->descNode[i],
                                                   256,
@@ -36490,7 +36490,7 @@ gcoHARDWARE_DrawBlitDepth(
 
             if (!pDescNode->descNode[i])
             {
-                gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsSURF_NODE), (gctPOINTER *)&pDescNode->descNode[i]);
+                gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsSURF_NODE), (gctPOINTER *)&pDescNode->descNode[i]));
                 gcoOS_ZeroMemory((gctPOINTER)pDescNode->descNode[i], gcmSIZEOF(gcsSURF_NODE));
                 gcmONERROR(gcsSURF_NODE_Construct(pDescNode->descNode[i],
                     256,

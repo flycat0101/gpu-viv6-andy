@@ -5071,7 +5071,7 @@ _InternalTFBSwitch(
 
             if (gcvNULL == Hardware->XFBStates->internalXFBNode)
             {
-                gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsSURF_NODE), (gctPOINTER *)&Hardware->XFBStates->internalXFBNode);
+                gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsSURF_NODE), (gctPOINTER *)&Hardware->XFBStates->internalXFBNode));
                 gcoOS_ZeroMemory((gctPOINTER)Hardware->XFBStates->internalXFBNode, gcmSIZEOF(gcsSURF_NODE));
                 gcmONERROR(gcsSURF_NODE_Construct(Hardware->XFBStates->internalXFBNode,
                                                   64,
