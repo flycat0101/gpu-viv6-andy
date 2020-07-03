@@ -663,7 +663,7 @@ VX_PRIVATE_API vx_status vxoNNSoftmax2_SW_Initialize(vxnne_layer ops_layer, cons
 
     vx_tensor  inputs = (vx_tensor)parameters[0];
     vx_scalar  beta = (vx_scalar)parameters[1];
-    vx_tensor  outputs = (vx_tensor)parameters[2];
+    vx_tensor  outputs = (vx_tensor)parameters[num - 1];
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
@@ -695,7 +695,10 @@ OnError:
 VX_PRIVATE_API vx_bool vxoNNSoftmax2_SH_EVIS_Support_Ext(vx_node node, const vx_reference parameters[], vx_uint32 _num, vxnne_register_param reg_param, vx_bool evis)
 {
     vx_tensor  inputs = (vx_tensor)parameters[0];
-    vx_tensor  outputs = (vx_tensor)parameters[2];
+    vx_tensor  outputs = (vx_tensor)parameters[_num - 1];
+    vx_scalar  axis_s = (vx_scalar)parameters[2];
+    vx_uint32  rank_x = TENSOR_DIM_NUM(inputs);
+    vx_int32   axis = axis_s->value->n32 >=0 ? axis_s->value->n32 : rank_x < 3 ? 0 : 2;
     vx_bool    enable_format = vx_false_e;
     vx_bool    enable_tf_quantize = vx_false_e;
     vx_enum    srcFormat = TENSOR_DATA_TYPE(inputs);
@@ -708,8 +711,6 @@ VX_PRIVATE_API vx_bool vxoNNSoftmax2_SH_EVIS_Support_Ext(vx_node node, const vx_
     if (evis)
     {
         vx_uint32 i = 0;
-        vx_uint32 rank_x = TENSOR_DIM_NUM(inputs);
-        vx_int32 axis = rank_x < 3 ? 0 : 2;
         vx_int32 shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
         vx_int32 out_shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
         vx_uint32 out_rank_x = 1;
@@ -726,9 +727,9 @@ VX_PRIVATE_API vx_bool vxoNNSoftmax2_SH_EVIS_Support_Ext(vx_node node, const vx_
         enable_format = (vx_bool)(
             ((srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_FLOAT32)
          || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_FLOAT16)
-         /*|| (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_INT16)
+         || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_INT16)
          || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_INT8)
-         || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_UINT8)*/
+         || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_UINT8)
          || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_FLOAT32)
          || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_FLOAT16)
          || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_INT16)
@@ -783,7 +784,10 @@ VX_PRIVATE_API vx_status vxoNNSoftmax2_SH_Initialize_Ext(vxnne_layer ops_layer, 
 
     vx_tensor  inputs = (vx_tensor)parameters[0];
     vx_scalar  beta = (vx_scalar)parameters[1];
-    vx_tensor  outputs = (vx_tensor)parameters[2];
+    vx_scalar  axis_s = (vx_scalar)parameters[2];
+    vx_tensor  outputs = (vx_tensor)parameters[_num - 1];
+    vx_uint32  rank_x = TENSOR_DIM_NUM(inputs);
+    vx_int32   axis = axis_s->value->n32 >=0 ? axis_s->value->n32 : rank_x < 3 ? 0 : 2;
     vx_float32 betaVal = beta->value->f32;
     vx_uint32  batchCount = TENSOR_SIZE_INDEX(inputs, 3);
     vx_uint32  idx = 0;
@@ -795,8 +799,6 @@ VX_PRIVATE_API vx_status vxoNNSoftmax2_SH_Initialize_Ext(vxnne_layer ops_layer, 
     if (evis)
     {
         vx_uint32 i = 0;
-        vx_uint32 rank_x = TENSOR_DIM_NUM(inputs);
-        vx_int32 axis = rank_x < 3 ? 0 : 2;
         vx_int32 shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
         vx_int32 out_shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
         vx_uint32 out_rank_x = 1;

@@ -106,15 +106,16 @@ VX_PRIVATE_API vx_status vxoNNL2NormalizeLayer_SW_Initialize(vxnne_layer ops_lay
     vx_status status = VX_SUCCESS;
     vxnne_l2normalize_layer l2normalizeLayer                = (vxnne_l2normalize_layer)ops_layer;
     vx_tensor  inputs                                       = (vx_tensor)parameters[0];
+    vx_scalar  axis_s                                       = num == vxmLENGTH_OF(nn_L2NormalizeLayer2_params) ? (vx_scalar)parameters[1] : NULL;
     vx_tensor  outputs                                      = (vx_tensor)parameters[num - 1];
     vx_uint32  i                                            = 0;
     vx_uint32  rank_x                                       = TENSOR_DIM_NUM(inputs);
-    vx_int32   axis                                         = rank_x < 3 ? 0 : 2;
+    vx_int32   axis                                         = axis_s ? axis_s->value->n32 : rank_x < 3 ? 0 : 2;
     vx_int32   shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION]     = {1};
     vx_int32   out_shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
     vx_uint32  out_rank_x                                   = 1;
     vx_int32   out_axis                                     = 0;
-    vx_bool    ret                                          = 0;
+    /*vx_bool    ret                                          = 0;*/
     vx_tensor  src                                          = NULL;
     vx_tensor  dst                                          = NULL;
 
@@ -125,7 +126,7 @@ VX_PRIVATE_API vx_status vxoNNL2NormalizeLayer_SW_Initialize(vxnne_layer ops_lay
         shape_x[i] = (vx_int32)TENSOR_VIEW_SIZE_INDEX(inputs, i);
     }
 
-    ret = vx_nn_kernel_optimize_softmax_shape(shape_x, rank_x, axis, out_shape_x, &out_rank_x, &out_axis);
+    vx_nn_kernel_optimize_softmax_shape(shape_x, rank_x, axis, out_shape_x, &out_rank_x, &out_axis);
     src = vxoTensor_ReshapeTensor(inputs, out_shape_x, out_rank_x);
     dst = vxoTensor_ReshapeTensor(outputs, out_shape_x, out_rank_x);
     l2normalizeLayer->base.temp_tensors[0] = src;
@@ -162,13 +163,14 @@ OnError:
 VX_PRIVATE_API vx_bool vxoNNL2NormalizeLayer_SH_EVIS_Support_Ext(vx_node node, const vx_reference parameters[], vx_uint32 _num, vxnne_register_param reg_param, vx_bool evis)
 {
     vx_tensor  inputs                           = (vx_tensor)parameters[0];
+    vx_scalar  axis_s                           = _num == vxmLENGTH_OF(nn_L2NormalizeLayer2_params) ? (vx_scalar)parameters[1] : NULL;
     vx_tensor  outputs                          = (vx_tensor)parameters[_num - 1];
     vx_bool    enableShader                     = vx_false_e;
     vx_type_e  inputFormat                      = (vx_type_e)TENSOR_DATA_TYPE(inputs);
     vx_type_e  outputFormat                     = (vx_type_e)TENSOR_DATA_TYPE(outputs);
     vx_uint32  i                                = 0;
     vx_uint32  rank_x                           = TENSOR_DIM_NUM(inputs);
-    vx_int32   axis                             = rank_x < 3 ? 0 : 2;
+    vx_int32   axis                             = axis_s ? axis_s->value->n32 : rank_x < 3 ? 0 : 2;
     vx_int32   shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
     vx_int32   out_shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
     vx_uint32  out_rank_x                       = 1;
@@ -224,15 +226,16 @@ VX_PRIVATE_API vx_status vxoNNL2NormalizeLayer_SH_Initialize_Ext(vxnne_layer ops
     vx_status status = VX_SUCCESS;
 
     vx_tensor  inputs                                       = (vx_tensor)parameters[0];
+    vx_scalar  axis_s                                       = _num == vxmLENGTH_OF(nn_L2NormalizeLayer2_params) ? (vx_scalar)parameters[1] : NULL;
     vx_tensor  outputs                                      = (vx_tensor)parameters[_num - 1];
     vx_uint32  i                                            = 0;
     vx_uint32  rank_x                                       = TENSOR_DIM_NUM(inputs);
-    vx_int32   axis                                         = rank_x < 3 ? 0 : 2;
+    vx_int32   axis                                         = axis_s ? axis_s->value->n32 : rank_x < 3 ? 0 : 2;
     vx_int32   shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION]     = {1};
     vx_int32   out_shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
     vx_uint32  out_rank_x                                   = 1;
     vx_int32   out_axis                                     = 0;
-    vx_bool    ret                                          = 0;
+    /*vx_bool    ret                                          = 0;*/
     vx_tensor  src                                          = NULL;
     vx_tensor  dst                                          = NULL;
      vx_uint32 batch                                        = (rank_x > 3) ? TENSOR_VIEW_SIZE_INDEX(inputs, 3) : 1;
@@ -244,7 +247,7 @@ VX_PRIVATE_API vx_status vxoNNL2NormalizeLayer_SH_Initialize_Ext(vxnne_layer ops
         shape_x[i] = (vx_int32)TENSOR_VIEW_SIZE_INDEX(inputs, i);
     }
 
-    ret = vx_nn_kernel_optimize_softmax_shape(shape_x, rank_x, axis, out_shape_x, &out_rank_x, &out_axis);
+    vx_nn_kernel_optimize_softmax_shape(shape_x, rank_x, axis, out_shape_x, &out_rank_x, &out_axis);
     src = vxoTensor_ReshapeTensor(inputs, out_shape_x, out_rank_x);
     dst = vxoTensor_ReshapeTensor(outputs, out_shape_x, out_rank_x);
     l2normalizeLayer->base.temp_tensors[0] = src;

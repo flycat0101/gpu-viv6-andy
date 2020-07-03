@@ -565,7 +565,7 @@ VX_PRIVATE_API vx_status vxoNormalization_SW_Initialize(vxnne_layer ops_layer, c
     vx_scalar  alpha_s                    = (vx_scalar)parameters[4];
     vx_scalar  beta_s                     = (vx_scalar)parameters[5];
     vx_scalar  bias_s                     = (vx_scalar)parameters[6];
-    vx_tensor  outputs                    = (vx_tensor)parameters[7];
+    vx_tensor  outputs                    = (vx_tensor)parameters[num - 1];
 
     vx_enum    norm_type                  = type_s->value->e;
     vx_uint32  norm_size                  = norm_size_s->value->u32;
@@ -605,7 +605,7 @@ VX_PRIVATE_API vx_bool vxoNormalization_SH_EVIS_Support_Ext(vx_node node, const 
     vx_scalar  norm_size_s                = (vx_scalar)parameters[2];
 
     vx_scalar  beta_s                     = (vx_scalar)parameters[5];
-    vx_tensor  outputs                    = (vx_tensor)parameters[7];
+    vx_tensor  outputs                    = (vx_tensor)parameters[num - 1];
 
     vx_enum    norm_type                  = type_s->value->e;
     vx_uint32  norm_size                  = norm_size_s->value->u32;
@@ -697,7 +697,7 @@ VX_PRIVATE_API vx_status vxoNormalization_SH_EVIS_Initialize_Ext(vxnne_layer ops
     vx_scalar  alpha_s                    = (vx_scalar)parameters[4];
     vx_scalar  beta_s                     = (vx_scalar)parameters[5];
     vx_scalar  bias_s                     = (vx_scalar)parameters[6];
-    vx_tensor  outputs                    = (vx_tensor)parameters[7];
+    vx_tensor  outputs                    = (vx_tensor)parameters[num - 1];
 
     vx_enum    norm_type                  = type_s->value->e;
     vx_uint32  norm_size                  = norm_size_s->value->u32;
@@ -776,7 +776,7 @@ VX_PRIVATE_API vx_bool vxoNormalization_TP_Support(vx_node node, const vx_refere
     vx_tensor  inputs                     = (vx_tensor)parameters[0];
     vx_scalar  type_s                     = (vx_scalar)parameters[1];
     vx_scalar  norm_size_s                = (vx_scalar)parameters[2];
-    vx_tensor  outputs                    = (vx_tensor)parameters[6];
+    vx_tensor  outputs                    = (vx_tensor)parameters[num - 1];
 
     vx_enum    norm_type                  = type_s->value->e;
     vx_uint32  norm_size                  = norm_size_s->value->u32;
@@ -811,7 +811,7 @@ VX_PRIVATE_API vx_status vxoNormalization_TP_Initialize(vxnne_layer ops_layer, c
     vx_scalar  alpha_s                    = (vx_scalar)parameters[4];
     vx_scalar  beta_s                     = (vx_scalar)parameters[5];
     vx_scalar  bias_s                     = (vx_scalar)parameters[6];
-    vx_tensor  outputs                    = (vx_tensor)parameters[7];
+    vx_tensor  outputs                    = (vx_tensor)parameters[num - 1];
 
     vx_enum    norm_type                  = type_s->value->e;
     vx_uint32  norm_size                  = norm_size_s->value->u32;
@@ -1138,7 +1138,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalizationLayer2_Initializer(vx_node 
     vx_uint32 div = 1;
     vx_scalar  div_s = vxCreateScalar(node->base.context, VX_TYPE_UINT32, &div);
     vx_reference params[] = {
-        parameters[0], parameters[1], parameters[2], (vx_reference)div_s, parameters[3], parameters[4], parameters[5], parameters[6],
+        parameters[0], parameters[1], parameters[2], (vx_reference)div_s, parameters[3], parameters[4], parameters[5], parameters[6], parameters[7],
     };
     vxmONERROR(vxoNormalization_Initializer_Ext(node, "NormalizationLayer2", params, gcmCOUNTOF(params)));
 
