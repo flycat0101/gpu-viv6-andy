@@ -1741,6 +1741,14 @@ sloCOMPILER_CheckProcessorSupported(
         {
             bSupportTS = gcvTRUE;
         }
+        else
+        {
+            extensionTS.extension2 = (sleEXTENSION2)(slvEXTENSION2_GL_ARB_TESSELLATION_SHADER);
+            if (sloCOMPILER_Extension2Enabled(Compiler, extensionTS.extension2))
+            {
+                bSupportTS = gcvTRUE;
+            }
+        }
     }
     else
     {
