@@ -3958,6 +3958,7 @@ _RemapTempIndexForExpandFunction(
                 gcoOS_PrintStrSafe(variableName, sizeof(variableName), &offset,
                                     "%s_%d", name, RealCallerCount));
 
+            gcmASSERT(isVariableSimple(variable));
             gcmONERROR(gcSHADER_AddVariableEx(Optimizer->shader,
                                               variableName,
                                               variable->u.type,
@@ -9147,6 +9148,9 @@ gcOpt_LoadSWW(
         /* Get pointer to temporary register. */
         temp = tempArray + code->instruction.tempIndex;
 
+        /* Skip if target is not simple type.*/
+        if (temp->arrayVariable && !isVariableSimple(temp->arrayVariable)) continue;
+
         /* Skip if target is part of an array. */
         if (temp->arrayVariable && GetVariableKnownArraySize(temp->arrayVariable) > 1) continue;
 
@@ -10892,7 +10896,14 @@ gcSHADER_PackRegister(
             gcVARIABLE variable = function->localVariables[j];
             gctUINT32 startIndex = variable->tempIndex;
             gctUINT arraySize = GetVariableKnownArraySize(variable);
-            gctUINT endIndex = startIndex + arraySize * gcmType_Rows(variable->u.type);
+            gctUINT endIndex;
+
+            if (!isVariableSimple(variable))
+            {
+                continue;
+            }
+
+            endIndex = startIndex + arraySize * gcmType_Rows(variable->u.type);
 
             for (k = startIndex; k < endIndex && k < maxRegCount; k++)
             {
@@ -10949,7 +10960,14 @@ gcSHADER_PackRegister(
             gcVARIABLE variable = function->localVariables[j];
             gctUINT32 startIndex = variable->tempIndex;
             gctUINT arraySize = GetVariableKnownArraySize(variable);
-            gctUINT endIndex = startIndex + arraySize * gcmType_Rows(variable->u.type);
+            gctUINT endIndex;
+
+            if (!isVariableSimple(variable))
+            {
+                continue;
+            }
+
+            endIndex = startIndex + arraySize * gcmType_Rows(variable->u.type);
 
             for (k = startIndex; k < endIndex && k < maxRegCount; k++)
             {

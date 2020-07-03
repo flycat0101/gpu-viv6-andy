@@ -918,13 +918,13 @@ typedef struct _gcSHADER_TYPEINFO
 
 extern const gcSHADER_TYPEINFO gcvShaderTypeInfo[];
 
-#define gcmType_Comonents(Type)         (gcvShaderTypeInfo[Type].components)
-#define gcmType_PackedComonents(Type)   (gcvShaderTypeInfo[Type].packedComponents)
-#define gcmType_Rows(Type)              (gcvShaderTypeInfo[Type].rows)
-#define gcmType_RowType(Type)           (gcvShaderTypeInfo[Type].rowType)
-#define gcmType_ComonentType(Type)      (gcvShaderTypeInfo[Type].componentType)
-#define gcmType_Kind(Type)              (gcvShaderTypeInfo[Type].kind)
-#define gcmType_Name(Type)              (gcvShaderTypeInfo[Type].name)
+#define gcmType_Comonents(Type)         (Type < gcSHADER_TYPE_COUNT? gcvShaderTypeInfo[Type].components : gcvShaderTypeInfo[gcSHADER_UNKONWN_TYPE].components)
+#define gcmType_PackedComonents(Type)   (Type < gcSHADER_TYPE_COUNT? gcvShaderTypeInfo[Type].packedComponents : gcvShaderTypeInfo[gcSHADER_UNKONWN_TYPE].packedComponents)
+#define gcmType_Rows(Type)              (Type < gcSHADER_TYPE_COUNT? gcvShaderTypeInfo[Type].rows : gcvShaderTypeInfo[gcSHADER_UNKONWN_TYPE].rows)
+#define gcmType_RowType(Type)           (Type < gcSHADER_TYPE_COUNT? gcvShaderTypeInfo[Type].rowType : gcvShaderTypeInfo[gcSHADER_UNKONWN_TYPE].rowType)
+#define gcmType_ComonentType(Type)      (Type < gcSHADER_TYPE_COUNT? gcvShaderTypeInfo[Type].componentType : gcvShaderTypeInfo[gcSHADER_UNKONWN_TYPE].componentType)
+#define gcmType_Kind(Type)              (Type < gcSHADER_TYPE_COUNT? gcvShaderTypeInfo[Type].kind : gcvShaderTypeInfo[gcSHADER_UNKONWN_TYPE].kind)
+#define gcmType_Name(Type)              (Type < gcSHADER_TYPE_COUNT? gcvShaderTypeInfo[Type].name : gcvShaderTypeInfo[gcSHADER_UNKONWN_TYPE].name)
 
 #define gcmType_isSampler(Type)         (gcmType_Kind(Type) == gceTK_SAMPLER || gcmType_Kind(Type) == gceTK_SAMPLER_T)
 

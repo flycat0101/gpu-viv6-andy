@@ -3718,7 +3718,7 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
             {
                 gcUNIFORM mappingGCSLUniform = Shader->uniforms[virUniform->gcslIndex];
                 /* if uniform is put into aubo by VIR, update its attributes */
-                if (VIR_Symbol_HasFlag(virUniformSym, VIR_SYMUNIFORMFLAG_MOVED_TO_DUBO))
+                if (VIR_Symbol_HasFlag(virUniformSym, VIR_SYMUNIFORMFLAG_MOVED_TO_DUBO) && isUniformBasicType(mappingGCSLUniform))
                 {
                     gcSHADER_TYPE base_type;
 
