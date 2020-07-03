@@ -488,6 +488,12 @@ vx_bool vx_nn_kernel_optimize_element_shape
     vx_int32* out_shape_x, vx_int32* out_rank_x
     );
 
+
+vx_sh_kernel_type_e getSHKernelType
+    (
+    vx_enum dtype
+    );
+
 vx_bool IsTPSupport_CheckOutPixel
     (
     vx_context context,

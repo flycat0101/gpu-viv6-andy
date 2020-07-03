@@ -393,6 +393,24 @@ enum vxnne_kernel_e
     VXNNE_KERNEL_FIXED_COUNT,
 };
 
+typedef enum
+{
+    INVALID = 0,
+    I8 = 1,
+    I16,
+    I32,
+    I64,
+    U8,
+    U16,
+    U32,
+    U64,
+    F16,
+    F32,
+    F64,
+    BF16,
+    BOOL8
+} vx_sh_kernel_type_e;
+
 #define VXNNE_KERNEL_DYNAMIC_COUNT 1024
 
 typedef enum _vxnne_user_node_type_e
