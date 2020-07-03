@@ -130,7 +130,7 @@ VIR_NameId  VIR_NAME_UNKNOWN,
     VIR_NAME_POINT_COORD,
     VIR_NAME_POSITION_W,
     VIR_NAME_DEPTH,
-    VIR_NAME_FOG_COORD,
+    VIR_NAME_FOG_FRAG_COORD,
     VIR_NAME_VERTEX_ID, /* gl_VertexID, for ES. */
     VIR_NAME_VERTEX_INDEX, /* gl_VertexIndex, for Vulkan only, where the indexing is relative to some base offset. */
     VIR_NAME_FRONT_COLOR,
@@ -179,6 +179,18 @@ VIR_NameId  VIR_NAME_UNKNOWN,
     VIR_NAME_SUBGROUP_ID, /* gl_SubgroupID */
     VIR_NAME_SUBGROUP_INVOCATION_ID, /* gl_SubgroupInvocationID */
     VIR_NAME_VIEW_INDEX, /* gl_ViewIndex */
+    VIR_NAME_SECONDARY_COLOR, /* gl_SecondaryColor */
+    VIR_NAME_NORMAL, /* gl_Normal */
+    VIR_NAME_VERTEX, /* gl_Vertex */
+    VIR_NAME_FOG_COORD, /* gl_FogCoord */
+    VIR_NAME_MULTI_TEX_COORD_0, /* gl_MultiTexCoord0 */
+    VIR_NAME_MULTI_TEX_COORD_1, /* gl_MultiTexCoord1 */
+    VIR_NAME_MULTI_TEX_COORD_2, /* gl_MultiTexCoord2 */
+    VIR_NAME_MULTI_TEX_COORD_3, /* gl_MultiTexCoord3 */
+    VIR_NAME_MULTI_TEX_COORD_4, /* gl_MultiTexCoord4 */
+    VIR_NAME_MULTI_TEX_COORD_5, /* gl_MultiTexCoord5 */
+    VIR_NAME_MULTI_TEX_COORD_6, /* gl_MultiTexCoord6 */
+    VIR_NAME_MULTI_TEX_COORD_7, /* gl_MultiTexCoord7 */
     VIR_NAME_BUILTIN_LAST;
 
 VIR_BuiltinTypeInfo VIR_builtinTypes[] =
@@ -2220,7 +2232,7 @@ static void
         VIR_NAME_POINT_COORD    =
         VIR_NAME_POSITION_W     =
         VIR_NAME_DEPTH          =
-        VIR_NAME_FOG_COORD      =
+        VIR_NAME_FOG_FRAG_COORD      =
         VIR_NAME_VERTEX_ID      =
         VIR_NAME_FRONT_COLOR    =
         VIR_NAME_BACK_COLOR     =
@@ -2240,6 +2252,18 @@ static void
         VIR_NAME_PRIMITIVE_ID       =
         VIR_NAME_TESS_LEVEL_OUTER   =
         VIR_NAME_TESS_LEVEL_INNER   =
+        VIR_NAME_SECONDARY_COLOR    =
+        VIR_NAME_NORMAL             =
+        VIR_NAME_VERTEX             =
+        VIR_NAME_FOG_COORD          =
+        VIR_NAME_MULTI_TEX_COORD_0  =
+        VIR_NAME_MULTI_TEX_COORD_1  =
+        VIR_NAME_MULTI_TEX_COORD_2  =
+        VIR_NAME_MULTI_TEX_COORD_3  =
+        VIR_NAME_MULTI_TEX_COORD_4  =
+        VIR_NAME_MULTI_TEX_COORD_5  =
+        VIR_NAME_MULTI_TEX_COORD_6  =
+        VIR_NAME_MULTI_TEX_COORD_7  =
         VIR_NAME_LAYER              = VIR_NAME_UNKNOWN;
 
     _add_name(VIR_NAME_NUM_GROUPS, "gl_NumWorkGroups");
@@ -2272,7 +2296,7 @@ _initOpenGLBuiltinNames(VIR_Shader * Shader, VIR_StringTable *StrTable)
     _add_name(VIR_NAME_POINT_COORD, "gl_PointCoord");
     _add_name(VIR_NAME_POSITION_W, "gl_Position.w");
     _add_name(VIR_NAME_DEPTH, "gl_FragDepth");
-    _add_name(VIR_NAME_FOG_COORD, "gl_FogFragCoord");
+    _add_name(VIR_NAME_FOG_FRAG_COORD, "gl_FogFragCoord");
     _add_name(VIR_NAME_VERTEX_ID, "gl_VertexID");
     _add_name(VIR_NAME_VERTEX_INDEX, "gl_VertexIndex");
     _add_name(VIR_NAME_FRONT_COLOR, "gl_FrontColor");
@@ -2321,7 +2345,18 @@ _initOpenGLBuiltinNames(VIR_Shader * Shader, VIR_StringTable *StrTable)
     _add_name(VIR_NAME_SUBGROUP_ID, "gl_SubgroupID");
     _add_name(VIR_NAME_SUBGROUP_INVOCATION_ID, "gl_SubgroupInvocationID");
     _add_name(VIR_NAME_VIEW_INDEX, "gl_ViewIndex");
-
+    _add_name(VIR_NAME_SECONDARY_COLOR, "gl_SecondaryColor");
+    _add_name(VIR_NAME_NORMAL, "gl_Normal");
+    _add_name(VIR_NAME_VERTEX, "gl_Vertex");
+    _add_name(VIR_NAME_FOG_COORD, "gl_FogCoord");
+    _add_name(VIR_NAME_MULTI_TEX_COORD_0, "gl_MultiTexCoord0");
+    _add_name(VIR_NAME_MULTI_TEX_COORD_1, "gl_MultiTexCoord1");
+    _add_name(VIR_NAME_MULTI_TEX_COORD_2, "gl_MultiTexCoord2");
+    _add_name(VIR_NAME_MULTI_TEX_COORD_3, "gl_MultiTexCoord3");
+    _add_name(VIR_NAME_MULTI_TEX_COORD_4, "gl_MultiTexCoord4");
+    _add_name(VIR_NAME_MULTI_TEX_COORD_5, "gl_MultiTexCoord5");
+    _add_name(VIR_NAME_MULTI_TEX_COORD_6, "gl_MultiTexCoord6");
+    _add_name(VIR_NAME_MULTI_TEX_COORD_7, "gl_MultiTexCoord7");
     /* WARNING!!! change builtin_last if add new name !!! */
     VIR_NAME_BUILTIN_LAST = VIR_NAME_VIEW_INDEX + sizeof("gl_SubgroupInvocationID");
 }

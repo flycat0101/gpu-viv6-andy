@@ -1490,7 +1490,7 @@ typedef enum _gceBuiltinNameKind
     gcSL_POINT_COORD     = -5,
     gcSL_POSITION_W      = -6,
     gcSL_DEPTH           = -7,
-    gcSL_FOG_COORD       = -8,
+    gcSL_FOG_FRAG_COORD  = -8,
     gcSL_VERTEX_ID       = -9,
     gcSL_INSTANCE_ID     = -10,
     gcSL_WORK_GROUP_ID          = -11,
@@ -1526,7 +1526,19 @@ typedef enum _gceBuiltinNameKind
     gcSL_CLIP_DISTANCE          = -41, /* gl_ClipDistance */
     gcSL_LOCAL_INVOCATION_INDEX  = -42,
     gcSL_GLOBAL_INVOCATION_INDEX = -43,
-    gcSL_BUILTINNAME_COUNT      = 44
+    gcSL_SECONDARY_COLOR        = -44, /* gl_SecondaryColor */
+    gcSL_NORMAL                 = -45, /* gl_Normal */
+    gcSL_VERTEX                 = -46, /* gl_Vertex */
+    gcSL_FOG_COORD              = -47, /* gl_FogCoord */
+    gcSL_MULTI_TEX_COORD_0      = -48, /* gl_MultiTexCoord0 */
+    gcSL_MULTI_TEX_COORD_1      = -49, /* gl_MultiTexCoord1 */
+    gcSL_MULTI_TEX_COORD_2      = -50, /* gl_MultiTexCoord2 */
+    gcSL_MULTI_TEX_COORD_3      = -51, /* gl_MultiTexCoord3 */
+    gcSL_MULTI_TEX_COORD_4      = -52, /* gl_MultiTexCoord4 */
+    gcSL_MULTI_TEX_COORD_5      = -53, /* gl_MultiTexCoord5 */
+    gcSL_MULTI_TEX_COORD_6      = -54, /* gl_MultiTexCoord6 */
+    gcSL_MULTI_TEX_COORD_7      = -55, /* gl_MultiTexCoord7 */
+    gcSL_BUILTINNAME_COUNT      = 56
 } gceBuiltinNameKind;
 
 /* Special code generation indices. */
