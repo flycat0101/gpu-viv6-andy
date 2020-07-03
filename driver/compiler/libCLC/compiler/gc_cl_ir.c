@@ -1684,6 +1684,8 @@ IN gctBOOL PtrDominant
 )
 {
     gceSTATUS status = gcvSTATUS_OK;
+    clsTYPE_QUALIFIER *nextDscr;
+    clsTYPE_QUALIFIER *prevDscr;
 
     if(!slmSLINK_LIST_IsEmpty(PtrDscr)) {
         if(slmSLINK_LIST_IsEmpty(Decl->ptrDscr) && Decl->dataType) {
@@ -1708,6 +1710,18 @@ IN gctBOOL PtrDominant
                                                        clvQUALIFIER_NONE,
                                                        Decl->dataType,
                                                        &Decl->dataType));
+            }
+        }
+
+        FOR_EACH_SLINK_NODE(PtrDscr, clsTYPE_QUALIFIER, prevDscr, nextDscr) {
+            if (nextDscr->type == T_EOF) break;
+            switch (nextDscr->type) {
+            case T_CONST:
+                nextDscr->type = clvQUALIFIER_NONE;
+                break;
+            case T_VOLATILE:
+                nextDscr->type = clvSTORAGE_QUALIFIER_NONE;
+                break;
             }
         }
 

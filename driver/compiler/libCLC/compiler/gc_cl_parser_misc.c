@@ -12898,6 +12898,19 @@ IN clsDECL * Decl
        dataType.accessQualifier = clvQUALIFIER_CONST;
     }
 
+    if (ForParamDecl == gcvTRUE &&
+        !clmDECL_IsPointerType(&decl))
+    {
+        if (decl.dataType->accessQualifier == clvQUALIFIER_CONST)
+        {
+            decl.dataType->accessQualifier = clvQUALIFIER_NONE;
+        }
+        if (decl.storageQualifier == clvSTORAGE_QUALIFIER_VOLATILE)
+        {
+            decl.storageQualifier = clvSTORAGE_QUALIFIER_NONE;
+        }
+    }
+
     if(ForParamDecl) {
         gctUINT stringNo = cloCOMPILER_GetCurrentStringNo(Compiler);
         gctUINT lineNo = cloCOMPILER_GetCurrentLineNo(Compiler);
