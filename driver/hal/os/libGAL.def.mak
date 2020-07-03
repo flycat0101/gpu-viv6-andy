@@ -227,7 +227,6 @@ EXPORTS
     gcoHAL_DumpFrameDB
     gcoHAL_InitGPUProfile
     gcoHAL_DumpGPUProfile
-    gcoHAL_InitCoreIndexByType
     gcoHAL_SetCoreIndex
 
 !IF "$(VIVANTE_ENABLE_2D)" == "1"
