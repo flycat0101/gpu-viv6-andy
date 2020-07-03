@@ -1276,6 +1276,7 @@ GLvoid __glDebugPrintLogMessage(__GLcontext *gc, GLenum source, GLenum type, GLu
 
         if (gcmIS_SUCCESS(gcoOS_Allocate(gcvNULL, dbgMachine->maxLogMsgs, (gctPOINTER *)&message)))
         {
+            gcoOS_ZeroMemory(message, dbgMachine->maxLogMsgs);
             /* format the message string */
             gcmARGUMENTS_START(args, format);
             gcoOS_PrintStrVSafe(message, (gctSIZE_T)dbgMachine->maxLogMsgs, &offset, format, args);
@@ -1356,6 +1357,8 @@ GLvoid GL_APIENTRY __gles_DebugMessageControl(__GLcontext *gc, GLenum source, GL
                 {
                     __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
                 }
+                gcoOS_ZeroMemory(msgCtrl, sizeof(__GLdbgMsgLog));
+
                 msgCtrl->id = ids[i];
                 msgCtrl->src = source;
                 msgCtrl->type = type;

@@ -3788,6 +3788,7 @@ gcChipProgramBindingRecompiledInfo(
         GLint index = 0;
         gctSTRING *names;
         gcmONERROR(gcoOS_Allocate(gcvNULL, combinedResCount * sizeof(gctSTRING), (gctPOINTER *)&names));
+        gcoOS_ZeroMemory(names, combinedResCount * sizeof(gctSTRING));
 
         for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
         {
@@ -8185,7 +8186,7 @@ gcChipProgramBinary_V0(
     if (nameCount > 0)
     {
         gcmONERROR(gcoOS_Allocate(gcvNULL, nameCount*sizeof(GLchar*), (gctPOINTER *)&programObject->ppXfbVaryingNames));
-
+        gcoOS_ZeroMemory(programObject->ppXfbVaryingNames, nameCount*sizeof(GLchar*));
         programObject->xfbVaryingNum = nameCount;
 
         nameCount = 0;
@@ -8203,6 +8204,7 @@ gcChipProgramBinary_V0(
                 {
                     gctUINT32 nameLen = (gctUINT32)strlen(&GetFeedbackVaryings(&(masterPgInstance->binaries[i]->transformFeedback))->name[j]) + 1;
                     gcmONERROR(gcoOS_Allocate(gcvNULL, nameLen, (gctPOINTER *)&programObject->ppXfbVaryingNames[nameCount]));
+                    gcoOS_ZeroMemory(programObject->ppXfbVaryingNames[nameCount], nameLen);
                     strcpy(programObject->ppXfbVaryingNames[nameCount],&GetFeedbackVaryings(&(masterPgInstance->binaries[i]->transformFeedback))->name[j]);
                     nameCount += 1;
                 }

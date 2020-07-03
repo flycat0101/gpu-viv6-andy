@@ -183,6 +183,7 @@ __GL_INLINE GLint __glMarkNameUsed(__GLcontext *gc, __GLsharedObjectMachine *sha
             }
             return gcvSTATUS_OUT_OF_MEMORY;
         }
+        gcoOS_ZeroMemory(allocated, sizeof(__GLnameAllocation));
         allocated->next = shared->nameArray;
         allocated->start = id;
         allocated->number = 1;
