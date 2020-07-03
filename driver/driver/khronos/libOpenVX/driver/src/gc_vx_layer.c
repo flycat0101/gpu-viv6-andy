@@ -15774,8 +15774,9 @@ vxnne_shader_executable vxnneRPNSoftMaxShaderExecutable(
 
     vx_reference parameters[2]     = {(vx_reference)inputs, (vx_reference)outputs};
 
-    vx_enum  inputFormat = TENSOR_DATA_TYPE(inputs);
-    vx_enum  outputFormat= TENSOR_DATA_TYPE(outputs);
+    vx_enum  inputFormat    = TENSOR_DATA_TYPE(inputs);
+    vx_enum  outputFormat   = TENSOR_DATA_TYPE(outputs);
+    vx_enum  input_qnt_type = TENSOR_QUANT_TYPE(inputs);
 
     vx_uint32 UniformDP4x4_cvtFP16ToFP32[16] = {
         0x01010101, // TCfg
@@ -15813,34 +15814,6 @@ vxnne_shader_executable vxnneRPNSoftMaxShaderExecutable(
         0x00000400, // AccumType, ConstantType, and PostShift
         0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
     };
-/*    vx_uint32 Uniform2x8_SubInt8[16] = {
-        0x99999999, // TCfg
-        0x44444444, // ASelt
-        0x33221100, 0x77665544, // ABin
-        0xaaaaaaaa, // BSelt
-        0x00000000, 0x00000000, // BBin
-        0x00000400, // AccumType, ConstantType, and PostShift
-        0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001 // Constant
-    };
-    vx_uint32 UniformDP4x4_cvtInt8toFp16_low[16] = {
-        0x01010101, // TCfg
-        0x00000000, // ASelt
-        0x00010000, 0x00030002, // ABin
-        0x01010101, // BSelt
-        0x00000000, 0x00000000, // BBin
-        0x00000400, // AccumType, ConstantType, and PostShift
-        0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
-    };
-    vx_uint32 UniformDP4x4_cvtInt8toFp16_high[16] = {
-        0x01010101, // TCfg
-        0x00000000, // ASelt
-        0x00050004, 0x00070006, // ABin
-        0x01010101, // BSelt
-        0x00000000, 0x00000000, // BBin
-        0x00000400, // AccumType, ConstantType, and PostShift
-        0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
-    };
-    */
     vx_uint32 Uni4x4_Sub_low[16] = {
         0x09090909, // TCfg
         0x04040404, // ASelt
@@ -15861,6 +15834,7 @@ vxnne_shader_executable vxnneRPNSoftMaxShaderExecutable(
     };
 
     vx_uint32 imgWid = 0, imgHei = 0, imgChe = 0;
+    vx_float32  softMaxScale = 0;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, inputs=%p, outputs=%p",
          context, kernelEnum, borderMode, inputs, outputs);
@@ -15868,6 +15842,23 @@ vxnne_shader_executable vxnneRPNSoftMaxShaderExecutable(
     imgWid  = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
     imgHei  = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
     imgChe  = TENSOR_VIEW_SIZE_INDEX(inputs, 2) / 2;
+
+    if (input_qnt_type ==VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        vx_int8 fl = TENSOR_POS(inputs);
+        if (fl >= 0)
+        {
+            softMaxScale = 1.0f / (vx_float32) (1 << fl);
+        }
+        else if (fl < 0)
+        {
+            softMaxScale = (vx_float32) (1 << -fl);
+        }
+    }
+    else if (input_qnt_type == VX_QUANT_AFFINE_SCALE)
+    {
+        softMaxScale = TENSOR_TF_SCALE(inputs);
+    }
 
     execution_parameters.globalWorkScale[0]  = 8;
     execution_parameters.globalWorkScale[1]  = 1;
@@ -15957,22 +15948,12 @@ vxnne_shader_executable vxnneRPNSoftMaxShaderExecutable(
 
     if (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16)
     {
-        vx_float32  softMaxScale = 0;
-        vx_int8 fixedPointPos = TENSOR_POS(inputs);
-        if ((fixedPointPos) > 0)
-            softMaxScale = (1.0f / ((vx_float32) (1 << (fixedPointPos))));
-        else
-            softMaxScale = ((vx_float32) (1 << -(fixedPointPos)));
-
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "Uni4x4_Sub_low", 1, Uni4x4_Sub_low);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "Uni4x4_Sub_high", 1, Uni4x4_Sub_high);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "softMaxScale", 1, &softMaxScale);
     }
     else  if (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16)
     {
-        vx_float32  softMaxScale = TENSOR_TF_SCALE(inputs);
-       // vx_float32  softMaxZP =  TENSOR_TF_ZEROPOINT(inputs);
-
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "Uni4x4_Sub_low", 1, Uni4x4_Sub_low);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "Uni4x4_Sub_high", 1, Uni4x4_Sub_high);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "softMaxScale", 1, &softMaxScale);
@@ -15980,13 +15961,6 @@ vxnne_shader_executable vxnneRPNSoftMaxShaderExecutable(
     }
     else if (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_FLOAT16)
     {
-        vx_float32  softMaxScale = 0;
-        vx_int8 fixedPointPos = TENSOR_POS(inputs);
-        if ((fixedPointPos) > 0)
-            softMaxScale = (1.0f / ((vx_float32) (1 << (fixedPointPos))));
-        else
-            softMaxScale = ((vx_float32) (1 << -(fixedPointPos)));
-
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "Uni4x4_Sub_low", 1, Uni4x4_Sub_low);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "Uni4x4_Sub_high", 1, Uni4x4_Sub_high);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "softMaxScale", 1, &softMaxScale);
@@ -16059,7 +16033,10 @@ vxnne_shader_executable vxnneRPNRegressionShaderExecutable(
         (vx_reference)feat_stride, (vx_reference)img_W, (vx_reference)img_H, (vx_reference)min_box_W,
         (vx_reference)min_box_H};
 
-    vx_enum  bboxsFormat  = TENSOR_DATA_TYPE(bboxs);
+    vx_enum     bboxsFormat     = TENSOR_DATA_TYPE(bboxs);
+    vx_enum     bboxs_qnt_type  = TENSOR_QUANT_TYPE(bboxs);
+    vx_float32  bboxScale       = 1.0f;
+    vx_float32  bboxZP          = 0;
 
     vx_uint32 UniformDP4x4_cvtFP16ToFP32[16] = {
         0x01010101, // TCfg
@@ -16078,15 +16055,6 @@ vxnne_shader_executable vxnneRPNRegressionShaderExecutable(
         0x00000000, 0x00000000, // BBin
         0x00000400, // AccumType, ConstantType, and PostShift
         0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000000, 0x00000000, 0x00000000 // Constant
-    };
-    vx_uint32 UniformDP4x4_cvtInt8toFp16_low[16] = {
-        0x01010101, // TCfg
-        0x00000000, // ASelt
-        0x00010000, 0x00030002, // ABin
-        0x01010101, // BSelt
-        0x00000000, 0x00000000, // BBin
-        0x00000400, // AccumType, ConstantType, and PostShift
-        0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
     };
     vx_uint32 Uni4x4_Cvt2Float32_low[16] = {
         0x01010101, // TCfg
@@ -16120,6 +16088,24 @@ vxnne_shader_executable vxnneRPNRegressionShaderExecutable(
     imgWid  = TENSOR_VIEW_SIZE_INDEX(scores, 0);
     imgHei  = TENSOR_VIEW_SIZE_INDEX(scores, 1);
     imgChe  = TENSOR_VIEW_SIZE_INDEX(scores, 2) / 2;
+
+    if (bboxs_qnt_type ==VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        vx_int8 fl = TENSOR_POS(bboxs);
+        if (fl >= 0)
+        {
+            bboxScale = 1.0f / (vx_float32) (1 << fl);
+        }
+        else if (fl < 0)
+        {
+            bboxScale = (vx_float32) (1 << -fl);
+        }
+    }
+    else if (bboxs_qnt_type == VX_QUANT_AFFINE_SCALE)
+    {
+        bboxScale = TENSOR_TF_SCALE(bboxs);
+        bboxZP    = (vx_float32)TENSOR_TF_ZEROPOINT(bboxs);
+    }
 
     execution_parameters.globalWorkScale[0]  = 4;
     execution_parameters.globalWorkScale[1]  = 1;
@@ -16189,7 +16175,6 @@ vxnne_shader_executable vxnneRPNRegressionShaderExecutable(
         {
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_INT8", borderMode);
             if (!shaderExecutable) goto OnError;
-            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "UniformDP4x4_cvtInt8toFp16_low", 1, UniformDP4x4_cvtInt8toFp16_low);
         }
     }
     else if (bboxsFormat == VX_TYPE_UINT8)
@@ -16205,32 +16190,17 @@ vxnne_shader_executable vxnneRPNRegressionShaderExecutable(
     status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "UniformDp2x8_packF16", 1, UniformDp2x8_packF16);
     if (bboxsFormat == VX_TYPE_INT8)
     {
-        vx_float32  bboxScale;
-        vx_int8 fixedPointPos = TENSOR_POS(bboxs);
-        if ((fixedPointPos) > 0)
-            bboxScale = (1.0f / ((vx_float32) (1 << (fixedPointPos))));
-        else
-            bboxScale = ((vx_float32) (1 << -(fixedPointPos)));
-
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "bboxScale", 1, &bboxScale);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "bboxZP", 1, &bboxZP);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "Uni4x4_Cvt2Float32_low", 1, &Uni4x4_Cvt2Float32_low);
     }
     else if (bboxsFormat == VX_TYPE_INT16)
     {
-        vx_float32  bboxScale;
-        vx_int8 fixedPointPos = TENSOR_POS(bboxs);
-        if ((fixedPointPos) > 0)
-            bboxScale = (1.0f / ((vx_float32) (1 << (fixedPointPos))));
-        else
-            bboxScale = ((vx_float32) (1 << -(fixedPointPos)));
-
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "bboxScale", 1, &bboxScale);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "Uni4x4_Cvt2Float32_low", 1, &Uni4x4_Cvt2Float32_low);
     }
     else if(bboxsFormat == VX_TYPE_UINT8)
     {
-        vx_float32  bboxScale = TENSOR_TF_SCALE(bboxs);
-        vx_float32  bboxZP =  (vx_uint8)TENSOR_TF_ZEROPOINT(bboxs);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "bboxScale", 1, &bboxScale);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "bboxZP", 1, &bboxZP);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "Uni4x4_Cvt2Float32_low", 1, &Uni4x4_Cvt2Float32_low);
@@ -25589,6 +25559,7 @@ vxnne_shader_executable vxnneGetLSTMUnitHiddenOutExtShaderExecutable(
     else if (TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE)
     {
         outputScale = 1.0f / TENSOR_TF_SCALE(output);
+        outputZP    = (vx_float32)TENSOR_TF_ZEROPOINT(output);
     }
 
     if (cell_state_out)
@@ -25679,7 +25650,7 @@ vxnne_shader_executable vxnneGetLSTMUnitHiddenOutExtShaderExecutable(
             0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
         };
 
-        if (TENSOR_QUANT_TYPE(output) == VX_QUANT_DYNAMIC_FIXED_POINT)
+        if (output_format == VX_TYPE_INT8 || output_format == VX_TYPE_INT16)
         {
             if (paramNum == 3 && TENSOR_DATA_TYPE(cell_state_in) == VX_TYPE_FLOAT32)
             {
@@ -25727,6 +25698,7 @@ vxnne_shader_executable vxnneGetLSTMUnitHiddenOutExtShaderExecutable(
             }
 
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniExtractInteger_2x8", 1, uniExtractInteger_2x8);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outputZP", 1, &outputZP);
             if (status != VX_SUCCESS) goto OnError;
         }
         else if (TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE && output_format == VX_TYPE_UINT8)

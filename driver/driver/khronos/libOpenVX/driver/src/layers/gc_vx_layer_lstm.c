@@ -102,7 +102,7 @@ vx_status vxoFC_GetConfigFromEnv(vx_enum* force_format, vx_int8_ptr force_dfb, v
      switch(_quant_format)
      {
      case VX_QUANT_NONE:
-         _data_format       = VX_TYPE_FLOAT16;
+         _data_format       = format == VX_TYPE_BFLOAT16? VX_TYPE_BFLOAT16 : VX_TYPE_FLOAT16;
          _quant_format      = VX_QUANT_NONE;
          _fixed_point_pos   = 0;
          _scale             = 1.f;
@@ -132,6 +132,13 @@ vx_status vxoFC_GetConfigFromEnv(vx_enum* force_format, vx_int8_ptr force_dfb, v
      }
      break;
      case VX_QUANT_AFFINE_SCALE:
+         {
+             _data_format       = format == VX_TYPE_BFLOAT16? VX_TYPE_BFLOAT16 : VX_TYPE_FLOAT16;
+             _quant_format      = VX_QUANT_NONE;
+             _fixed_point_pos   = 0;
+             _scale             = 1.f;
+             _zeroPoint         = 0;
+         }
      default:
          _fixed_point_pos = 0;
          break;
@@ -715,7 +722,7 @@ vx_status vxoLSTMLayer_Initialize(
                                                                                 output_sub_tensors[0],
                                                                                 NULL, NULL, NULL);
         }
-        else if (TENSOR_DATA_TYPE(input_fc_sub_tensors[0]) == VX_TYPE_FLOAT16)
+        else if (TENSOR_DATA_TYPE(input_fc_sub_tensors[0]) == VX_TYPE_FLOAT16 || TENSOR_DATA_TYPE(input_fc_sub_tensors[0]) == VX_TYPE_BFLOAT16)
         {
             shaderExecutable = vxnneGetLSTMUnitHiddenOutExtShaderExecutable(context,
                                                                          VXNNE_KERNEL_TENSOR_LSTMUNIT_HIDDENOUT_EXT,
@@ -829,7 +836,12 @@ vx_status vxoLSTMLayer_Initialize(
 
         bias_zero[0] = vxoTensor_CreateTensor(context, node->graph, &tensor_params, vx_false_e);
 
-        vxoTensor_AllocateMemory(bias_zero[0]);
+        if (vxoTensor_AllocateMemory(bias_zero[0]) != VX_SUCCESS)
+        {
+            vxError("vxoTensor_AllocateMemory fail at function %s, line %d", __FUNCTION__, __LINE__);
+            status = VX_ERROR_NO_MEMORY;
+            goto OnError;
+        }
         vxoTensor_GetTensorViewMemory(bias_zero[0], (vx_ptr_ptr)&bias_data, VX_NULL);
         vxoTensor_GetTensorElementCount(bias_zero[0], &bias_size);
         vxZeroMemory(bias_data, vxnneGetTypeSize(bias_format) * bias_size);
@@ -863,7 +875,12 @@ vx_status vxoLSTMLayer_Initialize(
 
             bias_zero[i] = vxoTensor_CreateTensor(context, node->graph, &tensor_params, vx_false_e);
 
-            vxoTensor_AllocateMemory(bias_zero[i]);
+            if (vxoTensor_AllocateMemory(bias_zero[i]) != VX_SUCCESS)
+            {
+                vxError("vxoTensor_AllocateMemory fail at function %s, line %d", __FUNCTION__, __LINE__);
+                status = VX_ERROR_NO_MEMORY;
+                goto OnError;
+            }
             vxoTensor_GetTensorViewMemory(bias_zero[i], (vx_ptr_ptr)&bias_data, VX_NULL);
             vxoTensor_GetTensorElementCount(bias_zero[i], &bias_size);
             vxZeroMemory(bias_data, vxnneGetTypeSize(bias_format) * bias_size);
@@ -986,7 +1003,7 @@ vx_status vxoLSTMLayer_Initialize(
                                                                                     NULL,
                                                                                     hidden_sub_tensors[i]);
             }
-            else if (TENSOR_DATA_TYPE(input_fc_sub_tensors[i]) == VX_TYPE_FLOAT16)
+            else if (TENSOR_DATA_TYPE(input_fc_sub_tensors[i]) == VX_TYPE_FLOAT16 || TENSOR_DATA_TYPE(input_fc_sub_tensors[i]) == VX_TYPE_BFLOAT16)
             {
                 shaderExecutable = vxnneGetLSTMUnitHiddenOutExtShaderExecutable(context,
                                                                              VXNNE_KERNEL_TENSOR_LSTMUNIT_HIDDENOUT_EXT,
