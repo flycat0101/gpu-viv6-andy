@@ -1493,7 +1493,7 @@ cloCOMPILER_Compile(
         }
 
         gcShaderClrEnableOfflineCompiler(Compiler->binary);
-        if(gcmOPT_hasFeature(FE_GENERATED_OFFLINE_COMPILER)) {
+        if(gcmOPT_hasFeature(FB_GENERATED_OFFLINE_COMPILER)) {
             gcShaderSetEnableOfflineCompiler(Compiler->binary);
         }
 

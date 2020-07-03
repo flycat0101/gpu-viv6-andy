@@ -104,7 +104,7 @@ gctINT
     {
         Program->objectType = clvOBJECT_UNKNOWN;
 
-        if (Program->ideOption.underIDE) gcOPT_ResetFeature(FE_GENERATED_OFFLINE_COMPILER);
+        if (Program->ideOption.underIDE) gcOPT_ResetFeature(FB_GENERATED_OFFLINE_COMPILER);
         if (Program->buildOptions) gcoOS_Free(gcvNULL, Program->buildOptions);
         if (Program->origbuildOptions) gcoOS_Free(gcvNULL, Program->origbuildOptions);
         if (Program->linkOptions) gcoOS_Free(gcvNULL, Program->linkOptions);
@@ -925,7 +925,7 @@ clBuildProgram(
          */
         gcSHADER_Destroy((gcSHADER)Program->binary);
 
-        if (Program->ideOption.underIDE) gcOPT_ResetFeature(FE_GENERATED_OFFLINE_COMPILER);
+        if (Program->ideOption.underIDE) gcOPT_ResetFeature(FB_GENERATED_OFFLINE_COMPILER);
         if (Program->buildOptions) gcoOS_Free(gcvNULL, Program->buildOptions);
         if (Program->origbuildOptions) gcoOS_Free(gcvNULL, Program->origbuildOptions);
         if (Program->buildLog) gcoOS_Free(gcvNULL, Program->buildLog);
@@ -941,7 +941,7 @@ clBuildProgram(
 
     if(currentIDEOption->underIDE)
     {
-        gcOPT_SetFeature(FE_GENERATED_OFFLINE_COMPILER);
+        gcOPT_SetFeature(FB_GENERATED_OFFLINE_COMPILER);
         if(Options)
         {
             gctPOINTER tempOption = gcvNULL;

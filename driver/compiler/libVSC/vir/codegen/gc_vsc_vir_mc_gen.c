@@ -470,7 +470,8 @@ _VSC_MC_GEN_GenOpcode(
         {
             gctUINT workgrpSize = VIR_Shader_GetWorkGroupSize(Gen->Shader);
 
-            if ((workgrpSize > 0) &&
+            if (!gcmOPT_hasFeature(FB_VSIMULATOR_RUNNING_MODE) &&
+                (workgrpSize > 0) &&
                 (workgrpSize <= (Gen->pComCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg.maxCoreCount * 4)))
             {
                 *BaseOpcode = 0x00;
