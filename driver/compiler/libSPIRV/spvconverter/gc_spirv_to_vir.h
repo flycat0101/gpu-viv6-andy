@@ -148,9 +148,6 @@
 #define SPV_ID_SYM_MATRIX_STRIDE(id) (spv->idDescriptor[id].u.sym.offsetInfo.virAcOffsetInfo.matrixStride)
 #define SPV_ID_SYM_LAYOUT_QUAL(id) (spv->idDescriptor[id].u.sym.offsetInfo.virAcOffsetInfo.layoutQual)
 #define SPV_ID_SYM_IS_ROW_MAJOR_MATRIX_COLUMN_INDEX(id) (spv->idDescriptor[id].u.sym.offsetInfo.virAcOffsetInfo.isRowMajorMatrixColumnIndexing)
-#define SPV_ID_SYM_UBOARRAY_BASE_SYM(id) (spv->idDescriptor[id].u.sym.offsetInfo.uboArrayBaseVirSymId)
-#define SPV_ID_SYM_UBOARRAY(id, index) (spv->idDescriptor[id].u.sym.offsetInfo.uboArrayVirSymId[index])
-#define SPV_ID_SYM_AC_DYNAMIC_INDEXING(id) (spv->idDescriptor[id].u.sym.offsetInfo.acDynamicIndexing)
 #define SPV_ID_SYM_IS_FUNC_PARAM(id) (spv->idDescriptor[id].u.sym.isFuncParam)
 #define SPV_ID_SYM_VIR_FUNC(id) (spv->idDescriptor[id].u.sym.virFunc)
 #define SPV_ID_SYM_IS_WORKGROUP(id) (spv->idDescriptor[id].u.sym.isWorkGroup)
@@ -175,11 +172,10 @@
 #define SPV_ID_VIR_STD_SYM(id) ((VIR_Symbol *)VIR_Shader_GetSymFromId(virShader, SPV_ID_VIR_SYM_ID(id)))
 #define SPV_ID_VIR_CURRENT_FUNC_SYM(id) ((VIR_Symbol *)VIR_Function_GetSymFromId(spv->virFunction, SPV_ID_VIR_SYM_ID(id)))
 #define SPV_ID_VIR_FUNC_SYM(id) ((VIR_Symbol *)VIR_Function_GetSymFromId(SPV_ID_SYM_VIR_FUNC(id), SPV_ID_VIR_SYM_ID(id)))
-#define SPV_ID_VIR_SYM(id) (SPV_ID_SYM_IS_FUNC_PARAM(id) ? SPV_ID_VIR_FUNC_SYM(id) : SPV_ID_VIR_STD_SYM(id))
+#define SPV_ID_VIR_SYM(id) (SPV_ID_SYM_IS_FUNC_PARAM(id) && (SPV_ID_TYPE(id) == SPV_ID_TYPE_SYMBOL) ? SPV_ID_VIR_FUNC_SYM(id) : SPV_ID_VIR_STD_SYM(id))
 #define SPV_ID_VIR_TYPE(id) (VIR_Shader_GetTypeFromId(virShader,SPV_ID_VIR_TYPE_ID(id)))
 #define SPV_ID_CST_SPV_TYPE(id) (spv->idDescriptor[id].u.cst.spvTypeId)
 #define SPV_ID_VIR_CONST_ID(id) (spv->idDescriptor[id].u.cst.virConstId)
-#define SPV_ID_VIR_CONST(id) (spv->idDescriptor[id].u.cst.virConst)
 #define SPV_ID_CST_VEC_SPVID(id, index) (spv->idDescriptor[id].u.cst.vecSpvId[index])
 #define SPV_ID_TYPE(id) (spv->idDescriptor[id].idType)
 #define SPV_ID_FIELD_HAS_NAME(id, mem) ((gctUINT)(mem) < spv->idDescriptor[(id)].u.type.u.st.maxNumField ? \
@@ -223,9 +219,10 @@
 
 #define SPV_ID_CLONE(from, to) (spv->idDescriptor[to] = spv->idDescriptor[from])
 
-#define SPV_CONST_SCALAR_INT(id) (VIR_Shader_GetConstFromId(virShader,spv->idDescriptor[id].u.cst.virConstId)->value.scalarVal.iValue)
-#define SPV_CONST_SCALAR_UINT(id) (VIR_Shader_GetConstFromId(virShader,spv->idDescriptor[id].u.cst.virConstId)->value.scalarVal.uValue)
-#define SPV_CONST_SCALAR_FLOAT(id) (VIR_Shader_GetConstFromId(virShader,spv->idDescriptor[id].u.cst.virConstId)->value.scalarVal.fValue)
+#define SPV_CONST_SCALAR_INT(Shader, id) (VIR_Shader_GetConstFromId((Shader), spv->idDescriptor[id].u.cst.virConstId)->value.scalarVal.iValue)
+#define SPV_CONST_SCALAR_UINT(Shader, id) (VIR_Shader_GetConstFromId((Shader), spv->idDescriptor[id].u.cst.virConstId)->value.scalarVal.uValue)
+#define SPV_CONST_SCALAR_FLOAT(Shader, id) (VIR_Shader_GetConstFromId((Shader), spv->idDescriptor[id].u.cst.virConstId)->value.scalarVal.fValue)
+#define SPV_CONST_VECTOR_VAL(Shader, id) (VIR_Shader_GetConstFromId((Shader), spv->idDescriptor[id].u.cst.virConstId)->value.vecVal)
 
 #define SPV_POINTER_VAR_OBJ_SPV_TYPE(ptr) (spv->idDescriptor[spv->idDescriptor[ptr].u.sym.spvBaseTypeId].u.type.u.pointer.objType)
 #define SPV_POINTER_VAR_OBJ_SPV_NAME(ptr) (ptr)
@@ -327,12 +324,6 @@
         spv->idDescriptor[id].u.sym.descriptorHeader.virSymId = sid; \
         SPV_ID_SYM_BASE_SPV_SYMBOL_ID(id) = SPV_INVALID_LABEL; \
     }
-
-#define SPV_SET_IDDESCRIPTOR_UBOARRAY_SYM(spv, id, index, sid) \
-    { \
-        spv->idDescriptor[id].u.sym.offsetInfo.uboArrayVirSymId[index] = sid; \
-    }
-
 
 #define SPV_SET_IDDESCRIPTOR_TYPE(spv, id, sid) \
     { \

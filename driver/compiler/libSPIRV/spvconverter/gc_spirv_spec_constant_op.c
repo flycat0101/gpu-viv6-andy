@@ -116,8 +116,8 @@ __SpvFoldingTwoSrcArithmeticOp(
         {
             __SpvFoldingTwoSrcArithmeticOpPerComponent(spv,
                                                        componentTypeId,
-                                                       SPV_ID_VIR_CONST(spv->operands[0]).vecVal.u32Value[i],
-                                                       SPV_ID_VIR_CONST(spv->operands[1]).vecVal.u32Value[i],
+                                                       SPV_CONST_VECTOR_VAL(pVirShader, spv->operands[0]).u32Value[i],
+                                                       SPV_CONST_VECTOR_VAL(pVirShader, spv->operands[1]).u32Value[i],
                                                        &u32Value[i]);
         }
 
@@ -127,8 +127,8 @@ __SpvFoldingTwoSrcArithmeticOp(
     {
         __SpvFoldingTwoSrcArithmeticOpPerComponent(spv,
                                                    spv->resultTypeId,
-                                                   SPV_ID_VIR_CONST(spv->operands[0]).scalarVal.uValue,
-                                                   SPV_ID_VIR_CONST(spv->operands[1]).scalarVal.uValue,
+                                                   SPV_CONST_SCALAR_UINT(pVirShader, spv->operands[0]),
+                                                   SPV_CONST_SCALAR_UINT(pVirShader, spv->operands[1]),
                                                    &u32Value[0]);
 
         operandSize = 1;
@@ -148,6 +148,7 @@ __SpvFoldingTwoSrcArithmeticOp(
 static gctBOOL
 __SpvFoldingCompositeVectorType(
     gcSPV           spv,
+    VIR_Shader*     pVirShader,
     gctUINT         objectId,
     gctUINT         componentIndex
     )
@@ -163,7 +164,7 @@ __SpvFoldingCompositeVectorType(
     /* Success, change it to OpConstant. */
     spv->opCode = SpvOpConstant;
     spv->operandSize = 1;
-    spv->operands[0] = SPV_ID_VIR_CONST(objectId).vecVal.u32Value[componentIndex];
+    spv->operands[0] = SPV_CONST_VECTOR_VAL(pVirShader, objectId).u32Value[componentIndex];
 
     return gcvTRUE;
 }
@@ -200,7 +201,7 @@ __SpvFoldingCompositeExtractOp(
 
     if (SPV_ID_TYPE_IS_VECTOR(objectTypeId))
     {
-        __SpvFoldingCompositeVectorType(spv, spv->operands[0], spv->operands[1]);
+        __SpvFoldingCompositeVectorType(spv, pVirShader, spv->operands[0], spv->operands[1]);
     }
     else
     {

@@ -1058,6 +1058,8 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 
 #define VIR_Shader_GetMinWorkGroupSizeSetByDriver(Shader)   ((Shader)->shaderLayout.compute.minWorkGroupSizeSetByDriver)
 #define VIR_Shader_SetMinWorkGroupSizeSetByDriver(Shader, V)do { (Shader)->shaderLayout.compute.minWorkGroupSizeSetByDriver = (V); } while (0)
+#define VIR_Shader_GetMaxWorkGroupSizeSetByDriver(Shader)   ((Shader)->shaderLayout.compute.maxWorkGroupSizeSetByDriver)
+#define VIR_Shader_SetMaxWorkGroupSizeSetByDriver(Shader, V)do { (Shader)->shaderLayout.compute.maxWorkGroupSizeSetByDriver = (V); } while (0)
 
 #define VIR_Shader_SetTCShaderLayout(s, outVertices, inVertices)            \
         do {                                                                \
@@ -4989,7 +4991,7 @@ typedef enum _VIR_SHADERFLAGS_EXT1
     VIR_SHFLAG_EXT1_CAPABILITY_FP16             = 0x00000040, /* Whether instruction support FP16 directly, so the data in register is FP16. */
     VIR_SHFLAG_EXT1_IMAGE_FORMAT_MISMATCH       = 0x00000080, /* Whether any image format/sampled type mismatch. */
     VIR_SHFLAG_EXT1_USE_EVIS_INST               = 0x00000100, /* Whether use EVIS instruction. */
-    VIR_SHFLAG_EXT1_SET_MIN_WORKGROUPSIZE       = 0x00000200, /* Whether driver sets the minimum workGroupSize. */
+    VIR_SHFLAG_EXT1_DEPEND_ON_WORK_GROUP_SIZE   = 0x00000200, /* Whether the shader depends on the workGroupSize. */
     VIR_SHFLAG_EXT1_COMPATIBILITY_PROFILR       = 0x00000400, /* Whether the shader version is compatibility profile. */
     VIR_SHFLAG_EXT1_TCS_STORE_PERPATCH_ADDR     = 0x00000800, /* Whether TCS needs to store per-patch addr. */
     VIR_SHFLAG_EXT1_TCS_STORE_PRIMITIVE_ID      = 0x00001000, /* Whether TCS needs to store PrimitiveId. */
@@ -5058,13 +5060,13 @@ typedef enum _VIR_SHADERFLAGS_EXT1
 #define VIR_Shader_CapabilityFP16(Shader)           (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_CAPABILITY_FP16) != 0)
 #define VIR_Shader_HasImageFormatMismatch(Shader)   (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_IMAGE_FORMAT_MISMATCH) != 0)
 #define VIR_Shader_UseEvisInst(Shader)              (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_USE_EVIS_INST) != 0)
+#define VIR_Shader_DependOnWorkGroupSize(Shader)    (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_DEPEND_ON_WORK_GROUP_SIZE) != 0)
 #define VIR_Shader_IsCompatibilityProfile(Shader)   (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_COMPATIBILITY_PROFILR) != 0)
 #define VIR_Shader_TcsStorePerpatchAddr(Shader)     (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_TCS_STORE_PERPATCH_ADDR) != 0)
 #define VIR_Shader_TcsStorePrimitiveId(Shader)      (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_TCS_STORE_PRIMITIVE_ID) != 0)
 #define VIR_Shader_UseConstRegForUBO(Shader)        (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_USE_CONST_REG_FOR_UBO) != 0)
 #define VIR_Shader_HasNoPerVertexInput(Shader)      (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_HAS_NO_PER_VERTEX_INPUT) != 0)
 #define VIR_Shader_NeedUpdatePrecision(Shader)      (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_ENABLE_PRECISION_UPDATE) != 0)
-#define VIR_Shader_DriverSetMinWorkGroupSize(Shader)(((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_SET_MIN_WORKGROUPSIZE) != 0)
 
 typedef struct _VIR_LIBRARYLIST VIR_LibraryList;
 
@@ -5171,8 +5173,9 @@ typedef struct _VIR_COMPUTELAYOUT
     /* The factor of reducing WorkGroupSize, the default value is 0. */
     gctUINT16           workGroupSizeFactor[3];
 
-    /* The minimum workGroupSize which is set by driver.*/
+    /* The minimum/maximum workGroupSize which is set by driver.*/
     gctUINT32           minWorkGroupSizeSetByDriver;
+    gctUINT32           maxWorkGroupSizeSetByDriver;
 } VIR_ComputeLayout;
 
 /* tcs and tes layout are defined in same struct */
@@ -7764,27 +7767,35 @@ typedef struct _VIR_BASE_TYPE_INFO
 
 typedef struct _VIR_AC_OFFSET_INFO
 {
-    gctBOOL                 bHasAccessChain;
+    gctUINT                 bHasAccessChain : 2;
+    gctUINT                 noNeedWShift    : 2;
+    gctUINT                 isRowMajorMatrixColumnIndexing : 2;
+
+    /* array stride and matrix stride, for struct member only. */
+    gctINT                  arrayStride     : 8;
+    gctINT                  matrixStride    : 8;
+    gctUINT                 reserved        : 10;
+
     /* For UBO/SBO/per-vertex only:
     ** for UBO/SBO, save the base address index;
     ** for per-vertex, save the invocation index.
     */
     VIR_SymbolKind          blockIndexType;
     VIR_SymId               blockIndex;
+
     /* Base offset. */
     VIR_SymbolKind          baseOffsetType;
     VIR_SymId               baseOffset;
+
     /* Vector index. */
     VIR_SymbolKind          vectorIndexType;
     VIR_SymId               vectorIndex;
-    gctBOOL                 noNeedWShift;
+
+    /* Array symbol. */
     VIR_Symbol*             arraySym;
-    /* array stride and matrix stride, for struct member only. */
-    gctINT                  arrayStride;
-    gctINT                  matrixStride;
+
     /* layout qual. */
     VIR_LayoutQual          layoutQual;
-    gctBOOL                 isRowMajorMatrixColumnIndexing;
 } VIR_AC_OFFSET_INFO;
 
 VSC_ErrCode

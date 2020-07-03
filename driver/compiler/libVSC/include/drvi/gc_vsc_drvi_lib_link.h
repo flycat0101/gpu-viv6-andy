@@ -88,6 +88,9 @@ typedef enum _VSC_LIB_LINK_TYPE
 
     /* The minimum workGroupSize that application requires. */
     VSC_LIB_LINK_TYPE_SET_MIN_WORK_GROUP_SIZE       = 7,
+
+    /* The fixed workGroupSize that application requires. */
+    VSC_LIB_LINK_TYPE_SET_FIXED_WORK_GROUP_SIZE     = 8,
 }VSC_LIB_LINK_TYPE;
 
 typedef enum _VSC_RES_OP_BIT
@@ -211,6 +214,7 @@ typedef struct _VSC_LIB_LINK_POINT
         VSC_LIB_LINK_IMAGE_READ_WRITE imageReadWrite;
         VSC_LIB_LINK_IMAGE_FORMAT     imageFormat;
         gctUINT                       minWorkGroupSize;
+        gctUINT                       maxWorkGroupSize;
     } u;
 }VSC_LIB_LINK_POINT;
 

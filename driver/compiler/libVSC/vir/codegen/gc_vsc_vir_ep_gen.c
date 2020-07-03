@@ -2686,6 +2686,7 @@ static void _CollectExeHints(VSC_SHADER_COMPILER_PARAM* pCompilerParam, VSC_SEP_
         pOutSEP->exeHints.derivedHints.prvStates.gps.bUseLocalMemory = VIR_Shader_UseLocalMem(pShader);
         pOutSEP->exeHints.derivedHints.prvStates.gps.bUsePrivateMemory = VIR_Shader_UsePrivateMem(pShader);
         pOutSEP->exeHints.derivedHints.prvStates.gps.bUseEvisInst = VIR_Shader_UseEvisInst(pShader);
+        pOutSEP->exeHints.derivedHints.prvStates.gps.bDependOnWorkGroupSize = VIR_Shader_DependOnWorkGroupSize(pShader);
 
         for (i = 0; i < 3; i++)
         {

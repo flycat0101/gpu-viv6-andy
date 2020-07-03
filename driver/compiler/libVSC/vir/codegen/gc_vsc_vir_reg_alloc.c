@@ -13082,6 +13082,7 @@ void _VIR_RA_LS_SetRegWatermark(
     VSC_HW_CONFIG       *pHwCfg = VIR_RA_LS_GetHwCfg(pRA);
     gctUINT             numWorkGroup = 1, numWorkThread = 1;
     gctBOOL             numWorkGroupChanged = gcvFALSE;
+    gctBOOL             bDependOnWorkGroupSize = gcvFALSE;
 
     /* set register allocated to shader */
     VIR_Shader_SetRegAllocated(pShader, gcvTRUE);
@@ -13184,6 +13185,35 @@ void _VIR_RA_LS_SetRegWatermark(
                 _VIR_RA_LS_ChangeLocalToGlobal(pShader);
                 VIR_Shader_ClrFlag(pShader, VIR_SHFLAG_USE_LOCAL_MEM);
             }
+        }
+    }
+
+    if (pShader->hasRegisterSpill && pRA->spillOffset == 0)
+    {
+        pShader->hasRegisterSpill = gcvFALSE;
+    }
+
+    /* Whether the shader depends on the workGroupSize. */
+    if (VIR_Shader_IsCL(pShader))
+    {
+        /*
+        ** There are two situation that this CS depends on WorkGroupSize, and when application set a smaller WorkGroupSize,
+        ** we need to trigger a recompilation.
+        **  1) Use WorkGroupSize to calculate the maximum register count and use register spill.
+        **     With a smaller WorkGroupSize, we can use more registers and maybe we can avoid the register spill.
+        **  2) Use the local memory.
+        **     With a smaller WorkGroupSize, the concurrent WorkGroupCount will be larger, we need to re-calcualte this.
+        */
+        if ((VIR_Shader_CalcMaxRegBasedOnWorkGroupSize(pShader) && pShader->hasRegisterSpill)
+            ||
+            VIR_Shader_FindSymbolByName(pShader, VIR_SYM_UNIFORM, _sldWorkGroupCountName))
+        {
+            bDependOnWorkGroupSize = gcvTRUE;
+        }
+
+        if (bDependOnWorkGroupSize)
+        {
+            VIR_Shader_SetFlagExt1(pShader, VIR_SHFLAG_EXT1_DEPEND_ON_WORK_GROUP_SIZE);
         }
     }
 
@@ -13748,15 +13778,10 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
             }
 
             /* for register spill, compute the base address */
-            if (pShader->hasRegisterSpill &&
-                ra.spillOffset > 0)
+            if (pShader->hasRegisterSpill)
             {
                 retValue = _VIR_RA_LS_SpillAddrComputation(&ra);
                 ON_ERROR(retValue, "_VIR_RA_LS_SpillAddrComputation");
-            }
-            else
-            {
-                pShader->hasRegisterSpill = gcvFALSE;
             }
 
             /* set input/output VIR_SYMFLAG_LOAD_STORE_ATTR flag */
