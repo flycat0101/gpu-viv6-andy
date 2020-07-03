@@ -93,6 +93,7 @@ VX_INTERNAL_API vx_node vxPyramidCopyImageNode(vx_graph graph, vx_image inputIma
 VX_INTERNAL_API vx_node vxTransPose2DTensorNode(vx_graph graph, vx_tensor inputTensor, vx_tensor outputTensor);
 VX_INTERNAL_API vx_node vxMultiply2DMatrixesNode(vx_graph graph, vx_tensor inputTensor0, vx_tensor inputTensor1, vx_tensor inputTensor2, vx_scalar enable_tensorC, vx_tensor outputTensor);
 
+VX_INTERNAL_API vx_node vxConvolve5x5Node(vx_graph graph, vx_image input, vx_convolution conv, vx_image output);
 EXTERN_C_END
 
 #endif /* __GC_VX_INTERNAL_NODE_API_H__ */

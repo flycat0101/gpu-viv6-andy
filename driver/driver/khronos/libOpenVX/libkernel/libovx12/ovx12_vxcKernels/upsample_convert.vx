@@ -75,9 +75,8 @@ __kernel void upsample_convert_s16_to_s16
     VXC_ReadImage(src1, src_image, coord.xy, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 
     coord.z ++;
-    vxc_short8 four = (vxc_short8)(4, 4, 4, 4, 4, 4, 4, 4);
-    _viv_asm(MULSAT, src0, src0, four);
-    _viv_asm(MULSAT, src1, src1, four);
+    VXC_DP2x8(src0, src0, src0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), uniIntergeMul4_2x8);
+    VXC_DP2x8(src1, src1, src1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), uniIntergeMul4_2x8);
 
     VXC_WriteImage(dst_image, coord.xy, src0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
     VXC_WriteImage(dst_image, coord.xz, src1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
