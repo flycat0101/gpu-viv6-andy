@@ -8211,13 +8211,16 @@ _PmSetPowerOffDirection(
     switch (Hardware->chipPowerState)
     {
     case gcvPOWER_ON:
-        /* Stall. */
-        status = _PmStallCommand(Hardware, command, Broadcast);
-
-        if (!gcmIS_SUCCESS(status))
+        if(Hardware->kernel->threadInitialized == gcvTRUE)
         {
-            /* abort for error and NOT READY. */
-            goto OnError;
+            /* Stall. */
+            status = _PmStallCommand(Hardware, command, Broadcast);
+
+            if (!gcmIS_SUCCESS(status))
+            {
+                /* abort for error and NOT READY. */
+                goto OnError;
+            }
         }
 
         if (State == gcvPOWER_IDLE)
@@ -8241,8 +8244,11 @@ _PmSetPowerOffDirection(
         }
 
     case gcvPOWER_SUSPEND:
-        /* Flush. */
-        gcmkONERROR(_PmFlushCache(Hardware, command));
+        if(Hardware->kernel->threadInitialized == gcvTRUE)
+        {
+            /* Flush. */
+            gcmkONERROR(_PmFlushCache(Hardware, command));
+        }
 
         /* Clock control. */
         gcmkONERROR(_PmClockControl(Hardware, gcvPOWER_OFF));
