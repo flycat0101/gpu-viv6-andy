@@ -36,7 +36,7 @@ endif
 
 INSTALL_DIR = $(SDK_DIR)/drivers
 
-LDLIBS = -L$(SDK_DIR)/drivers -lGAL -L$(ROOTFS_USR)/lib -lXdamage -lXfixes -lXext -lX11 -lpthread -lm  -ldl -ldrm
+LDLIBS = -L$(SDK_DIR)/drivers -lGAL -L$(ROOTFS)/usr/lib -lXdamage -lXfixes -lXext -lX11 -lpthread -lm  -ldl -ldrm
 
 ifeq ($(DEBUG),1)
 CFLAGS += -g -O0 -DDEBUG -fPIC
@@ -62,16 +62,14 @@ INCLUDE += \
 	-I$(TOPDIR)/include/dri \
 	-I$(TOPDIR)/include/gl \
 	-I$(TOPDIR)/include/glcore \
-	-I$(ROOTFS_USR)/include/X11/extensions \
-	-I$(ROOTFS_USR)/include \
-	-I$(ROOTFS_USR)/include/pixman-1
+	-I$(ROOTFS)/usr/include \
+	-I$(ROOTFS)/usr/include/libdrm \
+	-I$(ROOTFS)/usr/include/pixman-1 \
+	-I$(LIBDRM_DIR)/include/drm
 
 ifeq ($(X11_DRI3),1)
-INCLUDE += -I$(AQROOT)/driver/X/libdrm-2.4.91/include/drm \
-           -I$(AQROOT)/driver/X/libdrm-2.4.91/vivante
-LDLIBS += -lX11-xcb -ldrm_vivante -lxcb -lxcb-shm -lxcb-dri3 -lxcb-present -lxshmfence -lxcb-sync
-else
-INCLUDE += -I$(ROOTFS_USR)/include/libdrm
+INCLUDE += -I$(LIBDRM_DIR)/vivante
+LDLIBS += -lX11-xcb -ldrm_vivante -lxcb -lxcb-dri3 -lxcb-present -lxshmfence -lxcb-sync
 endif
 
 CFLAGS += $(INCLUDE)
@@ -128,6 +126,7 @@ install: all
 	@-cp $(TARGET_MODULE) $(INSTALL_DIR)
 	@mkdir -p $(SDK_DIR)/include/GL
 	@-cp -f $(AQROOT)/sdk/inc/GL/*.h $(SDK_DIR)/include/GL
+	@-cd $(OBJ_DIR); ln -sf libGL.so.1.2.0 libGL.so
 	@for lib in $(TARGET_LINKS); do \
 	    ln -sf $(notdir $(TARGET_MODULE)) $(INSTALL_DIR)/$$lib; \
 	done

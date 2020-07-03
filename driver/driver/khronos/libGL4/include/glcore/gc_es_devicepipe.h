@@ -14,7 +14,7 @@
 #ifndef __gc_es_devicepipe_h__
 #define __gc_es_devicepipe_h__
 
-#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(OPENGL40) && defined(GL4_DRI_BUILD)
 typedef struct __GLpipelineRec {
 
     /* Notify the pipeline that the drawable has changed*/
@@ -258,7 +258,7 @@ typedef struct __GLdevicePipelineRec
     /* Accumulation functions */
     GLvoid (*accum)(__GLcontext*, GLenum , GLfloat);
 
-#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(OPENGL40) && defined(GL4_DRI_BUILD)
     /* Device private context management functions */
     __GLpipeline ctx;
 #endif

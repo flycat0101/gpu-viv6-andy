@@ -329,7 +329,7 @@ struct __DRIdrawablePrivateRec {
     unsigned int phyAddress;
     int fullscreenCovered;
 
-#ifdef DRI_PIXMAPRENDER_GL
+#if defined(GL4_DRI_BUILD)
     GLvoid *wrapPixData;
     GLvoid *wrapSurface;
     GLvoid ( *doCPYToSCR)(__DRIdrawablePrivate *dPriv);

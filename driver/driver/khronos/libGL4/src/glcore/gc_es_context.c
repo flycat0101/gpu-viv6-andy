@@ -915,7 +915,7 @@ GLvoid __glEvaluateSystemDrawableChange(__GLcontext *gc, GLbitfield flags)
         gc->flags &= ~__GL_CONTEXT_SKIP_DRAW_INVALID_RENDERBUFFER;
     }
 }
-#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(OPENGL40) && defined(GL4_DRI_BUILD)
 
 /* Mutex lock for drawable change */
 __GLlock drawableChangeLock;
@@ -1516,7 +1516,7 @@ GLboolean __glLoseCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdr
     /* Notify DP the context is not current anymore */
     retVal = (*gc->dp.loseCurrent)(gc, GL_FALSE);
 
-#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(OPENGL40) && defined(GL4_DRI_BUILD)
     if (gc->imports.conformGLSpec)
     {
         /* Free all vertex data caches in video memory */
@@ -1612,7 +1612,7 @@ GLboolean __glMakeCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdr
     /* Notify the DP of the new context drawable pair */
     retVal = (*gc->dp.makeCurrent)(gc);
 
-#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(OPENGL40) && defined(GL4_DRI_BUILD)
     if (gc->imports.conformGLSpec && !gc->imports.fromEGL)
     {
         /* Get the latest drawable information */

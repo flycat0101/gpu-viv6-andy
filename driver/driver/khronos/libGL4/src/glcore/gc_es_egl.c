@@ -137,7 +137,7 @@ void __eglDestruct(void)
     /* Send OPENGL_DEINITIALIZATION escape call */
     if (__glDevicePipe.devDeinitialize)
     {
-#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(OPENGL40) && defined(GL4_DRI_BUILD)
         __glDevicePipe.devDeinitialize(gcvNULL);
 #else
         __glDevicePipe.devDeinitialize();

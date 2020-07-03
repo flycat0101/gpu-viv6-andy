@@ -96,8 +96,8 @@ endif
 CFLAGS += -Wno-maybe-uninitialized -Wno-unused-function -Wno-unused-variable -Wno-return-type
 CFLAGS  += -DSMALL_THRESHOLD -DADD_FSL_XRANDR
 CFLAGS += -fvisibility=hidden -fPIC -DPIC
-CFLAGS += -I. -I.. -I$(ROOTFS_USR)/include -I$(ROOTFS_USR)/include/xorg \
-          -I$(ROOTFS_USR)/include/X11/dri -I$(ROOTFS_USR)/include/$(PIXMAN)
+CFLAGS += -I. -I.. -I$(ROOTFS)/usr/include -I$(ROOTFS)/usr/include/xorg \
+          -I$(ROOTFS)/usr/include/X11/dri -I$(ROOTFS)/usr/include/$(PIXMAN)
 CFLAGS += -I./vivante_gal -I./vivante_fbdev -I./vivante_util -I./vivante_exa -I./vivante_extension -I$(AQROOT)/hal/kernel/inc
 
 LDFLAGS += -fPIC -Wall -Wl,-soname,vivante_drv.so -lm -ldl -L$(SDK_DIR)/drivers -lGAL
@@ -106,11 +106,10 @@ ifeq ($(HAVE_G2D),1)
 endif
 
 ifeq ($(X11_DRI3),1)
-CFLAGS += -I./imx_drm \
-          -I$(ROOTFS_USR)/include/libdrm
+CFLAGS += -I./imx_drm -I$(LIBDRM_DIR)/include/drm -I$(LIBDRM_DIR)/vivante
 LDFLAGS += -ldrm -ldrm_vivante
 else
-CFLAGS += -I$(ROOTFS_USR)/include/libdrm
+CFLAGS += -I$(ROOTFS)/usr/include/libdrm
 endif
 
 all: .libs/$(target)

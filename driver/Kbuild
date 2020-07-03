@@ -321,7 +321,7 @@ EXTRA_CFLAGS += -I$(AQROOT)/hal/kernel/archvg
 endif
 
 ifeq ($(VIVANTE_ENABLE_DRM), 1)
-EXTRA_CFLAGS += -I$(AQROOT)/driver/X/libdrm-2.4.91/include/drm
+EXTRA_CFLAGS += -I$(LIBDRM_DIR)/include/drm
 endif
 
 EXTRA_CFLAGS += -DHOST=\"$(HOST)\"

@@ -31,8 +31,8 @@
  */
 
 #include "glxclient.h"
-#include <extutil.h>
-#include <Xext.h>
+#include <X11/extensions/Xext.h>
+#include <X11/extensions/extutil.h>
 #include <string.h>
 #include <stdio.h>
 #include "gl_thread.h"

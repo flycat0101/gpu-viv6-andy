@@ -21,7 +21,7 @@ ROOTDIR = $(AQROOT)/driver/khronos/libGL4
 ################################################################################
 # Define target module name.
 
-ifeq ($(YOCTO_DRI_BUILD),1)
+ifeq ($(GL4_DRI_BUILD),1)
 ifeq ($(gcdSTATIC_LINK), 1)
   TARGET_MODULE     := $(OBJ_DIR)/vivante_dri.a
 else
@@ -63,16 +63,17 @@ INCLUDE += \
 	-I$(AQROOT)/driver/khronos/libEGL/inc \
 	-I$(AQROOT)/driver/khronos/libEGL/source \
 	-I$(AQROOT)/driver/khronos/libGL4/src/glcore \
-	-I$(ROOTDIR)/include -I$(ROOTDIR)/include/backend -I$(ROOTDIR)/include/gl \
-	-I$(ROOTDIR)/include/dri -I$(ROOTDIR)/include/glcore \
+	-I$(ROOTDIR)/include \
+	-I$(ROOTDIR)/include/backend \
+	-I$(ROOTDIR)/include/gl \
+	-I$(ROOTDIR)/include/glcore \
 	-I$(ROOTDIR)/include/chip \
 	-I$(ROOTDIR)/include/dri \
-	-I$(AQROOT)/driver/X/libdrm-2.4.91/include/drm \
-	-I$(AQROOT)/driver/X/libdrm-2.4.91 \
-	-I$(ROOTFS_USR)/include/pixman-1 \
-	-I$(ROOTFS_USR)/include/libdrm \
-	-I$(ROOTFS_USR)/include \
-	$(OSINCLUDEDIR)
+	-I$(ROOTFS)/usr/include \
+	-I$(ROOTFS)/usr/include/libdrm \
+	-I$(ROOTFS)/usr/include/pixman-1 \
+	-I$(LIBDRM_DIR) \
+	-I$(LIBDRM_DIR)/include/drm
 
 CFLAGS += $(INCLUDE)
 
@@ -169,7 +170,7 @@ LDFLAGS += -Wall -Wl,-z,defs -shared -Wl,-soname,$(TARGET_SONAME)
 ################################################################################
 # Supply dependent libraries.
 
-ifeq ($(YOCTO_DRI_BUILD),1)
+ifeq ($(GL4_DRI_BUILD),1)
 INSTALL_DIR = $(SDK_DIR)/drivers/dri
 LDLIBS := -L$(ROOTDIR)/src/GLX/client/$(OBJ_DIR) -lGL \
           -L$(AQROOT)/hal/user/$(OBJ_DIR) -lGAL \
@@ -193,7 +194,7 @@ all: $(TARGET_MODULE)
 clean:
 	@rm -rf $(OBJ_DIR)
 
-ifeq ($(YOCTO_DRI_BUILD),1)
+ifeq ($(GL4_DRI_BUILD),1)
 install: all
 	@mkdir -p $(INSTALL_DIR)
 	@-cp $(TARGET_MODULE) $(INSTALL_DIR)
@@ -226,6 +227,10 @@ else
 # module dependencies
 $(TARGET_MODULE): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so) \
                   $(wildcard $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.so)
+
+ifeq ($(GL4_DRI_BUILD),1)
+$(TARGET_MODULE): $(wildcard $(ROOTDIR)/src/GLX/client/$(OBJ_DIR)/libGL.so)
+endif
 
 $(TARGET_MODULE): $(OBJECTS)
 	@echo "  LINK    \033[1m$(notdir $@)\033[0m"

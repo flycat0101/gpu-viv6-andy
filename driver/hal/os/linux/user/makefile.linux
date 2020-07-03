@@ -39,7 +39,8 @@ INCLUDE := -I$(AQROOT)/hal/inc \
            -I$(AQROOT)/hal/user \
            -I$(AQROOT)/hal/optimizer \
            -I$(AQROOT)/hal/os/linux/user \
-           -I$(AQROOT)/compiler/libVSC/include
+           -I$(AQROOT)/compiler/libVSC/include \
+           -I$(AQROOT)/hal/os/linux/user/platform/$(soc_vendor)
 
 CFLAGS += $(INCLUDE)
 
@@ -51,19 +52,22 @@ ifneq ($(USE_ARMCC),1)
 endif
 
 ################################################################################
-# Describe object files.
+# Describe object files
 
-platform_option := \
-    $(firstword $(wildcard \
-        platform/$(soc_vendor)/gc_hal_user_platform_$(soc_board).c \
-        platform/default/gc_hal_user_platform_default.c))
+platform_option = $(wildcard \
+        platform/$(soc_vendor)/gc_hal_user_platform_$(soc_board).c)
+
+ifeq ($(platform_option),)
+  platform_option = $(wildcard \
+  		platform/default/gc_hal_user_platform_default.c)
+endif
 
 platform_option_obj := $(patsubst %.c,%.o,$(notdir $(platform_option)))
 
 OBJECTS := $(OBJ_DIR)/gc_hal_user_debug.o \
            $(OBJ_DIR)/gc_hal_user_os.o \
            $(OBJ_DIR)/gc_hal_user_math.o \
-           $(OBJ_DIR)/$(platform_option_obj) \
+           $(OBJ_DIR)/$(platform_option_obj)
 
 ################################################################################
 # Define targets.

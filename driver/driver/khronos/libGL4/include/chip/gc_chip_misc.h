@@ -29,7 +29,7 @@ typedef struct __GLchipXfbHeaderRec
     gctPOINTER   headerLocked;
 } __GLchipXfbHeader;
 
-#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(OPENGL40) && defined(GL4_DRI_BUILD)
 typedef struct _glsSwapInfo {
     /* Swap surface. */
     gcoSURF swapSurface;

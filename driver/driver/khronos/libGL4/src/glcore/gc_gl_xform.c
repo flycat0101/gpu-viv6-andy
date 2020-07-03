@@ -1163,7 +1163,7 @@ GLvoid __glFreeTransformState(__GLcontext *gc)
 */
 GLvoid __glComputeClipBox(__GLcontext *gc)
 {
-#if defined(_LINUX_) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(_LINUX_) && defined(GL4_DRI_BUILD)
     GLint llx, lly, urx, ury;
     GLint y0, y1;
 

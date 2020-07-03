@@ -19,7 +19,7 @@
 #include "gc_es_context.h"
 #include "gc_chip_context.h"
 #include "gc_es_device.h"
-#if defined(_LINUX_) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(_LINUX_) && defined(GL4_DRI_BUILD)
 #elif defined(_WINDOWS)
 #include "vvtpfdtypes.h"
 #include "wintogl.h"
@@ -28,7 +28,7 @@
 #define _GC_OBJ_ZONE    gcdZONE_GL40_DEVICE
 
 __GLchipGlobal dpGlobalInfo;
-#if defined(_LINUX_) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(_LINUX_) && defined(GL4_DRI_BUILD)
 extern void __glChipCreateDrawable(__GLdrawablePrivate *draw,void *window);
 #elif defined(_WINDOWS)
 extern VEGLimports imports;
@@ -370,7 +370,7 @@ GLboolean __glDpSetPixelFormat(GLint iPixelFormat )
 /* done */
 #endif
 
-#if defined(_LINUX_) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(_LINUX_) && defined(GL4_DRI_BUILD)
 #include<X11/Xlib.h>
 #include<X11/Xutil.h>
 #include<stdio.h>
@@ -435,7 +435,7 @@ __glDpInitialize(
     deviceEntry->devDestroyDrawable = __glChipDestroyDrawable;
     deviceEntry->devDeinitialize    = __gldevDeinitialize;
     deviceEntry->devInitialize      = __gldevInitialize;
-#if defined(_LINUX_) && defined(DRI_PIXMAPRENDER_GL)
+#if defined(_LINUX_) && defined(GL4_DRI_BUILD)
     deviceEntry->devCreateDrawable = __glChipCreateDrawable;
 #elif defined(_WINDOWS)
     deviceEntry->devDescribePixelFormat = __glDpDescribePixelFormat;
