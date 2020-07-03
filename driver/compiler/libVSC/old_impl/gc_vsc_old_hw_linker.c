@@ -3406,13 +3406,12 @@ _MapNonSamplerUniforms(
         case gcSHADER_VAR_CATEGORY_BLOCK_ADDRESS:
             if(isUniformStorageBlockAddress(uniform)) break;
             if(isUniformConstantAddressSpace(uniform)) break;
-            if(handleDefaultUBO)
+            if (handleDefaultUBO || unblockUniformBlock)
             {
-                if(!isUniformUsedInShader(uniform)) continue;
-            }
-            else if(unblockUniformBlock)
-            {
-                continue;
+                if (!isUniformUsedInShader(uniform))
+                {
+                    continue;
+                }
             }
             break;
 
@@ -3586,13 +3585,12 @@ _MapNonSamplerUniforms(
                 case gcSHADER_VAR_CATEGORY_BLOCK_ADDRESS:
                     if(isUniformStorageBlockAddress(uniform)) break;
                     if(isUniformConstantAddressSpace(uniform)) break;
-                    if(handleDefaultUBO)
+                    if (handleDefaultUBO || unblockUniformBlock)
                     {
-                        if(!isUniformUsedInShader(uniform)) continue;
-                    }
-                    else if(unblockUniformBlock)
-                    {
-                        continue;
+                        if (!isUniformUsedInShader(uniform))
+                        {
+                            continue;
+                        }
                     }
                     break;
 
@@ -3755,13 +3753,12 @@ _CalcUniformCount(
         case gcSHADER_VAR_CATEGORY_BLOCK_ADDRESS:
             if(isUniformStorageBlockAddress(uniform)) break;
             if(isUniformConstantAddressSpace(uniform)) break;
-            if(handleDefaultUBO)
+            if (handleDefaultUBO || unblockUniformBlock)
             {
-                if(!isUniformUsedInShader(uniform)) continue;
-            }
-            else if(unblockUniformBlock)
-            {
-                continue;
+                if (!isUniformUsedInShader(uniform))
+                {
+                    continue;
+                }
             }
             break;
 
@@ -3949,13 +3946,12 @@ _MapUniforms(
             case gcSHADER_VAR_CATEGORY_BLOCK_ADDRESS:
                 if(isUniformStorageBlockAddress(uniform)) break;
                 if(isUniformConstantAddressSpace(uniform)) break;
-                if(handleDefaultUBO)
+                if (handleDefaultUBO || unblockUniformBlock)
                 {
-                    if(!isUniformUsedInShader(uniform)) continue;
-                }
-                else if(unblockUniformBlock)
-                {
-                    continue;
+                    if (!isUniformUsedInShader(uniform))
+                    {
+                        continue;
+                    }
                 }
                 break;
 
@@ -22726,13 +22722,12 @@ _GenerateStates(
                         case gcSHADER_VAR_CATEGORY_BLOCK_ADDRESS:
                             if(isUniformStorageBlockAddress(uniform)) break;
                             if(isUniformConstantAddressSpace(uniform)) break;
-                            if(handleDefaultUBO)
+                            if (handleDefaultUBO || unblockUniformBlock)
                             {
-                                if(!isUniformUsedInShader(uniform)) continue;
-                            }
-                            else if(unblockUniformBlock)
-                            {
-                                continue;
+                                if (!isUniformUsedInShader(uniform))
+                                {
+                                    continue;
+                                }
                             }
                             break;
 

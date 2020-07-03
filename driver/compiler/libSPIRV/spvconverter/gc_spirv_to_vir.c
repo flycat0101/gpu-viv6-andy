@@ -12083,6 +12083,7 @@ static VSC_ErrCode __SpvDecodeInstruction(gcSPV spv, VIR_Shader * virShader)
                     if (spv->shaderStage == VSC_SHADER_STAGE_HS)
                     {
                         virShader->shaderLayout.tcs.tcsPatchOutputVertices = spv->exeModeDescriptor[i].extraOp[0];
+                        virShader->shaderLayout.tcs.tcsOutputVertexCount = virShader->shaderLayout.tcs.tcsPatchOutputVertices;
                         virShader->shaderLayout.tcs.tcsPatchInputVertices = (gctINT)spv->tcsInputVertices;
 
                         /* VK tcs input is always got from driver

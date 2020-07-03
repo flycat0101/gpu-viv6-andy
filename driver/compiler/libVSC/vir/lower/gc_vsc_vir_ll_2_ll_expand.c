@@ -18910,15 +18910,25 @@ _InsertLDARR(
     VIR_Operand_SetRelIndexingImmed(Opnd, 0);
     VIR_Operand_SetMatrixConstIndex(Opnd, 0);
 
-    if (Shader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL)
+    if (sym && isSymArrayedPerVertex(sym))
     {
-        if (sym &&
-            isSymArrayedPerVertex(sym) &&
-            VIR_Symbol_isOutput(sym))
+        if (VIR_Shader_IsTCS(Shader))
         {
-            Shader->shaderLayout.tcs.hasOutputVertexAccess = gcvTRUE;
+            if (VIR_Symbol_isOutput(sym))
+            {
+                Shader->shaderLayout.tcs.hasOutputVertexAccess = gcvTRUE;
+            }
+            else
+            {
+                Shader->shaderLayout.tcs.hasInputVertexAccess = gcvTRUE;
+            }
+        }
+        else if (VIR_Shader_IsTES(Shader) && VIR_Symbol_isInput(sym))
+        {
+            Shader->shaderLayout.tes.hasInputVertexAccess = gcvTRUE;
         }
     }
+
     return virErrCode;
 }
 
@@ -19068,17 +19078,7 @@ VIR_Lower_ArraryIndexing_To_LDARR_STARR(
                         }
                     }
 
-                    if (Shader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL)
-                    {
-                        VIR_Symbol  *baseSym = VIR_Operand_GetUnderlyingSymbol(VIR_Inst_GetSource(inst, 0));
-
-                        if (baseSym && isSymArrayedPerVertex(baseSym) && VIR_Symbol_isOutput(baseSym))
-                        {
-                            Shader->shaderLayout.tcs.hasOutputVertexAccess = gcvTRUE;
-                        }
-                    }
-
-                    if (Shader->shaderKind == VIR_SHADER_GEOMETRY)
+                    if (VIR_Shader_IsGS(Shader))
                     {
                         src = VIR_Inst_GetSource(inst, 1);
                         if (VIR_Operand_GetOpKind(src) == VIR_OPND_IMMEDIATE)

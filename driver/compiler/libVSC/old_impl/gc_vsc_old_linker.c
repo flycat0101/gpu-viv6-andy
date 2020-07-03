@@ -13033,6 +13033,7 @@ OnError:
 static gctBOOL
 _ToUploadUBO(
     IN gcSHADER     Shader,
+    IN gctINT       SpecificMaxUniformCount,
     OUT gctBOOL*    UploadUBO
     )
 {
@@ -13041,6 +13042,11 @@ _ToUploadUBO(
 
     /* Skip non-halti shader because it won't contain any UBO. */
     if (!gcSHADER_IsHaltiCompiler(Shader))
+    {
+        return gcvFALSE;
+    }
+
+    if (gcHWCaps.hwFeatureFlags.supportUnifiedConstant)
     {
         return gcvFALSE;
     }
@@ -13077,8 +13083,14 @@ _ToUploadUBO(
         break;
     }
 
+    if (SpecificMaxUniformCount != -1)
+    {
+        maxUniformCount = gcmMIN(maxUniformCount, (gctUINT32)SpecificMaxUniformCount);
+    }
+
     do
     {
+        /* Do a rough check here. */
         gcSHADER_GetUniformVectorCount(Shader,
                                        &uniformCount);
 
@@ -13639,6 +13651,10 @@ gcLinkTreeThruVirShaders(
             {
                 scParam.cfg.cFlags |= VSC_COMPILER_FLAG_ENABLE_MULTI_GPU;
             }
+            if (Flags & gcSHADER_FLAG_FORCE_GEN_FLOAT_MAD)
+            {
+                scParam.cfg.cFlags |= VSC_COMPILER_FLAG_FORCE_GEN_FLOAT_MAD;
+            }
         }
         else
         {
@@ -13716,6 +13732,10 @@ gcLinkTreeThruVirShaders(
             if (Flags & gcvSHADER_ENABLE_MULTI_GPU)
             {
                 scParam.cfg.cFlags |= VSC_COMPILER_FLAG_ENABLE_MULTI_GPU;
+            }
+            if (Flags & gcSHADER_FLAG_FORCE_GEN_FLOAT_MAD)
+            {
+                scParam.cfg.cFlags |= VSC_COMPILER_FLAG_FORCE_GEN_FLOAT_MAD;
             }
 
             if (clientAPI == gcvAPI_OPENGL)
@@ -14995,8 +15015,19 @@ _gcChangeLoadToMovUniform(
     gceSTATUS status = gcvSTATUS_OK;
     gcSHADER shader = Shader;
 
-    if (IsDefaultUBO && shader->_defaultUniformBlockIndex == -1)
+    if (IsDefaultUBO)
+    {
+        /* If default-UBO is not created, skip. */
+        if (GetShaderDefaultUniformBlockIndex(Shader) == -1)
+        {
+            return status;
+        }
+    }
+    /* Don't process twice. */
+    else if (gcShaderUseConstRegForUBO(Shader))
+    {
         return status;
+    }
 
     if (shader && shader->uniformBlockCount)
     {
@@ -15013,13 +15044,17 @@ _gcChangeLoadToMovUniform(
        {
            gctUINT uboIndex = 0;
            gctBOOL insertNewCode = gcvFALSE;
+           gctBOOL bInvalidCase = gcvFALSE;
 
            /* Get instruction. */
            code = &shader->code[curInstIdx];
 
            /* Determine temporary register usage. */
            if (gcmSL_OPCODE_GET(code->opcode, Opcode) != gcSL_LOAD ||
-               gcmSL_SOURCE_GET(code->source0, Type) != gcSL_UNIFORM) continue;
+               gcmSL_SOURCE_GET(code->source0, Type) != gcSL_UNIFORM)
+            {
+                continue;
+           }
 
            if (gcmSL_SOURCE_GET(code->source1, Type) != gcSL_CONSTANT)
            {
@@ -15065,6 +15100,30 @@ _gcChangeLoadToMovUniform(
 
            if (blockUniformMember)
            {
+               gctCONST_STRING uniformName = gcvNULL;
+
+               gcUNIFORM_GetName(blockUniformMember, gcvNULL, &uniformName);
+
+               /*
+               ** For a dynamic indexing LOAD, if any parent of this block member is an array, we can't tell if the array index is dynamically.
+               ** And since so far we can't map the memory offset to the register offset(because in RA we always use packed layout to allocate),
+               ** so we just don't change this LOAD.
+               */
+               if (isIndexedLoad
+                   &&
+                   (uniformName == gcvNULL || gcoOS_StrStr(uniformName, "[", gcvNULL)))
+               {
+                   bInvalidCase = gcvTRUE;
+               }
+           }
+
+           if (bInvalidCase)
+           {
+               continue;
+           }
+
+           if (blockUniformMember)
+           {
                gcSL_ENABLE enable = gcSL_ENABLE_X;
                gctUINT16 indexedRegIndex = 0;
                gcSL_INDEXED indexedMode = gcSL_NOT_INDEXED;
@@ -15098,8 +15157,6 @@ _gcChangeLoadToMovUniform(
                                                                       &indexedMode,
                                                                       &swizzle,
                                                                       &insertNewCode));
-
-
                }
                else
                {
@@ -17130,11 +17187,45 @@ gcLinkShaders(
     {
         if (!gcHWCaps.hwFeatureFlags.hasHalti1 || gcmOPT_UploadUBO())
         {
-            for(i = 0, shader = VertexShader; i < 2; i++, shader = FragmentShader)
+            gctBOOL bUnifiedConst = gcvFALSE;
+            gctINT totalLeftUniformCount = -1;
+            gctUINT totalUsedUniformCount = 0, usedUniformCount = 0;
+            /* Reserve some uniforms. */
+            gctUINT reversedUniformCount = 8;
+
+            if (gcHWCaps.unifiedConst &&
+                !((gcHWCaps.chipModel == gcv880) && ((gcHWCaps.chipRevision & 0xfff0) == 0x5120)))
             {
-                if (shader && _ToUploadUBO(shader, &uploadUBO[i]))
+                bUnifiedConst = gcvTRUE;
+            }
+
+            if (bUnifiedConst && VertexShader && FragmentShader)
+            {
+                /* Get the minimum used uniform count for vertex shader. */
+                gcSHADER_GetUniformVectorCountUsedInShader(VertexShader, &usedUniformCount);
+                totalUsedUniformCount = usedUniformCount + reversedUniformCount;
+            }
+
+            /* In most of the cases we can get better performance by optimizing the fragment shader first. */
+            for (i= 1, shader = FragmentShader; i >= 0; i--, shader = VertexShader)
+            {
+                /* Get the left uniform count. */
+                if (bUnifiedConst)
+                {
+                    totalLeftUniformCount = (gctINT)(gcHWCaps.maxTotalConstRegCount - totalUsedUniformCount);
+                }
+
+                if (shader && _ToUploadUBO(shader, totalLeftUniformCount, &uploadUBO[i]))
                 {
                     gcmERR_BREAK(_gcChangeLoadToMovUniform(shader, gcvFALSE));
+
+                    if (bUnifiedConst && shader == FragmentShader)
+                    {
+                        /* Update the minimum used uniform count for fragment shader. */
+                        gcSHADER_CheckUniformUsage(shader, Flags);
+                        gcSHADER_GetUniformVectorCountUsedInShader(shader, &usedUniformCount);
+                        totalUsedUniformCount = usedUniformCount + reversedUniformCount;
+                    }
                 }
             }
         }
@@ -17717,6 +17808,42 @@ gcLinkShaders(
     return status;
 }
 
+static void
+_gcUpdateUsedUniformCount(
+    IN gcSHADER* Shaders,
+    IN gctINT ShaderIndex,
+    IN gctUINT *UsedUniformCounts
+    )
+{
+    gctUINT usedUniformCount = 0;
+
+    gcSHADER_GetUniformVectorCountUsedInShader(Shaders[ShaderIndex], &usedUniformCount);
+    UsedUniformCounts[ShaderIndex] = usedUniformCount;
+
+    return;
+}
+
+static gctINT
+_gcUpdateLeftUniformCount(
+    IN gcSHADER* Shaders,
+    IN gctINT ShaderIndex,
+    IN gctUINT *UsedUniformCounts
+    )
+{
+    gctINT i;
+    gctINT leftUniformCount = 0;
+
+    for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i ++)
+    {
+        if (Shaders[i] && i != ShaderIndex)
+        {
+            leftUniformCount = (gctINT)(gcHWCaps.maxTotalConstRegCount - UsedUniformCounts[i]);
+        }
+    }
+
+    return leftUniformCount;
+}
+
 gceSTATUS
 _gcLinkFullGraphicsShaders(
     IN gcSHADER* Shaders, /* Indexed by gcsSHADER_GROUP_SHADER_KIND */
@@ -17739,6 +17866,11 @@ _gcLinkFullGraphicsShaders(
     gctCHAR     headsup[256];
     gctBOOL useFullNewLinker = gcvFALSE;
 
+    gctBOOL bUnifiedConst = gcvFALSE;
+    gctINT totalLeftUniformCount = 0;
+    gctUINT usedUniformCounts[gcMAX_SHADERS_IN_LINK_GOURP] = { 0 };
+    gctUINT usedUniformCount = 0;
+
     gctCONST_STRING shaderName[] =
     {
         "vertex",
@@ -17750,6 +17882,13 @@ _gcLinkFullGraphicsShaders(
     };
 
     gcmHEADER_ARG("Shaders=0x%x Flags=%x", Shaders, Flags);
+
+    /* Check if it is a unified const chip. */
+    if (gcHWCaps.unifiedConst &&
+        !((gcHWCaps.chipModel == gcv880) && ((gcHWCaps.chipRevision & 0xfff0) == 0x5120)))
+    {
+        bUnifiedConst = gcvTRUE;
+    }
 
     gcSetOptimizerOption(Flags);
     useFullNewLinker = gcUseFullNewLinker(gcHWCaps.hwFeatureFlags.hasHalti2);
@@ -17849,11 +17988,47 @@ _gcLinkFullGraphicsShaders(
                 }
             }
 
+            /* Just collect information here. */
             if (!gcHWCaps.hwFeatureFlags.hasHalti1 || gcmOPT_UploadUBO())
             {
-                if (_ToUploadUBO(Shaders[i], gcvNULL))
+                if (bUnifiedConst)
+                {
+                    /* Reserve some uniforms. */
+                    gctUINT reversedUniformCount = 8;
+
+                    /* Get the minimum used uniform count for this shader stage. */
+                    gcSHADER_GetUniformVectorCountUsedInShader(Shaders[i], &usedUniformCount);
+                    usedUniformCounts[i] = usedUniformCount + reversedUniformCount;
+                }
+            }
+        }
+    }
+
+    /* In most of the cases we can get better performance by optimizing the fragment shader first. */
+    if (!gcHWCaps.hwFeatureFlags.hasHalti1 || gcmOPT_UploadUBO())
+    {
+        for (i = gcMAX_SHADERS_IN_LINK_GOURP - 1; i >= 0; i--)
+        {
+            if (Shaders[i])
+            {
+                if (bUnifiedConst)
+                {
+                    totalLeftUniformCount = _gcUpdateLeftUniformCount(Shaders, i, usedUniformCounts);
+                }
+                else
+                {
+                    totalLeftUniformCount = -1;
+                }
+
+                if (_ToUploadUBO(Shaders[i], totalLeftUniformCount, gcvNULL))
                 {
                     gcmONERROR(_gcChangeLoadToMovUniform(Shaders[i], gcvFALSE));
+
+                    if (bUnifiedConst)
+                    {
+                        gcSHADER_CheckUniformUsage(Shaders[i], Flags);
+                        _gcUpdateUsedUniformCount(Shaders, i, usedUniformCounts);
+                    }
                 }
             }
         }
@@ -18791,7 +18966,7 @@ _gcLinkComputeShader(
 
     if (!gcHWCaps.hwFeatureFlags.hasHalti1 || gcmOPT_UploadUBO())
     {
-        if (_ToUploadUBO(ComputeShader, &uploadUBO))
+        if (_ToUploadUBO(ComputeShader, -1, &uploadUBO))
         {
             gcmONERROR(_gcChangeLoadToMovUniform(ComputeShader, gcvFALSE));
         }

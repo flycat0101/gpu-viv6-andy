@@ -5558,7 +5558,8 @@ _VIR_RA_ShaderEnableDepth(
 
 static gctUINT
 _VIR_RA_LS_GetStartReg(
-    VIR_RA_LS       *pRA)
+    VIR_RA_LS       *pRA
+    )
 {
     VIR_Shader              *pShader = VIR_RA_LS_GetShader(pRA);
     gctUINT startReg = 0;
@@ -5642,23 +5643,11 @@ _VIR_RA_LS_GetStartReg(
                If at runtime, the input vertex count is different than this assumed count,
                we need recompilation!!
                */
-            gctINT  inputCount = ((pShader->shaderLayout.tcs.tcsPatchInputVertices - 1) / 8 + 1);
-            gctINT  outputCount = ((pShader->shaderLayout.tcs.tcsPatchOutputVertices - 1) / 8 + 1);
+            gctINT regCount = VIR_Shader_GetTcsPerVertexRegCount(pShader, VIR_QUERY_PER_VERTEX_INPUT_OUTPUT);
 
             gcmASSERT(pShader->shaderLayout.tcs.tcsPatchInputVertices > 0);
 
-            /* if both input and output vertex are less than 4, we pack their regmap in one register. */
-            if ((pShader->shaderLayout.tcs.tcsPatchInputVertices <= 4) &&
-                (pShader->shaderLayout.tcs.tcsPatchOutputVertices <= 4))
-            {
-                VIR_Shader_SetFlag(pShader, VIR_SHFLAG_TCS_USE_PACKED_REMAP);
-                /* input regmap and output regmap are packed in one register */
-                startReg = 1 + 1;
-            }
-            else
-            {
-                startReg = 1 + inputCount + (pShader->shaderLayout.tcs.hasOutputVertexAccess ? outputCount : 0);
-            }
+            startReg = 1 + regCount;
 
             /* TCS remap always start from r1 */
             pShader->remapRegStart = 1;
@@ -5674,7 +5663,7 @@ _VIR_RA_LS_GetStartReg(
                r0.w output vertex addr and per-patch addr
                r1-rx remap for input vertex
             */
-            gctINT  inputCount = ((pShader->shaderLayout.tes.tessPatchInputVertices -1) / 8 + 1);
+            gctINT  inputCount = VIR_Shader_GetRegCountBasedOnVertexCount(pShader, pShader->shaderLayout.tes.tessInputVertexCount);
             startReg = 1 + inputCount;
 
             /* TES remap always start from r1 */
@@ -10247,6 +10236,7 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Vertex(
     VIR_SymId           addDstSymId = VIR_INVALID_ID, movDstSymId = VIR_INVALID_ID;
 
     gctINT              vertexCount = 0, outputCount = 0;
+    gctINT              vertexRegCount = 0, outputRegCount = 0;
     gctBOOL             inputVertex = gcvTRUE;
 
     gctBOOL             firstSelectMap = gcvFALSE;
@@ -10276,17 +10266,17 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Vertex(
 
     _VIR_RA_LS_SetLoadStoreAttr(pRA, pShader, pInst, src0Sym);
 
-    if (pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL)
+    if (VIR_Shader_IsTCS(pShader))
     {
         vertexCount = pShader->shaderLayout.tcs.tcsPatchInputVertices;
-        outputCount = pShader->shaderLayout.tcs.tcsPatchOutputVertices;
+        outputCount = pShader->shaderLayout.tcs.tcsOutputVertexCount;
     }
-    else if (pShader->shaderKind == VIR_SHADER_TESSELLATION_EVALUATION)
+    else if (VIR_Shader_IsTES(pShader))
     {
-        vertexCount = pShader->shaderLayout.tes.tessPatchInputVertices;
+        vertexCount = pShader->shaderLayout.tes.tessInputVertexCount;
         outputCount = vertexCount;
     }
-    else if (pShader->shaderKind == VIR_SHADER_GEOMETRY)
+    else if (VIR_Shader_IsGS(pShader))
     {
          /* points 1 vertex, lines 2 vertices, line adjacency 4 vertices,
             triangles 3 vertices, triangle adjacency 6 vertices
@@ -10324,6 +10314,17 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Vertex(
         gcmASSERT(gcvFALSE);
     }
 
+    if (VIR_Shader_IsTCS(pShader))
+    {
+        vertexRegCount = VIR_Shader_GetTcsPerVertexRegCount(pShader, VIR_QUERY_PER_VERTEX_INPUT_ONLY);
+        outputRegCount = VIR_Shader_GetTcsPerVertexRegCount(pShader, VIR_QUERY_PER_VERTEX_OUTPUT_ONLY);
+    }
+    else
+    {
+        vertexRegCount = VIR_Shader_GetRegCountBasedOnVertexCount(pShader, vertexCount);
+        outputRegCount = VIR_Shader_GetRegCountBasedOnVertexCount(pShader, outputCount);
+    }
+
     /* the remapAddress is different for input vertex or output vertex */
     if (VIR_Symbol_isOutput(src0Sym))
     {
@@ -10344,29 +10345,40 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Vertex(
     }
     else
     {
-        switch ((vertexCount - 1) / 8)
+        switch (vertexRegCount)
         {
         case 0:
+            firstSelectMap = gcvFALSE;
+            secondSelectMap = gcvFALSE;
+            outputRemapStart = 1;
+            destReg = (inputVertex ?  pShader->remapRegStart : 1);
+            break;
+
+        case 1:
             firstSelectMap = gcvFALSE;
             secondSelectMap = gcvFALSE;
             outputRemapStart = 2;
             destReg = (inputVertex ?  pShader->remapRegStart : 2);
             break;
-        case 1:
+
+        case 2:
             firstSelectMap = gcvTRUE;
             secondSelectMap = gcvFALSE;
             outputRemapStart = 3;
             break;
-        case 2:
+
+        case 3:
             firstSelectMap = gcvTRUE;
             secondSelectMap = gcvTRUE;
             outputRemapStart = 4;
             break;
-        case 3:
+
+        case 4:
             firstSelectMap = gcvTRUE;
             secondSelectMap = gcvTRUE;
             outputRemapStart = 5;
             break;
+
         default:
             gcmASSERT(gcvFALSE);
             break;
@@ -10375,7 +10387,7 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Vertex(
         if (!inputVertex)
         {
             destReg = pRA->resRegister;
-            switch ((outputCount - 1) / 8)
+            switch (outputRegCount - 1)
             {
             case 0:
                 firstSelectMap = gcvFALSE;
@@ -11320,57 +11332,6 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Patch_r0(
     return retValue;
 }
 
-VSC_ErrCode _VIR_RA_LS_PrependStoreAttr(
-    VIR_RA_LS*          pRA,
-    gctINT              attrIndex,
-    VIR_Enable          destEnable,
-    VIR_Instruction**   newInst)
-{
-    VSC_ErrCode         retValue  = VSC_ERR_NONE;
-    VIR_Shader*         pShader = VIR_RA_LS_GetShader(pRA);
-    VIR_Function*       pMainFunc = VIR_Shader_GetMainFunction(pShader);
-    VIR_SymId           symId = VIR_INVALID_ID;
-    VIR_RA_HWReg_Color  curColor;
-
-    curColor = InvalidColor;
-    gcmASSERT(VIR_Shader_GetKind(pShader) != VIR_SHADER_GEOMETRY);
-
-    retValue = VIR_Function_PrependInstruction(pMainFunc,
-                                               VIR_OP_STORE_ATTR,
-                                               VIR_TYPE_UINT16,
-                                               newInst);
-    ON_ERROR(retValue, "Fail to prepend a instruction.");
-
-    /* src0 - regmap */
-    _VIR_RA_LS_GenTemp(pRA, &symId);
-    VIR_Operand_SetTempRegister((*newInst)->src[VIR_Operand_Src0],
-                                pMainFunc,
-                                symId,
-                                VIR_TYPE_FLOAT_X4);
-    _VIR_RA_MakeColor(0, CHANNEL_W, &curColor);
-    _VIR_RA_LS_SetOperandHwRegInfo(pRA, (*newInst)->src[VIR_Operand_Src0], curColor);
-
-    /* src1 - attrIndex */
-    VIR_Operand_SetImmediateInt((*newInst)->src[VIR_Operand_Src1], attrIndex);
-
-    /* src2 need to be set by the clients */
-
-    /* in some cases (src2 is temp), store_attr destionation enable matters,
-       in other cases (src2 is immediate/uniform/indirect), store_attr needs destination
-       dest need to be reset by the client when needed */
-    _VIR_RA_LS_GenTemp(pRA, &symId);
-    VIR_Operand_SetTempRegister((*newInst)->dest,
-                                pMainFunc,
-                                symId,
-                                VIR_TYPE_FLOAT_X4);
-    _VIR_RA_MakeColor(0, 0, &curColor);
-    _VIR_RA_LS_SetOperandHwRegInfo(pRA, (*newInst)->dest, curColor);
-    VIR_Operand_SetEnable((*newInst)->dest, destEnable);
-
-OnError:
-    return retValue;
-}
-
 /*
 ** Per-HW requirement, generate store_attr for r0.z and r0.w data.
 ** We insert this STORE in the beginning so we can shorten the live range of r0.
@@ -11382,27 +11343,94 @@ VSC_ErrCode _VIR_RA_LS_GenStoreAttr_Patch_r0(
     VSC_ErrCode         retValue  = VSC_ERR_NONE;
     VIR_Shader*         pShader = VIR_RA_LS_GetShader(pRA);
     VIR_Function*       pMainFunc = VIR_Shader_GetMainFunction(pShader);
-    VIR_Instruction*    newInst = gcvNULL;
+    VIR_Instruction*    pNewInst = gcvNULL;
+    VIR_Operand*        pOpnd = gcvNULL;
     VIR_SymId           symId = VIR_INVALID_ID;
     VIR_RA_HWReg_Color  curColor;
+    gctBOOL             bNeedPerpatchAddr = VIR_Shader_TcsStorePerpatchAddr(pShader);
+    gctBOOL             bNeedPrimitiveId = VIR_Shader_TcsStorePrimitiveId(pShader);
+    gctUINT             attrIndex = 1;
+    VIR_Enable          enable = VIR_ENABLE_NONE;
+    VIR_Swizzle         swizzle = VIR_SWIZZLE_XXXX;
+    VIR_HwRegId         hwRegId = 0;
+    gctUINT             shift = 0;
+
+    /* No need to generate this STORE_ATTR if they are not used in TES. */
+    if (!bNeedPerpatchAddr && !bNeedPrimitiveId)
+    {
+        return retValue;
+    }
 
     _VIR_RA_MakeColor(VIR_RA_INVALID_REG, 0, &curColor);
     _VIR_RA_MakeColorHI(VIR_RA_INVALID_REG, 0, &curColor);
 
-    /* store_attr for r0.w and r0.z */
-    /* no need to reset dest, because src2 is temp */
-    retValue = _VIR_RA_LS_PrependStoreAttr(pRA, 1, VIR_ENABLE_ZW, &newInst);
-    ON_ERROR(retValue, "Fail to insert store attr.");
+    /*
+    ** r0.z := primitiveID
+    ** r0.w := perPatch.address
+    */
+    if (bNeedPrimitiveId && bNeedPerpatchAddr)
+    {
+        enable = VIR_ENABLE_ZW;
+        swizzle = VIR_SWIZZLE_XXXY;
+        shift = 2;
+    }
+    else if (bNeedPrimitiveId)
+    {
+        enable = VIR_ENABLE_Z;
+        swizzle = VIR_SWIZZLE_XXXX;
+        shift = 2;
+    }
+    else
+    {
+        gcmASSERT(bNeedPerpatchAddr);
+        enable = VIR_ENABLE_W;
+        swizzle = VIR_SWIZZLE_XXXX;
+        shift = 3;
+    }
 
-    /* set the src2 */
+    /* store_attr for r0.z and r0.w */
+    /* no need to reset dest, because src2 is temp */
+    retValue = VIR_Function_PrependInstruction(pMainFunc,
+                                               VIR_OP_STORE_ATTR,
+                                               VIR_TYPE_UINT16,
+                                               &pNewInst);
+    ON_ERROR(retValue, "Fail to prepend a instruction.");
+
+    /* src0 - regmap */
     _VIR_RA_LS_GenTemp(pRA, &symId);
-    VIR_Operand_SetTempRegister(newInst->src[VIR_Operand_Src2],
+    pOpnd = VIR_Inst_GetSource(pNewInst, 0);
+    VIR_Operand_SetTempRegister(pOpnd,
                                 pMainFunc,
                                 symId,
                                 VIR_TYPE_FLOAT_X4);
-    _VIR_RA_MakeColor(0, 2, &curColor);
-    _VIR_RA_LS_SetOperandHwRegInfo(pRA, newInst->src[VIR_Operand_Src2], curColor);
-    VIR_Operand_SetSwizzle(newInst->src[VIR_Operand_Src2], VIR_SWIZZLE_XXXY);
+    _VIR_RA_MakeColor(0, CHANNEL_W, &curColor);
+    _VIR_RA_LS_SetOperandHwRegInfo(pRA, pOpnd, curColor);
+
+    /* src1 - attrIndex */
+    pOpnd = VIR_Inst_GetSource(pNewInst, 1);
+    VIR_Operand_SetImmediateInt(pOpnd, attrIndex);
+
+    /* src2 - data */
+    pOpnd = VIR_Inst_GetSource(pNewInst, 2);
+    VIR_Operand_SetTempRegister(pOpnd,
+                                pMainFunc,
+                                symId,
+                                VIR_TYPE_FLOAT_X4);
+    _VIR_RA_LS_GenTemp(pRA, &symId);
+    _VIR_RA_MakeColor(hwRegId, shift, &curColor);
+    _VIR_RA_LS_SetOperandHwRegInfo(pRA, pOpnd, curColor);
+    VIR_Operand_SetSwizzle(pOpnd, swizzle);
+
+    /* DEST. */
+    pOpnd = VIR_Inst_GetDest(pNewInst);
+    _VIR_RA_LS_GenTemp(pRA, &symId);
+    VIR_Operand_SetTempRegister(pOpnd,
+                                pMainFunc,
+                                symId,
+                                VIR_TYPE_FLOAT_X4);
+    _VIR_RA_MakeColor(0, 0, &curColor);
+    _VIR_RA_LS_SetOperandHwRegInfo(pRA, pOpnd, curColor);
+    VIR_Operand_SetEnable(pOpnd, enable);
 
 OnError:
     return retValue;
@@ -12692,7 +12720,7 @@ _VIR_RA_LS_MovHWInputRegisters(
             pShader->shaderKind == VIR_SHADER_TESSELLATION_EVALUATION ||
             pShader->shaderKind == VIR_SHADER_GEOMETRY)
     {
-        gctINT  inputCount, outputCount, regIdx, lastRegNum = 0;
+        gctINT  inputCount, regIdx, lastRegNum = 0;
 
         if (pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL)
         {
@@ -12704,18 +12732,7 @@ _VIR_RA_LS_MovHWInputRegisters(
                r1 - rx remap for input vertex
                r(x+1) - ry remap for output vertex (if there is read of output vertex)
            */
-            inputCount = ((pShader->shaderLayout.tcs.tcsPatchInputVertices - 1) / 8 + 1);
-            outputCount = ((pShader->shaderLayout.tcs.tcsPatchOutputVertices - 1) / 8 + 1);
-
-            if (VIR_Shader_TCS_UsePackedRemap(pShader))
-            {
-                /* remap is packed in r1 */
-                lastRegNum  = 1;
-            }
-            else
-            {
-                lastRegNum = inputCount + (pShader->shaderLayout.tcs.hasOutputVertexAccess ? outputCount : 0);
-            }
+            lastRegNum = VIR_Shader_GetTcsPerVertexRegCount(pShader, VIR_QUERY_PER_VERTEX_INPUT_OUTPUT);
         }
         else if (pShader->shaderKind == VIR_SHADER_TESSELLATION_EVALUATION)
         {
@@ -12726,7 +12743,7 @@ _VIR_RA_LS_MovHWInputRegisters(
                r0.w output vertex addr and per-patch addr
                r1-rx remap for input vertex
             */
-            inputCount = ((pShader->shaderLayout.tes.tessPatchInputVertices -1) / 8 + 1);
+            inputCount = VIR_Shader_GetRegCountBasedOnVertexCount(pShader, pShader->shaderLayout.tes.tessInputVertexCount);
             lastRegNum  = inputCount;
         }
         else if (pShader->shaderKind == VIR_SHADER_GEOMETRY)

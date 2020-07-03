@@ -12,6 +12,7 @@
 
 
 #include "vir/transform/gc_vsc_vir_fcp.h"
+#include "vir/transform/gc_vsc_vir_misc_opts.h"
 
 void _VIR_ReplaceIndexOpnd(
     VIR_Operand     *pIdxOpnd,
@@ -2095,6 +2096,29 @@ VSC_ErrCode vscVIR_PostMCCleanup(
         {
             VIR_OpCode opCode = VIR_Inst_GetOpcode(inst);
 
+            if (opCode == VIR_OP_ATTR_LD)
+            {
+                VIR_Symbol*     pBaseSym = VIR_Operand_GetUnderlyingSymbol(VIR_Inst_GetSource(inst, 0));
+
+                if (pBaseSym && isSymArrayedPerVertex(pBaseSym))
+                {
+                    if (VIR_Shader_IsTCS(pShader))
+                    {
+                        if (VIR_Symbol_isOutput(pBaseSym))
+                        {
+                            pShader->shaderLayout.tcs.hasOutputVertexAccess = gcvTRUE;
+                        }
+                        else
+                        {
+                            pShader->shaderLayout.tcs.hasInputVertexAccess = gcvTRUE;
+                        }
+                    }
+                    else if (VIR_Shader_IsTES(pShader) && VIR_Symbol_isInput(pBaseSym))
+                    {
+                        pShader->shaderLayout.tes.hasInputVertexAccess = gcvTRUE;
+                    }
+                }
+            }
 
             /* disable this when RA enabled for now, since DU and RA has not supported indexed opnd yet */
             if (!bRAEnabled)
@@ -2153,6 +2177,20 @@ VSC_ErrCode vscVIR_PostMCCleanup(
             /* Process the modifier order. */
             errCode = _ProcessModifier(pDuInfo, pShader, pHwCfg, func, inst);
             ON_ERROR(errCode, "Process modifier order.");
+
+
+            /*
+            ** Initialize the HW specific attribute here because so far they are only used in RA.
+            ** Do not initialize the per-vertex load here because the vertex count may be changed in the second linkage.
+            */
+            errCode = vscVIR_AddTsHwSpecificAttribute(pDuInfo,
+                                                      pShader,
+                                                      func,
+                                                      inst,
+                                                      gcvFALSE,
+                                                      gcvNULL,
+                                                      &bChanged);
+            ON_ERROR(errCode, "Fail to add HW specific attributes.");
         }
     }
 

@@ -191,6 +191,10 @@ VIR_NameId  VIR_NAME_UNKNOWN,
     VIR_NAME_MULTI_TEX_COORD_5, /* gl_MultiTexCoord5 */
     VIR_NAME_MULTI_TEX_COORD_6, /* gl_MultiTexCoord6 */
     VIR_NAME_MULTI_TEX_COORD_7, /* gl_MultiTexCoord7 */
+    VIR_NAME_HW_OUTPUT_REMAP_ADDR, /* TCS output remap address. */
+    VIR_NAME_HW_PERPATCH_ADDR, /* per-patch address. */
+    VIR_NAME_PER_VERTEX_INPUT_ADDR, /* per-vertex input. */
+    VIR_NAME_PER_VERTEX_OUTPUT_ADDR, /* per-vertex output. */
     VIR_NAME_BUILTIN_LAST;
 
 VIR_BuiltinTypeInfo VIR_builtinTypes[] =
@@ -2357,8 +2361,13 @@ _initOpenGLBuiltinNames(VIR_Shader * Shader, VIR_StringTable *StrTable)
     _add_name(VIR_NAME_MULTI_TEX_COORD_5, "gl_MultiTexCoord5");
     _add_name(VIR_NAME_MULTI_TEX_COORD_6, "gl_MultiTexCoord6");
     _add_name(VIR_NAME_MULTI_TEX_COORD_7, "gl_MultiTexCoord7");
+    _add_name(VIR_NAME_HW_OUTPUT_REMAP_ADDR, "#tcs_output_remap_addr");
+    _add_name(VIR_NAME_HW_PERPATCH_ADDR, "#perpatch_addr");
+    _add_name(VIR_NAME_PER_VERTEX_INPUT_ADDR, "#pervertex_input");
+    _add_name(VIR_NAME_PER_VERTEX_OUTPUT_ADDR, "#pervertex_output");
+
     /* WARNING!!! change builtin_last if add new name !!! */
-    VIR_NAME_BUILTIN_LAST = VIR_NAME_VIEW_INDEX + sizeof("gl_SubgroupInvocationID");
+    VIR_NAME_BUILTIN_LAST = VIR_NAME_PER_VERTEX_OUTPUT_ADDR + sizeof("#pervertex_output");
 }
 #undef _add_name
 
@@ -2678,6 +2687,10 @@ VIR_Shader_Construct0(
         CHECK_ERROR(errCode, "InitConstTable");
 
         /* init id lists */
+        idList = &Shader->hwSpecificAttributes;
+        errCode = VIR_IdList_Init(&Shader->pmp.mmWrapper, 4, &idList);
+        CHECK_ERROR(errCode, "InitIdList");
+
         idList = &Shader->attributes;
         errCode = VIR_IdList_Init(&Shader->pmp.mmWrapper, 16, &idList);
         CHECK_ERROR(errCode, "InitIdList");
@@ -5943,6 +5956,75 @@ VIR_Shader_DestroyOutputComponentMapList(
     VIR_Shader_SetOutputComponentMapList(pShader, gcvNULL);
 
     return errCode;
+}
+
+gctINT
+VIR_Shader_GetRegCountBasedOnVertexCount(
+    IN OUT  VIR_Shader*     pShader,
+    gctINT                  vertexCount
+    )
+{
+    if (vertexCount == 0)
+    {
+        return 0;
+    }
+    else
+    {
+        /* Each remap address needs 16bit, so we can only 8 addresses for a temp register. */
+        return (vertexCount - 1) / 8 + 1;
+    }
+}
+
+gctINT
+VIR_Shader_GetTcsPerVertexRegCount(
+    IN OUT  VIR_Shader*     pShader,
+    VIR_QUERY_PER_VERTEX    queryMode
+    )
+{
+    gctINT                  result = 0, inputCount = 0, outputCount = 0;
+
+    gcmASSERT(VIR_Shader_IsTCS(pShader));
+
+    /*
+    ** We can't just use the usage of per-vertex input to check this, we need to make sure that TCS has no any per-vertex input.
+    ** And we may update this in function "_DoSecondStageOfLinkage".
+    */
+    inputCount = VIR_Shader_GetRegCountBasedOnVertexCount(pShader, pShader->shaderLayout.tcs.tcsPatchInputVertices);
+
+    if (pShader->shaderLayout.tcs.hasOutputVertexAccess)
+    {
+        outputCount = VIR_Shader_GetRegCountBasedOnVertexCount(pShader, pShader->shaderLayout.tcs.tcsOutputVertexCount);
+    }
+
+    switch (queryMode)
+    {
+    case VIR_QUERY_PER_VERTEX_INPUT_ONLY:
+        result = inputCount;
+        break;
+
+    case VIR_QUERY_PER_VERTEX_OUTPUT_ONLY:
+        result = outputCount;
+        break;
+
+    case VIR_QUERY_PER_VERTEX_INPUT_OUTPUT:
+        /* input regmap and output regmap are packed in one register */
+        if (VIR_Shader_TCS_UsePackedRemap(pShader))
+        {
+            result = 1;
+        }
+        else
+        {
+            result = inputCount + outputCount;
+        }
+        break;
+
+    default:
+        gcmASSERT(gcvFALSE);
+        result = inputCount + outputCount;
+        break;
+    }
+
+    return result;
 }
 
 /* types */

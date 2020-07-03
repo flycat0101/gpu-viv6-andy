@@ -1079,16 +1079,12 @@ static gctBOOL _VIR_CG_isUniformAllocable(
             break;
 
         case VIR_UNIFORM_UNIFORM_BLOCK_ADDRESS:
-            if (handleDefaultUBO)
+            if (handleDefaultUBO || unblockUniformBlock)
             {
                 if (!isSymUniformUsedInShader(pSym))
                 {
                     retValue = gcvFALSE;
                 }
-            }
-            else if (unblockUniformBlock)
-            {
-                retValue = gcvFALSE;
             }
             break;
 

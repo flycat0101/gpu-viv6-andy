@@ -321,6 +321,7 @@ VIR_IO_writeStringTable(VIR_Shader_IOBuffer *Buf, VIR_StringTable* pStringTbl)
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_HASH_ITERATOR     iter;
     VSC_DIRECT_HNODE_PAIR pair;
+
     /* write bolcktable */
     errCode = VIR_IO_writeBlockTable(Buf, pStringTbl, gcvNULL, VIR_NAME_BUILTIN_LAST);
     ON_ERROR(errCode, "Failed to write string table");
@@ -1416,6 +1417,9 @@ VIR_IO_writeShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
         errCode = VIR_IO_writeBlock(buf, (gctCHAR *)pShader->constantMemoryBuffer, pShader->constantMemorySize);
         ON_ERROR(errCode, "Fail to write constantMemoryBuffer, sz: %d.", pShader->constantMemorySize);
     }
+
+    errCode = VIR_IO_writeIdList(buf, &pShader->hwSpecificAttributes);
+    ON_ERROR(errCode, "Fail to write HW specific attributes id list.");
 
     errCode = VIR_IO_writeIdList(buf, &pShader->attributes);
     ON_ERROR(errCode, "Fail to write attributes id list.");
@@ -3190,6 +3194,9 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader, gctUINT message
         ON_ERROR(errCode, "Fail to read constantMemoryBuffer, sz: %d.", pShader->constantMemorySize);
     }
 
+    errCode = VIR_IO_readIdList(buf, &pShader->hwSpecificAttributes);
+    ON_ERROR(errCode, "Fail to read HW specific attributes id list.");
+
     errCode = VIR_IO_readIdList(buf, &pShader->attributes);
     ON_ERROR(errCode, "Fail to read attributes id list.");
 
@@ -4829,6 +4836,9 @@ VIR_Shader_Copy(
     Copy_Field(Shader, Source, fullUnifiedUniforms);
     Copy_Field(Shader, Source, needToAdjustSamplerPhysical);
     Copy_Field(Shader, Source, _enableDefaultUBO);
+
+    errCode = VIR_CopyIdList(&context, &Shader->hwSpecificAttributes, &Source->hwSpecificAttributes);
+    ON_ERROR(errCode, "Fail to copy HW specific attributes id list.");
 
     errCode = VIR_CopyIdList(&context, &Shader->attributes, &Source->attributes);
     ON_ERROR(errCode, "Fail to copy attributes id list.");

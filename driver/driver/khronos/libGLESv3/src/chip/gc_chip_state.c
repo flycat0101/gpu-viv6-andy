@@ -1597,7 +1597,16 @@ gcChipValidateShader(
 
         if (localMask & __GL_DIRTY_GLSL_PATCH_VERTICES)
         {
-            gcmONERROR(gco3D_SetPatchVertices(chipCtx->engine, gc->shaderProgram.patchVertices));
+            GLint perPatchVertexCount = gc->shaderProgram.patchVertices;
+
+            if (chipCtx->activePrograms[__GLSL_STAGE_TCS]
+                &&
+                chipCtx->activePrograms[__GLSL_STAGE_TCS]->curPgInstance->programState.hints->tcsHasNoPerVertexAttribute)
+            {
+                perPatchVertexCount = 1;
+            }
+
+            gcmONERROR(gco3D_SetPatchVertices(chipCtx->engine, perPatchVertexCount));
         }
 
         /* Mark all uniforms dirty if program switched */
@@ -3316,7 +3325,10 @@ gcChipNeedRecompile(
     if (program->stageBits & gcvPROGRAM_STAGE_TCS_BIT)
     {
         pgStateKey->staticKey->tcsPatchInVertices = masterInstance->tcsPatchInVertices;
-        if (pgKeyState->staticKey->tcsPatchInVertices != masterInstance->tcsPatchInVertices)
+        if (pgKeyState->staticKey->tcsPatchInVertices != masterInstance->tcsPatchInVertices
+            &&
+            /* We don't need to do this recompilation if there is not per-vertex attribute. */
+            !program->masterPgInstance->programState.hints->tcsHasNoPerVertexAttribute)
         {
             pgStateKey->staticKey->tcsPatchInVertices = pgKeyState->staticKey->tcsPatchInVertices;
             pgStateKeyMask->s.hasTcsPatchInVertices = 1;

@@ -21,6 +21,7 @@ BEGIN_EXTERN_C()
 typedef struct VIR_PH_PEEPHOLE
 {
     VIR_Shader *            shader;
+    gctUINT                 cFlags;
     VIR_BASIC_BLOCK *       curr_bb;
     VIR_DEF_USAGE_INFO *    du_info;
 
@@ -42,6 +43,8 @@ typedef struct VIR_PH_PEEPHOLE
 
 #define VSC_PH_Peephole_GetShader(ph)          ((ph)->shader)
 #define VSC_PH_Peephole_SetShader(ph, s)       ((ph)->shader = (s))
+#define VSC_PH_Peephole_GetCFlags(ph)          ((ph)->cFlags)
+#define VSC_PH_Peephole_SetCFlags(ph, s)       ((ph)->cFlags = (s))
 #define VSC_PH_Peephole_GetCurrFunc(ph)        (VIR_Shader_GetCurrentFunction((ph)->shader))
 #define VSC_PH_Peephole_GetCurrBB(ph)          ((ph)->curr_bb)
 #define VSC_PH_Peephole_SetCurrBB(ph, b)       ((ph)->curr_bb = (b))

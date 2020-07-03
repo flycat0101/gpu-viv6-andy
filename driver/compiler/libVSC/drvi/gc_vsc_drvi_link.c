@@ -4709,6 +4709,27 @@ static gctBOOL _NeedIoHwMemPackedBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER
     return gcvFALSE;
 }
 
+static VSC_ErrCode _UpdatePerVertexIoCount(VIR_Shader* pShader,
+                                           gctINT vertexCount)
+{
+    VSC_ErrCode                errCode = VSC_ERR_NONE;
+
+    if (VIR_Shader_IsTCS(pShader))
+    {
+        pShader->shaderLayout.tcs.tcsOutputVertexCount = vertexCount;
+    }
+    else if (VIR_Shader_IsTES(pShader))
+    {
+        pShader->shaderLayout.tes.tessInputVertexCount = vertexCount;
+    }
+    else
+    {
+        gcmASSERT(gcvFALSE);
+    }
+
+    return errCode;
+}
+
 static VSC_ErrCode _CalcIoHwCompIndexBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
                                                                      VIR_Shader* pUpperShader,
                                                                      VIR_Shader* pLowerShader,
@@ -4728,11 +4749,29 @@ static VSC_ErrCode _CalcIoHwCompIndexBetweenTwoShaderStagesPerExeObj(VSC_BASE_LI
     gctUINT                    hwChannelIdxForPrimId = NOT_ASSIGNED, hwChannelIdxForPtCoord = NOT_ASSIGNED;
     gctUINT                    hwChannelIdxForPos = NOT_ASSIGNED, hwChannelIdxForPtSz = NOT_ASSIGNED;
     gctBOOL                    bNeedIoMemPacked;
+    gctBOOL                    bUpdateVertexCount = (!bPerPrim && VIR_Shader_IsTES(pLowerShader));
 
     /* No need to go on if there are obvious results */
     if (outputCount == 0 && attrCount == 0)
     {
+        if (!bPerPrim && VIR_Shader_IsVS(pUpperShader) && VIR_Shader_IsTCS(pLowerShader))
+        {
+            pLowerShader->shaderLayout.tcs.tcsPatchInputVertices = 1;
+            VIR_Shader_SetFlagExt1(pLowerShader, VIR_SHFLAG_EXT1_HAS_NO_PER_VERTEX_INPUT);
+        }
+
+        if (bUpdateVertexCount)
+        {
+            gcmASSERT(VIR_Shader_IsTCS(pUpperShader));
+            _UpdatePerVertexIoCount(pLowerShader, 0);
+        }
+
         return VSC_ERR_NONE;
+    }
+
+    if (bUpdateVertexCount && !pLowerShader->shaderLayout.tes.hasInputVertexAccess)
+    {
+        _UpdatePerVertexIoCount(pLowerShader, 0);
     }
 
     /* !!!
@@ -5582,6 +5621,55 @@ OnError:
     return errCode;
 }
 
+/* Collect some information cross shaders. */
+static VSC_ErrCode _CollectInfoCrossShaders(VSC_PROGRAM_LINKER_HELPER* pPgLinkHelper)
+{
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    VIR_Shader*                 pCurShader = gcvNULL;
+    VIR_Shader*                 pPreShader = gcvNULL;
+    gctUINT                     stageIdx;
+
+    for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx ++)
+    {
+        pCurShader = (VIR_Shader*)pPgLinkHelper->pgPassMnger.pPgmLinkerParam->hShaderArray[stageIdx];
+
+        if (pCurShader == gcvNULL)
+        {
+            continue;
+        }
+
+        /* Check whether PrimitiveId/PerPatchAddr is used in TES. */
+        if (VIR_Shader_IsTES(pCurShader))
+        {
+            VIR_Symbol*         pSymbol = gcvNULL;
+
+            /* Check whether per-patch address is used in TES. */
+            pSymbol = VIR_Shader_FindSymbolById(pCurShader, VIR_SYM_VARIABLE, VIR_NAME_HW_PERPATCH_ADDR);
+            if (pSymbol && !isSymUnused(pSymbol))
+            {
+                if (pPreShader && VIR_Shader_IsTCS(pPreShader))
+                {
+                    VIR_Shader_SetFlagExt1(pPreShader, VIR_SHFLAG_EXT1_TCS_STORE_PERPATCH_ADDR);
+                }
+            }
+
+            /* Check whether PrimitiveId is used in TES. */
+            pSymbol = VIR_Shader_FindSymbolById(pCurShader, VIR_SYM_VARIABLE, VIR_NAME_PRIMITIVE_ID);
+            if (pSymbol && !isSymUnused(pSymbol))
+            {
+                if (pPreShader && VIR_Shader_IsTCS(pPreShader))
+                {
+                    VIR_Shader_SetFlagExt1(pPreShader, VIR_SHFLAG_EXT1_TCS_STORE_PRIMITIVE_ID);
+                }
+            }
+        }
+
+        pPreShader = pCurShader;
+    }
+
+    return errCode;
+}
+
 /* API level check for shaders:
    Geometry shader:
    It is a link-time error if not all provided sizes (sized input arrays and layout size) match in the geometry
@@ -5678,6 +5766,13 @@ static VSC_ErrCode _DoSecondStageOfLinkage(VSC_PROGRAM_LINKER_HELPER* pPgLinkHel
     /* 4. Calc the sampler base offset for unified sampler mode. */
     errCode = _CalcSamplerBaseOffset(pPgLinkHelper);
     ON_ERROR(errCode, "Calc the sampler base offset for unified sampler mode.");
+
+    /*
+    ** 5. Collect some information cross shaders. Do it here because most of optimizations have been done:
+    **    redundant instructions have been deleted and unused variables have been marked.
+    */
+    errCode = _CollectInfoCrossShaders(pPgLinkHelper);
+    ON_ERROR(errCode, "Collect some information cross shaders.");
 
 OnError:
     return errCode;
@@ -6322,6 +6417,8 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
                 gcmASSERT(shCompParamArray[VSC_SHADER_STAGE_HS].hShader);
                 pShader->shaderLayout.tes.tessPatchInputVertices =
                     ((VIR_Shader*)shCompParamArray[VSC_SHADER_STAGE_HS].hShader)->shaderLayout.tcs.tcsPatchOutputVertices;
+
+                pShader->shaderLayout.tes.tessInputVertexCount = pShader->shaderLayout.tes.tessPatchInputVertices;
             }
 
             vscSPM_Initialize(&shPassMngerArray[stageIdx],

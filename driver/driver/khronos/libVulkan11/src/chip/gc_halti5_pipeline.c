@@ -2000,6 +2000,7 @@ static VkResult halti5_pip_emit_graphicsProgram(
     uint32_t colorOutCount;
     const gcsFEATURE_DATABASE *database = devCtx->database;
     halti5_module *chipModule = (halti5_module *)devCtx->chipPriv;
+    uint32_t perPatchVertexCount;
 
     /* step 1: emit hardware states for shader instance */
     halti5_pip_emit_graphicsShaderInstance(devCtx, pip);
@@ -2478,7 +2479,15 @@ static VkResult halti5_pip_emit_graphicsProgram(
 
     if (info->pTessellationState)
     {
-        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x01F0, VK_FALSE, info->pTessellationState->patchControlPoints);
+        perPatchVertexCount = info->pTessellationState->patchControlPoints;
+
+        if (hints->tcsHasNoPerVertexAttribute)
+        {
+            gcmASSERT(hints->stageBits & gcvPROGRAM_STAGE_TCS_BIT);
+            perPatchVertexCount = 1;
+        }
+
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x01F0, VK_FALSE, perPatchVertexCount);
     }
 
     /* Flush private constant uniform. */
