@@ -4185,8 +4185,12 @@ static PROG_VK_RESOURCE_SET* _GetVkResourceSetBySetIdx(PROGRAM_EXECUTABLE_PROFIL
         oldCountOfSets = pPEP->u.vk.resourceSetCount;
 
         newCountOfSet = setIndex + 1;
-        gcoOS_Allocate(gcvNULL, newCountOfSet * sizeof(PROG_VK_RESOURCE_SET),
-                       (gctPOINTER*)&pPEP->u.vk.pResourceSets);
+        if (gcoOS_Allocate(gcvNULL, newCountOfSet * sizeof(PROG_VK_RESOURCE_SET),
+            (gctPOINTER*)&pPEP->u.vk.pResourceSets) != gcvSTATUS_OK)
+        {
+            gcmPRINT("Failed to allocate memory in GetVkResourceSetBySetIdx.");
+            return gcvNULL;
+        }
         pPEP->u.vk.resourceSetCount = newCountOfSet;
 
         if (pOldResSet)
@@ -5893,6 +5897,10 @@ static VSC_ErrCode _CollectCompilerGeneatedCombinedSampler(VSC_PEP_GEN_HELPER* p
                 }
 
                 pResSet = _GetVkResourceSetBySetIdx(pOutPEP, VIR_Symbol_GetDescriptorSet(pTexSym));
+                if (pResSet == gcvNULL)
+                {
+                    return VSC_ERR_OUT_OF_MEMORY;
+                }
                 for (j = 0; j < pResSet->separatedTexTable.countOfEntries; j ++)
                 {
                     pSeparatedTexEntry = &pResSet->separatedTexTable.pTextureEntries[j];
@@ -5960,6 +5968,10 @@ static VSC_ErrCode _CollectCompilerGeneatedCombinedSampler(VSC_PEP_GEN_HELPER* p
                 }
 
                 pResSet = _GetVkResourceSetBySetIdx(pOutPEP, VIR_Symbol_GetDescriptorSet(pSamplerSym));
+                if (pResSet == gcvNULL)
+                {
+                    return VSC_ERR_OUT_OF_MEMORY;
+                }
                 for (j = 0; j < pResSet->separatedSamplerTable.countOfEntries; j ++)
                 {
                     pSeparatedSamplerEntry = &pResSet->separatedSamplerTable.pSamplerEntries[j];
@@ -6385,7 +6397,10 @@ static VSC_ErrCode _CollectResourceLayoutTablesToPEP(VSC_PEP_GEN_HELPER* pPepGen
 
         /* Get corresponding set */
         pResSet = _GetVkResourceSetBySetIdx(pOutPEP, pResAllocEntry->resBinding.set);
-
+        if (pResSet == gcvNULL)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         if (pResAllocEntry->resBinding.arraySize == 0)
         {
             continue;

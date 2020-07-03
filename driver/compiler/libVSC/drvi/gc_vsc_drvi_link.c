@@ -3516,9 +3516,21 @@ static VSC_ErrCode _FindVectorizableIoPackets(VSC_BASE_LINKER_HELPER* pBaseLinkH
     {
         pNormalIoPairArray[i] = (ATTR_OUTPUT_PAIR*)vscMM_Alloc(pBaseLinkHelper->pMM,
                                                                MAX_SHADER_IO_NUM * sizeof(ATTR_OUTPUT_PAIR));
+        if (pNormalIoPairArray[i] == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            ERR_REPORT(errCode, "Failed to allocate memory for pNormalIoPairArray.");
+            return errCode;
+        }
     }
     pSoIoPairArray = (ATTR_OUTPUT_PAIR*)vscMM_Alloc(pBaseLinkHelper->pMM,
                                                     2 * MAX_SHADER_IO_NUM * sizeof(ATTR_OUTPUT_PAIR));
+    if (pSoIoPairArray == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ERR_REPORT(errCode, "Failed to allocate memory for pSoIoPairArray.");
+        return errCode;
+    }
 
     /* Collect io-pairs */
     _CollectVectorizableIoPairs(pBaseLinkHelper,
@@ -3541,6 +3553,12 @@ static VSC_ErrCode _FindVectorizableIoPackets(VSC_BASE_LINKER_HELPER* pBaseLinkH
         {
             pAVPArray = (VIR_IO_VECTORIZABLE_PACKET*)vscMM_Alloc(pBaseLinkHelper->pMM,
                                                                  MAX_SHADER_IO_NUM * sizeof(VIR_IO_VECTORIZABLE_PACKET));
+            if (pAVPArray == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                ERR_REPORT(errCode, "Failed to allocate memory for pAVPArray.");
+                return errCode;
+            }
             memset(pAVPArray, 0, MAX_SHADER_IO_NUM * sizeof(VIR_IO_VECTORIZABLE_PACKET));
             for (i = 0; i < MAX_SHADER_IO_NUM; i ++)
             {
@@ -3552,6 +3570,12 @@ static VSC_ErrCode _FindVectorizableIoPackets(VSC_BASE_LINKER_HELPER* pBaseLinkH
         {
             pOVPArray = (VIR_IO_VECTORIZABLE_PACKET*)vscMM_Alloc(pBaseLinkHelper->pMM,
                                                                  MAX_SHADER_IO_NUM * sizeof(VIR_IO_VECTORIZABLE_PACKET));
+            if (pOVPArray == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                ERR_REPORT(errCode, "Failed to allocate memory for pOVPArray.");
+                return errCode;
+            }
             memset(pOVPArray, 0, MAX_SHADER_IO_NUM * sizeof(VIR_IO_VECTORIZABLE_PACKET));
             for (i = 0; i < MAX_SHADER_IO_NUM; i ++)
             {
@@ -3832,6 +3856,12 @@ static VSC_ErrCode _FindIoVectorizablePacketsForSingleShader(VSC_BASE_LINKER_HEL
     /* Allocate packets. */
     pIoVecPackets = (VIR_IO_VECTORIZABLE_PACKET*)vscMM_Alloc(pBaseLinkHelper->pMM,
                                                              numOfPackets * sizeof(VIR_IO_VECTORIZABLE_PACKET));
+    if (pIoVecPackets == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ERR_REPORT(errCode, "Failed to allocate memory for pIoVecPackets.");
+        return errCode;
+    }
     memset(pIoVecPackets, 0, numOfPackets * sizeof(VIR_IO_VECTORIZABLE_PACKET));
 
     /* Fill the data. */
@@ -3906,11 +3936,23 @@ static VSC_ErrCode _FindIoVectorizablePacketsForTwoShader(VSC_BASE_LINKER_HELPER
     /* Allocate output packets. */
     pOutputVecPackets = (VIR_IO_VECTORIZABLE_PACKET*)vscMM_Alloc(pBaseLinkHelper->pMM,
                                                                  numOfPackets * sizeof(VIR_IO_VECTORIZABLE_PACKET));
+    if (pOutputVecPackets == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ERR_REPORT(errCode, "Failed to allocate memory for pOutputVecPackets.");
+        return errCode;
+    }
     memset(pOutputVecPackets, 0, numOfPackets * sizeof(VIR_IO_VECTORIZABLE_PACKET));
 
     /* Allocate input packets. */
     pInputVecPackets = (VIR_IO_VECTORIZABLE_PACKET*)vscMM_Alloc(pBaseLinkHelper->pMM,
                                                                 numOfPackets * sizeof(VIR_IO_VECTORIZABLE_PACKET));
+    if (pInputVecPackets == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ERR_REPORT(errCode, "Failed to allocate memory for pInputVecPackets.");
+        return errCode;
+    }
     memset(pInputVecPackets, 0, numOfPackets * sizeof(VIR_IO_VECTORIZABLE_PACKET));
 
     /* Fill the data. */
@@ -6348,6 +6390,12 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
         {
             pPEP = (PROGRAM_EXECUTABLE_PROFILE*)vscMM_Alloc(pgLinkHelper.baseHelper.pMM,
                                                             sizeof(PROGRAM_EXECUTABLE_PROFILE));
+            if (pPEP == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                ON_ERROR(errCode, "Failed to allocate memory for pPEP.");
+                return gcvSTATUS_OUT_OF_MEMORY;
+            }
             bInternalPEP = gcvTRUE;
         }
         else
@@ -6854,6 +6902,12 @@ VSC_ErrCode _CreateKernelInternal(VSC_SHADER_PASS_MANAGER*        pShPassMnger,
         {
             pKEP = (KERNEL_EXECUTABLE_PROFILE*)vscMM_Alloc(baseHelper.pMM,
                                                            sizeof(KERNEL_EXECUTABLE_PROFILE));
+            if (pKEP == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                ON_ERROR(errCode, "Failed to allocate memory for pKEP.");
+                return errCode;
+            }
         }
         else
         {

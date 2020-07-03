@@ -177,6 +177,10 @@ _VSC_MOVA_NewConstKey(
     )
 {
     _VSC_RA_MOVA_CONSTKEY* constKey = (_VSC_RA_MOVA_CONSTKEY*)vscMM_Alloc(pMM, sizeof(_VSC_RA_MOVA_CONSTKEY));
+    if (constKey == gcvNULL)
+    {
+        return gcvNULL;
+    }
     constKey->defInst = defInst;
     constKey->enable =  enable;
     return constKey;
@@ -512,6 +516,10 @@ static VIR_RA_OutputKey* _VIR_RA_NewOutputKey(
     )
 {
     VIR_RA_OutputKey* outputKey = (VIR_RA_OutputKey*)vscMM_Alloc(VIR_RA_LS_GetMM(pRA), sizeof(VIR_RA_OutputKey));
+    if (outputKey == gcvNULL)
+    {
+        return gcvNULL;
+    }
     outputKey->masterRegNo = masterRegNo;
     outputKey->useInst = pInst;
     return outputKey;
@@ -1239,7 +1247,7 @@ void _VIR_RA_LS_SetRestrictLR(
     VIR_RA_LR_SetFlag(pLR, VIR_RA_LRFLAG_NO_SHIFT);
 }
 
-static void _VIR_RA_LS_Init(
+static gctBOOL _VIR_RA_LS_Init(
     VIR_RA_LS           *pRA,
     VIR_Shader          *pShader,
     VSC_HW_CONFIG       *pHwCfg,
@@ -1362,6 +1370,10 @@ static void _VIR_RA_LS_Init(
        called for each function */
     pLR = (VIR_RA_LS_Liverange*)vscMM_Alloc(
                 VIR_RA_LS_GetMM(pRA), sizeof(VIR_RA_LS_Liverange));
+    if (pLR == gcvNULL)
+    {
+        return gcvFALSE;
+    }
     VIR_RA_LS_SetSortedLRHead(pRA, pLR);
 
     /* allocate the LR active list head
@@ -1369,6 +1381,10 @@ static void _VIR_RA_LS_Init(
        called for each function */
     pLR = (VIR_RA_LS_Liverange*)vscMM_Alloc(
                 VIR_RA_LS_GetMM(pRA), sizeof(VIR_RA_LS_Liverange));
+    if (pLR == gcvNULL)
+    {
+        return gcvFALSE;
+    }
     VIR_RA_LS_SetActiveLRHead(pRA, pLR);
 
     /* allocate for outputLRTable */
@@ -1447,6 +1463,7 @@ static void _VIR_RA_LS_Init(
 
     memset(&pRA->checkRedefinedResInfo, 0, sizeof(VSC_CHECK_REDEFINED_RES));
     pRA->checkRedefinedResInfo.pMM = pMM;
+    return gcvTRUE;
 }
 
 static VSC_ErrCode
@@ -2223,7 +2240,7 @@ _VIR_RA_LS_GetDefMasterRegNo(
 /* several cases we need to assign consecutive registers for a LR
    1) array/matrix/uchar_x16 with dynamic indexing
    there maybe other requirements later */
-void _VIR_RA_LS_HandleMultiRegLR(
+gctBOOL _VIR_RA_LS_HandleMultiRegLR(
     VIR_RA_LS       *pRA,
     VIR_Instruction *pInst,
     gctUINT         defIdx)
@@ -2263,6 +2280,10 @@ void _VIR_RA_LS_HandleMultiRegLR(
 
                     outputInst = _VIR_RA_LS_GetDefOutputUseInst(pRA, defIdx);
                     outputKey = _VIR_RA_NewOutputKey(pRA, varSym->u2.tempIndex, outputInst);
+                    if (outputKey == gcvNULL)
+                    {
+                        return gcvFALSE;
+                    }
 
                     if(!vscHTBL_DirectTestAndGet(pRA->outputLRTable, (void*) outputKey, gcvNULL))
                     {
@@ -2296,6 +2317,7 @@ void _VIR_RA_LS_HandleMultiRegLR(
             }
         }
     }
+    return gcvTRUE;
 }
 
 void _VIR_RA_LS_SetRegNoRange(
@@ -2359,7 +2381,7 @@ void _VIR_RA_LS_SetRegNoRange(
 }
 
 /* this function is to set masterWebIdx for each LR which does not need to assign color */
-static void
+static gctBOOL
 _VIR_RA_LS_SetMasterLR(
     VIR_RA_LS       *pRA)
 {
@@ -2379,7 +2401,10 @@ _VIR_RA_LS_SetMasterLR(
             outputKey = _VIR_RA_NewOutputKey(pRA,
                 _VIR_RA_LS_GetDefMasterRegNo(pRA, pLR->masterWebIdx),
                 _VIR_RA_LS_GetDefOutputUseInst(pRA, pLR->masterWebIdx));
-
+            if (outputKey == gcvNULL)
+            {
+                return gcvFALSE;
+            }
             if(vscHTBL_DirectTestAndGet(pRA->outputLRTable, (void*)(outputKey), (void**)&masterWebIdx))
             {
                 pMasterLR = _VIR_RA_LS_Web2LR(pRA, (gctUINT)masterWebIdx);
@@ -2401,6 +2426,7 @@ _VIR_RA_LS_SetMasterLR(
             pMasterLR->endPoint = vscMAX(pMasterLR->endPoint, pLR->endPoint);
         }
     }
+    return gcvTRUE;
 }
 
 void _VIR_RS_LS_MarkLRLive(
@@ -3008,7 +3034,7 @@ void _VIR_RA_LS_CheckMovaType(
 }
 #endif
 
-void _VIR_RA_LS_MarkDef(
+gctBOOL _VIR_RA_LS_MarkDef(
     VIR_RA_LS       *pRA,
     VIR_Instruction *pInst,
     gctUINT         firstRegNo,
@@ -3029,7 +3055,7 @@ void _VIR_RA_LS_MarkDef(
         /* some instruction may not actually define anything, such as
          * if the SOTRE has no need to have temp register to hold it
          * value if the value is already held in temp register */
-        return;
+        return gcvTRUE;
     }
 
     if (instOpcode == VIR_OP_LDARR && _VIR_RA_LS_removableLDARR(pRA, pInst, gcvTRUE))
@@ -3148,7 +3174,10 @@ void _VIR_RA_LS_MarkDef(
 
                         _VIR_RA_LS_SetRegNoRange(pRA, defIdx, firstRegNo, regNoRange, gcvTRUE);
 
-                        _VIR_RA_LS_HandleMultiRegLR(pRA, pInst, defIdx);
+                        if (_VIR_RA_LS_HandleMultiRegLR(pRA, pInst, defIdx) == gcvFALSE)
+                        {
+                            return gcvFALSE;
+                        }
 
                         if (removableLDARR)
                         {
@@ -3233,6 +3262,7 @@ void _VIR_RA_LS_MarkDef(
             }
         }
     }
+    return gcvTRUE;
 }
 
 gctBOOL _VIR_RA_LS_isUseCrossInst(
@@ -6577,7 +6607,12 @@ VSC_ErrCode _VIR_RA_LS_BuildLRTableBB(
                                             &bDstIndexing))
         {
             /* mark dead for the real def */
-            _VIR_RA_LS_MarkDef(pRA, pInst, firstRegNo, regNoRange, defEnableMask, bDstIndexing, pBlkFlow);
+            if (_VIR_RA_LS_MarkDef(pRA, pInst, firstRegNo, regNoRange, defEnableMask, bDstIndexing, pBlkFlow) == gcvFALSE)
+            {
+                retValue = VSC_ERR_OUT_OF_MEMORY;
+                ERR_REPORT(retValue, "Failed to allocate memory for outputKey.");
+                return retValue;
+            }
         }
 
         /* mark live for all uses */
@@ -6692,6 +6727,12 @@ VSC_ErrCode _VIR_RA_LS_BuildLRTable(
         ppBasicBlkRPO = (VIR_BASIC_BLOCK**)vscMM_Alloc(
             VIR_RA_LS_GetMM(pRA),
             sizeof(VIR_BASIC_BLOCK*)*countOfBasicBlk);
+        if (ppBasicBlkRPO == gcvNULL)
+        {
+            retValue = VSC_ERR_OUT_OF_MEMORY;
+            ERR_REPORT(retValue, "Failed to allocate memory for ppBasicBlkRPO.");
+            return retValue;
+        }
 
         retValue = vscDG_PstOrderTraversal(&pCfg->dgGraph,
                                 VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
@@ -6712,7 +6753,12 @@ VSC_ErrCode _VIR_RA_LS_BuildLRTable(
             }
         }
 
-        _VIR_RA_LS_SetMasterLR(pRA);
+        if (_VIR_RA_LS_SetMasterLR(pRA) == gcvFALSE)
+        {
+            retValue = VSC_ERR_OUT_OF_MEMORY;
+            ERR_REPORT(retValue, "Failed to allocate memory for outputKey.");
+            return retValue;
+        }
     }
 
     /* adjust VX LR's start point */
@@ -8788,7 +8834,14 @@ _VIR_RA_LS_InsertSpillOffset(
 
         if (pRA->bReservedMovaReg && !bMovaSrc0Spill)
         {
-            vscHTBL_DirectSet(pRA->movaHash, _VSC_MOVA_NewConstKey(pMM, pDef->defKey.pDefInst, enable_channel), (void*)movInst);
+            _VSC_RA_MOVA_CONSTKEY* constKey = _VSC_MOVA_NewConstKey(pMM, pDef->defKey.pDefInst, enable_channel);
+            if (constKey == gcvNULL)
+            {
+                retErrCode = VSC_ERR_OUT_OF_MEMORY;
+                ERR_REPORT(retErrCode, "Failed to allocate memory for constKey.");
+                return retErrCode;
+            }
+            vscHTBL_DirectSet(pRA->movaHash, constKey, (void*)movInst);
         }
     }
     else
@@ -13534,7 +13587,12 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
 
     VIR_Shader_RenumberInstId(pShader);
 
-    _VIR_RA_LS_Init(&ra, pShader, pHwCfg, pLvInfo, pOption, pDumper, pCG, pPassWorker->basePassWorker.pMM);
+    if (_VIR_RA_LS_Init(&ra, pShader, pHwCfg, pLvInfo, pOption, pDumper, pCG, pPassWorker->basePassWorker.pMM) == gcvFALSE)
+    {
+        retValue = VSC_ERR_OUT_OF_MEMORY;
+        ERR_REPORT(retValue, "Falied to allocate the LR sorted list head.");
+        return retValue;
+    }
     ra.needBoundsCheck = needBoundsCheck;
     ra.scratchChannel = needBoundsCheck ? VIR_CHANNEL_W : VIR_CHANNEL_Y;
 
@@ -13585,6 +13643,13 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
             ppFuncBlkRPO = (VIR_FUNC_BLOCK**)vscMM_Alloc(
                                             VIR_RA_LS_GetMM(&ra),
                                             sizeof(VIR_FUNC_BLOCK*)*countOfFuncBlk);
+            if (ppFuncBlkRPO == gcvNULL)
+            {
+                retValue = VSC_ERR_OUT_OF_MEMORY;
+                ERR_REPORT(retValue, "Failed to allocate memory for ppFuncBlkRPO.");
+                return retValue;
+            }
+
             retValue = vscDG_PstOrderTraversal(&pCG->dgGraph,
                                     VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                                     gcvFALSE,

@@ -617,6 +617,10 @@ static VSC_IS_DepDagNode* _VSC_IS_DepDag_NewNode(
     IN VIR_Instruction* inst)
 {
     VSC_IS_DepDagNode* node = (VSC_IS_DepDagNode*)vscMM_Alloc(VSC_IS_DepDag_GetMM(dag), sizeof(VSC_IS_DepDagNode));
+    if (node == gcvNULL)
+    {
+        return gcvNULL;
+    }
     _VSC_IS_DepDagNode_Init(node, inst);
     if(inst && VIR_Inst_GetOpcode(inst) == VIR_OP_KILL)
     {
@@ -1113,14 +1117,19 @@ static gctUINT32 _VSC_IS_GetBBEssence(
     return len;
 }
 
-static void _VSC_IS_InstSched_NewDepDag(
+static gctBOOL _VSC_IS_InstSched_NewDepDag(
     IN OUT VSC_IS_InstSched* is
     )
 {
     VSC_IS_DepDag* dag = (VSC_IS_DepDag*)vscMM_Alloc(VSC_IS_InstSched_GetMM(is), sizeof(VSC_IS_DepDag));
+    if (dag == gcvNULL)
+    {
+        return gcvFALSE;
+    }
 
     _VSC_IS_DepDag_Init(dag, VSC_IS_InstSched_GetMM(is));
     VSC_IS_InstSched_SetCurrDepDag(is, dag);
+    return gcvTRUE;
 }
 
 static void _VSC_IS_InstSched_DeleteDepDag(
@@ -1731,6 +1740,7 @@ static VSC_ErrCode _VSC_IS_BuildDAGForBB_Basic(
         VSC_IS_RegConflictType excludeRCT;
         VSC_IS_OtherConflictType excludeOCT;
         VSC_IS_DepDagNode* node = _VSC_IS_DepDag_NewNode(dag, inst);
+        if (node == gcvNULL)
 
         if (!node)
         {
@@ -1887,12 +1897,22 @@ static VSC_ErrCode _VSC_IS_BuildDAGForBB(
         tail_count = vscSRARR_GetElementCount(tail_array);
 
         /* because tail_array changes during node adding, we need to copy them at first here */
-        gcoOS_Allocate(gcvNULL, sizeof(VSC_IS_DepDagNode*) * tail_count, (gctPOINTER*)&tail_nodes);
+        if (gcoOS_Allocate(gcvNULL, sizeof(VSC_IS_DepDagNode*) * tail_count, (gctPOINTER*)&tail_nodes) != gcvSTATUS_OK)
+        {
+            ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Fail to allocate memory in Build DAG For BB.");
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         for(i = 0; i < tail_count; i++)
         {
             tail_nodes[i] = *(VSC_IS_DepDagNode**)vscSRARR_GetElement(tail_array, i);
         }
         pseudo_end = _VSC_IS_DepDag_NewNode(dag, gcvNULL);
+        if (pseudo_end == gcvNULL)
+        {
+            err_code = VSC_ERR_OUT_OF_MEMORY;
+            ERR_REPORT(err_code, "Failed to allocate memory in New DepDag Node.");
+            return err_code;
+        }
         _VSC_IS_DepDag_AddNode(dag, pseudo_end);
         /* add the pseudo_end node */
         for(i = 0; i < tail_count; i++)
@@ -5393,7 +5413,11 @@ static VSC_ErrCode _VSC_IS_DoInstructionSchedulingForBB(
         return err_code;
     }
 
-    _VSC_IS_InstSched_NewDepDag(is);
+    if (_VSC_IS_InstSched_NewDepDag(is) == gcvFALSE)
+    {
+        ERR_REPORT(err_code, "Failed to allocate memory in InstSched New DepDag Node.");
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
     _VSC_IS_BuildDAGForBB(is);
 
     switch(VSC_OPTN_ISOptions_GetAlgorithm(options))
