@@ -8023,7 +8023,7 @@ _LoadInterfaceBlockMember(
                     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
                     while (!isVariableTopLevelStruct(structVariable) &&
-                           structVariable->parent)
+                           structVariable->parent != -1)
                     {
                         status = gcSHADER_GetVariable(binary,
                                                       structVariable->parent,
@@ -9377,7 +9377,7 @@ _MakeStoreSource(
                 gcVARIABLE parentVariable, structVariable;
 
                 gcmASSERT(LOperand->reg.qualifier == slvSTORAGE_QUALIFIER_STORAGE_BLOCK_MEMBER);
-                gcmASSERT(LOperand->reg.u.variable->parent != 0);
+                gcmASSERT(LOperand->reg.u.variable->parent != -1);
 
                 status = gcSHADER_GetVariable(binary,
                                               LOperand->reg.u.variable->parent,

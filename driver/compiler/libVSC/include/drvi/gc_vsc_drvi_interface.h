@@ -58,8 +58,10 @@
 /* 0.0.1.35 Add a new opcode MOV_DUAL16 04/23/2020 */
 /* 0.0.1.36 Add VIR_ModifierOrder in VIR_Operand on 05/14/2020 */
 /* 0.0.1.37 Add the sampled image information on 03/11/2020 */
-#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 37)
-#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 37)
+/* 0.0.1.38 Saving the return variable to a argument 03/27/2020 */
+/* 0.0.1.39 Update the image addre for an image buffer 04/01/2020 */
+#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 39)
+#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 39)
 
 #if !defined(gcdTARGETHOST_BIGENDIAN)
 #define gcdTARGETHOST_BIGENDIAN 0  /* default host little endian, to change the

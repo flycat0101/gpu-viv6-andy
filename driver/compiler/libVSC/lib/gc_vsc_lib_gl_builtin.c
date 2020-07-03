@@ -6434,6 +6434,12 @@ gctSTRING gcLibImageAddr_intrinsic =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   p.z = int(img_desc.x) + p.z * int(is.w);\n"
 "   return _viv_image_computeImgAddr3D(img_desc, p).y;\n"
+"}\n"
+"highp uint _viv_image_addr_image_buffer(highp uvec4 img_desc, int p, int selectSample)\n"
+"{\n"
+"   int imgWidth = IMAGE_BUFFER_WIDTH_SIZE;\n"
+"   ivec2 coord = ivec2(p%imgWidth, p/imgWidth);\n"
+"   return _viv_image_computeImgAddr2D(img_desc, coord).y;\n"
 "}\n";
 
 gctSTRING gcLibImageSwizzle =

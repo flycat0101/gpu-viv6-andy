@@ -4830,6 +4830,13 @@ VkResult halti5_dispatch(
 
     __VK_ASSERT(cmdBuf->curScrachBufIndex == 0);
 
+    /* Check if the group count of any dimension is zero, if so, just skip this draw. */
+    if (x == 0 || y == 0 || z == 0)
+    {
+        __VK_DEBUG_PRINT(__VK_DBG_LEVEL_WARNING, "The group count is(%d, %d, %d), just skip it.\n", x, y, z);
+        return result;
+    }
+
     if (chipModel == gcv7000 && chipRevision == 0x6009)
     {
         needWorkaround = VK_TRUE;
@@ -8553,6 +8560,26 @@ static VkResult halti5_helper_setDescSetSeperateImage(
                         }
                     }
 
+                    if (texEntry->hwMappings[stageIdx].s.imageDerivedInfo.pMipLevel)
+                    {
+                        SHADER_PRIV_CONSTANT_ENTRY *privEntry = texEntry->hwMappings[stageIdx].s.imageDerivedInfo.pMipLevel;
+
+                        if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
+                        {
+                            __vkImage *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imgv->createInfo.image);
+                            uint32_t data[4];
+                            uint32_t hwConstRegNoForSize = privEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.constReg.hwRegNo;
+                            uint32_t hwConstRegAddrForSize = (hwConstRegAddrBase >> 2) + (hwConstRegNoForSize * 4)
+                                                    + privEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
+                            __VK_ASSERT(privEntry->commonPrivm.privmKind == SHS_PRIV_CONSTANT_KIND_LEVELS_SAMPLES);
+                            data[0] = img->createInfo.mipLevels;
+                            data[1] = 0;
+                            data[2] = 0;
+                            data[3] = 0;
+                            __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddrForSize + (arrayIdx * 4), VK_FALSE, 4, data);
+                        }
+                    }
+
                     if (texEntry->hwMappings[stageIdx].s.imageDerivedInfo.pExtraLayer)
                     {
                         SHADER_PRIV_UAV_ENTRY* privEntry = texEntry->hwMappings[stageIdx].s.imageDerivedInfo.pExtraLayer;
@@ -9029,6 +9056,26 @@ static VkResult halti5_helper_setDescSetCombinedImageSampler(
                         }
                     }
 
+                    if (texEntry->hwMappings[stageIdx].s.imageDerivedInfo.pMipLevel)
+                    {
+                        SHADER_PRIV_CONSTANT_ENTRY *privEntry = texEntry->hwMappings[stageIdx].s.imageDerivedInfo.pMipLevel;
+
+                        if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
+                        {
+                            __vkImage *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imgv->createInfo.image);
+                            uint32_t data[4];
+                            uint32_t hwConstRegNoForSize = privEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.constReg.hwRegNo;
+                            uint32_t hwConstRegAddrForSize = (hwConstRegAddrBase >> 2) + (hwConstRegNoForSize * 4)
+                                                    + privEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
+                            __VK_ASSERT(privEntry->commonPrivm.privmKind == SHS_PRIV_CONSTANT_KIND_LEVELS_SAMPLES);
+                            data[0] = img->createInfo.mipLevels;
+                            data[1] = 0;
+                            data[2] = 0;
+                            data[3] = 0;
+                            __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddrForSize + (arrayIdx * 4), VK_FALSE, 4, data);
+                        }
+                    }
+
                     if (texEntry->hwMappings[stageIdx].s.imageDerivedInfo.pExtraLayer)
                     {
                         SHADER_PRIV_UAV_ENTRY* privEntry = texEntry->hwMappings[stageIdx].s.imageDerivedInfo.pExtraLayer;
@@ -9468,6 +9515,26 @@ static VkResult halti5_helper_setDescSetInputAttach(
                                 }
                             }
 
+                            if (inputAttachEntry->imageDerivedInfo[stageIdx].pMipLevel)
+                            {
+                                SHADER_PRIV_CONSTANT_ENTRY *privEntry = inputAttachEntry->imageDerivedInfo[stageIdx].pMipLevel;
+
+                                if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
+                                {
+                                    __vkImage *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imgv->createInfo.image);
+                                    uint32_t data[4];
+                                    uint32_t hwConstRegNoForSize = privEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.constReg.hwRegNo;
+                                    uint32_t hwConstRegAddrForSize = (hwConstRegAddrBase >> 2) + (hwConstRegNoForSize * 4)
+                                                            + privEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
+                                    __VK_ASSERT(privEntry->commonPrivm.privmKind == SHS_PRIV_CONSTANT_KIND_LEVELS_SAMPLES);
+                                    data[0] = img->createInfo.mipLevels;
+                                    data[1] = 0;
+                                    data[2] = 0;
+                                    data[3] = 0;
+                                    __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddrForSize + (arrayIdx * 4), VK_FALSE, 4, data);
+                                }
+                            }
+
                             if (inputAttachEntry->imageDerivedInfo[stageIdx].pExtraLayer)
                             {
                                 SHADER_PRIV_UAV_ENTRY* privEntry = inputAttachEntry->imageDerivedInfo[stageIdx].pExtraLayer;
@@ -9598,6 +9665,26 @@ static VkResult halti5_helper_setDescSetStorage(
                             }
                         }
 
+                        if (storageEntry->imageDerivedInfo[stageIdx].pMipLevel)
+                        {
+                            SHADER_PRIV_CONSTANT_ENTRY *privEntry = storageEntry->imageDerivedInfo[stageIdx].pMipLevel;
+
+                            if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
+                            {
+                                __vkImage *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imgv->createInfo.image);
+                                uint32_t data[4];
+                                uint32_t hwConstRegNoForSize = privEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.constReg.hwRegNo;
+                                uint32_t hwConstRegAddrForSize = (hwConstRegAddrBase >> 2) + (hwConstRegNoForSize * 4)
+                                                        + privEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
+                                __VK_ASSERT(privEntry->commonPrivm.privmKind == SHS_PRIV_CONSTANT_KIND_LEVELS_SAMPLES);
+                                data[0] = img->createInfo.mipLevels;
+                                data[1] = 0;
+                                data[2] = 0;
+                                data[3] = 0;
+                                __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddrForSize + (arrayIdx * 4), VK_FALSE, 4, data);
+                            }
+                        }
+
                         if (storageEntry->imageDerivedInfo[stageIdx].pExtraLayer)
                         {
                             SHADER_PRIV_UAV_ENTRY* privEntry = storageEntry->imageDerivedInfo[stageIdx].pExtraLayer;
@@ -9610,6 +9697,7 @@ static VkResult halti5_helper_setDescSetStorage(
                         }
                     }
                     break;
+
                 case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
                     {
                         __vkBufferView *bufv;
@@ -9642,8 +9730,28 @@ static VkResult halti5_helper_setDescSetStorage(
                                 __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 1, &size);
                             }
                         }
+
+                        if (storageEntry->imageDerivedInfo[stageIdx].pMipLevel)
+                        {
+                            SHADER_PRIV_CONSTANT_ENTRY *privEntry = storageEntry->imageDerivedInfo[stageIdx].pMipLevel;
+
+                            if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
+                            {
+                                uint32_t data[4];
+                                uint32_t hwConstRegNoForSize = privEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.constReg.hwRegNo;
+                                uint32_t hwConstRegAddrForSize = (hwConstRegAddrBase >> 2) + (hwConstRegNoForSize * 4)
+                                                        + privEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
+                                __VK_ASSERT(privEntry->commonPrivm.privmKind == SHS_PRIV_CONSTANT_KIND_LEVELS_SAMPLES);
+                                data[0] = 1;
+                                data[1] = 0;
+                                data[2] = 0;
+                                data[3] = 0;
+                                __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddrForSize + (arrayIdx * 4), VK_FALSE, 4, data);
+                            }
+                        }
                     }
                     break;
+
                 case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
                     {
                         uint32_t physical;

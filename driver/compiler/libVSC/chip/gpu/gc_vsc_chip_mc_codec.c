@@ -6919,7 +6919,8 @@ static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCod
         (pCodecHelperInst->baseOpcode == 0x7F &&
          pCodecHelperInst->extOpcode == 0x0F))
     {
-        if (!pMcCodec->pHwCfg->hwFeatureFlags.supportAdvancedInsts)
+        if (!pMcCodec->pHwCfg->hwFeatureFlags.supportAdvancedInsts ||
+            !pMcCodec->pHwCfg->hwFeatureFlags.hasHalti5)
         {
             GotoError();
         }
