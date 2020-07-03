@@ -1780,18 +1780,27 @@ VIR_IO_readBlockTable(VIR_Shader_IOBuffer * Buf,
             }
             else
             {
+                gctUINT id = 0;
                 if (i == startToReadBlockIndex)
                 {
-                    vscBT_AddContinuousEntries(pBlockTbl,
-                                  ioBuffer->buffer+ioBuffer->curPos,
-                                  (pBlockTbl->blockSize - startToReadBlockOffset)/pBlockTbl->entrySize);
+                    id = vscBT_AddContinuousEntries(pBlockTbl,
+                                                    ioBuffer->buffer+ioBuffer->curPos,
+                                                    (pBlockTbl->blockSize - startToReadBlockOffset)/pBlockTbl->entrySize);
+                    if (VIR_Id_isInvalid(id))
+                    {
+                        return VSC_ERR_OUT_OF_MEMORY;
+                    }
                     ioBuffer->curPos += pBlockTbl->blockSize  - startToReadBlockOffset;
                 }
                 else
                 {
-                    vscBT_AddContinuousEntries(pBlockTbl,
-                                  ioBuffer->buffer + ioBuffer->curPos,
-                                  pBlockTbl->entryCountPerBlock);
+                    id = vscBT_AddContinuousEntries(pBlockTbl,
+                                                    ioBuffer->buffer + ioBuffer->curPos,
+                                                    pBlockTbl->entryCountPerBlock);
+                    if (VIR_Id_isInvalid(id))
+                    {
+                        return VSC_ERR_OUT_OF_MEMORY;
+                    }
                     ioBuffer->curPos += pBlockTbl->blockSize;
                 }
             }
@@ -1826,18 +1835,27 @@ VIR_IO_readBlockTable(VIR_Shader_IOBuffer * Buf,
             }
             else
             {
+                gctUINT id = 0;
                 if (i == startToReadBlockIndex)
                 {
-                    vscBT_AddContinuousEntries(pBlockTbl,
-                                  ioBuffer->buffer+ioBuffer->curPos,
-                                  (nextOffsetInCurBlock - startToReadBlockOffset)/pBlockTbl->entrySize);
+                    id = vscBT_AddContinuousEntries(pBlockTbl,
+                                                    ioBuffer->buffer+ioBuffer->curPos,
+                                                    (nextOffsetInCurBlock - startToReadBlockOffset)/pBlockTbl->entrySize);
+                    if (VIR_Id_isInvalid(id))
+                    {
+                        return VSC_ERR_OUT_OF_MEMORY;
+                    }
                     ioBuffer->curPos += nextOffsetInCurBlock  - startToReadBlockOffset;
                 }
                 else
                 {
-                    vscBT_AddContinuousEntries(pBlockTbl,
-                                  ioBuffer->buffer+ioBuffer->curPos,
-                                  nextOffsetInCurBlock/pBlockTbl->entrySize);
+                    id = vscBT_AddContinuousEntries(pBlockTbl,
+                                                    ioBuffer->buffer+ioBuffer->curPos,
+                                                    nextOffsetInCurBlock/pBlockTbl->entrySize);
+                    if (VIR_Id_isInvalid(id))
+                    {
+                        return VSC_ERR_OUT_OF_MEMORY;
+                    }
                     ioBuffer->curPos += nextOffsetInCurBlock;
                 }
                 pBlockTbl->nextOffsetInCurBlock = nextOffsetInCurBlock;

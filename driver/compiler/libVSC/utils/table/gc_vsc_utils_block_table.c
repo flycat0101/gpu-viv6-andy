@@ -285,6 +285,10 @@ static gctUINT8 * _AllocContinuousEntriesPtr(VSC_BLOCK_TABLE* pBT, gctUINT entry
     if (pBT->ppBlockArray[pBT->curBlockIdx] == gcvNULL)
     {
         pBT->ppBlockArray[pBT->curBlockIdx] = (VSC_BT_BLOCK_PTR)vscMM_Alloc(pBT->pMM, pBT->blockSize);
+        if (pBT->ppBlockArray[pBT->curBlockIdx] == gcvNULL)
+        {
+            return gcvNULL;
+        }
     }
 
     pFirstEntry = pBT->ppBlockArray[pBT->curBlockIdx] + pBT->nextOffsetInCurBlock;

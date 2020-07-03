@@ -995,14 +995,15 @@ _VSC_DCE_RemoveDeadCodeOnFunction(
                 _VSC_DCE_DeleteUsage(dce, inst, opnd, coverMask, coverFlag);
             }
 
-            vscVIR_DeleteDef(
-                VSC_DCE_GetDUInfo(dce),
-                inst,
-                destInfo.u1.virRegInfo.virReg,
-                1,
-                inst_enable & (~flag.isAlive),
-                VIR_HALF_CHANNEL_MASK_FULL,
-                gcvNULL);
+            errCode = vscVIR_DeleteDef(
+                                       VSC_DCE_GetDUInfo(dce),
+                                       inst,
+                                       destInfo.u1.virRegInfo.virReg,
+                                       1,
+                                       inst_enable & (~flag.isAlive),
+                                       VIR_HALF_CHANNEL_MASK_FULL,
+                                       gcvNULL);
+            ON_ERROR(errCode, "Failed in Delete Def.");
 
             VIR_Inst_SetEnable(inst, (VIR_Enable)flag.isAlive);
             /* normalize swizzle by enable */
@@ -1033,7 +1034,7 @@ _VSC_DCE_RemoveDeadCodeOnFunction(
             gcmASSERT(0);
         }
     }
-
+OnError:
     return errCode;
 }
 

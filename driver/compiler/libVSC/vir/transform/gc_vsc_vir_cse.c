@@ -601,16 +601,17 @@ static VSC_ErrCode _VSC_LCSE_ReplaceUses(
                     {
                         for (channel = 0; channel < VIR_CHANNEL_COUNT; channel++)
                         {
-                            vscVIR_AddNewUsageToDef(VSC_LCSE_GetDuInfo(lcse),
-                                                    commonInst,
-                                                    instIter,
-                                                    srcOpnd,
-                                                    gcvFALSE,
-                                                    srcInfo.u1.virRegInfo.virReg,
-                                                    1,
-                                                    (1 << channel),
-                                                    VIR_HALF_CHANNEL_MASK_FULL,
-                                                    gcvNULL);
+                            errCode = vscVIR_AddNewUsageToDef(VSC_LCSE_GetDuInfo(lcse),
+                                                              commonInst,
+                                                              instIter,
+                                                              srcOpnd,
+                                                              gcvFALSE,
+                                                              srcInfo.u1.virRegInfo.virReg,
+                                                              1,
+                                                              (1 << channel),
+                                                              VIR_HALF_CHANNEL_MASK_FULL,
+                                                              gcvNULL);
+                            ON_ERROR(errCode, "Failed to add new usage to def.");
                         }
                     }
 
@@ -633,7 +634,7 @@ static VSC_ErrCode _VSC_LCSE_ReplaceUses(
             }
         }
     }
-
+OnError:
     return errCode;
 }
 
@@ -709,14 +710,15 @@ static VSC_ErrCode _VSC_LCSE_ReplaceInst(
                 VIR_Operand_SetSwizzle(pNewOpnd, VIR_Enable_2_Swizzle_WShift(newEnable));
 
                 /* Update the DU. */
-                vscVIR_AddNewDef(pDuInfo,
-                                 pNewAttrLdInst,
-                                 virRegId,
-                                 1,
-                                 newEnable,
-                                 VIR_HALF_CHANNEL_MASK_FULL,
-                                 gcvNULL,
-                                 gcvNULL);
+                errCode = vscVIR_AddNewDef(pDuInfo,
+                                           pNewAttrLdInst,
+                                           virRegId,
+                                           1,
+                                           newEnable,
+                                           VIR_HALF_CHANNEL_MASK_FULL,
+                                           gcvNULL,
+                                           gcvNULL);
+                ON_ERROR(errCode, "Failed to add new def.");
 
                 for (srcIdx = 0; srcIdx < VIR_Inst_GetSrcNum(pNewAttrLdInst); srcIdx++)
                 {
@@ -729,16 +731,17 @@ static VSC_ErrCode _VSC_LCSE_ReplaceInst(
                         continue;
                     }
 
-                    vscVIR_AddNewUsageToDef(pDuInfo,
-                                            VIR_ANY_DEF_INST,
-                                            pNewAttrLdInst,
-                                            srcOpnd,
-                                            gcvFALSE,
-                                            srcInfo.u1.virRegInfo.virReg,
-                                            1,
-                                            VIR_Swizzle_2_Enable(srcSwizzle),
-                                            VIR_HALF_CHANNEL_MASK_FULL,
-                                            gcvNULL);
+                    errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                                      VIR_ANY_DEF_INST,
+                                                      pNewAttrLdInst,
+                                                      srcOpnd,
+                                                      gcvFALSE,
+                                                      srcInfo.u1.virRegInfo.virReg,
+                                                      1,
+                                                      VIR_Swizzle_2_Enable(srcSwizzle),
+                                                      VIR_HALF_CHANNEL_MASK_FULL,
+                                                      gcvNULL);
+                    ON_ERROR(errCode, "Failed to add new usage to def.");
                 }
 
                 /* Set the hash key. */
@@ -815,16 +818,17 @@ static VSC_ErrCode _VSC_LCSE_ReplaceInst(
         {
             if (VIR_Operand_GetEnable(commonInstDest) & (1 << channel))
             {
-                vscVIR_AddNewUsageToDef(pDuInfo,
-                                        pReplacedInst,
-                                        toBeReplaced,
-                                        toBeReplacedOperand,
-                                        gcvFALSE,
-                                        dstInfo.u1.virRegInfo.virReg,
-                                        1,
-                                        (1 << channel),
-                                        VIR_HALF_CHANNEL_MASK_FULL,
-                                        gcvNULL);
+                errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                                  pReplacedInst,
+                                                  toBeReplaced,
+                                                  toBeReplacedOperand,
+                                                  gcvFALSE,
+                                                  dstInfo.u1.virRegInfo.virReg,
+                                                  1,
+                                                  (1 << channel),
+                                                  VIR_HALF_CHANNEL_MASK_FULL,
+                                                  gcvNULL);
+                ON_ERROR(errCode, "Failed to add new usage to def.");
             }
         }
 

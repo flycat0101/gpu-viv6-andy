@@ -12500,16 +12500,17 @@ VSC_ErrCode _VIR_RA_LS_AssignColorForA0B0Inst(
 
                     if (VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pNewOpnd)) & (1 << pDef->defKey.channel))
                     {
-                        vscVIR_AddNewUsageToDef(pDuInfo,
-                                        pDef->defKey.pDefInst,
-                                        pNewInst,
-                                        pNewOpnd,
-                                        gcvFALSE,
-                                        operandInfo.u1.virRegInfo.startVirReg,
-                                        operandInfo.u1.virRegInfo.virRegCount,
-                                        (1 << pDef->defKey.channel),
-                                        VIR_HALF_CHANNEL_MASK_FULL,
-                                        gcvNULL);
+                        retValue = vscVIR_AddNewUsageToDef(pDuInfo,
+                                                           pDef->defKey.pDefInst,
+                                                           pNewInst,
+                                                           pNewOpnd,
+                                                           gcvFALSE,
+                                                           operandInfo.u1.virRegInfo.startVirReg,
+                                                           operandInfo.u1.virRegInfo.virRegCount,
+                                                           (1 << pDef->defKey.channel),
+                                                           VIR_HALF_CHANNEL_MASK_FULL,
+                                                           gcvNULL);
+                        ON_ERROR(retValue, "Failed to add new usage to def.");
                     }
 
                     defIdx = pDef->nextDefInWebIdx;
@@ -12573,6 +12574,7 @@ VSC_ErrCode _VIR_RA_LS_AssignColorForA0B0Inst(
 
     _VIR_RA_LS_ExpireActiveLRs(pRA, VIR_Inst_GetId(pInst));
 
+OnError:
     return retValue;
 }
 

@@ -1301,7 +1301,8 @@ static VSC_ErrCode _RenameDstOfSeedInst(
         {
             if(instDestEnable & (1 << channel))
             {
-                vscVIR_DeleteDef(pDuInfo, pSeedInst, instDestInfo.u1.virRegInfo.startVirReg, instDestInfo.u1.virRegInfo.virRegCount, (VIR_Enable)(1 << channel), VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+                errCode = vscVIR_DeleteDef(pDuInfo, pSeedInst, instDestInfo.u1.virRegInfo.startVirReg, instDestInfo.u1.virRegInfo.virRegCount, (VIR_Enable)(1 << channel), VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+                ON_ERROR(errCode, "Failed in Delete Def.");
             }
         }
     }
@@ -1349,21 +1350,23 @@ static VSC_ErrCode _RenameDstOfSeedInst(
 
         VIR_Operand_GetOperandInfo(pSeedInst, destOper, &instDestInfo);
 
-        vscVIR_AddNewDef(pDuInfo, pSeedInst,
-                         instDestInfo.u1.virRegInfo.startVirReg,
-                         instDestInfo.u1.virRegInfo.virRegCount,
-                         instDestEnable, VIR_HALF_CHANNEL_MASK_FULL,
-                         gcvNULL, gcvNULL);
+        errCode = vscVIR_AddNewDef(pDuInfo, pSeedInst,
+                                   instDestInfo.u1.virRegInfo.startVirReg,
+                                   instDestInfo.u1.virRegInfo.virRegCount,
+                                   instDestEnable, VIR_HALF_CHANNEL_MASK_FULL,
+                                   gcvNULL, gcvNULL);
+        ON_ERROR(errCode, "Failed to add new def.");
 
         firstRegNo  = instDestInfo.u1.virRegInfo.startVirReg;
         regNoRange  = 1;
 
-        vscVIR_AddNewUsageToDef(pDuInfo, pSeedInst, pUsageInst, pUsageOper,
-                               gcvFALSE, firstRegNo, regNoRange, instDestEnable,
-                               VIR_HALF_CHANNEL_MASK_FULL,
-                               gcvNULL);
+        errCode = vscVIR_AddNewUsageToDef(pDuInfo, pSeedInst, pUsageInst, pUsageOper,
+                                          gcvFALSE, firstRegNo, regNoRange, instDestEnable,
+                                          VIR_HALF_CHANNEL_MASK_FULL,
+                                          gcvNULL);
+        ON_ERROR(errCode, "Failed to add new usage to def.");
     }
-
+OnError:
     return errCode;
 }
 
@@ -1944,7 +1947,7 @@ static void _UpdateSymbolTypeAfterVectorized(
     }
 }
 
-static void _VectorizeOpndsBasedOnOrgSymOrVirreg(VIR_Shader* pShader,
+static VSC_ErrCode _VectorizeOpndsBasedOnOrgSymOrVirreg(VIR_Shader* pShader,
                                                  VIR_BASIC_BLOCK* pBasicBlock,
                                                  VIR_DEF_USAGE_INFO* pDuInfo,
                                                  VIR_OPND_VECTORIZED_INFO* pOpndVectorizedInfo,
@@ -1954,6 +1957,7 @@ static void _VectorizeOpndsBasedOnOrgSymOrVirreg(VIR_Shader* pShader,
                                                  VIR_Operand* pOpnd,
                                                  gctBOOL bDst)
 {
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
     gctUINT                 i, channelSwizzle, seedSwizzle, swizzle, resultSwizzle = 0;
     gctUINT8                seedEnable, enable, deltaEnable, channel;
     gctUINT                 firstRegNo, regNoRange;
@@ -1996,15 +2000,16 @@ static void _VectorizeOpndsBasedOnOrgSymOrVirreg(VIR_Shader* pShader,
         deltaEnable = (~seedEnable & enable);
         if (deltaEnable != VIR_ENABLE_NONE)
         {
-            vscVIR_AddNewDef(pDuInfo,
-                             pOpndVectorizedInfo->instPair.pSeedInst,
-                             firstRegNo,
-                             regNoRange,
-                             deltaEnable,
-                             VIR_HALF_CHANNEL_MASK_FULL,
-                             &nativeDefFlags,
-                             gcvNULL
-                             );
+            errCode = vscVIR_AddNewDef(pDuInfo,
+                                       pOpndVectorizedInfo->instPair.pSeedInst,
+                                       firstRegNo,
+                                       regNoRange,
+                                       deltaEnable,
+                                       VIR_HALF_CHANNEL_MASK_FULL,
+                                       &nativeDefFlags,
+                                       gcvNULL
+                                       );
+            ON_ERROR(errCode, "Failed to add new def.");
         }
 
         /* Copy all usages of def of inst to def of seed inst, and delete corresponding usages for def of inst */
@@ -2025,16 +2030,17 @@ static void _VectorizeOpndsBasedOnOrgSymOrVirreg(VIR_Shader* pShader,
             for (pUsage = vscVIR_GeneralDuIterator_First(&duIter); pUsage != gcvNULL;
                  pUsage = vscVIR_GeneralDuIterator_Next(&duIter))
             {
-                vscVIR_AddNewUsageToDef(pDuInfo,
-                                        pOpndVectorizedInfo->instPair.pSeedInst,
-                                        pUsage->usageKey.pUsageInst,
-                                        pUsage->usageKey.pOperand,
-                                        pUsage->usageKey.bIsIndexingRegUsage,
-                                        firstRegNo,
-                                        regNoRange,
-                                        (1 << channel),
-                                        VIR_HALF_CHANNEL_MASK_FULL,
-                                        gcvNULL);
+                errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                                  pOpndVectorizedInfo->instPair.pSeedInst,
+                                                  pUsage->usageKey.pUsageInst,
+                                                  pUsage->usageKey.pOperand,
+                                                  pUsage->usageKey.bIsIndexingRegUsage,
+                                                  firstRegNo,
+                                                  regNoRange,
+                                                  (1 << channel),
+                                                  VIR_HALF_CHANNEL_MASK_FULL,
+                                                  gcvNULL);
+                ON_ERROR(errCode, "Failed to add new usage to def.");
 
                 vscVIR_DeleteUsage(pDuInfo,
                                    pOpndVectorizedInfo->instPair.pInst,
@@ -2050,13 +2056,14 @@ static void _VectorizeOpndsBasedOnOrgSymOrVirreg(VIR_Shader* pShader,
         }
 
         /* Delete defs that have been derived to seed inst */
-        vscVIR_DeleteDef(pDuInfo,
-                         pOpndVectorizedInfo->instPair.pInst,
-                         firstRegNo,
-                         regNoRange,
-                         enable,
-                         VIR_HALF_CHANNEL_MASK_FULL,
-                         gcvNULL);
+        errCode = vscVIR_DeleteDef(pDuInfo,
+                                   pOpndVectorizedInfo->instPair.pInst,
+                                   firstRegNo,
+                                   regNoRange,
+                                   enable,
+                                   VIR_HALF_CHANNEL_MASK_FULL,
+                                   gcvNULL);
+        ON_ERROR(errCode, "Failed in Delete Def.");
     }
     else
     {
@@ -2090,16 +2097,17 @@ static void _VectorizeOpndsBasedOnOrgSymOrVirreg(VIR_Shader* pShader,
         for (pDef = vscVIR_GeneralUdIterator_First(&udIter); pDef != gcvNULL;
              pDef = vscVIR_GeneralUdIterator_Next(&udIter))
         {
-            vscVIR_AddNewUsageToDef(pDuInfo,
-                                    pDef->defKey.pDefInst,
-                                    pOpndVectorizedInfo->instPair.pSeedInst,
-                                    pSeedOpnd,
-                                    gcvFALSE,
-                                    operandInfo.u1.virRegInfo.virReg,
-                                    1,
-                                    (1 << pDef->defKey.channel),
-                                    VIR_HALF_CHANNEL_MASK_FULL,
-                                    gcvNULL);
+            errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                              pDef->defKey.pDefInst,
+                                              pOpndVectorizedInfo->instPair.pSeedInst,
+                                              pSeedOpnd,
+                                              gcvFALSE,
+                                              operandInfo.u1.virRegInfo.virReg,
+                                              1,
+                                              (1 << pDef->defKey.channel),
+                                              VIR_HALF_CHANNEL_MASK_FULL,
+                                              gcvNULL);
+            ON_ERROR(errCode, "Failed to add new usage to def.");
         }
 
         vscVIR_DeleteUsage(pDuInfo,
@@ -2113,6 +2121,9 @@ static void _VectorizeOpndsBasedOnOrgSymOrVirreg(VIR_Shader* pShader,
                            VIR_HALF_CHANNEL_MASK_FULL,
                            gcvNULL);
     }
+
+OnError:
+    return errCode;
 }
 
 static VSC_ErrCode _VectorizeSym2SymOpnds(VIR_VECTORIZER_INFO* pVectorizerInfo,
@@ -2124,6 +2135,7 @@ static VSC_ErrCode _VectorizeSym2SymOpnds(VIR_VECTORIZER_INFO* pVectorizerInfo,
                                           gctUINT8 orgEnable,
                                           gctBOOL bDst)
 {
+    VSC_ErrCode  errCode = VSC_ERR_NONE;
     VIR_Operand* pSeedOpnd = pOpndVectorizedInfo->opndPair.pSeedOpnd;
     VIR_Operand* pOpnd = pOpndVectorizedInfo->opndPair.pOpnd;
 
@@ -2134,12 +2146,14 @@ static VSC_ErrCode _VectorizeSym2SymOpnds(VIR_VECTORIZER_INFO* pVectorizerInfo,
     else
     {
         /* Use original sym or virreg */
-        _VectorizeOpndsBasedOnOrgSymOrVirreg(pShader, pBasicBlock, pDuInfo, pOpndVectorizedInfo,
-                                             orgSeedEnable, orgEnable, pSeedOpnd, pOpnd,
-                                             bDst);
+        errCode = _VectorizeOpndsBasedOnOrgSymOrVirreg(pShader, pBasicBlock, pDuInfo, pOpndVectorizedInfo,
+                                                       orgSeedEnable, orgEnable, pSeedOpnd, pOpnd,
+                                                       bDst);
+        ON_ERROR(errCode, "Fail to use original sym or virreg.");
     }
 
-    return VSC_ERR_NONE;
+OnError:
+    return errCode;
 }
 
 static VSC_ErrCode _VectorizeVirreg2SymOpnds(VIR_VECTORIZER_INFO* pVectorizerInfo,
@@ -2179,6 +2193,7 @@ static VSC_ErrCode _VectorizeVirreg2VirregOpnds(VIR_VECTORIZER_INFO* pVectorizer
                                                 gctUINT8 orgEnable,
                                                 gctBOOL bDst)
 {
+    VSC_ErrCode  errCode = VSC_ERR_NONE;
     VIR_Operand* pSeedOpnd = pOpndVectorizedInfo->opndPair.pSeedOpnd;
     VIR_Operand* pOpnd = pOpndVectorizedInfo->opndPair.pOpnd;
 
@@ -2189,12 +2204,12 @@ static VSC_ErrCode _VectorizeVirreg2VirregOpnds(VIR_VECTORIZER_INFO* pVectorizer
     else
     {
         /* Use original sym or virreg */
-        _VectorizeOpndsBasedOnOrgSymOrVirreg(pShader, pBasicBlock, pDuInfo, pOpndVectorizedInfo,
-                                             orgSeedEnable, orgEnable, pSeedOpnd, pOpnd,
-                                             bDst);
+        errCode = _VectorizeOpndsBasedOnOrgSymOrVirreg(pShader, pBasicBlock, pDuInfo, pOpndVectorizedInfo,
+                                                       orgSeedEnable, orgEnable, pSeedOpnd, pOpnd, bDst);
+        ON_ERROR(errCode, "Fail to use original sym or virreg.");
     }
-
-    return VSC_ERR_NONE;
+OnError:
+    return errCode;
 }
 
 static VSC_ErrCode _UpdateVectorizedVImmHashTable(VIR_VECTORIZER_INFO* pVectorizerInfo,
@@ -2647,15 +2662,16 @@ static VSC_ErrCode _VectorizeSym2SymOnDst(VIR_Shader* pShader,
     VIR_Operand_SetEnable(pDst, newInstEnable);
 
     /* Add new defs related to new-enable */
-    vscVIR_AddNewDef(pDuInfo,
-                     pInst,
-                     firstSeedRegNo,
-                     seedRegNoRange,
-                     newInstEnable,
-                     VIR_HALF_CHANNEL_MASK_FULL,
-                     &seedInstNativeDefFlags,
-                     gcvNULL
-                     );
+    errCode = vscVIR_AddNewDef(pDuInfo,
+                               pInst,
+                               firstSeedRegNo,
+                               seedRegNoRange,
+                               newInstEnable,
+                               VIR_HALF_CHANNEL_MASK_FULL,
+                               &seedInstNativeDefFlags,
+                               gcvNULL
+                               );
+    ON_ERROR(errCode, "Failed to add new def.");
 
     /* Change swizzle of srcs of inst due to inst's enable has been changed */
     if (VIR_Inst_isComponentwise(pInst))
@@ -2772,42 +2788,45 @@ static VSC_ErrCode _VectorizeSym2SymOnDst(VIR_Shader* pShader,
 
             if (VSC_UTILS_TST_BIT(redundantEnable, channel))
             {
-                vscVIR_AddNewUsageToDef(pDuInfo,
-                                        pSeedInst,
-                                        pUsageInst,
-                                        pUsageOpnd,
-                                        bForIndexingReg,
-                                        firstSeedRegNo,
-                                        seedRegNoRange,
-                                        (1 << pSeedChlMappingArray[channel]),
-                                        VIR_HALF_CHANNEL_MASK_FULL,
-                                        gcvNULL);
+                errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                                  pSeedInst,
+                                                  pUsageInst,
+                                                  pUsageOpnd,
+                                                  bForIndexingReg,
+                                                  firstSeedRegNo,
+                                                  seedRegNoRange,
+                                                  (1 << pSeedChlMappingArray[channel]),
+                                                  VIR_HALF_CHANNEL_MASK_FULL,
+                                                  gcvNULL);
+                ON_ERROR(errCode, "Failed to add new usage to def.");
             }
             else if (VSC_UTILS_TST_BIT(unRedundantEnable, channel))
             {
-                vscVIR_AddNewUsageToDef(pDuInfo,
-                                        pInst,
-                                        pUsageInst,
-                                        pUsageOpnd,
-                                        bForIndexingReg,
-                                        firstSeedRegNo,
-                                        seedRegNoRange,
-                                        (1 << urSeedChlMappingArray[channel]),
-                                        VIR_HALF_CHANNEL_MASK_FULL,
-                                        gcvNULL);
+                errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                                  pInst,
+                                                  pUsageInst,
+                                                  pUsageOpnd,
+                                                  bForIndexingReg,
+                                                  firstSeedRegNo,
+                                                  seedRegNoRange,
+                                                  (1 << urSeedChlMappingArray[channel]),
+                                                  VIR_HALF_CHANNEL_MASK_FULL,
+                                                  gcvNULL);
+                ON_ERROR(errCode, "Failed to add new usage to def.");
             }
         }
     }
 
     vscHTBL_Finalize(&opndSwizzleHashTable);
 
-    vscVIR_DeleteDef(pDuInfo,
-                     pInst,
-                     firstRegNo,
-                     regNoRange,
-                     orgInstEnable,
-                     VIR_HALF_CHANNEL_MASK_FULL,
-                     gcvNULL);
+    errCode = vscVIR_DeleteDef(pDuInfo,
+                               pInst,
+                               firstRegNo,
+                               regNoRange,
+                               orgInstEnable,
+                               VIR_HALF_CHANNEL_MASK_FULL,
+                               gcvNULL);
+    ON_ERROR(errCode, "Failed in Delete Def.");
 
     /* Set new operand type for all affected operands based on seed-opnd's symbol */
     defIdx = vscVIR_FindFirstDefIndex(pDuInfo, firstSeedRegNo);
@@ -3306,16 +3325,17 @@ static VSC_ErrCode _RemoveRedundantExpressions(VIR_VECTORIZER_INFO* pVectorizerI
                 VIR_Operand_SetSym(pUsageOpnd, VIR_Operand_GetSymbol(VIR_Inst_GetDest(pSeedInst)));
             }
 
-            vscVIR_AddNewUsageToDef(pDuInfo,
-                                    pSeedInst,
-                                    pUsageInst,
-                                    pUsageOpnd,
-                                    bForIndexingReg,
-                                    firstSeedRegNo,
-                                    seedRegNoRange,
-                                    (1 << pSeedChlMappingArray[channel]),
-                                    VIR_HALF_CHANNEL_MASK_FULL,
-                                    gcvNULL);
+            errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                              pSeedInst,
+                                              pUsageInst,
+                                              pUsageOpnd,
+                                              bForIndexingReg,
+                                              firstSeedRegNo,
+                                              seedRegNoRange,
+                                              (1 << pSeedChlMappingArray[channel]),
+                                              VIR_HALF_CHANNEL_MASK_FULL,
+                                              gcvNULL);
+            ON_ERROR(errCode, "Failed to add new usage to def.");
         }
     }
 
@@ -3325,13 +3345,14 @@ static VSC_ErrCode _RemoveRedundantExpressions(VIR_VECTORIZER_INFO* pVectorizerI
     /* Delete defs for redundant enable */
     if (redundantEnable != 0)
     {
-        vscVIR_DeleteDef(pDuInfo,
-                         pInst,
-                         firstRegNo,
-                         regNoRange,
-                         redundantEnable,
-                         VIR_HALF_CHANNEL_MASK_FULL,
-                         gcvNULL);
+        errCode = vscVIR_DeleteDef(pDuInfo,
+                                   pInst,
+                                   firstRegNo,
+                                   regNoRange,
+                                   redundantEnable,
+                                   VIR_HALF_CHANNEL_MASK_FULL,
+                                   gcvNULL);
+        ON_ERROR(errCode, "Failed in Delete Def.");
 
         for (i = 0; i < VIR_Inst_GetSrcNum(pInst); i ++)
         {
@@ -3393,6 +3414,7 @@ static VSC_ErrCode _RemoveRedundantExpressions(VIR_VECTORIZER_INFO* pVectorizerI
         vscHTBL_Reset(pVectorizerInfo->pRedundantExpressionHashTable);
     }
 
+OnError:
     return errCode;
 }
 
