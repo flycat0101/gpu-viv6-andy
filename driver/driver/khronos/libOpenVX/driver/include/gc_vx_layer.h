@@ -304,10 +304,12 @@ enum vxnne_kernel_e
     VXNNE_KERNEL_GPU_TENSOR2ROW,
     VXNNE_KERNEL_GEMM,
     VXNNE_KERNEL_GPU_GEMM,
-    VXNNE_KERNEL_L2NORM_SUMSQRT,
-    VXNNE_KERNEL_GPU_L2NORM_SUMSQRT,
-    VXNNE_KERNEL_L2NORM_SUMSCALE,
-    VXNNE_KERNEL_GPU_L2NORM_SUMSCALE,
+    VXNNE_KERNEL_L2NORM_AXIS0,
+    VXNNE_KERNEL_GPU_L2NORM_AXIS0,
+    VXNNE_KERNEL_L2NORM_AXIS1,
+    VXNNE_KERNEL_GPU_L2NORM_AXIS1,
+    VXNNE_KERNEL_L2NORM_AXIS2,
+    VXNNE_KERNEL_GPU_L2NORM_AXIS2,
     VXNNE_KERNEL_TENSOR_LSTMLAYER,
     VXNNE_KERNEL_TENSOR_LSTMUNIT,
     VXNNE_KERNEL_GPU_TENSOR_LSTMUNIT,
@@ -2009,6 +2011,7 @@ typedef struct _vxnne_l2normalize_operation_s
     vxnne_operation_s                base;
     vx_tensor                        inputs;
     vx_tensor                        outputs;
+    vx_int32                         axis;
 }
 vxnne_l2normalize_operation_s, * vxnne_l2normalize_operation;
 
@@ -2017,8 +2020,7 @@ typedef struct _vxnne_l2normalize_layer_s
     vxnne_layer_s                                   base;
     vxnne_operation                                 operations[2];
     vxnne_l2normalize_operation_s                   l2normalize_sw_operation;
-    vxnne_shader_operation_s                        l2normalize_SumSqrt_sh_operation;
-    vxnne_shader_operation_s                        l2normalize_sumScale_sh_operation;
+    vxnne_shader_operation_s                        l2normalize_sh_operation;
 }
 vxnne_l2normalize_layer_s, *vxnne_l2normalize_layer;
 
@@ -3403,19 +3405,28 @@ vxnne_shader_executable vxnneGemm_noBiasShaderExecutable(
     vx_uint32               overflow_policy,
     vx_tensor               output);
 
-vxnne_shader_executable vxnneL2NormSumSqrtShaderExecutable(
+vxnne_shader_executable vxnneGetL2NormAxis0ShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
+    vx_uint32               axis,
     vx_tensor               input,
     vx_tensor               output);
 
-vxnne_shader_executable vxnneL2NormSumScaleShaderExecutable(
+vxnne_shader_executable vxnneGetL2NormAxis1ShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
+    vx_uint32               axis,
     vx_tensor               input,
-    vx_tensor               sumTmp,
+    vx_tensor               output);
+
+vxnne_shader_executable vxnneGetL2NormAxis2ShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_uint32               axis,
+    vx_tensor               input,
     vx_tensor               output);
 
 vxnne_shader_executable vxnneLSTMUnitShaderExecutable(
@@ -3953,20 +3964,32 @@ vxnne_shader_executable vxnneGetGPUHashLUTShaderExecutable(
     vx_tensor               output
     );
 
-vxnne_shader_executable vxnneGPUL2NormSumSqrtShaderExecutable(
+vxnne_shader_executable vxnneGetGPUL2NormAxis0ShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
+    vx_int32                axis,
     vx_tensor               input,
-    vx_tensor               output);
+    vx_tensor               output
+    );
 
-vxnne_shader_executable vxnneGPUL2NormSumScaleShaderExecutable(
+vxnne_shader_executable vxnneGetGPUL2NormAxis1ShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
+    vx_int32                axis,
     vx_tensor               input,
-    vx_tensor               sumTmp,
-    vx_tensor               output);
+    vx_tensor               output
+    );
+
+vxnne_shader_executable vxnneGetGPUL2NormAxis2ShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_int32                axis,
+    vx_tensor               input,
+    vx_tensor               output
+    );
 
 vxnne_shader_executable vxnneGetGPUReorgShaderExecutable(
     vx_context              context,
