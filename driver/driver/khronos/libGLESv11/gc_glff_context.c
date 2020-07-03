@@ -108,7 +108,6 @@ static gctBOOL _IsNeedClearTexture()
 **
 **      SharedContext
 **          TBD.
-**
 **      SharedContextClient
 **          shared context's client, such as es11, es20, es3
 **
