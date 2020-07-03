@@ -1856,7 +1856,11 @@ gcoINDEX_UploadDynamicEx(
     /* If the index wasn't initialized as dynamic, do it now */
     if (Index->dynamic == gcvNULL)
     {
+#if !gcdCAPTURE_ONLY_MODE
         gcmONERROR(gcoINDEX_SetDynamic(Index, 128 << 10, 32));
+#else
+        gcmONERROR(gcoINDEX_SetDynamic(Index, 1 << 10, 1));
+#endif
     }
 
     if (Index->dynamicAllocate)
