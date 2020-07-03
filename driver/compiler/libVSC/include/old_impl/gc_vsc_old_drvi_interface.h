@@ -765,7 +765,8 @@ typedef struct _gcsHINT
 
     /* Third word. */
     gctUINT     fragColorUsage        : 2;
-    gctUINT     reserved              : 30;
+    gctBOOL     dependOnWorkGroupSize : 2;
+    gctUINT     reserved              : 28;
 
     /* flag if the shader uses gl_FragCoord, gl_FrontFacing, gl_PointCoord */
     gctCHAR     useFragCoord[4];

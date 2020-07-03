@@ -7701,6 +7701,8 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
     pStatesPgmer->pHints->useGroupId = (pGpsSEP->inputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_THREADGROUPID].ioIndexMask != 0);
     pStatesPgmer->pHints->useLocalId = (pGpsSEP->inputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_THREADIDINGROUP].ioIndexMask != 0);
     pStatesPgmer->pHints->useEvisInst = pGpsSEP->exeHints.derivedHints.prvStates.gps.bUseEvisInst;
+    pStatesPgmer->pHints->dependOnWorkGroupSize = pGpsSEP->exeHints.derivedHints.prvStates.gps.bDependOnWorkGroupSize;
+
     for (i = 0; i < 3; i++)
     {
         pStatesPgmer->pHints->workGroupSizeFactor[i] = pGpsSEP->exeHints.derivedHints.prvStates.gps.workGroupSizeFactor[i];
@@ -7962,15 +7964,25 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
     /* Program simulated shared (local) memory */
     else if (pGpsSEP->exeHints.nativeHints.prvStates.gps.shareMemSizePerThreadGrpInByte > 0)
     {
+        /* So far we only support Vulkan and OCL. */
         if (DECODE_SHADER_CLIENT(pGpsSEP->shVersionType) == SHADER_CLIENT_VK ||
             DECODE_SHADER_CLIENT(pGpsSEP->shVersionType) == SHADER_CLIENT_CL)
         {
-             /* Do not program the shared memory when multi-GPU is enabled, let driver programs it. */
-            if (pGpsSEP->exeHints.derivedHints.globalStates.bEnableMultiGPU)
+            gctBOOL bAllocSharedMem = gcvTRUE;
+
+            /*
+            ** Do not program the shared memory if currWorkGrpNum may be changed by driver or the size is not fixed, which are:
+            **  1) OCL client driver because driver request to allocate this by itself.
+            **  2) When multi-GPU is enabled because driver needs to allocate different value for each GPU.
+            */
+            if (DECODE_SHADER_CLIENT(pGpsSEP->shVersionType) == SHADER_CLIENT_CL
+                ||
+                pGpsSEP->exeHints.derivedHints.globalStates.bEnableMultiGPU)
             {
-                gcmASSERT(DECODE_SHADER_CLIENT(pGpsSEP->shVersionType) == SHADER_CLIENT_CL);
+                bAllocSharedMem = gcvFALSE;
             }
-            else
+
+            if (bAllocSharedMem)
             {
                 errCode = _ProgramGpsSharedMemory(pShHwInfo, pStatesPgmer);
                 ON_ERROR(errCode, "Program GP shared memory");

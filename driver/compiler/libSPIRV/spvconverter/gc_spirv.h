@@ -285,13 +285,13 @@ typedef struct _SpvCovDecorator
 }SpvCovDecorator;
 
 typedef enum{
-    SPV_ID_TYPE_UNKNOWN = 0,
-    SPV_ID_TYPE_SYMBOL,
-    SPV_ID_TYPE_CONST,
-    SPV_ID_TYPE_TYPE,
-    SPV_ID_TYPE_COMPARE,
-    SPV_ID_TYPE_FUNC_DEFINE,
-    SPV_ID_TYPE_LABEL,
+    SPV_ID_TYPE_UNKNOWN     = 0,
+    SPV_ID_TYPE_SYMBOL      = 1,
+    SPV_ID_TYPE_CONST       = 2,
+    SPV_ID_TYPE_TYPE        = 3,
+    SPV_ID_TYPE_COMPARE     = 4,
+    SPV_ID_TYPE_FUNC_DEFINE = 5,
+    SPV_ID_TYPE_LABEL       = 6,
 }SpvIDType;
 
 typedef enum{
@@ -333,30 +333,29 @@ typedef struct
 {
     SpvDescriptorHeader descriptorHeader;
 
+    gctUINT             isFuncParam     : 2;
+    gctUINT             isWorkGroup     : 2;
+        /* Use it to check the function parameter:
+    *  If this spvId has been stored before a function call, then it is a assignment for a in/inout paramter.
+    *  If this spvId has been loaded before a function call, then it is a assignment for a const paramter.
+    */
+    gctUINT             usedStoreAsDest : 2;
+    gctUINT             usedLoadAsDest  : 2;
+    gctUINT             isSampledImage  : 2;
+    gctUINT             isPerVertex     : 2;
+    gctUINT             isPerPatch      : 2;
+    gctUINT             isPushConstUBO  : 2;
+
+    /* For inputAttachment. */
+    gctUINT             attachmentFlag  : 16;
+
     /* This is the base type ID, not pointer type. */
     SpvId spvBaseTypeId;
 
     /* This is the pointer type ID, if it is not a pointer, then it equals with the base type ID. */
     SpvId spvPointerTypeId;
 
-    gctBOOL isFuncParam;
     VIR_Function *virFunc;
-    gctBOOL isWorkGroup;
-
-    /* Use it to check the function parameter:
-    *  If this spvId has been stored before a function call, then it is a assignment for a in/inout paramter.
-    *  If this spvId has been loaded before a function call, then it is a assignment for a const paramter.
-    */
-    gctBOOL usedStoreAsDest;
-    gctBOOL usedLoadAsDest;
-    gctBOOL isSampledImage;
-    gctBOOL isPerVertex;
-    gctBOOL isPerPatch;
-    gctBOOL isPushConstUBO;
-
-    /* For inputAttachment. */
-    Spv_AttachmentFlag attachmentFlag;
-
     SpvStorageClass storageClass;
 
     SpvId image;
@@ -372,8 +371,6 @@ typedef struct
     struct
     {
         VIR_AC_OFFSET_INFO virAcOffsetInfo;
-        VIR_SymId   uboArrayVirSymId[20];
-        SpvId acDynamicIndexing;
     } offsetInfo;
 
     /* If this symbol is created by a accesschain, save the base spv symbol ID. */
@@ -425,7 +422,6 @@ typedef struct
 {
     SpvDescriptorHeader descriptorHeader;
 
-    VIR_ConstVal virConst;
     VIR_ConstId virConstId;
     SpvId spvTypeId;
     SpvId vecSpvId[16];
@@ -467,17 +463,19 @@ typedef struct {
 typedef struct
 {
     /* Type of this ID */
-    SpvIDType idType;
-
-    /* vir info of this Id, sym name or type name */
-    VIR_NameId virNameId;
-    VIR_TypeId virTypeId;
+    gctUINT             idType          : 3;
 
     /* if this ID has been initialzied before.*/
-    gctBOOL initialized;
+    gctUINT             initialized     : 2;
 
     /* Whether this is used to calculate the memory address. */
-    gctBOOL isMemAddrCalc;
+    gctUINT             isMemAddrCalc   : 2;
+
+    SpvInterfaceFlag    interfaceFlag;
+
+    /* vir info of this Id, sym name or type name */
+    VIR_NameId          virNameId;
+    VIR_TypeId          virTypeId;
 
     union{
         SpvSymDescriptor            sym;
@@ -488,9 +486,6 @@ typedef struct
         SpvFuncDescriptor           func;
         SpvExtInstSetDescriptor     extInstSet;
     }u;
-
-    SpvInterfaceFlag interfaceFlag;
-
 }SpvCovIDDescriptor;
 
 typedef struct

@@ -3433,9 +3433,9 @@ static VSC_ErrCode __SpvConvToBuiltInConst(
     switch (dec->decorationData.builtIn)
     {
     case SpvBuiltInWorkgroupSize:
-        virShader->shaderLayout.compute.workGroupSize[0] = SPV_ID_VIR_CONST(targetId).vecVal.u32Value[0];
-        virShader->shaderLayout.compute.workGroupSize[1] = SPV_ID_VIR_CONST(targetId).vecVal.u32Value[1];
-        virShader->shaderLayout.compute.workGroupSize[2] = SPV_ID_VIR_CONST(targetId).vecVal.u32Value[2];
+        virShader->shaderLayout.compute.workGroupSize[0] = SPV_CONST_VECTOR_VAL(virShader, targetId).u32Value[0];
+        virShader->shaderLayout.compute.workGroupSize[1] = SPV_CONST_VECTOR_VAL(virShader, targetId).u32Value[1];
+        virShader->shaderLayout.compute.workGroupSize[2] = SPV_CONST_VECTOR_VAL(virShader, targetId).u32Value[2];
         break;
 
     default:
@@ -3517,7 +3517,7 @@ static VSC_ErrCode __SpvInsertInstruction3(gcSPV spv, VIR_Shader * virShader, VI
 
     virSwizzle = __SpvID2Swizzle(spv, src);
 
-    constVal.uValue = SPV_CONST_SCALAR_UINT(src);
+    constVal.uValue = SPV_CONST_SCALAR_UINT(virShader, src);
     VIR_Operand_SetImmediate(VIR_Inst_GetSource(virInst, 0), SPV_ID_VIR_TYPE_ID(srcType), constVal);
     VIR_Operand_SetSwizzle(VIR_Inst_GetSource(virInst, 0), virSwizzle);
     VIR_Operand_SetOpKind(VIR_Inst_GetSource(virInst, 0), VIR_OPND_IMMEDIATE);
@@ -4624,7 +4624,7 @@ VSC_ErrCode __SpvEmitType(gcSPV spv, VIR_Shader * virShader)
             else
             {
                 gcmASSERT(SPV_ID_TYPE(spv->operands[1]) == SPV_ID_TYPE_CONST);
-                arrayLength = SPV_ID_VIR_CONST(spv->operands[1]).scalarVal.uValue;
+                arrayLength = SPV_CONST_SCALAR_UINT(virShader, spv->operands[1]);
             }
 
             VIR_Shader_AddArrayType(virShader,
@@ -5275,7 +5275,6 @@ VSC_ErrCode __SpvEmitUndef(gcSPV spv, VIR_Shader * virShader)
     return virErrCode;
 }
 
-
 VSC_ErrCode __SpvEmitSpecConstantOp(gcSPV spv, VIR_Shader * virShader)
 {
     VSC_ErrCode virErrCode = VSC_ERR_NONE;
@@ -5400,6 +5399,9 @@ VSC_ErrCode __SpvEmitConstant(gcSPV spv, VIR_Shader * virShader)
     VkSpecializationMapEntry * mapEntry = gcvNULL;
     gctUINT8 *specData = spv->specInfo ? (gctUINT8 *)spv->specInfo->pData : gcvNULL;
     gctBOOL addSym = gcvFALSE;
+    VIR_ConstVal targetConstVal;
+
+    memset(&targetConstVal, 0, sizeof(VIR_ConstVal));
 
     SPV_GET_DECORATOR(dec, targetId, memberIndex);
 
@@ -5440,25 +5442,25 @@ VSC_ErrCode __SpvEmitConstant(gcSPV spv, VIR_Shader * virShader)
         {
             /*gcmASSERT(mapEntry->size == 4);*/
             gcoOS_MemCopy(&constValue, specData, mapEntry->size);
-            SPV_ID_VIR_CONST(targetId).scalarVal.uValue = constValue;
+            targetConstVal.scalarVal.uValue = constValue;
         }
         else if (spv->opCode == SpvOpConstantNull)
         {
-            SPV_ID_VIR_CONST(targetId).scalarVal.fValue = 0.0f;
-            SPV_ID_VIR_CONST(targetId).scalarVal.iValue = 0;
-            SPV_ID_VIR_CONST(targetId).scalarVal.uValue = 0;
+            targetConstVal.scalarVal.fValue = 0.0f;
+            targetConstVal.scalarVal.iValue = 0;
+            targetConstVal.scalarVal.uValue = 0;
         }
         else if (SPV_ID_TYPE_IS_FLOAT(spv->resultTypeId))
         {
-            SPV_ID_VIR_CONST(targetId).scalarVal.fValue = (*(gctFLOAT *)(&constValue));
+            targetConstVal.scalarVal.fValue = (*(gctFLOAT *)(&constValue));
         }
         else if (SPV_ID_TYPE_IS_SIGNEDINTEGER(spv->resultTypeId))
         {
-            SPV_ID_VIR_CONST(targetId).scalarVal.iValue = (gctINT)constValue;
+            targetConstVal.scalarVal.iValue = (gctINT)constValue;
         }
         else if (SPV_ID_TYPE_IS_UNSIGNEDINTEGER(spv->resultTypeId))
         {
-            SPV_ID_VIR_CONST(targetId).scalarVal.uValue = constValue;
+            targetConstVal.scalarVal.uValue = constValue;
         }
         else if (SPV_ID_TYPE_IS_BOOLEAN(spv->resultTypeId))
         {
@@ -5467,14 +5469,14 @@ VSC_ErrCode __SpvEmitConstant(gcSPV spv, VIR_Shader * virShader)
                 spv->opCode == SpvOpSpecConstantTrue
                 )
             {
-                SPV_ID_VIR_CONST(targetId).scalarVal.iValue = 1;
+                targetConstVal.scalarVal.iValue = 1;
             }
             else if (spv->opCode == SpvOpConstantFalse ||
                      spv->opCode == SpvOpConstantNull ||
                      spv->opCode == SpvOpSpecConstantFalse
                      )
             {
-                SPV_ID_VIR_CONST(targetId).scalarVal.iValue = 0;
+                targetConstVal.scalarVal.iValue = 0;
             }
         }
         else
@@ -5482,7 +5484,7 @@ VSC_ErrCode __SpvEmitConstant(gcSPV spv, VIR_Shader * virShader)
             gcmASSERT(0);
         }
 
-        VIR_Shader_AddConstant(virShader, typeID, &SPV_ID_VIR_CONST(targetId), &cstId);
+        VIR_Shader_AddConstant(virShader, typeID, &targetConstVal, &cstId);
         addSym = gcvTRUE;
 
         SPV_ID_VIR_CONST_ID(targetId) = cstId;
@@ -5533,24 +5535,24 @@ VSC_ErrCode __SpvEmitConstant(gcSPV spv, VIR_Shader * virShader)
             {
                 for (i = 0; i < compCount; i++)
                 {
-                    SPV_ID_VIR_CONST(targetId).vecVal.f32Value[i] =
-                        isConstantNull ? 0.0f : SPV_ID_VIR_CONST(spv->operands[i]).scalarVal.fValue;
+                    targetConstVal.vecVal.f32Value[i] =
+                        isConstantNull ? 0.0f : SPV_CONST_SCALAR_FLOAT(virShader, spv->operands[i]);
                 }
             }
             else if (SPV_ID_TYPE_IS_UNSIGNEDINTEGER(SPV_ID_TYPE_VEC_COMP_TYPE(spv->resultTypeId)))
             {
                 for (i = 0; i < compCount; i++)
                 {
-                    SPV_ID_VIR_CONST(targetId).vecVal.u32Value[i] =
-                        isConstantNull ? 0 : SPV_ID_VIR_CONST(spv->operands[i]).scalarVal.uValue;
+                    targetConstVal.vecVal.u32Value[i] =
+                        isConstantNull ? 0 : SPV_CONST_SCALAR_UINT(virShader, spv->operands[i]);
                 }
             }
             else if (SPV_ID_TYPE_IS_SIGNEDINTEGER(SPV_ID_TYPE_VEC_COMP_TYPE(spv->resultTypeId)))
             {
                 for (i = 0; i < compCount; i++)
                 {
-                    SPV_ID_VIR_CONST(targetId).vecVal.i32Value[i] =
-                        isConstantNull ? 0 : SPV_ID_VIR_CONST(spv->operands[i]).scalarVal.iValue;
+                    targetConstVal.vecVal.i32Value[i] =
+                        isConstantNull ? 0 : SPV_CONST_SCALAR_INT(virShader, spv->operands[i]);
                 }
             }
             else if (SPV_ID_TYPE_IS_BOOLEAN(SPV_ID_TYPE_VEC_COMP_TYPE(spv->resultTypeId)))
@@ -5559,12 +5561,12 @@ VSC_ErrCode __SpvEmitConstant(gcSPV spv, VIR_Shader * virShader)
                 {
                     if (isConstantNull)
                     {
-                        SPV_ID_VIR_CONST(targetId).vecVal.u32Value[i] = 0;
+                        targetConstVal.vecVal.u32Value[i] = 0;
                     }
                     else
                     {
-                        SPV_ID_VIR_CONST(targetId).vecVal.u32Value[i] =
-                            (SPV_ID_VIR_CONST(spv->operands[i]).scalarVal.iValue == 0) ? 0 : 1;
+                        targetConstVal.vecVal.u32Value[i] =
+                            (SPV_CONST_SCALAR_INT(virShader, spv->operands[i]) == 0) ? 0 : 1;
                     }
                 }
             }
@@ -5573,7 +5575,7 @@ VSC_ErrCode __SpvEmitConstant(gcSPV spv, VIR_Shader * virShader)
                 gcmASSERT(gcvFALSE);
             }
 
-            VIR_Shader_AddConstant(virShader, typeID, &SPV_ID_VIR_CONST(targetId), &cstId);
+            VIR_Shader_AddConstant(virShader, typeID, &targetConstVal, &cstId);
             addSym = gcvTRUE;
 
             SPV_ID_VIR_CONST_ID(targetId) = cstId;
@@ -6785,7 +6787,7 @@ VSC_ErrCode __SpvEmitAccessChain(gcSPV spv, VIR_Shader * virShader)
         else if ( SPV_ID_TYPE(spv->operands[i]) == SPV_ID_TYPE_CONST)
         {
             accessChainType[i - 1] = VIR_SYM_CONST;
-            accessChain[i - 1] = SPV_ID_VIR_CONST(spv->operands[i]).scalarVal.uValue;
+            accessChain[i - 1] = SPV_CONST_SCALAR_UINT(virShader, spv->operands[i]);
         }
         else
         {
@@ -7254,7 +7256,7 @@ VSC_ErrCode __SpvEmitCompositeExtract(gcSPV spv, VIR_Shader * virShader)
             if (SPV_ID_TYPE(spv->operands[1]) == SPV_ID_TYPE_CONST)
             {
                 /* index should be integer or unsigned-integer */
-                gctUINT vectorIndex = SPV_CONST_SCALAR_INT(spv->operands[1]);
+                gctUINT vectorIndex = SPV_CONST_SCALAR_INT(virShader, spv->operands[1]);
                 VIR_Operand_SetSwizzle(operand, __SpvConstIndexToVIRSwizzle(vectorIndex));
             }
             else
@@ -7278,31 +7280,31 @@ VSC_ErrCode __SpvEmitCompositeExtract(gcSPV spv, VIR_Shader * virShader)
 
             if (componentType == VIR_TYPE_FLOAT32)
             {
-                constVal.fValue = SPV_ID_VIR_CONST(spv->operands[0]).vecVal.f32Value[spv->operands[1]];
+                constVal.fValue = SPV_CONST_VECTOR_VAL(virShader, spv->operands[0]).f32Value[spv->operands[1]];
             }
             else if (componentType == VIR_TYPE_INT32)
             {
-                constVal.iValue = SPV_ID_VIR_CONST(spv->operands[0]).vecVal.i32Value[spv->operands[1]];
+                constVal.iValue = SPV_CONST_VECTOR_VAL(virShader, spv->operands[0]).i32Value[spv->operands[1]];
             }
             else if (componentType == VIR_TYPE_INT16)
             {
-                constVal.iValue = SPV_ID_VIR_CONST(spv->operands[0]).vecVal.i16Value[spv->operands[1]];
+                constVal.iValue = SPV_CONST_VECTOR_VAL(virShader, spv->operands[0]).i16Value[spv->operands[1]];
             }
             else if (componentType == VIR_TYPE_INT8)
             {
-                constVal.iValue = SPV_ID_VIR_CONST(spv->operands[0]).vecVal.i8Value[spv->operands[1]];
+                constVal.iValue = SPV_CONST_VECTOR_VAL(virShader, spv->operands[0]).i8Value[spv->operands[1]];
             }
             else if (componentType == VIR_TYPE_UINT32)
             {
-                constVal.uValue = SPV_ID_VIR_CONST(spv->operands[0]).vecVal.u32Value[spv->operands[1]];
+                constVal.uValue = SPV_CONST_VECTOR_VAL(virShader, spv->operands[0]).u32Value[spv->operands[1]];
             }
             else if (componentType == VIR_TYPE_UINT16)
             {
-                constVal.uValue = SPV_ID_VIR_CONST(spv->operands[0]).vecVal.u16Value[spv->operands[1]];
+                constVal.uValue = SPV_CONST_VECTOR_VAL(virShader, spv->operands[0]).u16Value[spv->operands[1]];
             }
             else if (componentType == VIR_TYPE_UINT8)
             {
-                constVal.uValue = SPV_ID_VIR_CONST(spv->operands[0]).vecVal.u8Value[spv->operands[1]];
+                constVal.uValue = SPV_CONST_VECTOR_VAL(virShader, spv->operands[0]).u8Value[spv->operands[1]];
             }
             else
             {
@@ -8954,7 +8956,7 @@ VSC_ErrCode __SpvEmitImageSample(gcSPV spv, VIR_Shader * virShader)
         }
         else if (SPV_ID_TYPE(spvOperand) == SPV_ID_TYPE_CONST)
         {
-            constVal.uValue = SPV_CONST_SCALAR_UINT(spvOperand);
+            constVal.uValue = SPV_CONST_SCALAR_UINT(virShader, spvOperand);
             VIR_Operand_SetImmediate(paramOperand, SPV_ID_VIR_TYPE_ID(spvOperand), constVal);
             VIR_Operand_SetOpKind(paramOperand, VIR_OPND_IMMEDIATE);
         }
@@ -8999,7 +9001,7 @@ VSC_ErrCode __SpvEmitImageSample(gcSPV spv, VIR_Shader * virShader)
             }
             else if (SPV_ID_TYPE(spvOperand) == SPV_ID_TYPE_CONST)
             {
-                constVal.uValue = SPV_CONST_SCALAR_UINT(spvOperand);
+                constVal.uValue = SPV_CONST_SCALAR_UINT(virShader, spvOperand);
                 VIR_Operand_SetImmediate(paramOperand, SPV_ID_VIR_TYPE_ID(spvOperand), constVal);
                 VIR_Operand_SetOpKind(paramOperand, VIR_OPND_IMMEDIATE);
             }

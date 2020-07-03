@@ -1300,7 +1300,10 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
             /* Whether use Evis instruction. */
             gctUINT               bUseEvisInst                    : 1;
 
-            gctUINT               reserved                        : 28;
+            /* Whether the shader depends on the workGroupSize. */
+            gctUINT               bDependOnWorkGroupSize          : 1;
+
+            gctUINT               reserved                        : 27;
 
             gctUINT16             workGroupSizeFactor[3];
         } gps;

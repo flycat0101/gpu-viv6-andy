@@ -7647,22 +7647,56 @@ VIR_Lib_SetMinWorkGroupSize(
     }
 
     VIR_Shader_SetMinWorkGroupSizeSetByDriver(pShader, minWorkGroupSize);
-    VIR_Shader_SetFlagExt1(pShader, VIR_SHFLAG_EXT1_SET_MIN_WORKGROUPSIZE);
 
 OnError:
     return errCode;
 }
 
-static void
+VSC_ErrCode
+VIR_Lib_SetMaxWorkGroupSize(
+    IN gctUINT                      maxWorkGroupSize,
+    IN OUT VIR_Shader*              pShader
+    )
+{
+    VSC_ErrCode                     errCode = VSC_ERR_NONE;
+    gctUINT                         workGroupSize = VIR_Shader_GetWorkGroupSize(pShader);
+
+    if (maxWorkGroupSize == 0)
+    {
+        maxWorkGroupSize = 1;
+    }
+
+    /*
+    ** If the workGroupSize is fixed(set in shader source),
+    ** then we need to make sure that the maximum workGroupSize is the same as the fixed workGroupSize.
+    */
+    if (VIR_Shader_CheckWorkGroupSizeFixed(pShader) && (maxWorkGroupSize != workGroupSize))
+    {
+        errCode = VSC_ERR_INVALID_DATA;
+        ON_ERROR(errCode, "Can't set the workGroupSize if it is fixed.");
+    }
+
+    VIR_Shader_SetMaxWorkGroupSizeSetByDriver(pShader, maxWorkGroupSize);
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
 _InitializeLibLinkEntryData(
     IN VSC_MM                   *pMM,
     VSC_SHADER_LIB_LINK_ENTRY   *pLibLinkEntry
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     if (pLibLinkEntry->pTempHashTable == gcvNULL)
     {
         pLibLinkEntry->pTempHashTable = (VSC_HASH_TABLE*)vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 64);
+        if(pLibLinkEntry->pTempHashTable == gcvNULL)
+            return VSC_ERR_OUT_OF_MEMORY;
     }
+
+    return errCode;
 }
 
 static void
@@ -7755,7 +7789,8 @@ VIR_LinkLibLibrary(
     for (i = 0; i < pLibLinkTable->shLinkEntryCount; i ++)
     {
         libEntry = &pLibLinkTable->pShLibLinkEntries[i];
-        _InitializeLibLinkEntryData(pMM, libEntry);
+        errCode = _InitializeLibLinkEntryData(pMM, libEntry);
+        ON_ERROR0(errCode);
 
         /* TODO: will move it into _LinkLibContext_Initialize later */
         for (j = 0; j < MAX_LIB_NUM; j++)
@@ -7861,6 +7896,20 @@ VIR_LinkLibLibrary(
             case VSC_LIB_LINK_TYPE_SET_MIN_WORK_GROUP_SIZE:
                 errCode = VIR_Lib_SetMinWorkGroupSize(linkPoint->u.minWorkGroupSize, pShader);
                 ON_ERROR(errCode, "Fail to set the WorkGroupSize.");
+                bTransFunc = gcvFALSE;
+                break;
+
+            case VSC_LIB_LINK_TYPE_SET_FIXED_WORK_GROUP_SIZE:
+                gcmASSERT(linkPoint->u.minWorkGroupSize == linkPoint->u.maxWorkGroupSize);
+                errCode = VIR_Lib_SetMinWorkGroupSize(linkPoint->u.minWorkGroupSize, pShader);
+                ON_ERROR(errCode, "Fail to set the WorkGroupSize.");
+
+                errCode = VIR_Lib_SetMaxWorkGroupSize(linkPoint->u.maxWorkGroupSize, pShader);
+                ON_ERROR(errCode, "Fail to set the WorkGroupSize.");
+
+                VIR_Shader_SetAdjustedWorkGroupSize(pShader, linkPoint->u.maxWorkGroupSize);
+                VIR_Shader_SetWorkGroupSizeAdjusted(pShader, gcvTRUE);
+
                 bTransFunc = gcvFALSE;
                 break;
 

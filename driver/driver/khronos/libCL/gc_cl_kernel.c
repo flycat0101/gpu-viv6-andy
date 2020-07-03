@@ -7534,28 +7534,30 @@ static gceSTATUS clfDisableOpencvENVConfig(cl_kernel Kernel, gctUINT workGroupSi
 {
     gceSTATUS status = gcvSTATUS_OK;
     gctUINT32 threadCount;
-    VSC_HW_CONFIG hwCfg;
+    VSC_HW_CONFIG* pHwCfg;
     gcePATCH_ID patchId;
 
-    clmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &hwCfg), CL_INVALID_VALUE);
+    clmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &clgDefaultPlatform->vscCoreSysCtx.hwCfg), CL_INVALID_VALUE);
+
+    pHwCfg = &clgDefaultPlatform->vscCoreSysCtx.hwCfg;
 
     if (workGroupSize == 0)
     {
-        threadCount = hwCfg.maxCoreCount * hwCfg.maxThreadCountPerCore;
-        hwCfg.initWorkGroupSizeToCalcRegCount       = 128;
-        hwCfg.maxWorkGroupSize                      = gcmMIN(threadCount, 1024);
-        hwCfg.minWorkGroupSize                      = 1;
+        threadCount = pHwCfg->maxCoreCount * pHwCfg->maxThreadCountPerCore;
+        pHwCfg->initWorkGroupSizeToCalcRegCount       = 128;
+        pHwCfg->maxWorkGroupSize                      = gcmMIN(threadCount, 1024);
+        pHwCfg->minWorkGroupSize                      = 1;
     }
     else
     {
         threadCount = workGroupSize;
-        hwCfg.initWorkGroupSizeToCalcRegCount       = threadCount;
-        hwCfg.maxWorkGroupSize                      = threadCount;
-        hwCfg.minWorkGroupSize                      = threadCount;
+        pHwCfg->initWorkGroupSizeToCalcRegCount       = threadCount;
+        pHwCfg->maxWorkGroupSize                      = threadCount;
+        pHwCfg->minWorkGroupSize                      = threadCount;
     }
 
     clmONERROR(gcoHAL_GetPatchID(gcvNULL, &patchId), CL_INVALID_VALUE);
-    clmONERROR((*Kernel->context->platform->loadCompiler)(&hwCfg, patchId), CL_INVALID_VALUE);
+    clmONERROR((*Kernel->context->platform->loadCompiler)(pHwCfg, patchId), CL_INVALID_VALUE);
     clmONERROR((*Kernel->context->platform->unloadCompiler)(), CL_INVALID_VALUE);
 
 OnError:
@@ -7565,17 +7567,19 @@ OnError:
 static gceSTATUS clfEnableOpencvENVConfig(cl_kernel Kernel)
 {
     gceSTATUS status = gcvSTATUS_OK;
-    VSC_HW_CONFIG hwCfg;
+    VSC_HW_CONFIG* pHwCfg;
     gcePATCH_ID patchId;
 
-    clmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &hwCfg), CL_INVALID_VALUE);
+    clmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &clgDefaultPlatform->vscCoreSysCtx.hwCfg), CL_INVALID_VALUE);
 
-    hwCfg.initWorkGroupSizeToCalcRegCount       = 256;
-    hwCfg.maxWorkGroupSize                      = 256;
-    hwCfg.minWorkGroupSize                      = 256;
+    pHwCfg = &clgDefaultPlatform->vscCoreSysCtx.hwCfg;
+
+    pHwCfg->initWorkGroupSizeToCalcRegCount       = 256;
+    pHwCfg->maxWorkGroupSize                      = 256;
+    pHwCfg->minWorkGroupSize                      = 256;
 
     clmONERROR(gcoHAL_GetPatchID(gcvNULL, &patchId), CL_INVALID_VALUE);
-    clmONERROR((*Kernel->context->platform->loadCompiler)(&hwCfg, patchId), CL_INVALID_VALUE);
+    clmONERROR((*Kernel->context->platform->loadCompiler)(pHwCfg, patchId), CL_INVALID_VALUE);
     clmONERROR((*Kernel->context->platform->unloadCompiler)(), CL_INVALID_VALUE);
 
 OnError:

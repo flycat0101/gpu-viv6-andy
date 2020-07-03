@@ -16506,20 +16506,43 @@ VIR_Operand_GetConstValForUniform(
     return constId;
 }
 
+static VIR_TypeId
+_GetBaseTypeId(
+    IN  VIR_Shader*         pShader,
+    IN  VIR_TypeId          typeId
+    )
+{
+    VIR_Type*               pType = VIR_Shader_GetTypeFromId(pShader, typeId);
+
+    if (VIR_Type_isArray(pType) || VIR_Type_isPointer(pType))
+    {
+        pType = VIR_Shader_GetTypeFromId(pShader, _GetBaseTypeId(pShader, VIR_Type_GetBaseTypeId(pType)));
+    }
+
+    return VIR_Type_GetIndex(pType);
+}
+
 VIR_TypeId
 VIR_Operand_GetSymbolTypeId(
-    IN  VIR_Shader         *pShader,
-    IN  VIR_Operand        *pOpnd
+    IN  VIR_Shader*         pShader,
+    IN  VIR_Operand*        pOpnd
     )
 {
     if (VIR_Operand_isSymbol(pOpnd) || VIR_Operand_isVirReg(pOpnd))
     {
-        return VIR_Symbol_GetTypeId(VIR_Operand_GetSymbol(pOpnd));
+        VIR_TypeId          typeId = _GetBaseTypeId(pShader, VIR_Symbol_GetTypeId(VIR_Operand_GetSymbol(pOpnd)));
+
+        if (!VIR_TypeId_isPrimitive(typeId))
+        {
+            typeId = VIR_Operand_GetTypeId(pOpnd);
+        }
+
+        return typeId;
     }
     else if (VIR_Operand_isConst(pOpnd))
     {
         VIR_ConstId         constId = VIR_Operand_GetConstId(pOpnd);
-        VIR_Const          *pConstVal = VIR_Shader_GetConstFromId(pShader, constId);
+        VIR_Const*          pConstVal = VIR_Shader_GetConstFromId(pShader, constId);
 
         return pConstVal->type;
     }
@@ -20064,16 +20087,19 @@ VIR_Shader_GetWorkGroupSizeInfo(
     ** If driver set a minimum workGroupSize, then we need to match this requirement.
     ** Otherwise use the HW size as the limitation.
     */
-    if (VIR_Shader_DriverSetMinWorkGroupSize(pShader))
-    {
-        minWorkGroupSize = VIR_Shader_GetMinWorkGroupSizeSetByDriver(pShader);
-    }
-    else
+    minWorkGroupSize = VIR_Shader_GetMinWorkGroupSizeSetByDriver(pShader);
+    if (minWorkGroupSize == 0)
     {
         minWorkGroupSize = pHwCfg ? pHwCfg->minWorkGroupSize : 1;
     }
 
-    maxWorkGroupSize = vscMAX(minWorkGroupSize, pHwCfg ? pHwCfg->maxWorkGroupSize : 1024);
+    maxWorkGroupSize = VIR_Shader_GetMaxWorkGroupSizeSetByDriver(pShader);
+    if (maxWorkGroupSize == 0)
+    {
+        maxWorkGroupSize = pHwCfg ? pHwCfg->maxWorkGroupSize : 1024;
+    }
+
+    maxWorkGroupSize = vscMAX(minWorkGroupSize, maxWorkGroupSize);
     initWorkGroupSize = vscMAX(minWorkGroupSize, pHwCfg ? pHwCfg->initWorkGroupSizeToCalcRegCount : 128);
 
     if (pMinWorkGroupSize)
