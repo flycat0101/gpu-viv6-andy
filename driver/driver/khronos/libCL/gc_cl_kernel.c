@@ -6923,35 +6923,42 @@ clfCreateVirInstanceHash(
     )
 {
     clsVIRInstanceHashRec_PTR pHash = gcvNULL;
+    gceSTATUS       status = gcvSTATUS_OK;
     gctPOINTER                pointer = gcvNULL;
     gcmHEADER_ARG("tbEntryNum=%d maxEntryObjs=%d",
                    tbEntryNum, maxEntryObjs);
 
-    gcoOS_Allocate(gcvNULL, sizeof(clsVIRInstanceHashRec), &pointer);
+    gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsVIRInstanceHashRec), &pointer));
     gcoOS_ZeroMemory(pointer, sizeof(clsVIRInstanceHashRec));
     pHash = (clsVIRInstanceHashRec_PTR)pointer;
-    gcmASSERT(pHash != gcvNULL);
-
-    if(pHash == gcvNULL)
-    {
-        gcmFOOTER_ARG("return=0x%x", pHash);
-        return gcvNULL;
-    }
 
     pHash->tbEntryNum = tbEntryNum;
     pHash->maxEntryObjs = maxEntryObjs;
     pHash->year = 0;
 
-    gcoOS_Allocate(gcvNULL, tbEntryNum * sizeof(clsVIRInstanceKey_PTR), &pointer);
+    gcmONERROR(gcoOS_Allocate(gcvNULL, tbEntryNum * sizeof(clsVIRInstanceKey_PTR), &pointer));
     gcoOS_ZeroMemory(pointer, tbEntryNum * sizeof(clsVIRInstanceKey_PTR));
     pHash->ppHashTable = (clsVIRInstanceKey_PTR *)pointer;
-    gcoOS_Allocate(gcvNULL, tbEntryNum * sizeof(gctUINT), &pointer);
+    gcmONERROR(gcoOS_Allocate(gcvNULL, tbEntryNum * sizeof(gctUINT), &pointer));
     gcoOS_ZeroMemory(pointer, tbEntryNum * sizeof(gctUINT));
     pHash->pEntryCounts = (gctUINT *)pointer;
     gcmASSERT(pHash->ppHashTable && pHash->pEntryCounts);
 
     gcmFOOTER_ARG("return=0x%x", pHash);
     return pHash;
+
+OnError:
+    if (pHash->ppHashTable)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, pHash->ppHashTable);
+    }
+
+    if (pHash)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, pHash);
+    }
+    gcmFOOTER_ARG("return=0x%x", gcvNULL);
+    return gcvNULL;
 }
 
 clsVIRInstanceKey_PTR
@@ -7638,7 +7645,7 @@ clfRecompileVIRKernel(
 
     if(kep->kernelHints.imageCount)
     {
-        gcoOS_Allocate(gcvNULL, kep->kernelHints.imageCount * gcmSIZEOF(VSC_IMAGE_DESC_INFO), &ptrImage);
+        gcmONERROR(gcoOS_Allocate(gcvNULL, kep->kernelHints.imageCount * gcmSIZEOF(VSC_IMAGE_DESC_INFO), &ptrImage));
         gcoOS_ZeroMemory(ptrImage, kep->kernelHints.imageCount * gcmSIZEOF(VSC_IMAGE_DESC_INFO));
         linkEntry.linkPoint[0].u.imageReadWrite.imageInfo = (VSC_IMAGE_DESC_INFO *)ptrImage;
     }
@@ -7646,7 +7653,7 @@ clfRecompileVIRKernel(
     if (kep->kernelHints.samplerCount)
     {
         /* sampler count may be 0 */
-        gcoOS_Allocate(gcvNULL, kep->kernelHints.samplerCount * gcmSIZEOF(VSC_SAMPLER_INFO), &ptrSampler);
+        gcmONERROR(gcoOS_Allocate(gcvNULL, kep->kernelHints.samplerCount * gcmSIZEOF(VSC_SAMPLER_INFO), &ptrSampler));
         gcoOS_ZeroMemory(ptrSampler, kep->kernelHints.samplerCount * gcmSIZEOF(VSC_SAMPLER_INFO));
         linkEntry.linkPoint[0].u.imageReadWrite.samplerInfo = (VSC_SAMPLER_INFO *)ptrSampler;
     }
@@ -7703,10 +7710,27 @@ clfRecompileVIRKernel(
         gcmOS_SAFE_FREE(gcvNULL, ptrSampler);
     }
 
-OnError:
     if (Kernel->recompileThreadRemap == gcvTRUE)
     {
         gcmONERROR(clfEnableOpencvENVConfig(Kernel));
+    }
+
+    return status;
+OnError:
+
+    if (ptrImage)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, ptrImage);
+    }
+
+    if (ptrSampler)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, ptrImage);
+    }
+
+    if (Kernel->recompileThreadRemap == gcvTRUE)
+    {
+        clfEnableOpencvENVConfig(Kernel);
     }
 
     return status;
