@@ -857,7 +857,7 @@
     /* bit field operations */
     VIR_OPINFO(BITFIND_MSB, 1, HasDest|Componentwise|Expr|EPFromS0, 1, AL), /* OGL. Find the most significant non-sign bit for the integer */
     VIR_OPINFO(BITFIND_LSB, 1, HasDest|Componentwise|Expr|EPFromS0, 1, AL), /* OGL. Find the least significant non-sign bit for the integer */
-    VIR_OPINFO(CTZ, 1, HasDest|Componentwise|Expr|EPFromS0, 1, AL), /* OCL. Returns the count of trailing 0-bits in x. If x is 0,
+    VIR_OPINFO(CTZ, 1, HasDest|Componentwise|Expr|EPFromS0, 1, NM), /* OCL. Returns the count of trailing 0-bits in x. If x is 0,
                                                                                   returns the size in bits of the type of x or
                                                                                   component type of x, if x is a vector. */
     VIR_OPINFO(BITSEL, 2, HasDest|Componentwise|Expr|EPFromS0, 1, AL), /* bit select */

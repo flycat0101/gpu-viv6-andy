@@ -756,6 +756,48 @@ OnError:
     return status;
 }
 
+static gctUINT
+_CalculateSelectHighCount(
+    IN gcsTHREAD_WALKER_INFO_PTR info
+    )
+{
+    gctUINT32 selectHighCount = 0;
+    gctUINT32 globalIdNeed32Bit[3] = { 0, 0, 0 };
+
+    /* Check if dimension size need 32bit size. */
+    if (info->globalOffsetX + info->globalSizeX > 0x00010000)
+    {
+        globalIdNeed32Bit[0] = 1;
+    }
+    if (info->globalOffsetY + info->globalSizeY > 0x00010000)
+    {
+        globalIdNeed32Bit[1] = 1;
+    }
+    if (info->globalOffsetZ + info->globalSizeZ > 0x00010000)
+    {
+        globalIdNeed32Bit[2] = 1;
+    }
+
+    /* So far we can only support one dimension whose size is 32bit. */
+    if (globalIdNeed32Bit[0] + globalIdNeed32Bit[1] + globalIdNeed32Bit[2] > 1)
+    {
+    }
+    else if (globalIdNeed32Bit[0])
+    {
+        selectHighCount = 0;
+    }
+    else if (globalIdNeed32Bit[1])
+    {
+        selectHighCount = 1;
+    }
+    else if (globalIdNeed32Bit[2])
+    {
+        selectHighCount = 2;
+    }
+
+    return selectHighCount;
+}
+
 /*******************************************************************************
 **  gcoHARDWARE_InvokeThreadWalkerCL
 **
@@ -980,7 +1022,11 @@ gcoHARDWARE_InvokeThreadWalkerCL(
 
         for(i = 0; i < usedGPUCount; i++)
         {
+            gctUINT selectHighCount;
+
             info = &eachGPUInfo[i];
+
+            selectHighCount = _CalculateSelectHighCount(info);
 
             if (gpuCount > 1)
             {
@@ -1154,7 +1200,19 @@ gcoHARDWARE_InvokeThreadWalkerCL(
  26:24))) | (((gctUINT32) ((gctUINT32) (info->valueOrder) & ((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24))) );    gcmENDSTATEBATCH_NEW(reserve, memory);
+ ~0U : (~(~0U << ((1 ?
+ 26:24) - (0 ?
+ 26:24) + 1))))))) << (0 ?
+ 26:24))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:28) - (0 ?
+ 29:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:28) - (0 ?
+ 29:28) + 1))))))) << (0 ?
+ 29:28))) | (((gctUINT32) ((gctUINT32) (selectHighCount) & ((gctUINT32) ((((1 ?
+ 29:28) - (0 ?
+ 29:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:28) - (0 ? 29:28) + 1))))))) << (0 ? 29:28))) );    gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
 
@@ -2474,6 +2532,7 @@ gcoHARDWARE_InvokeThreadWalkerGL(
     gctUINT groupNumberPerCluster = 0;
     gctUINT localMemSizeInByte = 0;
     gctBOOL bEnableWGPack = gcvFALSE;
+    gctUINT selectHighCount = 0;
 
     /* Define state buffer variables. */
     gcmDEFINESTATEBUFFER_NEW(reserve, stateDelta, memory);
@@ -2549,12 +2608,6 @@ gcoHARDWARE_InvokeThreadWalkerGL(
         gcmONERROR(gcoHARDWARE_FlushMultiGPURenderingMode(Hardware, (gctPOINTER*)&memory, gcvMULTI_GPU_RENDERING_MODE_INTERLEAVED_128x64));
     }
 
-#if gcdENABLE_TRUST_APPLICATION&&0
-    if (Hardware->features[gcvFEATURE_SECURITY] && Hardware->GPUProtecedModeDirty)
-    {
-        gcmONERROR(gcoHARDWARE_FlushProtectMode(Hardware, (gctPOINTER*)&memory));
-    }
-#endif
 
     if (Hardware->stallSource < Hardware->stallDestination)
     {
@@ -2567,6 +2620,8 @@ gcoHARDWARE_InvokeThreadWalkerGL(
     }
 
     gcmASSERT(Hardware->features[gcvFEATURE_SHADER_ENHANCEMENTS2]);
+
+    selectHighCount = _CalculateSelectHighCount(Info);
 
     {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
@@ -2721,7 +2776,19 @@ gcoHARDWARE_InvokeThreadWalkerGL(
  26:24))) | (((gctUINT32) ((gctUINT32) (Info->valueOrder) & ((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24))) );    gcmENDSTATEBATCH_NEW(reserve, memory);
+ ~0U : (~(~0U << ((1 ?
+ 26:24) - (0 ?
+ 26:24) + 1))))))) << (0 ?
+ 26:24))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:28) - (0 ?
+ 29:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:28) - (0 ?
+ 29:28) + 1))))))) << (0 ?
+ 29:28))) | (((gctUINT32) ((gctUINT32) (selectHighCount) & ((gctUINT32) ((((1 ?
+ 29:28) - (0 ?
+ 29:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:28) - (0 ? 29:28) + 1))))))) << (0 ? 29:28))) );    gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
 

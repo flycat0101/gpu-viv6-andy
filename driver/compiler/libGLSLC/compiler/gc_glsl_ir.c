@@ -2177,6 +2177,7 @@ slsNAME_Construct(
         name->dataType                  = DataType;
         name->symbol                    = Symbol;
         name->isBuiltIn                 = IsBuiltIn;
+        name->usePreDefinedForBuiltin   = gcvFALSE;
         name->extension                 = Extension;
 
         status = slsNAME_Initialize(Compiler, name, gcvTRUE);

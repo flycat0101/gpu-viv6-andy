@@ -155,7 +155,7 @@ static gcSHADER clTune_10(IN gcSHADER Shader)
     /* Add attributes and uniforms. */
     gcmONERROR(gcSHADER_AddAttribute(shader, "#global_id", gcSHADER_INTEGER_X4, 1, gcvFALSE, gcSHADER_SHADER_DEFAULT,
                                      gcSHADER_PRECISION_DEFAULT, &global_id));
-    gcmONERROR(gcSHADER_AddUniform(shader, "#global_size", gcSHADER_INTEGER_X4, 1, gcSHADER_PRECISION_DEFAULT, &global_size));
+    gcmONERROR(gcSHADER_AddUniform(shader, _sldGlobalSizeName, gcSHADER_INTEGER_X4, 1, gcSHADER_PRECISION_DEFAULT, &global_size));
     gcmONERROR(gcUNIFORM_SetFlags(global_size, gcvUNIFORM_KIND_GLOBAL_SIZE));
     gcmONERROR(gcUNIFORM_SetFormat(global_size, gcSL_UINT32, gcvFALSE));
 
@@ -1235,7 +1235,7 @@ static gcSHADER clTune_21(IN gcSHADER Shader)
     /* Allocate attributes and uniforms. */
     gcmONERROR(gcSHADER_AddAttribute(shader, "#global_id", gcSHADER_INTEGER_X4, 1, gcvFALSE, gcSHADER_SHADER_DEFAULT, gcSHADER_PRECISION_DEFAULT,
                                      &global_id));
-    gcmONERROR(gcSHADER_AddUniform(shader, "#global_size", gcSHADER_INTEGER_X4, 1, gcSHADER_PRECISION_DEFAULT, &global_size));
+    gcmONERROR(gcSHADER_AddUniform(shader, _sldGlobalSizeName, gcSHADER_INTEGER_X4, 1, gcSHADER_PRECISION_DEFAULT, &global_size));
     gcmONERROR(gcUNIFORM_SetFlags(global_size, gcvUNIFORM_KIND_GLOBAL_SIZE));
     gcmONERROR(gcUNIFORM_SetFormat(global_size, gcSL_UINT32, gcvFALSE));
     gcmONERROR(gcSHADER_AddUniform(shader, "source#size", gcSHADER_INTEGER_X4, 1, gcSHADER_PRECISION_DEFAULT, &source_size));
