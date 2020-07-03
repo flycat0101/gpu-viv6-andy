@@ -2711,7 +2711,7 @@ gcoHARDWARE_FlushMultiGPURenderingMode(
         {
             gcmASSERT(surface);
 
-            gcmVERIFY_OK(
+            gcmONERROR(
                 gcoOS_AllocateMemory(gcvNULL,
                                      sizeof(gcsRECT) * coreCount,
                                      (gctPOINTER *)&renderWindow));
