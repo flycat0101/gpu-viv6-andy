@@ -8254,11 +8254,7 @@ _patchTexldFormatConversion(
                 continue;
             }
 
-            if (gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer) != gcvSTATUS_OK)
-            {
-                ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Fail to allocate memory for gcSL instruction.");
-                return gcvSTATUS_OUT_OF_MEMORY;
-            }
+            gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
             tempCode1 = (gcSL_INSTRUCTION) pointer;
             gcoOS_MemCopy(tempCode1, &Shader->code[i], sizeof(struct _gcSL_INSTRUCTION));
 
@@ -8601,8 +8597,7 @@ _patchDepthComparison(
                                 prevCode);
             if (stubFunction == gcvNULL)
             {
-                ERR_REPORT(gcvSTATUS_OUT_OF_MEMORY, "Fail to Construct call stub function.");
-                return gcvSTATUS_OUT_OF_MEMORY;
+                gcmONERROR(gcvSTATUS_INVALID_DATA);
             }
 
             /* Change the texld instruciton to call stub */

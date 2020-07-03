@@ -1924,6 +1924,7 @@ static VSC_ErrCode _VSC_IS_BuildDAGForBB(
         {
             err_code = VSC_ERR_OUT_OF_MEMORY;
             ERR_REPORT(err_code, "Failed to allocate memory in New DepDag Node.");
+            gcoOS_Free(gcvNULL, (gctPOINTER)tail_nodes);
             return err_code;
         }
         err_code = _VSC_IS_DepDag_AddNode(dag, pseudo_end);
@@ -1935,6 +1936,7 @@ static VSC_ErrCode _VSC_IS_BuildDAGForBB(
             {
                 err_code = VSC_ERR_OUT_OF_MEMORY;
                 ERR_REPORT(err_code, "Failed to add edge.");
+                gcoOS_Free(gcvNULL, (gctPOINTER)tail_nodes);
                 return err_code;
             }
         }
