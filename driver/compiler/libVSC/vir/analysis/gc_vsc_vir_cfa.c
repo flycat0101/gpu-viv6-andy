@@ -454,12 +454,20 @@ static VIR_FLOW_TYPE _GetFlowType(VIR_OpCode opcode)
     }
 }
 
-static void _InitializeBbReachRelation(VIR_BB_REACH_RELATION* pBbReachRelation, VSC_MM* pMM, gctINT totalBbCount)
+static VSC_ErrCode _InitializeBbReachRelation(VIR_BB_REACH_RELATION* pBbReachRelation, VSC_MM* pMM, gctINT totalBbCount)
 {
-    vscBV_Initialize(&pBbReachRelation->fwdReachInBBSet, pMM, totalBbCount);
-    vscBV_Initialize(&pBbReachRelation->fwdReachOutBBSet, pMM, totalBbCount);
-    vscBV_Initialize(&pBbReachRelation->bwdReachInBBSet, pMM, totalBbCount);
-    vscBV_Initialize(&pBbReachRelation->bwdReachOutBBSet, pMM, totalBbCount);
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    errCode = vscBV_Initialize(&pBbReachRelation->fwdReachInBBSet, pMM, totalBbCount);
+    if (errCode != VSC_ERR_NONE)
+        return errCode;
+    errCode = vscBV_Initialize(&pBbReachRelation->fwdReachOutBBSet, pMM, totalBbCount);
+    if (errCode != VSC_ERR_NONE)
+        return errCode;
+    errCode = vscBV_Initialize(&pBbReachRelation->bwdReachInBBSet, pMM, totalBbCount);
+    if (errCode != VSC_ERR_NONE)
+        return errCode;
+    errCode = vscBV_Initialize(&pBbReachRelation->bwdReachOutBBSet, pMM, totalBbCount);
+    return errCode;
 }
 
 static void _FinalizeBbReachRelation(VIR_BB_REACH_RELATION* pBbReachRelation)
@@ -513,10 +521,16 @@ static VIR_BASIC_BLOCK* _AddBasicBlockToCFG(VIR_CONTROL_FLOW_GRAPH* pCfg)
     if(errCode != VSC_ERR_NONE)
         return gcvNULL;
 
-    _InitializeBbReachRelation(&pBasicBlock->globalReachSet, gcvNULL, 0);
-    _InitializeBbReachRelation(&pBasicBlock->localReachSet, gcvNULL, 0);
+    errCode = _InitializeBbReachRelation(&pBasicBlock->globalReachSet, gcvNULL, 0);
+    if(errCode != VSC_ERR_NONE)
+        return gcvNULL;
+    errCode = _InitializeBbReachRelation(&pBasicBlock->localReachSet, gcvNULL, 0);
+    if(errCode != VSC_ERR_NONE)
+        return gcvNULL;
 
-    vscDG_AddNode(&pCfg->dgGraph, &pBasicBlock->dgNode);
+    errCode = vscDG_AddNode(&pCfg->dgGraph, &pBasicBlock->dgNode);
+    if(errCode != VSC_ERR_NONE)
+        return gcvNULL;
 
     return pBasicBlock;
 }
@@ -3031,12 +3045,13 @@ VSC_ErrCode vscVIR_BuildBbReachRelation(VIR_Shader* pShader)
 
     /* 1. We firstly get raw global BB reach relation by using DFA solution */
 
-    vscVIR_InitializeBaseTsDFA(&baseTsDFA,
+    errCode = vscVIR_InitializeBaseTsDFA(&baseTsDFA,
                                pCg,
                                VIR_DFA_TYPE_HELPER,
                                globalBbCount,
                                &pCg->pmp.mmWrapper,
                                &tsDfaResolvers);
+    ON_ERROR(errCode, "Build raw bb reach relation");
 
     errCode = vscVIR_DoForwardIterativeTsDFA(pCg, &baseTsDFA, gcvTRUE);
     ON_ERROR(errCode, "Build raw bb reach relation");
@@ -3056,12 +3071,14 @@ VSC_ErrCode vscVIR_BuildBbReachRelation(VIR_Shader* pShader)
         {
             if (!BV_IS_VALID(&pThisBlock->globalReachSet.bwdReachInBBSet))
             {
-                _InitializeBbReachRelation(&pThisBlock->globalReachSet,
+                errCode = _InitializeBbReachRelation(&pThisBlock->globalReachSet,
                                            &pCFG->pmp.mmWrapper,
                                            globalBbCount);
-                _InitializeBbReachRelation(&pThisBlock->localReachSet,
+                ON_ERROR(errCode, "Build raw bb reach relation");
+                errCode = _InitializeBbReachRelation(&pThisBlock->localReachSet,
                                            &pCFG->pmp.mmWrapper,
                                            vscDG_GetHistNodeCount(&pCFG->dgGraph));
+                ON_ERROR(errCode, "Build raw bb reach relation");
             }
 
             /* Note we only use inFlow of BB to get reach-relation because outFlow make all BB
@@ -3077,12 +3094,14 @@ VSC_ErrCode vscVIR_BuildBbReachRelation(VIR_Shader* pShader)
 
                 if (!BV_IS_VALID(&pFromBlock->globalReachSet.bwdReachInBBSet))
                 {
-                    _InitializeBbReachRelation(&pFromBlock->globalReachSet,
+                    errCode = _InitializeBbReachRelation(&pFromBlock->globalReachSet,
                                                &pFromBlock->pOwnerCFG->pmp.mmWrapper,
                                                globalBbCount);
-                    _InitializeBbReachRelation(&pFromBlock->localReachSet,
+                    ON_ERROR(errCode, "Build raw bb reach relation");
+                    errCode = _InitializeBbReachRelation(&pFromBlock->localReachSet,
                                                &pFromBlock->pOwnerCFG->pmp.mmWrapper,
                                                vscDG_GetHistNodeCount(&pFromBlock->pOwnerCFG->dgGraph));
+                    ON_ERROR(errCode, "Build raw bb reach relation");
                 }
 
                 /* Fwd */

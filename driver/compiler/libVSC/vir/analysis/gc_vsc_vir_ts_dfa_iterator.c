@@ -48,25 +48,45 @@ gctBOOL vscVIR_CheckDFAFlowBuilt(VIR_BASE_DFA* pBaseDFA)
     return pBaseDFA->cmnDfaFlags.bFlowBuilt;
 }
 
-void vscVIR_InitializeTsBlockFlow(VIR_TS_BLOCK_FLOW* pTsBlkFlow, VIR_BASIC_BLOCK* pOwnerBB, VSC_MM* pMM, gctINT flowSize)
+VSC_ErrCode vscVIR_InitializeTsBlockFlow(VIR_TS_BLOCK_FLOW* pTsBlkFlow, VIR_BASIC_BLOCK* pOwnerBB, VSC_MM* pMM, gctINT flowSize)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     pTsBlkFlow->pOwnerBB = pOwnerBB;
 
     pOwnerBB->pTsWorkDataFlow = pTsBlkFlow;
     pOwnerBB->bInWorklist = gcvFALSE;
 
-    vscBV_Initialize(&pTsBlkFlow->genFlow, pMM, flowSize);
-    vscBV_Initialize(&pTsBlkFlow->killFlow, pMM, flowSize);
-    vscBV_Initialize(&pTsBlkFlow->inFlow, pMM, flowSize);
-    vscBV_Initialize(&pTsBlkFlow->outFlow, pMM, flowSize);
+    errCode = vscBV_Initialize(&pTsBlkFlow->genFlow, pMM, flowSize);
+    if (errCode != VSC_ERR_NONE)
+        return errCode;
+    errCode = vscBV_Initialize(&pTsBlkFlow->killFlow, pMM, flowSize);
+    if (errCode != VSC_ERR_NONE)
+        return errCode;
+    errCode = vscBV_Initialize(&pTsBlkFlow->inFlow, pMM, flowSize);
+    if (errCode != VSC_ERR_NONE)
+        return errCode;
+    errCode = vscBV_Initialize(&pTsBlkFlow->outFlow, pMM, flowSize);
+    if (errCode != VSC_ERR_NONE)
+        return errCode;
+    return errCode;
 }
 
-void vscVIR_UpdateTsBlockFlowSize(VIR_TS_BLOCK_FLOW* pTsBlkFlow, gctINT newFlowSize)
+VSC_ErrCode vscVIR_UpdateTsBlockFlowSize(VIR_TS_BLOCK_FLOW* pTsBlkFlow, gctINT newFlowSize)
 {
-    vscBV_Resize(&pTsBlkFlow->genFlow, newFlowSize, gcvTRUE);
-    vscBV_Resize(&pTsBlkFlow->killFlow, newFlowSize, gcvTRUE);
-    vscBV_Resize(&pTsBlkFlow->inFlow, newFlowSize, gcvTRUE);
-    vscBV_Resize(&pTsBlkFlow->outFlow, newFlowSize, gcvTRUE);
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    errCode = vscBV_Resize(&pTsBlkFlow->genFlow, newFlowSize, gcvTRUE);
+    if (errCode != VSC_ERR_NONE)
+        return errCode;
+    errCode = vscBV_Resize(&pTsBlkFlow->killFlow, newFlowSize, gcvTRUE);
+    if (errCode != VSC_ERR_NONE)
+        return errCode;
+    errCode = vscBV_Resize(&pTsBlkFlow->inFlow, newFlowSize, gcvTRUE);
+    if (errCode != VSC_ERR_NONE)
+        return errCode;
+    errCode = vscBV_Resize(&pTsBlkFlow->outFlow, newFlowSize, gcvTRUE);
+    if (errCode != VSC_ERR_NONE)
+        return errCode;
+    return errCode;
 }
 
 void vscVIR_FinalizeTsBlockFlow(VIR_TS_BLOCK_FLOW* pTsBlkFlow)
@@ -87,8 +107,8 @@ VSC_ErrCode vscVIR_InitializeTsFuncFlow(VIR_TS_FUNC_FLOW* pTsFuncFlow, VIR_FUNC_
 
     pTsFuncFlow->pOwnerFB = pOwnerFB;
 
-    vscBV_Initialize(&pTsFuncFlow->inFlow, pMM, flowSize);
-    vscBV_Initialize(&pTsFuncFlow->outFlow, pMM, flowSize);
+    CHECK_ERROR0(vscBV_Initialize(&pTsFuncFlow->inFlow, pMM, flowSize));
+    CHECK_ERROR0(vscBV_Initialize(&pTsFuncFlow->outFlow, pMM, flowSize));
 
     /* Intialize block flow array. Note as iterative analyzer will use id of basicblk to index
        block-flow, history node count will be used to allocate these contents */
@@ -110,19 +130,22 @@ VSC_ErrCode vscVIR_InitializeTsFuncFlow(VIR_TS_FUNC_FLOW* pTsFuncFlow, VIR_FUNC_
         VIR_TS_BLOCK_FLOW* pBlkFlow = (VIR_TS_BLOCK_FLOW*)vscSRARR_GetElement(&pTsFuncFlow->tsBlkFlowArray,
                                                                               pBasicBlk->dgNode.id);
 
-        vscVIR_InitializeTsBlockFlow(pBlkFlow, pBasicBlk, pMM, flowSize);
+        errCode = vscVIR_InitializeTsBlockFlow(pBlkFlow, pBasicBlk, pMM, flowSize);
+        if (errCode != VSC_ERR_NONE)
+            return errCode;
     }
 
     return errCode;
 }
 
-void vscVIR_UpdateTsFuncFlowSize(VIR_TS_FUNC_FLOW* pTsFuncFlow, gctINT newFlowSize)
+VSC_ErrCode vscVIR_UpdateTsFuncFlowSize(VIR_TS_FUNC_FLOW* pTsFuncFlow, gctINT newFlowSize)
 {
     CFG_ITERATOR       basicBlkIter;
     VIR_BASIC_BLOCK*   pBasicBlk;
+    VSC_ErrCode        errCode = VSC_ERR_NONE;
 
-    vscBV_Resize(&pTsFuncFlow->inFlow, newFlowSize, gcvTRUE);
-    vscBV_Resize(&pTsFuncFlow->outFlow, newFlowSize, gcvTRUE);
+    CHECK_ERROR0(vscBV_Resize(&pTsFuncFlow->inFlow, newFlowSize, gcvTRUE));
+    CHECK_ERROR0(vscBV_Resize(&pTsFuncFlow->outFlow, newFlowSize, gcvTRUE));
 
     CFG_ITERATOR_INIT(&basicBlkIter, &pTsFuncFlow->pOwnerFB->cfg);
     pBasicBlk = (VIR_BASIC_BLOCK *)CFG_ITERATOR_FIRST(&basicBlkIter);
@@ -131,8 +154,11 @@ void vscVIR_UpdateTsFuncFlowSize(VIR_TS_FUNC_FLOW* pTsFuncFlow, gctINT newFlowSi
         VIR_TS_BLOCK_FLOW* pBlkFlow = (VIR_TS_BLOCK_FLOW*)vscSRARR_GetElement(&pTsFuncFlow->tsBlkFlowArray,
                                                                               pBasicBlk->dgNode.id);
 
-        vscVIR_UpdateTsBlockFlowSize(pBlkFlow, newFlowSize);
+        errCode = vscVIR_UpdateTsBlockFlowSize(pBlkFlow, newFlowSize);
+        if (errCode != VSC_ERR_NONE)
+            return errCode;
     }
+    return errCode;
 }
 
 void vscVIR_FinalizeTsFuncFlow(VIR_TS_FUNC_FLOW* pTsFuncFlow)
@@ -196,16 +222,19 @@ VSC_ErrCode vscVIR_InitializeBaseTsDFA(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_CALL_GRA
         VIR_TS_FUNC_FLOW* pFuncFlow = (VIR_TS_FUNC_FLOW*)vscSRARR_GetElement(&pBaseTsDFA->tsFuncFlowArray,
                                                                              pFuncBlk->dgNode.id);
 
-        vscVIR_InitializeTsFuncFlow(pFuncFlow, pFuncBlk, pMM, flowSize);
+        errCode = vscVIR_InitializeTsFuncFlow(pFuncFlow, pFuncBlk, pMM, flowSize);
+        if (errCode != VSC_ERR_NONE)
+            return errCode;
     }
 
     return errCode;
 }
 
-void vscVIR_UpdateBaseTsDFAFlowSize(VIR_BASE_TS_DFA* pBaseTsDFA, gctINT newFlowSize)
+VSC_ErrCode vscVIR_UpdateBaseTsDFAFlowSize(VIR_BASE_TS_DFA* pBaseTsDFA, gctINT newFlowSize)
 {
     CG_ITERATOR     funcBlkIter;
     VIR_FUNC_BLOCK* pFuncBlk;
+    VSC_ErrCode     errCode = VSC_ERR_NONE;
 
     vscVIR_UpdateBaseDFAFlowSize(&pBaseTsDFA->baseDFA, newFlowSize);
 
@@ -216,8 +245,11 @@ void vscVIR_UpdateBaseTsDFAFlowSize(VIR_BASE_TS_DFA* pBaseTsDFA, gctINT newFlowS
         VIR_TS_FUNC_FLOW* pFuncFlow = (VIR_TS_FUNC_FLOW*)vscSRARR_GetElement(&pBaseTsDFA->tsFuncFlowArray,
                                                                              pFuncBlk->dgNode.id);
 
-        vscVIR_UpdateTsFuncFlowSize(pFuncFlow, newFlowSize);
+        errCode = vscVIR_UpdateTsFuncFlowSize(pFuncFlow, newFlowSize);
+        if (errCode != VSC_ERR_NONE)
+            return errCode;
     }
+    return errCode;
 }
 
 void vscVIR_FinalizeBaseTsDFA(VIR_BASE_TS_DFA* pBaseTsDFA)

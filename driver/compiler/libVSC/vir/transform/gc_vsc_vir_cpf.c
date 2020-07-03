@@ -449,8 +449,12 @@ _VSC_CPF_InitializeBlkFlow(
         VSC_CPF_BLOCK_FLOW  *pBlkFlow = (VSC_CPF_BLOCK_FLOW*)
             vscSRARR_GetElement(pBlkFlowArray, pBasicBlk->dgNode.id);
 
-        vscSV_Initialize(&pBlkFlow->inFlow, pMM, flowSize, VSC_CPF_GetStateCount(pCPF));
-        vscSV_Initialize(&pBlkFlow->outFlow, pMM, flowSize, VSC_CPF_GetStateCount(pCPF));
+        errCode = vscSV_Initialize(&pBlkFlow->inFlow, pMM, flowSize, VSC_CPF_GetStateCount(pCPF));
+        if (errCode != VSC_ERR_NONE)
+            return errCode;
+        errCode = vscSV_Initialize(&pBlkFlow->outFlow, pMM, flowSize, VSC_CPF_GetStateCount(pCPF));
+        if (errCode != VSC_ERR_NONE)
+            return errCode;
     }
 
     return errCode;
@@ -3155,12 +3159,16 @@ _VSC_CPF_AnalysisOnBlock(
             pLoopBlkFlow = (VSC_CPF_BLOCK_FLOW*)vscSRARR_GetElement(VSC_CPF_GetBlkFlowArray(pCPF), pLoopBB->dgNode.id);
 
             /* Clean the in flow. */
-            vscSV_Initialize(&pLoopBlkFlow->inFlow, VSC_CPF_GetMM(pCPF), VSC_CPF_GetFlowSize(pCPF), VSC_CPF_GetStateCount(pCPF));
+            errCode = vscSV_Initialize(&pLoopBlkFlow->inFlow, VSC_CPF_GetMM(pCPF), VSC_CPF_GetFlowSize(pCPF), VSC_CPF_GetStateCount(pCPF));
+            if (errCode != VSC_ERR_NONE)
+                return errCode;
 
             /* Do not clean the out flow of the end BB. */
             if (pLoopBB != VIR_LoopInfo_GetLoopEnd(pLoopInfo))
             {
-                vscSV_Initialize(&pLoopBlkFlow->outFlow, VSC_CPF_GetMM(pCPF), VSC_CPF_GetFlowSize(pCPF), VSC_CPF_GetStateCount(pCPF));
+                errCode = vscSV_Initialize(&pLoopBlkFlow->outFlow, VSC_CPF_GetMM(pCPF), VSC_CPF_GetFlowSize(pCPF), VSC_CPF_GetStateCount(pCPF));
+                if (errCode != VSC_ERR_NONE)
+                    return errCode;
             }
 
             /* Remove it from the table. */

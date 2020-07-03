@@ -1686,12 +1686,13 @@ static VSC_ErrCode _DoReachDefAnalysis(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* 
 #endif
                                             };
 
-    vscVIR_InitializeBaseTsDFA(&pDuInfo->baseTsDFA,
+    errCode = vscVIR_InitializeBaseTsDFA(&pDuInfo->baseTsDFA,
                                pCg,
                                VIR_DFA_TYPE_REACH_DEF,
                                flowSize,
                                &pDuInfo->pmp.mmWrapper,
                                &tsDfaResolvers);
+    CHECK_ERROR(errCode, "failed to initialize base Ts DFA");
 
     /* Do analysis! */
     vscVIR_DoForwardIterativeTsDFA(pCg,
@@ -2289,7 +2290,8 @@ static VSC_ErrCode _AddOutputUsages(VIR_Shader* pShader,
     VIR_DU_CHAIN_USAGE_NODE* pUsageNode;
     VSC_BIT_VECTOR           tmpMask;
 
-    vscBV_Initialize(&tmpMask, pDuInfo->baseTsDFA.baseDFA.pScratchMemPool, pDuInfo->baseTsDFA.baseDFA.flowSize);
+    errCode = vscBV_Initialize(&tmpMask, pDuInfo->baseTsDFA.baseDFA.pScratchMemPool, pDuInfo->baseTsDFA.baseDFA.flowSize);
+    ON_ERROR(errCode, "Failed to initialize bv");
 
     for (thisDefIdx = 0; thisDefIdx < defCount; thisDefIdx ++)
     {
@@ -2585,7 +2587,8 @@ static VSC_ErrCode _BuildDUUDChainPerBB(VIR_BASIC_BLOCK* pBasicBlk, VIR_DEF_USAG
     gctBOOL                bIndexing, bCertainWrite;
     VSC_STATE_VECTOR       localHalfChannelKillFlow;
 
-    vscBV_Initialize(&workingDefFlow, pDuInfo->baseTsDFA.baseDFA.pScratchMemPool, pDuInfo->baseTsDFA.baseDFA.flowSize);
+    errCode = vscBV_Initialize(&workingDefFlow, pDuInfo->baseTsDFA.baseDFA.pScratchMemPool, pDuInfo->baseTsDFA.baseDFA.flowSize);
+    ON_ERROR(errCode, "Failed to initialize BV.");
 
     /* Initialize working flow as input flow */
     vscBV_Copy(&workingDefFlow, &pBasicBlk->pTsWorkDataFlow->inFlow);
@@ -2596,8 +2599,9 @@ static VSC_ErrCode _BuildDUUDChainPerBB(VIR_BASIC_BLOCK* pBasicBlk, VIR_DEF_USAG
        VIR_HALF_CHANNEL_MASK_HIGH (2),
        VIR_HALF_CHANNEL_MASK_FULL (3)
     */
-    vscSV_Initialize(&localHalfChannelKillFlow, pDuInfo->baseTsDFA.baseDFA.pScratchMemPool,
+    errCode = vscSV_Initialize(&localHalfChannelKillFlow, pDuInfo->baseTsDFA.baseDFA.pScratchMemPool,
                      pDuInfo->baseTsDFA.baseDFA.flowSize, 4);
+    ON_ERROR(errCode, "Failed to initialize SV.");
 
     /* Go through all instructions of basic block to create each usage and make connection between
        this usage and its def */
@@ -3329,8 +3333,10 @@ static VSC_ErrCode _BuildWebs(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuInfo)
         return errCode;
     }
 
-    vscBV_Initialize(&globalWorkingFlow, pCg->pScratchMemPool, defCount);
-    vscBV_Initialize(&localWorkingFlow, pCg->pScratchMemPool, defCount);
+    errCode = vscBV_Initialize(&globalWorkingFlow, pCg->pScratchMemPool, defCount);
+    CHECK_ERROR(errCode, "Failed to initialize bv");
+    errCode = vscBV_Initialize(&localWorkingFlow, pCg->pScratchMemPool, defCount);
+    CHECK_ERROR(errCode, "Failed to initialize bv");
 
     /* Mark all defs not processed */
     vscBV_SetAll(&globalWorkingFlow);
@@ -3567,9 +3573,11 @@ static gctBOOL _UpdateReachDefFlow(VIR_DEF_USAGE_INFO* pDuInfo,
     gctUINT             i, defIdx, globalToBbIdx;
 
     /* We need firstly update flow size */
-    vscVIR_UpdateBaseTsDFAFlowSize(&pDuInfo->baseTsDFA, BT_GET_MAX_VALID_ID(&pDuInfo->defTable));
+    if (vscVIR_UpdateBaseTsDFAFlowSize(&pDuInfo->baseTsDFA, BT_GET_MAX_VALID_ID(&pDuInfo->defTable)) != VSC_ERR_NONE)
+        return gcvFALSE;
 
-    vscBV_Initialize(&workingDefFlow, pCg->pScratchMemPool, pDuInfo->baseTsDFA.baseDFA.flowSize);
+    if (vscBV_Initialize(&workingDefFlow, pCg->pScratchMemPool, pDuInfo->baseTsDFA.baseDFA.flowSize) != VSC_ERR_NONE)
+        return gcvFALSE;
 
     /* Generate working def flow based on updated def-index-array */
     for (i = 0; i < udiArraySize; i ++)
@@ -3876,9 +3884,10 @@ VSC_ErrCode vscVIR_AddNewUsageToDef(VIR_DEF_USAGE_INFO* pDuInfo,
         *pRetUsageIdx = VIR_INVALID_DEF_INDEX;
     }
 
-    vscBV_Initialize(&tmpWorkingDefFlow,
+    errCode = vscBV_Initialize(&tmpWorkingDefFlow,
                      pDuInfo->baseTsDFA.baseDFA.pScratchMemPool,
                      BT_GET_MAX_VALID_ID(&pDuInfo->defTable));
+    ON_ERROR(errCode, "Failed to initialize bv");
 
     /* Check which target defs are for this new usage */
     for (regNo = firstUsageRegNo; regNo < firstUsageRegNo + usageRegNoRange; regNo ++)
