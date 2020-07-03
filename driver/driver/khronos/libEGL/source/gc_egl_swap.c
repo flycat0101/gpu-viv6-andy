@@ -11,7 +11,6 @@
 *****************************************************************************/
 
 
-ClipDamageRegion
 #include "gc_egl_precomp.h"
 
 #if defined(ANDROID)
