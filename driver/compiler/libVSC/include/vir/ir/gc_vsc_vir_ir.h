@@ -7516,7 +7516,8 @@ gctBOOL
 VIR_Operand_Identical(
     IN VIR_Operand  *Opnd0,
     IN VIR_Operand  *Opnd1,
-    IN VIR_Shader   *Shader
+    IN VIR_Shader   *Shader,
+    IN gctBOOL       bIgnoreNegModifier
     );
 
 gctBOOL

@@ -140,7 +140,7 @@ static VSC_ErrCode _VSC_LCSE_ReplaceUses(
 
                 VIR_Operand_GetOperandInfo(instIter, srcOpnd, &srcInfo);
 
-                if (VIR_Operand_Identical(srcOpnd, newDstOpnd, VSC_LCSE_GetShader(lcse)))
+                if (VIR_Operand_Identical(srcOpnd, newDstOpnd, VSC_LCSE_GetShader(lcse), gcvFALSE))
                 {
                     VIR_TypeId srcOpndTypeId = VIR_Operand_GetTypeId(srcOpnd);
 
@@ -510,7 +510,7 @@ static void _VSC_LCSE_ExpMap_MultiKill(
                 {
                     kills = gcvTRUE;
                 }
-                else if(!VIR_Operand_Identical(VIR_Inst_GetSource(killingInst, 0), VIR_Inst_GetSource(keyInst, 0), VSC_LCSE_ExpMap_GetShader(expMap)))
+                else if(!VIR_Operand_Identical(VIR_Inst_GetSource(killingInst, 0), VIR_Inst_GetSource(keyInst, 0), VSC_LCSE_ExpMap_GetShader(expMap), gcvFALSE))
                 {
                     /* different base means no overlap */
                     kills = gcvFALSE;
@@ -524,12 +524,12 @@ static void _VSC_LCSE_ExpMap_MultiKill(
                 else
                 {
                     /* same base, constant offset. see whether the constant values are the same */
-                    kills = VIR_Operand_Identical(VIR_Inst_GetSource(killingInst, 1), VIR_Inst_GetSource(keyInst, 1), VSC_LCSE_ExpMap_GetShader(expMap));
+                    kills = VIR_Operand_Identical(VIR_Inst_GetSource(killingInst, 1), VIR_Inst_GetSource(keyInst, 1), VSC_LCSE_ExpMap_GetShader(expMap), gcvFALSE);
                 }
             }
             else if (VIR_OPCODE_isAttrSt(killOpcode) && VIR_OPCODE_isAttrLd(keyOpcode))
             {
-                if(!VIR_Operand_Identical(VIR_Inst_GetSource(killingInst, 0), VIR_Inst_GetSource(keyInst, 0), VSC_LCSE_ExpMap_GetShader(expMap)))
+                if(!VIR_Operand_Identical(VIR_Inst_GetSource(killingInst, 0), VIR_Inst_GetSource(keyInst, 0), VSC_LCSE_ExpMap_GetShader(expMap), gcvFALSE))
                 {
                     /* different base means no overlap */
                     kills = gcvFALSE;
@@ -543,7 +543,7 @@ static void _VSC_LCSE_ExpMap_MultiKill(
                 else
                 {
                     /* same base, constant offset. see whether the constant values are the same */
-                    if (VIR_Operand_Identical(VIR_Inst_GetSource(killingInst, 1), VIR_Inst_GetSource(keyInst, 1), VSC_LCSE_ExpMap_GetShader(expMap)))
+                    if (VIR_Operand_Identical(VIR_Inst_GetSource(killingInst, 1), VIR_Inst_GetSource(keyInst, 1), VSC_LCSE_ExpMap_GetShader(expMap), gcvFALSE))
                     {
                         if(VIR_Operand_isSymbol(VIR_Inst_GetSource(killingInst, 2)) ||
                            VIR_Operand_isSymbol(VIR_Inst_GetSource(keyInst, 2)))
@@ -553,7 +553,7 @@ static void _VSC_LCSE_ExpMap_MultiKill(
                         }
                         else
                         {
-                            kills = VIR_Operand_Identical(VIR_Inst_GetSource(killingInst, 2), VIR_Inst_GetSource(keyInst, 2), VSC_LCSE_ExpMap_GetShader(expMap));
+                            kills = VIR_Operand_Identical(VIR_Inst_GetSource(killingInst, 2), VIR_Inst_GetSource(keyInst, 2), VSC_LCSE_ExpMap_GetShader(expMap), gcvFALSE);
                         }
                     }
                     else

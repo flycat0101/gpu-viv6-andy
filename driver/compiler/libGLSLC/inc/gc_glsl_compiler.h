@@ -611,6 +611,9 @@ typedef enum _sleEXTENSION2
     slvEXTENSION2_GL_ARB_TEXTURE_MULTISAMPLE                 = 0x00000010,
     slvEXTENSION2_GL_ARB_GEOMETRY_SHADER4                    = 0x00000020,
     slvEXTENSION2_GL_EXT_GEOMETRY_SHADER4                    = 0x00000040,
+    slvEXTENSION2_GL_GEOMETRY_SHADER4                        = slvEXTENSION2_GL_ARB_GEOMETRY_SHADER4
+                                                             | slvEXTENSION2_GL_EXT_GEOMETRY_SHADER4,
+    slvEXTENSION2_GL_ARB_COMPATIBILITY                       = 0x00000200,
 }
 sleEXTENSION2;
 

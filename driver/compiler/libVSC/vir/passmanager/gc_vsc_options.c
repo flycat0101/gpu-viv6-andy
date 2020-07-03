@@ -1008,12 +1008,13 @@ void VSC_OPTN_PHOptions_SetDefault(
     IN gctUINT optLevel
     )
 {
-    gctUINT  option = VSC_OPTN_PHOptions_OPTS_MODIFIER |
-                      VSC_OPTN_PHOptions_OPTS_MAD |
-                      VSC_OPTN_PHOptions_OPTS_RSQ |
-                      VSC_OPTN_PHOptions_OPTS_RUC |
+    gctUINT  option = VSC_OPTN_PHOptions_OPTS_MODIFIER  |
+                      VSC_OPTN_PHOptions_OPTS_MAD       |
+                      VSC_OPTN_PHOptions_OPTS_RSQ       |
+                      VSC_OPTN_PHOptions_OPTS_RUC       |
                       VSC_OPTN_PHOptions_OPTS_MOV_LDARR |
-                      VSC_OPTN_PHOptions_OPTS_LSHIFT_LS;
+                      VSC_OPTN_PHOptions_OPTS_LSHIFT_LS |
+                      VSC_OPTN_PHOptions_OPTS_MERGE_ADD;
 
     if(optLevel >= 2)
     {

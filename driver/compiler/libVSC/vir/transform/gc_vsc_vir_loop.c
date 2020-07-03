@@ -3734,8 +3734,8 @@ _VIR_LoopInfo_DetectLoopUpbound(
             VIR_Instruction* cmpInst = VIR_Inst_GetPrev(selectInst);
 
             if(VIR_Inst_GetEnable(cmpInst) == VIR_ENABLE_X &&
-               VIR_Operand_Identical(VIR_Inst_GetDest(cmpInst), VIR_Inst_GetSource(selectInst, 0), VIR_LoopInfo_GetShader(loopInfo)) &&
-               VIR_Operand_Identical(VIR_Inst_GetDest(selectInst), VIR_Inst_GetSource(lastInst, 0), VIR_LoopInfo_GetShader(loopInfo)) &&
+               VIR_Operand_Identical(VIR_Inst_GetDest(cmpInst), VIR_Inst_GetSource(selectInst, 0), VIR_LoopInfo_GetShader(loopInfo), gcvFALSE) &&
+               VIR_Operand_Identical(VIR_Inst_GetDest(selectInst), VIR_Inst_GetSource(lastInst, 0), VIR_LoopInfo_GetShader(loopInfo), gcvFALSE) &&
                VIR_Inst_GetConditionOp(selectInst) == VIR_COP_SELMSB &&
                VIR_Operand_isImm(VIR_Inst_GetSource(selectInst, 1)) &&
                VIR_Operand_GetImmediateUint(VIR_Inst_GetSource(selectInst, 1)) == 1 &&

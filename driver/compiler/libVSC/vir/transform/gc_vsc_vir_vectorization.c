@@ -1048,7 +1048,7 @@ static VIR_OPND_VECTORIZABILITY_CHK_RES _Sym2SymOpndsVectorizabilityCheck(VIR_VE
     if (VIR_Operand_GetRelAddrMode(pSeedOpnd) == VIR_INDEXED_NONE &&
         VIR_Operand_GetRelAddrMode(pOpnd) == VIR_INDEXED_NONE)
     {
-        if (pOpndVectorizedInfo->opndPair.bNeedToBeSame && !VIR_Operand_Identical(pSeedOpnd, pOpnd, pShader))
+        if (pOpndVectorizedInfo->opndPair.bNeedToBeSame && !VIR_Operand_Identical(pSeedOpnd, pOpnd, pShader, gcvFALSE))
         {
             return VIR_OPND_VECTORIZABILITY_CHK_RES_DISCARD;
         }
@@ -1105,7 +1105,7 @@ static VIR_OPND_VECTORIZABILITY_CHK_RES _Virreg2VirregOpndsVectorizabilityCheck(
     VIR_Operand* pSeedOpnd = pOpndVectorizedInfo->opndPair.pSeedOpnd;
     VIR_Operand* pOpnd = pOpndVectorizedInfo->opndPair.pOpnd;
 
-    if (pOpndVectorizedInfo->opndPair.bNeedToBeSame && !VIR_Operand_Identical(pSeedOpnd, pOpnd, pShader))
+    if (pOpndVectorizedInfo->opndPair.bNeedToBeSame && !VIR_Operand_Identical(pSeedOpnd, pOpnd, pShader, gcvFALSE))
     {
         return VIR_OPND_VECTORIZABILITY_CHK_RES_DISCARD;
     }
@@ -1128,7 +1128,7 @@ static VIR_OPND_VECTORIZABILITY_CHK_RES _Simm2SimmOpndsVectorizabilityCheck(VIR_
         return VIR_OPND_VECTORIZABILITY_CHK_RES_DISCARD;
     }
 
-    if (pOpndVectorizedInfo->opndPair.bNeedToBeSame && !VIR_Operand_Identical(pOpndVectorizedInfo->opndPair.pSeedOpnd, pOpndVectorizedInfo->opndPair.pOpnd, pShader))
+    if (pOpndVectorizedInfo->opndPair.bNeedToBeSame && !VIR_Operand_Identical(pOpndVectorizedInfo->opndPair.pSeedOpnd, pOpndVectorizedInfo->opndPair.pOpnd, pShader, gcvFALSE))
     {
         return VIR_OPND_VECTORIZABILITY_CHK_RES_DISCARD;
     }
@@ -1147,7 +1147,7 @@ static VIR_OPND_VECTORIZABILITY_CHK_RES _Vimm2SimmOpndsVectorizabilityCheck(VIR_
         return VIR_OPND_VECTORIZABILITY_CHK_RES_DISCARD;
     }
 
-    if (pOpndVectorizedInfo->opndPair.bNeedToBeSame && !VIR_Operand_Identical(pOpndVectorizedInfo->opndPair.pSeedOpnd, pOpndVectorizedInfo->opndPair.pOpnd, pShader))
+    if (pOpndVectorizedInfo->opndPair.bNeedToBeSame && !VIR_Operand_Identical(pOpndVectorizedInfo->opndPair.pSeedOpnd, pOpndVectorizedInfo->opndPair.pOpnd, pShader, gcvFALSE))
     {
         return VIR_OPND_VECTORIZABILITY_CHK_RES_DISCARD;
     }
@@ -1166,7 +1166,7 @@ static VIR_OPND_VECTORIZABILITY_CHK_RES _Simm2VimmOpndsVectorizabilityCheck(VIR_
         return VIR_OPND_VECTORIZABILITY_CHK_RES_DISCARD;
     }
 
-    if (pOpndVectorizedInfo->opndPair.bNeedToBeSame && !VIR_Operand_Identical(pOpndVectorizedInfo->opndPair.pSeedOpnd, pOpndVectorizedInfo->opndPair.pOpnd, pShader))
+    if (pOpndVectorizedInfo->opndPair.bNeedToBeSame && !VIR_Operand_Identical(pOpndVectorizedInfo->opndPair.pSeedOpnd, pOpndVectorizedInfo->opndPair.pOpnd, pShader, gcvFALSE))
     {
         return VIR_OPND_VECTORIZABILITY_CHK_RES_DISCARD;
     }
@@ -1185,7 +1185,7 @@ static VIR_OPND_VECTORIZABILITY_CHK_RES _Vimm2VimmOpndsVectorizabilityCheck(VIR_
         return VIR_OPND_VECTORIZABILITY_CHK_RES_DISCARD;
     }
 
-    if (pOpndVectorizedInfo->opndPair.bNeedToBeSame && !VIR_Operand_Identical(pOpndVectorizedInfo->opndPair.pSeedOpnd, pOpndVectorizedInfo->opndPair.pOpnd, pShader))
+    if (pOpndVectorizedInfo->opndPair.bNeedToBeSame && !VIR_Operand_Identical(pOpndVectorizedInfo->opndPair.pSeedOpnd, pOpndVectorizedInfo->opndPair.pOpnd, pShader, gcvFALSE))
     {
         return VIR_OPND_VECTORIZABILITY_CHK_RES_DISCARD;
     }

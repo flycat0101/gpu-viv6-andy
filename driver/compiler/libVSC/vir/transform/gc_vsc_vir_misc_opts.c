@@ -6170,7 +6170,7 @@ VSC_ErrCode _MergeConstantOffsetForArrayInst(
     pADDDest = VIR_Inst_GetDest(pADD);
     pADDtSrc1 = VIR_Inst_GetSource(pADD, 1);
 
-    if(!VIR_Operand_Identical(pMOVADest, pOffsetOperand, pShader) || !VIR_Operand_Identical(pADDDest, pMOVASrc, pShader))
+    if(!VIR_Operand_Identical(pMOVADest, pOffsetOperand, pShader, gcvFALSE) || !VIR_Operand_Identical(pADDDest, pMOVASrc, pShader, gcvFALSE))
     {
         return errCode;
     }
@@ -9469,13 +9469,14 @@ _CalculateCoordWithOffset(
     IN      VIR_Shader       *pShader,
     IN      VSC_HW_CONFIG    *HwCfg,
     IN      VIR_Function     *pFunc,
-    IN      VIR_Instruction  *pInst
+    IN      VIR_Instruction  *pInst,
+    IN      gctBOOL          *pChanged
     )
 {
     VSC_ErrCode                 errCode = VSC_ERR_NONE;
     VIR_Operand                *pParamSrc = VIR_Inst_GetSource(pInst, 2);
     VIR_Operand                *pOffsetOpnd = gcvNULL;
-    VIR_Operand  *pTexldModifier = (VIR_Operand *)pParamSrc;
+    VIR_Operand                *pTexldModifier = (VIR_Operand *)pParamSrc;
 
     /* Skip non-param operand. */
     if (pParamSrc == gcvNULL || VIR_Operand_GetOpKind(pParamSrc) != VIR_OPND_TEXLDPARM)
@@ -9496,15 +9497,20 @@ _CalculateCoordWithOffset(
     if (_NeedToCalculateOffset(pShader, pFunc, pOffsetOpnd))
     {
         errCode = _CalculateOffsetCoord(pShader,
-            HwCfg,
-            pFunc,
-            pInst);
+                                        HwCfg,
+                                        pFunc,
+                                        pInst);
         ON_ERROR(errCode, "Calculate offset coord");
     }
 
     /* Clean up the offset param. */
     VIR_Operand_ClrTexModifierFlag(pTexldModifier, VIR_TMFLAG_OFFSET);
     VIR_Operand_SetTexldModifier(pTexldModifier, VIR_TEXLDMODIFIER_OFFSET, gcvNULL);
+
+    if (pChanged)
+    {
+        *pChanged = gcvTRUE;
+    }
 
 OnError:
     return errCode;
@@ -9528,40 +9534,58 @@ _CalculateImageOffsetCoord(
     VIR_TypeId                  offsetTypeId = VIR_Operand_GetTypeId(pOffsetOpnd);
     VIR_SymId                   newCoordSymId = VIR_INVALID_ID;
     VIR_VirRegId                tempRegId = VIR_INVALID_ID;
-    VIR_Instruction             *inst = gcvNULL;
-    VIR_Operand                 *operand = gcvNULL;
+    VIR_Instruction             *pNewInst = gcvNULL;
+    VIR_Operand                 *pNewOpnd = gcvNULL;
 
-    /* Move the coord into a new reg. */
+    /* Create a new reg to save the coord. */
     tempRegId = VIR_Shader_NewVirRegId(pShader, 1);
     errCode = VIR_Shader_AddSymbol(pShader,
-        VIR_SYM_VIRREG,
-        tempRegId,
-        VIR_Shader_GetTypeFromId(pShader, coordTypeId),
-        VIR_STORAGE_UNKNOWN,
-        &newCoordSymId);
-    CHECK_ERROR(errCode, "VIR_Shader_AddSymbol failed.");
+                                   VIR_SYM_VIRREG,
+                                   tempRegId,
+                                   VIR_Shader_GetTypeFromId(pShader, coordTypeId),
+                                   VIR_STORAGE_UNKNOWN,
+                                   &newCoordSymId);
+    ON_ERROR(errCode, "Fail to add a vir reg.");
+
+    /* Move the original coord into a new reg. */
+    /* MOV: newCoord, coord */
+    errCode = VIR_Function_AddInstructionBefore(pFunc,
+                                                VIR_OP_MOV,
+                                                coordTypeId,
+                                                pInst,
+                                                gcvTRUE,
+                                                &pNewInst);
+    ON_ERROR(errCode, "Fail to add a instruction.");
+
+    pNewOpnd = VIR_Inst_GetDest(pNewInst);
+    VIR_Operand_SetSymbol(pNewOpnd, pFunc, newCoordSymId);
+    VIR_Operand_SetEnable(pNewOpnd, VIR_TypeId_Conv2Enable(coordTypeId));
+
+    pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
+    VIR_Operand_Copy(pNewOpnd, pCoordOpnd);
 
     /* Calculate the new coordinate value with offset. */
     /* ADD: newCoord, coord, offset */
-    errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_ADD,
-        offsetTypeId,
-        pInst,
-        gcvTRUE,
-        &inst);
-    ON_ERROR(errCode, "Add instruction.");
+    errCode = VIR_Function_AddInstructionBefore(pFunc,
+                                                VIR_OP_ADD,
+                                                offsetTypeId,
+                                                pInst,
+                                                gcvTRUE,
+                                                &pNewInst);
+    ON_ERROR(errCode, "Fail to add a instruction.");
 
-    operand = VIR_Inst_GetDest(inst);
-    VIR_Operand_SetTempRegister(operand,
-        pFunc,
-        newCoordSymId,
-        offsetTypeId);
-    VIR_Operand_SetEnable(operand, VIR_TypeId_Conv2Enable(offsetTypeId));
+    pNewOpnd = VIR_Inst_GetDest(pNewInst);
+    VIR_Operand_SetSymbol(pNewOpnd, pFunc, newCoordSymId);
+    VIR_Operand_SetEnable(pNewOpnd, VIR_TypeId_Conv2Enable(offsetTypeId));
+    VIR_Operand_SetTypeId(pNewOpnd, offsetTypeId);
 
-    operand = VIR_Inst_GetSource(inst, 0);
-    VIR_Operand_Copy(operand, pCoordOpnd);
+    pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
+    VIR_Operand_SetSymbol(pNewOpnd, pFunc, newCoordSymId);
+    VIR_Operand_SetSwizzle(pNewOpnd, VIR_TypeId_Conv2Swizzle(offsetTypeId));
+    VIR_Operand_SetTypeId(pNewOpnd, offsetTypeId);
 
-    operand = VIR_Inst_GetSource(inst, 1);
-    VIR_Operand_Copy(operand, pOffsetOpnd);
+    pNewOpnd = VIR_Inst_GetSource(pNewInst, 1);
+    VIR_Operand_Copy(pNewOpnd, pOffsetOpnd);
 
     /* Update the coord operand. */
     VIR_Operand_SetSymbol(pCoordOpnd, pFunc, newCoordSymId);
@@ -9576,8 +9600,9 @@ _CalculateImageCoordWithOffset(
     IN      VIR_Shader       *pShader,
     IN      VSC_HW_CONFIG    *HwCfg,
     IN      VIR_Function     *pFunc,
-    IN      VIR_Instruction  *pInst
-)
+    IN      VIR_Instruction  *pInst,
+    IN      gctBOOL          *pChanged
+    )
 {
     VSC_ErrCode                 errCode = VSC_ERR_NONE;
     VIR_Operand                *pParamSrc = VIR_Inst_GetSource(pInst, 1);
@@ -9614,15 +9639,20 @@ _CalculateImageCoordWithOffset(
     if (_NeedToCalculateOffset(pShader, pFunc, pOffsetOpnd))
     {
         errCode = _CalculateImageOffsetCoord(pShader,
-            HwCfg,
-            pFunc,
-            pInst);
+                                             HwCfg,
+                                             pFunc,
+                                             pInst);
         ON_ERROR(errCode, "Calculate offset coord");
     }
 
     /* Clean up the offset param. */
     VIR_Operand_ClrTexModifierFlag(pImgFetchModifier, VIR_TMFLAG_OFFSET);
     VIR_Operand_SetTexldModifier(pImgFetchModifier, VIR_TEXLDMODIFIER_OFFSET, gcvNULL);
+
+    if (pChanged)
+    {
+        *pChanged = gcvTRUE;
+    }
 
 OnError:
     return errCode;
@@ -9653,6 +9683,7 @@ VSC_ErrCode vscVIR_FixCoordWithOffset(VSC_SH_PASS_WORKER* pPassWorker)
     VSC_HW_CONFIG              *pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
     VIR_FuncIterator            func_iter;
     VIR_FunctionNode           *func_node;
+    gctBOOL                     bChanged = gcvFALSE;
 
     /* Process all instructions. */
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
@@ -9669,19 +9700,25 @@ VSC_ErrCode vscVIR_FixCoordWithOffset(VSC_SH_PASS_WORKER* pPassWorker)
         {
             if (VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(inst)))
             {
-                _CalculateCoordWithOffset(pShader, pHwCfg, func, inst);
+                _CalculateCoordWithOffset(pShader, pHwCfg, func, inst, &bChanged);
             }
             /* For ImageFetch operand with image source, calculate new coordinate with offset before link intrinsic function.*/
-            if (inst->_opcode == VIR_OP_INTRINSIC)
+            else if (inst->_opcode == VIR_OP_INTRINSIC)
             {
                 VIR_IntrinsicsKind      intrinsicsKind;
                 intrinsicsKind = VIR_Operand_GetIntrinsicKind(VIR_Inst_GetSource(inst, 0));
                 if (VIR_Intrinsics_isImageFetch(intrinsicsKind))
                 {
-                    _CalculateImageCoordWithOffset(pShader, pHwCfg, func, inst);
+                    _CalculateImageCoordWithOffset(pShader, pHwCfg, func, inst, &bChanged);
                 }
             }
         }
+    }
+
+    if (bChanged &&
+        VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    {
+        VIR_Shader_Dump(gcvNULL, "After fix the coordinate offset.", pShader, gcvTRUE);
     }
 
     return errCode;
