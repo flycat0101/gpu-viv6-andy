@@ -7425,6 +7425,8 @@ VIR_UBO_Member_Identical(
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     gctBOOL                    matched = gcvFALSE;
+    VIR_Type*                  type1;
+    VIR_Type*                  type2;
 
     /* If input uniform has SkipNameCheck flag, then check DescriptorSet and binding, instead of checking name string. */
     if (isSymSkipNameCheck(Sym1))
@@ -7454,6 +7456,13 @@ VIR_UBO_Member_Identical(
     }
 
     if (VIR_Symbol_GetLayoutQualifier(Sym1) != VIR_Symbol_GetLayoutQualifier(Sym2))
+    {
+        return VSC_ERR_UNIFORM_TYPE_MISMATCH;
+    }
+
+    type1 = VIR_Symbol_GetType(Sym1);
+    type2 = VIR_Symbol_GetType(Sym2);
+    if (!VIR_Type_Identical(Shader1, type1, Shader2, type2))
     {
         return VSC_ERR_UNIFORM_TYPE_MISMATCH;
     }
