@@ -3941,6 +3941,7 @@ GLvoid GL_APIENTRY __gles_TransformFeedbackVaryings(__GLcontext *gc, GLuint prog
         {
             __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
         }
+        gcoOS_ZeroMemory(programObject->ppXfbVaryingNames, count*sizeof(GLchar*));
     }
 
     for (i = 0; i < (GLuint)count; i++)
