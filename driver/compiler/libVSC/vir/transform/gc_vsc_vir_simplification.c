@@ -234,6 +234,22 @@ gctBOOL _VSC_SIMP_DestSrc0SameType(
 }
 
 /* _VSC_SIMP_STEPS_DEST_CHECK */
+static
+gctBOOL _VSC_SIMP_DestFloating(
+    IN VIR_Instruction* inst,
+    IN VIR_Operand* opnd
+    )
+{
+    VIR_Shader*         pShader = VIR_Inst_GetShader(inst);
+    VIR_Type*           destType = VIR_Shader_GetTypeFromId(pShader, VIR_Operand_GetTypeId(opnd));
+
+    if (VIR_Type_isPrimitive(destType) && VIR_Type_isFloat(destType))
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
 
 /* _VSC_SIMP_STEPS_SRC_CHECK */
 
@@ -325,6 +341,60 @@ gctBOOL _VSC_SIMP_ChannelwiseConstOrImmOne(
     }
 
     return gcvTRUE;
+}
+
+static gctBOOL
+_VSC_SIMP_ChannelwiseConstOrImmNegOne(
+    IN VIR_Instruction*         pInst,
+    IN VIR_Operand*             pOpnd
+    )
+{
+    VIR_Enable                  enable = VIR_Operand_GetEnable(VIR_Inst_GetDest(pInst));
+    gctUINT                     i;
+    VIR_TypeId                  typeId;
+    gctBOOL                     bMatched = gcvTRUE;
+
+    if (!VIR_Operand_ContainsConstantValue(pOpnd))
+    {
+        return gcvFALSE;
+    }
+
+    for (i = 0; i < VIR_CHANNEL_NUM; i++)
+    {
+        if (enable & (1 << i))
+        {
+            gctUINT constValue = VIR_Operand_ExtractOneChannelConstantValue(pOpnd, VIR_Inst_GetShader(pInst), i, &typeId);
+
+            switch (typeId)
+            {
+            case VIR_TYPE_FLOAT32:
+                if (constValue != 0xBF800000)
+                {
+                    bMatched = gcvFALSE;
+                }
+                break;
+
+            case VIR_TYPE_UINT32:
+            case VIR_TYPE_INT32:
+                if (constValue != 0xFFFFFFFF)
+                {
+                    bMatched = gcvFALSE;
+                }
+                break;
+
+            default:
+                bMatched = gcvFALSE;
+                break;
+            }
+        }
+
+        if (!bMatched)
+        {
+            break;
+        }
+    }
+
+    return bMatched;
 }
 
 static
@@ -662,6 +732,14 @@ void _VSC_SIMP_MOVDestZero(
     VIR_Operand_SetTypeId(VIR_Inst_GetSource(inst, 0), VIR_Operand_GetTypeId(VIR_Inst_GetDest(inst)));
 }
 
+static void
+_VSC_SIMP_NegateSrc0(
+    IN OUT VIR_Instruction* inst
+    )
+{
+    VIR_Operand_NegateOperand(VIR_Inst_GetShader(inst), VIR_Inst_GetSource(inst, 0));
+}
+
 static
 void _VSC_SIMP_Change2NOP(
     IN OUT VIR_Instruction* inst
@@ -891,18 +969,41 @@ _VSC_SIMP_Steps MOV_Steps[] = {
 };
 
 _VSC_SIMP_Steps MUL_Steps[] = {
+    /* a = 1 * b --> a = b */
     {_VSC_SIMP_STEPS_COUNT, {2}},
     {_VSC_SIMP_STEPS_SRC0_CHECK, {(gctUINTPTR_T)_VSC_SIMP_ChannelwiseConstOrImmOne}},
     {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_VSC_SIMP_MOVDestSrc1}},
+
+    /* a = b * 1 --> a = b */
     {_VSC_SIMP_STEPS_COUNT, {2}},
     {_VSC_SIMP_STEPS_SRC1_CHECK, {(gctUINTPTR_T)_VSC_SIMP_ChannelwiseConstOrImmOne}},
     {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_VSC_SIMP_MOVDestSrc0}},
+
+    /* Since many integer instructions can't support the NEG modifier, we just handle floating here. */
+    /* a = -1.0 * b --> a = -b */
+    {_VSC_SIMP_STEPS_COUNT, {4}},
+    {_VSC_SIMP_STEPS_DEST_CHECK, {(gctUINTPTR_T)_VSC_SIMP_DestFloating}},
+    {_VSC_SIMP_STEPS_SRC0_CHECK, {(gctUINTPTR_T)_VSC_SIMP_ChannelwiseConstOrImmNegOne}},
+    {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_VSC_SIMP_MOVDestSrc1}},
+    {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_VSC_SIMP_NegateSrc0}},
+
+    /* a = b * -1.0 --> a = -b */
+    {_VSC_SIMP_STEPS_COUNT, {4}},
+    {_VSC_SIMP_STEPS_DEST_CHECK, {(gctUINTPTR_T)_VSC_SIMP_DestFloating}},
+    {_VSC_SIMP_STEPS_SRC1_CHECK, {(gctUINTPTR_T)_VSC_SIMP_ChannelwiseConstOrImmNegOne}},
+    {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_VSC_SIMP_MOVDestSrc0}},
+    {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_VSC_SIMP_NegateSrc0}},
+
+    /* a = 0 * b --> a = 0 */
     {_VSC_SIMP_STEPS_COUNT, {2}},
     {_VSC_SIMP_STEPS_SRC0_CHECK, {(gctUINTPTR_T)_VSC_SIMP_ChannelwiseConstOrImmZero}},
     {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_VSC_SIMP_MOVDestSrc0}},
+
+    /* a = b * 0 --> a = 0 */
     {_VSC_SIMP_STEPS_COUNT, {2}},
     {_VSC_SIMP_STEPS_SRC1_CHECK, {(gctUINTPTR_T)_VSC_SIMP_ChannelwiseConstOrImmZero}},
     {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_VSC_SIMP_MOVDestSrc1}},
+
     {_VSC_SIMP_STEPS_END, {0}},
 };
 
@@ -1233,12 +1334,19 @@ VSC_ErrCode VSC_SIMP_Simplification_PerformOnInst(
                             VIR_LOG(dumper, "after SIMP:\n");
                             VIR_Inst_Dump(dumper, inst);
                         }
-                        /* recursively simplify */
-                        return VSC_SIMP_Simplification_PerformOnInst(simp, inst, gcvNULL);
+
+                        /* recursively simplify if this is the last transform operation. */
+                        if (count == 1)
+                        {
+                            return VSC_SIMP_Simplification_PerformOnInst(simp, inst, gcvNULL);
+                        }
+
+                        break;
                     }
                     default:
                     {
                         gcmASSERT(0);
+                        break;
                     }
                 }
                 if(check)

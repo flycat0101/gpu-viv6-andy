@@ -996,7 +996,7 @@ _createUniform(
         vConst.value.scalarVal.uValue = imm;
         vConst.index = VIR_INVALID_ID;
 
-        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, &pImmUniform, &swizzle);
+        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, gcvTRUE, &pImmUniform, &swizzle);
 
         /* Set this uniform as operand and set correct swizzle */
         sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);

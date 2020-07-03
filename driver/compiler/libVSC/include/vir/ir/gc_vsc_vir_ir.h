@@ -5936,6 +5936,7 @@ VSC_ErrCode
 VIR_Shader_AddInitializedUniform(
     IN  VIR_Shader *      Shader,
     IN  VIR_Const *       Constant,
+    IN  gctBOOL           bUsedInShader,
     OUT VIR_Uniform **    Uniform,
     OUT VIR_Swizzle *     Swizzle
     );

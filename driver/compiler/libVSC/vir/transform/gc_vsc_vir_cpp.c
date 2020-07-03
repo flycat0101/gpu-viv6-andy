@@ -2675,6 +2675,8 @@ typedef struct VIR_SCPP_COPY
     VIR_SymId rhsSymId[VIR_CHANNEL_NUM];
     VIR_Swizzle mappingSwizzle;
     VIR_Instruction*    pMovInst;
+    VIR_Modifier destModifier;
+    VIR_Modifier src0Modifier;
 } VIR_SCPP_Copy;
 
 #define VIR_SCPP_Copy_GetRhsSymId(d, i)                  ((d)->rhsSymId[i])
@@ -2685,6 +2687,10 @@ typedef struct VIR_SCPP_COPY
 #define VIR_SCPP_Copy_SetSingleMappingSwizzle(d, i, m)   VIR_Swizzle_SetChannel((d)->mappingSwizzle, i, (m))
 #define VIR_SCPP_Copy_GetMovInst(d)                      ((d)->pMovInst)
 #define VIR_SCPP_Copy_SetMovInst(d, m)                   ((d)->pMovInst = (m))
+#define VIR_SCPP_Copy_GetDestModifier(d)                 ((d)->destModifier)
+#define VIR_SCPP_Copy_SetDestModifier(d, m)              ((d)->destModifier = (m))
+#define VIR_SCPP_Copy_GetSrc0Modifier(d)                 ((d)->src0Modifier)
+#define VIR_SCPP_Copy_SetSrc0Modifier(d, m)              ((d)->src0Modifier = (m))
 
 void
 _VIR_SCPP_Copy_Init(
@@ -2700,6 +2706,9 @@ _VIR_SCPP_Copy_Init(
     }
     VIR_SCPP_Copy_SetMappingSwizzle(copy, VIR_SWIZZLE_XYZW);
     VIR_SCPP_Copy_SetMovInst(copy, pMovInst);
+
+    VIR_SCPP_Copy_SetDestModifier(copy, VIR_Operand_GetModifier(VIR_Inst_GetDest(pMovInst)));
+    VIR_SCPP_Copy_SetSrc0Modifier(copy, VIR_Operand_GetModifier(VIR_Inst_GetSource(pMovInst, 0)));
 }
 
 static VIR_SymId
@@ -2933,6 +2942,7 @@ VSC_ErrCode VIR_SCPP_PerformOnBB(
     VSC_OPTN_SCPPOptions* option = VIR_SCPP_GetOptions(scpp);
     VIR_DEF_USAGE_INFO* pDuInfo = VIR_SCPP_GetDUInfo(scpp);
     gctBOOL bChanged = gcvFALSE;
+    gctBOOL bHandleModifier = gcvFALSE;
 
     if(VSC_UTILS_MASK(VSC_OPTN_SCPPOptions_GetTrace(option), VSC_OPTN_SCPPOptions_TRACE_INPUT_BB))
     {
@@ -2987,6 +2997,15 @@ VSC_ErrCode VIR_SCPP_PerformOnBB(
                                  */
                                 continue;
                             }
+
+                            if (VIR_SCPP_Copy_GetSrc0Modifier(copy) != VIR_MOD_NONE)
+                            {
+                                if (!bHandleModifier)
+                                {
+                                    continue;
+                                }
+                            }
+
                             if(VSC_UTILS_MASK(VSC_OPTN_SCPPOptions_GetTrace(option), VSC_OPTN_SCPPOptions_TRACE_DETAIL))
                             {
                                 VIR_LOG(VIR_SCPP_GetDumper(scpp), "transform instruction:\n");
@@ -3134,6 +3153,8 @@ VSC_ErrCode VIR_SCPP_PerformOnBB(
                _VIR_SCPP_NeedToUpdateCopy(pDuInfo, shader, instIter))
             {
                 if(!destIndexing && !srcIndexing &&
+                   (VIR_Operand_GetModifier(src) == VIR_MOD_NONE  || bHandleModifier)
+                   &&
                    _VIR_SCPP_AbleToDoNeighborPropagation(shader, instIter))
                 {
                     /* transform
@@ -3142,7 +3163,6 @@ VSC_ErrCode VIR_SCPP_PerformOnBB(
                         to
                         036: ADD                int hp  temp(262).hp.x, int hp  temp(262).hp.x, int 1
                         to ease loop optimization */
-
                     VIR_Instruction*    pPrevInst = VIR_Inst_GetPrev(instIter);
                     VIR_Operand*        pNewOpnd = gcvNULL;
                     VIR_OperandInfo     operandInfo;

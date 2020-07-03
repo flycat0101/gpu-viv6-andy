@@ -1805,9 +1805,6 @@ VSC_ErrCode VIR_CG_MapUniforms(
     /* set the handleDefaultUBO flag */
     _VIR_CG_isUBOSupported(pShader, pHwConfig, &handleDefaultUBO, &unblockUniformBlock);
 
-    /* check uniform usage: if a uniform is used in shader or LTC expression */
-    VSC_CheckUniformUsage(pShader);
-
     /* Map all uniforms. */
     for (i = 0; i < (gctINT) VIR_IdList_Count(&pShader->uniforms); ++i)
     {
@@ -2299,9 +2296,6 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
 
     /* set the handleDefaultUBO flag */
     _VIR_CG_isUBOSupported(pShader, pHwConfig, &handleDefaultUBO, &unblockUniformBlock);
-
-    /* check uniform usage: if a uniform is used in shader or LTC expression */
-    VSC_CheckUniformUsage(pShader);
 
     /* Intialize res-alloc-layout */
     memset(pResAllocLayout, 0, sizeof(VIR_SHADER_RESOURCE_ALLOC_LAYOUT));
@@ -3207,6 +3201,9 @@ VSC_ErrCode VIR_RA_PerformUniformAlloc(
         {
             allocUniform = gcvTRUE;
 
+            /* Check uniform usage: if a uniform is used in shader or LTC expression */
+            VSC_CheckUniformUsage(pShader);
+
             /* Analysis the constant register read port to optimize them. */
             if (bOptCstRegReadPort)
             {
@@ -3555,7 +3552,7 @@ VSC_ErrCode VIR_CG_Unified_MapUniforms(
             continue;
         }
 
-        /* check uniform usage: if a uniform is used in shader or LTC expression */
+        /* Check uniform usage: if a uniform is used in shader or LTC expression */
         VSC_CheckUniformUsage(pShader);
 
         /* Map all the other uniforms. */
