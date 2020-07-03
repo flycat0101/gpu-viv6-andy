@@ -595,53 +595,46 @@ _SetTraceMode(
     void
     )
 {
-    static gctBOOL Once = gcvFALSE;
+    gctSTRING tracemode = gcvNULL;
+    gctSTRING veglNoMtEnvVar = gcvNULL;
 
     gcoOS_LockPLS();
 
-    if (!Once)
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_TRACE", &tracemode)) && tracemode)
     {
-        gctSTRING tracemode = gcvNULL;
-        gctSTRING veglNoMtEnvVar = gcvNULL;
-
-        if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_TRACE", &tracemode)) && tracemode)
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(tracemode, "0")))
         {
-            if (gcmIS_SUCCESS(gcoOS_StrCmp(tracemode, "0")))
-            {
-                veglTraceMode = gcvTRACEMODE_NONE;
-            }
-            else if (gcmIS_SUCCESS(gcoOS_StrCmp(tracemode, "1")))
-            {
-                veglTraceMode = gcvTRACEMODE_FULL;
-            }
-            else if (gcmIS_SUCCESS(gcoOS_StrCmp(tracemode, "2")))
-            {
-                veglTraceMode = gcvTRACEMODE_LOGGER;
-            }
-            else if (gcmIS_SUCCESS(gcoOS_StrCmp(tracemode, "3")))
-            {
-                veglTraceMode = gcvTRACEMODE_ALLZONE;
-            }
-            else
-            {
-                gcmPRINT("EGL: unsupported trace mode");
-            }
-
-            veglInitTracerDispatchTable();
+            veglTraceMode = gcvTRACEMODE_NONE;
+        }
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(tracemode, "1")))
+        {
+            veglTraceMode = gcvTRACEMODE_FULL;
+        }
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(tracemode, "2")))
+        {
+            veglTraceMode = gcvTRACEMODE_LOGGER;
+        }
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(tracemode, "3")))
+        {
+            veglTraceMode = gcvTRACEMODE_ALLZONE;
+        }
+        else
+        {
+            gcmPRINT("EGL: unsupported trace mode");
         }
 
-        if (veglTraceMode == gcvTRACEMODE_ALLZONE)
-        {
-            gcoOS_SetDebugLevel(gcvLEVEL_VERBOSE);
-            gcoOS_SetDebugZone(gcdZONE_ALL);
-        }
+        veglInitTracerDispatchTable();
+    }
 
-        if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_NO_MT", &veglNoMtEnvVar)) && veglNoMtEnvVar)
-        {
-            enableSwapWorker = gcvFALSE;
-        }
+    if (veglTraceMode == gcvTRACEMODE_ALLZONE)
+    {
+        gcoOS_SetDebugLevel(gcvLEVEL_VERBOSE);
+        gcoOS_SetDebugZone(gcdZONE_ALL);
+    }
 
-        Once = gcvTRUE;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_NO_MT", &veglNoMtEnvVar)) && veglNoMtEnvVar)
+    {
+        enableSwapWorker = gcvFALSE;
     }
 
     gcoOS_UnLockPLS();
