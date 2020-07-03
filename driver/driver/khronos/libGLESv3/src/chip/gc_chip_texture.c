@@ -3567,6 +3567,7 @@ __glChipGenerateMipMap(
     gcoSURF surface = gcvNULL;
     gctBOOL splitTexture = gcvFALSE;
     gceSTATUS status = gcvSTATUS_OK;
+    GLint numdepths, depth;
 
     gcmHEADER_ARG("Context=0x%x texObj=0x%x faces=%d maxLevel=0x%x",
                    gc, texObj, faces, maxLevel);
@@ -3626,7 +3627,11 @@ __glChipGenerateMipMap(
     }
 
     /* When generate mips, we should sync texture surface from corresponding RT surface. */
-    gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc, texObj, 0, baseLevel, 0));
+    numdepths = (texObj->targetIndex == __GL_TEXTURE_3D_INDEX) ? baseMipmap->depth : texObj->arrays;
+    for(depth = 0; depth < numdepths; depth++)
+    {
+        gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc, texObj, 0, baseLevel, depth));
+    }
 
     gcmONERROR(gcoTEXTURE_GetMipMap(texInfo->object, baseLevel, &surface));
 
