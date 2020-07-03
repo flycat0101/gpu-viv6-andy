@@ -2927,6 +2927,7 @@ _FillInFeatureTable(
      || ((chipModel == gcv2000) && (chipRevision == 0x5108))
      || ((chipModel == gcv600) && (chipRevision == 0x4653))
      || ((chipModel == gcv400) && (chipRevision == 0x4645))
+     || ((chipModel == gcv400) && (chipRevision == 0x4652))
        )
     {
         Features[gcvFEATURE_MAX_POINTSIZE_CLAMP] = gcvFALSE;
