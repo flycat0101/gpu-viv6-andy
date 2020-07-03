@@ -232,7 +232,7 @@ void _VIR_ReplaceLDARR(
         if (!hasOtherDef)
         {
             /* case 1: remove the LDARR */
-            VIR_Pass_RemoveInstruction(pFunc, pInst, pInvalidCfg);
+            vscVIR_RemoveInstructionWithDu(gcvNULL, pFunc, pInst, pInvalidCfg);
         }
         else
         {
@@ -985,7 +985,7 @@ static VSC_ErrCode _VIR_MergeICASTP(
             vscVIR_DeleteDef(du_info, icast, icast_dest_info.u1.virRegInfo.virReg,
                              1, icast_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
         }
-        VIR_Pass_RemoveInstruction(func, icast, pInvalidCfg);
+        vscVIR_RemoveInstructionWithDu(gcvNULL, func, icast, pInvalidCfg);
         vscHTBL_Destroy(def_inst_set0);
         return errCode;
     }
@@ -1134,7 +1134,7 @@ static VSC_ErrCode _VIR_MergeICASTD(
                 VIR_LOG_FLUSH(dumper);
             }
 
-            VIR_Pass_RemoveInstruction(func, icast, pInvalidCfg);
+            vscVIR_RemoveInstructionWithDu(gcvNULL, func, icast, pInvalidCfg);
         }
         return errCode;
     }

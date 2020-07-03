@@ -4962,6 +4962,7 @@ typedef enum _VIR_SHADERFLAGS_EXT1
     VIR_SHFLAG_EXT1_IMAGE_FORMAT_MISMATCH       = 0x00000100, /* Whether any image format/sampled type mismatch. */
     VIR_SHFLAG_EXT1_USE_EVIS_INST               = 0x00000200, /* Whether use EVIS instruction. */
     VIR_SHFLAG_EXT1_COMPATIBILITY_PROFILR       = 0x00000400, /* Whether the shader version is compatibility profile. */
+    VIR_SHFLAG_EXT1_USE_CONST_REG_FOR_UBO       = 0x00000800, /* Whether use constant register to save the UBO. */
     VIR_SHFLAG_EXT1_ENABLE_PRECISION_UPDATE     = 0x00008000, /* Whether shader need update precision */
 
     VIR_SHFLAG_EXT1_SET_MIN_WORKGROUPSIZE       = 0x00010000, /* Whether driver sets the minimum workGroupSize. */
@@ -5028,6 +5029,7 @@ typedef enum _VIR_SHADERFLAGS_EXT1
 #define VIR_Shader_HasImageFormatMismatch(Shader)   (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_IMAGE_FORMAT_MISMATCH) != 0)
 #define VIR_Shader_UseEvisInst(Shader)              (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_USE_EVIS_INST) != 0)
 #define VIR_Shader_IsCompatibilityProfile(Shader)   (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_COMPATIBILITY_PROFILR) != 0)
+#define VIR_Shader_UseConstRegForUBO(Shader)        (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_USE_CONST_REG_FOR_UBO) != 0)
 #define VIR_Shader_NeedUpdatePrecision(Shader)      (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_ENABLE_PRECISION_UPDATE) != 0)
 #define VIR_Shader_DriverSetMinWorkGroupSize(Shader)(((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_SET_MIN_WORKGROUPSIZE) != 0)
 
@@ -8482,20 +8484,6 @@ VIR_Copy_FixOperand(VIR_CopyContext *Ctx, VIR_Operand* pOperand);
 #define DBUG_SIG    gcmCC('D', 'B', 'U', 'G')
 
 /* Those functions are used in the PASS only. */
-VSC_ErrCode
-VIR_Pass_RemoveInstruction(
-    IN VIR_Function*    pFunction,
-    IN VIR_Instruction* pInst,
-    INOUT gctBOOL*      pInvalidCFG
-    );
-
-VSC_ErrCode
-VIR_Pass_DeleteInstruction(
-    IN VIR_Function*    pFunction,
-    IN VIR_Instruction* pInst,
-    INOUT gctBOOL*      pInvalidCFG
-    );
-
 VSC_ErrCode
 VIR_Pass_MoveInstructionBefore(
     IN VIR_Function*    pMoveFunction,

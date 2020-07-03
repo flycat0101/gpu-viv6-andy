@@ -62,7 +62,7 @@ VSC_ErrCode _ConvertRetToJmpForFunction(
         {
             if (isMainFunc)
             {
-                errCode = VIR_Pass_DeleteInstruction(pFunc, pInst, pInvalidCfg);
+                errCode = vscVIR_DeleteInstructionWithDu(gcvNULL, pFunc, pInst, pInvalidCfg);
                 ON_ERROR(errCode, "delete instruction");
             }
             break;
@@ -104,7 +104,7 @@ VSC_ErrCode _ConvertRetToJmpForFunction(
             pNewInst = VIR_InstIterator_Next(&instIter);
 
             /* Remove the RET instruction. */
-            errCode = VIR_Pass_DeleteInstruction(pFunc, pInst, pInvalidCfg);
+            errCode = vscVIR_DeleteInstructionWithDu(gcvNULL, pFunc, pInst, pInvalidCfg);
             ON_ERROR(errCode, "delete instruction");
 
             pInst = pNewInst;
@@ -181,7 +181,7 @@ VSC_ErrCode vscVIR_RemoveNop(VSC_SH_PASS_WORKER* pPassWorker)
 
             if (VIR_Inst_GetOpcode(inst) == VIR_OP_NOP)
             {
-                VIR_Pass_DeleteInstruction(func, inst, &bInvalidCfg);
+                vscVIR_DeleteInstructionWithDu(gcvNULL, func, inst, &bInvalidCfg);
             }
 
             inst = nextinst;

@@ -260,7 +260,7 @@ static VSC_ErrCode _VSC_CPP_RemoveDefInst(
     }
 
     /* remove MOV */
-    errCode = VIR_Pass_DeleteInstruction(func, defInst, &VSC_CPP_GetInvalidCfg(cpp));
+    errCode = vscVIR_DeleteInstructionWithDu(gcvNULL, func, defInst, &VSC_CPP_GetInvalidCfg(cpp));
 
     return errCode;
 }
@@ -2384,7 +2384,7 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
             VIR_Inst_Dump(dumper, inst);
             VIR_LOG_FLUSH(dumper);
         }
-        VIR_Pass_DeleteInstruction(func, inst, &VSC_CPP_GetInvalidCfg(cpp));
+        vscVIR_DeleteInstructionWithDu(gcvNULL, func, inst, &VSC_CPP_GetInvalidCfg(cpp));
 
         vscHTBL_Reset(inst_usage_set);
     }

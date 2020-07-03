@@ -78,7 +78,7 @@ _VIR_CFO_PerformPatternTransformationOnFunction(
                         VIR_Inst_Dump(dumper, inst);
                     }
 
-                    VIR_Pass_DeleteInstruction(func, inst, &VIR_CFO_GetInvalidCfg(cfo));
+                    vscVIR_DeleteInstructionWithDu(gcvNULL, func, inst, &VIR_CFO_GetInvalidCfg(cfo));
                     inst = nextInst;
                     break;
                 }
@@ -117,7 +117,7 @@ _VIR_CFO_PerformPatternTransformationOnFunction(
                             VIR_Label_SetReference(label, startLink);
                             VIR_Label_SetReference(labelNext, gcvNULL);
                         }
-                        VIR_Pass_DeleteInstruction(func, nextInst, &VIR_CFO_GetInvalidCfg(cfo));
+                        vscVIR_DeleteInstructionWithDu(gcvNULL, func, nextInst, &VIR_CFO_GetInvalidCfg(cfo));
                         break;
                     }
                 }
@@ -145,7 +145,7 @@ _VIR_CFO_PerformPatternTransformationOnFunction(
                                 VIR_LOG(dumper, "remove instruction:\n");
                                 VIR_Inst_Dump(dumper, inst);
                             }
-                            VIR_Pass_DeleteInstruction(func, inst, &VIR_CFO_GetInvalidCfg(cfo));
+                            vscVIR_DeleteInstructionWithDu(gcvNULL, func, inst, &VIR_CFO_GetInvalidCfg(cfo));
                             inst = nextInst;
                             break;
                         }
@@ -208,7 +208,7 @@ _VIR_CFO_PerformPatternTransformationOnFunction(
                                             VIR_LOG(dumper, "remove instruction:\n");
                                             VIR_Inst_Dump(dumper, nextInst);
                                         }
-                                        VIR_Pass_DeleteInstruction(func, nextInst, &VIR_CFO_GetInvalidCfg(cfo));
+                                        vscVIR_DeleteInstructionWithDu(gcvNULL, func, nextInst, &VIR_CFO_GetInvalidCfg(cfo));
                                         break;
                                     }
                                     else if((VIR_Swizzle_Channel_Count(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(inst, 0))) == 1 &&
@@ -243,7 +243,7 @@ _VIR_CFO_PerformPatternTransformationOnFunction(
                                             VIR_LOG(dumper, "remove instruction:\n");
                                             VIR_Inst_Dump(dumper, nextInst);
                                         }
-                                        VIR_Pass_DeleteInstruction(func, nextInst, &VIR_CFO_GetInvalidCfg(cfo));
+                                        vscVIR_DeleteInstructionWithDu(gcvNULL, func, nextInst, &VIR_CFO_GetInvalidCfg(cfo));
                                         break;
                                     }
                                 }
@@ -275,7 +275,7 @@ _VIR_CFO_PerformPatternTransformationOnFunction(
                                 VIR_LOG(dumper, "remove instruction:\n");
                                 VIR_Inst_Dump(dumper, inst);
                             }
-                            VIR_Pass_DeleteInstruction(func, inst, &VIR_CFO_GetInvalidCfg(cfo));
+                            vscVIR_DeleteInstructionWithDu(gcvNULL, func, inst, &VIR_CFO_GetInvalidCfg(cfo));
                             inst = nextInst;
                             break;
                         }
@@ -295,7 +295,7 @@ _VIR_CFO_PerformPatternTransformationOnFunction(
                     VIR_LOG(dumper, "remove instruction:\n");
                     VIR_Inst_Dump(dumper, inst);
                 }
-                VIR_Pass_DeleteInstruction(func, inst, &VIR_CFO_GetInvalidCfg(cfo));
+                vscVIR_DeleteInstructionWithDu(gcvNULL, func, inst, &VIR_CFO_GetInvalidCfg(cfo));
                 inst = nextInst;
                 break;
             }

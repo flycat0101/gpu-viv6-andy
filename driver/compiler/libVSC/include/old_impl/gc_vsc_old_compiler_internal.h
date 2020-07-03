@@ -1359,6 +1359,24 @@ gcIsInstHWBarrier(
     }                                                          \
     while(0)                                                   \
 
+#define _MASSAGE_MAX_VS_UNIFORM_FOR_OES30(vsUniform)           \
+    do {                                                       \
+        if (gcPatchId == gcvPATCH_GTFES30)                     \
+        {                                                      \
+            vsUniform = gcmMAX(vsUniform, 256);                \
+        }                                                      \
+    }                                                          \
+    while(0)
+
+#define _MASSAGE_MAX_PS_UNIFORM_FOR_OES30(psUniform)           \
+    do {                                                       \
+        if (gcPatchId == gcvPATCH_GTFES30)                     \
+        {                                                      \
+            psUniform = gcmMAX(psUniform, 224);                \
+        }                                                      \
+    }                                                          \
+    while(0)
+
 END_EXTERN_C()
 
 #endif /* __gc_vsc_old_compiler_internal_h_ */

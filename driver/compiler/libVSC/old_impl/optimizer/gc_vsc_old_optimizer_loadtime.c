@@ -3697,10 +3697,11 @@ gceSTATUS gcOPT_GetUniformSrcLTC(
             : Instruction->source1Indexed;
         gctINT    combinedOffset = 0;
         gcUNIFORM uniform = Shader->uniforms[uniformIndex];
+        gcSL_INDEXED indexed = (gcSL_INDEXED)gcmSL_SOURCE_GET(source, Indexed);
 
         gcmASSERT(uniformIndex < (gctINT)Shader->uniformCount);
 
-        if (gcmSL_SOURCE_GET(source, Indexed) != gcSL_NOT_INDEXED)
+        if (indexed != gcSL_NOT_INDEXED)
         {
             LTCValue *            indexedValue;
             gcSL_FORMAT           indexedTempFormat;
@@ -3711,27 +3712,7 @@ gceSTATUS gcOPT_GetUniformSrcLTC(
             /* Can not use indexedValue->sourceInfo since it (result) was not inilialized */
             indexedTempFormat = indexedValue->elementType;
 
-            switch (gcmSL_SOURCE_GET(source, Indexed))
-            {
-            case gcSL_INDEXED_X:
-                indexedOffset = (indexedTempFormat == gcSL_FLOAT) ? (gctINT)indexedValue->v[0].f32
-                    : indexedValue->v[0].i16;
-                break;
-            case gcSL_INDEXED_Y:
-                indexedOffset = (indexedTempFormat == gcSL_FLOAT) ? (gctINT)indexedValue->v[1].f32
-                    : indexedValue->v[1].i16;
-                break;
-            case gcSL_INDEXED_Z:
-                indexedOffset = (indexedTempFormat == gcSL_FLOAT) ? (gctINT)indexedValue->v[2].f32
-                    : indexedValue->v[2].i16;
-                break;
-            case gcSL_INDEXED_W:
-                indexedOffset = (indexedTempFormat == gcSL_FLOAT) ? (gctINT)indexedValue->v[3].f32
-                    : indexedValue->v[3].i16;
-                break;
-            default:
-                break;
-            }
+            indexedOffset = (indexedTempFormat == gcSL_FLOAT) ? (gctINT)indexedValue->v[indexed - 1].f32 : indexedValue->v[indexed - 1].i32;
         }
         combinedOffset = constOffset + indexedOffset;
 

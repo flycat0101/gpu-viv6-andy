@@ -671,7 +671,7 @@ _VSC_DCE_RemoveInstruction(
     IN VIR_Instruction  *inst
     )
 {
-    VIR_Pass_RemoveInstruction(func, inst, &dce->rebuildCFG);
+    vscVIR_RemoveInstructionWithDu(gcvNULL, func, inst, &dce->rebuildCFG);
 }
 
 static VIR_Instruction*

@@ -838,6 +838,27 @@ gctBOOL vscVIR_FindUniqueNearestDefInst(
     INOUT VIR_Instruction**         ppNearestDefInst
     );
 
+gctBOOL vscVIR_CleanDuForInstruction(
+    IN VIR_DEF_USAGE_INFO*          pDuInfo,
+    IN VIR_Instruction*             pInst
+    );
+
+VSC_ErrCode
+vscVIR_DeleteInstructionWithDu(
+    IN VIR_DEF_USAGE_INFO*          pDuInfo,
+    IN VIR_Function*                pFunction,
+    IN VIR_Instruction*             pInst,
+    INOUT gctBOOL*                  pInvalidCFG
+    );
+
+VSC_ErrCode
+vscVIR_RemoveInstructionWithDu(
+    IN VIR_DEF_USAGE_INFO*          pDuInfo,
+    IN VIR_Function*                pFunction,
+    IN VIR_Instruction*             pInst,
+    INOUT gctBOOL*                  pInvalidCFG
+    );
+
 /*
  *  LV analysis
  */

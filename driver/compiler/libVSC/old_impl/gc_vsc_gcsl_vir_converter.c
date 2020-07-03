@@ -7406,9 +7406,14 @@ gcSHADER_Conv2VIR(
         VIR_Shader_SetFlag(VirShader, VIR_SHFLAG_HAS_DEFINE_MAIN_FUNC);
     }
 
-    if(gcShaderIsCompatibilityProfile(Shader))
+    if (gcShaderIsCompatibilityProfile(Shader))
     {
         VIR_Shader_SetFlagExt1(VirShader, VIR_SHFLAG_EXT1_COMPATIBILITY_PROFILR);
+    }
+
+    if (gcShaderUseConstRegForUBO(Shader))
+    {
+        VIR_Shader_SetFlagExt1(VirShader, VIR_SHFLAG_EXT1_USE_CONST_REG_FOR_UBO);
     }
 
      size = (Shader->codeCount + 1) * gcmSIZEOF(conv2VirsInstMap);

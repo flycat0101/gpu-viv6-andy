@@ -1528,7 +1528,7 @@ static void _VIR_RA_LS_DeleteDeadInsts(
     {
         VIR_Instruction*    pDeadInst = (VIR_Instruction*)VSC_DIRECT_HNODE_PAIR_FIRST(&deadInstSetPair);
         gcmASSERT(VIR_Inst_GetFlags(pDeadInst) & VIR_INSTFLAG_DEAD_INST);
-        VIR_Pass_DeleteInstruction(VIR_Inst_GetFunction(pDeadInst), pDeadInst, gcvNULL);
+        vscVIR_DeleteInstructionWithDu(gcvNULL, VIR_Inst_GetFunction(pDeadInst), pDeadInst, gcvNULL);
     }
 
     /* Destory the dead instruction set if exist. */
@@ -11320,32 +11320,31 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Patch_r0(
     return retValue;
 }
 
-VSC_ErrCode _VIR_RA_LS_InsertStoreAttr(
-    VIR_RA_LS       *pRA,
-    gctINT          attrIndex,
-    VIR_Enable      destEnable,
-    VIR_Instruction **newInst)
+VSC_ErrCode _VIR_RA_LS_PrependStoreAttr(
+    VIR_RA_LS*          pRA,
+    gctINT              attrIndex,
+    VIR_Enable          destEnable,
+    VIR_Instruction**   newInst)
 {
     VSC_ErrCode         retValue  = VSC_ERR_NONE;
-    VIR_Shader          *pShader = VIR_RA_LS_GetShader(pRA);
-    VIR_Function        *pFunc = VIR_Shader_GetCurrentFunction(pShader);
-
+    VIR_Shader*         pShader = VIR_RA_LS_GetShader(pRA);
+    VIR_Function*       pMainFunc = VIR_Shader_GetMainFunction(pShader);
     VIR_SymId           symId = VIR_INVALID_ID;
-    VIR_RA_HWReg_Color      curColor;
+    VIR_RA_HWReg_Color  curColor;
 
     curColor = InvalidColor;
     gcmASSERT(VIR_Shader_GetKind(pShader) != VIR_SHADER_GEOMETRY);
 
-    retValue = VIR_Function_AddInstruction(pFunc,
-                VIR_OP_STORE_ATTR,
-                VIR_TYPE_UINT16,
-                newInst);
-    if (retValue != VSC_ERR_NONE) return retValue;
+    retValue = VIR_Function_PrependInstruction(pMainFunc,
+                                               VIR_OP_STORE_ATTR,
+                                               VIR_TYPE_UINT16,
+                                               newInst);
+    ON_ERROR(retValue, "Fail to prepend a instruction.");
 
     /* src0 - regmap */
     _VIR_RA_LS_GenTemp(pRA, &symId);
     VIR_Operand_SetTempRegister((*newInst)->src[VIR_Operand_Src0],
-                                pFunc,
+                                pMainFunc,
                                 symId,
                                 VIR_TYPE_FLOAT_X4);
     _VIR_RA_MakeColor(0, CHANNEL_W, &curColor);
@@ -11361,44 +11360,51 @@ VSC_ErrCode _VIR_RA_LS_InsertStoreAttr(
        dest need to be reset by the client when needed */
     _VIR_RA_LS_GenTemp(pRA, &symId);
     VIR_Operand_SetTempRegister((*newInst)->dest,
-                                pFunc,
+                                pMainFunc,
                                 symId,
                                 VIR_TYPE_FLOAT_X4);
     _VIR_RA_MakeColor(0, 0, &curColor);
     _VIR_RA_LS_SetOperandHwRegInfo(pRA, (*newInst)->dest, curColor);
     VIR_Operand_SetEnable((*newInst)->dest, destEnable);
 
+OnError:
     return retValue;
 }
 
-/* per HW requirement, generate store_attr for r0.z and ro.w data at the end of the shader */
+/*
+** Per-HW requirement, generate store_attr for r0.z and r0.w data.
+** We insert this STORE in the beginning so we can shorten the live range of r0.
+*/
 VSC_ErrCode _VIR_RA_LS_GenStoreAttr_Patch_r0(
-    VIR_RA_LS       *pRA)
+    VIR_RA_LS*          pRA
+    )
 {
     VSC_ErrCode         retValue  = VSC_ERR_NONE;
-    VIR_Shader          *pShader = VIR_RA_LS_GetShader(pRA);
-    VIR_Function        *pFunc = VIR_Shader_GetMainFunction(pShader);
-    VIR_Instruction     *newInst = gcvNULL;
+    VIR_Shader*         pShader = VIR_RA_LS_GetShader(pRA);
+    VIR_Function*       pMainFunc = VIR_Shader_GetMainFunction(pShader);
+    VIR_Instruction*    newInst = gcvNULL;
     VIR_SymId           symId = VIR_INVALID_ID;
-    VIR_RA_HWReg_Color      curColor;
+    VIR_RA_HWReg_Color  curColor;
 
     _VIR_RA_MakeColor(VIR_RA_INVALID_REG, 0, &curColor);
     _VIR_RA_MakeColorHI(VIR_RA_INVALID_REG, 0, &curColor);
 
     /* store_attr for r0.w and r0.z */
     /* no need to reset dest, because src2 is temp */
-    _VIR_RA_LS_InsertStoreAttr(pRA, 1, VIR_ENABLE_ZW, &newInst);
+    retValue = _VIR_RA_LS_PrependStoreAttr(pRA, 1, VIR_ENABLE_ZW, &newInst);
+    ON_ERROR(retValue, "Fail to insert store attr.");
 
     /* set the src2 */
     _VIR_RA_LS_GenTemp(pRA, &symId);
     VIR_Operand_SetTempRegister(newInst->src[VIR_Operand_Src2],
-                                pFunc,
+                                pMainFunc,
                                 symId,
                                 VIR_TYPE_FLOAT_X4);
     _VIR_RA_MakeColor(0, 2, &curColor);
     _VIR_RA_LS_SetOperandHwRegInfo(pRA, newInst->src[VIR_Operand_Src2], curColor);
     VIR_Operand_SetSwizzle(newInst->src[VIR_Operand_Src2], VIR_SWIZZLE_XXXY);
 
+OnError:
     return retValue;
 }
 
@@ -13721,7 +13727,7 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
             if (pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL)
             {
                 retValue = _VIR_RA_LS_GenStoreAttr_Patch_r0(&ra);
-                ON_ERROR(retValue, "_VIR_RA_LS_GenStoreAttr_Patch_r0");
+                ON_ERROR(retValue, "Fail to generate STORE patch r0.");
             }
 
             /* for register spill, compute the base address */

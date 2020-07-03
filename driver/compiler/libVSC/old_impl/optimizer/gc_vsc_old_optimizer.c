@@ -7410,7 +7410,7 @@ _GetLTCValue(
     tempValue.sourceInfo = 0;
     for (i = 0; i < MAX_LTC_COMPONENTS; i++)
     {
-        tempValue.v[i].u64 = 0;
+        tempValue.v[i].u32 = 0;
     }
 
     /* Get the uniform data. */
