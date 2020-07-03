@@ -29,143 +29,65 @@ vx_status vxnneExecuteSWSoftmax(struct _vxnne_operation_s *operation)
     vx_int8    input_fp        = TENSOR_POS(input);
     vx_int8    output_fp       = TENSOR_POS(output);
     vx_enum    outputRMode     = TENSOR_ROUNDING_MODE(output);
-    vx_float32 beta;
-
-    vx_uint32 width,height,channel,dims;
-    vx_uint32 i,c,index,Dim,ItemCount;
-    vx_float32_ptr p_pfProSum, pfProSum = NULL;
-    vx_float32_ptr p_pfMax, pfMax = NULL;
-    vx_float32_ptr p_pfProbFP32, pfProbFP32 = VX_NULL;
-    vx_float32_ptr p_pfInput, pfInput = VX_NULL;
+    vx_float32 beta = betas ? betas->value->f32 : 1.0f;
     vx_uint8_ptr input_data_ptr = NULL;
     vx_uint8_ptr output_data_ptr = NULL;
+    vx_uint32 i = 0;
+    vx_uint32 j = 0;
+    vx_uint32 dims = TENSOR_DIM_NUM(input);
+    vx_int32  axis = dims < 3 ? 0 : 2;
+    vx_uint32 outerSize = 1;
+    vx_uint32 axisSize  = TENSOR_VIEW_SIZE_INDEX(input, axis);
+    vx_uint32 innerSize = 1;
 
     vxoTensor_GetTensorBatchArrayViewMemory(input, operation->currBatchIndex, (gctPOINTER *)&input_data_ptr, VX_NULL);
     vxoTensor_GetTensorBatchArrayViewMemory(output, operation->currBatchIndex, (gctPOINTER *)&output_data_ptr, VX_NULL);
 
-    dims = TENSOR_DIM_NUM(input);
-    switch(dims)
+    for (i = 0; i < (vx_uint32)axis; i++)
     {
-        case 1:
-            channel = TENSOR_VIEW_SIZE_INDEX(input, 0);
-            width   = 1;
-            height  = 1;
-            break;
-        case 2:
-            channel = TENSOR_VIEW_SIZE_INDEX(input, 0);
-            width   = 1;
-            height  = 1;
-            break;
-        case 3:
-            width   = TENSOR_VIEW_SIZE_INDEX(input, 0);
-            height  = TENSOR_VIEW_SIZE_INDEX(input, 1);
-            channel = TENSOR_VIEW_SIZE_INDEX(input, 2);
-            break;
-        case 4:
-            width   = TENSOR_VIEW_SIZE_INDEX(input, 0);
-            height  = TENSOR_VIEW_SIZE_INDEX(input, 1);
-            channel = TENSOR_VIEW_SIZE_INDEX(input, 2);
-            break;
-        default:
-            vxError("Input tensor error dimension[%u]\n", dims);
-            return VX_ERROR_INVALID_DIMENSION;
+        innerSize *= TENSOR_VIEW_SIZE_INDEX(input, i);
     }
 
-    ItemCount = width * height;
-    Dim       = channel * width * height; /* default axis = 3, so softmax it in channel */
-    pfMax       = (vx_float32_ptr)vxAllocateAndZeroMemory(ItemCount * sizeof(vx_float32));
-    pfProSum    = (vx_float32_ptr)vxAllocateAndZeroMemory(ItemCount * sizeof(vx_float32));
-    pfInput     = (vx_float32_ptr)vxAllocateAndZeroMemory(channel * ItemCount * sizeof(vx_float32));
-    pfProbFP32  = (vx_float32_ptr)vxAllocateAndZeroMemory(channel * ItemCount * sizeof(vx_float32));
-
-    index = 0;
-    p_pfInput = pfInput;
-    p_pfMax = pfMax;
-
-    for(c = 0; c < channel; c++)
+    for (i = axis + 1; i < dims; i++)
     {
-        for(i = 0; i < ItemCount; i++)
-        {
-            index = c * ItemCount + i;
-            p_pfInput[i] = vxnneGetDataExt(input_format, TENSOR_QUANT_TYPE(input), index, (vx_uint8_ptr)input_data_ptr, input_fp, TENSOR_TF_ZEROPOINT(input), TENSOR_TF_SCALE(input));
-            p_pfMax[i]   = gcmMAX(p_pfMax[i], p_pfInput[i]);
-        }
-        p_pfInput += ItemCount;
+        outerSize *= TENSOR_VIEW_SIZE_INDEX(input, i);
     }
-    p_pfMax += ItemCount;
 
-
-    p_pfProbFP32 = pfProbFP32;
-    p_pfInput = pfInput;
-    p_pfMax = pfMax;
-    p_pfProSum = pfProSum;
-
-    for(c = 0; c < channel; c++)
+    for (i = 0; i < outerSize; i++)
     {
-        for(i = 0; i < ItemCount; i++)
+        for (j = 0; j < innerSize; j++)
         {
-            if (betas != VX_NULL)
+            uint32_t inner = i * axisSize * innerSize;
+            uint32_t begin = i * axisSize * innerSize + j;
+            uint32_t end = begin + axisSize * innerSize;
+            // Find max
+            float maxValue = vxnneGetDataExt(input_format, TENSOR_QUANT_TYPE(input), begin, (vx_uint8_ptr)input_data_ptr, input_fp, TENSOR_TF_ZEROPOINT(input), TENSOR_TF_SCALE(input));
+            float sum = 0.0f;
+            for (inner = begin ; inner < end; inner += innerSize)
             {
-                beta = betas->value->f32;
-                p_pfProbFP32[i] = gcoMATH_Exp((p_pfInput[i] - p_pfMax[i]) * beta);
+                vx_float32 val = vxnneGetDataExt(input_format, TENSOR_QUANT_TYPE(input), inner, (vx_uint8_ptr)input_data_ptr, input_fp, TENSOR_TF_ZEROPOINT(input), TENSOR_TF_SCALE(input));
+                maxValue = gcmMAX(maxValue, val);
             }
-            else
-                p_pfProbFP32[i] = gcoMATH_Exp(p_pfInput[i] - p_pfMax[i]);
+
+            // Compute sum
+            for (inner = begin ; inner < end; inner += innerSize)
+            {
+                vx_float32 val = vxnneGetDataExt(input_format, TENSOR_QUANT_TYPE(input), inner, (vx_uint8_ptr)input_data_ptr, input_fp, TENSOR_TF_ZEROPOINT(input), TENSOR_TF_SCALE(input));
+                sum += gcoMATH_Exp((val - maxValue) * beta);
+            }
+
+            // Compute result
+            for (inner = begin ; inner < end; inner += innerSize)
+            {
+                vx_float32 val = vxnneGetDataExt(input_format, TENSOR_QUANT_TYPE(input), inner, (vx_uint8_ptr)input_data_ptr, input_fp, TENSOR_TF_ZEROPOINT(input), TENSOR_TF_SCALE(input));
+
+                val = gcoMATH_Exp((val - maxValue) * beta) / sum;
+
+                vxnneSaveDataExt(output_format, TENSOR_QUANT_TYPE(output), inner, val, (vx_uint8_ptr)output_data_ptr, output_fp, TENSOR_TF_ZEROPOINT(output), TENSOR_TF_SCALE(output), outputRMode);
+            }
         }
-        p_pfProbFP32 += ItemCount;
-        p_pfInput += ItemCount;
     }
 
-    p_pfProbFP32 = pfProbFP32;
-    p_pfProSum = pfProSum;
-
-    for(c = 0; c < channel; c++)
-    {
-        for(i = 0; i < ItemCount; i++)
-        {
-            index = c * ItemCount + i;
-            p_pfProSum[i] += pfProbFP32[index];
-        }
-    }
-    p_pfProSum += ItemCount;
-
-
-    p_pfProbFP32 = pfProbFP32;
-    p_pfProSum = pfProSum;
-    index = 0;
-
-    for(c = 0; c < channel; c++)
-    {
-        for(i = 0; i < ItemCount; i++)
-        {
-            vx_float32 div = p_pfProbFP32[i] / p_pfProSum[i];
-
-
-            vxnneSaveDataExt(output_format, TENSOR_QUANT_TYPE(output), index++, div, (vx_uint8_ptr)output_data_ptr, output_fp, TENSOR_TF_ZEROPOINT(output), TENSOR_TF_SCALE(output), outputRMode);
-        }
-        p_pfProbFP32 += ItemCount;
-    }
-    p_pfProSum += ItemCount;
-
-    if(pfMax)
-    {
-        vxFree(pfMax);
-    }
-
-    if(pfProSum)
-    {
-        vxFree(pfProSum);
-    }
-
-    if(pfInput)
-    {
-        vxFree(pfInput);
-    }
-
-    if(pfProbFP32)
-    {
-        vxFree(pfProbFP32);
-    }
     return status;
 }
 
@@ -198,8 +120,6 @@ VX_PRIVATE_API vx_status vxoNNSoftmax_SW_Initialize(vxnne_layer ops_layer, const
     vx_tensor  inputs = (vx_tensor)parameters[0];
     vx_tensor  outputs = (vx_tensor)parameters[1];
 
-    vx_uint32  batchCount = TENSOR_SIZE_INDEX(inputs, 3);
-
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
     vxmONERROR(vxnneOperation_Initialize(&softmaxLayer->softmax_sw_operation.base,
@@ -208,7 +128,7 @@ VX_PRIVATE_API vx_status vxoNNSoftmax_SW_Initialize(vxnne_layer ops_layer, const
         VXNNE_OPERATOR_SOFTMAX,
         vxnneExecuteSWSoftmax,
         VX_NULL,
-        batchCount,
+        1,
         0));
 
     vxmONERROR(vxnneLayer_SetOperation(&softmaxLayer->base, &softmaxLayer->softmax_sw_operation.base, 0));
@@ -225,54 +145,53 @@ OnError:
 
 VX_PRIVATE_API vx_bool vxoNNSoftmax_SH_EVIS_Support_Ext(vx_node node, const vx_reference parameters[], vx_uint32 _num, vxnne_register_param reg_param, vx_bool evis)
 {
-    vx_status status = VX_SUCCESS;
-
     vx_tensor  inputs = (vx_tensor)parameters[0];
     vx_tensor  outputs = (vx_tensor)parameters[1];
     vx_enum    srcFormat = TENSOR_DATA_TYPE(inputs);
     vx_enum    dstFormat = TENSOR_DATA_TYPE(outputs);
-    vx_uint32  dims = TENSOR_DIM_NUM(inputs);
-    vx_uint32  width = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
-    vx_uint32  height = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
     vx_bool    enable_format = vx_false_e;
     vx_bool    enable_tf_quantize = vx_false_e;
-    vx_bool    enable_float32 = vx_false_e;
-    vx_uint32  batchCount = TENSOR_SIZE_INDEX(inputs, 3);
-
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
 
     vxoLayer_VerificationHead(node, parameters, _num, reg_param);
 
-    switch (dims)
-    {
-    case 1:
-        batchCount = 1;
-        break;
-    case 2:
-        batchCount = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
-        break;
-    case 3:
-        batchCount = 1;
-        break;
-    case 4:
-        batchCount = TENSOR_VIEW_SIZE_INDEX(inputs, 3);
-        break;
-    default:
-        vxError("Input tensor error dimension[%u]\n", dims);
-        status = VX_ERROR_INVALID_DIMENSION;
-        goto OnError;
-    }
-
-
     if(evis)
     {
-        enable_float32 = (vx_bool)(dstFormat == VX_TYPE_FLOAT32 && ((width % 4 == 0) || ((width * height < IMG_MAX_WIDTH) && ((width * height % 4 == 0) || dims < 3)) || dims == 1));
-        enable_format = (((srcFormat == VX_TYPE_INT8 ||  srcFormat == VX_TYPE_FLOAT16) && (dstFormat == VX_TYPE_FLOAT16 || enable_float32))
-                         || ((srcFormat == VX_TYPE_BFLOAT16) && (dstFormat == VX_TYPE_BFLOAT16 || dstFormat == VX_TYPE_FLOAT16 || enable_float32))
-                         || (srcFormat == VX_TYPE_INT16 && (dstFormat == VX_TYPE_INT16 || dstFormat == VX_TYPE_FLOAT16))
-                         || (srcFormat == VX_TYPE_INT8 &&  dstFormat == VX_TYPE_INT8)
-                         || (srcFormat == VX_TYPE_FLOAT16 &&  dstFormat == VX_TYPE_UINT8));
-        enable_tf_quantize = ((srcFormat == VX_TYPE_UINT8) && (dstFormat == VX_TYPE_FLOAT16 || enable_float32 || dstFormat == VX_TYPE_UINT8));
+        vx_uint32 i = 0;
+        vx_uint32 rank_x = TENSOR_DIM_NUM(inputs);
+        vx_int32 axis = rank_x < 3 ? 0 : 2;
+        vx_int32 shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+        vx_int32 out_shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+        vx_uint32 out_rank_x = 1;
+        vx_int32  out_axis = 0;
+        vx_bool    ret = 0;
+
+        for (i = 0; i < rank_x; i++)
+        {
+            shape_x[i] = (vx_int32)TENSOR_VIEW_SIZE_INDEX(inputs, i);
+        }
+
+        ret = vx_nn_kernel_optimize_softmax_shape(shape_x, rank_x, axis, out_shape_x, &out_rank_x, &out_axis);
+
+        enable_format = (vx_bool)(
+            ((srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_FLOAT32)
+         || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_FLOAT16)
+         /*|| (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_INT16)
+         || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_INT8)
+         || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_UINT8)*/
+         || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_FLOAT32)
+         || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_FLOAT16)
+         || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_INT16)
+         || (srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_FLOAT32)
+         || (srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_FLOAT16)
+         || (srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_INT8)
+         || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_FLOAT32)
+         || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_FLOAT16)
+         || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
+         || (srcFormat == VX_TYPE_BFLOAT16 && dstFormat == VX_TYPE_FLOAT32)
+         || (srcFormat == VX_TYPE_BFLOAT16 && dstFormat == VX_TYPE_FLOAT16)
+         || (srcFormat == VX_TYPE_BFLOAT16 && dstFormat == VX_TYPE_BFLOAT16))
+          && ret && out_axis < 3);
     }
     else
     {
@@ -284,7 +203,7 @@ VX_PRIVATE_API vx_bool vxoNNSoftmax_SH_EVIS_Support_Ext(vx_node node, const vx_r
     support = support && (enable_format || enable_tf_quantize);
 
     vxoLayer_VerificationFoot(node, parameters, _num, reg_param, &support);
-OnError:
+
     return support;
 }
 
@@ -326,7 +245,63 @@ VX_PRIVATE_API vx_status vxoNNSoftmax_SH_Initialize_Ext(vxnne_layer ops_layer, c
 
     if (evis)
     {
-        shaderExecutable = vxnneGetSoftmaxShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_SOFTMAX, &ops_layer->node->kernelAttributes.borderMode, dims, inputs, beta, outputs);
+        vx_uint32 i = 0;
+        vx_uint32 rank_x = TENSOR_DIM_NUM(inputs);
+        vx_int32 axis = rank_x < 3 ? 0 : 2;
+        vx_int32 shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+        vx_int32 out_shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+        vx_uint32 out_rank_x = 1;
+        vx_int32  out_axis = 0;
+        vx_tensor  src = NULL;
+        vx_tensor  dst = NULL;
+
+        for (i = 0; i < rank_x; i++)
+        {
+            shape_x[i] = (vx_int32)TENSOR_VIEW_SIZE_INDEX(inputs, i);
+        }
+
+        vx_nn_kernel_optimize_softmax_shape(shape_x, rank_x, axis, out_shape_x, &out_rank_x, &out_axis);
+        src = vxoTensor_ReshapeTensor(inputs, out_shape_x, out_rank_x);
+        dst = vxoTensor_ReshapeTensor(outputs, out_shape_x, out_rank_x);
+        softmaxLayer->base.temp_tensors[0] = src;
+        softmaxLayer->base.temp_tensors[1] = dst;
+        softmaxLayer->base.num_temp_tensors = 2;
+
+        batchCount = out_rank_x > 3 ? out_shape_x[3] : 1;
+
+        if (out_axis == 0)
+        {
+            shaderExecutable = vxnneGetSoftmaxAxis0ShaderExecutable(
+                ops_layer->node->base.context,
+                VXNNE_KERNEL_SOFTMAX_AXIS0,
+                &ops_layer->node->kernelAttributes.borderMode,
+                out_axis,
+                src,
+                beta,
+                dst);
+        }
+        else if (out_axis == 1)
+        {
+            shaderExecutable = vxnneGetSoftmaxAxis1ShaderExecutable(
+                ops_layer->node->base.context,
+                VXNNE_KERNEL_SOFTMAX_AXIS1,
+                &ops_layer->node->kernelAttributes.borderMode,
+                out_axis,
+                src,
+                beta,
+                dst);
+        }
+        else
+        {
+            shaderExecutable = vxnneGetSoftmaxAxis2ShaderExecutable(
+                ops_layer->node->base.context,
+                VXNNE_KERNEL_SOFTMAX_AXIS2,
+                &ops_layer->node->kernelAttributes.borderMode,
+                out_axis,
+                src,
+                beta,
+                dst);
+        }
 
         if (!shaderExecutable)
         {
@@ -439,15 +414,20 @@ OnError:
     vx_enum    srcFormat                  = TENSOR_DATA_TYPE(inputs);
     vx_enum    dstFormat                  = TENSOR_DATA_TYPE(outputs);
     vx_uint32  dims                       = TENSOR_DIM_NUM(inputs);
-    vx_uint32  width                      = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
-    vx_uint32  height                     = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
     vx_bool    useShadeExe                = vx_false_e;
     vx_bool    enable_format              = vx_false_e;
     vx_bool    enable_tf_quantize         = vx_false_e;
-    vx_bool    enable_float32             = vx_false_e;
     vx_uint32  batchCount                 = TENSOR_SIZE_INDEX(inputs, 3);
     vx_float32 beta                       = 1.0;
     vxnne_softmax_layer  softmaxLayer = VX_NULL;
+    vx_uint32  rank_x                     = TENSOR_DIM_NUM(inputs);
+    vx_int32   axis                       = rank_x < 3 ? 0 : 2;
+    vx_int32   shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+    vx_int32   out_shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+    vx_uint32  out_rank_x                 = 1;
+    vx_int32   out_axis                   = 0;
+    vx_tensor  src                        = NULL;
+    vx_tensor  dst                        = NULL;
 
     /* destroy the existing layer */
     if (node->layer)
@@ -495,12 +475,35 @@ OnError:
 
     if(node->base.context->evisNoInst.supportEVIS)
     {
-        enable_float32 = (vx_bool)(dstFormat == VX_TYPE_FLOAT32 && ((width % 4 == 0) || ((width * height < IMG_MAX_WIDTH) && ((width * height % 4 == 0) || dims < 3)) || dims == 1));
-        enable_format = (((srcFormat == VX_TYPE_INT8 ||  srcFormat == VX_TYPE_FLOAT16) && (dstFormat == VX_TYPE_FLOAT16 || enable_float32))
-                         || ((srcFormat == VX_TYPE_BFLOAT16) && (dstFormat == VX_TYPE_BFLOAT16 || dstFormat == VX_TYPE_FLOAT16 || enable_float32))
-                         || (srcFormat == VX_TYPE_INT16 && (dstFormat == VX_TYPE_INT16 || dstFormat == VX_TYPE_FLOAT16))
-                         || (srcFormat == VX_TYPE_INT8 &&  dstFormat == VX_TYPE_INT8));
-        enable_tf_quantize = ((srcFormat == VX_TYPE_UINT8) && (dstFormat == VX_TYPE_FLOAT16 || enable_float32 || dstFormat == VX_TYPE_UINT8));
+        vx_uint32 i = 0;
+        vx_bool    ret = 0;
+
+        for (i = 0; i < rank_x; i++)
+        {
+            shape_x[i] = (vx_int32)TENSOR_VIEW_SIZE_INDEX(inputs, i);
+        }
+
+        ret = vx_nn_kernel_optimize_softmax_shape(shape_x, rank_x, axis, out_shape_x, &out_rank_x, &out_axis);
+
+        enable_format = (vx_bool)(
+            ((srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_FLOAT32)
+         || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_FLOAT16)
+         /*|| (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_INT16)
+         || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_INT8)
+         || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_UINT8)*/
+         || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_FLOAT32)
+         || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_FLOAT16)
+         || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_INT16)
+         || (srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_FLOAT32)
+         || (srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_FLOAT16)
+         || (srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_INT8)
+         || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_FLOAT32)
+         || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_FLOAT16)
+         || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
+         || (srcFormat == VX_TYPE_BFLOAT16 && dstFormat == VX_TYPE_FLOAT32)
+         || (srcFormat == VX_TYPE_BFLOAT16 && dstFormat == VX_TYPE_FLOAT16)
+         || (srcFormat == VX_TYPE_BFLOAT16 && dstFormat == VX_TYPE_BFLOAT16))
+          && ret && out_axis < 3);
     }
     else
     {
@@ -518,7 +521,47 @@ OnError:
 
         if(node->base.context->evisNoInst.supportEVIS)
         {
-            shaderExecutable = vxnneGetSoftmaxShaderExecutable(node->base.context, VXNNE_KERNEL_SOFTMAX, &node->kernelAttributes.borderMode, dims, inputs, beta, outputs);
+            src = vxoTensor_ReshapeTensor(inputs, out_shape_x, out_rank_x);
+            dst = vxoTensor_ReshapeTensor(outputs, out_shape_x, out_rank_x);
+            softmaxLayer->base.temp_tensors[0] = src;
+            softmaxLayer->base.temp_tensors[1] = dst;
+            softmaxLayer->base.num_temp_tensors = 2;
+
+            batchCount = out_rank_x > 3 ? out_shape_x[3] : 1;
+
+            if (out_axis == 0)
+            {
+                shaderExecutable = vxnneGetSoftmaxAxis0ShaderExecutable(
+                    node->base.context,
+                    VXNNE_KERNEL_SOFTMAX_AXIS0,
+                    &node->kernelAttributes.borderMode,
+                    out_axis,
+                    src,
+                    beta,
+                    dst);
+            }
+            else if (out_axis == 1)
+            {
+                shaderExecutable = vxnneGetSoftmaxAxis1ShaderExecutable(
+                    node->base.context,
+                    VXNNE_KERNEL_SOFTMAX_AXIS1,
+                    &node->kernelAttributes.borderMode,
+                    out_axis,
+                    src,
+                    beta,
+                    dst);
+            }
+            else
+            {
+                shaderExecutable = vxnneGetSoftmaxAxis2ShaderExecutable(
+                    node->base.context,
+                    VXNNE_KERNEL_SOFTMAX_AXIS2,
+                    &node->kernelAttributes.borderMode,
+                    out_axis,
+                    src,
+                    beta,
+                    dst);
+            }
 
             if (!shaderExecutable)
             {
@@ -563,7 +606,7 @@ OnError:
             VXNNE_OPERATOR_SOFTMAX,
             vxnneExecuteSWSoftmax,
             VX_NULL,
-            batchCount,
+            1,
             0);
 
         vxnneLayer_SetOperation(&softmaxLayer->base, &softmaxLayer->softmax_sw_operation.base, 0);
@@ -583,6 +626,7 @@ exit:
         softmaxLayer = VX_NULL;
     }
 #endif
+
     return status;
 }
 
@@ -620,7 +664,6 @@ VX_PRIVATE_API vx_status vxoNNSoftmax2_SW_Initialize(vxnne_layer ops_layer, cons
     vx_tensor  inputs = (vx_tensor)parameters[0];
     vx_scalar  beta = (vx_scalar)parameters[1];
     vx_tensor  outputs = (vx_tensor)parameters[2];
-    vx_uint32  batchCount = TENSOR_SIZE_INDEX(inputs, 3);
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
@@ -630,7 +673,7 @@ VX_PRIVATE_API vx_status vxoNNSoftmax2_SW_Initialize(vxnne_layer ops_layer, cons
         VXNNE_OPERATOR_SOFTMAX,
         vxnneExecuteSWSoftmax,
         VX_NULL,
-        batchCount,
+        1,
         0));
 
     vxmONERROR(vxnneLayer_SetOperation(
@@ -655,12 +698,8 @@ VX_PRIVATE_API vx_bool vxoNNSoftmax2_SH_EVIS_Support_Ext(vx_node node, const vx_
     vx_tensor  outputs = (vx_tensor)parameters[2];
     vx_bool    enable_format = vx_false_e;
     vx_bool    enable_tf_quantize = vx_false_e;
-    vx_bool    enable_float32 = vx_false_e;
     vx_enum    srcFormat = TENSOR_DATA_TYPE(inputs);
     vx_enum    dstFormat = TENSOR_DATA_TYPE(outputs);
-    vx_uint32  dims = TENSOR_DIM_NUM(inputs);
-    vx_uint32  width = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
-    vx_uint32  height = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
 
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
 
@@ -668,12 +707,42 @@ VX_PRIVATE_API vx_bool vxoNNSoftmax2_SH_EVIS_Support_Ext(vx_node node, const vx_
 
     if (evis)
     {
-        enable_float32 = (vx_bool)(dstFormat == VX_TYPE_FLOAT32 && ((width % 4 == 0) || ((width * height < IMG_MAX_WIDTH) && ((width * height % 4 == 0) || dims < 3)) || dims == 1));
-        enable_format = (((srcFormat == VX_TYPE_INT8 || srcFormat == VX_TYPE_FLOAT16) && (dstFormat == VX_TYPE_FLOAT16 || enable_float32))
-            || ((srcFormat == VX_TYPE_BFLOAT16) && (dstFormat == VX_TYPE_BFLOAT16 || dstFormat == VX_TYPE_FLOAT16 || enable_float32))
-            || (srcFormat == VX_TYPE_INT16 && (dstFormat == VX_TYPE_INT16 || dstFormat == VX_TYPE_FLOAT16))
-            || (srcFormat == VX_TYPE_INT8 &&  dstFormat == VX_TYPE_INT8));
-        enable_tf_quantize = ((srcFormat == VX_TYPE_UINT8) && (dstFormat == VX_TYPE_FLOAT16 || enable_float32 || dstFormat == VX_TYPE_UINT8));
+        vx_uint32 i = 0;
+        vx_uint32 rank_x = TENSOR_DIM_NUM(inputs);
+        vx_int32 axis = rank_x < 3 ? 0 : 2;
+        vx_int32 shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+        vx_int32 out_shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+        vx_uint32 out_rank_x = 1;
+        vx_int32  out_axis = 0;
+        vx_bool    ret = 0;
+
+        for (i = 0; i < rank_x; i++)
+        {
+            shape_x[i] = (vx_int32)TENSOR_VIEW_SIZE_INDEX(inputs, i);
+        }
+
+        ret = vx_nn_kernel_optimize_softmax_shape(shape_x, rank_x, axis, out_shape_x, &out_rank_x, &out_axis);
+
+        enable_format = (vx_bool)(
+            ((srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_FLOAT32)
+         || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_FLOAT16)
+         /*|| (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_INT16)
+         || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_INT8)
+         || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_UINT8)*/
+         || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_FLOAT32)
+         || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_FLOAT16)
+         || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_INT16)
+         || (srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_FLOAT32)
+         || (srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_FLOAT16)
+         || (srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_INT8)
+         || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_FLOAT32)
+         || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_FLOAT16)
+         || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
+         || (srcFormat == VX_TYPE_BFLOAT16 && dstFormat == VX_TYPE_FLOAT32)
+         || (srcFormat == VX_TYPE_BFLOAT16 && dstFormat == VX_TYPE_FLOAT16)
+         || (srcFormat == VX_TYPE_BFLOAT16 && dstFormat == VX_TYPE_BFLOAT16))
+          && ret && out_axis < 3);
+
     }
     else
     {
@@ -710,7 +779,6 @@ VX_PRIVATE_API vx_bool vxoNNSoftmax2_SH_EVIS_Support(vx_node node, const vx_refe
 
 VX_PRIVATE_API vx_status vxoNNSoftmax2_SH_Initialize_Ext(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 _num, vxnne_register_param reg_param, vx_bool evis)
 {
-    vx_status status = VX_SUCCESS;
     vxnne_softmax2_layer  softmax2Layer = (vxnne_softmax2_layer)ops_layer;
 
     vx_tensor  inputs = (vx_tensor)parameters[0];
@@ -718,15 +786,71 @@ VX_PRIVATE_API vx_status vxoNNSoftmax2_SH_Initialize_Ext(vxnne_layer ops_layer, 
     vx_tensor  outputs = (vx_tensor)parameters[2];
     vx_float32 betaVal = beta->value->f32;
     vx_uint32  batchCount = TENSOR_SIZE_INDEX(inputs, 3);
-    vx_uint32  dims = TENSOR_DIM_NUM(inputs);
     vx_uint32  idx = 0;
     vxnne_shader_executable shaderExecutable = VX_NULL;
+    vx_status status = VX_SUCCESS;
 
     vxoLayer_InitializeHead(ops_layer, parameters, _num, reg_param);
 
     if (evis)
     {
-        shaderExecutable = vxnneGetSoftmaxShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_SOFTMAX, &ops_layer->node->kernelAttributes.borderMode, dims, inputs, betaVal, outputs);
+        vx_uint32 i = 0;
+        vx_uint32 rank_x = TENSOR_DIM_NUM(inputs);
+        vx_int32 axis = rank_x < 3 ? 0 : 2;
+        vx_int32 shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+        vx_int32 out_shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+        vx_uint32 out_rank_x = 1;
+        vx_int32  out_axis = 0;
+        vx_tensor  src = NULL;
+        vx_tensor  dst = NULL;
+
+        for (i = 0; i < rank_x; i++)
+        {
+            shape_x[i] = (vx_int32)TENSOR_VIEW_SIZE_INDEX(inputs, i);
+        }
+
+        vx_nn_kernel_optimize_softmax_shape(shape_x, rank_x, axis, out_shape_x, &out_rank_x, &out_axis);
+        src = vxoTensor_ReshapeTensor(inputs, out_shape_x, out_rank_x);
+        dst = vxoTensor_ReshapeTensor(outputs, out_shape_x, out_rank_x);
+        softmax2Layer->base.temp_tensors[0] = src;
+        softmax2Layer->base.temp_tensors[1] = dst;
+        softmax2Layer->base.num_temp_tensors = 2;
+
+        batchCount = out_rank_x > 3 ? out_shape_x[3] : 1;
+
+        if (out_axis == 0)
+        {
+            shaderExecutable = vxnneGetSoftmaxAxis0ShaderExecutable(
+                ops_layer->node->base.context,
+                VXNNE_KERNEL_SOFTMAX_AXIS0,
+                &ops_layer->node->kernelAttributes.borderMode,
+                out_axis,
+                src,
+                betaVal,
+                dst);
+        }
+        else if (out_axis == 1)
+        {
+            shaderExecutable = vxnneGetSoftmaxAxis1ShaderExecutable(
+                ops_layer->node->base.context,
+                VXNNE_KERNEL_SOFTMAX_AXIS1,
+                &ops_layer->node->kernelAttributes.borderMode,
+                out_axis,
+                src,
+                betaVal,
+                dst);
+        }
+        else
+        {
+            shaderExecutable = vxnneGetSoftmaxAxis2ShaderExecutable(
+                ops_layer->node->base.context,
+                VXNNE_KERNEL_SOFTMAX_AXIS2,
+                &ops_layer->node->kernelAttributes.borderMode,
+                out_axis,
+                src,
+                betaVal,
+                dst);
+        }
         if (!shaderExecutable)
         {
             status = VX_FAILURE;
@@ -739,8 +863,8 @@ VX_PRIVATE_API vx_status vxoNNSoftmax2_SH_Initialize_Ext(vxnne_layer ops_layer, 
             batchCount,
             shaderExecutable));
 
-        vxmONERROR(vxnneOperation_AddReference(&softmax2Layer->softmax2_SHoperation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT));
-        vxmONERROR(vxnneOperation_AddReference(&softmax2Layer->softmax2_SHoperation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+        vxmONERROR(vxnneOperation_AddReference(&softmax2Layer->softmax2_SHoperation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&softmax2Layer->softmax2_SHoperation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT));
         vxmONERROR(vxnneLayer_SetOperation(
             &softmax2Layer->base,
             &softmax2Layer->softmax2_SHoperation.base,
@@ -849,16 +973,20 @@ OnError:
     vx_bool    useShadeExe                = vx_false_e;
     vx_bool    enable_format              = vx_false_e;
     vx_bool    enable_tf_quantize         = vx_false_e;
-    vx_bool    enable_float32             = vx_false_e;
     vx_uint32  batchCount                 = TENSOR_SIZE_INDEX(inputs, 3);
     vx_enum    srcFormat                  = TENSOR_DATA_TYPE(inputs);
     vx_enum    dstFormat                  = TENSOR_DATA_TYPE(outputs);
-    vx_uint32  dims                       = TENSOR_DIM_NUM(inputs);
-    vx_uint32  width                      = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
-    vx_uint32  height                     = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
     vx_uint32  idx                        = 0;
     vx_uint32  numTmpTensor               = 0;
     vxnne_softmax2_layer  softmax2Layer   = VX_NULL;
+    vx_uint32  rank_x                     = TENSOR_DIM_NUM(inputs);
+    vx_int32   axis                       = rank_x < 3 ? 0 : 2;
+    vx_int32   shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+    vx_int32   out_shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+    vx_uint32  out_rank_x                 = 1;
+    vx_int32   out_axis                   = 0;
+    vx_tensor  src                        = NULL;
+    vx_tensor  dst                        = NULL;
 
     /* destroy the existing layer */
     if (node->layer)
@@ -885,12 +1013,35 @@ OnError:
 
     if(node->base.context->evisNoInst.supportEVIS)
     {
-        enable_float32 = (vx_bool)(dstFormat == VX_TYPE_FLOAT32 && ((width % 4 == 0) || ((width * height < IMG_MAX_WIDTH) && ((width * height % 4 == 0) || dims < 3)) || dims == 1));
-        enable_format = (((srcFormat == VX_TYPE_INT8 ||  srcFormat == VX_TYPE_FLOAT16) && (dstFormat == VX_TYPE_FLOAT16 || enable_float32))
-                         || ((srcFormat == VX_TYPE_BFLOAT16) && (dstFormat == VX_TYPE_BFLOAT16 || dstFormat == VX_TYPE_FLOAT16 || enable_float32))
-                         || (srcFormat == VX_TYPE_INT16 && (dstFormat == VX_TYPE_INT16 || dstFormat == VX_TYPE_FLOAT16))
-                         || (srcFormat == VX_TYPE_INT8 &&  dstFormat == VX_TYPE_INT8));
-        enable_tf_quantize = ((srcFormat == VX_TYPE_UINT8) && (dstFormat == VX_TYPE_FLOAT16 || enable_float32 || dstFormat == VX_TYPE_UINT8));
+        vx_uint32 i = 0;
+        vx_bool    ret = 0;
+
+        for (i = 0; i < rank_x; i++)
+        {
+            shape_x[i] = (vx_int32)TENSOR_VIEW_SIZE_INDEX(inputs, i);
+        }
+
+        ret = vx_nn_kernel_optimize_softmax_shape(shape_x, rank_x, axis, out_shape_x, &out_rank_x, &out_axis);
+
+        enable_format = (vx_bool)(
+            ((srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_FLOAT32)
+         || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_FLOAT16)
+         /*|| (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_INT16)
+         || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_INT8)
+         || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_UINT8)*/
+         || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_FLOAT32)
+         || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_FLOAT16)
+         || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_INT16)
+         || (srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_FLOAT32)
+         || (srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_FLOAT16)
+         || (srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_INT8)
+         || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_FLOAT32)
+         || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_FLOAT16)
+         || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
+         || (srcFormat == VX_TYPE_BFLOAT16 && dstFormat == VX_TYPE_FLOAT32)
+         || (srcFormat == VX_TYPE_BFLOAT16 && dstFormat == VX_TYPE_FLOAT16)
+         || (srcFormat == VX_TYPE_BFLOAT16 && dstFormat == VX_TYPE_BFLOAT16))
+          && ret && out_axis < 3);
     }
     else
     {
@@ -907,7 +1058,47 @@ OnError:
 
         if(node->base.context->evisNoInst.supportEVIS)
         {
-            shaderExecutable = vxnneGetSoftmaxShaderExecutable(node->base.context, VXNNE_KERNEL_SOFTMAX, &node->kernelAttributes.borderMode, dims, inputs, betaVal, outputs);
+            src = vxoTensor_ReshapeTensor(inputs, out_shape_x, out_rank_x);
+            dst = vxoTensor_ReshapeTensor(outputs, out_shape_x, out_rank_x);
+            softmax2Layer->base.temp_tensors[0] = src;
+            softmax2Layer->base.temp_tensors[1] = dst;
+            softmax2Layer->base.num_temp_tensors = 2;
+
+            batchCount = out_rank_x > 3 ? out_shape_x[3] : 1;
+
+            if (out_axis == 0)
+            {
+                shaderExecutable = vxnneGetSoftmaxAxis0ShaderExecutable(
+                    node->base.context,
+                    VXNNE_KERNEL_SOFTMAX_AXIS0,
+                    &node->kernelAttributes.borderMode,
+                    out_axis,
+                    src,
+                    betaVal,
+                    dst);
+            }
+            else if (out_axis == 1)
+            {
+                shaderExecutable = vxnneGetSoftmaxAxis1ShaderExecutable(
+                    node->base.context,
+                    VXNNE_KERNEL_SOFTMAX_AXIS1,
+                    &node->kernelAttributes.borderMode,
+                    out_axis,
+                    src,
+                    betaVal,
+                    dst);
+            }
+            else
+            {
+                shaderExecutable = vxnneGetSoftmaxAxis2ShaderExecutable(
+                    node->base.context,
+                    VXNNE_KERNEL_SOFTMAX_AXIS2,
+                    &node->kernelAttributes.borderMode,
+                    out_axis,
+                    src,
+                    betaVal,
+                    dst);
+            }
             if (!shaderExecutable)
             {
                 status = VX_FAILURE;
@@ -921,8 +1112,8 @@ OnError:
                 shaderExecutable);
             if (status != VX_SUCCESS) goto exit;
 
-            vxnneOperation_AddReference(&softmax2Layer->softmax2_SHoperation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&softmax2Layer->softmax2_SHoperation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+            vxnneOperation_AddReference(&softmax2Layer->softmax2_SHoperation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&softmax2Layer->softmax2_SHoperation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT);
             vxnneLayer_SetOperation(
                 &softmax2Layer->base,
                 &softmax2Layer->softmax2_SHoperation.base,
@@ -960,7 +1151,7 @@ OnError:
             VXNNE_OPERATOR_SOFTMAX,
             vxnneExecuteSWSoftmax,
             VX_NULL,
-            batchCount,
+            1,
             0);
 
         vxnneLayer_SetOperation(
