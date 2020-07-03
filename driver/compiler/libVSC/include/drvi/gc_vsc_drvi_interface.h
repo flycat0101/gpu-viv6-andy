@@ -807,6 +807,7 @@ typedef struct _VSC_HW_CONFIG
     gctUINT              psSamplerNoBaseInInstruction;
     gctFLOAT             minPointSize;
     gctFLOAT             maxPointSize;
+    gctUINT              maxTcsOutPatchVectors;
 
     /* Caps for workGroupSize. */
     gctUINT              initWorkGroupSizeToCalcRegCount;
