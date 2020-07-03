@@ -3772,8 +3772,7 @@ _FuncInit_MMU(IN gcsFUNCTION_EXECUTION_PTR Execution)
         &physical
         ));
 
-    if (!gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_MMU_PAGE_DESCRIPTOR)
-        && (physical & 0xFFFFFFFF00000000ULL))
+    if (physical & 0xFFFFFFFF00000000ULL)
     {
         gcmkFATAL("%s(%d): Command buffer physical address (0x%llx) for MMU setup exceeds 32bits, "
                   "please rebuild kernel with CONFIG_ZONE_DMA32=y or CONFIG_ZONE_DMA=y or both.",

@@ -327,7 +327,7 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
             weightX = vxoGraphOptimization_computeFinalKernelSize(weightX, strideX);
             weightY = vxoGraphOptimization_computeFinalKernelSize(weightY, strideY);
 
-            if(!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1) &&
+            if(gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1) &&
                 (TENSOR_SIZE_INDEX(inputTensor,0) > NN_IMAGE_XSIZE_MAX || TENSOR_SIZE_INDEX(inputTensor, 1) > NN_IMAGE_YSIZE_MAX) )
                 break;
 
@@ -515,7 +515,7 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
                 else
                     batch = TENSOR_SIZE_INDEX(input, 3);
 
-                if(!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1) &&
+                if(gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1) &&
                     batch > NN_IMAGE_XSIZE_MAX )
                     break;
             }
@@ -544,7 +544,7 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
                 else
                     batch = TENSOR_SIZE_INDEX(input, 3);
 
-                if(!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1) &&
+                if(gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1) &&
                     batch > NN_IMAGE_XSIZE_MAX )
                     break;
             }
@@ -1714,7 +1714,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeConvolutionNodes(vx_node nod
                 }
             case VX_KERNEL_NN_PRELU:
                 {
-                    if(!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU))
+                    if(gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU))
                         break;
 
                     prelu_alpha = (vx_tensor) nodes[i]->paramTable[1];
@@ -2959,15 +2959,15 @@ VX_PRIVATE_API vx_status vxoGraphOptimization_TensorAdd2Conv_createBias_asymmeti
     vx_uint32 bDims[1] = {coreNum};
     float biasScale = TENSOR_TF_SCALE(*weight) * TENSOR_TF_SCALE(tensorIn[0]);
 
-    vx_tensor_create_params_t bias_p = vxoGraphOptimization_createParamsForTensor(1, bDims, VX_TYPE_INT32, VX_QUANT_AFFINE_SCALE,
-        0, 0, biasScale);
-
-    *bias = vxCreateTensor2(context, &bias_p, sizeof(bias_p));
-
+    if(!(*bias))
+    {
+        vx_tensor_create_params_t bias_p = vxoGraphOptimization_createParamsForTensor(1, bDims, VX_TYPE_INT32, VX_QUANT_AFFINE_SCALE,
+            0, 0, biasScale);
+        *bias = vxCreateTensor2(context, &bias_p, sizeof(bias_p));
+    }
     {
         vx_uint32 i = 0;
         float biasValue         = (TENSOR_TF_ZEROPOINT(tensorIn[0]) - TENSOR_TF_ZEROPOINT(tensorIn[1])) * TENSOR_TF_SCALE(tensorIn[1]);
-        float biasScale         = TENSOR_TF_SCALE(*weight) * TENSOR_TF_SCALE(tensorIn[0]);
         vx_int32 quantedDias    = (vx_int32)roundRTNE(biasValue / biasScale);
         vx_int32 *biasData      = (vx_int32 *)vxAllocateAndZeroMemory(coreNum* sizeof(vx_int32));
 
@@ -3199,6 +3199,34 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_TensorAdd2Conv(vx_graph graph)
             if(TENSOR_DATA_TYPE(tensorIn[0]) != TENSOR_DATA_TYPE(tensorIn[1]) ||
                 TENSOR_DATA_TYPE(tensorIn[0]) != TENSOR_DATA_TYPE(output) )
                 continue;
+
+            if(gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NEGATIVE_POST_SHIFT_FIX) &&
+                VX_QUANT_DYNAMIC_FIXED_POINT == TENSOR_QUANT_TYPE(tensorIn[0]))
+            {
+                    vx_int32 weight_fl = gcmMAX(TENSOR_POS(tensorIn[1]) - TENSOR_POS(tensorIn[0]), 0);
+                    if(TENSOR_POS(tensorIn[0]) + weight_fl < TENSOR_POS(output) )
+                        continue;
+            }
+
+            /* the formula is required:
+                  abs(fl1 - fl2) < data's bit width
+
+               such as:
+                    input1's fl = 30,
+                    input2's fl = 7,
+
+                   if the conv's input's fl is 30, the weight should be [1, 2^-23], but 2^-23 is too small.
+                   if 7, weight should be [2^23, 1], 2^23 is overflow for int8 or int16.
+            */
+            if(VX_QUANT_DYNAMIC_FIXED_POINT == TENSOR_QUANT_TYPE(tensorIn[0]) )
+            {
+                vx_uint8 delta = gcmABS(TENSOR_POS(tensorIn[0]) - TENSOR_POS(tensorIn[1]) );
+
+                if((delta > 15 && TENSOR_DATA_TYPE(tensorIn[0]) == VX_TYPE_INT16) ||
+                    (delta > 7 && TENSOR_DATA_TYPE(tensorIn[0]) == VX_TYPE_INT8)
+                    )
+                    continue;
+            }
 
             if(node->kernel->enumeration == VX_KERNEL_TENSOR_SUBTRACT)
                 factor = -1;
