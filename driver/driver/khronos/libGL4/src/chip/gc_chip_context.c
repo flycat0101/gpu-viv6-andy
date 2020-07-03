@@ -1966,6 +1966,7 @@ __glChipGetDeviceConstants(
     } while (GL_FALSE);
 
     constants->maxNumTextureLevels = __glFloorLog2(constants->maxTextureSize) + 1;
+    shaderCaps->maxLights = 8;
     shaderCaps->maxClipPlanes = 8;
     shaderCaps->maxClipDistances = 8;
     shaderCaps->maxCullDistances = 0;

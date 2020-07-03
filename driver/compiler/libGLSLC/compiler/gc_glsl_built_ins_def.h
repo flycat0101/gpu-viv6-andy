@@ -3836,6 +3836,18 @@ updateForClipDistance(
     OUT slsDATA_TYPE** DataType
     );
 
+gceSTATUS
+updateForTextureCoord(
+    IN sloCOMPILER Compiler,
+    OUT slsDATA_TYPE** DataType
+    );
+
+gceSTATUS
+updateForLights(
+    IN sloCOMPILER Compiler,
+    OUT slsDATA_TYPE** DataType
+    );
+
 static slsBUILT_IN_VARIABLE PerVertexVariables[] =
 {
     {{slvEXTENSION1_NONE},  "gl_Position",              "#In.Position",      slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER,   T_VEC4,     0,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE},
