@@ -116,9 +116,10 @@ void vscTree_Destroy(VSC_TREE* pTree)
     }
 }
 
-static void _AddSubTreeNodesToNodeList(VSC_TREE* pTree, VSC_TREE_NODE* pRootOfSubTree,
-                                       gctUINT depth, gctBOOL bUpdateDepthOnly)
+static VSC_ErrCode _AddSubTreeNodesToNodeList(VSC_TREE* pTree, VSC_TREE_NODE* pRootOfSubTree,
+                                              gctUINT depth, gctBOOL bUpdateDepthOnly)
 {
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
     VSC_CHILD_LIST_ITERATOR childIter;
     VSC_TREE_NODE*          pThisChildNode;
 
@@ -132,7 +133,8 @@ static void _AddSubTreeNodesToNodeList(VSC_TREE* pTree, VSC_TREE_NODE* pRootOfSu
 
         if (vscUNILST_GetNodeCount(&pRootOfSubTree->childrenList) == 0)
         {
-            vscSRARR_AddElement(&pTree->leafNodeArray, (void*)&pRootOfSubTree);
+            errCode = vscSRARR_AddElement(&pTree->leafNodeArray, (void*)&pRootOfSubTree);
+            ON_ERROR(errCode, "Failed in vscSRARR_AddElement.");
         }
     }
 
@@ -142,8 +144,12 @@ static void _AddSubTreeNodesToNodeList(VSC_TREE* pTree, VSC_TREE_NODE* pRootOfSu
     pThisChildNode = VSC_CHILD_LIST_ITERATOR_FIRST(&childIter);
     for (; pThisChildNode != gcvNULL; pThisChildNode = VSC_CHILD_LIST_ITERATOR_NEXT(&childIter))
     {
-        _AddSubTreeNodesToNodeList(pTree, pThisChildNode, depth + 1, bUpdateDepthOnly);
+        errCode = _AddSubTreeNodesToNodeList(pTree, pThisChildNode, depth + 1, bUpdateDepthOnly);
+        ON_ERROR(errCode, "Failed in _AddSubTreeNodesToNodeList.");
     }
+
+OnError:
+    return errCode;
 }
 
 static void _RemoveSubTreeNodesFromNodeList(VSC_TREE* pTree, VSC_TREE_NODE* pRootOfSubTree, gctUINT depthDelta)
@@ -194,14 +200,16 @@ static gctBOOL _IsNodeInSubTree(VSC_TREE_NODE* pSubTree, VSC_TREE_NODE* pNode)
     return gcvFALSE;
 }
 
-void vscTREE_AddSubTree(VSC_TREE* pTree, VSC_TREE_NODE* pGraftPoint, VSC_TREE_NODE* pRootOfSubTree)
+VSC_ErrCode vscTREE_AddSubTree(VSC_TREE* pTree, VSC_TREE_NODE* pGraftPoint, VSC_TREE_NODE* pRootOfSubTree)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     gcmASSERT(TNLST_GET_NODE_COUNT(&pTree->nodeList) != 0 || pGraftPoint == gcvNULL);
     gcmASSERT(_IsNodeInSubTree(pTree->pRootNode, pGraftPoint));
 
     /* Add all nodes in sub-tree to tree node list */
-    _AddSubTreeNodesToNodeList(pTree, pRootOfSubTree,
-                               (pGraftPoint == gcvNULL) ? 0 : (pGraftPoint->depth + 1), gcvFALSE);
+    errCode = _AddSubTreeNodesToNodeList(pTree, pRootOfSubTree,
+                                         (pGraftPoint == gcvNULL) ? 0 : (pGraftPoint->depth + 1), gcvFALSE);
+    ON_ERROR(errCode, "Failed in _AddSubTreeNodesToNodeList.");
 
     if (pGraftPoint == gcvNULL)
     {
@@ -224,14 +232,17 @@ void vscTREE_AddSubTree(VSC_TREE* pTree, VSC_TREE_NODE* pGraftPoint, VSC_TREE_NO
 
         pRootOfSubTree->pParentNode = pGraftPoint;
     }
+OnError:
+    return errCode;
 }
 
-void vscTREE_RemoveSubTree(VSC_TREE* pTree, VSC_TREE_NODE* pRootOfSubTree)
+VSC_ErrCode vscTREE_RemoveSubTree(VSC_TREE* pTree, VSC_TREE_NODE* pRootOfSubTree)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     /* If sub-tree is already decoupled from tree, just return */
     if (pRootOfSubTree->id == INVALID_TNODE_ID)
     {
-        return;
+        return errCode;
     }
 
     /* Topoloy update */
@@ -242,7 +253,8 @@ void vscTREE_RemoveSubTree(VSC_TREE* pTree, VSC_TREE_NODE* pRootOfSubTree)
 
         if (vscUNILST_GetNodeCount(&pRootOfSubTree->pParentNode->childrenList) == 0)
         {
-            vscSRARR_AddElement(&pTree->leafNodeArray, (void*)&pRootOfSubTree->pParentNode);
+            errCode = vscSRARR_AddElement(&pTree->leafNodeArray, (void*)&pRootOfSubTree->pParentNode);
+            ON_ERROR(errCode, "Failed in vscSRARR_AddElement.");
         }
 
         pRootOfSubTree->pParentNode = gcvNULL;
@@ -257,28 +269,32 @@ void vscTREE_RemoveSubTree(VSC_TREE* pTree, VSC_TREE_NODE* pRootOfSubTree)
         pTree->pRootNode =  gcvNULL;
         pTree->nextNodeId = 0;
     }
+
+OnError:
+    return errCode;
 }
 
-void vscTREE_MoveSubTree(VSC_TREE* pTree, VSC_TREE_NODE* pNewGraftPoint, VSC_TREE_NODE* pRootOfSubTree)
+VSC_ErrCode vscTREE_MoveSubTree(VSC_TREE* pTree, VSC_TREE_NODE* pNewGraftPoint, VSC_TREE_NODE* pRootOfSubTree)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     /* If sub-tree or graft point is already decoupled from tree, just return */
     if (pRootOfSubTree->id == INVALID_TNODE_ID || pNewGraftPoint->id == INVALID_TNODE_ID)
     {
         gcmASSERT(gcvFALSE);
-        return;
+        return errCode;
     }
 
     /* No need to move for whole tree or same graft point */
     if ((pRootOfSubTree->pParentNode == gcvNULL) || (pNewGraftPoint == pRootOfSubTree->pParentNode))
     {
-        return;
+        return errCode;
     }
 
     /* Check whether new graft point is inside of sub-tree, if so, just abort it */
     if (_IsNodeInSubTree(pRootOfSubTree, pNewGraftPoint))
     {
         gcmASSERT(gcvFALSE);
-        return;
+        return errCode;
     }
 
     /* Remove from old graft point */
@@ -286,7 +302,8 @@ void vscTREE_MoveSubTree(VSC_TREE* pTree, VSC_TREE_NODE* pNewGraftPoint, VSC_TRE
                      (VSC_UNI_LIST_NODE*)&pRootOfSubTree->asSiblingNode);
     if (vscUNILST_GetNodeCount(&pRootOfSubTree->pParentNode->childrenList) == 0)
     {
-        vscSRARR_AddElement(&pTree->leafNodeArray, (void*)&pRootOfSubTree->pParentNode);
+        errCode = vscSRARR_AddElement(&pTree->leafNodeArray, (void*)&pRootOfSubTree->pParentNode);
+        CHECK_ERROR(errCode, "Failed in vscSRARR_AddElement.");
     }
 
     /* Add to new graft point */
@@ -301,16 +318,23 @@ void vscTREE_MoveSubTree(VSC_TREE* pTree, VSC_TREE_NODE* pNewGraftPoint, VSC_TRE
 
     /* Update depth */
     _AddSubTreeNodesToNodeList(pTree, pRootOfSubTree, pNewGraftPoint->depth + 1, gcvTRUE);
+    return errCode;
 }
 
-void vscTREE_MergeTwoTrees(VSC_TREE* pDstTree, VSC_TREE* pSrcTree, VSC_TREE_NODE* pGraftPointInDstTree)
+VSC_ErrCode vscTREE_MergeTwoTrees(VSC_TREE* pDstTree, VSC_TREE* pSrcTree, VSC_TREE_NODE* pGraftPointInDstTree)
 {
+    VSC_ErrCode    errCode = VSC_ERR_NONE;
     VSC_TREE_NODE* pRootOfSrc = pSrcTree->pRootNode;
 
     gcmASSERT(_IsNodeInSubTree(pDstTree->pRootNode, pGraftPointInDstTree));
 
-    vscTREE_RemoveSubTree(pSrcTree, pRootOfSrc);
-    vscTREE_AddSubTree(pDstTree, pGraftPointInDstTree, pRootOfSrc);
+    errCode =vscTREE_RemoveSubTree(pSrcTree, pRootOfSrc);
+    ON_ERROR(errCode, "Failed in vscTREE_RemoveSubTree.");
+    errCode = vscTREE_AddSubTree(pDstTree, pGraftPointInDstTree, pRootOfSrc);
+    ON_ERROR(errCode, "Failed in vscTREE_AddSubTree.");
+
+OnError:
+    return errCode;
 }
 
 gctUINT vscTREE_GetNodeCount(VSC_TREE* pTree)

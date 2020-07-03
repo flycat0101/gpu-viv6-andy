@@ -1395,7 +1395,8 @@ VSC_ErrCode _VSC_SIMP_SelectCandidateFunction(
                 currentParam.paramTypeByteSize = VIR_Type_GetTypeByteSize(Shader, VIR_Symbol_GetType(paramSym)) / paramTypeArraySize;
                 /*Get pointer to parameter.*/
                 currentParam.paramPtr = Operand;
-                vscSRARR_AddElement(candidateFunc.longSizeParams, &currentParam);
+                errCode = vscSRARR_AddElement(candidateFunc.longSizeParams, &currentParam);
+                CHECK_ERROR(errCode, "Failed in vscSRARR_AddElement");
                 /*dump*/
                 if (VSC_UTILS_MASK(VSC_OPTN_ParamOptOptions_GetTrace(paramOptsOptions),
                         VSC_OPTN_ParamOptOptions_TRACE))
@@ -1430,7 +1431,8 @@ VSC_ErrCode _VSC_SIMP_SelectCandidateFunction(
     }
     if (isOptimizable)
     {
-        vscSRARR_AddElement(paramOptimizer->candidateFuncs, &candidateFunc);
+        errCode = vscSRARR_AddElement(paramOptimizer->candidateFuncs, &candidateFunc);
+        CHECK_ERROR(errCode, "Failed in vscSRARR_AddElement");
         /*dump*/
         if (VSC_UTILS_MASK(VSC_OPTN_ParamOptOptions_GetTrace(paramOptsOptions),
                 VSC_OPTN_ParamOptOptions_TRACE))
@@ -1464,6 +1466,7 @@ VSC_ErrCode _VSC_SIMP_AddOneArgument(
     IN OUT VSC_SIMPLE_RESIZABLE_ARRAY *longSizeArguments
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     gctSIZE_T i;
     gctUINT currentArgumentCount = vscSRARR_GetElementCount(longSizeArguments);
     /*Check array to see if the argument is already in it.*/
@@ -1486,7 +1489,9 @@ VSC_ErrCode _VSC_SIMP_AddOneArgument(
         LONG_SIZE_ARGUMENT *prevArgument = (LONG_SIZE_ARGUMENT*)vscSRARR_GetElement(longSizeArguments, currentArgumentCount - 1);
         longSizeArg->offset = prevArgument->offset + prevArgument->argArraySize * prevArgument->argTypeByteSize;
     }
-    vscSRARR_AddElement(longSizeArguments, longSizeArg);
+    errCode = vscSRARR_AddElement(longSizeArguments, longSizeArg);
+    CHECK_ERROR(errCode, "Failed in vscSRARR_AddElement");
+
     return VSC_ERR_NONE;
 }
 

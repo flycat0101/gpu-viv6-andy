@@ -141,10 +141,10 @@ void vscTREE_Destroy(VSC_TREE* pTree);
    vscTREE_RemoveSubTree can make a part of tree as homeless sub-tree (that's why is not represented by VSC_TREE).
    For a homeless tree, although it has no VSC_TREE to manage its nodes, it still has tree topoloy, so you can
    still traversal it. The most important charater of homeless tree is id of each node is INVALID_TNODE_ID. */
-void vscTREE_AddSubTree(VSC_TREE* pTree, VSC_TREE_NODE* pGraftPoint, VSC_TREE_NODE* pRootOfSubTree);
-void vscTREE_RemoveSubTree(VSC_TREE* pTree, VSC_TREE_NODE* pRootOfSubTree);
-void vscTREE_MoveSubTree(VSC_TREE* pTree, VSC_TREE_NODE* pNewGraftPoint, VSC_TREE_NODE* pRootOfSubTree);
-void vscTREE_MergeTwoTrees(VSC_TREE* pDstTree, VSC_TREE* pSrcTree, VSC_TREE_NODE* pGraftPointInDstTree);
+VSC_ErrCode vscTREE_AddSubTree(VSC_TREE* pTree, VSC_TREE_NODE* pGraftPoint, VSC_TREE_NODE* pRootOfSubTree);
+VSC_ErrCode vscTREE_RemoveSubTree(VSC_TREE* pTree, VSC_TREE_NODE* pRootOfSubTree);
+VSC_ErrCode vscTREE_MoveSubTree(VSC_TREE* pTree, VSC_TREE_NODE* pNewGraftPoint, VSC_TREE_NODE* pRootOfSubTree);
+VSC_ErrCode vscTREE_MergeTwoTrees(VSC_TREE* pDstTree, VSC_TREE* pSrcTree, VSC_TREE_NODE* pGraftPointInDstTree);
 
 gctUINT vscTREE_GetNodeCount(VSC_TREE* pTree);
 gctUINT vscTREE_GetHistNodeCount(VSC_TREE* pTree);

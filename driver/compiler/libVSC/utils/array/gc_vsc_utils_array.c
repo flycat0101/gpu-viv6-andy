@@ -74,9 +74,10 @@ void vscSRARR_Destroy(VSC_SIMPLE_RESIZABLE_ARRAY* pArray)
     }
 }
 
-static void _CheckElementSpace(VSC_SIMPLE_RESIZABLE_ARRAY* pArray)
+static VSC_ErrCode _CheckElementSpace(VSC_SIMPLE_RESIZABLE_ARRAY* pArray)
 {
-    gctUINT newAllocCount;
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    gctUINT     newAllocCount;
 
     if (pArray->elementCount == pArray->allocatedCount)
     {
@@ -89,7 +90,15 @@ static void _CheckElementSpace(VSC_SIMPLE_RESIZABLE_ARRAY* pArray)
 
         pArray->allocatedCount = newAllocCount;
         pArray->pElement = vscMM_Realloc(pArray->pMM, pArray->pElement, pArray->elementSize*pArray->allocatedCount);
+        if (pArray->pElement == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR(errCode, "Failed to allocate memory for pArray->pElement.");
+        }
     }
+
+OnError:
+    return errCode;
 }
 
 VSC_ErrCode vscSRARR_SetElementCount(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, gctUINT newEleCount)
@@ -117,21 +126,31 @@ gctUINT vscSRARR_GetElementCount(VSC_SIMPLE_RESIZABLE_ARRAY* pArray)
     return pArray->elementCount;
 }
 
-gctUINT vscSRARR_AddElement(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, void* pNewEle)
+VSC_ErrCode vscSRARR_AddElement(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, void* pNewEle)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     if (pArray->elementSize == 0)
     {
         WARNING_REPORT(VSC_ERR_INVALID_DATA, "The element size of an array is 0, something is wrong!!!");
     }
 
-    _CheckElementSpace(pArray);
+    errCode = _CheckElementSpace(pArray);
+    ON_ERROR(errCode, "Failed at _CheckElementSpace.");
+
     memcpy((gctUINT8*)pArray->pElement + pArray->elementSize*pArray->elementCount,
            pNewEle, pArray->elementSize);
-    return pArray->elementCount ++;
+
+    pArray->elementCount ++;
+
+OnError:
+    return errCode;
 }
 
-gctUINT vscSRARR_AddElementToSpecifiedIndex(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, void* pNewEle, gctINT index)
+VSC_ErrCode vscSRARR_AddElementToSpecifiedIndex(VSC_SIMPLE_RESIZABLE_ARRAY* pArray,
+                                                void* pNewEle,
+                                                gctINT index)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     gctUINT i, j;
 
     if (index < 0)
@@ -149,7 +168,8 @@ gctUINT vscSRARR_AddElementToSpecifiedIndex(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, 
     /* When the index is the element count, just append a new element. */
     if (index == (gctINT)pArray->elementCount)
     {
-        return vscSRARR_AddElement(pArray, pNewEle);
+        errCode = vscSRARR_AddElement(pArray, pNewEle);
+        return errCode;
     }
 
     if (pArray->elementSize == 0)
@@ -157,7 +177,8 @@ gctUINT vscSRARR_AddElementToSpecifiedIndex(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, 
         WARNING_REPORT(VSC_ERR_INVALID_DATA, "The element size of an array is 0, something is wrong!!!");
     }
 
-    _CheckElementSpace(pArray);
+    errCode = _CheckElementSpace(pArray);
+    ON_ERROR(errCode, "Failed in _CheckElementSpace.");
 
     for (i = pArray->elementCount - 1; i >= (gctUINT)index; i--)
     {
@@ -170,12 +191,20 @@ gctUINT vscSRARR_AddElementToSpecifiedIndex(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, 
 
     memcpy((gctUINT8*)pArray->pElement + pArray->elementSize * index, pNewEle, pArray->elementSize);
 
-    return pArray->elementCount ++;
+    pArray->elementCount ++;
+
+OnError:
+    return errCode;
 }
 
 void* vscSRARR_GetNextEmpty(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, gctUINT *pIndex)
 {
-    _CheckElementSpace(pArray);
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    errCode = _CheckElementSpace(pArray);
+    if (errCode == VSC_ERR_OUT_OF_MEMORY)
+    {
+        return gcvNULL;
+    }
     *pIndex = pArray->elementCount ++;
     return (gctUINT8*)pArray->pElement + pArray->elementSize*(*pIndex);
 }
