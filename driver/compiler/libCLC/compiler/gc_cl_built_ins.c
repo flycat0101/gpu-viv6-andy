@@ -1441,11 +1441,7 @@ IN cleSHADER_TYPE ShaderType
 #if LOAD_BUILT_IN_FUNCS_ONLY_ONCE
     do {
         /* Load built-in functions */
-        status = _LoadIntrinsicBuiltinFunctions(Compiler,
-                                                _cldIntrinsicBuiltinFunctionCount,
-                                                IntrinsicBuiltinFunctions);
-        if (gcmIS_ERROR(status)) break;
-
+        /* KS builtin functions are loaded first */
         status = _LoadBuiltinFunctions(Compiler,
                         _cldKSBuiltinFunctionCount,
                         KSBuiltinFunctions);
@@ -1479,6 +1475,11 @@ IN cleSHADER_TYPE ShaderType
         status = _LoadBuiltinFunctions(Compiler,
                            _cldImageBuiltinFunctionCount,
                            ImageBuiltinFunctions);
+        if (gcmIS_ERROR(status)) break;
+
+        status = _LoadIntrinsicBuiltinFunctions(Compiler,
+                                                _cldIntrinsicBuiltinFunctionCount,
+                                                IntrinsicBuiltinFunctions);
         if (gcmIS_ERROR(status)) break;
 
         gcmFOOTER_NO();

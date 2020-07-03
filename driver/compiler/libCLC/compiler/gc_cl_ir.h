@@ -1186,10 +1186,18 @@ struct _clsNAME *scopeName;
 cltPOOL_STRING symbol;
 struct _clsNAME_SPACE *    parent;
 slsDLINK_LIST    names;
+clsHASH_TABLE    nameHash;
 slsDLINK_LIST    subSpaces;
 gctUINT16 die;
 }
 clsNAME_SPACE;
+
+typedef struct _clsNAME_NODE
+{
+    slsDLINK_NODE node;
+    clsNAME       *name;
+}
+clsNAME_NODE;
 
 gceSTATUS
 clsNAME_SPACE_ReleaseName(

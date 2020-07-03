@@ -4466,6 +4466,25 @@ IN cloCOMPILER Compiler,
 IN clsNAME_SPACE *NameSpace
 )
 {
+    clsNAME_SPACE *orgNamespace = Compiler->context.currentSpace;
+    if (NameSpace == orgNamespace)
+        return;
+    if (NameSpace == Compiler->context.generalBuiltinSpace)
+    {
+        /* change to general built-in space */
+#if (__USE_VSC_MP__ ||__USE_VSC_BMS__)
+        Compiler->currentMmWrapper = &Compiler->generalPMP.mmWrapper;
+#endif
+    }
+    if(orgNamespace == Compiler->context.generalBuiltinSpace)
+    {
+        /* change from general built-in space */
+#if __USE_VSC_MP__
+        Compiler->currentMmWrapper = &Compiler->privatePMP.mmWrapper;
+#elif __USE_VSC_BMS__
+        Compiler->currentMmWrapper = &Compiler->scratchMemPool.mmWrapper;
+#endif
+    }
     Compiler->context.currentSpace = NameSpace;
 }
 
@@ -5036,6 +5055,15 @@ clsNAME_SPACE *  NameSpace
 )
 {
    return NameSpace == Compiler->context.unnamedSpace;
+}
+
+gctBOOL
+cloCOMPILER_IsNameSpaceGeneralBuiltin(
+IN cloCOMPILER Compiler,
+clsNAME_SPACE *  NameSpace
+)
+{
+   return NameSpace == Compiler->context.generalBuiltinSpace;
 }
 
 gctBOOL

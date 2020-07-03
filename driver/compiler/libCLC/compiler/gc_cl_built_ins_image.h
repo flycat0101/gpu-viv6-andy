@@ -189,7 +189,6 @@ static clsBUILTIN_FUNCTION    ImageBuiltinFunctions[] =
     {clvEXTENSION_NONE,    "get_image_dim",       T_INT4, 1, {T_IMAGE3D_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_dim",       T_INT2, 1, {T_IMAGE2D_ARRAY_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_dim",       T_INT4, 1, {T_VIV_GENERIC_IMAGE_T}, {0}, {0}, 1},
-    {clvEXTENSION_NONE,    "get_image_dim",       T_INT2, 1, {T_VIV_GENERIC_IMAGE_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_array_size",       T_INT, 1, {T_IMAGE1D_ARRAY_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_array_size",       T_INT, 1, {T_IMAGE2D_ARRAY_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_array_size",       T_INT, 1, {T_VIV_GENERIC_IMAGE_T}, {0}, {0}, 1},
