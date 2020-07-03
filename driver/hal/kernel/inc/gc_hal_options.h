@@ -364,7 +364,11 @@ This define enables the use of VM for gckCommand and fence buffers.
         Number of bytes in a command buffer.
 */
 #ifndef gcdCMD_BUFFER_SIZE
+#if gcdCAPTURE_ONLY_MODE
+#   define gcdCMD_BUFFER_SIZE                   (4 << 10)
+#else
 #   define gcdCMD_BUFFER_SIZE                   (128 << 10)
+#endif
 #endif
 
 /*
@@ -382,7 +386,11 @@ This define enables the use of VM for gckCommand and fence buffers.
         Number of command buffers to use per client.
 */
 #ifndef gcdCMD_BUFFERS
+#if gcdCAPTURE_ONLY_MODE
+#   define gcdCMD_BUFFERS                       1
+#else
 #   define gcdCMD_BUFFERS                       2
+#endif
 #endif
 
 /*
@@ -545,7 +553,11 @@ This define enables the use of VM for gckCommand and fence buffers.
     between multiple sub-buffers.
 */
 #ifndef gcdENABLE_BUFFER_ALIGNMENT
+#if gcdCAPTURE_ONLY_MODE
+#   define gcdENABLE_BUFFER_ALIGNMENT             0
+#else
 #   define gcdENABLE_BUFFER_ALIGNMENT             1
+#endif
 #endif
 
 /*
@@ -555,9 +567,14 @@ This define enables the use of VM for gckCommand and fence buffers.
     _GetSurfaceBankAlignment() and _GetBankOffsetBytes() to define how
     different types of allocations are bank and channel aligned.
     When disabled (default), no bank alignment is done.
+    For CAPTURE ONLY MODE, should make sure that gcdENABLE_BANK_ALIGNMENT is disabled.
 */
 #ifndef gcdENABLE_BANK_ALIGNMENT
+#if gcdCAPTURE_ONLY_MODE
 #   define gcdENABLE_BANK_ALIGNMENT             0
+#else
+#   define gcdENABLE_BANK_ALIGNMENT             0
+#endif
 #endif
 
 /*
