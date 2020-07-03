@@ -167,8 +167,9 @@ void vscDG_Destroy(VSC_DIRECTED_GRAPH* pDG)
     }
 }
 
-static void _UpdateRootArray(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
+static VSC_ErrCode _UpdateRootArray(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     gcmASSERT(pNode->id != INVALID_GNODE_ID);
 
     /* Root array */
@@ -177,38 +178,51 @@ static void _UpdateRootArray(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
         if (vscSRARR_GetElementIndexByContent(&pDG->rootNodeArray, (void*)&pNode) ==
             VSC_INVALID_ARRAY_INDEX)
         {
-            vscSRARR_AddElement(&pDG->rootNodeArray, (void*)&pNode);
+            errCode = vscSRARR_AddElement(&pDG->rootNodeArray, (void*)&pNode);
+            ON_ERROR(errCode, "Failed in vscSRARR_AddElement.");
         }
     }
     else
     {
         vscSRARR_RemoveElementByContent(&pDG->rootNodeArray, (void*)&pNode);
     }
+OnError:
+    return errCode;
 }
 
-static void _UpdateTailArray(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
+static VSC_ErrCode _UpdateTailArray(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     gcmASSERT(pNode->id != INVALID_GNODE_ID);
 
     /* Tail array */
     if (DGND_GET_OUT_DEGREE(pNode) == 0)
     {
-        if (vscSRARR_GetElementIndexByContent(&pDG->tailNodeArray, (void*)&pNode) ==
-            VSC_INVALID_ARRAY_INDEX)
+        if (vscSRARR_GetElementIndexByContent(&pDG->tailNodeArray, (void*)&pNode) == VSC_INVALID_ARRAY_INDEX)
         {
-            vscSRARR_AddElement(&pDG->tailNodeArray, (void*)&pNode);
+            errCode = vscSRARR_AddElement(&pDG->tailNodeArray, (void*)&pNode);
+            ON_ERROR(errCode, "Failed in vscSRARR_AddElement.");
         }
     }
     else
     {
         vscSRARR_RemoveElementByContent(&pDG->tailNodeArray, (void*)&pNode);
     }
+
+OnError:
+    return errCode;
 }
 
-static void _UpdateRootTailArray(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
+static VSC_ErrCode _UpdateRootTailArray(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
 {
-    _UpdateRootArray(pDG, pNode);
-    _UpdateTailArray(pDG, pNode);
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    errCode = _UpdateRootArray(pDG, pNode);
+    ON_ERROR(errCode, "Failed in _UpdateRootArray.");
+    errCode = _UpdateTailArray(pDG, pNode);
+    ON_ERROR(errCode, "Failed in _UpdateTailArray.");
+
+OnError:
+    return errCode;
 }
 
 VSC_ErrCode vscDG_AddNode(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
@@ -225,7 +239,8 @@ VSC_ErrCode vscDG_AddNode(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
     ON_ERROR0(errCode);
 
     /* Since this is fresh node, so it must be as both root and tail. */
-    _UpdateRootTailArray(pDG, pNode);
+    errCode = _UpdateRootTailArray(pDG, pNode);
+    ON_ERROR(errCode, "Failed in _UpdateRootTailArray.");
 
 OnError:
     return errCode;
@@ -264,6 +279,7 @@ VSC_DG_EDGE* vscDG_GetEdge(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_
 
 VSC_DG_EDGE* vscDG_AddEdge(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_DG_NODE* pToNode, gctBOOL* pIsNewEdge)
 {
+    VSC_ErrCode  errCode = VSC_ERR_NONE;
     VSC_DG_EDGE* pEdges;
     VSC_DG_EDGE* pSuccEdge;
     VSC_DG_EDGE* pPredEdge;
@@ -283,12 +299,20 @@ VSC_DG_EDGE* vscDG_AddEdge(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_
     /* Check whether from-node and to-node are in graph, if not, add them */
     if (pFromNode->id == INVALID_GNODE_ID)
     {
-        vscDG_AddNode(pDG, pFromNode);
+        errCode = vscDG_AddNode(pDG, pFromNode);
+        if (errCode != VSC_ERR_NONE)
+        {
+            return gcvNULL;
+        }
     }
 
     if (pToNode->id == INVALID_GNODE_ID)
     {
-        vscDG_AddNode(pDG, pToNode);
+        errCode = vscDG_AddNode(pDG, pToNode);
+        if (errCode != VSC_ERR_NONE)
+        {
+            return gcvNULL;
+        }
     }
 
     /* If edge is already existed, just return this edge */
@@ -327,59 +351,23 @@ VSC_DG_EDGE* vscDG_AddEdge(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_
     AJLST_ADD_EDGE(&pToNode->predList, pPredEdge);
 
     /* Lastly, update root and tail array */
-    _UpdateTailArray(pDG, pFromNode);
-    _UpdateRootArray(pDG, pToNode);
-
+    errCode = _UpdateTailArray(pDG, pFromNode);
+    if (errCode == VSC_ERR_OUT_OF_MEMORY)
+    {
+        return gcvNULL;
+    }
+    errCode = _UpdateRootArray(pDG, pToNode);
+    if (errCode == VSC_ERR_OUT_OF_MEMORY)
+    {
+        return gcvNULL;
+    }
     return pEdges;
 }
 
-VSC_DG_EDGE* vscDG_ReplaceEdgeFromNode(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_DG_NODE* pToNode, VSC_DG_NODE* pNewFromNode)
-{
-    VSC_DG_EDGE* pSuccEdge = gcvNULL;
-    VSC_DG_EDGE* pPredEdge = gcvNULL;
-
-    gcmASSERT(pFromNode->id != INVALID_GNODE_ID);
-    gcmASSERT(pToNode->id != INVALID_GNODE_ID);
-
-    /* Find successor edge and then remove */
-    for (pSuccEdge = AJLST_GET_FIRST_EDGE(&pFromNode->succList);
-         pSuccEdge != NULL;
-         pSuccEdge = DGEG_GET_NEXT_EDGE(pSuccEdge))
-    {
-        if (pSuccEdge->pFromNode == pFromNode && pSuccEdge->pToNode == pToNode)
-        {
-            AJLST_REMOVE_EDGE(&pFromNode->succList, pSuccEdge);
-            break;
-        }
-    }
-    gcmASSERT(pSuccEdge);
-
-    /* Find predecessor edge and remove */
-    for (pPredEdge = AJLST_GET_FIRST_EDGE(&pToNode->predList);
-         pPredEdge != NULL;
-         pPredEdge = DGEG_GET_NEXT_EDGE(pPredEdge))
-    {
-        if (pPredEdge->pToNode == pFromNode && pPredEdge->pFromNode == pToNode)
-        {
-            break;
-        }
-    }
-    gcmASSERT(pPredEdge);
-
-    /* Free edges, note that pSuccEdge and pPredEdge are successive and pSuccEdge points whole entity */
-    pSuccEdge->pFromNode = pNewFromNode;
-    pPredEdge->pToNode = pNewFromNode;
-    AJLST_ADD_EDGE(&pNewFromNode->succList, pSuccEdge);
-
-    /* Lastly, update root and tail array */
-    _UpdateTailArray(pDG, pFromNode);
-    _UpdateTailArray(pDG, pNewFromNode);
-
-    return pSuccEdge;
-}
 
 VSC_DG_EDGE* vscDG_ReplaceEdgeToNode(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_DG_NODE* pToNode, VSC_DG_NODE* pNewToNode)
 {
+    VSC_ErrCode  errCode = VSC_ERR_NONE;
     VSC_DG_EDGE* pSuccEdge = gcvNULL;
     VSC_DG_EDGE* pPredEdge = gcvNULL;
 
@@ -417,14 +405,22 @@ VSC_DG_EDGE* vscDG_ReplaceEdgeToNode(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFrom
     AJLST_ADD_EDGE(&pNewToNode->predList, pPredEdge);
 
     /* Lastly, update root and tail array */
-    _UpdateRootArray(pDG, pToNode);
-    _UpdateRootArray(pDG, pNewToNode);
-
+    errCode = _UpdateRootArray(pDG, pToNode);
+    if (errCode == VSC_ERR_OUT_OF_MEMORY)
+    {
+        return gcvNULL;
+    }
+    errCode = _UpdateRootArray(pDG, pNewToNode);
+    if (errCode == VSC_ERR_OUT_OF_MEMORY)
+    {
+        return gcvNULL;
+    }
     return pSuccEdge;
 }
 
-void vscDG_RemoveEdge(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_DG_NODE* pToNode)
+VSC_ErrCode vscDG_RemoveEdge(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_DG_NODE* pToNode)
 {
+    VSC_ErrCode  errCode = VSC_ERR_NONE;
     VSC_DG_EDGE* pSuccEdge = gcvNULL;
     VSC_DG_EDGE* pPredEdge = gcvNULL;
 
@@ -464,12 +460,18 @@ void vscDG_RemoveEdge(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_DG_NO
     vscMM_Free(pDG->pMM, pSuccEdge);
 
     /* Lastly, update root and tail array */
-    _UpdateTailArray(pDG, pFromNode);
-    _UpdateRootArray(pDG, pToNode);
+    errCode = _UpdateTailArray(pDG, pFromNode);
+    ON_ERROR(errCode, "Failed in _UpdateTailArray.");
+    errCode = _UpdateRootArray(pDG, pToNode);
+    ON_ERROR(errCode, "Failed in _UpdateRootArray.");
+
+OnError:
+    return errCode;
 }
 
-void vscDG_RemoveNode(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
+VSC_ErrCode vscDG_RemoveNode(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
 {
+    VSC_ErrCode  errCode = VSC_ERR_NONE;
     VSC_DG_EDGE* pSuccEdge = gcvNULL;
     VSC_DG_EDGE* pPredEdge = gcvNULL;
 
@@ -480,7 +482,8 @@ void vscDG_RemoveNode(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
          pSuccEdge != NULL;
          pSuccEdge = AJLST_GET_FIRST_EDGE(&pNode->succList))
     {
-        vscDG_RemoveEdge(pDG, pSuccEdge->pFromNode, pSuccEdge->pToNode);
+        errCode = vscDG_RemoveEdge(pDG, pSuccEdge->pFromNode, pSuccEdge->pToNode);
+        ON_ERROR(errCode, "Failed in vscDG_RemoveEdge.");
     }
 
     /* Remove all predecessor edges */
@@ -488,7 +491,8 @@ void vscDG_RemoveNode(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
          pPredEdge != NULL;
          pPredEdge = AJLST_GET_FIRST_EDGE(&pNode->predList))
     {
-        vscDG_RemoveEdge(pDG, pPredEdge->pToNode, pPredEdge->pFromNode);
+        errCode = vscDG_RemoveEdge(pDG, pPredEdge->pToNode, pPredEdge->pFromNode);
+        ON_ERROR(errCode, "Failed in vscDG_RemoveEdge.");
     }
 
     /* Remove it from root and tail array */
@@ -505,6 +509,9 @@ void vscDG_RemoveNode(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
     {
         pDG->nextNodeId = 0;
     }
+
+OnError:
+    return errCode;
 }
 
 VSC_DG_NODE* vscDG_GetNodeById(VSC_DIRECTED_GRAPH* pDG, gctUINT nodeId)
@@ -828,7 +835,8 @@ static VSC_ErrCode _DoPreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
                 /* Record pre-order seq */
                 ppRetNodeOrder[(*pPreOrderIdx) ++] = pEdge->pToNode;
 
-                vscSRARR_AddElement(&unvisitedDescendantArray, pEdge->pToNode);
+                errCode = vscSRARR_AddElement(&unvisitedDescendantArray, pEdge->pToNode);
+                CHECK_ERROR(errCode, "Failed in vscSRARR_AddElement");
             }
         }
 
@@ -1068,7 +1076,8 @@ static VSC_ErrCode _DoPostOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
             {
                 pEdge->pToNode->bVisited = gcvTRUE;
 
-                vscSRARR_AddElement(&unvisitedDescendantArray, pEdge->pToNode);
+                errCode = vscSRARR_AddElement(&unvisitedDescendantArray, pEdge->pToNode);
+                CHECK_ERROR(errCode, "Failed in vscSRARR_AddElement.");
             }
         }
 
@@ -1300,7 +1309,8 @@ static VSC_ErrCode _DoTraversalCB(VSC_DIRECTED_GRAPH* pDG,
             {
                 SAFE_CALL_DG_NODE_HANDLER_CONTINUE(pfnHandlerOwnPre, pNode, pParam);
                 pEdge->pToNode->bVisited = gcvTRUE;
-                vscSRARR_AddElement(&unvisitedDescendantArray, pEdge->pToNode);
+                errCode = vscSRARR_AddElement(&unvisitedDescendantArray, pEdge->pToNode);
+                CHECK_ERROR(errCode, "Failed in vscSRARR_AddElement.");
             }
         }
 

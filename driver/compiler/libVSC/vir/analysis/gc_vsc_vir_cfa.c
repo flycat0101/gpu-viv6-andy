@@ -95,8 +95,9 @@ static gctBOOL _RootFuncBlkHandlerDFSPost(VIR_CALL_GRAPH* pCg, VIR_FUNC_BLOCK* p
     return gcvTRUE;
 }
 
-static void _RemoveFuncBlockFromCallGraph(VIR_CALL_GRAPH* pCg, VIR_FUNC_BLOCK* pFuncBlk, gctBOOL bRemoveFuncInShader)
+static VSC_ErrCode _RemoveFuncBlockFromCallGraph(VIR_CALL_GRAPH* pCg, VIR_FUNC_BLOCK* pFuncBlk, gctBOOL bRemoveFuncInShader)
 {
+    VSC_ErrCode                  errCode = VSC_ERR_NONE;
     VSC_ADJACENT_LIST_ITERATOR   edgeIter;
     VIR_CG_EDGE*                 pEdge;
 
@@ -111,7 +112,8 @@ static void _RemoveFuncBlockFromCallGraph(VIR_CALL_GRAPH* pCg, VIR_FUNC_BLOCK* p
     vscSRARR_Finalize(&pFuncBlk->mixedCallSiteArray);
 
     /* Remove node from graph */
-    vscDG_RemoveNode(&pCg->dgGraph, &pFuncBlk->dgNode);
+    errCode = vscDG_RemoveNode(&pCg->dgGraph, &pFuncBlk->dgNode);
+    CHECK_ERROR(errCode, "Failed in vscDG_RemoveNode.");
 
     /* Remove func from shader */
     if (bRemoveFuncInShader)
@@ -126,13 +128,14 @@ static void _RemoveFuncBlockFromCallGraph(VIR_CALL_GRAPH* pCg, VIR_FUNC_BLOCK* p
 
     /* Free this node */
     vscMM_Free(&pCg->pmp.mmWrapper, pFuncBlk);
+    return errCode;
 }
 
 static VSC_ErrCode _RemoveUnreachableFunctions(VIR_CALL_GRAPH* pCg)
 {
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
     CG_ITERATOR             funcBlkIter;
     VIR_FUNC_BLOCK*         pFuncBlk;
-    VSC_ErrCode             errCode = VSC_ERR_NONE;
 
     /* Firstly do traversal CG to find unreachable func-blocks which are not visisted ones */
     errCode = vscDG_TraversalCB(&pCg->dgGraph,
@@ -154,7 +157,8 @@ static VSC_ErrCode _RemoveUnreachableFunctions(VIR_CALL_GRAPH* pCg)
         /* Any unvisited one is unreachable, so remove it from graph */
         if (!pFuncBlk->dgNode.bVisited)
         {
-            _RemoveFuncBlockFromCallGraph(pCg, pFuncBlk, gcvTRUE);
+            errCode = _RemoveFuncBlockFromCallGraph(pCg, pFuncBlk, gcvTRUE);
+            ON_ERROR(errCode, "Failed in _RemoveFuncBlockFromCallGraph.");
         }
     }
 
@@ -246,7 +250,11 @@ static VIR_CG_EDGE* _AddEdgeForCG(VIR_CALL_GRAPH* pCg, VIR_FUNC_BLOCK* pFromFB,
     }
 
     /* Add this call site */
-    vscSRARR_AddElement(&pEdge->callSiteArray, (void*)&pCallSiteInst);
+    if (vscSRARR_AddElement(&pEdge->callSiteArray, (void*)&pCallSiteInst) != VSC_ERR_NONE)
+    {
+        return gcvNULL;
+    }
+
     return pEdge;
 }
 
@@ -312,7 +320,8 @@ VSC_ErrCode vscVIR_BuildCallGraph(VSC_MM* pScratchMemPool, VIR_Shader* pShader, 
                     CHECK_ERROR(errCode, "Build call graph");
                 }
 
-                vscSRARR_AddElement(&pThisFuncBlk->mixedCallSiteArray, (void*)&pInst);
+                errCode = vscSRARR_AddElement(&pThisFuncBlk->mixedCallSiteArray, (void*)&pInst);
+                CHECK_ERROR(errCode, "Failed in vscSRARR_AddElement.");
 
                 /* We need to remove all these connections when remove this call instruction. */
             }
@@ -371,7 +380,8 @@ VSC_ErrCode vscVIR_DestroyCallGraph(VIR_CALL_GRAPH* pCg)
     {
         pNextFuncBlk = (VIR_FUNC_BLOCK *)CG_ITERATOR_NEXT(&funcBlkIter);
 
-        _RemoveFuncBlockFromCallGraph(pCg, pThisFuncBlk, gcvFALSE);
+        errCode = _RemoveFuncBlockFromCallGraph(pCg, pThisFuncBlk, gcvFALSE);
+        CHECK_ERROR(errCode, "Failed in _RemoveFuncBlockFromCallGraph.");
 
         pThisFuncBlk = pNextFuncBlk;
     }
@@ -393,9 +403,7 @@ VSC_ErrCode vscVIR_RemoveFuncBlockFromCallGraph(VIR_CALL_GRAPH* pCg,
                                                 VIR_FUNC_BLOCK* pFuncBlk,
                                                 gctBOOL bRemoveFuncInShader)
 {
-    _RemoveFuncBlockFromCallGraph(pCg, pFuncBlk, bRemoveFuncInShader);
-
-    return VSC_ERR_NONE;
+    return _RemoveFuncBlockFromCallGraph(pCg, pFuncBlk, bRemoveFuncInShader);
 }
 
 /*
@@ -669,13 +677,13 @@ static VIR_CFG_EDGE* _AddEdgeForCFG(VIR_CONTROL_FLOW_GRAPH* pCfg, VIR_BASIC_BLOC
 
 static VSC_ErrCode _AddEdgesForCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
 {
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
     CFG_ITERATOR            basicBlkIter;
     VIR_BASIC_BLOCK*        pEntryBlock = (VIR_BASIC_BLOCK*)DGNLST_GET_FIRST_NODE(&pCFG->dgGraph.nodeList);
     VIR_BASIC_BLOCK*        pExitBlock = (VIR_BASIC_BLOCK*)DGND_GET_NEXT_NODE(&pEntryBlock->dgNode);
     VIR_BASIC_BLOCK*        pStartBlock = (VIR_BASIC_BLOCK*)DGND_GET_NEXT_NODE(&pExitBlock->dgNode);
     VIR_BASIC_BLOCK*        pThisBlock;
     VIR_BASIC_BLOCK*        pBranchTargetBB;
-    VSC_ErrCode             errCode  = VSC_ERR_NONE;
     VIR_CFG_EDGE*           pEdge;
 
     CFG_ITERATOR_INIT(&basicBlkIter, pCFG);
@@ -827,17 +835,19 @@ static gctBOOL _RootBasicBlkHandlerDFSPostFromTail(VIR_CONTROL_FLOW_GRAPH* pCFG,
 }
 
 /* Remove basic block from CFG. */
-static void _RemoveBasicBlockFromCFG(
+static VSC_ErrCode _RemoveBasicBlockFromCFG(
     VIR_CONTROL_FLOW_GRAPH* pCFG,
     VIR_BASIC_BLOCK* pBasicBlk,
     gctBOOL bDeleteInst)
 {
+    VSC_ErrCode            errCode = VSC_ERR_NONE;
     VIR_Instruction*       pInst = BB_GET_START_INST(pBasicBlk);
     VIR_Instruction*       pEndInst = BB_GET_END_INST(pBasicBlk);
     VIR_Instruction*       pNextInst;
 
     /* Remove node from graph */
-    vscDG_RemoveNode(&pCFG->dgGraph, &pBasicBlk->dgNode);
+    errCode = vscDG_RemoveNode(&pCFG->dgGraph, &pBasicBlk->dgNode);
+    CHECK_ERROR(errCode, "Failed in vscDG_RemoveNode.");
 
     vscBV_Finalize(&pBasicBlk->domSet);
     vscBV_Finalize(&pBasicBlk->postDomSet);
@@ -937,6 +947,7 @@ static void _RemoveBasicBlockFromCFG(
 
     /* Free this node */
     vscMM_Free(&pCFG->pmp.mmWrapper, pBasicBlk);
+    return errCode;
 }
 
 static VSC_ErrCode _RemoveUnreachableBasicBlocks(VIR_CONTROL_FLOW_GRAPH* pCFG, gctBOOL *bRemoved)
@@ -1160,7 +1171,9 @@ VIR_BASIC_BLOCK* vscVIR_AddBasicBlockToCFG(VIR_CONTROL_FLOW_GRAPH* pCFG,
 
     pNewBasicBlk = _AddBasicBlockToCFG(pCFG);
     if(pNewBasicBlk == gcvNULL)
+    {
         return gcvNULL;
+    }
 
     pNewBasicBlk->pStartInst = pStartInst;
     pNewBasicBlk->pEndInst = pEndInst;
@@ -1226,7 +1239,7 @@ VSC_ErrCode vscVIR_RemoveEdgeFromCFG(VIR_CONTROL_FLOW_GRAPH* pCFG,
     gcmASSERT(pCFG->pOwnerFuncBlk != gcvNULL);
     gcmASSERT(vscVIR_GetCfgEdge(pCFG, pFromBasicBlk, pToBasicBlk));
 
-    vscDG_RemoveEdge(&pCFG->dgGraph, &pFromBasicBlk->dgNode, &pToBasicBlk->dgNode);
+    errCode = vscDG_RemoveEdge(&pCFG->dgGraph, &pFromBasicBlk->dgNode, &pToBasicBlk->dgNode);
 
     return errCode;
 }
@@ -1377,7 +1390,8 @@ VIR_BB_ChangeSuccBBs(
 
         if(remove)
         {
-            vscVIR_RemoveEdgeFromCFG(BB_GET_CFG(bb), bb, succBB);
+            errCode = vscVIR_RemoveEdgeFromCFG(BB_GET_CFG(bb), bb, succBB);
+            CHECK_ERROR(errCode, "Failed in vscVIR_RemoveEdgeFromCFG.");
         }
     }
 
@@ -1461,12 +1475,13 @@ VIR_BB_ChangeSuccBBs(
     return errCode;
 }
 
-void
+VSC_ErrCode
 VIR_BB_RemoveBranch(
     VIR_BASIC_BLOCK* bb,
     gctBOOL setNop
     )
 {
+    VSC_ErrCode      errCode = VSC_ERR_NONE;
     VIR_Instruction* bbEnd = BB_GET_END_INST(bb);
 
     gcmASSERT(VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(bbEnd)));
@@ -1491,10 +1506,13 @@ VIR_BB_RemoveBranch(
         {
             VIR_BB* succBB = CFG_EDGE_GET_TO_BB(succEdge);
 
-            vscVIR_RemoveEdgeFromCFG(BB_GET_CFG(bb), bb, succBB);
+            errCode =vscVIR_RemoveEdgeFromCFG(BB_GET_CFG(bb), bb, succBB);
+            CHECK_ERROR(errCode, "Failed in vscVIR_RemoveEdgeFromCFG.");
         }
-        vscVIR_AddEdgeToCFG(BB_GET_CFG(bb), bb, VIR_BB_GetFollowingBB(bb), VIR_CFG_EDGE_TYPE_ALWAYS);
+        errCode = vscVIR_AddEdgeToCFG(BB_GET_CFG(bb), bb, VIR_BB_GetFollowingBB(bb), VIR_CFG_EDGE_TYPE_ALWAYS);
+        CHECK_ERROR(errCode, "Failed in vscVIR_AddEdgeToCFG.");
     }
+    return errCode;
 }
 
 VSC_ErrCode
@@ -1592,6 +1610,10 @@ VIR_BB_CopyBBBefore(
         }
 
         newBB = vscVIR_AddBasicBlockToCFG(BB_GET_CFG(source), newBBStart, newBBEnd, BB_GET_FLOWTYPE(source));
+        if (newBB == gcvNULL)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
 
         if(newBB == gcvNULL)
         {
@@ -1657,6 +1679,10 @@ VIR_BB_CopyBBAfter(
         }
 
         newBB = vscVIR_AddBasicBlockToCFG(BB_GET_CFG(source), newBBStart, newBBEnd, BB_GET_FLOWTYPE(source));
+        if (newBB == gcvNULL)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
 
         if(newBB == gcvNULL)
         {
@@ -1813,6 +1839,7 @@ VIR_BASIC_BLOCK* vscBBWKL_RemoveBBFromWorkItemList(VIR_BB_WORKLIST* pWorkItemLis
 static VIR_DOM_TREE_NODE* _AddDomNodeToDomTree(VIR_DOM_TREE* pDomTree, VIR_DOM_TREE_NODE* pParentDomNode,
                                                VIR_BASIC_BLOCK* pBasicBlock, gctBOOL bPostDom)
 {
+    VSC_ErrCode        errCode = VSC_ERR_NONE;
     VIR_DOM_TREE_NODE* pDomTreeNode = gcvNULL;
 
     pDomTreeNode = (VIR_DOM_TREE_NODE*)vscMM_Alloc(&pDomTree->pOwnerCFG->pmp.mmWrapper,
@@ -1834,9 +1861,13 @@ static VIR_DOM_TREE_NODE* _AddDomNodeToDomTree(VIR_DOM_TREE* pDomTree, VIR_DOM_T
         pBasicBlock->pDomTreeNode = pDomTreeNode;
     }
 
-    vscTREE_AddSubTree(&pDomTree->tree,
-                       pParentDomNode ? &pParentDomNode->treeNode : gcvNULL,
-                       &pDomTreeNode->treeNode);
+    errCode = vscTREE_AddSubTree(&pDomTree->tree,
+                                 pParentDomNode ? &pParentDomNode->treeNode : gcvNULL,
+                                 &pDomTreeNode->treeNode);
+    if (errCode != VSC_ERR_NONE)
+    {
+        return gcvNULL;
+    }
 
     return pDomTreeNode;
 }

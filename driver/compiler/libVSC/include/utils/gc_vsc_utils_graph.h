@@ -343,10 +343,9 @@ VSC_ErrCode vscDG_AddNode(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode);
 /* Return 2 VSC_DG_EDGEs which are successive, first one is successor edge, and 2nd is predecessor edge. */
 VSC_DG_EDGE* vscDG_AddEdge(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_DG_NODE* pToNode, gctBOOL* pIsNewEdge);
 VSC_DG_EDGE* vscDG_GetEdge(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_DG_NODE* pToNode);
-VSC_DG_EDGE* vscDG_ReplaceEdgeFromNode(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_DG_NODE* pToNode, VSC_DG_NODE* pNewFromNode);
 VSC_DG_EDGE* vscDG_ReplaceEdgeToNode(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_DG_NODE* pToNode, VSC_DG_NODE* pNewToNode);
-void vscDG_RemoveEdge(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_DG_NODE* pToNode);
-void vscDG_RemoveNode(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode);
+VSC_ErrCode vscDG_RemoveEdge(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_DG_NODE* pToNode);
+VSC_ErrCode vscDG_RemoveNode(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode);
 
 VSC_DG_NODE* vscDG_GetNodeById(VSC_DIRECTED_GRAPH* pDG, gctUINT nodeId);
 

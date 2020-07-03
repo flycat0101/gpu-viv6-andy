@@ -3870,7 +3870,8 @@ static VSC_ErrCode _FindInstsToVectorizeToSeedInst(VIR_VECTORIZER_INFO* pVectori
                 */
                 if (ovMode == VIR_OPND_VECTORIZE_MODE_FROM_SEED_INST)
                 {
-                    vscSRARR_AddElementToSpecifiedIndex(pInstArray, &pSeedInst, i);
+                    errCode = vscSRARR_AddElementToSpecifiedIndex(pInstArray, &pSeedInst, i);
+                    ON_ERROR(errCode, "Failed in vscSRARR_AddElementToSpecifiedIndex.");
                     vscSRARR_RemoveElementByIndex(pInstArray, seedInstIndex);
                     seedInstIndex = i - 1;
                 }
@@ -3948,7 +3949,8 @@ static VSC_ErrCode _DoVectorizationOnBasicBlock(VIR_VECTORIZER_INFO* pVectorizer
                 pTempInst = *(VIR_Instruction**)vscSRARR_GetElement(pInstArray, 0);
                 if (VIR_Inst_GetOpcode(pInst) == VIR_Inst_GetOpcode(pTempInst))
                 {
-                    vscSRARR_AddElement(pInstArray, &pInst);
+                    errCode = vscSRARR_AddElement(pInstArray, &pInst);
+                    ON_ERROR(errCode, "Failed in vscSRARR_AddElement.");
                     break;
                 }
             }
@@ -3958,6 +3960,11 @@ static VSC_ErrCode _DoVectorizationOnBasicBlock(VIR_VECTORIZER_INFO* pVectorizer
             if (i == vscSRARR_GetElementCount(&opArray))
             {
                 pInstArray = (VSC_SIMPLE_RESIZABLE_ARRAY*)vscSRARR_GetNextEmpty(&opArray, &i);
+                if (pInstArray == gcvNULL)
+                {
+                    errCode = VSC_ERR_OUT_OF_MEMORY;
+                    CHECK_ERROR(errCode, "Failed in vscSRARR_GetNextEmpty");
+                }
 
                 errCode = vscSRARR_Initialize(pInstArray,
                                               pMM,
@@ -3966,7 +3973,8 @@ static VSC_ErrCode _DoVectorizationOnBasicBlock(VIR_VECTORIZER_INFO* pVectorizer
                                               gcvNULL);
                 ON_ERROR0(errCode);
 
-                vscSRARR_AddElement(pInstArray, &pInst);
+                errCode = vscSRARR_AddElement(pInstArray, &pInst);
+                ON_ERROR(errCode, "Failed in vscSRARR_AddElement.");
             }
         }
 

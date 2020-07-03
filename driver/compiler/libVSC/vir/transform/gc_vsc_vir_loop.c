@@ -4967,14 +4967,16 @@ _VIR_LoopInfo_StaticallyUnroll(
             }
             else if(bb == loopEnd)
             {
-                VIR_BB_RemoveBranch(bb, gcvTRUE);
+                errCode = VIR_BB_RemoveBranch(bb, gcvTRUE);
+                ON_ERROR(errCode, "Failed in VIR_BB_RemoveBranch.");
 
                 /* update copied loops except the last one */
                 {
                     gctUINT i;
                     for(i = 0; i < copyCount; i++)
                     {
-                        VIR_BB_RemoveBranch((VIR_BB*)vscHTBL_DirectGet(bbToNewBBMaps[i], bb), gcvTRUE);
+                        errCode = VIR_BB_RemoveBranch((VIR_BB*)vscHTBL_DirectGet(bbToNewBBMaps[i], bb), gcvTRUE);
+                        ON_ERROR(errCode, "Failed in VIR_BB_RemoveBranch.");
                     }
                 }
 
@@ -5383,14 +5385,16 @@ _VIR_LoopInfo_DynamicallyUnroll(
                 {
                     VIR_Instruction* cmpInst = BB_GET_END_INST(bb);
                     VIR_Instruction* newCmpInst = BB_GET_END_INST((VIR_BB*)vscHTBL_DirectGet(bbToNewBBMaps[factor - 2], bb));
-                    VIR_BB_RemoveBranch(bb, gcvTRUE);
+                    errCode = VIR_BB_RemoveBranch(bb, gcvTRUE);
+                    ON_ERROR(errCode, "Failed in VIR_BB_RemoveBranch.");
 
                     /* update copied loops except the last one */
                     {
                         gctUINT i;
                         for(i = 0; i < factor - 2; i++)
                         {
-                            VIR_BB_RemoveBranch((VIR_BB*)vscHTBL_DirectGet(bbToNewBBMaps[i], bb), gcvTRUE);
+                            errCode = VIR_BB_RemoveBranch((VIR_BB*)vscHTBL_DirectGet(bbToNewBBMaps[i], bb), gcvTRUE);
+                            ON_ERROR(errCode, "Failed in VIR_BB_RemoveBranch.");
                         }
                     }
 
@@ -5509,7 +5513,8 @@ _VIR_LoopInfo_PerformLoopUnrollingOnLoop(
         {
             if(iterations <= 1)
             {
-                VIR_BB_RemoveBranch(VIR_LoopInfo_GetLoopEnd(loopInfo), gcvTRUE);
+                errCode = VIR_BB_RemoveBranch(VIR_LoopInfo_GetLoopEnd(loopInfo), gcvTRUE);
+                ON_ERROR(errCode, "Failed in VIR_BB_RemoveBranch.");
             }
             else
             {

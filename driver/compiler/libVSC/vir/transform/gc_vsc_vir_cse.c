@@ -1434,20 +1434,27 @@ VSC_ErrCode _VSC_CIE_CollectCands(
             {
                 /*found the key */
                 key = (VSC_SIMPLE_RESIZABLE_ARRAY*)vscSRARR_GetElement(intrinsicKeys, keyIndex);
-                vscSRARR_AddElement(key, &pInst);
+                errCode = vscSRARR_AddElement(key, &pInst);
+                CHECK_ERROR(errCode, "Failed in vscSRARR_AddElement");
             }
             else
             {
                 /*create a new key and add to intrinsicKeys*/
                 gctUINT i = vscSRARR_GetElementCount(intrinsicKeys);
                 key = (VSC_SIMPLE_RESIZABLE_ARRAY*)vscSRARR_GetNextEmpty(intrinsicKeys, &i);
+                if (key == gcvNULL)
+                {
+                    errCode = VSC_ERR_OUT_OF_MEMORY;
+                    CHECK_ERROR(errCode, "Failed in vscSRARR_GetNextEmpty");
+                }
 
                 CHECK_ERROR0(vscSRARR_Initialize(key,
                                                  VSC_CIE_GetMm(cie),
                                                  4,
                                                  sizeof(VIR_Instruction*),
                                                  gcvNULL));
-                vscSRARR_AddElement(key, &pInst);
+                errCode = vscSRARR_AddElement(key, &pInst);
+                CHECK_ERROR(errCode, "Failed in vscSRARR_AddElement");
             }
         }
         pInst = VIR_Inst_GetNext(pInst);

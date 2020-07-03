@@ -469,7 +469,7 @@ VIR_BB_ChangeSuccBBs(
     VIR_BASIC_BLOCK* newJmpTo,
     VIR_BASIC_BLOCK* newFallThru
     );
-void
+VSC_ErrCode
 VIR_BB_RemoveBranch(
     VIR_BASIC_BLOCK* bb,
     gctBOOL setNop

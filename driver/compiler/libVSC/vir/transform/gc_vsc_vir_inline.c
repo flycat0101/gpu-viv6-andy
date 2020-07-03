@@ -846,12 +846,13 @@ VSC_ErrCode VSC_IL_InlineSingleFunction(
         }
     }
 
-OnError:
     /* update the call graph accordingly */
-    vscDG_RemoveEdge((VSC_DIRECTED_GRAPH*)pCG,
-        (VSC_DG_NODE*) VIR_Function_GetFuncBlock(pCallerFunc),
-        (VSC_DG_NODE*) VIR_Function_GetFuncBlock(pCalleeFunc));
+    retValue = vscDG_RemoveEdge((VSC_DIRECTED_GRAPH*)pCG,
+                               (VSC_DG_NODE*) VIR_Function_GetFuncBlock(pCallerFunc),
+                               (VSC_DG_NODE*) VIR_Function_GetFuncBlock(pCalleeFunc));
+    ON_ERROR(retValue, "Failed in vscDG_RemoveEdge.");
 
+OnError:
     INST_LIST_FINALIZE(&calleeInsts);
     vscHTBL_Destroy(pLabelSet);
     vscHTBL_Destroy(pJmpSet);
@@ -1014,7 +1015,8 @@ VSC_ErrCode VSC_IL_OptimizeCallStackDepth(
                 (origCallDepth != 0 || VSC_IL_GetRemoveUnusedFunctions(pInliner)))
             {
                 /* remove this function block from the call graph */
-                vscVIR_RemoveFuncBlockFromCallGraph(pCG, pFuncBlk, gcvTRUE);
+                retValue = vscVIR_RemoveFuncBlockFromCallGraph(pCG, pFuncBlk, gcvTRUE);
+                ON_ERROR(retValue, "Failed in vscVIR_RemoveFuncBlockFromCallGraph.");
             }
         }
     }
@@ -1181,7 +1183,8 @@ VSC_ErrCode VSC_IL_TopDownInline(
                     (origCallDepth != 0 || VSC_IL_GetRemoveUnusedFunctions(pInliner)))
                 {
                     /* remove this function block from the call graph */
-                    vscVIR_RemoveFuncBlockFromCallGraph(pCG, pFuncBlk, gcvTRUE);
+                    retValue = vscVIR_RemoveFuncBlockFromCallGraph(pCG, pFuncBlk, gcvTRUE);
+                    ON_ERROR(retValue, "Failed in vscVIR_RemoveFuncBlockFromCallGraph.");
                 }
             }
         }
