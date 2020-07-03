@@ -1008,11 +1008,7 @@ This define enables the use of VM for gckCommand and fence buffers.
         Expremental, under test only. Not ready for production.
 */
 #ifndef gcdPARTIAL_FAST_CLEAR
-#if defined(ANDROID)
 #   define gcdPARTIAL_FAST_CLEAR                0
-#else
-#   define gcdPARTIAL_FAST_CLEAR                1
-#endif
 #endif
 
 /*
