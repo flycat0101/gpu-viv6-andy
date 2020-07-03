@@ -221,7 +221,7 @@
         vkGetSemaphoreFdKHR;
         vkImportSemaphoreFdKHR;
         vkGetFenceFdKHR;
-        vkImportFenceFdKH;
+        vkImportFenceFdKHR;
 
         vkCreateXlibSurfaceKHR*;
         vkGetPhysicalDeviceXlibPresentationSupportKHR*;

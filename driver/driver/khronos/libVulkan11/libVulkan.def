@@ -237,7 +237,7 @@ EXPORTS
         vkGetSemaphoreFdKHR
         vkImportSemaphoreFdKHR
         vkGetFenceFdKHR
-        vkImportFenceFdKH
+        vkImportFenceFdKHR
 
         vkCreateWin32SurfaceKHR
         vkGetPhysicalDeviceWin32PresentationSupportKHR
