@@ -438,8 +438,8 @@ _VSC_CPF_InitializeBlkFlow(
                                      gcvNULL));
 
     /* pBlkFlowArray's element count is the number of BB in CFG */
-    vscSRARR_SetElementCount(pBlkFlowArray,
-        vscDG_GetHistNodeCount(&pOwnerFB->cfg.dgGraph));
+    errCode = vscSRARR_SetElementCount(pBlkFlowArray, vscDG_GetHistNodeCount(&pOwnerFB->cfg.dgGraph));
+    CHECK_ERROR(errCode, "Failed in vscSRARR_SetElementCount");
 
     CFG_ITERATOR_INIT(&basicBlkIter, &pOwnerFB->cfg);
     pBasicBlk = (VIR_BASIC_BLOCK *)CFG_ITERATOR_FIRST(&basicBlkIter);

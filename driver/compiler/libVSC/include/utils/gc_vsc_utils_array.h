@@ -45,7 +45,7 @@ void vscSRARR_Destroy(VSC_SIMPLE_RESIZABLE_ARRAY* pArray);
 
 /* Operations */
 
-void vscSRARR_SetElementCount(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, gctUINT newEleCount); /* Directly mark how many elements are used in array */
+VSC_ErrCode vscSRARR_SetElementCount(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, gctUINT newEleCount); /* Directly mark how many elements are used in array */
 gctUINT vscSRARR_GetElementCount(VSC_SIMPLE_RESIZABLE_ARRAY* pArray);
 gctUINT vscSRARR_AddElement(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, void* pNewEle);
 gctUINT vscSRARR_AddElementToSpecifiedIndex(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, void* pNewEle, gctINT index);

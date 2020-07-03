@@ -100,7 +100,8 @@ VSC_ErrCode vscVIR_InitializeTsFuncFlow(VIR_TS_FUNC_FLOW* pTsFuncFlow, VIR_FUNC_
 
     /* Directly mark all elements are used because we control index of array by ourself (i.e
        id of graph node) */
-    vscSRARR_SetElementCount(&pTsFuncFlow->tsBlkFlowArray, vscDG_GetHistNodeCount(&pOwnerFB->cfg.dgGraph));
+    errCode = vscSRARR_SetElementCount(&pTsFuncFlow->tsBlkFlowArray, vscDG_GetHistNodeCount(&pOwnerFB->cfg.dgGraph));
+    CHECK_ERROR(errCode, "Failed in vscSRARR_SetElementCount");
 
     CFG_ITERATOR_INIT(&basicBlkIter, &pOwnerFB->cfg);
     pBasicBlk = (VIR_BASIC_BLOCK *)CFG_ITERATOR_FIRST(&basicBlkIter);
@@ -185,7 +186,8 @@ VSC_ErrCode vscVIR_InitializeBaseTsDFA(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_CALL_GRA
 
     /* Directly mark all elements are used because we control index of array by ourself (i.e
        id of graph node) */
-    vscSRARR_SetElementCount(&pBaseTsDFA->tsFuncFlowArray, vscDG_GetHistNodeCount(&pCg->dgGraph));
+    errCode = vscSRARR_SetElementCount(&pBaseTsDFA->tsFuncFlowArray, vscDG_GetHistNodeCount(&pCg->dgGraph));
+    CHECK_ERROR(errCode, "Failed in vscSRARR_SetElementCount");
 
     CG_ITERATOR_INIT(&funcBlkIter, pCg);
     pFuncBlk = (VIR_FUNC_BLOCK *)CG_ITERATOR_FIRST(&funcBlkIter);

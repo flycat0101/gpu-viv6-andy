@@ -92,15 +92,24 @@ static void _CheckElementSpace(VSC_SIMPLE_RESIZABLE_ARRAY* pArray)
     }
 }
 
-void vscSRARR_SetElementCount(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, gctUINT newEleCount)
+VSC_ErrCode vscSRARR_SetElementCount(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, gctUINT newEleCount)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     if (pArray->allocatedCount < newEleCount)
     {
         pArray->allocatedCount = newEleCount;
         pArray->pElement = vscMM_Realloc(pArray->pMM, pArray->pElement, pArray->elementSize*pArray->allocatedCount);
+        if (pArray->pElement == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR(errCode, "Failed to allocate memory for Array->pElement.");
+        }
     }
 
     pArray->elementCount = newEleCount;
+
+OnError:
+    return errCode;
 }
 
 gctUINT vscSRARR_GetElementCount(VSC_SIMPLE_RESIZABLE_ARRAY* pArray)

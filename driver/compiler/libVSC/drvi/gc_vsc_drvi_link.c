@@ -6133,14 +6133,17 @@ extern VSC_ErrCode _CompileShaderInternal(VSC_SHADER_PASS_MANAGER*   pShPassMnge
 extern gctUINT _GetCompLevelFromExpectedShaderLevel(VIR_ShLevel expectedShLevel);
 extern VIR_ShLevel _GetExpectedLastLevel(VSC_SHADER_COMPILER_PARAM* pCompilerParam);
 
-static gctBOOL _InitializeShLibLinkTable(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
-                                         gctBOOL bGfxOnlyProgram,
-                                         VSC_PROG_LIB_LINK_TABLE* pPgLibLinkTable,
-                                         VIR_ShLevel maxShLevelAmongLinkLibs,
-                                         gctUINT shStage,
-                                         VIR_ShLevel* pTrueLibShLevel,
-                                         VSC_SHADER_LIB_LINK_TABLE* pOutShLibLinkTable)
+static VSC_ErrCode _InitializeShLibLinkTable(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
+                                             gctBOOL bGfxOnlyProgram,
+                                             VSC_PROG_LIB_LINK_TABLE* pPgLibLinkTable,
+                                             VIR_ShLevel maxShLevelAmongLinkLibs,
+                                             gctUINT shStage,
+                                             VIR_ShLevel* pTrueLibShLevel,
+                                             VSC_SHADER_LIB_LINK_TABLE* pOutShLibLinkTable,
+                                             gctBOOL * beInitialized)
 {
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    gceSTATUS                   status  = gcvSTATUS_OK;
     gctUINT                     i, libLinkEntryCount = 0;
     VSC_SHADER_COMPILER_PARAM   compParam;
     VSC_PROGRAM_LINKER_HELPER*  pPgLinkHelper = (VSC_PROGRAM_LINKER_HELPER*)pBaseLinkHelper;
@@ -6187,10 +6190,12 @@ static gctBOOL _InitializeShLibLinkTable(VSC_BASE_LINKER_HELPER* pBaseLinkHelper
                                           VSC_COMPILER_FLAG_COMPILE_TO_LL |
                                           VSC_COMPILER_FLAG_COMPILE_TO_MC);
                 compParam.cfg.cFlags |= _GetCompLevelFromExpectedShaderLevel(expectedShLevel);
-
-                if (vscCompileShader(&compParam, gcvNULL) != gcvSTATUS_OK)
+                status = vscCompileShader(&compParam, gcvNULL);
+                if (status != gcvSTATUS_OK)
                 {
-                    return gcvFALSE;
+                    errCode = vscERR_CastGcStatus2ErrCode(status);
+                    *beInitialized = gcvFALSE;
+                    return errCode;
                 }
 
                 *pTrueLibShLevel = _GetExpectedLastLevel(&compParam);
@@ -6211,6 +6216,11 @@ static gctBOOL _InitializeShLibLinkTable(VSC_BASE_LINKER_HELPER* pBaseLinkHelper
             pOutShLibLinkTable->shLinkEntryCount = libLinkEntryCount;
             pOutShLibLinkTable->pShLibLinkEntries = (VSC_SHADER_LIB_LINK_ENTRY*)vscMM_Alloc(pBaseLinkHelper->pMM,
                                                                       libLinkEntryCount*sizeof(VSC_SHADER_LIB_LINK_ENTRY));
+            if (pOutShLibLinkTable->pShLibLinkEntries == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                ON_ERROR(errCode, "Failed to allocate memory for LibLinkEntries.");
+            }
 
             libLinkEntryCount = 0;
             for (i = 0; i < pPgLibLinkTable->progLinkEntryCount; i ++)
@@ -6227,7 +6237,9 @@ static gctBOOL _InitializeShLibLinkTable(VSC_BASE_LINKER_HELPER* pBaseLinkHelper
         }
     }
 
-    return (libLinkEntryCount > 0);
+OnError:
+    *beInitialized = (libLinkEntryCount > 0);
+    return errCode;
 }
 
 static void _FinalizeShLibLinkTable(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
@@ -6351,6 +6363,7 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
     VIR_Shader*                   pShader;
     VIR_ShLevel                   maxShLevelAmongLinkLibs = VIR_SHLEVEL_Unknown, finalTrueLibShLevel = VIR_SHLEVEL_Unknown;
     VIR_ShLevel                   trueLibShLevel = VIR_SHLEVEL_Unknown;
+    gctBOOL                       beInitialized = gcvFALSE;
 
     gcmASSERT(pPgLinkParam->cfg.cFlags & VSC_COMPILER_FLAG_COMPILE_TO_MC);
 
@@ -6441,9 +6454,11 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
 
             if (pPgLinkParam->pProgLibLinkTable)
             {
-                if (_InitializeShLibLinkTable(&pgLinkHelper.baseHelper, bGfxOnlyProgram, pPgLinkParam->pProgLibLinkTable,
-                                              maxShLevelAmongLinkLibs, stageIdx, &trueLibShLevel,
-                                              &shLibLinkTableArray[stageIdx]))
+                errCode = _InitializeShLibLinkTable(&pgLinkHelper.baseHelper, bGfxOnlyProgram, pPgLinkParam->pProgLibLinkTable,
+                                                    maxShLevelAmongLinkLibs, stageIdx, &trueLibShLevel,
+                                                    &shLibLinkTableArray[stageIdx], &beInitialized);
+                ON_ERROR(errCode, "Failed in _InitializeShLibLinkTable.");
+                if (beInitialized)
                 {
                     pShLibLinkTablePointerArray[stageIdx] = &shLibLinkTableArray[stageIdx];
 
