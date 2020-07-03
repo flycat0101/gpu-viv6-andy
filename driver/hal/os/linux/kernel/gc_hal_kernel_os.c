@@ -7053,7 +7053,7 @@ gceSTATUS
 gckOS_CPUPhysicalToGPUPhysical(
     IN gckOS Os,
     IN gctPHYS_ADDR_T CPUPhysical,
-    IN gctPHYS_ADDR_T * GPUPhysical
+    OUT gctPHYS_ADDR_T * GPUPhysical
     )
 {
     gcsPLATFORM * platform;

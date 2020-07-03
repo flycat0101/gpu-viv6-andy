@@ -359,10 +359,14 @@ _IdentifyHardwareByDatabase(
     /* If module parameter doesn't set per-core SRAM sizes. */
     if (i == gcvSRAM_INTER_COUNT)
     {
-        for (i = gcvSRAM_INTERNAL0; i < gcvSRAM_INTER_COUNT; i++)
+        gctUINT j = 0;
+        for (i = Core; i < gcvCORE_COUNT; i++)
         {
-            /* Try to get SRAM sizes from database. */
-            Device->sRAMSizes[Core][i] = Identity->sRAMSizes[i] = database->VIP_SRAM_SIZE;
+            for (j = gcvSRAM_INTERNAL0; j < gcvSRAM_INTER_COUNT; j++)
+            {
+                /* Try to get SRAM sizes from database. */
+                Device->sRAMSizes[i][j] = Identity->sRAMSizes[j] = database->VIP_SRAM_SIZE;
+            }
         }
     }
 
