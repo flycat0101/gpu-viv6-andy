@@ -2163,9 +2163,16 @@ VX_PRIVATE_API vx_bool vxoNNDilationConvolutionLayer_SH_EVIS_Support_Ext(vx_node
             vx_int32  paddingLeft           = padXLeft->value->n32;
             vx_int32  paddingRight          = padXRight->value->n32;
             vx_int32  input_width           = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
+            vx_int32  limit_len             = 8;
 
-            is_cross_width_read = (vx_bool)(paddingLeft > 0 && paddingRight > 0
-                                        && (input_width + paddingLeft) < 8);
+            if ((VX_TYPE_INT8 == inputFormat) || (VX_TYPE_UINT8 == inputFormat))
+            {
+                limit_len = 16;
+            }
+
+            is_cross_width_read = (vx_bool)((paddingLeft > 0) && (paddingRight > 0)
+                                        && ((input_width + paddingLeft) < limit_len)
+                                        && (input_width < ((vx_int32)kernel_x - 1)));
 
             if (biases)
             {
