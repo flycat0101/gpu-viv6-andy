@@ -3020,6 +3020,102 @@ static struct _gcsSURF_FORMAT_INFO formatINT[] =
     },
 };
 
+/* Format value range: 1800-1899
+ * Class: Integer formats (gcsFORMAT_CLASS_TYPE_RGBA)
+ * Component encoding: (A, R, G, B) */
+static struct _gcsSURF_FORMAT_INFO formatINT2[] =
+{
+    {
+        gcmNameFormat(R10G10B10A2UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
+        {{{ 0, 2 }, { 22, 10 }, { 12, 10 }, { 2, 10 }, {0}, {0}}},
+        {{{ 0, 2 }, { 22, 10 }, { 12, 10 }, { 2, 10 }, {0}, {0}}},
+        gcvSURF_R10G10B10A2UI, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_R10G10B10A2UI, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+    {
+        gcmNameFormat(R5G6B5UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
+        {{{ 0, 0 }, { 11, 5 }, { 5, 6 }, { 0, 5 }, {0}, {0}}},
+        {{{ 0, 0 }, { 11, 5 }, { 5, 6 }, { 0, 5 }, {0}, {0}}},
+        gcvSURF_R5G6B5UI, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_R5G6B5UI, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+    {
+        gcmNameFormat(B5G6R5UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
+        {{{ 0, 0 }, { 0, 5 }, { 5, 6 }, { 11, 5 }, {0}, {0}}},
+        {{{ 0, 0 }, { 0, 5 }, { 5, 6 }, { 11, 5 }, {0}, {0}}},
+        gcvSURF_B5G6R5UI, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_B5G6R5UI, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+    {
+        gcmNameFormat(R3G3B2UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(8),
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
+        {{{ 0, 0 }, { 5, 3 }, { 2, 3 }, { 0, 2 }, {0}, {0}}},
+        {{{ 0, 0 }, { 5, 3 }, { 2, 3 }, { 0, 2 }, {0}, {0}}},
+        gcvSURF_R3G3B2UI, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_R3G3B2UI, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+    {
+        gcmNameFormat(B2G3R3UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(8),
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
+        {{{ 0, 0 }, { 0, 3 }, { 3, 3 }, { 6, 2 }, {0}, {0}}},
+        {{{ 0, 0 }, { 0, 3 }, { 3, 3 }, { 6, 2 }, {0}, {0}}},
+        gcvSURF_B2G3R3UI, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_B2G3R3UI, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+    {
+        gcmNameFormat(R4G4B4A4UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
+        {{{ 0, 4 }, { 12, 4 }, { 8, 4 }, { 4, 4 }, {0}, {0}}},
+        {{{ 0, 4 }, { 12, 4 }, { 8, 4 }, { 4, 4 }, {0}, {0}}},
+        gcvSURF_R4G4B4A4UI, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_R4G4B4A4UI, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+    {
+        gcmNameFormat(A4B4G4R4UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
+        {{{ 12, 4 }, { 0, 4 }, { 4, 4 }, { 8, 4 }, {0}, {0}}},
+        {{{ 12, 4 }, { 0, 4 }, { 4, 4 }, { 8, 4 }, {0}, {0}}},
+        gcvSURF_A4B4G4R4UI, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_A4B4G4R4UI, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+    {
+        gcmNameFormat(R5G5B5A1UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
+        {{{ 0, 1 }, { 11, 5 }, { 6, 5 }, { 1, 5 }, {0}, {0}}},
+        {{{ 0, 1 }, { 11, 5 }, { 6, 5 }, { 1, 5 }, {0}, {0}}},
+        gcvSURF_R5G5B5A1UI, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_R5G5B5A1UI, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+    {
+        gcmNameFormat(A1B5G5R5UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(16),
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
+        {{{ 15, 1 }, { 0, 5 }, { 5, 5 }, { 10, 5 }, {0}, {0}}},
+        {{{ 15, 1 }, { 0, 5 }, { 5, 5 }, { 10, 5 }, {0}, {0}}},
+        gcvSURF_A1B5G5R5UI, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_A1B5G5R5UI, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+    {
+        gcmNameFormat(R8G8B8A8UI), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_INTEGER, gcmNON_COMPRESSED_BPP_ENTRY(32),
+        1, 0, 0, gcvFALSE, gcvENDIAN_SWAP_DWORD,
+        {{{ 0, 8 }, { 24, 8 }, { 16, 8 }, { 8, 8 }, {0}, {0}}},
+        {{{ 0, 8 }, { 24, 8 }, { 16, 8 }, { 8, 8 }, {0}, {0}}},
+        gcvSURF_R8G8B8A8UI, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_R8G8B8A8UI, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+};
+
 /* Format value range: 1600-1699
  * Class: ASTC formats
  * Component encoding: N/A */
@@ -3315,6 +3411,12 @@ static struct gcsFORMAT_ARRAY formatArray[] =
 
     /* 1600-1699 */
     { formatASTC, gcmCOUNTOF(formatASTC) },
+
+    /* 1700-1799 */
+    gcmDUMMY_FORMAT_ARRAY_ENTRY(),
+
+    /* 1800-1899 */
+    { formatINT2, gcmCOUNTOF(formatINT2) },
 };
 
 #define gcmGET_SURF_FORMAT_INFO(Format) \
