@@ -8589,7 +8589,7 @@ gcSHADER_Has64BitOperation(
     IN gcSHADER                    Shader
     );
 
-void
+gceSTATUS
 gcSHADER_SetBuildOptions(
     IN gcSHADER             Shader,
     IN gctSTRING            Options

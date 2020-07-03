@@ -2812,7 +2812,10 @@ _createOutputConvertStubFunction(
         gcoOS_PrintStrSafe(funcName, sizeof(funcName), &offset,
                            "#outputConvert%d", CodeIndex));
 
-    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
+    if (gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     tempCode = (gcSL_INSTRUCTION) pointer;
 
@@ -2903,7 +2906,10 @@ _createLongULongStubFunction_src2(
         gcoOS_PrintStrSafe(funcName, sizeof(funcName), &offset,
                            "longShift_%u", Patch->instructionIndex));
 
-    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
+    if (gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     tempCode = (gcSL_INSTRUCTION) pointer;
 
@@ -3000,7 +3006,10 @@ _createLongULongStubFunction_src1(
         gcoOS_PrintStrSafe(funcName, sizeof(funcName), &offset,
                            "longConvert_%u", Patch->instructionIndex));
 
-    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
+    if (gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     tempCode = (gcSL_INSTRUCTION) pointer;
 
@@ -3091,7 +3100,10 @@ _createLongULongStubFunction_jmp(
         gcoOS_PrintStrSafe(funcName, sizeof(funcName), &offset,
                            "longjmp_%u", Patch->instructionIndex));
 
-    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
+    if (gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     tempCode = (gcSL_INSTRUCTION) pointer;
 
@@ -3179,7 +3191,10 @@ _createLongULongStubFunction_jmp_src2(
         gcoOS_PrintStrSafe(funcName, sizeof(funcName), &offset,
                            "longjmp_%u", Patch->instructionIndex));
 
-    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
+    if (gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     tempCode = (gcSL_INSTRUCTION) pointer;
 
@@ -3275,6 +3290,10 @@ _createLongULongStubFunction(
             if ((condition == gcSL_EQUAL  || condition == gcSL_NOT_EQUAL) && (gcmSL_SOURCE_GET(code->source1, Type) == gcSL_CONSTANT))
             {
                 function = _createLongULongStubFunction_src1(Shader, Patch, ConvertFunction);
+                if (function == gcvNULL)
+                {
+                    return gcvNULL;
+                }
             }
             else if (condition == gcSL_LESS_OR_EQUAL ||
                       condition == gcSL_GREATER_OR_EQUAL ||
@@ -3284,6 +3303,10 @@ _createLongULongStubFunction(
                       condition == gcSL_NOT_EQUAL)
             {
                 function = _createLongULongStubFunction_src2(Shader, Patch, ConvertFunction);
+                if (function == gcvNULL)
+                {
+                    return gcvNULL;
+                }
             }
             else
             {
@@ -3310,6 +3333,10 @@ _createLongULongStubFunction(
     case gcSL_MAX:
     case gcSL_MIN:
         function = _createLongULongStubFunction_src2(Shader, Patch, ConvertFunction);
+        if (function == gcvNULL)
+        {
+            return gcvNULL;
+        }
         break;
 
     case gcSL_F2I:
@@ -3319,6 +3346,10 @@ _createLongULongStubFunction(
     case gcSL_LEADZERO:
     case gcSL_POPCOUNT:
         function = _createLongULongStubFunction_src1(Shader, Patch, ConvertFunction);
+        if (function == gcvNULL)
+        {
+            return gcvNULL;
+        }
         break;
 
     default:
@@ -3354,7 +3385,10 @@ _createReadImageStubFunction(
         gcoOS_PrintStrSafe(funcName, sizeof(funcName), &offset,
                            "_readImage_%d", CodeIndex));
 
-    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
+    if (gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     tempCode = (gcSL_INSTRUCTION) pointer;
 
@@ -3468,7 +3502,10 @@ _createReadImageStubFunction2(
         gcoOS_PrintStrSafe(funcName, sizeof(funcName), &offset,
                            "_readImage_%d", CodeIndex));
 
-    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
+    if (gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     tempCode = (gcSL_INSTRUCTION) pointer;
 
@@ -3583,7 +3620,10 @@ _createWriteImageStubFunction(
         gcoOS_PrintStrSafe(funcName, sizeof(funcName), &offset,
                            "_writeImage_%d", CodeIndex));
 
-    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
+    if (gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     tempCode = (gcSL_INSTRUCTION) pointer;
 
@@ -3700,7 +3740,10 @@ _createWriteImageStubFunction2(
         gcoOS_PrintStrSafe(funcName, sizeof(funcName), &offset,
                            "_writeImage_%d", CodeIndex));
 
-    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
+    if (gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     tempCode = (gcSL_INSTRUCTION) pointer;
 
@@ -3948,7 +3991,10 @@ _createDepthComparisonStubFunction(
         gcoOS_PrintStrSafe(funcName, sizeof(funcName), &offset,
                            "#depthFormatConvert%d", CodeIndex));
 
-    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
+    if (gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     tempCode = (gcSL_INSTRUCTION) pointer;
 
@@ -4462,7 +4508,10 @@ _createBlendStubFunction(
         gcoOS_PrintStrSafe(funcName, sizeof(funcName), &offset,
                            "_blendEquation%d", CodeIndex));
 
-    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
+    if (gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     tempCode = (gcSL_INSTRUCTION) pointer;
 
@@ -6665,7 +6714,10 @@ _createAlphaTestStubFunction(
         gcoOS_PrintStrSafe(funcName, sizeof(funcName), &offset,
                            "_alphaTestStub_%d", CodeIndex));
 
-    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
+    if (gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     tempCode = (gcSL_INSTRUCTION) pointer;
 
@@ -6902,6 +6954,11 @@ _patchAlphaTest(
         AlphaTestShader,
         convertFunction,
         tempCodeIndex);
+    if (stubFunction == gcvNULL)
+    {
+        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Fail to Construct call stub function.");
+        return gcvSTATUS_OUT_OF_MEMORY;
+    }
 
     /* Call the stub function. */
     tempCode = &Shader->code[tempCodeIndex];
@@ -6981,7 +7038,10 @@ _createSampleMaskStubFunction(
         gcoOS_PrintStrSafe(funcName, sizeof(funcName), &offset,
                            "_sampleMaskStub_%d", CodeIndex));
 
-    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
+    if (gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     tempCode = (gcSL_INSTRUCTION) pointer;
 
@@ -7214,7 +7274,11 @@ _patchSampleMask(
                             SampleMask,
                             sampleMaskFunction,
                             tempCodeIndex);
-
+        if (stubFunction == gcvNULL)
+        {
+            ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Fail to Construct call stub function.");
+            return gcvSTATUS_OUT_OF_MEMORY;
+        }
 
         lastInstruction = Shader->lastInstruction;
         instrIndex = Shader->instrIndex;
@@ -7530,7 +7594,10 @@ IN gctUINT               CodeIndex
         gcoOS_PrintStrSafe(funcName, sizeof(funcName), &offset,
         "_alphaBlend_%d", CodeIndex));
 
-    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
+    if (gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer) != gcvSTATUS_OK)
+    {
+        return gcvNULL;
+    }
 
     tempCode = (gcSL_INSTRUCTION)pointer;
 
@@ -7725,7 +7792,11 @@ IN OUT gcsPatchAlphaBlend  *    AlphaBlend
         AlphaBlend,
         convertFunction,
         tempCodeIndex);
-
+    if (stubFunction == gcvNULL)
+    {
+        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Fail to Construct call stub function.");
+        return gcvSTATUS_OUT_OF_MEMORY;
+    }
 
     /* Call the stub function. */
     tempCode = &Shader->code[tempCodeIndex];
@@ -8183,7 +8254,11 @@ _patchTexldFormatConversion(
                 continue;
             }
 
-            gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
+            if (gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer) != gcvSTATUS_OK)
+            {
+                ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Fail to allocate memory for gcSL instruction.");
+                return gcvSTATUS_OUT_OF_MEMORY;
+            }
             tempCode1 = (gcSL_INSTRUCTION) pointer;
             gcoOS_MemCopy(tempCode1, &Shader->code[i], sizeof(struct _gcSL_INSTRUCTION));
 
@@ -8378,6 +8453,11 @@ _patchOutputFormatConversion(
                         OutputConversion,
                         convertFunction,
                         tempCodeIndex);
+    if (stubFunction == gcvNULL)
+    {
+        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Fail to Construct call stub function.");
+        return gcvSTATUS_OUT_OF_MEMORY;
+    }
 
     /* Change the texld instruciton to call stub */
     tempCode = &Shader->code[tempCodeIndex];
@@ -8519,6 +8599,11 @@ _patchDepthComparison(
                                 convertFunction,
                                 i,
                                 prevCode);
+            if (stubFunction == gcvNULL)
+            {
+                ERR_REPORT(gcvSTATUS_OUT_OF_MEMORY, "Fail to Construct call stub function.");
+                return gcvSTATUS_OUT_OF_MEMORY;
+            }
 
             /* Change the texld instruciton to call stub */
             /* Shader->code may be resized to a new array, so need to use index. */
@@ -8936,6 +9021,11 @@ _patchLongULong(
                                                             Patch,
                                                             convertFunction_jmp,
                                                             &jmpIndex);
+                if (stubFunction_jmp == gcvNULL)
+                {
+                    ERR_REPORT(gcvSTATUS_OUT_OF_MEMORY, "Fail to Construct call stub function.");
+                    return gcvSTATUS_OUT_OF_MEMORY;
+                }
             }
 
             /* Change the texld instruciton to call stub */
@@ -9133,6 +9223,11 @@ _patchLongULong(
                                                                         Patch,
                                                                         convertFunction_jmp,
                                                                         &jmpIndex);
+            if (stubFunction_jmp == gcvNULL)
+            {
+                ERR_REPORT(gcvSTATUS_OUT_OF_MEMORY, "Fail to Construct call stub function.");
+                return gcvSTATUS_OUT_OF_MEMORY;
+            }
             /* Change the instruciton to call stub */
             code = &Shader->code[patchInstrIndex];
             origJmpLabel = gcmSL_JMP_TARGET(code);
@@ -9397,6 +9492,11 @@ _patchLongULongVIR(
                                                                     Patch,
                                                                     convertFunction_jmp,
                                                                     &jmpIndex);
+                if (stubFunction_jmp == gcvNULL)
+                {
+                    ERR_REPORT(gcvSTATUS_OUT_OF_MEMORY, "Fail to Construct call stub function.");
+                    return gcvSTATUS_OUT_OF_MEMORY;
+                }
             }
 
             /* Insert NOPs first. */
@@ -9460,6 +9560,11 @@ _patchLongULongVIR(
                                                                      Patch,
                                                                      convertFunction_jmp,
                                                                      &jmpIndex);
+            if (stubFunction_jmp == gcvNULL)
+            {
+                ERR_REPORT(gcvSTATUS_OUT_OF_MEMORY, "Fail to Construct call stub function.");
+                return gcvSTATUS_OUT_OF_MEMORY;
+            }
             /* Insert NOPs first. */
             gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader,
                                                      patchInstrIndex + 1,
@@ -9633,6 +9738,11 @@ _patchReadImage(
                                         convertFunction,
                                         i,
                                         prevCode);
+                if (stubFunction == gcvNULL)
+                {
+                    ERR_REPORT(gcvSTATUS_OUT_OF_MEMORY, "Fail to Construct call stub function.");
+                    return gcvSTATUS_OUT_OF_MEMORY;
+                }
             }
             else
             {
@@ -9642,6 +9752,11 @@ _patchReadImage(
                                         convertFunction,
                                         i,
                                         prevCode);
+                if (stubFunction == gcvNULL)
+                {
+                    ERR_REPORT(gcvSTATUS_OUT_OF_MEMORY, "Fail to Construct call stub function.");
+                    return gcvSTATUS_OUT_OF_MEMORY;
+                }
             }
 
             /* Change the texld instruciton to call stub */
@@ -9735,6 +9850,11 @@ _patchWriteImage(
                                         convertFunction,
                                         i,
                                         prevCode);
+                if (stubFunction == gcvNULL)
+                {
+                    ERR_REPORT(gcvSTATUS_OUT_OF_MEMORY, "Fail to Construct call stub function.");
+                    return gcvSTATUS_OUT_OF_MEMORY;
+                }
             }
             else
             {
@@ -9744,6 +9864,11 @@ _patchWriteImage(
                                         convertFunction,
                                         i,
                                         prevCode);
+                if (stubFunction == gcvNULL)
+                {
+                    ERR_REPORT(gcvSTATUS_OUT_OF_MEMORY, "Fail to Construct call stub function.");
+                    return gcvSTATUS_OUT_OF_MEMORY;
+                }
             }
 
             /* Change the texld instruciton to call stub */
@@ -11029,8 +11154,10 @@ _addToLibraryList(
         gctINT i;
 
         /* create a new node if LibraryShader is not in the list */
-        gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcLibraryList), &pointer));
-        if (pointer == gcvNULL) return gcvNULL;
+        if (gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcLibraryList), &pointer) != gcvSTATUS_OK)
+        {
+            return gcvNULL;
+        }
 
         libList = (gcLibraryList *)pointer;
 
@@ -11040,9 +11167,13 @@ _addToLibraryList(
 
         /* make sure the max temp count can fit into 16bit */
         gcmASSERT(LibraryShader->_tempRegCount < 0xFFFF);
-        gcmVERIFY_OK(gcoOS_Allocate(gcvNULL,
+        if (gcoOS_Allocate(gcvNULL,
                                   gcmSIZEOF(gctUINT32) * LibraryShader->_tempRegCount,
-                                  &pointer));
+                                  &pointer) != gcvSTATUS_OK)
+        {
+            return gcvNULL;
+        }
+
         libList->tempMappingTableEntries = LibraryShader->_tempRegCount;
         libList->tempMappingTable = (gctUINT32 *) pointer;
 
@@ -11056,9 +11187,12 @@ _addToLibraryList(
         gcmASSERT(libList->uniformMappingTableEntries < 0xFFFF);
         if (libList->uniformMappingTableEntries > 0)
         {
-            gcmVERIFY_OK(gcoOS_Allocate(gcvNULL,
+            if (gcoOS_Allocate(gcvNULL,
                                       gcmSIZEOF(gctUINT16) * libList->uniformMappingTableEntries,
-                                      &pointer));
+                                      &pointer) != gcvSTATUS_OK)
+            {
+                return gcvNULL;
+            }
             libList->uniformMappingTable = (gctUINT16 *) pointer;
 
             for (i=0; i < (gctINT)libList->uniformMappingTableEntries; i++)
@@ -13340,7 +13474,10 @@ gcSHADER_FindLibFunction(
     if (Shader->variableCount > 0)
     {
         /* change arguments according to the map*/
-        gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, Shader->variableCount * gcmSIZEOF(gctBOOL), &pointer));
+        if (gcoOS_Allocate(gcvNULL, Shader->variableCount * gcmSIZEOF(gctBOOL), &pointer) != gcvSTATUS_OK)
+        {
+            return gcvSTATUS_OUT_OF_MEMORY;
+        }
         gcoOS_ZeroMemory(pointer, Shader->variableCount * gcmSIZEOF(gctBOOL));
         checkVariable = (gctBOOL *)pointer;
     }
@@ -13711,7 +13848,10 @@ _createTexGradBuiltinFunc(
         *OutFunction = gcvNULL;
     }
 
-    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
+    if (gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer) != gcvSTATUS_OK)
+    {
+        return gcvSTATUS_OUT_OF_MEMORY;
+    }
 
     gcmVERIFY_OK(
         gcoOS_PrintStrSafe(funcName, sizeof(funcName), &offset,
@@ -14084,6 +14224,11 @@ gcSHADER_LinkBuiltinLibrary(
                                             &rt_height,
                                             &rt_width,
                                             &blend_enable_mode);
+                        if (stubFunction == gcvNULL)
+                        {
+                            ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Fail to Construct call stub function.");
+                            return gcvSTATUS_OUT_OF_MEMORY;
+                        }
 
                         /* Change the NOP instruciton to call stub */
                         tempCode = &Shader->code[tempCodeIndex];

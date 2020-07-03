@@ -1518,7 +1518,7 @@ cloCOMPILER_Compile(
 
         if (Options != 0 && *Options != 0)
         {
-            gcSHADER_SetBuildOptions(Compiler->binary, (gctSTRING)Options);
+            gcmONERROR(gcSHADER_SetBuildOptions(Compiler->binary, (gctSTRING)Options));
         }
 
         /* Return */

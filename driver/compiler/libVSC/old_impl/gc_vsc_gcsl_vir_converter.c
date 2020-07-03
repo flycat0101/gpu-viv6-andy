@@ -1943,6 +1943,10 @@ VIR_Uniform  *VirUniform
 
         arrayLength = VIR_Type_GetArrayLength(type);
         initializerPtr = (VIR_ConstId *)vscMM_Alloc(memPool, sizeof(VIR_ConstId) * arrayLength);
+        if (initializerPtr == gcvNULL)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         VIR_Uniform_SetInitializerPtr(VirUniform, initializerPtr);
     }
     else {
@@ -8210,7 +8214,10 @@ gcSHADER_Conv2VIR(
     if (VirShader->optionsLen)
     {
         VirShader->buildOptions = (gctSTRING)vscMM_Alloc(&VirShader->pmp.mmWrapper, VirShader->optionsLen);
-
+        if (VirShader->buildOptions == gcvNULL)
+        {
+            return gcvSTATUS_OUT_OF_MEMORY;
+        }
         gcmONERROR(gcoOS_StrCopySafe(VirShader->buildOptions,
                                      VirShader->optionsLen,
                                      Shader->buildOptions));
