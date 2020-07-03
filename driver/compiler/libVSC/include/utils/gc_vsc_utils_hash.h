@@ -94,7 +94,7 @@ typedef struct _VSC_HASH_TABLE
 /* Creation and destroy */
 VSC_HASH_TABLE *vscHTBL_Create(VSC_MM* pMM, PFN_VSC_HASH_FUNC pfnHashFunc,
                                PFN_VSC_KEY_CMP pfnKeyCmp, gctINT tableSize);
-void vscHTBL_Initialize(VSC_HASH_TABLE* pHT, VSC_MM* pMM, PFN_VSC_HASH_FUNC pfnHashFunc,
+VSC_ErrCode vscHTBL_Initialize(VSC_HASH_TABLE* pHT, VSC_MM* pMM, PFN_VSC_HASH_FUNC pfnHashFunc,
                         PFN_VSC_KEY_CMP pfnKeyCmp, gctINT tableSize);
 void vscHTBL_Destroy(VSC_HASH_TABLE* pHT);
 void vscHTBL_Finalize(VSC_HASH_TABLE* pHT);
@@ -120,9 +120,9 @@ gctINT vscHTBL_CountItems(VSC_HASH_TABLE* pHT);
 /* Hash node operations exclusively for special case of container that user does not need maintain VSC_HASH_NODE_EXT */
 gctBOOL vscHTBL_DirectTestAndGet(VSC_HASH_TABLE* pHT, void* pHashKey, void** ppVal);
 void* vscHTBL_DirectGet(VSC_HASH_TABLE* pHT, void* pHashKey);
-void vscHTBL_DirectSet(VSC_HASH_TABLE* pHT, void* pHashKey, void* pVal);
+VSC_ErrCode vscHTBL_DirectSet(VSC_HASH_TABLE* pHT, void* pHashKey, void* pVal);
 void* vscHTBL_DirectRemove(VSC_HASH_TABLE* pHT, void* pHashKey);
-void vscHTBL_DirectDuplicate(VSC_HASH_TABLE* pDstHT, VSC_HASH_TABLE* pSrcHT);
+VSC_ErrCode vscHTBL_DirectDuplicate(VSC_HASH_TABLE* pDstHT, VSC_HASH_TABLE* pSrcHT);
 
 /* Iterator to iterate all hash node */
 typedef struct _VSC_HASH_ITERATOR

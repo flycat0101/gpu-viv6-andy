@@ -55,7 +55,7 @@ void vscHNDEXT_SetUserData(VSC_HASH_NODE_EXT* pThisExtNode, void* pUserData)
     vscBSNODE_Initialize(&pThisExtNode->baseNode, pUserData);
 }
 
-void
+VSC_ErrCode
 vscHTBL_Initialize(
     VSC_HASH_TABLE*   pHT,
     VSC_MM*           pMM,
@@ -63,11 +63,12 @@ vscHTBL_Initialize(
     PFN_VSC_KEY_CMP   pfnKeyCmp,
     gctINT            tableSize)
 {
+    VSC_ErrCode       errCode = VSC_ERR_NONE;
     gctINT            i;
 
     if (tableSize <= 0)
     {
-        return;
+        return errCode;
     }
 
     pHT->pfnHashFunc = pfnHashFunc;
@@ -75,6 +76,11 @@ vscHTBL_Initialize(
     pHT->tableSize   = tableSize;
     pHT->pMM         = pMM;
     pHT->pTable = (VSC_HASH_NODE_LIST*)vscMM_Alloc(pMM, tableSize*sizeof(VSC_HASH_NODE_LIST));
+    if(pHT->pTable == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR(errCode,"fail in vscHTBL_Initialize");
+    }
     for (i = 0; i < pHT->tableSize; i ++)
     {
         HNLST_INITIALIZE(pHT->pTable + i);
@@ -85,6 +91,11 @@ vscHTBL_Initialize(
     if (gcmGetOptimizerOption()->dumpHashPerf)
     {
         pHT->searchTime = (SEARCH_TIME*)vscMM_Alloc(pMM,sizeof(SEARCH_TIME));
+        if(pHT->searchTime == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR(errCode,"fail in vscHTBL_Initialize");
+        }
         pHT->searchTime->searchFailed = 0;
         pHT->searchTime->searchSucceed = 0;
         pHT->searchTime->searchTotal = 0;
@@ -96,6 +107,11 @@ vscHTBL_Initialize(
         {
             gcmASSERT(gcvFALSE);
         }
+        if(pHT->searchTime->searchTimesArray == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR(errCode,"fail in vscHTBL_Initialize");
+        }
         for (i = 0; i < (HTBL_MAX_SEARCH_TIMES(pHT) + 1); i ++)
         {
             pHT->searchTime->searchTimesArray[i] = 0;
@@ -105,6 +121,9 @@ vscHTBL_Initialize(
     {
         pHT->searchTime = gcvNULL;
     }
+
+OnError:
+    return errCode;
 }
 
 VSC_HASH_TABLE *vscHTBL_Create(
@@ -121,7 +140,13 @@ VSC_HASH_TABLE *vscHTBL_Create(
     }
 
     pHT = (VSC_HASH_TABLE*)vscMM_Alloc(pMM, sizeof(VSC_HASH_TABLE));
-    vscHTBL_Initialize(pHT, pMM, pfnHashFunc, pfnKeyCmp, tableSize);
+    if(pHT == gcvNULL)
+    {
+        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "fail in vscHTBL_Create");
+        return gcvNULL;
+    }
+    if(vscHTBL_Initialize(pHT, pMM, pfnHashFunc, pfnKeyCmp, tableSize) == VSC_ERR_OUT_OF_MEMORY)
+        return gcvNULL;
 
     return pHT;
 }
@@ -144,6 +169,7 @@ vscHTBL_CreateOrInitialize(
         if (hTable == gcvNULL)
         {
             errCode = VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR0(errCode);
         }
         else
         {
@@ -163,7 +189,8 @@ vscHTBL_CreateOrInitialize(
                 vscMM_Free(hTable->pMM, hTable->searchTime);
                 hTable->searchTime = gcvNULL;
             }
-            vscHTBL_Initialize(hTable, hTable->pMM, pfnHashFunc, pfnKeyCmp, tableSize);
+            errCode = vscHTBL_Initialize(hTable, hTable->pMM, pfnHashFunc, pfnKeyCmp, tableSize);
+            ON_ERROR0(errCode);
         }
         else
         {
@@ -171,6 +198,8 @@ vscHTBL_CreateOrInitialize(
             hTable->pfnKeyCmp   = pfnKeyCmp ? pfnKeyCmp : vscHKCMP_Default;
         }
     }
+
+OnError:
     return errCode;
 }
 
@@ -484,8 +513,9 @@ void* vscHTBL_DirectGet(VSC_HASH_TABLE* pHT, void* pHashKey)
     return gcvNULL;
 }
 
-void vscHTBL_DirectSet(VSC_HASH_TABLE* pHT, void* pHashKey, void* pVal)
+VSC_ErrCode vscHTBL_DirectSet(VSC_HASH_TABLE* pHT, void* pHashKey, void* pVal)
 {
+    VSC_ErrCode            errCode = VSC_ERR_NONE;
     VSC_HASH_NODE_EXT*     pExtHashNode = gcvNULL;
     gctBOOL                bHit;
 
@@ -494,6 +524,11 @@ void vscHTBL_DirectSet(VSC_HASH_TABLE* pHT, void* pHashKey, void* pVal)
     {
         /* Allocate a new hash ext-node */
         pExtHashNode = (VSC_HASH_NODE_EXT*)vscMM_Alloc(pHT->pMM, sizeof(VSC_HASH_NODE_EXT));
+        if(pExtHashNode == gcvNULL)
+        {
+            ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "fail in vscHTBL_DirectSet");
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
 
         /* Initialize member of new hash ext-node */
         vscHNDEXT_Initialize(pExtHashNode, pHashKey, pVal);
@@ -506,6 +541,7 @@ void vscHTBL_DirectSet(VSC_HASH_TABLE* pHT, void* pHashKey, void* pVal)
         /* Set new user data of old hash ext-node */
         vscHNDEXT_SetUserData(pExtHashNode, pVal);
     }
+    return errCode;
 }
 
 void* vscHTBL_DirectRemove(VSC_HASH_TABLE* pHT, void* pHashKey)
@@ -526,8 +562,9 @@ void* vscHTBL_DirectRemove(VSC_HASH_TABLE* pHT, void* pHashKey)
     return gcvNULL;
 }
 
-void vscHTBL_DirectDuplicate(VSC_HASH_TABLE* pDstHT, VSC_HASH_TABLE* pSrcHT)
+VSC_ErrCode vscHTBL_DirectDuplicate(VSC_HASH_TABLE* pDstHT, VSC_HASH_TABLE* pSrcHT)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     gcmASSERT(pSrcHT && pDstHT);
 
     if (pDstHT->tableSize > 0)
@@ -543,9 +580,12 @@ void vscHTBL_DirectDuplicate(VSC_HASH_TABLE* pDstHT, VSC_HASH_TABLE* pSrcHT)
         for (pSrcHashNode = vscHTBLIterator_First(&iter); pSrcHashNode != gcvNULL; pSrcHashNode = vscHTBLIterator_Next(&iter))
         {
             void* pVal = vscHTBL_DirectGet(pSrcHT, pSrcHashNode->pHashKey);
-            vscHTBL_DirectSet(pDstHT, pSrcHashNode->pHashKey, pVal);
+            errCode = vscHTBL_DirectSet(pDstHT, pSrcHashNode->pHashKey, pVal);
+            if(errCode != VSC_ERR_NONE)
+                return errCode;
         }
     }
+    return errCode;
 }
 
 void vscHTBLIterator_Init(VSC_HASH_ITERATOR* pIter, VSC_HASH_TABLE* pHtbl)
