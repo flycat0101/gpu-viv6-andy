@@ -11,6 +11,7 @@
 *****************************************************************************/
 
 
+ClipDamageRegion
 #include "gc_egl_precomp.h"
 
 #if defined(ANDROID)
@@ -1631,8 +1632,8 @@ _ClipDamageRegion(
                 }
             }
 
-            index = (Draw->curDamage == 0) ? (EGL_WORKER_COUNT - 1)
-                  : (Draw->curDamage - 1);
+            index = (index == 0) ? (EGL_WORKER_COUNT - 1)
+                  : (index - 1);
         }
 
         if (!boundingValid)
