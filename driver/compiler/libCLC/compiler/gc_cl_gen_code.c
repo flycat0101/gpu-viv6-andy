@@ -2558,7 +2558,7 @@ _FillMemoryOffsetOrArray(
         dataTypes->def = binaryDataType;
         clsROPERAND_InitializeScalarConstant(&dataTypes->byteOffset,
                                              clmGenCodeDataType(T_INT),
-                                             long,
+                                             int,
                                              offset);
     }
 
@@ -2749,7 +2749,7 @@ IN OUT gctUINT * Start
        dataType = clmGenCodeDataType(T_INT);
        clsROPERAND_InitializeScalarConstant(&TargetDataTypes[*Start].byteOffset,
                                             dataType,
-                                            long,
+                                            int,
                                             0);
        (*Start)++;
        return gcvSTATUS_OK;
@@ -2760,7 +2760,7 @@ IN OUT gctUINT * Start
        dataType = clmGenCodeDataType(T_INT);
        clsROPERAND_InitializeScalarConstant(&TargetDataTypes[*Start].byteOffset,
                                             dataType,
-                                            long,
+                                            int,
                                             0);
        (*Start)++;
        return gcvSTATUS_OK;
@@ -2797,7 +2797,7 @@ IN OUT gctUINT * Start
           dataType = clmGenCodeDataType(T_INT);
           clsROPERAND_InitializeScalarConstant(&TargetDataTypes[*Start].byteOffset,
                                                dataType,
-                                               long,
+                                               int,
                                                0);
           (*Start)++;
       }
@@ -2828,7 +2828,7 @@ IN OUT gctUINT * Start
        dataType = clmGenCodeDataType(T_INT);
        clsROPERAND_InitializeScalarConstant(&TargetDataTypes[*Start].byteOffset,
                                             dataType,
-                                            long,
+                                            int,
                                             0);
        (*Start)++;
        return gcvSTATUS_OK;
@@ -2865,7 +2865,7 @@ IN OUT gctUINT * Start
           dataType = clmGenCodeDataType(T_INT);
           clsROPERAND_InitializeScalarConstant(&TargetDataTypes[*Start].byteOffset,
                                                dataType,
-                                               long,
+                                               int,
                                                0);
           (*Start)++;
       }
@@ -12297,7 +12297,7 @@ _GenScaledIndexOperand(
          if(shiftValue > 0) {
             clsROPERAND_InitializeScalarConstant(size,
                                                  clmGenCodeDataType(T_INT),
-                                                 long,
+                                                 int,
                                                  shiftValue);
             clsIOPERAND_New(Compiler, result, IndexOperand->dataType);
             status = clGenShiftExprCode(Compiler,
@@ -12363,7 +12363,7 @@ clGenScaledIndexOperand(
      else {
        clsROPERAND_InitializeScalarConstant(ScaledOperand,
                                             clmGenCodeDataType(T_INT),
-                                            long,
+                                            int,
                                             index * ElementDataTypeSize);
      }
      return gcvSTATUS_OK;
@@ -12378,7 +12378,7 @@ clGenScaledIndexOperand(
      if (shiftValue > 0 && needShift) {
         clsROPERAND_InitializeScalarConstant(scale,
                                              clmGenCodeDataType(T_INT),
-                                             long,
+                                             int,
                                              shiftValue);
         status = clGenShiftExprCode(Compiler,
                                     LineNo,
@@ -12391,7 +12391,7 @@ clGenScaledIndexOperand(
      else {
         clsROPERAND_InitializeScalarConstant(scale,
                                              clmGenCodeDataType(T_INT),
-                                             long,
+                                             int,
                                              ElementDataTypeSize);
         status = clGenArithmeticExprCode(Compiler,
                                          LineNo,
@@ -12464,7 +12464,7 @@ OUT clsROPERAND *NewOffset
        }
        clsROPERAND_InitializeScalarConstant(step,
                                             clmGenCodeDataType(T_INT),
-                                            long,
+                                            int,
                                             Incr);
        status = clGenGenericCode2(Compiler,
                                   LineNo,
@@ -12555,7 +12555,7 @@ clGenScaledIndexOperandWithOffset(
         if(shiftValue > 0) {
            clsROPERAND_InitializeScalarConstant(scale,
                                                 clmGenCodeDataType(T_INT),
-                                                long,
+                                                int,
                                                 shiftValue);
            status = clGenShiftExprCode(Compiler,
                                        LineNo,
@@ -12568,7 +12568,7 @@ clGenScaledIndexOperandWithOffset(
         else {
            clsROPERAND_InitializeScalarConstant(scale,
                                                 clmGenCodeDataType(T_INT),
-                                                long,
+                                                int,
                                                 ElementDataTypeSize);
            status = clGenArithmeticExprCode(Compiler,
                                             LineNo,
@@ -21876,7 +21876,7 @@ IN OUT clsGEN_CODE_PARAMETERS * Parameters
                                       funcName->context.u.variable.logicalRegs);
                clsROPERAND_InitializeScalarConstant(offset,
                                                     clmGenCodeDataType(T_INT),
-                                                    long,
+                                                    int,
                                                     clmNAME_VariableMemoryOffset_NOCHECK_GET(funcName));
                _clmGenStructAssign(Compiler,
                                    Jump->u.returnExpr,
@@ -22255,7 +22255,7 @@ IN OUT clsIOPERAND *IOperand
 
    clsROPERAND_InitializeScalarConstant(offset,
                                         clmGenCodeDataType(T_INT),
-                                        long,
+                                        int,
                                         Offset + clmNAME_VariableMemoryOffset_GET(Variable));
 
    return clGenLoadCode(Compiler,
@@ -24367,7 +24367,7 @@ cloIR_CONSTANT_GenCode(
               byteOffset = clmNAME_VariableMemoryOffset_GET(Constant->variable);
               clsROPERAND_InitializeScalarConstant(&Parameters->dataTypes[i].byteOffset,
                                                    clmGenCodeDataType(T_INT),
-                                                   long,
+                                                   int,
                                                    byteOffset);
           }
        }
@@ -25049,7 +25049,7 @@ clGenPointerArithmeticCode(
        if(shiftValue > 0) {
           clsROPERAND_InitializeScalarConstant(size,
                                                clmGenCodeDataType(T_INT),
-                                               long,
+                                               int,
                                                shiftValue);
           clsIOPERAND_New(Compiler, iOperand, Res->dataType);
           status = clGenGenericCode2(Compiler,
@@ -25122,7 +25122,7 @@ clGenPointerArithmeticCode(
           if(Opcode == clvOPCODE_SUB) {
              clsROPERAND_InitializeScalarConstant(&LeftParameters->dataTypes[0].byteOffset,
                                                   clmGenCodeDataType(T_INT),
-                                                  long,
+                                                  int,
                                                   -offset);
              if(Hint & clvGEN_SAVE_ADDRESS_OFFSET) {
                  LeftParameters->dataTypes[0].savedByteOffset = -offset;
@@ -25131,7 +25131,7 @@ clGenPointerArithmeticCode(
           else {
              clsROPERAND_InitializeScalarConstant(&LeftParameters->dataTypes[0].byteOffset,
                                                   clmGenCodeDataType(T_INT),
-                                                  long,
+                                                  int,
                                                   offset);
              if(Hint & clvGEN_SAVE_ADDRESS_OFFSET) {
                  LeftParameters->dataTypes[0].savedByteOffset = offset;
@@ -27205,7 +27205,7 @@ _GenIndexScaleCode(
 
     clsROPERAND_InitializeScalarConstant(&rOperand,
                                          clmGenCodeDataType(T_INT),
-                                         long,
+                                         int,
                                          ElementDataTypeSize);
 
     return clGenArithmeticExprCode(Compiler,
@@ -30634,7 +30634,7 @@ errorHandling:
 
                       clsROPERAND_InitializeScalarConstant(byteOffset,
                                                            clmGenCodeDataType(T_INT),
-                                                           long,
+                                                           int,
                                                            0);
                       if(scaledIndex->isReg) {
                          clsROPERAND rOperand[1];
