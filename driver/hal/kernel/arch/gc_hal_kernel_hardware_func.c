@@ -3772,11 +3772,21 @@ _FuncInit_MMU(IN gcsFUNCTION_EXECUTION_PTR Execution)
         &physical
         ));
 
-    if (!(flags & gcvALLOC_FLAG_4GB_ADDR) && (physical & 0xFFFFFFFF00000000ULL))
+    if (!gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_MMU_PAGE_DESCRIPTOR)
+        && (physical & 0xFFFFFFFF00000000ULL))
     {
         gcmkFATAL("%s(%d): Command buffer physical address (0x%llx) for MMU setup exceeds 32bits, "
-                  "please rebuild kernel with CONFIG_ZONE_DMA32=y.",
+                  "please rebuild kernel with CONFIG_ZONE_DMA32=y or CONFIG_ZONE_DMA=y or both.",
                   __FUNCTION__, __LINE__, physical);
+
+        gcmkFATAL("Some Archs, for ARM64, the setting is special:\n"
+                    "kernel version   ZONE_DMA   ZONE_DMA32\n"
+                    "3.7  - 3.14        no          yes\n"
+                    "3.15 - 4.15        yes         no\n"
+                    "4.16 - 5.4.5       no          yes\n"
+                    "5.5.rc1 -          yes         yes\n");
+
+        gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
     }
 
     gcmkSAFECASTPHYSADDRT(Execution->funcCmd[0].address, physical);
