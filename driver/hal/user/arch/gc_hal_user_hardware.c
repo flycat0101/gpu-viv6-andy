@@ -2435,6 +2435,13 @@ _FillInFeatureTable(
         Features[gcvFEATURE_TEX_CACHE_FLUSH_FIX] = gcvTRUE;
         Features[gcvFEATURE_TEXTURE_BUFFER] = gcvTRUE;
     }
+    if ((chipModel == gcv600)  && (chipRevision == 0x4653) ||
+        (chipModel == gcv880)  && (chipRevision == 0x5106) ||
+        (chipModel == gcv2000) && (chipRevision == 0x5108) ||
+        (chipModel == gcv3000) && (chipRevision == 0x5450))
+    {
+        Features[gcvFEATURE_TX_BORDER_CLAMP] = gcvTRUE;
+    }
 
     /* Special case.*/
     if (!Features[gcvFEATURE_DEPTH_MATH_FIX]
