@@ -688,6 +688,7 @@ gceSTATUS _InitResolveState(
     pCurSrc->clipRect.top = 0;
     pCurSrc->clipRect.right = dest->alignedW;
     pCurSrc->clipRect.bottom = dest->alignedH;
+    pCurSrc->srcType = gcv2D_SOURCE_COLOR;
 
     source->rotation = gcvSURF_0_DEGREE;
 
