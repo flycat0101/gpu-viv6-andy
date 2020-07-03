@@ -45,7 +45,7 @@ struct _VIR_LINKER_CALL_INST_NODE
     } u;
 };
 
-void VIR_LIB_WorkListQueue(
+VSC_ErrCode VIR_LIB_WorkListQueue(
     IN VSC_MM                   *pMM,
     IN VIR_LIB_WORKLIST         *WorkList,
     IN VIR_Function             *Func
@@ -57,7 +57,7 @@ void VIR_LIB_WorkListDequeue(
     OUT VIR_Function            **Func
     );
 
-void VIR_LIB_CallSitesQueue(
+VSC_ErrCode VIR_LIB_CallSitesQueue(
     IN VSC_MM                   *pMM,
     IN VIR_LIB_CALLSITES        *pCallSites,
     IN VIR_LINKER_CALL_INST_NODE*InstNode
@@ -152,7 +152,7 @@ VIR_Intrinsic_LibList_Finalize(
     IN  VIR_Intrinsic_LibList    *pIntrinsicLibList
     );
 
-void
+VSC_ErrCode
 VIR_Intrinsic_LibList_AppendNode(
     IN  VIR_Intrinsic_LibList    *pIntrinsicLibList,
     IN  VIR_Shader               *pIntrinsicLib,
@@ -175,7 +175,7 @@ typedef struct _VIR_LinkLib_TRANSPOINT
 
 } VIR_LinkLib_Transpoint;
 
-typedef void (*VIR_LinkLib_GET_TRANSPOINT_PTR)(
+typedef VSC_ErrCode (*VIR_LinkLib_GET_TRANSPOINT_PTR)(
     IN  VIR_LinkLibContext      *Context,
     OUT VIR_TRANS_WORKLIST      *Transpoints
     );

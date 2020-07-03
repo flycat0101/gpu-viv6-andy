@@ -905,12 +905,18 @@ _Pattern_ClonePattern(
     VIR_Pattern *clonedPattern = gcvNULL;
 
     clonedPattern = (VIR_Pattern *)vscMM_Alloc(Context->pMM, sizeof(VIR_Pattern));
+    if(clonedPattern == gcvNULL)
+        return gcvNULL;
     memcpy(clonedPattern, Pattern, sizeof(VIR_Pattern));
 
     clonedPattern->matchInsts = (VIR_PatternMatchInst *)vscMM_Alloc(Context->pMM, sizeof(VIR_PatternMatchInst));
+    if(clonedPattern->matchInsts == gcvNULL)
+        return gcvNULL;
     memcpy(clonedPattern->matchInsts, Pattern->matchInsts, sizeof(VIR_PatternMatchInst) * Pattern->matchCount);
 
     clonedPattern->replaceInsts = (VIR_PatternReplaceInst *)vscMM_Alloc(Context->pMM, sizeof(VIR_PatternReplaceInst));
+    if(clonedPattern->replaceInsts == gcvNULL)
+        return gcvNULL;
     memcpy(clonedPattern->replaceInsts, Pattern->replaceInsts, sizeof(VIR_PatternReplaceInst) * Pattern->repalceCount);
 
     return clonedPattern;
@@ -1109,6 +1115,11 @@ _Pattern_ReplaceInline(
         */
 
         Pattern = _Pattern_ClonePattern(Context, Pattern);
+        if(Pattern == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            return errCode;
+        }
 
         /* Reset the flags. */
         if (Pattern->flags & VIR_PATN_FLAG_EXPAND_MODE_SAME_COMPONENT_VALUE)
@@ -1134,6 +1145,11 @@ _Pattern_ReplaceInline(
         */
 
         Pattern = _Pattern_ClonePattern(Context, Pattern);
+        if(Pattern == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            return errCode;
+        }
         Pattern->replaceInsts[Pattern->repalceCount - 1].opnd[0] = -(VIR_PATTERN_TEMP_COUNT - 1);
     }
 

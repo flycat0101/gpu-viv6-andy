@@ -3008,7 +3008,11 @@ _VSC_MC_GEN_GenInst(
         return VSC_ERR_NONE;
     }
 
-    VIR_Inst_InitMcInsts(Inst, Gen->Shader, *GenCount, (gctINT32)Gen->InstCount, !bIsBackFill);
+    status = VIR_Inst_InitMcInsts(Inst, Gen->Shader, *GenCount, (gctINT32)Gen->InstCount, !bIsBackFill);
+    if(status != VSC_ERR_NONE)
+    {
+        return status;
+    }
 
     if (bNeedGen)
     {

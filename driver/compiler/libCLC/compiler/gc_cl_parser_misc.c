@@ -86,6 +86,8 @@ IN gctCONST_STRING Options)
 /** Initialize index to keyword table entries **/
     if(_IndexKeywordStrings == gcvNULL) {
          _IndexKeywordStrings = clScanInitIndexToKeywordTableEntries();
+         if(_IndexKeywordStrings == gcvNULL)
+             return gcvSTATUS_OUT_OF_MEMORY;
     }
 
     status = cloCOMPILER_MakeCurrent(Compiler, StringCount, Strings, Options);

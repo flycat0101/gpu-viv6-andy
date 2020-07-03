@@ -64,18 +64,23 @@ VIR_IO_Finalize(VIR_Shader_IOBuffer *Buf, gctBOOL bFreeBuffer)
     }
 }
 
-static void
+static VSC_ErrCode
 _VIR_IO_SymbolListQueue(
     IN VSC_MM                   *pMM,
     IN VSC_SIMPLE_QUEUE         *pWorkList,
     IN VIR_Symbol               *pSymbol
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_UNI_LIST_NODE_EXT *worklistNode = (VSC_UNI_LIST_NODE_EXT *)vscMM_Alloc(pMM,
         sizeof(VSC_UNI_LIST_NODE_EXT));
 
+    if(worklistNode == gcvNULL)
+        return VSC_ERR_OUT_OF_MEMORY;
     vscULNDEXT_Initialize(worklistNode, pSymbol);
     QUEUE_PUT_ENTRY(pWorkList, worklistNode);
+
+    return errCode;
 }
 
 static void
@@ -1755,6 +1760,11 @@ VIR_IO_readBlockTable(VIR_Shader_IOBuffer * Buf,
                     /* make sure block is allocated */
                     pBlockTbl->ppBlockArray[i] = (VSC_BT_BLOCK_PTR)vscMM_Alloc(pBlockTbl->pMM, pBlockTbl->blockSize);
                     gcmASSERT(pBlockTbl->ppBlockArray[i] != gcvNULL);
+                    if(pBlockTbl->ppBlockArray[i] == gcvNULL)
+                    {
+                        errCode = VSC_ERR_OUT_OF_MEMORY;
+                        ON_ERROR0(errCode);
+                    }
                 }
                 j = (i == startToReadBlockIndex) ? startToReadBlockOffset/pBlockTbl->entrySize : 0;
                 for (; j < pBlockTbl->entryCountPerBlock; j++)
@@ -1797,6 +1807,11 @@ VIR_IO_readBlockTable(VIR_Shader_IOBuffer * Buf,
                     /* make sure block is allocated */
                     pBlockTbl->ppBlockArray[i] = (VSC_BT_BLOCK_PTR)vscMM_Alloc(pBlockTbl->pMM, pBlockTbl->blockSize);
                     gcmASSERT(pBlockTbl->ppBlockArray[i] != gcvNULL);
+                    if(pBlockTbl->ppBlockArray[i] == gcvNULL)
+                    {
+                        errCode = VSC_ERR_OUT_OF_MEMORY;
+                        ON_ERROR0(errCode);
+                    }
                 }
                 for (; j < nextOffsetInCurBlock/pBlockTbl->entrySize; j++)
                 {
@@ -2235,6 +2250,11 @@ VIR_IO_readUniformBlock(VIR_Shader_IOBuffer *Buf, VIR_UniformBlock* pUniformBloc
     {
         pUniformBlock->uniforms = (VIR_Uniform **)vscMM_Alloc(&Buf->shader->pmp.mmWrapper,
                                           sizeof(VIR_Uniform*) * pUniformBlock->uniformCount);
+        if(pUniformBlock->uniforms == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR0(errCode);
+        }
         for (i=0; i<pUniformBlock->uniformCount; i++)
         {
             ON_ERROR0(VIR_IO_readUint(Buf, &uVal));
@@ -2268,6 +2288,11 @@ VIR_IO_readStorageBlock(VIR_Shader_IOBuffer *Buf, VIR_StorageBlock* pStorageBloc
     {
         pStorageBlock->variables = (VIR_SymId *)vscMM_Alloc(&Buf->shader->pmp.mmWrapper,
                                           sizeof(VIR_SymId) * pStorageBlock->variableCount);
+        if(pStorageBlock->variables == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR0(errCode);
+        }
         for (i=0; i<pStorageBlock->variableCount; i++)
         {
             ON_ERROR0(VIR_IO_readUint(Buf, &uVal));
@@ -2567,6 +2592,11 @@ VIR_IO_readOperandList(
 
         allocSize = sizeof(VIR_OperandList) * uVal;
         node = (VIR_OperandList *)vscMM_Alloc(&Buf->shader->pmp.mmWrapper, allocSize);
+        if(node == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR0(errCode);
+        }
         node->value = VIR_Function_GetOperandFromId(Buf->shader->currentFunction, uVal);
         node->next = gcvNULL;
         if (*pOperandList == gcvNULL)
@@ -2865,9 +2895,9 @@ VIR_IO_readSymbol(VIR_Shader_IOBuffer *Buf, VIR_Symbol* pSymbol)
     {
         ON_ERROR0(VIR_IO_readUint(Buf, &uVal));
         VIR_Symbol_SetHostFunction(pSymbol, (VIR_Function *)gcmINT2PTR(uVal));
-        _VIR_IO_SymbolListQueue(&Buf->shader->pmp.mmWrapper,
-                                &Buf->localSymbolList,
-                                pSymbol);
+        ON_ERROR0(_VIR_IO_SymbolListQueue(&Buf->shader->pmp.mmWrapper,
+                                          &Buf->localSymbolList,
+                                          pSymbol));
     }
     else
     {
@@ -3261,7 +3291,7 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader, gctUINT message
                 (VIR_Instruction *)vscMM_Alloc(memPool, pShader->ltcInstructionCount * sizeof(VIR_Instruction));
         }
 
-        if (pShader->ltcCodeUniformIndex == gcvNULL)
+        if (pShader->ltcExpressions == gcvNULL)
         {
             ON_ERROR0(VSC_ERR_OUT_OF_MEMORY);
         }
@@ -3559,6 +3589,7 @@ VIR_CopyBlockTable(VIR_CopyContext *    Ctx,
                                           pToBlockTbl->blockSize);
         if (pToBlockTbl->ppBlockArray[i] == gcvNULL)
         {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
             goto OnError;
         }
         gcoOS_MemCopy(pToBlockTbl->ppBlockArray[i],
@@ -3926,6 +3957,10 @@ VIR_CopyStorageBlock(VIR_CopyContext * Ctx, VIR_StorageBlock* pToStorageBlock, V
     {
         pToStorageBlock->variables = (VIR_SymId *)vscMM_Alloc(Ctx->memPool,
                                           sizeof(VIR_SymId) * pFromStorageBlock->variableCount);
+        if (pToStorageBlock->variables == gcvNULL)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         for (i=0; i<pFromStorageBlock->variableCount; i++)
         {
             pToStorageBlock->variables[i] = pFromStorageBlock->variables[i];
@@ -4198,6 +4233,11 @@ VIR_CopyOperandList(
 
         allocSize = sizeof(VIR_OperandList);
         node = (VIR_OperandList *)vscMM_Alloc(Ctx->memPool, allocSize);
+        if(node == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR0(errCode);
+        }
         node->value = VIR_Function_GetOperandFromId(Ctx->curToFunction, VIR_Operand_GetIndex(ptr->value));
         ON_ERROR0(VIR_Copy_FixOperand(Ctx, node->value));
         node->next = gcvNULL;
@@ -4289,6 +4329,7 @@ VIR_CopyValueList(VIR_CopyContext *Ctx, VIR_ValueList* pToValueList, VIR_ValueLi
     if (pToValueList->values == gcvNULL)
     {
         gcmASSERT(gcvFALSE);
+        errCode = VSC_ERR_OUT_OF_MEMORY;
         goto OnError;
     }
     ON_ERROR0(VIR_CopyBlock(pToValueList->values, pFromValueList->values, sz));
@@ -4429,9 +4470,9 @@ VIR_Copy_FixSymbol(VIR_CopyContext * Ctx, VIR_Symbol* pSymbol)
         VIR_SymId funcSymId = VIR_Function_GetSymId(VIR_Symbol_GetHostFunction(pSymbol));
 
         VIR_Symbol_SetHostFunction(pSymbol, (VIR_Function *)gcmINT2PTR(funcSymId));
-        _VIR_IO_SymbolListQueue(&Ctx->toShader->pmp.mmWrapper,
-                                &Ctx->localSymbolList,
-                                pSymbol);
+        ON_ERROR0(_VIR_IO_SymbolListQueue(&Ctx->toShader->pmp.mmWrapper,
+                                          &Ctx->localSymbolList,
+                                          pSymbol));
     }
     else
     {
@@ -4853,7 +4894,7 @@ VIR_Shader_Copy(
     {
         Shader->ltcCodeUniformIndex =
             (gctINT *)vscMM_Alloc(memPool, Source->ltcUniformCount * sizeof(gctINT));
-        if (Shader->constantMemoryBuffer == gcvNULL)
+        if (Shader->ltcCodeUniformIndex == gcvNULL)
         {
             return VSC_ERR_OUT_OF_MEMORY;
         }
@@ -4866,7 +4907,7 @@ VIR_Shader_Copy(
         }
         Shader->ltcExpressions =
             (VIR_Instruction *)vscMM_Alloc(memPool, Source->ltcInstructionCount * sizeof(VIR_Instruction));
-        if (Shader->constantMemoryBuffer == gcvNULL)
+        if (Shader->ltcExpressions == gcvNULL)
         {
             return VSC_ERR_OUT_OF_MEMORY;
         }

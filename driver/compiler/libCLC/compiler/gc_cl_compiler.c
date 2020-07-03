@@ -3295,6 +3295,7 @@ OUT clsDATA_TYPE ** DataType
                 status = gcoOS_Allocate(gcvNULL,
                                         (gctSIZE_T)sizeof(clsDATA_TYPE),
                                         &pointer);
+                if (gcmIS_ERROR(status)) return status;
                 dataType = pointer;
 
                 dataType->type  = Source->type;

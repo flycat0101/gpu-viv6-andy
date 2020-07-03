@@ -320,7 +320,9 @@ clScanInitIndexToKeywordTableEntries(void)
                                     sizeof(clsKEYWORD_NODE),
                                     (gctPOINTER *) &node);
       if (gcmIS_ERROR(status))
-         break;
+      {
+         return gcvNULL;
+      }
       node->keyword = KeywordTable[i];
       slsDLINK_LIST_InsertFirst(bucket, &node->node);
    }
