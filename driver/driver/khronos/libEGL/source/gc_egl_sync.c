@@ -775,15 +775,18 @@ veglWaitSync(
     }
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
 #if defined(WL_EGL_PLATFORM) || defined(EGL_API_WL)
-    status = gcoOS_WaitNativeFence(gcvNULL, sync->fenceFD, 2000);
-
-    if (status == gcvSTATUS_TIMEOUT)
+    if (sync->fenceFD >= 0)
     {
-        /* Print a warning. */
-        gcmPRINT("%s: Warning: wait for fence fd=%d", __func__, sync->fenceFD);
+        status = gcoOS_WaitNativeFence(gcvNULL, sync->fenceFD, 2000);
 
-        /* Wait for ever. */
-        status = gcoOS_WaitNativeFence(gcvNULL, sync->fenceFD, gcvINFINITE);
+        if (status == gcvSTATUS_TIMEOUT)
+        {
+            /* Print a warning. */
+            gcmPRINT("%s: Warning: wait for fence fd=%d", __func__, sync->fenceFD);
+
+            /* Wait for ever. */
+            status = gcoOS_WaitNativeFence(gcvNULL, sync->fenceFD, gcvINFINITE);
+        }
     }
 #endif
 #endif
