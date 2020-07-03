@@ -142,7 +142,7 @@ VSC_BLOCK_TABLE* vscBT_Create(
     PFN_VSC_KEY_CMP         pfnKeyCmp,
     gctINT                  hashTableSize);
 
-void vscBT_Initialize(
+gctBOOL vscBT_Initialize(
     VSC_BLOCK_TABLE*        pBT,
     VSC_MM*                 pMM,
     gctUINT                 flag,

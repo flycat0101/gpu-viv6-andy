@@ -33,15 +33,22 @@ VSC_BLOCK_TABLE* vscBT_Create(
     VSC_BLOCK_TABLE*     pBT = gcvNULL;
 
     pBT = (VSC_BLOCK_TABLE*)vscMM_Alloc(pMM, sizeof(VSC_BLOCK_TABLE));
+    if (pBT == gcvNULL)
+    {
+        return gcvNULL;
+    }
 
-    vscBT_Initialize(pBT, pMM, flag, entrySize, blockSize,
+    if (vscBT_Initialize(pBT, pMM, flag, entrySize, blockSize,
                      initBlockCount, pfnGetFreeEntry,
-                     pfnHashFunc, pfnKeyCmp, hashTableSize);
+                     pfnHashFunc, pfnKeyCmp, hashTableSize) == gcvFALSE)
+    {
+        return gcvNULL;
+    }
 
     return pBT;
 }
 
-void vscBT_Initialize(
+gctBOOL vscBT_Initialize(
     VSC_BLOCK_TABLE*        pBT,
     VSC_MM*                 pMM,
     gctUINT                 flag,
@@ -72,6 +79,10 @@ void vscBT_Initialize(
     gcmASSERT(initBlockCount > 0);
     pBT->blockCount = initBlockCount;
     pBT->ppBlockArray = (VSC_BT_BLOCK_PTR*)vscMM_Alloc(pMM, initBlockCount*sizeof(VSC_BT_BLOCK_PTR));
+    if (pBT->ppBlockArray == gcvNULL)
+    {
+        return gcvFALSE;
+    }
     memset(pBT->ppBlockArray, 0, initBlockCount*sizeof(VSC_BT_BLOCK_PTR));
 
     pBT->curBlockIdx = 0;
@@ -91,6 +102,7 @@ void vscBT_Initialize(
     {
         pBT->pHashTable = vscHTBL_Create(pMM, pfnHashFunc, pfnKeyCmp, hashTableSize);
     }
+    return gcvTRUE;
 }
 
 void vscBT_Finalize(VSC_BLOCK_TABLE* pBT)

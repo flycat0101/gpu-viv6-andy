@@ -64,6 +64,10 @@ static VSC_BUDDY_MEM_BLOCK_NODE* _ReallocInUnderlyingMem(VSC_BUDDY_MEM_SYS* pBMS
 
     /* Re-allocate block */
     pNewRet = (VSC_BUDDY_MEM_BLOCK_NODE*)vscPMP_Realloc(pBMS->pPriMemPool, pOrgBlock, newReqBlockSize);
+    if (pNewRet == gcvNULL)
+    {
+        return gcvNULL;
+    }
 
     /* If this allocation is a huge allocation, track it */
     if (newReqBlockSize > vscPMP_GetLowLimitOfChunkSize(pBMS->pPriMemPool) &&
@@ -73,6 +77,10 @@ static VSC_BUDDY_MEM_BLOCK_NODE* _ReallocInUnderlyingMem(VSC_BUDDY_MEM_SYS* pBMS
 
         pHugeAllocNode = (VSC_BUDDY_MEM_HUGE_ALLOC_IN_PMP*)vscPMP_Alloc(pBMS->pPriMemPool,
                                                           sizeof(VSC_BUDDY_MEM_HUGE_ALLOC_IN_PMP));
+        if (pHugeAllocNode == gcvNULL)
+        {
+            return gcvNULL;
+        }
 
         pHugeAllocNode->pBase = pNewRet;
         vscULNDEXT_Initialize(&pHugeAllocNode->uniHugeAllocNode, pHugeAllocNode);
@@ -546,6 +554,10 @@ void* vscBMS_Realloc(VSC_BUDDY_MEM_SYS* pBMS, void* pOrgAddress, gctUINT newReqS
                release original allocation by BMS and allocate new one by PMP */
 
             pNewAddress = vscBMS_Alloc(pBMS, newReqSize);
+            if (pNewAddress == gcvNULL)
+            {
+                return gcvNULL;
+            }
             memcpy(pNewAddress, pOrgAddress, pOrgBlock->blkHeader.cmnBlkHeader.userReqSize);
             vscBMS_Free(pBMS, pOrgAddress);
             return pNewAddress;
@@ -601,6 +613,10 @@ void* vscBMS_Realloc(VSC_BUDDY_MEM_SYS* pBMS, void* pOrgAddress, gctUINT newReqS
         else
         {
             pNewAddress = vscBMS_Alloc(pBMS, newReqSize);
+            if (pNewAddress == gcvNULL)
+            {
+                return gcvNULL;
+            }
             memcpy(pNewAddress, pOrgAddress, pOrgBlock->blkHeader.cmnBlkHeader.userReqSize);
             vscBMS_Free(pBMS, pOrgAddress);
             return pNewAddress;

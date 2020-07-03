@@ -64,6 +64,10 @@ VSC_TREE* vscTREE_Create(VSC_MM* pMM, gctUINT leafInitAllocCount)
     VSC_TREE*   pTree = gcvNULL;
 
     pTree = (VSC_TREE*)vscMM_Alloc(pMM, sizeof(VSC_TREE));
+    if (pTree == gcvNULL)
+    {
+        return gcvNULL;
+    }
     vscTREE_Initialize(pTree, pMM, leafInitAllocCount);
 
     return pTree;

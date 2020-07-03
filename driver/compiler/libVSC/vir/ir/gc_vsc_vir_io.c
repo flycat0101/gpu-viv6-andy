@@ -3569,7 +3569,7 @@ VIR_CopyBlockTable(VIR_CopyContext *    Ctx,
 
     gcmASSERT(pToBlockTbl != gcvNULL);
 
-    vscBT_Initialize(pToBlockTbl, Ctx->memPool,
+    if (vscBT_Initialize(pToBlockTbl, Ctx->memPool,
                      pFromBlockTbl->flag,
                      pFromBlockTbl->entrySize,
                      pFromBlockTbl->blockSize,
@@ -3577,7 +3577,12 @@ VIR_CopyBlockTable(VIR_CopyContext *    Ctx,
                      pFromBlockTbl->pfnGetFreeEntry,
                      hTbl ? hTbl->pfnHashFunc : gcvNULL,
                      hTbl ? hTbl->pfnKeyCmp : gcvNULL,
-                     hTbl ? hTbl->tableSize : 0);
+                     hTbl ? hTbl->tableSize : 0) == gcvFALSE)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ERR_REPORT(errCode, "Failed to allocate memory for BT.");
+        return errCode;
+    }
 
     pToBlockTbl->curBlockIdx = pFromBlockTbl->curBlockIdx;
     pToBlockTbl->nextOffsetInCurBlock = pFromBlockTbl->nextOffsetInCurBlock;

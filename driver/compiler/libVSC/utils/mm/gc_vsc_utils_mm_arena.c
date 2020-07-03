@@ -158,6 +158,10 @@ void* vscAMS_Realloc(VSC_ARENA_MEM_SYS* pAMS, void* pOrgAddress, gctUINT newReqS
 
     /* Just call alloc to alloc a new one, and copy original data to new place */
     pNewAddress = vscAMS_Alloc(pAMS, newReqSize);
+    if (pNewAddress == gcvNULL)
+    {
+        return gcvNULL;
+    }
     memcpy(pNewAddress, pOrgAddress, pOrgCmnBlkHeader->userReqSize);
 
     return pNewAddress;
