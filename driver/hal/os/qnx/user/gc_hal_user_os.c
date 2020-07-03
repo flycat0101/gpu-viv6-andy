@@ -1900,6 +1900,11 @@ gcoOS_GetBaseAddress(
     /* Verify the arguments. */
     gcmDEBUG_VERIFY_ARGUMENT(BaseAddress);
 
+    if (gcPLS.os == gcvNULL)
+    {
+        gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
+    }
+
     gcmONERROR(gcoHAL_GetHardwareType(gcvNULL, &type));
 
     /* Return base address. */
@@ -2514,6 +2519,11 @@ gcoOS_DeviceControl(
 
         iface->hardwareType = tls->currentType;
         iface->coreIndex = tls->currentType == gcvHARDWARE_2D ? 0: tls->currentCoreIndex;
+    }
+
+    if (gcPLS.os == gcvNULL)
+    {
+        return gcvSTATUS_OUT_OF_MEMORY;
     }
 
     switch (iface->command)
