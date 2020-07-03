@@ -907,164 +907,29 @@ _loadBuiltInOfDepthRange(
     return status;
 }
 
-/* Built-In Uniform State of LightSource */
-static gceSTATUS
-_loadBuiltInOfLightSource(
-    IN sloCOMPILER Compiler,
-    IN slsBASIC_BUILT_IN_TYPE_INFO * BasicBuiltInTypeInfos
-    )
-{
-    gceSTATUS               status = gcvSTATUS_OK;
-    gctUINT                 i;
-    slsNAME_SPACE *         fieldNameSpace;
-    slsDATA_TYPE *          fieldDataType[12];
-    const gctCONST_STRING   fields[12] = {"ambient", "diffuse", "specular", "position", "halfVector", "spotDirection", "spotExponent", "spotCutoff",
-                                          "spotCosCutoff", "constantAttenuation", "linearAttenuation", "quadraticAttenuation"};
-    const gctINT            dataType[12] = {T_VEC4, T_VEC4, T_VEC4, T_VEC4, T_VEC4, T_VEC3, T_VEC4, T_FLOAT, T_FLOAT, T_FLOAT, T_FLOAT, T_FLOAT};
-    sltPOOL_STRING          fieldSymbol;
-    slsDATA_TYPE *          structDataType, *variableDataType, *arrayDataType;
-    sltPOOL_STRING          structSymbol;
-    sltPOOL_STRING          variableSymbol;
-    sloEXTENSION            extension = {0};
 
-    gcmHEADER_ARG("Compiler=0x%x BasicBuiltInTypeInfos=0x%x",
-                  Compiler, BasicBuiltInTypeInfos);
-
-    /* Verify the arguments. */
-    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
-    gcmVERIFY_ARGUMENT(BasicBuiltInTypeInfos);
-
-    extension.extension1 = slvEXTENSION1_NONE;
-    do
-    {
-        /* Create the struct field for :
-           ambient, diffuse, specular, position, halfVector, spotDirection, spotExponent, spotCutoff
-           spotCosCutoff, constantAttenuation, linearAttenuation, quadraticAttenuation
-           */
-        status = sloCOMPILER_CreateNameSpace(Compiler,
-                                             gcvNULL,
-                                             slvNAME_SPACE_TYPE_STRUCT,
-                                             &fieldNameSpace);
-
-        if (gcmIS_ERROR(status)) break;
-
-        for (i = 0; i < 12; i++)
-        {
-            status = sloCOMPILER_CreateDataType(Compiler,
-                                    dataType[i],
-                                    gcvNULL,
-                                    &fieldDataType[i]);
-            fieldDataType[i]->qualifiers.precision = slvPRECISION_QUALIFIER_HIGH;
-
-            status = sloCOMPILER_AllocatePoolString(Compiler,
-                                                    fields[i],
-                                                    &fieldSymbol);
-            if (gcmIS_ERROR(status)) break;
-
-            status = sloCOMPILER_CreateName(Compiler,
-                                            0,
-                                            0,
-                                            slvFIELD_NAME,
-                                            fieldDataType[i],
-                                            fieldSymbol,
-                                            extension,
-                                            gcvFALSE,
-                                            gcvNULL);
-
-            if (gcmIS_ERROR(status)) break;
-        }
-
-        if (gcmIS_ERROR(status)) break;
-
-        sloCOMPILER_PopCurrentNameSpace(Compiler, gcvNULL);
-
-        /* Create the struct type: gl_LightSourceParameters */
-        status = sloCOMPILER_CreateDataType(Compiler,
-                                            T_STRUCT,
-                                            fieldNameSpace,
-                                            &structDataType);
-        if (gcmIS_ERROR(status)) break;
-
-        structDataType->qualifiers.storage = slvSTORAGE_QUALIFIER_UNIFORM;
-
-        status = sloCOMPILER_AllocatePoolString(Compiler,
-                                                "#LightSourceParameters",
-                                                &structSymbol);
-
-        if (gcmIS_ERROR(status)) break;
-
-        slsNAME_SPACE_SetSpaceName(fieldNameSpace, structSymbol);
-
-        status = sloCOMPILER_CreateName(Compiler,
-                                        0,
-                                        0,
-                                        slvSTRUCT_NAME,
-                                        structDataType,
-                                        structSymbol,
-                                        extension,
-                                        gcvFALSE,
-                                        gcvNULL);
-        if (gcmIS_ERROR(status)) break;
-
-        /* Create the array variable: gl_LightSource */
-        slsDATA_TYPE_Clone(Compiler,
-                           structDataType->qualifiers.storage,
-                           structDataType->qualifiers.precision,
-                           structDataType,
-                           &variableDataType);
-        if (gcmIS_ERROR(status)) break;
-
-        sloCOMPILER_CreateArrayDataType(Compiler,
-                                        variableDataType,
-                                        8,
-                                        &arrayDataType);
-        if (gcmIS_ERROR(status)) break;
-
-        sloCOMPILER_AllocatePoolString(Compiler,
-                                       "gl_LightSource",
-                                       &variableSymbol);
-        if (gcmIS_ERROR(status)) break;
-
-        sloCOMPILER_CreateName(Compiler,
-                               0,
-                               0,
-                               slvVARIABLE_NAME,
-                               arrayDataType,
-                               variableSymbol,
-                               extension,
-                               gcvFALSE,
-                               gcvNULL);
-        if (gcmIS_ERROR(status)) break;
-
-        gcmFOOTER_NO();
-        return gcvSTATUS_OK;
-    }
-    while (gcvFALSE);
-
-    gcmFOOTER();
-    return status;
-}
-
-gctBOOL
-_IsGLShaderHaveBuiltinUniform(
+static gctBOOL
+_DoesGLShaderSupportBuiltinUniform(
     IN sloCOMPILER Compiler
     )
 {
-    gctBOOL isHave = gcvFALSE;
+    gctBOOL isSupport = gcvFALSE;
 
     if (sloCOMPILER_IsOGLVersion(Compiler))
     {
-        if(sloCOMPILER_IsOGL11Version(Compiler) || sloCOMPILER_IsOGL12Version(Compiler))
-            isHave = gcvTRUE;
-        else if(sloCOMPILER_IsOGL13Version(Compiler))
-            isHave = gcvFALSE;
+        if(sloCOMPILER_IsOGL11Version(Compiler) ||
+           sloCOMPILER_IsOGL12Version(Compiler) ||
+           sloCOMPILER_IsOGL13Version(Compiler))
+            isSupport = gcvTRUE;
         else if(sloCOMPILER_IsOGL14Version(Compiler) /* TODO: && extension GL_ARB_compatibility is enable */ )
-            isHave = gcvTRUE;
-        else if((sloCOMPILER_IsOGL15VersionOrAbove(Compiler, gcvFALSE) || sloCOMPILER_IsOGL33VersionOrAbove(Compiler, gcvTRUE)) &&
-                 slsCOMPILER_HasCompatibilityProfile(slvCOMPILER_IS_COMPATIBILITY_PROFILE))
-            isHave = gcvTRUE;
+            isSupport = gcvTRUE;
+        else if((sloCOMPILER_IsOGL15VersionOrAbove(Compiler, gcvTRUE)) &&
+                 slsCOMPILER_HasCompatibilityProfile(Compiler->context.compilerFlags))
+            isSupport = gcvTRUE;
+        else
+            isSupport = gcvFALSE;
     }
-    return isHave;
+    return isSupport;
 }
 
 /* Built-In Uniform State */
@@ -1074,21 +939,12 @@ _LoadBuiltInUniformState(
     IN slsBASIC_BUILT_IN_TYPE_INFO * BasicBuiltInTypeInfos
     )
 {
-    gceSTATUS               status;
+    gceSTATUS  status = gcvSTATUS_OK;
 
     status = _loadBuiltInOfDepthRange(Compiler, BasicBuiltInTypeInfos);
     if (gcmIS_ERROR(status))
     {
         gcoOS_Print("Error: Load Built-In Uniform State of DepthRangeParameters is failed!\n");
-        return status;
-    }
-    if (_IsGLShaderHaveBuiltinUniform(Compiler))
-    {
-        status = _loadBuiltInOfLightSource(Compiler, BasicBuiltInTypeInfos);
-    }
-    if (gcmIS_ERROR(status))
-    {
-        gcoOS_Print("Error: Load Built-In Uniform State of LightSourceParameters is failed!\n");
         return status;
     }
     return status;
@@ -1348,7 +1204,7 @@ OnError:
 }
 
 static gceSTATUS
-_LoadBuiltInVariablesForUniformArray(
+_LoadBuiltInVariablesForStructArrayUniform(
     IN sloCOMPILER Compiler,
     IN slsBUILT_IN_VARIABLE  Variable
     )
@@ -1461,6 +1317,7 @@ _LoadBuiltInVariables(
     slsDATA_TYPE *                  dataType;
     sltPOOL_STRING                  symbolInPool;
     sloEXTENSION                    extension = {0};
+    gctBOOL                         isGLUniformSupported = _DoesGLShaderSupportBuiltinUniform(Compiler);
 
     gcmHEADER_ARG("Compiler=0x%x BasicBuiltInTypeInfos=0x%x "
                   "BuiltInVariableCount=%u BuiltInVariables=0x%x",
@@ -1482,6 +1339,13 @@ _LoadBuiltInVariables(
             continue;
         }
 
+        if (extension.extension1 == slvEXTENSION1_SUPPORT_OGL
+            && BuiltInVariables[i].qualifier == slvSTORAGE_QUALIFIER_UNIFORM
+            && !isGLUniformSupported)
+        {
+            continue;
+        }
+
         /* Load the filed variables for a struct. */
         if (BuiltInVariables[i].type == T_IO_BLOCK &&
             BuiltInVariables[i].fieldVariables != gcvNULL)
@@ -1498,11 +1362,14 @@ _LoadBuiltInVariables(
             continue;
         }
 
-        if (BuiltInVariables[i].qualifier == slvSTORAGE_QUALIFIER_UNIFORM &&
+
+        if (_DoesGLShaderSupportBuiltinUniform(Compiler) &&
+            BuiltInVariables[i].qualifier == slvSTORAGE_QUALIFIER_UNIFORM &&
+            BuiltInVariables[i].fieldVariables != gcvNULL &&
             BuiltInVariables[i].arrayLength > 0)
         {
-            status = _LoadBuiltInVariablesForUniformArray(Compiler,
-                                                          BuiltInVariables[i]);
+            status = _LoadBuiltInVariablesForStructArrayUniform(Compiler,
+                                                                BuiltInVariables[i]);
 
             if (gcmIS_ERROR(status)) break;
             continue;
@@ -2411,6 +2278,7 @@ slGetBuiltInVariableImplSymbol(
 {
     gctUINT     i;
     sleSHADER_TYPE shaderType;
+    gceSTATUS  status = gcvSTATUS_OK;
     gcmHEADER_ARG("Symbol=0x%x ImplSymbol=0x%x ImplQualifier=0x%x",
                   Symbol, ImplSymbol, ImplQualifier);
 
@@ -2453,10 +2321,22 @@ slGetBuiltInVariableImplSymbol(
     if((shaderType == slvSHADER_TYPE_VERTEX || shaderType == slvSHADER_TYPE_FRAGMENT) &&
         gcmIS_SUCCESS(gcoOS_StrNCmp(Symbol, "gl_LightSource[", 15)))
     {
-        gctSTRING subString;
-        gctCHAR   string[1024] = "#";
+        gctSTRING subString = gcvNULL;
+        gctSTRING string = gcvNULL;
+        gctPOINTER pointer = gcvNULL;
+        gctCHAR   sharp[2] = "#";
+        gctUINT length = gcoOS_StrLen(Symbol, NULL);
+
+        status = gcoOS_Allocate(gcvNULL, length, &pointer);
+        if (gcmIS_ERROR(status))
+        {
+            return status;
+        }
+        string = pointer;
+        gcoOS_StrCopySafe(string, 2, sharp);
+
         gcoOS_StrFindReverse(Symbol, '_', &subString);
-        gcoOS_StrCatSafe(string, 1024, (subString + 1));
+        gcoOS_StrCatSafe(string, length - 1, (subString + 1));
         *ImplSymbol = string;
         *ImplQualifier  = slvSTORAGE_QUALIFIER_UNIFORM;
     }
@@ -2910,13 +2790,26 @@ _ConvertCoordForSampler1D(
     }
     else if (slsDATA_TYPE_IsSampler1DArray(samplerOperand->dataType))
     {
-        /* precomponentCount = 2 */
-        newcomponentCount = 3;
-        needGenAccessLayer = gcvTRUE;
+        /* For textureGrad , to convert dPdx from float to vec2(dPdx, 0),convert dPdy from float to vec2(dPdy, 0)*/
+        if (precomponentCount == 1)
+        {
+            newcomponentCount = 2;
+        }
+        else
+        {
+            /* precomponentCount = 2 */
+            newcomponentCount = 3;
+            needGenAccessLayer = gcvTRUE;
+        }
     }
     else if ((samplerOperand->dataType)->elementType == slvTYPE_SAMPLER1DSHADOW)
     {
-        if (precomponentCount == 4)/* For 1D in projection */
+        /* For textureGrad , to convert dPdx from float to vec2(dPdx, 0),convert dPdy from float to vec2(dPdy, 0)*/
+        if (precomponentCount == 1)
+        {
+            newcomponentCount = 2;
+        }
+        else if (precomponentCount == 4)/* For 1D in projection */
         {
             newcomponentCount = 4;
         }
@@ -2929,9 +2822,18 @@ _ConvertCoordForSampler1D(
     else
     {
         gcmASSERT((samplerOperand->dataType)->elementType == slvTYPE_SAMPLER1DARRAYSHADOW);
-        /* precomponentCount = 3 */
-        newcomponentCount = 4;
-        needGenAccessLayer = gcvTRUE;
+
+        /* For textureGrad , to convert dPdx from float to vec2(dPdx, 0),convert dPdy from float to vec2(dPdy, 0)*/
+        if (precomponentCount == 1)
+        {
+            newcomponentCount = 2;
+        }
+        else
+        {
+            /* precomponentCount = 3 */
+            newcomponentCount = 4;
+            needGenAccessLayer = gcvTRUE;
+        }
     }
     gcmASSERT(precomponentCount > 0);
     gcmASSERT(newcomponentCount > 1);
@@ -7886,7 +7788,8 @@ _GenTextureNonShadowGradCode(
 {
     gceSTATUS   status;
     slsROPERAND lod[1];
-
+    slsGEN_CODE_PARAMETERS textureParameters[2];
+    sloIR_EXPR  samplerOperand = slsDLINK_LIST_First(&PolynaryExpr->operands->members, struct _sloIR_EXPR);
     gcmHEADER();
 
     /* Verify the arguments. */
@@ -7895,6 +7798,71 @@ _GenTextureNonShadowGradCode(
     gcmASSERT(OperandCount == 4);
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
+
+    if (slsDATA_TYPE_IsSampler1D(samplerOperand->dataType) || slsDATA_TYPE_IsSampler1DArray(samplerOperand->dataType))
+    {
+        slsGEN_CODE_PARAMETERS interParameters[2];
+        slsROPERAND rOperand[1];
+        slsIOPERAND iOperand[1];
+
+        /* convert coordinate from 1D to 2D */
+        status = _ConvertCoordForSampler1D(Compiler,
+                                           CodeGenerator,
+                                           PolynaryExpr,
+                                           OperandsParameters,
+                                           iOperand);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        slsROPERAND_InitializeUsingIOperand(rOperand, iOperand);
+        OperandsParameters[1].rOperands[0] = rOperand[0];
+
+        /* convert dPdx from float to vec2. */
+        interParameters[1] = OperandsParameters[2];
+        status = _ConvertCoordForSampler1D(Compiler,
+                                           CodeGenerator,
+                                           PolynaryExpr,
+                                           interParameters,
+                                           iOperand);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        slsROPERAND_InitializeUsingIOperand(rOperand, iOperand);
+        OperandsParameters[2].rOperands[0] = rOperand[0];
+
+        /* convert dPdx from float to vec2. */
+        interParameters[1] = OperandsParameters[3];
+        status = _ConvertCoordForSampler1D(Compiler,
+                                           CodeGenerator,
+                                           PolynaryExpr,
+                                           interParameters,
+                                           iOperand);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        slsROPERAND_InitializeUsingIOperand(rOperand, iOperand);
+        OperandsParameters[3].rOperands[0] = rOperand[0];
+    }
+
+    /* For gsampler2DRect type, need to convert p as normalized p. */
+    if (slsDATA_TYPE_IsSampler2DRect(samplerOperand->dataType))
+    {
+        /*
+        ** If HW can support INTEGER coord, we don't need to convert it to FLOAT.
+        ** And we generate TEXLD_U instead of TEXLD.
+        */
+        if (GetHWHasUniversalTexldV2() && GetHWHasTexldUFix())
+        {
+            OperandsParameters[1].genTexldU = gcvTRUE;
+        }
+        else
+        {
+            status = _ConvertCoordFor2DRect(Compiler,
+                                            PolynaryExpr,
+                                            OperandCount,
+                                            &OperandsParameters[0],
+                                            &OperandsParameters[1],
+                                            textureParameters);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+            *(OperandsParameters[1].dataTypes) = *(textureParameters[1].dataTypes);
+            *(OperandsParameters[1].rOperands) = *(textureParameters[1].rOperands);
+        }
+    }
 
     if (GetHWHasHalti2())
     {
@@ -7955,7 +7923,10 @@ _GenTextureShadowGradCode(
     )
 {
     gceSTATUS   status;
-    slsROPERAND lod[1];
+    slsROPERAND lod[1], rOperand[1];
+    slsIOPERAND iOperand[1];
+    slsGEN_CODE_PARAMETERS textureParameters[2];
+    sloIR_EXPR  samplerOperand = slsDLINK_LIST_First(&PolynaryExpr->operands->members, struct _sloIR_EXPR);
 
     gcmHEADER();
 
@@ -7965,6 +7936,69 @@ _GenTextureShadowGradCode(
     gcmASSERT(OperandCount == 4);
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
+
+    if (samplerOperand->dataType->elementType == slvTYPE_SAMPLER1DSHADOW ||
+        samplerOperand->dataType->elementType == slvTYPE_SAMPLER1DARRAYSHADOW)
+    {
+        slsGEN_CODE_PARAMETERS interParameters[2];
+        /* convert coordinate from 1D to 2D */
+        status = _ConvertCoordForSampler1D(Compiler,
+                                           CodeGenerator,
+                                           PolynaryExpr,
+                                           OperandsParameters,
+                                           iOperand);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        slsROPERAND_InitializeUsingIOperand(rOperand, iOperand);
+        OperandsParameters[1].rOperands[0] = rOperand[0];
+
+        /* convert dPdx from float to vec2. */
+        interParameters[1] = OperandsParameters[2];
+        status = _ConvertCoordForSampler1D(Compiler,
+                                           CodeGenerator,
+                                           PolynaryExpr,
+                                           interParameters,
+                                           iOperand);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        slsROPERAND_InitializeUsingIOperand(rOperand, iOperand);
+        OperandsParameters[2].rOperands[0] = rOperand[0];
+
+        /* convert dPdx from float to vec2. */
+        interParameters[1] = OperandsParameters[3];
+        status = _ConvertCoordForSampler1D(Compiler,
+                                           CodeGenerator,
+                                           PolynaryExpr,
+                                           interParameters,
+                                           iOperand);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        slsROPERAND_InitializeUsingIOperand(rOperand, iOperand);
+        OperandsParameters[3].rOperands[0] = rOperand[0];
+    }
+
+    /* For sampler2DRectShadow type, need to convert p.xy as normalized p.xy.*/
+    if (samplerOperand->dataType->elementType == slvTYPE_SAMPLER2DRECTSHADOW)
+    {
+        /*
+        ** If HW can support INTEGER coord, we don't need to convert it to FLOAT.
+        ** And we generate TEXLD_U instead of TEXLD.
+        */
+        if (GetHWHasUniversalTexldV2() && GetHWHasTexldUFix())
+        {
+            OperandsParameters[1].genTexldU = gcvTRUE;
+        }
+        else
+        {
+            status = _ConvertCoordsFor2DRect(Compiler,
+                                            PolynaryExpr,
+                                            OperandCount,
+                                            &OperandsParameters[0],
+                                            &OperandsParameters[1],
+                                            textureParameters);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+            *(OperandsParameters[1].dataTypes) = *(textureParameters[1].dataTypes);
+            *(OperandsParameters[1].rOperands) = *(textureParameters[1].rOperands);
+        }
+    }
 
     if (GetHWHasHalti2())
     {
@@ -8305,8 +8339,11 @@ _GenTextureGradCode(
     expr = slsDLINK_LIST_First(&PolynaryExpr->operands->members, struct _sloIR_EXPR);
     switch(expr->dataType->elementType)
     {
+    case slvTYPE_SAMPLER1DSHADOW:
     case slvTYPE_SAMPLER2DSHADOW:
     case slvTYPE_SAMPLERCUBESHADOW:
+    case slvTYPE_SAMPLER2DRECTSHADOW:
+    case slvTYPE_SAMPLER1DARRAYSHADOW:
     case slvTYPE_SAMPLER2DARRAYSHADOW:
         genCode = _GenTextureShadowGradCode;
         break;
