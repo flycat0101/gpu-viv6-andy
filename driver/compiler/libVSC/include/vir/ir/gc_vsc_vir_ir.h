@@ -2424,7 +2424,8 @@ extern VIR_NameId   VIR_NAME_UNKNOWN,
                     VIR_NAME_WORK_GROUP_INDEX,
                     VIR_NAME_LOCAL_INVOCATION_ID,
                     VIR_NAME_GLOBAL_INVOCATION_ID,
-                    VIR_NAME_LOCALINVOCATIONINDEX,
+                    VIR_NAME_LOCAL_INVOCATION_INDEX,
+                    VIR_NAME_GLOBAL_INVOCATION_INDEX,
                     VIR_NAME_HELPER_INVOCATION,
                     VIR_NAME_SUBSAMPLE_DEPTH,
                     VIR_NAME_PERVERTEX, /* gl_PerVertex */
@@ -7964,6 +7965,15 @@ void VIR_Shader_CountCode(
 gctBOOL
 VIR_Shader_CanRemoveUnusedFunctions(
     IN  VIR_Shader*         pShader
+    );
+
+VSC_ErrCode
+VIR_Shader_GenGlobalInvocationIndex(
+    IN  VIR_Shader*         pShader,
+    IN  VIR_Function*       pFunc,
+    IN  VIR_Symbol*         pGlobalInvocationIndexSym,
+    IN  VIR_Instruction*    pInsertBeforeInst,
+    IN  gctBOOL             bUpdateSlot
     );
 
 gctBOOL

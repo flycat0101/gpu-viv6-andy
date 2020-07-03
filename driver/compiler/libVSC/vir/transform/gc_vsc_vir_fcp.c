@@ -1376,7 +1376,7 @@ _CalculateLocalInvocationIndex(
         return errCode;
     }
 
-    pLocalInvocationIndex = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_LOCALINVOCATIONINDEX);
+    pLocalInvocationIndex = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_LOCAL_INVOCATION_INDEX);
     errCode = VIR_Shader_GenInvocationIndex(pShader,
                                             VIR_Shader_GetMainFunction(pShader),
                                             pLocalInvocationIndex,
@@ -1385,6 +1385,38 @@ _CalculateLocalInvocationIndex(
     ON_ERROR(errCode, "Calcualte local invocation index.");
 
     VIR_Shader_ClrFlagExt1(pShader, VIR_SHFLAG_EXT1_CALC_LOCAL_INVOCATION_INDEX);
+    if (pChanged)
+    {
+        *pChanged |= bChanged;
+    }
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
+_CalculateGlobalInvocationIndex(
+    VIR_Shader*         pShader,
+    gctBOOL*            pChanged
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Symbol*         pGlobalInvocationIndexSym = gcvNULL;
+    gctBOOL             bChanged = gcvTRUE;
+
+    pGlobalInvocationIndexSym = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_GLOBAL_INVOCATION_INDEX);
+    if (pGlobalInvocationIndexSym == gcvNULL || isSymUnused(pGlobalInvocationIndexSym))
+    {
+        return errCode;
+    }
+
+    errCode = VIR_Shader_GenGlobalInvocationIndex(pShader,
+                                                 VIR_Shader_GetMainFunction(pShader),
+                                                 pGlobalInvocationIndexSym,
+                                                 gcvNULL,
+                                                 gcvTRUE);
+    ON_ERROR(errCode, "Calcualte global invocation index.");
+
     if (pChanged)
     {
         *pChanged |= bChanged;
@@ -1979,6 +2011,10 @@ VSC_ErrCode vscVIR_PostMCCleanup(
     /* Use gl_LocalInvocationID to calculate the gl_LocalInvocationIndex. */
     errCode = _CalculateLocalInvocationIndex(pShader, &bInvalidDu);
     ON_ERROR(errCode, "Calculate local invocation index. ");
+
+    /* Use gl_globalInvocationID to calculate the gl_globalInvocationIndex. */
+    errCode = _CalculateGlobalInvocationIndex(pShader, &bInvalidDu);
+    ON_ERROR(errCode, "Calculate global invocation index. ");
 
     if (VirSHADER_DumpCodeGenVerbose(pShader))
     {
