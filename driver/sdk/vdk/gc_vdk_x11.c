@@ -253,7 +253,7 @@ _SignalHandler(
 static int (* _ImportVideoMemory)(uint32_t name,
                                   uint32_t *node);
 
-static int (* _WrapUserMemory)(gcsUSER_MEMORY_DESC *desc,
+static int (* _WrapUserMemory)(gcsUSER_MEMORY_DESC *desc, uint32_t type,
                                uint32_t *node);
 
 static int (* _ReleaseVideoMemory)(uint32_t node);
@@ -1169,7 +1169,7 @@ _LockPixmap(
 
     desc.flag = gcvALLOC_FLAG_DMABUF;
     desc.handle = pixmapfd;
-    status = _WrapUserMemory(&desc, &node);
+    status = _WrapUserMemory(&desc, 0, &node);
     close(pixmapfd);
     if (status != 0)
     {
