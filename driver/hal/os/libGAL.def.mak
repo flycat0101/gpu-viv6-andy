@@ -394,6 +394,7 @@ EXPORTS
     gcoSURF_WaitFence
     gcoSURF_AlignResolveRect
     gcoSURF_DrawBlit
+    gcoSURF_DrawBlitDepth
     gcsSURF_NODE_Construct
     gcsSURF_NODE_Destroy
     gcsSURF_NODE_Lock

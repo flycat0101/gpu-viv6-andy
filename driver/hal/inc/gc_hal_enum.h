@@ -1504,8 +1504,9 @@ gceCLEAR;
 
 typedef enum _gceBLITDRAW_TYPE
 {
-    gcvBLITDRAW_CLEAR = 0,
-    gcvBLITDRAW_BLIT  = 1,
+    gcvBLITDRAW_CLEAR      = 0,
+    gcvBLITDRAW_BLIT       = 1,
+    gcvBLITDRAW_BLIT_DEPTH = 2,
 
     /* last number, not a real type */
     gcvBLITDRAW_NUM_TYPE
