@@ -62,7 +62,14 @@ typedef struct _VSC_EP_IO_BUFFER
     } epData;
 } VSC_EP_IO_BUFFER;
 
-#define VSC_EP_ALLOC_MEM(MEM, TYPE, SIZE)         do {VSC_IO_AllocateMem(SIZE, (void**)&(MEM));  memset((MEM), 0, (SIZE));} while (0);
+#define VSC_EP_ALLOC_MEM(MEM, TYPE, SIZE) \
+    do { \
+         VSC_ErrCode errCode = VSC_ERR_NONE; \
+         errCode = VSC_IO_AllocateMem(SIZE, (void**)&(MEM)); \
+         if (errCode == VSC_ERR_OUT_OF_MEMORY){return errCode;} \
+         memset((MEM), 0, (SIZE)); \
+       } \
+    while (0);
 
 static void
 _vscEP_Buffer_Init(
@@ -3388,12 +3395,13 @@ OnError:
 }
 
 /* Load the image derived information. */
-static void
+static VSC_ErrCode
 _vscEP_Buffer_LoadImageDerivedInfo(
     VSC_EP_IO_BUFFER*       pEPBuf,
     PROG_VK_IMAGE_DERIVED_INFO* pImageDerivedInfo
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_IO_BUFFER* pIoBuf = pEPBuf->pIoBuf;
     gctUINT uVal = 0;
 
@@ -3436,6 +3444,7 @@ _vscEP_Buffer_LoadImageDerivedInfo(
     /* Load the image format. */
     VSC_IO_readUint(pIoBuf, (gctUINT*)&pImageDerivedInfo->imageFormatInfo.imageFormat);
     VSC_IO_readUint(pIoBuf, (gctUINT*)&pImageDerivedInfo->imageFormatInfo.bSetInSpriv);
+    return errCode;
 }
 
 /* Load the sampler derived information. */
@@ -4415,7 +4424,7 @@ _vscEP_Buffer_LoadVKSeparatedTextureHwMapping(
     VSC_ErrCode errCode = VSC_ERR_NONE;
 
     /* Load the image derived information. */
-    _vscEP_Buffer_LoadImageDerivedInfo(pEPBuf, &pSeparatedTextureHwMapping->s.imageDerivedInfo);
+    ON_ERROR0(_vscEP_Buffer_LoadImageDerivedInfo(pEPBuf, &pSeparatedTextureHwMapping->s.imageDerivedInfo));
     ON_ERROR0(_vscEP_Buffer_LoadUavSlotMapping(pEPBuf, &pSeparatedTextureHwMapping->s.hwMapping));
     ON_ERROR0(_vscEP_Buffer_LoadVKPrivCombTexSampHwMappingList(pEPBuf, &pSeparatedTextureHwMapping->s.texHwMappingList));
 
@@ -4583,10 +4592,10 @@ _vscEP_Buffer_LoadVKUniformTexelBufferEntry(
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
     {
         /* Load the sampler derived information. */
-        _vscEP_Buffer_LoadSamplerDerivedInfo(pEPBuf, &pUniformTexelBufferEntry->samplerDerivedInfo[i]);
+        ON_ERROR0(_vscEP_Buffer_LoadSamplerDerivedInfo(pEPBuf, &pUniformTexelBufferEntry->samplerDerivedInfo[i]));
 
         /* Load the image derived information. */
-        _vscEP_Buffer_LoadImageDerivedInfo(pEPBuf, &pUniformTexelBufferEntry->imageDerivedInfo[i]);
+        ON_ERROR0(_vscEP_Buffer_LoadImageDerivedInfo(pEPBuf, &pUniformTexelBufferEntry->imageDerivedInfo[i]));
     }
 
     if (pUniformTexelBufferEntry->utbBinding.arraySize != 0)
@@ -4700,10 +4709,10 @@ _vscEP_Buffer_LoadVKInutAttachmentEntry(
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
     {
         /* Load the image derived information. */
-        _vscEP_Buffer_LoadImageDerivedInfo(pEPBuf, &pInputAttachmentEntry->imageDerivedInfo[i]);
+        ON_ERROR0(_vscEP_Buffer_LoadImageDerivedInfo(pEPBuf, &pInputAttachmentEntry->imageDerivedInfo[i]));
 
         /* Load the sampler derived information. */
-        _vscEP_Buffer_LoadSamplerDerivedInfo(pEPBuf, &pInputAttachmentEntry->samplerDerivedInfo[i]);
+        ON_ERROR0(_vscEP_Buffer_LoadSamplerDerivedInfo(pEPBuf, &pInputAttachmentEntry->samplerDerivedInfo[i]));
     }
 
     /* Load ResOpBits. */
@@ -4783,7 +4792,7 @@ _vscEP_Buffer_LoadVKStorageEntry(
     /* Load the image derived information. */
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
     {
-        _vscEP_Buffer_LoadImageDerivedInfo(pEPBuf, &pStorageEntry->imageDerivedInfo[i]);
+        ON_ERROR0(_vscEP_Buffer_LoadImageDerivedInfo(pEPBuf, &pStorageEntry->imageDerivedInfo[i]));
     }
 
     /* Load ResOpBits. */

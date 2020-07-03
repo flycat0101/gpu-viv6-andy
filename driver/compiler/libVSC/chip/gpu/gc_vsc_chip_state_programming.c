@@ -63,6 +63,7 @@ VSC_ErrCode vscInitializeChipStatesProgrammer(VSC_CHIP_STATES_PROGRAMMER* pState
                                               PVSC_SYS_CONTEXT pSysCtx,
                                               struct _gcsHINT* pHints)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     gcoOS_ZeroMemory(pStatesPgmer, sizeof(VSC_CHIP_STATES_PROGRAMMER));
 
     vscPMP_Intialize(&pStatesPgmer->pmp, gcvNULL, VSC_CHIP_STATES_ALLOC_GRANULARITY*4, sizeof(void*), gcvTRUE);
@@ -71,6 +72,12 @@ VSC_ErrCode vscInitializeChipStatesProgrammer(VSC_CHIP_STATES_PROGRAMMER* pState
 
     pStatesPgmer->pStartStateBuffer = (gctUINT*)vscMM_Alloc(&pStatesPgmer->pmp.mmWrapper,
                                                             VSC_CHIP_STATES_ALLOC_GRANULARITY*sizeof(gctUINT));
+    if (pStatesPgmer->pStartStateBuffer == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR(errCode, "Failed to allocate memory for pStartStateBuffer.");
+    }
+
     pStatesPgmer->allocSize = VSC_CHIP_STATES_ALLOC_GRANULARITY;
     pStatesPgmer->nextStateAddr = 0;
 
@@ -78,10 +85,16 @@ VSC_ErrCode vscInitializeChipStatesProgrammer(VSC_CHIP_STATES_PROGRAMMER* pState
 
     pStatesPgmer->pStateDelta = (gctUINT32*)vscMM_Alloc(&pStatesPgmer->pmp.mmWrapper,
         VSC_CHIP_STATES_ALLOC_GRANULARITY * sizeof(gctUINT));
+    if (pStatesPgmer->pStateDelta == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR(errCode, "Failed to allocate memory for pStateDelta.");
+    }
     pStatesPgmer->stateDeltaAllocSize  = VSC_CHIP_STATES_ALLOC_GRANULARITY;
     pStatesPgmer->nextStateDeltaAddr = 0;
 
-    return (pStatesPgmer->pStartStateBuffer) ? VSC_ERR_NONE : VSC_ERR_OUT_OF_MEMORY;
+OnError:
+    return errCode;
 }
 
 VSC_ErrCode vscFinalizeChipStatesProgrammer(VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
@@ -852,6 +865,11 @@ static VSC_ErrCode _AllocVidMemForCrSpill(VSC_CHIP_STATES_PROGRAMMER* pStatesPgm
         gctUINT32 physical = NOT_ASSIGNED;
 
         pSpillData = (gctUINT*)vscMM_Alloc(&pStatesPgmer->pmp.mmWrapper, crSpillSize);
+        if (pSpillData == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR(errCode, "Failed to allocate memory for pSpillData.");
+        }
         memset(pSpillData, 0, crSpillSize);
 
         *pCrSpillMemSize = crSpillSize;
