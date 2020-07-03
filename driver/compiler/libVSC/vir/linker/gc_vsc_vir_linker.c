@@ -3621,6 +3621,12 @@ VIR_Lib_LinkFunctions(
 
                 newParam = VIR_Function_GetSymFromId(pFunc, newParamId);
 
+                /* Copy the flag. */
+                if (isSymFunctionReturnVariable(libParam))
+                {
+                    VIR_Symbol_SetFlagExt(newParam, VIR_SYMFLAGEXT_FUNCTION_RET_VARIABLE);
+                }
+
                 /* add parameter virreg */
                 regCount = VIR_Type_GetRegOrOpaqueCount(pShader,
                                                         VIR_Shader_GetTypeFromId(pShader, pTyId),
@@ -4651,8 +4657,6 @@ VIR_Lib_UpdateCallSites(
                             typeId = VIR_TYPE_UINT_X8;
                             newSrcType = VIR_Symbol_GetTypeId(sym);
                         }
-
-                        bMapSwizzle = gcvFALSE;
                     }
                     /* matrix and struct's input is already lowered */
                     VIR_Function_AddInstructionBefore(pCallerFunc,
@@ -4715,6 +4719,7 @@ VIR_Lib_UpdateCallSites(
                         VIR_Operand_SetRelIndex(newOpnd, 0);
                     }
                 }
+
                 if (VIR_Symbol_isOutParam(parmSym))
                 {
                     dstType = VIR_Shader_GetTypeFromId(pShader, VIR_Operand_GetTypeId(destOpnd));
@@ -4733,16 +4738,8 @@ VIR_Lib_UpdateCallSites(
 
                     VIR_Operand_SetEnable(newInst->dest, movEnable);
 
-                    if (i < argCount)
-                    {
-                        gcmASSERT(opnd && !VIR_Operand_isUndef(opnd));
-                        /* matrix and struct's output in parameter list is already lowered */
-                        VIR_Operand_SetTempRegister(newInst->dest,
-                                                    pCallerFunc,
-                                                    VIR_Operand_GetSymbolId_(opnd),
-                                                    VIR_Operand_GetTypeId(opnd));
-                    }
-                    else
+                    /* Set the return value. */
+                    if (i >= argCount || isSymFunctionReturnVariable(parmSym))
                     {
                         /* matrix and struct's output is not lowered */
                         if (VIR_TypeId_isPrimitive(VIR_Operand_GetTypeId(destOpnd)) &&
@@ -4775,6 +4772,15 @@ VIR_Lib_UpdateCallSites(
                         {
                             gcmASSERT(gcvFALSE);
                         }
+                    }
+                    else
+                    {
+                        gcmASSERT(opnd && !VIR_Operand_isUndef(opnd));
+                        /* matrix and struct's output in parameter list is already lowered */
+                        VIR_Operand_SetTempRegister(newInst->dest,
+                                                    pCallerFunc,
+                                                    VIR_Operand_GetSymbolId_(opnd),
+                                                    VIR_Operand_GetTypeId(opnd));
                     }
 
                     VIR_Operand_SetSwizzle(newInst->src[0], VIR_Enable_2_Swizzle(movEnable));

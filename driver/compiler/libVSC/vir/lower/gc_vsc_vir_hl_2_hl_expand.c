@@ -12,8 +12,8 @@
 
 
 #include "vir/lower/gc_vsc_vir_hl_2_hl.h"
-
 #include "vir/lower/gc_vsc_vir_lower_common_func.h"
+#include "vir/transform/gc_vsc_vir_misc_opts.h"
 
 static void
 _Lower_Initialize(
@@ -5225,6 +5225,9 @@ VIR_Lower_HighLevel_To_HighLevel_Expand(
         errCode = _VIR_HL_FindAllUniformsWithinResourceLayout(pResourceLayout, shader);
         CHECK_ERROR(errCode, "_VIR_HL_FindAllUniformsWithinResourceLayout failed.");
     }
+
+    /* Change all RETs to JMPs and only keep one RET at the end of the function. */
+    vscVIR_ConvertRetToJmpForFunctions(shader, gcvNULL);
 
     /* Renumber instruction ID. */
     VIR_Shader_RenumberInstId(shader);

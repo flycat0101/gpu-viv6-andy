@@ -18,6 +18,15 @@
 
 BEGIN_EXTERN_C()
 
+/***************************************Misc functions***************************************/
+VSC_ErrCode
+vscVIR_ConvertRetToJmpForFunctions(
+    IN OUT VIR_Shader*              pShader,
+    OUT gctBOOL*                    pInvalidCfg
+    );
+
+/***************************************Misc passes***************************************/
+
 typedef struct _VSC_PRELL_PASS_DATA
 {
     gctBOOL                     bHasFuncNeedToForceInline;

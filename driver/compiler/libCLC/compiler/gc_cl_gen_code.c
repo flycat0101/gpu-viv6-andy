@@ -4331,6 +4331,14 @@ OUT gctUINT *NumRegNeeded
                                                     tempRegIndex,
                                                     argumentQualifier);
                if (gcmIS_ERROR(status)) return status;
+
+               if (ParentName->type == clvFUNC_NAME || ParentName->type == clvKERNEL_FUNC_NAME)
+               {
+                   gcsFUNCTION_ARGUMENT_PTR functionArgument = gcvNULL;
+
+                   functionArgument = &ParentName->context.u.variable.u.kernelFunction->arguments[ParentName->context.u.variable.u.kernelFunction->argumentCount - 1];
+                   functionArgument->flags |= gceFUNCTION_ARGUMENT_FLAG_IS_RETURN_VARIABLE;
+               }
             }
             else {
                gcmASSERT(ParentName->context.u.variable.u.function);
@@ -4476,6 +4484,14 @@ OUT gctUINT *NumRegNeeded
                                               tempRegIndex,
                                               argumentQualifier);
                if (gcmIS_ERROR(status)) return status;
+
+               if (ParentName->type == clvFUNC_NAME || ParentName->type == clvKERNEL_FUNC_NAME)
+               {
+                   gcsFUNCTION_ARGUMENT_PTR functionArgument = gcvNULL;
+
+                   functionArgument = &ParentName->context.u.variable.u.function->arguments[ParentName->context.u.variable.u.function->argumentCount - 1];
+                   functionArgument->flags |= gceFUNCTION_ARGUMENT_FLAG_IS_RETURN_VARIABLE;
+               }
             }
         }
         else {
