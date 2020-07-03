@@ -13032,48 +13032,74 @@ OnError:
 
 static gctBOOL
 _ToUploadUBO(
-    IN gcSHADER VertexShader,
-    IN gcSHADER FragmentShader,
-    OUT gctBOOL *UploadUBO
-)
+    IN gcSHADER     Shader,
+    OUT gctBOOL*    UploadUBO
+    )
 {
-    gctBOOL uploadUBO = gcvFALSE;
+    gctBOOL         uploadUBO = gcvFALSE;
+    gctUINT         maxUniformCount = 0, uniformCount = 0, uboUniformCount = 0;
 
-    if(gcmOPT_UploadUBO() &&
-       VertexShader && FragmentShader) {
-        gctUINT vsUniform;
-        gctUINT psUniform;
-        gctUINT uniformCount, uboUniformCount;
-
-        vsUniform = gcHWCaps.maxVSConstRegCount;
-        psUniform = gcHWCaps.maxPSConstRegCount;
-
-        _MASSAGE_MAX_UNIFORM_FOR_OES30(vsUniform, psUniform);
-
-        do {
-            gcSHADER_GetUniformVectorCount(VertexShader,
-                                           &uniformCount);
-
-            gcSHADER_GetUniformVectorCountByCategory(VertexShader,
-                                                     gcSHADER_VAR_CATEGORY_BLOCK_MEMBER,
-                                                     &uboUniformCount);
-            if(vsUniform < (uniformCount + uboUniformCount)) break;
-
-            gcSHADER_GetUniformVectorCount(FragmentShader,
-                                           &uniformCount);
-
-            gcSHADER_GetUniformVectorCountByCategory(FragmentShader,
-                                                     gcSHADER_VAR_CATEGORY_BLOCK_MEMBER,
-                                                     &uboUniformCount);
-            if(psUniform < (uniformCount + uboUniformCount)) break;
-
-            uploadUBO = gcvTRUE;
-        } while (gcvFALSE);
+    /* Skip non-halti shader because it won't contain any UBO. */
+    if (!gcSHADER_IsHaltiCompiler(Shader))
+    {
+        return gcvFALSE;
     }
 
-    if(UploadUBO) {
+    switch (Shader->type)
+    {
+    case gcSHADER_TYPE_VERTEX:
+        maxUniformCount = GetGLMaxVertexUniformVectors();
+        _MASSAGE_MAX_VS_UNIFORM_FOR_OES30(maxUniformCount);
+        break;
+
+    case gcSHADER_TYPE_TCS:
+        maxUniformCount = GetGLMaxTCSUniformVectors();
+        break;
+
+    case gcSHADER_TYPE_TES:
+        maxUniformCount = GetGLMaxTESUniformVectors();
+        break;
+
+    case gcSHADER_TYPE_GEOMETRY:
+        maxUniformCount = GetGLMaxGSUniformVectors();
+        break;
+
+    case gcSHADER_TYPE_FRAGMENT:
+        maxUniformCount = GetGLMaxFragmentUniformVectors();
+        _MASSAGE_MAX_PS_UNIFORM_FOR_OES30(maxUniformCount);
+        break;
+
+    case gcSHADER_TYPE_COMPUTE:
+        maxUniformCount = GetGLMaxComputeUniformComponents() / 4;
+        break;
+
+    default:
+        break;
+    }
+
+    do
+    {
+        gcSHADER_GetUniformVectorCount(Shader,
+                                       &uniformCount);
+
+        gcSHADER_GetUniformVectorCountByCategory(Shader,
+                                                 gcSHADER_VAR_CATEGORY_BLOCK_MEMBER,
+                                                 &uboUniformCount);
+
+        if (maxUniformCount < (uniformCount + uboUniformCount))
+        {
+            break;
+        }
+
+        uploadUBO = gcvTRUE;
+
+    } while (gcvFALSE);
+
+    if (UploadUBO)
+    {
         *UploadUBO = uploadUBO;
     }
+
     return uploadUBO;
 }
 
@@ -15119,6 +15145,8 @@ _gcChangeLoadToMovUniform(
            {
                curInstIdx++;
            }
+
+           gcShaderSetUseConstRegForUBO(Shader);
        }
     }
 
@@ -16857,7 +16885,7 @@ gcLinkShaders(
     gctBOOL    dumpFragCGV = gcvFALSE;
     gctBOOL    dumpCGV;
     gctBOOL    enableDefaultUBO = gcvFALSE;
-    gctBOOL    uploadUBO = gcvFALSE;
+    gctBOOL    uploadUBO[2] = { gcvFALSE, gcvFALSE };
     gctBOOL    isRecompiler = Flags & gcvSHADER_RECOMPILER;
     gcSHADER shader, vsTemp = gcvNULL, fsTemp = gcvNULL;
     gctUINT32_PTR vertexVersion = gcvNULL, fragmentVersion = gcvNULL;
@@ -17100,12 +17128,11 @@ gcLinkShaders(
 
     do
     {
-        if(!gcHWCaps.hwFeatureFlags.hasHalti1 ||
-           _ToUploadUBO(VertexShader, FragmentShader, &uploadUBO))
+        if (!gcHWCaps.hwFeatureFlags.hasHalti1 || gcmOPT_UploadUBO())
         {
             for(i = 0, shader = VertexShader; i < 2; i++, shader = FragmentShader)
             {
-                if (shader)
+                if (shader && _ToUploadUBO(shader, &uploadUBO[i]))
                 {
                     gcmERR_BREAK(_gcChangeLoadToMovUniform(shader, gcvFALSE));
                 }
@@ -17526,7 +17553,7 @@ gcLinkShaders(
                 }
 
                 if(vertexTree->hints)
-                    vertexTree->hints->uploadedUBO = uploadUBO;
+                    vertexTree->hints->uploadedUBO = uploadUBO[0];
 
                 gcmERR_BREAK(gcLINKTREE_GenerateStates(&vertexTree,
                                                        Flags,
@@ -17571,7 +17598,7 @@ gcLinkShaders(
                 }
 
                 if(fragmentTree->hints)
-                    fragmentTree->hints->uploadedUBO = uploadUBO;
+                    fragmentTree->hints->uploadedUBO = uploadUBO[1];
 
                 gcmERR_BREAK(gcLINKTREE_GenerateStates(&fragmentTree,
                                                        Flags,
@@ -17771,7 +17798,7 @@ _gcLinkFullGraphicsShaders(
 
     for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i ++)
     {
-       if (Shaders[i])
+        if (Shaders[i])
         {
             /*
             ** Ignore all references to the gl_BoundingBox in TS since we don't support it.
@@ -17819,6 +17846,14 @@ _gcLinkFullGraphicsShaders(
                 {
                     gcmFATAL("ERROR: Cannot clamp output color on fragment shader.");
                     return status;
+                }
+            }
+
+            if (!gcHWCaps.hwFeatureFlags.hasHalti1 || gcmOPT_UploadUBO())
+            {
+                if (_ToUploadUBO(Shaders[i], gcvNULL))
+                {
+                    gcmONERROR(_gcChangeLoadToMovUniform(Shaders[i], gcvFALSE));
                 }
             }
         }
@@ -18695,6 +18730,7 @@ _gcLinkComputeShader(
     gcLINKTREE              *trees[gcMAX_SHADERS_IN_LINK_GOURP] = {0, 0, 0, 0, 0, 0};
     gctBOOL                 hasHalti2 = gcHWCaps.hwFeatureFlags.hasHalti2;
     gctBOOL                 useFullNewLinker = gcvFALSE;
+    gctBOOL                 uploadUBO = gcvFALSE;
 
     gcmHEADER_ARG("ComputeShader=0x%x Flags=%x",
                   ComputeShader, Flags);
@@ -18751,6 +18787,14 @@ _gcLinkComputeShader(
         !useFullNewLinker)
     {
         _gcPackingFunctionArgument(ComputeShader, dumpCGVerbose);
+    }
+
+    if (!gcHWCaps.hwFeatureFlags.hasHalti1 || gcmOPT_UploadUBO())
+    {
+        if (_ToUploadUBO(ComputeShader, &uploadUBO))
+        {
+            gcmONERROR(_gcChangeLoadToMovUniform(ComputeShader, gcvFALSE));
+        }
     }
 
     if (!useFullNewLinker)
@@ -18933,6 +18977,12 @@ _gcLinkComputeShader(
                     computeTree->useICache = gcvFALSE;
                 }
             }
+
+            if(computeTree->hints)
+            {
+                computeTree->hints->uploadedUBO = uploadUBO;
+            }
+
             /* Generate kernel shader states. */
             gcmONERROR(gcLINKTREE_GenerateStates(&computeTree,
                                                  Flags,

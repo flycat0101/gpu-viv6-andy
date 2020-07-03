@@ -3759,7 +3759,7 @@ static VSC_ErrCode _VectorizeInstToSeedInst(VIR_VECTORIZER_INFO* pVectorizerInfo
     }
 
     /* Delete inst */
-    VIR_Pass_DeleteInstruction(pBasicBlock->pOwnerCFG->pOwnerFuncBlk->pVIRFunc, pInst, &pVectorizerInfo->bInvalidCfg);
+    vscVIR_DeleteInstructionWithDu(gcvNULL, pBasicBlock->pOwnerCFG->pOwnerFuncBlk->pVIRFunc, pInst, &pVectorizerInfo->bInvalidCfg);
 
     *pVectorizeSucc = gcvTRUE;
 

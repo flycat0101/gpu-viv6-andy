@@ -15148,7 +15148,7 @@ VIR_Operand_NegateOperand(
     {
     case VIR_OPND_IMMEDIATE:
         {
-            VIR_PrimitiveTypeId type = VIR_Operand_GetTypeId(Operand);
+            VIR_PrimitiveTypeId type = VIR_GetTypeComponentType(VIR_Operand_GetTypeId(Operand));
 
             if (bHasAbs)
             {
@@ -17851,6 +17851,7 @@ VIR_ScalarConstVal_GetNeg(
     {
     /* Floating. */
     case VIR_TYPE_FLOAT32:
+    case VIR_TYPE_FLOAT16:
         out_imm->fValue = -in_imm->fValue;
         break;
 
@@ -21001,48 +21002,6 @@ VIR_Shader_NeedToCheckDual16(
 }
 
 /* Those functions are used in the PASS only. */
-VSC_ErrCode
-VIR_Pass_RemoveInstruction(
-    IN VIR_Function*    pFunction,
-    IN VIR_Instruction* pInst,
-    INOUT gctBOOL*      pInvalidCFG
-    )
-{
-    VSC_ErrCode         errCode  = VSC_ERR_NONE;
-    VIR_BASIC_BLOCK*    pBB = VIR_Inst_GetBasicBlock(pInst);
-
-    VIR_Function_RemoveInstruction(pFunction, pInst, gcvTRUE);
-
-    /* If there is no instruction within one BB, we need to rebuild CFG. */
-    if (pInvalidCFG && pBB && BB_GET_LENGTH(pBB) == 0)
-    {
-        *pInvalidCFG = gcvTRUE;
-    }
-
-    return errCode;
-}
-
-VSC_ErrCode
-VIR_Pass_DeleteInstruction(
-    IN VIR_Function*    pFunction,
-    IN VIR_Instruction* pInst,
-    INOUT gctBOOL*      pInvalidCFG
-    )
-{
-    VSC_ErrCode         errCode  = VSC_ERR_NONE;
-    VIR_BASIC_BLOCK*    pBB = VIR_Inst_GetBasicBlock(pInst);
-
-    VIR_Function_DeleteInstruction(pFunction, pInst);
-
-    /* If there is no instruction within one BB, we need to rebuild CFG. */
-    if (pInvalidCFG && pBB && BB_GET_LENGTH(pBB) == 0)
-    {
-        *pInvalidCFG = gcvTRUE;
-    }
-
-    return errCode;
-}
-
 VSC_ErrCode
 VIR_Pass_MoveInstructionBefore(
     IN VIR_Function*    pMoveFunction,

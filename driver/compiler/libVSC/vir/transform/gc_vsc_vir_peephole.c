@@ -2024,7 +2024,7 @@ static VSC_ErrCode _VSC_PH_RemoveSingleInst(
     IN OUT VIR_Instruction* inst
     )
 {
-    return VIR_Pass_RemoveInstruction(func, inst, &VSC_PH_Peephole_GetCfgChanged(ph));
+    return vscVIR_RemoveInstructionWithDu(gcvNULL, func, inst, &VSC_PH_Peephole_GetCfgChanged(ph));
 }
 
 static VSC_ErrCode _VSC_PH_RemoveInst(
@@ -5144,7 +5144,7 @@ static VSC_ErrCode _VSC_PH_GenerateLoadStore(
                 VIR_GENERAL_UD_ITERATOR udIter;
                 VIR_DEF*                pDef = gcvNULL;
 
-                newSwizzle = VIR_Enable_GetMappingSwizzle(addEnable, VIR_Operand_GetSwizzle(pAddSrc0Opnd));
+                newSwizzle = VIR_Enable_GetMappingFullChannelSwizzle(addEnable, VIR_Operand_GetSwizzle(pAddSrc0Opnd));
                 VIR_Operand_SetSwizzle(pBaseOpnd, newSwizzle);
 
                 vscVIR_InitGeneralUdIterator(&udIter, pDuInfo, pAddInst, pAddSrc0Opnd, gcvFALSE, gcvFALSE);
@@ -5207,7 +5207,10 @@ static VSC_ErrCode _VSC_PH_GenerateLoadStore(
         /* We need to delete this ADD instruction when all usage instructions are matched. */
         if (bNeedToMatchAllUsageInst)
         {
-            errCode = VIR_Pass_DeleteInstruction(VIR_Inst_GetFunction(pAddInst), pAddInst, &VSC_PH_Peephole_GetCfgChanged(ph));
+            errCode = vscVIR_DeleteInstructionWithDu(pDuInfo,
+                                                     VIR_Inst_GetFunction(pAddInst),
+                                                     pAddInst,
+                                                     &VSC_PH_Peephole_GetCfgChanged(ph));
             ON_ERROR(errCode, "Delete instruction error.");
         }
 

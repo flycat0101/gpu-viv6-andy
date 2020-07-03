@@ -5561,3 +5561,139 @@ gctBOOL vscVIR_FindUniqueNearestDefInst(
     return bFound;
 }
 
+gctBOOL vscVIR_CleanDuForInstruction(
+    IN VIR_DEF_USAGE_INFO*          pDuInfo,
+    IN VIR_Instruction*             pInst
+    )
+{
+    VIR_Shader*                     pShader = VIR_Inst_GetShader(pInst);
+    VIR_Operand*                    pOpnd = gcvNULL;
+    VIR_OperandInfo                 opndInfo;
+    VIR_VirRegId                    indexedSymRegId = VIR_INVALID_ID;
+    VIR_Symbol*                     pIndexedSym = gcvNULL;
+    VIR_Indexed                     opndIndexed = VIR_INDEXED_NONE;
+    gctUINT                         i;
+
+    /* Delete the DEF. */
+    pOpnd = VIR_Inst_GetDest(pInst);
+    if (VIR_OPCODE_hasDest(VIR_Inst_GetOpcode(pInst)) && pOpnd != gcvNULL)
+    {
+        VIR_Operand_GetOperandInfo(pInst, pOpnd, &opndInfo);
+        gcmASSERT(opndInfo.isVreg);
+
+        vscVIR_DeleteDef(pDuInfo,
+                         pInst,
+                         opndInfo.u1.virRegInfo.virReg,
+                         1,
+                         VIR_Operand_GetEnable(pOpnd),
+                         VIR_HALF_CHANNEL_MASK_FULL,
+                         gcvNULL);
+    }
+
+    /* Check all sources. */
+    for (i = 0; i < VIR_Inst_GetSrcNum(pInst); i++)
+    {
+        pOpnd = VIR_Inst_GetSource(pInst, i);
+        VIR_Operand_GetOperandInfo(pInst, pOpnd, &opndInfo);
+
+        if (!opndInfo.isVreg)
+        {
+            continue;
+        }
+
+        /* Delete the source usage. */
+        vscVIR_DeleteUsage(pDuInfo,
+                           VIR_ANY_DEF_INST,
+                           pInst,
+                           pOpnd,
+                           gcvFALSE,
+                           opndInfo.u1.virRegInfo.virReg,
+                           1,
+                           VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pOpnd)),
+                           VIR_HALF_CHANNEL_MASK_FULL,
+                           gcvNULL);
+
+        /* Check the indexed symbol. */
+        opndIndexed = VIR_Operand_GetRelAddrMode(pOpnd);
+        if (VIR_Operand_GetIsConstIndexing(pOpnd) || opndIndexed == VIR_INDEXED_NONE)
+        {
+            continue;
+        }
+
+        pIndexedSym = VIR_Shader_GetSymFromId(pShader, VIR_Operand_GetRelIndexing(pOpnd));
+        indexedSymRegId = VIR_Symbol_GetVregIndex(pIndexedSym);
+
+        if (indexedSymRegId == VIR_INVALID_ID)
+        {
+            continue;
+        }
+
+        vscVIR_DeleteUsage(pDuInfo,
+                           VIR_ANY_DEF_INST,
+                           pInst,
+                           pOpnd,
+                           gcvTRUE,
+                           indexedSymRegId,
+                           1,
+                           VIR_Swizzle_2_Enable(opndIndexed - 1),
+                           VIR_HALF_CHANNEL_MASK_FULL,
+                           gcvNULL);
+    }
+
+    return gcvTRUE;
+}
+
+VSC_ErrCode
+vscVIR_DeleteInstructionWithDu(
+    IN VIR_DEF_USAGE_INFO*          pDuInfo,
+    IN VIR_Function*                pFunction,
+    IN VIR_Instruction*             pInst,
+    INOUT gctBOOL*                  pInvalidCFG
+    )
+{
+    VSC_ErrCode                     errCode  = VSC_ERR_NONE;
+    VIR_BASIC_BLOCK*                pBB = VIR_Inst_GetBasicBlock(pInst);
+
+    if (pDuInfo)
+    {
+        vscVIR_CleanDuForInstruction(pDuInfo, pInst);
+    }
+
+    VIR_Function_DeleteInstruction(pFunction, pInst);
+
+    /* If there is no instruction within one BB, we need to rebuild CFG. */
+    if (pInvalidCFG && pBB && BB_GET_LENGTH(pBB) == 0)
+    {
+        *pInvalidCFG = gcvTRUE;
+    }
+
+    return errCode;
+}
+
+VSC_ErrCode
+vscVIR_RemoveInstructionWithDu(
+    IN VIR_DEF_USAGE_INFO*          pDuInfo,
+    IN VIR_Function*                pFunction,
+    IN VIR_Instruction*             pInst,
+    INOUT gctBOOL*                  pInvalidCFG
+    )
+{
+    VSC_ErrCode         errCode  = VSC_ERR_NONE;
+    VIR_BASIC_BLOCK*    pBB = VIR_Inst_GetBasicBlock(pInst);
+
+    if (pDuInfo)
+    {
+        vscVIR_CleanDuForInstruction(pDuInfo, pInst);
+    }
+
+    VIR_Function_RemoveInstruction(pFunction, pInst, gcvTRUE);
+
+    /* If there is no instruction within one BB, we need to rebuild CFG. */
+    if (pInvalidCFG && pBB && BB_GET_LENGTH(pBB) == 0)
+    {
+        *pInvalidCFG = gcvTRUE;
+    }
+
+    return errCode;
+}
+

@@ -206,7 +206,14 @@ static void _VIR_CG_isUBOSupported(
         else
         {
             *handleDefaultUBO = gcvFALSE;
-            *unblockUniformBlock = gcvFALSE;
+            if (VIR_Shader_UseConstRegForUBO(pShader))
+            {
+                *unblockUniformBlock = gcvTRUE;
+            }
+            else
+            {
+                *unblockUniformBlock = gcvFALSE;
+            }
         }
     }
 }

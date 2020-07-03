@@ -563,34 +563,40 @@ static VSC_ErrCode _VSC_LCSE_ReplaceUses(
                         VIR_Inst_Dump(dumper, instIter);
                     }
 
-                    vscVIR_DeleteUsage(VSC_LCSE_GetDuInfo(lcse),
-                        VIR_ANY_DEF_INST,
-                        instIter,
-                        srcOpnd,
-                        gcvFALSE,
-                        srcInfo.u1.virRegInfo.virReg,
-                        1,
-                        VIR_Operand_GetEnable(VIR_Inst_GetDest(replacedInst)),
-                        VIR_HALF_CHANNEL_MASK_FULL,
-                        gcvNULL);
+                    if (srcInfo.isVreg)
+                    {
+                        vscVIR_DeleteUsage(VSC_LCSE_GetDuInfo(lcse),
+                                           VIR_ANY_DEF_INST,
+                                           instIter,
+                                           srcOpnd,
+                                           gcvFALSE,
+                                           srcInfo.u1.virRegInfo.virReg,
+                                           1,
+                                           VIR_Operand_GetEnable(VIR_Inst_GetDest(replacedInst)),
+                                           VIR_HALF_CHANNEL_MASK_FULL,
+                                           gcvNULL);
+                    }
 
                     VIR_Operand_Copy(srcOpnd, VIR_Inst_GetSource(replacedInst, 0));
                     VIR_Operand_SetTypeId(srcOpnd, srcOpndTypeId);
 
                     VIR_Operand_GetOperandInfo(instIter, srcOpnd, &srcInfo);
 
-                    for (channel = 0; channel < VIR_CHANNEL_COUNT; channel++)
+                    if (srcInfo.isVreg)
                     {
-                        vscVIR_AddNewUsageToDef(VSC_LCSE_GetDuInfo(lcse),
-                            commonInst,
-                            instIter,
-                            srcOpnd,
-                            gcvFALSE,
-                            srcInfo.u1.virRegInfo.virReg,
-                            1,
-                            (1 << channel),
-                            VIR_HALF_CHANNEL_MASK_FULL,
-                            gcvNULL);
+                        for (channel = 0; channel < VIR_CHANNEL_COUNT; channel++)
+                        {
+                            vscVIR_AddNewUsageToDef(VSC_LCSE_GetDuInfo(lcse),
+                                                    commonInst,
+                                                    instIter,
+                                                    srcOpnd,
+                                                    gcvFALSE,
+                                                    srcInfo.u1.virRegInfo.virReg,
+                                                    1,
+                                                    (1 << channel),
+                                                    VIR_HALF_CHANNEL_MASK_FULL,
+                                                    gcvNULL);
+                        }
                     }
 
                     if(VSC_UTILS_MASK(VSC_OPTN_LCSEOptions_GetTrace(options), VSC_OPTN_LCSEOptions_TRACE_REPLACING))

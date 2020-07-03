@@ -1198,7 +1198,7 @@ static VSC_ErrCode VSC_IL_CleanupLables(
             if (VIR_Inst_GetOpcode(inst) == VIR_OP_LABEL &&
                 VIR_Inst_GetJmpLabel(inst)->referenced == gcvNULL)
             {
-                VIR_Pass_DeleteInstruction(func, inst, gcvNULL);
+                vscVIR_DeleteInstructionWithDu(gcvNULL, func, inst, gcvNULL);
             }
 
             inst = next_inst;
