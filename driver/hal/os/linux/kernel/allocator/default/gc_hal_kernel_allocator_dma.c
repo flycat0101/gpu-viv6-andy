@@ -165,7 +165,7 @@ _DmaAlloc(
 #endif
 
     mdlPriv->kvaddr
-#if defined CONFIG_MIPS || defined CONFIG_CPU_CSKYV2 || defined CONFIG_PPC || defined CONFIG_ARM64
+#if defined CONFIG_MIPS || defined CONFIG_CPU_CSKYV2 || defined CONFIG_PPC || defined CONFIG_ARM64 || !gcdENABLE_BUFFERABLE_VIDEO_MEMORY
         = dma_alloc_coherent(galcore_device, NumPages * PAGE_SIZE, &mdlPriv->dmaHandle, gfp);
 #else
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0)
@@ -322,7 +322,7 @@ _DmaMmap(
     gcmkHEADER_ARG("Allocator=%p Mdl=%p vma=%p", Allocator, Mdl, vma);
 
     gcmkASSERT(skipPages + numPages <= Mdl->numPages);
-
+#if gcdENABLE_BUFFERABLE_VIDEO_MEMORY
     /* map kernel memory to user space.. */
 #if defined CONFIG_MIPS || defined CONFIG_CPU_CSKYV2 || defined CONFIG_PPC
     if (remap_pfn_range(
@@ -348,6 +348,14 @@ _DmaMmap(
             mdlPriv->dmaHandle + (skipPages << PAGE_SHIFT),
             numPages << PAGE_SHIFT) < 0)
 #endif
+#endif
+#else
+    /* map kernel memory to user space.. */
+    if (dma_mmap_coherent(galcore_device,
+            vma,
+            (gctINT8_PTR)mdlPriv->kvaddr + (skipPages << PAGE_SHIFT),
+            mdlPriv->dmaHandle + (skipPages << PAGE_SHIFT),
+            numPages << PAGE_SHIFT) < 0)
 #endif
     {
         gcmkTRACE_ZONE(
