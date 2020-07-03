@@ -89,8 +89,8 @@ EXPORTS
     gcoOS_QueryProfileTickRate
     gcoOS_QueryVideoMemory
     gcoOS_LockPLS
-	gcoOS_LockGLFECompiler
-	gcoOS_LockCLFECompiler
+    gcoOS_LockGLFECompiler
+    gcoOS_LockCLFECompiler
     gcoOS_Read
     gcoOS_ReadRegister
     gcoOS_ReleaseMutex
@@ -122,8 +122,8 @@ EXPORTS
     gcoOS_StrToFloat
     gcoOS_StrToInt
     gcoOS_UnLockPLS
-	gcoOS_UnLockGLFECompiler
-	gcoOS_UnLockCLFECompiler
+    gcoOS_UnLockGLFECompiler
+    gcoOS_UnLockCLFECompiler
     gcoOS_Verify
     gcoOS_WaitSignal
     gcoOS_Write
@@ -199,7 +199,7 @@ EXPORTS
     gcoOS_SwapBuffers
     gcoOS_SetDisplayVirtualEx
     gcoOS_QuerySystemInfo
-	gcoOS_CPUPhysicalToGPUPhysical
+    gcoOS_CPUPhysicalToGPUPhysical
 
     ; gcsMEM
     gcfMEM_InitFSMemPool
@@ -225,8 +225,10 @@ EXPORTS
     gcoHAL_Construct
     gcoHAL_Destroy
     gcoHAL_DumpFrameDB
-	gcoHAL_InitGPUProfile
-	gcoHAL_DumpGPUProfile
+    gcoHAL_InitGPUProfile
+    gcoHAL_DumpGPUProfile
+    gcoHAL_InitCoreIndexByType
+    gcoHAL_SetCoreIndex
 
 !IF "$(VIVANTE_ENABLE_2D)" == "1"
     gcoHAL_Get2DEngine
@@ -251,6 +253,7 @@ EXPORTS
     gcoHAL_QueryChipFeature
     gcoHAL_QueryChipIdentity
     gcoHAL_QueryChipIdentityEx
+    gcoHAL_QuerySuperTileMode
     gcoHAL_QueryChipLimits
     gcoHAL_QueryPowerManagementState
     gcoHAL_QueryTiled
@@ -284,7 +287,7 @@ EXPORTS
     gcoHAL_SetBltNP2Texture
     gcoHAL_Get3DEngine
     gcoHAL_SetCompilerFuncTable
-	gcoHAL_SetFscaleValue
+    gcoHAL_SetFscaleValue
 !ENDIF
     gcoHAL_SetHardwareType
     gcoHAL_GetBaseAddr
@@ -789,7 +792,7 @@ EXPORTS
     gcoCL_AllocateMemory
     gcoCL_FreeMemory
     gcoCL_WrapUserMemory
-	gcoCL_WrapUserPhysicalMemory
+    gcoCL_WrapUserPhysicalMemory
     gcoCL_FlushMemory
     gcoCL_InvalidateMemoryCache
     gcoCL_ShareMemoryWithStream
@@ -805,7 +808,7 @@ EXPORTS
     gcoCL_QueryDeviceCount
 	gcoCL_QueryDeviceCountWithGPUType
     gcoCL_QueryDeviceCountWithVIPType
-	gcoCL_QueryDeviceCountWith3D2DType
+    gcoCL_QueryDeviceCountWith3D2DType
     gcoCL_Commit
     gcoCL_CreateSignal
     gcoCL_DestroySignal
@@ -1041,7 +1044,7 @@ EXPORTS
     gcoVX_ProgrammCrossEngine
     gcoVX_SetNNImage
     gcoVX_GetNNConfig
-	gcoVX_QueryHWChipInfo
+    gcoVX_QueryHWChipInfo
     gcoVX_FlushCache
     gcoVX_AllocateMemoryEx
     gcoVX_AllocateMemoryExAddAllocflag
@@ -1076,6 +1079,5 @@ EXPORTS
 !ENDIF
 
 !ENDIF
-
 
 <<
