@@ -826,6 +826,26 @@ __kernel void pRelu_BF16toBF16
     VXC_WriteImage2DArray(output, coord, src1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 }
 
+#define PRELUBF16BF16TOBF16PROCESS(read_fun, write_fun) \
+    vxc_short8 src0, para_s16; \
+    read_fun(src0, input, coord, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+    VXC_ReadImage(para_s16, para, coord_para, 0, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0)); \
+    vxc_short8 zero = (vxc_short8)(0, 0, 0, 0, 0, 0, 0, 0); \
+    vxc_ushort8 src1, src2; \
+    float4 srcA, srcB; \
+    float4 para_f32; \
+    VXC_DP2x8(src1, src0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part0_2x8); \
+    _viv_asm(COPY, srcA, src1, 16); \
+    VXC_DP2x8(src1, src0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part1_2x8); \
+    _viv_asm(COPY, srcB, src1, 16); \
+    VXC_DP2x8(src1, para_s16, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part0_2x8); \
+    _viv_asm(COPY, para_f32, src1, 16); \
+    srcA = srcA >= 0 ? srcA : srcA * para_f32.x; \
+    srcB = srcB >= 0 ? srcB : srcB * para_f32.x; \
+    _viv_asm(COPY, src1, srcA, 16); \
+    _viv_asm(COPY, src2, srcB, 16); \
+    VXC_DP2x8(src1, src1, src2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniPackedBF16_2x8); \
+    write_fun(output, coord, src1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 
 __kernel void pRelu_BF16BF16toBF16_2d
     (
@@ -835,33 +855,8 @@ __kernel void pRelu_BF16BF16toBF16_2d
     )
 {
     int2 coord = (int2)(get_global_id(0), get_global_id(1));
-
-    vxc_short8 src0, para_s16;
-
-    VXC_ReadImage(src0, input, coord, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    VXC_ReadImage(para_s16, para, coord.yy, 0, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
-
-    vxc_short8 zero = (vxc_short8)(0, 0, 0, 0, 0, 0, 0, 0);
-
-    vxc_ushort8 src1, src2;
-    float4 srcA, srcB;
-    float4 para_f32;
-    VXC_DP2x8(src1, src0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part0_2x8);
-    _viv_asm(COPY, srcA, src1, 16);
-    VXC_DP2x8(src1, src0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part1_2x8);
-    _viv_asm(COPY, srcB, src1, 16);
-
-    VXC_DP2x8(src1, para_s16, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part0_2x8);
-    _viv_asm(COPY, para_f32, src1, 16);
-
-    srcA = srcA >= 0 ? srcA : srcA * para_f32.x;
-    srcB = srcB >= 0 ? srcB : srcB * para_f32.x;
-
-    _viv_asm(COPY, src1, srcA, 16);
-    _viv_asm(COPY, src2, srcB, 16);
-
-    VXC_DP2x8(src1, src1, src2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniPackedBF16_2x8);
-    VXC_WriteImage(output, coord, src1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    int2 coord_para = (int2)(get_global_id(1), 0);
+    PRELUBF16BF16TOBF16PROCESS(VXC_ReadImage, VXC_WriteImage)
 }
 
 __kernel void pRelu_BF16BF16toBF16
@@ -872,31 +867,97 @@ __kernel void pRelu_BF16BF16toBF16
     )
 {
     int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
-    int4 coord_para = (int4)(coord.z, 0, 0, 0);
+    int2 coord_para = (int2)(coord.z, 0);
+    PRELUBF16BF16TOBF16PROCESS(VXC_ReadImage2DArray, VXC_WriteImage2DArray)
+}
 
-    vxc_short8 src0, para_s16;
+_viv_uniform int width_remin;
 
-    VXC_ReadImage2DArray(src0, input, coord, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    VXC_ReadImage(para_s16, para, coord_para.xy, 0, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+#define PRELUBF16BF16TOF32PROCESS(read_fun) \
+    coord.x = coord.x == 0 ? 0 : coord.x - width_remin; \
+    vxc_short8 src0, para_s16; \
+    read_fun(src0, input, coord, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+    VXC_ReadImage(para_s16, para, coord_para, 0, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0)); \
+    vxc_short8 zero = (vxc_short8)(0, 0, 0, 0, 0, 0, 0, 0); \
+    vxc_ushort8 src1, src2; \
+    float4 srcA, srcB; \
+    float4 para_f32; \
+    VXC_DP2x8(src1, src0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part0_2x8); \
+    _viv_asm(COPY, srcA, src1, 16); \
+    VXC_DP2x8(src1, src0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part1_2x8); \
+    _viv_asm(COPY, srcB, src1, 16); \
+    VXC_DP2x8(src1, para_s16, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part0_2x8); \
+    _viv_asm(COPY, para_f32, src1, 16); \
+    srcA = srcA >= 0 ? srcA : srcA * para_f32.x; \
+    srcB = srcB >= 0 ? srcB : srcB * para_f32.x; \
+    write_imagef(output, coord, srcA); \
+    coord.x += 4; \
+    write_imagef(output, coord, srcB);
 
-    vxc_short8 zero = (vxc_short8)(0, 0, 0, 0, 0, 0, 0, 0);
+__kernel void pRelu_BF16BF16toF32_2d
+    (
+    __read_only  image2d_array_t input,
+    __read_only  image2d_array_t para,
+    __write_only image2d_t       output
+    )
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    int2 coord_para = (int2)(get_global_id(1), 0);
+    PRELUBF16BF16TOF32PROCESS(VXC_ReadImage)
+}
 
-    vxc_ushort8 src1, src2;
-    float4 srcA, srcB;
-    float4 para_f32;
-    VXC_DP2x8(src1, src0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part0_2x8);
-    _viv_asm(COPY, srcA, src1, 16);
-    VXC_DP2x8(src1, src0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part1_2x8);
-    _viv_asm(COPY, srcB, src1, 16);
-    VXC_DP2x8(src1, para_s16, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part0_2x8);
-    _viv_asm(COPY, para_f32, src1, 16);
+__kernel void pRelu_BF16BF16toF32
+    (
+    __read_only  image2d_array_t input,
+    __read_only  image2d_array_t para,
+    __write_only image2d_array_t output
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int2 coord_para = (int2)(coord.z, 0);
+    PRELUBF16BF16TOF32PROCESS(VXC_ReadImage2DArray)
+}
 
-    srcA = srcA >= 0 ? srcA : srcA * para_f32.x;
-    srcB = srcB >= 0 ? srcB : srcB * para_f32.x;
+#define PRELUF32BF16TOBF16PROCESS(write_fun) \
+    vxc_short8 para_s16; \
+    VXC_ReadImage(para_s16, para, coord_para, 0, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0)); \
+    vxc_short8 zero = (vxc_short8)(0, 0, 0, 0, 0, 0, 0, 0); \
+    vxc_ushort8 src1, src2; \
+    float4 srcA, srcB; \
+    float4 para_f32; \
+    srcA = read_imagef(input, coord); \
+    coord.x += 4; \
+    srcB = read_imagef(input, coord); \
+    coord.x -= 4; \
+    VXC_DP2x8(src1, para_s16, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part0_2x8); \
+    _viv_asm(COPY, para_f32, src1, 16); \
+    srcA = srcA >= 0 ? srcA : srcA * para_f32.x; \
+    srcB = srcB >= 0 ? srcB : srcB * para_f32.x; \
+    _viv_asm(COPY, src1, srcA, 16); \
+    _viv_asm(COPY, src2, srcB, 16); \
+    VXC_DP2x8(src1, src1, src2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniPackedBF16_2x8); \
+    write_fun(output, coord, src1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 
-    _viv_asm(COPY, src1, srcA, 16);
-    _viv_asm(COPY, src2, srcB, 16);
+__kernel void pRelu_F32BF16toBF16_2d
+    (
+    __read_only  image2d_t       input,
+    __read_only  image2d_array_t para,
+    __write_only image2d_array_t output
+    )
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    int2 coord_para = (int2)(get_global_id(1), 0);
+    PRELUF32BF16TOBF16PROCESS(VXC_WriteImage)
+}
 
-    VXC_DP2x8(src1, src1, src2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniPackedBF16_2x8);
-    VXC_WriteImage2DArray(output, coord, src1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+__kernel void pRelu_F32BF16toBF16
+    (
+    __read_only  image2d_array_t input,
+    __read_only  image2d_array_t para,
+    __write_only image2d_array_t output
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int2 coord_para = (int2)(coord.z, 0);
+    PRELUF32BF16TOBF16PROCESS(VXC_WriteImage2DArray)
 }

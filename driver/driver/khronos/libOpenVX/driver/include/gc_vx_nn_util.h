@@ -141,8 +141,7 @@ void getFP32M0AndN(vx_float32 mult, vx_uint16 *M0, vx_int8 *N);
 void calculateActivationRangeFloat16(vx_int32 activation, vx_int16* act_min, vx_int16* act_max);
 void calculateActivationRangeInt16(vx_int32 activation, vx_int8 fixedPointPos, vx_int16* act_min, vx_int16* act_max, vx_int32 roundMode);
 void calculateActivationRangeUInt8(vx_int32 activation, vx_float32 scale, vx_int32 zero_point, vx_uint8* act_min, vx_uint8* act_max, vx_float32 range_min, vx_float32 range_max);
-void calculateActivationRangeInt8(vx_int32 activation, vx_int8 fixedPointPos, vx_int8* act_min, vx_int8* act_max, vx_int32 roundMode);
-vx_bool getFC_1x1xN_to_NN_kxxkyxkz(vx_uint32 input_size, vx_uint32 *kx, vx_uint32 *ky, vx_uint32 *kz);
+void calculateActivationRangeInt8(vx_int32 activation, vx_float32 scale, vx_int32 zp, vx_int8* act_min, vx_int8* act_max, vx_int32 roundMode);
 vx_status checkGetDataFactor(vx_uint32 data, vx_uint32 *factor, vx_uint32 minLimit, vx_uint32 maxLimit, vx_uint32 alignData);
 vx_bool checkOutputTensorDoAlu(vx_tensor src, vx_tensor dst);
 #if defined(__linux__)
