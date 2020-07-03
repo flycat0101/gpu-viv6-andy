@@ -16971,14 +16971,6 @@ gcSHADER_GetBuiltinNameKind(
     {
         kind = gcSL_GLOBAL_INVOCATION_ID;
     }
-    else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "local_invocation_index")))
-    {
-        kind = gcSL_LOCAL_INVOCATION_INDEX;
-    }
-    else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "global_invocation_index")))
-    {
-        kind = gcSL_GLOBAL_INVOCATION_INDEX;
-    }
     else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "cluster_id")))
     {
         kind = gcSL_CLUSTER_ID;
@@ -30452,12 +30444,6 @@ _PredefinedName(
     case gcSL_GLOBAL_INVOCATION_ID:
         return "#global_id";
 
-    case gcSL_LOCAL_INVOCATION_INDEX:
-        return "#local_invocation_index";
-
-    case gcSL_GLOBAL_INVOCATION_INDEX:
-        return "#global_invocation_index";
-
     case gcSL_CLUSTER_ID:
         return "#cluster_id";
 
@@ -34594,12 +34580,6 @@ _findBuiltinVariableTempIndex(
             case gcSL_GLOBAL_INVOCATION_ID:
                 BuiltinsTempIndex->GlobalInvocationIDTempIndex = attribute->index;
                 break;
-            case gcSL_LOCAL_INVOCATION_INDEX:
-                BuiltinsTempIndex->LocalInvocationIndexTempIndex = attribute->index;
-                break;
-            case gcSL_GLOBAL_INVOCATION_INDEX:
-                BuiltinsTempIndex->GlobalInvocationIndexTempIndex = attribute->index;
-                break;
             case gcSL_CLUSTER_ID:
                 BuiltinsTempIndex->ClusterIDTempIndex = attribute->index;
                 break;
@@ -34871,8 +34851,6 @@ _initBuiltinsTempIndex(
     BuiltinsTempIndex->WorkGroupIDTempIndex  =
     BuiltinsTempIndex->LocalInvocationIDTempIndex  =
     BuiltinsTempIndex->GlobalInvocationIDTempIndex  =
-    BuiltinsTempIndex->LocalInvocationIndexTempIndex  =
-    BuiltinsTempIndex->GlobalInvocationIndexTempIndex  =
     BuiltinsTempIndex->FrontColorTempIndex  =
     BuiltinsTempIndex->BackColorTempIndex   =
     BuiltinsTempIndex->FrontColorSecondaryTempIndex =

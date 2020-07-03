@@ -11018,7 +11018,7 @@ _CollectSubGroupVariables(
         VIR_Symbol*         pLocalInvocationIndex = gcvNULL;
         VIR_Symbol*         pVregSym = gcvNULL;
 
-        pLocalInvocationIndex = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_LOCAL_INVOCATION_INDEX);
+        pLocalInvocationIndex = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_LOCALINVOCATIONINDEX);
 
         if (pLocalInvocationIndex == gcvNULL)
         {
@@ -11050,7 +11050,7 @@ _CollectSubGroupVariables(
             pLocalInvocationIndex = VIR_Shader_AddBuiltinAttribute(pShader,
                                                                    VIR_TYPE_UINT32,
                                                                    gcvFALSE,
-                                                                   VIR_NAME_LOCAL_INVOCATION_INDEX);
+                                                                   VIR_NAME_LOCALINVOCATIONINDEX);
             outRegId = VIR_Shader_NewVirRegId(pShader, 1);
             VIR_Shader_AddSymbol(pShader,
                                  VIR_SYM_VIRREG,

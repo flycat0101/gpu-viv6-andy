@@ -963,9 +963,6 @@ static clsBUILTIN_UNNAMED_VARIABLE _BuiltinUnnamedVariables[] = {
     {clvBUILTIN_GLOBAL_SIZE, clvQUALIFIER_UNIFORM, clvQUALIFIER_NONE, T_UINT4, gcvFALSE, "#global_size"},
     {clvBUILTIN_GLOBAL_WORK_SCALE, clvQUALIFIER_UNIFORM, clvQUALIFIER_NONE, T_UINT4, gcvFALSE, "#global_work_scale"},
     {clvBUILTIN_LOCAL_SIZE, clvQUALIFIER_UNIFORM, clvQUALIFIER_NONE, T_UINT4, gcvFALSE, "#local_size"},
-    {clvBUILTIN_GLOBAL_INVOCATION_INDEX, clvQUALIFIER_ATTRIBUTE, clvQUALIFIER_NONE, T_UINT, gcvFALSE, "#global_invocation_index"},
-    {clvBUILTIN_LOCAL_INVOCATION_INDEX, clvQUALIFIER_ATTRIBUTE, clvQUALIFIER_NONE, T_UINT, gcvFALSE, "#local_invocation_index"},
-    {clvBUILTIN_ENQUEUED_LOCAL_SIZE, clvQUALIFIER_UNIFORM, clvQUALIFIER_NONE, T_UINT4, gcvFALSE, "#enqueued_local_size"},
     {clvBUILTIN_NUM_GROUPS, clvQUALIFIER_UNIFORM, clvQUALIFIER_NONE, T_UINT4, gcvFALSE, "#num_groups"},
     {clvBUILTIN_NUM_GROUPS_FOR_SINGLE_GPU, clvQUALIFIER_UNIFORM, clvQUALIFIER_NONE, T_UINT4, gcvFALSE, "#num_groups_single_gpu"},
     {clvBUILTIN_GLOBAL_OFFSET, clvQUALIFIER_UNIFORM, clvQUALIFIER_NONE, T_UINT4, gcvFALSE, "#global_offset"},
@@ -976,7 +973,6 @@ static clsBUILTIN_UNNAMED_VARIABLE _BuiltinUnnamedVariables[] = {
     {clvBUILTIN_PRINTF_ADDRESS, clvQUALIFIER_UNIFORM, clvQUALIFIER_NONE, T_CHAR, gcvTRUE, "#printf_address"},
     {clvBUILTIN_WORKITEM_PRINTF_BUFFER_SIZE, clvQUALIFIER_UNIFORM, clvQUALIFIER_NONE, T_UINT, gcvFALSE, "#workItem_printf_buffer_size"},
     {clvBUILTIN_CLUSTER_ID, clvQUALIFIER_ATTRIBUTE, clvQUALIFIER_NONE, T_UINT, gcvFALSE, "#cluster_id"},
-    {clvBUILTIN_KERNEL_ARG, clvQUALIFIER_UNIFORM, clvQUALIFIER_NONE, T_UINT, gcvFALSE, "#kernelArg"},
 };
 
 #define _cldBuiltinUnnamedVariableStart 1
@@ -3428,9 +3424,6 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"get_local_size",     gcvFALSE,    gcvFALSE,   gcvNULL, _GenGetLocalSizeCode},
     {"get_num_groups",     gcvFALSE,    gcvFALSE,   gcvNULL, _GenGetNumGroupsCode},
     {"get_global_offset",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenGetGlobalOffsetCode},
-    {"get_global_linear_id", gcvFALSE,    gcvFALSE,   gcvNULL, _GenGetGlobalLinearIdCode},
-    {"get_local_linear_id",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenGetLocalLinearIdCode},
-    {"get_enqueued_local_size", gcvFALSE, gcvFALSE,   gcvNULL, _GenGetEnqueuedLocalSizeCode},
 
     /* Synchronization function. */
     {"barrier",            gcvFALSE,    gcvFALSE,   gcvNULL, _GenBarrierCode},

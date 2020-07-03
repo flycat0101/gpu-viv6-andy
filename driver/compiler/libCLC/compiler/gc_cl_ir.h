@@ -91,30 +91,26 @@ struct _clsARRAY;
 /* BUILTIN VARIABLE TYPES */
 typedef enum _cleBUILTIN_VARIABLE
 {
-    clvBUILTIN_NONE                         = 0,
-    clvBUILTIN_GLOBAL_ID                    = 1,
-    clvBUILTIN_LOCAL_ID                     = 2,
-    clvBUILTIN_GROUP_ID                     = 3,
-    clvBUILTIN_WORK_DIM                     = 4,
-    clvBUILTIN_GLOBAL_SIZE                  = 5,
-    clvBUILTIN_GLOBAL_WORK_SCALE            = 6,
-    clvBUILTIN_LOCAL_SIZE                   = 7,
-    clvBUILTIN_GLOBAL_INVOCATION_INDEX      = 8,
-    clvBUILTIN_LOCAL_INVOCATION_INDEX       = 9,
-    clvBUILTIN_ENQUEUED_LOCAL_SIZE          = 10,
-    clvBUILTIN_NUM_GROUPS                   = 11,
-    clvBUILTIN_NUM_GROUPS_FOR_SINGLE_GPU    = 12,
-    clvBUILTIN_GLOBAL_OFFSET                = 13,
-    clvBUILTIN_LOCAL_ADDRESS_SPACE          = 14,
-    clvBUILTIN_PRIVATE_ADDRESS_SPACE        = 15,
-    clvBUILTIN_CONSTANT_ADDRESS_SPACE       = 16,
-    clvBUILTIN_ARG_LOCAL_MEM_SIZE           = 17,
-    clvBUILTIN_PRINTF_ADDRESS               = 18,
-    clvBUILTIN_WORKITEM_PRINTF_BUFFER_SIZE  = 19,
-    clvBUILTIN_CLUSTER_ID                   = 20,
-    clvBUILTIN_KERNEL_ARG                   = 21,
-    clvBUILTIN_LAST_ONE                     = clvBUILTIN_KERNEL_ARG + 1,
-                                /* This is a fake one to mark the last of all builtin's
+    clvBUILTIN_NONE,
+    clvBUILTIN_GLOBAL_ID,
+    clvBUILTIN_LOCAL_ID,
+    clvBUILTIN_GROUP_ID,
+    clvBUILTIN_WORK_DIM,
+    clvBUILTIN_GLOBAL_SIZE,
+    clvBUILTIN_GLOBAL_WORK_SCALE,
+    clvBUILTIN_LOCAL_SIZE,
+    clvBUILTIN_NUM_GROUPS,
+    clvBUILTIN_NUM_GROUPS_FOR_SINGLE_GPU,
+    clvBUILTIN_GLOBAL_OFFSET,
+    clvBUILTIN_LOCAL_ADDRESS_SPACE,
+    clvBUILTIN_PRIVATE_ADDRESS_SPACE,
+    clvBUILTIN_CONSTANT_ADDRESS_SPACE,
+    clvBUILTIN_ARG_LOCAL_MEM_SIZE,
+    clvBUILTIN_PRINTF_ADDRESS,
+    clvBUILTIN_WORKITEM_PRINTF_BUFFER_SIZE,
+    clvBUILTIN_CLUSTER_ID,
+    clvBUILTIN_KERNEL_ARG,
+    clvBUILTIN_LAST_ONE   /* This is a fake one to mark the last of all builtin's
                                  New builtins have to be added before this one and the
                                  order has to be maintained - please refer to corresponding
                                  definitions in gc_cl_built_ins.c */
@@ -981,7 +977,6 @@ typedef enum _cleATTR_FLAGS
     clvATTR_WORK_GROUP_SIZE_HINT = 0x20,
     clvATTR_ALWAYS_INLINE        = 0x40,
     clvATTR_KERNEL_SCALE_HINT    = 0x80,
-    clvATTR_UNROLL_HINT          = 0x100,
 }
 cleATTR_FLAGS;
 
@@ -998,7 +993,6 @@ typedef struct _clsATTRIBUTE
     gctUINT         reqdWorkGroupSize[3]; /* default {0,0,0} */
     gctUINT         workGroupSizeHint[3]; /* default {0,0,0} */
     gctUINT         kernelScaleHint[3];   /* default {1,1,1} */
-    gctUINT         unrollHint    : 1;
 } clsATTRIBUTE;
 
 struct _cloIR_EXPR;

@@ -211,7 +211,6 @@ typedef struct _gcBuiltinsTempIndex
    gctINT       LocalInvocationIDTempIndex;
    gctINT       GlobalInvocationIDTempIndex;
    gctINT       LocalInvocationIndexTempIndex;
-   gctINT       GlobalInvocationIndexTempIndex;
    gctINT       HelperInvocationTempIndex;
    gctINT       FrontColorTempIndex;
    gctINT       BackColorTempIndex;
