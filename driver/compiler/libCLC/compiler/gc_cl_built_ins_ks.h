@@ -24,7 +24,9 @@ static clsBUILTIN_FUNCTION    KSBuiltinFunctions[] =
     {clvEXTENSION_NONE,    "get_local_size",      T_SIZE_T,    1, {T_UINT}, {0}, {1}, 1},
     {clvEXTENSION_NONE,    "get_global_offset",   T_SIZE_T,    1, {T_UINT}, {0}, {1}, 1},
     {clvEXTENSION_NONE,    "get_num_groups",      T_SIZE_T,    1, {T_UINT}, {0}, {1}, 1},
-
+    {clvEXTENSION_NONE,    "get_global_linear_id", T_UINT,      0, {T_VOID}, {0}, {1}, 1},
+    {clvEXTENSION_NONE,    "get_local_linear_id",  T_UINT,      0, {T_VOID}, {0}, {1}, 1},
+    {clvEXTENSION_NONE,    "get_enqueued_local_size", T_SIZE_T, 1, {T_UINT}, {0}, {1}, 1},
     {clvEXTENSION_NONE,    "barrier",          T_VOID, 1, {T_UINT}, {0}, {1}, 1},
     {clvEXTENSION_NONE,    "mem_fence",        T_VOID, 1, {T_UINT}, {0}, {1}, 1},
 
@@ -573,6 +575,90 @@ _GenGetWorkDimCode(
 }
 
 static gceSTATUS
+_GenGetLocalLinearIdCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+   gceSTATUS status;
+   clsNAME *name;
+   clsLOPERAND lOperand[1];
+   clsROPERAND rOperand[1];
+
+/* Verify the arguments. */
+   clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+   clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
+   gcmASSERT(OperandCount == 0);
+   gcmASSERT(IOperand);
+
+   name = _cldUnnamedVariable(clvBUILTIN_LOCAL_INVOCATION_INDEX);
+/* Allocate all logical registers */
+   status = clsNAME_AllocLogicalRegs(Compiler,
+                                     CodeGenerator,
+                                     name);
+   if(gcmIS_ERROR(status)) return status;
+
+   clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
+   clsROPERAND_InitializeReg(rOperand,
+                             _cldUnnamedVariableRegs(clvBUILTIN_LOCAL_INVOCATION_INDEX));
+   rOperand->dataType = clmGenCodeDataType(T_UINT);
+   rOperand->vectorIndex.mode = clvINDEX_CONSTANT;
+   rOperand->vectorIndex.u.constant = (gctREG_INDEX)0;
+
+   return clGenAssignCode(Compiler,
+                          PolynaryExpr->exprBase.base.lineNo,
+                          PolynaryExpr->exprBase.base.stringNo,
+                          lOperand,
+                          rOperand);
+}
+
+static gceSTATUS
+_GenGetGlobalLinearIdCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+   gceSTATUS status;
+   clsNAME *name;
+   clsLOPERAND lOperand[1];
+   clsROPERAND rOperand[1];
+
+/* Verify the arguments. */
+   clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+   clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
+   gcmASSERT(OperandCount == 0);
+   gcmASSERT(IOperand);
+
+   name = _cldUnnamedVariable(clvBUILTIN_GLOBAL_INVOCATION_INDEX);
+/* Allocate all logical registers */
+   status = clsNAME_AllocLogicalRegs(Compiler,
+                                     CodeGenerator,
+                                     name);
+   if(gcmIS_ERROR(status)) return status;
+
+   clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
+   clsROPERAND_InitializeReg(rOperand,
+                             _cldUnnamedVariableRegs(clvBUILTIN_GLOBAL_INVOCATION_INDEX));
+   rOperand->dataType = clmGenCodeDataType(T_UINT);
+   rOperand->vectorIndex.mode = clvINDEX_CONSTANT;
+   rOperand->vectorIndex.u.constant = (gctREG_INDEX)0;
+
+   return clGenAssignCode(Compiler,
+                          PolynaryExpr->exprBase.base.lineNo,
+                          PolynaryExpr->exprBase.base.stringNo,
+                          lOperand,
+                          rOperand);
+}
+
+static gceSTATUS
 _GenGetGlobalSizeCode(
     IN cloCOMPILER Compiler,
     IN cloCODE_GENERATOR CodeGenerator,
@@ -778,6 +864,168 @@ _GenGetLocalSizeCode(
    clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
    clsROPERAND_InitializeReg(rOperand,
                              _cldUnnamedVariableRegs(clvBUILTIN_LOCAL_SIZE));
+   rOperand->dataType = clmGenCodeDataType(T_INT);
+   argument = OperandsParameters->rOperands;
+
+   if(argument->isReg) { /* variable argument */
+   /* The condition part: t0 == 0 */
+      clmGEN_CODE_IF(Compiler,
+                     CodeGenerator,
+                     PolynaryExpr->exprBase.base.lineNo,
+                     PolynaryExpr->exprBase.base.stringNo,
+                     &OperandsParameters[0].rOperands[0],
+                     clvCONDITION_EQUAL,
+                     zeroROperand);
+
+        rOperand->vectorIndex.mode = clvINDEX_CONSTANT;
+        rOperand->vectorIndex.u.constant = (gctREG_INDEX)0;
+        gcmONERROR(clGenAssignCode(Compiler,
+                                   PolynaryExpr->exprBase.base.lineNo,
+                                   PolynaryExpr->exprBase.base.stringNo,
+                                   lOperand,
+                                   rOperand));
+
+      /* The false part, "!==0" */
+      clmGEN_CODE_ELSE(Compiler,
+                       CodeGenerator,
+                       PolynaryExpr->exprBase.base.lineNo,
+                       PolynaryExpr->exprBase.base.stringNo);
+
+     /* The condition part: t0 == 1 */
+         clmGEN_CODE_IF(Compiler,
+                        CodeGenerator,
+                        PolynaryExpr->exprBase.base.lineNo,
+                        PolynaryExpr->exprBase.base.stringNo,
+                        &OperandsParameters[0].rOperands[0],
+                        clvCONDITION_EQUAL,
+                        oneROperand);
+
+            rOperand->vectorIndex.mode = clvINDEX_CONSTANT;
+            rOperand->vectorIndex.u.constant = (gctREG_INDEX)1;
+            gcmONERROR(clGenAssignCode(Compiler,
+                                       PolynaryExpr->exprBase.base.lineNo,
+                                       PolynaryExpr->exprBase.base.stringNo,
+                                       lOperand,
+                                       rOperand));
+
+     /* The false part, "!==0 && !==1" */
+         clmGEN_CODE_ELSE(Compiler,
+                          CodeGenerator,
+                          PolynaryExpr->exprBase.base.lineNo,
+                          PolynaryExpr->exprBase.base.stringNo);
+
+         /* The condition part: t0 == 2 */
+             clmGEN_CODE_IF(Compiler,
+                            CodeGenerator,
+                            PolynaryExpr->exprBase.base.lineNo,
+                            PolynaryExpr->exprBase.base.stringNo,
+                            &OperandsParameters[0].rOperands[0],
+                            clvCONDITION_EQUAL,
+                            twoROperand);
+
+                rOperand->vectorIndex.mode = clvINDEX_CONSTANT;
+                rOperand->vectorIndex.u.constant = (gctREG_INDEX)2;
+                gcmONERROR(clGenAssignCode(Compiler,
+                                           PolynaryExpr->exprBase.base.lineNo,
+                                           PolynaryExpr->exprBase.base.stringNo,
+                                           lOperand,
+                                           rOperand));
+
+         /* The false part, "!==0 && !==1" && "!==2" */
+             clmGEN_CODE_ELSE(Compiler,
+                              CodeGenerator,
+                              PolynaryExpr->exprBase.base.lineNo,
+                              PolynaryExpr->exprBase.base.stringNo);
+
+                gcmONERROR(clGenAssignCode(Compiler,
+                                           PolynaryExpr->exprBase.base.lineNo,
+                                           PolynaryExpr->exprBase.base.stringNo,
+                                           lOperand,
+                                           oneROperand));
+
+             clmGEN_CODE_ENDIF(Compiler,
+                               CodeGenerator,
+                               PolynaryExpr->exprBase.base.lineNo,
+                               PolynaryExpr->exprBase.base.stringNo);
+
+          clmGEN_CODE_ENDIF(Compiler,
+                            CodeGenerator,
+                            PolynaryExpr->exprBase.base.lineNo,
+                            PolynaryExpr->exprBase.base.stringNo);
+
+       clmGEN_CODE_ENDIF(Compiler,
+                         CodeGenerator,
+                         PolynaryExpr->exprBase.base.lineNo,
+                         PolynaryExpr->exprBase.base.stringNo);
+   }
+   else {  /* constant argument */
+      gctUINT argValue;
+      argValue = argument->u.constant.values[0].intValue;
+      if(argValue < cldMaxWorkDim) {
+         rOperand->vectorIndex.mode = clvINDEX_CONSTANT;
+         rOperand->vectorIndex.u.constant = (gctREG_INDEX)argValue;
+         gcmONERROR(clGenAssignCode(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
+                                    lOperand,
+                                    rOperand));
+      }
+      else {
+         gcmONERROR(clGenAssignCode(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
+                                    lOperand,
+                                    oneROperand));
+      }
+   }
+
+OnError:
+   return status;
+}
+
+static gceSTATUS
+_GenGetEnqueuedLocalSizeCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+   gceSTATUS status;
+   clsROPERAND *argument;
+   clsNAME *localSize;
+   clsLOPERAND lOperand[1];
+   clsROPERAND rOperand[1];
+   clsROPERAND    twoROperand[1], oneROperand[1], zeroROperand[1];
+
+/* Verify the arguments. */
+   clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+   clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
+   gcmASSERT(OperandCount == 1);
+   gcmASSERT(OperandsParameters);
+   gcmASSERT(IOperand);
+
+   clsROPERAND_InitializeIntOrIVecConstant(twoROperand,
+                       clmGenCodeDataType(T_INT),
+                       (gctUINT)2);
+   clsROPERAND_InitializeIntOrIVecConstant(oneROperand,
+                       clmGenCodeDataType(T_INT),
+                       (gctUINT)1);
+   clsROPERAND_InitializeIntOrIVecConstant(zeroROperand,
+                       clmGenCodeDataType(T_INT),
+                       (gctUINT)0);
+   localSize = _cldUnnamedVariable(clvBUILTIN_ENQUEUED_LOCAL_SIZE);
+/* Allocate all logical registers */
+   status = clsNAME_AllocLogicalRegs(Compiler,
+                                     CodeGenerator,
+                                     localSize);
+   if(gcmIS_ERROR(status)) return status;
+
+   clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
+   clsROPERAND_InitializeReg(rOperand,
+                             _cldUnnamedVariableRegs(clvBUILTIN_ENQUEUED_LOCAL_SIZE));
    rOperand->dataType = clmGenCodeDataType(T_INT);
    argument = OperandsParameters->rOperands;
 
