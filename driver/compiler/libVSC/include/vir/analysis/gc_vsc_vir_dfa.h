@@ -138,7 +138,7 @@ typedef struct _VIR_BASE_TS_DFA VIR_BASE_TS_DFA;
 
 /* Callbacks for doing real specific ts-DFA, boolean return value means whether flow is changed after
    resolved, if changed return TRUE, otherwise, return FALSE */
-typedef void (*PFN_TS_BLOCK_FLOW_LOCAL_GENKILL_RESOLVER)(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow);
+typedef VSC_ErrCode (*PFN_TS_BLOCK_FLOW_LOCAL_GENKILL_RESOLVER)(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow);
 typedef void (*PFN_TS_BLOCK_FLOW_INIT_RESOLVER)(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow);
 typedef gctBOOL (*PFN_TS_BLOCK_FLOW_ITERATE_RESOLVER)(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow);
 typedef gctBOOL (*PFN_TS_BLOCK_FLOW_COMBINE_RESOLVER)(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow); /* n-to-1 */

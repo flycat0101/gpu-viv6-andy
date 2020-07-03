@@ -311,7 +311,8 @@ static VSC_ErrCode _InitializeForwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFunc
         Also initialize workitem list */
     for (bbIdx = 0; bbIdx < countOfBasicBlk; bbIdx ++)
     {
-        pTsDFA->tsDfaResolvers.ts_localGenKill_resolver(pTsDFA, ppBasicBlkRPO[bbIdx]->pTsWorkDataFlow);
+        errCode = pTsDFA->tsDfaResolvers.ts_localGenKill_resolver(pTsDFA, ppBasicBlkRPO[bbIdx]->pTsWorkDataFlow);
+        CHECK_ERROR(errCode, "Failed in ts_localGenKill_resolver.");
         pTsDFA->tsDfaResolvers.ts_initBlockFlow_resolver(pTsDFA, ppBasicBlkRPO[bbIdx]->pTsWorkDataFlow);
 
         /* Initialize each workitem, and add it to workitem list. Note that entry block won't be
@@ -577,7 +578,8 @@ static VSC_ErrCode _InitializeBackwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFun
         Also initialize workitem list */
     for (bbIdx = 0; bbIdx < countOfBasicBlk; bbIdx ++)
     {
-        pTsDFA->tsDfaResolvers.ts_localGenKill_resolver(pTsDFA, ppBasicBlkRPO[bbIdx]->pTsWorkDataFlow);
+        errCode = pTsDFA->tsDfaResolvers.ts_localGenKill_resolver(pTsDFA, ppBasicBlkRPO[bbIdx]->pTsWorkDataFlow);
+        CHECK_ERROR(errCode, "Failed in ts_localGenKill_resolver.");
         pTsDFA->tsDfaResolvers.ts_initBlockFlow_resolver(pTsDFA, ppBasicBlkRPO[bbIdx]->pTsWorkDataFlow);
 
         /* Initialize each workitem, and add it to workitem list. Note that exit block won't be
