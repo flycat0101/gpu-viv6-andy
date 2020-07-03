@@ -13576,14 +13576,15 @@ gcSPV_Decode(
     gcmHEADER();
 
     /* Initialize current memory pool */
-    spvInitializeMemPool(SPV_MEMPOOL_PAGESIZE, &spvMemPool);
+    status = spvInitializeMemPool(SPV_MEMPOOL_PAGESIZE, &spvMemPool);
+    gcmONERROR(status);
 
     Spv = (gcSPV)gcSPV_CreateSPV(spvMemPool, info);
 
     if (Spv->src == gcvNULL)
     {
         gcmFOOTER();
-        return gcvSTATUS_INVALID_DATA;
+        gcmONERROR(gcvSTATUS_INVALID_DATA);
     }
 
     if ((!info->isLibraryShader || gcmGetOptimizerOption()->includeLib) && !disableIRDump && gcmGetOptimizerOption()->dumpShaderSource)
@@ -13685,12 +13686,15 @@ gcSPV_Decode(
     }
 
 OnError:
-    vscPMP_Finalize(&Spv->pmp);
-    if (Spv->internalIds != gcvNULL)
+    if(Spv != gcvNULL)
     {
-        spvFree(gcvNULL, Spv->internalIds);
+        vscPMP_Finalize(&Spv->pmp);
+        if (Spv->internalIds != gcvNULL)
+        {
+            spvFree(gcvNULL, Spv->internalIds);
+        }
+        vscBV_Finalize(&Spv->internalIdMask);
     }
-    vscBV_Finalize(&Spv->internalIdMask);
 
     /* Uninitialize, this will destroy Spv */
     spvUninitializeMemPool(spvMemPool);
@@ -13730,10 +13734,12 @@ gcSPV_PreDecode(
     SpvFuncCallTable       *funcTable = gcvNULL;
 
     /* Initialize the memory pool for the spirv converter. */
-    spvInitializeMemPool(SPV_MEMPOOL_PAGESIZE, &spvMemPool);
+    status = spvInitializeMemPool(SPV_MEMPOOL_PAGESIZE, &spvMemPool);
+    gcmONERROR(status);
 
     /* Initialize the memory pool for the function table only. */
-    spvInitializeMemPool(SPV_MEMPOOL_PAGESIZE, &memPoolForFuncTable);
+    status = spvInitializeMemPool(SPV_MEMPOOL_PAGESIZE, &memPoolForFuncTable);
+    gcmONERROR(status);
 
     Spv = (gcSPV)gcSPV_CreateSPV(spvMemPool, info);
 
