@@ -8179,12 +8179,14 @@ supportCMP_single_value_jmp_2_succ2_resCondOp(
 }
 
 static gctBOOL
-notDual16Req(
+notDual16ReqOrLongUlong(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
     )
 {
-    return !VIR_Lower_MatchDual16Req(Context, VIR_Inst_GetDest(Inst), VIR_Inst_GetSource(VIR_Inst_GetPrev(Inst), 0));
+    VIR_Operand *dest = VIR_Inst_GetDest(Inst);
+    return !(VIR_Lower_MatchDual16Req(Context, dest, VIR_Inst_GetSource(VIR_Inst_GetPrev(Inst), 0)) ||
+             _isLongUlong(Context, dest));
 }
 
 /*
@@ -8194,7 +8196,7 @@ notDual16Req(
 */
 static VIR_PatternMatchInst _jmpcPatInst0[] = {
     { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { VIR_Lower_HasHalti4, supportCMP_single_value_jmp_2_succ2_resCondOp }, VIR_PATN_MATCH_FLAG_AND },
-    { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 4, 5, 0, 0 }, { notDual16Req }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 4, 5, 0, 0 }, { notDual16ReqOrLongUlong }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 6, 0, 0, 0 }, { VIR_Lower_label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
 };
 
