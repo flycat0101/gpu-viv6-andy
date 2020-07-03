@@ -1115,6 +1115,7 @@ gbm_viv_surface_create(
 
     surf->queue.head = surf->queue.tail = 0;
     surf->lastIndex = -1;
+    surf->lastBuffer = -1;
     for (int i = 0; i < GBM_QUEUE_SIZE; i++)
     {
         surf->queue.data[i] = -1;
@@ -1286,12 +1287,14 @@ gbm_viv_surface_get_free_buffer(
     struct gbm_viv_surface *surf
     )
 {
-    int i = 0;
+    gctINT i = 0;
     struct gbm_bo * bo = NULL;
     gctBOOL found = gcvFALSE;
 
     do
     {
+        i = (surf->lastBuffer + 1) % surf->buffer_count;
+
         if (surf->buffers[i].status == FREE)
         {
             gcmASSERT(surf->buffers[i].lockCount == 0);
@@ -1307,11 +1310,10 @@ gbm_viv_surface_get_free_buffer(
                 }
             }
         }
-        if (found)
-           break;
-
-        if ((i++) == surf->buffer_count)
-            i = 0;
+        if (found){
+            surf->lastBuffer = i;
+            break;
+        }
 
     } while (gcvTRUE);
 
