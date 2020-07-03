@@ -3941,6 +3941,37 @@ VIR_Shader_GetLogicalCount(
     return count;
 }
 
+gctUINT
+VIR_Shader_GetNextLlSlot(
+    IN  VIR_Shader*     pShader,
+    IN  VIR_IdList*     pSymIdList
+    )
+{
+    gctUINT             symCount = VIR_IdList_Count(pSymIdList);
+    gctUINT             i;
+    gctUINT             nextLlSlot = 0;
+
+    for (i = 0; i < symCount; i++)
+    {
+        VIR_SymId       symId = VIR_IdList_GetId(pSymIdList, i);
+        VIR_Symbol*     pSym = VIR_Shader_GetSymFromId(pShader, symId);
+        gctUINT         symRegCount;
+
+        if (!isSymUnused(pSym) && !isSymVectorizedOut(pSym))
+        {
+            gcmASSERT(VIR_Symbol_GetFirstSlot(pSym) != NOT_ASSIGNED);
+
+            symRegCount = VIR_Symbol_GetVirIoRegCount(pShader, pSym);
+            if (nextLlSlot < (VIR_Symbol_GetFirstSlot(pSym) + symRegCount))
+            {
+                nextLlSlot = VIR_Symbol_GetFirstSlot(pSym) + symRegCount;
+            }
+        }
+    }
+
+    return nextLlSlot;
+}
+
 VIR_Symbol*
 VIR_Shader_AddBuiltinAttribute(
     IN  VIR_Shader *    VirShader,
@@ -19973,27 +20004,7 @@ VIR_Shader_GenInvocationIndex(
 
         if (bUpdateSlot)
         {
-            VIR_AttributeIdList*    pAttrIdLsts = VIR_Shader_GetAttributes(Shader);
-            gctUINT                 attrCount = VIR_IdList_Count(pAttrIdLsts);
-            gctUINT                 attrIdx;
-
-            for (attrIdx = 0; attrIdx < attrCount; attrIdx ++)
-            {
-                VIR_SymId       attrSymId = VIR_IdList_GetId(pAttrIdLsts, attrIdx);
-                VIR_Symbol      *pAttrSym = VIR_Shader_GetSymFromId(Shader, attrSymId);
-                gctUINT         thisOutputRegCount;
-
-                if (!isSymUnused(pAttrSym) && !isSymVectorizedOut(pAttrSym))
-                {
-                    gcmASSERT(VIR_Symbol_GetFirstSlot(pAttrSym) != NOT_ASSIGNED);
-
-                    thisOutputRegCount = VIR_Symbol_GetVirIoRegCount(Shader, pAttrSym);
-                    if (nextAttrLlSlot < (VIR_Symbol_GetFirstSlot(pAttrSym) + thisOutputRegCount))
-                    {
-                        nextAttrLlSlot = VIR_Symbol_GetFirstSlot(pAttrSym) + thisOutputRegCount;
-                    }
-                }
-            }
+            nextAttrLlSlot = VIR_Shader_GetNextLlSlot(Shader, VIR_Shader_GetAttributes(Shader));
         }
 
         errCode = VIR_Shader_AddSymbol(Shader,

@@ -2964,27 +2964,7 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
                 if (pLocIdSym == gcvNULL)
                 {
                     VIR_SymId     outRegId;
-                    VIR_AttributeIdList *pAttrIdLsts = VIR_Shader_GetAttributes(pShader);
-                    gctUINT       attrCount = VIR_IdList_Count(pAttrIdLsts);
-                    gctUINT       attrIdx;
-                    gctUINT       nextAttrLlSlot = 0;
-                    for (attrIdx = 0; attrIdx < attrCount; attrIdx ++)
-                    {
-                        VIR_SymId       attrSymId = VIR_IdList_GetId(pAttrIdLsts, attrIdx);
-                        VIR_Symbol      *pAttrSym = VIR_Shader_GetSymFromId(pShader, attrSymId);
-                        gctUINT         thisOutputRegCount;
-
-                        if (!isSymUnused(pAttrSym) && !isSymVectorizedOut(pAttrSym))
-                        {
-                            gcmASSERT(VIR_Symbol_GetFirstSlot(pAttrSym) != NOT_ASSIGNED);
-
-                            thisOutputRegCount = VIR_Symbol_GetVirIoRegCount(pShader, pAttrSym);
-                            if (nextAttrLlSlot < (VIR_Symbol_GetFirstSlot(pAttrSym) + thisOutputRegCount))
-                            {
-                                nextAttrLlSlot = VIR_Symbol_GetFirstSlot(pAttrSym) + thisOutputRegCount;
-                            }
-                        }
-                    }
+                    gctUINT       nextAttrLlSlot = VIR_Shader_GetNextLlSlot(pShader, VIR_Shader_GetAttributes(pShader));
 
                     pLocIdSym = VIR_Shader_AddBuiltinAttribute(pShader, VIR_TYPE_UINT_X4, gcvFALSE, VIR_NAME_LOCAL_INVOCATION_ID);
                     outRegId = VIR_Shader_NewVirRegId(pShader, 1);

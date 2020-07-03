@@ -539,14 +539,11 @@ static VSC_ErrCode _DoRtLayerPatch(
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     VIR_AttributeIdList*       pAttrIdLsts = VIR_Shader_GetAttributes(pShader);
-    VIR_OutputIdList*          pOutputIdLsts = VIR_Shader_GetOutputs(pShader);
     gctUINT                    attrCount = VIR_IdList_Count(pAttrIdLsts);
-    gctUINT                    outputCount = VIR_IdList_Count(pOutputIdLsts);
     VIR_Symbol*                pAttrSym = gcvNULL;
-    VIR_Symbol*                pOutputSym;
     VIR_Symbol*                pOutLayerSym;
-    gctUINT                    attrIdx, outputIdx, nextOutputLlSlot = 0, thisOutputRegCount;
-    gctUINT                    attrSymId = VIR_INVALID_ID, outputSymId = VIR_INVALID_ID;
+    gctUINT                    attrIdx, nextOutputLlSlot = 0;
+    gctUINT                    attrSymId = VIR_INVALID_ID;
     gctBOOL                    bHasLayerAttr = gcvFALSE;
     VIR_Instruction*           pNewInsertedInst;
     VIR_Operand *              opnd;
@@ -572,22 +569,8 @@ static VSC_ErrCode _DoRtLayerPatch(
         return errCode;
     }
 
-    for (outputIdx = 0; outputIdx < outputCount; outputIdx ++)
-    {
-        outputSymId = VIR_IdList_GetId(pOutputIdLsts, outputIdx);
-        pOutputSym = VIR_Shader_GetSymFromId(pShader, outputSymId);
-
-        if (!isSymUnused(pOutputSym) && !isSymVectorizedOut(pOutputSym))
-        {
-            gcmASSERT(VIR_Symbol_GetFirstSlot(pOutputSym) != NOT_ASSIGNED);
-
-            thisOutputRegCount = VIR_Symbol_GetVirIoRegCount(pShader, pOutputSym);
-            if (nextOutputLlSlot < (VIR_Symbol_GetFirstSlot(pOutputSym) + thisOutputRegCount))
-            {
-                nextOutputLlSlot = VIR_Symbol_GetFirstSlot(pOutputSym) + thisOutputRegCount;
-            }
-        }
-    }
+    /* Get the next ll slot. */
+    nextOutputLlSlot = VIR_Shader_GetNextLlSlot(pShader, VIR_Shader_GetOutputs(pShader));
 
     /* Add layer output and set its llSlot */
     pOutLayerSym = VIR_Shader_AddBuiltinOutput(pShader, VIR_TYPE_UINT32, gcvFALSE, VIR_NAME_PS_OUT_LAYER);

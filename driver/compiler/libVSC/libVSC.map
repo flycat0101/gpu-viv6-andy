@@ -306,6 +306,7 @@
     gcSHADER_GetDebugInfo;
 	gcSHADER_SetBuildOptions;
 	gcSHADER_SetAttrLocationByDriver;
+    gcSHADER_SetCLProgramBinaryType;
     gcSHADER_SetFragOutUsage;
 
     gcATTRIBUTE_GetName;

@@ -5777,26 +5777,79 @@ void _VIR_RA_LS_InitializeOpnd(
     }
 }
 
-VSC_ErrCode _VIR_RA_LS_AssignAttributes(
-    VIR_RA_LS       *pRA)
+static void _VIR_RA_LS_ResortAttributeList(
+    VIR_Shader*             pShader,
+    VSC_HW_CONFIG*          pHwCfg,
+    VIR_AttributeIdList*    pAttrList
+    )
 {
-    VSC_ErrCode retValue  = VSC_ERR_NONE;
+    gctBOOL                 bResortThreadId = gcvFALSE;
+    VIR_Symbol*             pAttrSymbol = gcvNULL;
+    VIR_NameId              attrSymNameId;
+    gctUINT                 i;
+    gctUINT                 attrCount = VIR_IdList_Count(pAttrList);
 
-    VIR_Shader              *pShader = VIR_RA_LS_GetShader(pRA);
-    VIR_LIVENESS_INFO       *pLvInfo = VIR_RA_LS_GetLvInfo(pRA);
-    VIR_AttributeIdList     *pAttrs = VIR_Shader_GetAttributes(pShader);
-    VIR_RA_ColorPool        *pCP = VIR_RA_LS_GetColorPool(pRA);
-    VIR_Dumper              *pDumper = VIR_RA_LS_GetDumper(pRA);
-    VSC_OPTN_RAOptions      *pOption = VIR_RA_LS_GetOptions(pRA);
+    /*
+    ** For a compute shader which threadwalkers in PS, in order to match the HW behavior,
+    ** we need to make sure that threadid/threadgroupid/threadidingroup are the first three temp registers.
+    */
+    if ((VIR_Shader_IsCL(pShader) || VIR_Shader_IsGlCompute(pShader))
+        &&
+        pHwCfg->hwFeatureFlags.hasThreadWalkerInPS)
+    {
+        bResortThreadId = gcvTRUE;
+    }
 
-    gctUINT     attrCount = VIR_IdList_Count(pAttrs);
-    gctUINT     reg, currAttr;
-    gctUINT     primIdWebIdx = NOT_ASSIGNED, ptCoordWebIdx = NOT_ASSIGNED;
-    gctUINT     instanceIdWebIdx = NOT_ASSIGNED, vertexIdWebIdx = NOT_ASSIGNED;
-    VIR_Symbol  *primIdAttr = gcvNULL, *ptCoordAttr = gcvNULL;
-    VIR_Symbol  *instanceIdAttr = gcvNULL, *vertexIdAttr = gcvNULL;
+    if (bResortThreadId)
+    {
+        VIR_SymId           attrSymId, tempSymId;
+        gctUINT             currAttrIndex = 0;
 
-    VIR_RA_HWReg_Color  LRColor;
+        for (i = 0; i < attrCount; i++)
+        {
+            attrSymId = VIR_IdList_GetId(pAttrList, i);
+            pAttrSymbol = VIR_Shader_GetSymFromId(pShader, attrSymId);
+            attrSymNameId = VIR_Symbol_GetName(pAttrSymbol);
+
+            if (attrSymNameId == VIR_NAME_WORK_GROUP_ID         ||
+                attrSymNameId == VIR_NAME_LOCAL_INVOCATION_ID   ||
+                attrSymNameId == VIR_NAME_GLOBAL_INVOCATION_ID)
+            {
+                /* Swap i and currAttrIndex. */
+                if (i != currAttrIndex)
+                {
+                    tempSymId = VIR_IdList_GetId(pAttrList, currAttrIndex);
+                    VIR_IdList_Set(pAttrList, i, tempSymId);
+                    VIR_IdList_Set(pAttrList, currAttrIndex, attrSymId);
+                }
+
+                /* Move to next position. */
+                currAttrIndex++;
+            }
+        }
+    }
+}
+
+VSC_ErrCode _VIR_RA_LS_AssignAttributes(
+    VIR_RA_LS*              pRA
+    )
+{
+    VSC_ErrCode             retValue  = VSC_ERR_NONE;
+    VIR_Shader*             pShader = VIR_RA_LS_GetShader(pRA);
+    VIR_LIVENESS_INFO*      pLvInfo = VIR_RA_LS_GetLvInfo(pRA);
+    VIR_AttributeIdList*    pAttrs = VIR_Shader_GetAttributes(pShader);
+    VIR_RA_ColorPool*       pCP = VIR_RA_LS_GetColorPool(pRA);
+    VIR_Dumper*             pDumper = VIR_RA_LS_GetDumper(pRA);
+    VSC_OPTN_RAOptions*     pOption = VIR_RA_LS_GetOptions(pRA);
+    gctUINT                 attrCount = VIR_IdList_Count(pAttrs);
+    gctUINT                 reg, currAttr;
+    gctUINT                 primIdWebIdx = NOT_ASSIGNED, ptCoordWebIdx = NOT_ASSIGNED;
+    gctUINT                 instanceIdWebIdx = NOT_ASSIGNED, vertexIdWebIdx = NOT_ASSIGNED;
+    VIR_Symbol*             primIdAttr = gcvNULL;
+    VIR_Symbol*             ptCoordAttr = gcvNULL;
+    VIR_Symbol*             instanceIdAttr = gcvNULL;
+    VIR_Symbol*             vertexIdAttr = gcvNULL;
+    VIR_RA_HWReg_Color      LRColor;
 
     LRColor = InvalidColor;
 
@@ -5807,6 +5860,9 @@ VSC_ErrCode _VIR_RA_LS_AssignAttributes(
         VIR_LOG_FLUSH(pDumper);
     }
 
+    /* Resort the attribute list if needed. */
+    _VIR_RA_LS_ResortAttributeList(pShader, VIR_RA_LS_GetHwCfg(pRA), pAttrs);
+
     /* reserve registers per HW spec */
     reg = _VIR_RA_LS_GetStartReg(pRA);
     pCP->colorMap[VIR_RA_HWREG_GR].availReg = reg;
@@ -5814,24 +5870,20 @@ VSC_ErrCode _VIR_RA_LS_AssignAttributes(
     /* only allocate for used attributes */
     for (currAttr = 0; currAttr < attrCount; currAttr++)
     {
-        VIR_Symbol  *attribute = VIR_Shader_GetSymFromId(pShader,
-                                    VIR_IdList_GetId(pAttrs, currAttr));
-        VIR_Type    *attrType = VIR_Symbol_GetType(attribute);
-        gctUINT     attrRegCount = VIR_Type_GetVirRegCount(pShader, attrType, -1);
-        gctUINT     components = VIR_Symbol_GetComponents(attribute);
-
-        gctUINT         location;
-        VIR_IdList      *pLocationList = gcvNULL;
-        gctUINT         j;
-
-        VIR_DEF_KEY     defKey;
-        gctUINT         defIdx, webIdx;
-        gctUINT         attFlags;
-        gctUINT         curReg = reg;
-        gctUINT8        shift = 0;
-        gctBOOL         skipAlloc = gcvFALSE;
-
-        VIR_RA_LS_Liverange *pLR = gcvNULL;
+        VIR_Symbol*         attribute = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pAttrs, currAttr));
+        VIR_Type*           attrType = VIR_Symbol_GetType(attribute);
+        gctUINT             attrRegCount = VIR_Type_GetVirRegCount(pShader, attrType, -1);
+        gctUINT             components = VIR_Symbol_GetComponents(attribute);
+        gctUINT             location;
+        VIR_IdList*         pLocationList = gcvNULL;
+        gctUINT             j;
+        VIR_DEF_KEY         defKey;
+        gctUINT             defIdx, webIdx;
+        gctUINT             attFlags;
+        gctUINT             curReg = reg;
+        gctUINT8            shift = 0;
+        gctBOOL             skipAlloc = gcvFALSE;
+        VIR_RA_LS_Liverange*pLR = gcvNULL;
 
         /* we don't need to assign register for per-vertex/per-patch input,
            we will use load_attr to access them */

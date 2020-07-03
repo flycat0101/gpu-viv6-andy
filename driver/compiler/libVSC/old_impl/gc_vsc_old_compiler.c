@@ -3022,6 +3022,7 @@ gcSHADER_Copy(
 
     /* Copy the shader type. */
     Shader->type               = Source->type;
+    Shader->clProgramBinaryType= Source->clProgramBinaryType;
     Shader->flags              = Source->flags;
     Shader->optimizationOption = Source->optimizationOption;
     Shader->compilerVersion[0] = Source->compilerVersion[0];
@@ -12095,7 +12096,7 @@ gcSHADER_LoadEx(
     IN gctUINT32 BufferSize
     )
 {
-    gctUINT32 bytes;
+    gctUINT32 bytes, offset = 0;
     gctUINT32 * codeCount;
     gctUINT16 * count;
     gctUINT16 * privateMemorySize;
@@ -12164,33 +12165,27 @@ gcSHADER_LoadEx(
     /* Check flag after load the shader header. */
     bHasLoadKernel = gcShaderHasLoadedKernel(Shader);
 
-    bytes = BufferSize - _getShaderBinaryHeaderSize(shaderVersion);
+    offset = _getShaderBinaryHeaderSize(shaderVersion);
+    bytes = BufferSize - offset;
 
-    /* Get the attribute count. */
-    if (shaderVersion <= gcdSL_SHADER_BINARY_BEFORE_SAVEING_UNIFORM_PHYSICAL_ADDR)
+    if (shaderVersion > gcdSL_SHADER_BINARY_BEFORE_SAVING_CL_PROGRAM_BINARY_TYPE)
     {
-        count  = (gctUINT16 *) ((gctUINT8 *)Buffer + _getShaderBinaryHeaderSize(shaderVersion));
+        Shader->clProgramBinaryType = (gcCL_PROGRAM_BINARY_TYPE)(*(gctUINT32 *)((gctUINT8 *)Buffer + offset));
+        bytes -= sizeof(gctUINT32);
+        offset += sizeof(gctUINT32);
     }
-    /* Get sampler index, then get attribute count. */
-    else
+
+    if (shaderVersion > gcdSL_SHADER_BINARY_BEFORE_SAVEING_UNIFORM_PHYSICAL_ADDR)
     {
-        Shader->samplerIndex = *(gctINT *)((gctUINT8 *)Buffer + _getShaderBinaryHeaderSize(shaderVersion));
-
-        if (bytes < sizeof(gctINT))
-        {
-            /* Invalid sampler index. */
-            gcmFATAL("gcSHADER_LoadEx: Invalid sampler index.");
-            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-            return gcvSTATUS_INVALID_DATA;
-        }
-
+        Shader->samplerIndex = *(gctINT *)((gctUINT8 *)Buffer + offset);
         bytes -= sizeof(gctINT);
-        count  = (gctUINT16 *) ((gctUINT8 *)Buffer + _getShaderBinaryHeaderSize(shaderVersion) + sizeof(gctINT));
+        offset += sizeof(gctINT);
     }
 
     /************************************************************************/
     /*                              attributes                              */
     /************************************************************************/
+    count  = (gctUINT16 *) ((gctUINT8 *)Buffer + offset);
     if (bytes < sizeof(gctUINT16))
     {
         /* Invalid attribute count. */
@@ -15247,6 +15242,9 @@ gcSHADER_SaveEx(
     /* File Header. */
     bytes = _gcdShaderBinaryHeaderSize;
 
+    /* cl_program_binary_type. */
+    bytes += sizeof(gctUINT32);
+
     /* shader sampler index. */
     bytes += sizeof(gctINT);
 
@@ -15643,6 +15641,10 @@ gcSHADER_SaveEx(
 
     /* Word 9: size of binary excluding header */
     *(gctUINT32 *) buffer = bytes - _gcdShaderBinaryHeaderSize;
+    buffer += sizeof(gctUINT32);
+
+    /* cl_program_binary_type. */
+    gcoOS_MemCopy(buffer, &Shader->clProgramBinaryType, sizeof(gctUINT32));
     buffer += sizeof(gctUINT32);
 
     /* Sampler index. */
@@ -27799,6 +27801,19 @@ gcSHADER_SetAttrLocationByDriver(
 
 OnError:
     gcmFOOTER_NO();
+    return status;
+}
+
+gceSTATUS
+gcSHADER_SetCLProgramBinaryType(
+    IN gcSHADER             Shader,
+    IN gctUINT              clProgramBinaryType
+    )
+{
+    gceSTATUS               status = gcvSTATUS_OK;
+
+    Shader->clProgramBinaryType = (gcCL_PROGRAM_BINARY_TYPE)clProgramBinaryType;
+
     return status;
 }
 
