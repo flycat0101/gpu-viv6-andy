@@ -7133,6 +7133,26 @@ VSC_ErrCode vscVIR_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
                     VIR_LOG(dumper, "inst not supported by dual16.\n", i);
                     VIR_LOG_FLUSH(dumper);
                 }
+                if (!dual16NotSupported && !needRunSingleT)
+                {
+                    if (VIR_Inst_GetOpcode(pInst) == (VIR_OpCode)VSC_OPTN_DUAL16Options_GetSkipOpcode(options))
+                    {
+                        needRunSingleT = gcvTRUE;
+                        if (VSC_UTILS_MASK(VSC_OPTN_DUAL16Options_GetTrace(options), VSC_OPTN_DUAL16Options_TRACE_DETAIL))
+                        {
+                            VIR_LOG(dumper, "inst not run dual16 because option (skipopcode:%d).\n", VSC_OPTN_DUAL16Options_GetSkipOpcode(options));
+                        }
+                    }
+                    else if (!VSC_OPTN_InRange(VIR_Inst_GetId(pInst), VSC_OPTN_DUAL16Options_GetBeforeInst(options), VSC_OPTN_DUAL16Options_GetAfterInst(options)))
+                    {
+                        needRunSingleT = gcvTRUE;
+                        if (VSC_UTILS_MASK(VSC_OPTN_DUAL16Options_GetTrace(options), VSC_OPTN_DUAL16Options_TRACE_DETAIL))
+                        {
+                            VIR_LOG(dumper, "inst (%d) not run dual16 because not in the range of option (al %d, bl %d).\n", VIR_Inst_GetId(pInst),
+                                    VSC_OPTN_DUAL16Options_GetAfterInst(options), VSC_OPTN_DUAL16Options_GetBeforeInst(options));
+                        }
+                    }
+                }
                 gcmASSERT(VIR_OP_MAXOPCODE > opcode);
                 codeInfo.codeCounter[(gctINT)opcode]++;
                 if (opcode != VIR_OP_LABEL /* exclude non executive IRs */)
