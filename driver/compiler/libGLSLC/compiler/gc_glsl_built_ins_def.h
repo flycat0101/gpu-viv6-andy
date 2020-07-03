@@ -3966,6 +3966,7 @@ static slsBUILT_IN_VARIABLE VSBuiltInVariables[] =
     {{slvEXTENSION1_NONE},  "gl_BackSecondaryColor",  "#BackSecondaryColor", slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_NONE},  "gl_TexCoord",            "#TexCoord",           slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     8,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE, updateForTexCoord},
     {{slvEXTENSION1_NONE},  "gl_FogFragCoord",        "#FogFragCoord",       slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},  "gl_ClipVertex",          "#ClipVertex",         slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
 
 #include "builtin_def/gc_glsl_general_vars.def.h"
 };
@@ -4032,12 +4033,30 @@ static slsBUILT_IN_VARIABLE TCSBuiltInVariables[] =
     {{slvEXTENSION1_NONE},  "gl_PatchVerticesIn",       "#TcsPatchVerticesIn", slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_UNIFORM   ,   T_INT,      0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_NONE},  "gl_PrimitiveID",           "#PrimitiveID",        slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_IN,   T_INT,      0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_NONE},  "gl_InvocationID",          "#InvocationID",       slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_IN,   T_INT,      0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
+
+    {{slvEXTENSION1_NONE},  "gl_in.gl_FrontColor",          "#FrontColor",         slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},  "gl_in.gl_BackColor",           "#BackColor",          slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},  "gl_in.gl_FrontSecondaryColor", "#FrontSecondaryColor",slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},  "gl_in.gl_BackSecondaryColor",  "#BackSecondaryColor", slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},  "gl_in.gl_TexCoord",            "#TexCoord",           slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER,  T_VEC4,     8,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE, updateForTexCoord},
+    {{slvEXTENSION1_NONE},  "gl_in.gl_FogFragCoord",        "#FogFragCoord",       slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},  "gl_in.gl_ClipVertex",          "#ClipVertex",         slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE},
+
     /* output. */
     {{slvEXTENSION1_NONE},  "gl_TessLevelOuter",        "#TessLevelOuter",     slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_PATCH_OUT,  T_FLOAT,    4,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_NONE},  "gl_TessLevelInner",        "#TessLevelInner",     slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_PATCH_OUT,  T_FLOAT,    2,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_NONE},  "gl_out",                   "#Out",                slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_OUT_IO_BLOCK,  T_IO_BLOCK,   32,    slvSTORAGE_QUALIFIER_OUT_IO_BLOCK, PerVertexVariables, "gl_PerVertex", 2, gcvTRUE},
     {{slvEXTENSION1_NONE},  "gl_out.gl_Position",       "#Position",           slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_OUT_IO_BLOCK_MEMBER,   T_VEC4,   0,   slvSTORAGE_QUALIFIER_OUT_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_NONE},  "gl_out.gl_PointSize",      "#PointSize",          slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_OUT_IO_BLOCK_MEMBER,   T_FLOAT,   0,   slvSTORAGE_QUALIFIER_OUT_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE},
+
+    {{slvEXTENSION1_NONE},  "gl_FrontColor",          "#FrontColor",         slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},  "gl_BackColor",           "#BackColor",          slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},  "gl_FrontSecondaryColor", "#FrontSecondaryColor",slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},  "gl_BackSecondaryColor",  "#BackSecondaryColor", slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},  "gl_TexCoord",            "#TexCoord",           slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     8,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE, updateForTexCoord},
+    {{slvEXTENSION1_NONE},  "gl_FogFragCoord",        "#FogFragCoord",       slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},  "gl_ClipVertex",          "#ClipVertex",         slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
+
     /* a special patch output for GL_EXT_primitive_bounding_box. */
     {{slvEXTENSION1_EXT_PRIMITIVE_BOUNDING_BOX},  "gl_BoundingBoxEXT",           "#BoundingBox",        slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_PATCH_OUT,  T_VEC4,    2,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_EXT_PRIMITIVE_BOUNDING_BOX},  "gl_BoundingBox",              "#BoundingBox",        slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_PATCH_OUT,  T_VEC4,    2,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
@@ -4057,10 +4076,27 @@ static slsBUILT_IN_VARIABLE TESBuiltInVariables[] =
     {{slvEXTENSION1_NONE},  "gl_TessCoord",             "#TessCoord",          slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_IN,   T_VEC3,     0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_NONE},  "gl_TessLevelOuter",        "#TessLevelOuter",     slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_PATCH_IN,   T_FLOAT,    4,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_NONE},  "gl_TessLevelInner",        "#TessLevelInner",     slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_PATCH_IN,   T_FLOAT,    2,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
+
+    {{slvEXTENSION1_NONE},  "gl_in.gl_FrontColor",          "#FrontColor",         slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},  "gl_in.gl_BackColor",           "#BackColor",          slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},  "gl_in.gl_FrontSecondaryColor", "#FrontSecondaryColor",slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},  "gl_in.gl_BackSecondaryColor",  "#BackSecondaryColor", slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},  "gl_in.gl_TexCoord",            "#TexCoord",           slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER,  T_VEC4,     8,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE, updateForTexCoord},
+    {{slvEXTENSION1_NONE},  "gl_in.gl_FogFragCoord",        "#FogFragCoord",       slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},  "gl_in.gl_ClipVertex",          "#ClipVertex",         slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE},
+
     /* output. */
     {{slvEXTENSION1_NONE},  gcvNULL,                    "#Out",                slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_OUT_IO_BLOCK,   T_IO_BLOCK,   0,   slvSTORAGE_QUALIFIER_OUT_IO_BLOCK, PerVertexVariables, "gl_PerVertex", 2, gcvFALSE},
     {{slvEXTENSION1_NONE},  "gl_Position",              "#Position",           slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
     {{slvEXTENSION1_NONE},  "gl_PointSize",             "#PointSize",          slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
+
+    {{slvEXTENSION1_NONE},  "gl_FrontColor",            "#FrontColor",         slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},  "gl_BackColor",             "#BackColor",          slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},  "gl_FrontSecondaryColor",   "#FrontSecondaryColor",slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},  "gl_BackSecondaryColor",    "#BackSecondaryColor", slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},  "gl_TexCoord",              "#TexCoord",           slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     8,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE, updateForTexCoord},
+    {{slvEXTENSION1_NONE},  "gl_FogFragCoord",          "#FogFragCoord",       slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {{slvEXTENSION1_NONE},  "gl_ClipVertex",            "#ClipVertex",         slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
 };
 
 static gctUINT TESBuiltInVariableCount =

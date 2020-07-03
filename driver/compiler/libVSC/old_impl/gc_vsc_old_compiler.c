@@ -16958,6 +16958,10 @@ gcSHADER_GetBuiltinNameKind(
     {
         kind = gcSL_BACK_SECONDARY_COLOR;
     }
+    else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "ClipVertex")))
+    {
+        kind = gcSL_CLIP_VERTEX;
+    }
     else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "group_id")) ||
              gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "WorkGroupID")))
     {
@@ -17202,6 +17206,7 @@ gcSHADER_GetBuiltinNameString(
         "gl_MultiTexCoord5", /* -53 gcSL_MULTI_TEX_COORD_5 */
         "gl_MultiTexCoord6", /* -54 gcSL_MULTI_TEX_COORD_6 */
         "gl_MultiTexCoord7", /* -55 gcSL_MULTI_TEX_COORD_7 */
+        "gl_Clip_Vertex", /* -56 gcSL_CLIP_VERTEX */
     };
 
     if (Kind < 0 && Kind > (-1 - (gctINT)gcmCOUNTOF(sBuildinNames)))
@@ -30554,6 +30559,9 @@ _PredefinedName(
     case gcSL_TEX_COORD:
         return "gl_Tex_Coord";
 
+    case gcSL_CLIP_VERTEX:
+        return "gl_ClipVertex";
+
     case gcSL_SUBSAMPLE_DEPTH:
         return "gcSL_SUBSAMPLE_DEPTH";
 
@@ -34728,6 +34736,9 @@ _findBuiltinVariableTempIndex(
                 break;
             case gcSL_BACK_SECONDARY_COLOR:
                 BuiltinsTempIndex->BackColorSecondaryTempIndex = attribute->index;
+                break;
+            case gcSL_CLIP_VERTEX:
+                BuiltinsTempIndex->ClipVertexTempIndex = attribute->index;
                 break;
             case gcSL_INVOCATION_ID:
                 BuiltinsTempIndex->InvocationIDTempIndex = attribute->index;
