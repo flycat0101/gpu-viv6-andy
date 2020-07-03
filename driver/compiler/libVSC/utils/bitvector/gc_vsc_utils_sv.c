@@ -76,16 +76,20 @@ VSC_STATE_VECTOR* vscSV_Create(VSC_MM* pMM, gctINT svSize, gctUINT stateCount)
     return pSV;
 }
 
-void vscSV_Resize(VSC_STATE_VECTOR *pSV, gctINT newSvSize, gctBOOL bKeep)
+VSC_ErrCode vscSV_Resize(VSC_STATE_VECTOR *pSV, gctINT newSvSize, gctBOOL bKeep)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     gctINT bvIdx;
 
     gcmASSERT(SV_IS_VALID(pSV));
 
     for (bvIdx = 0; bvIdx < pSV->bvCount; bvIdx ++)
     {
-        vscBV_Resize(&pSV->pBVs[bvIdx], newSvSize, bKeep);
+        errCode = vscBV_Resize(&pSV->pBVs[bvIdx], newSvSize, bKeep);
+        if(errCode != VSC_ERR_NONE)
+            return errCode;
     }
+    return errCode;
 }
 
 void vscSV_Finalize(VSC_STATE_VECTOR* pSV)

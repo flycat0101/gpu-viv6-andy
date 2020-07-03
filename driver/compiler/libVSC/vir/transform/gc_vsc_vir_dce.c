@@ -89,16 +89,19 @@ _VSC_DCE_DumpWorkList(
     }
 }
 
-static void
+static VSC_ErrCode
 _VSC_DCE_WorkListQueue(
     IN VSC_DCE         *dce,
     IN VIR_Instruction *inst
     )
 {
+    VSC_ErrCode           errCode       = VSC_ERR_NONE;
     VSC_UNI_LIST_NODE_EXT *worklistNode = (VSC_UNI_LIST_NODE_EXT *)vscMM_Alloc(VSC_DCE_GetMM(dce),
         sizeof(VSC_UNI_LIST_NODE_EXT));
     VSC_OPTN_DCEOptions  *options      = VSC_DCE_GetOptions(dce);
 
+    if(!worklistNode)
+        return VSC_ERR_OUT_OF_MEMORY;
     if(VSC_UTILS_MASK(VSC_OPTN_DCEOptions_GetTrace(options),
         VSC_OPTN_DCEOptions_TRACE_ADDED))
     {
@@ -111,18 +114,25 @@ _VSC_DCE_WorkListQueue(
     }
     vscULNDEXT_Initialize(worklistNode, inst);
     QUEUE_PUT_ENTRY(&VSC_DCE_GetWorkList(dce), worklistNode);
+
+    return errCode;
 }
 
-static void
+static VSC_ErrCode
 _VSC_DCE_JmpListAdd(
     IN VSC_DCE         *dce,
     IN VIR_Instruction *inst
     )
 {
+    VSC_ErrCode           errCode     = VSC_ERR_NONE;
     VSC_BI_LIST_NODE_EXT *jmpListNode = (VSC_BI_LIST_NODE_EXT *)vscMM_Alloc(VSC_DCE_GetMM(dce),
         sizeof(VSC_BI_LIST_NODE_EXT));
+    if(!jmpListNode)
+        return VSC_ERR_OUT_OF_MEMORY;
     vscBLNDEXT_Initialize(jmpListNode, inst);
     vscBILST_Append(&VSC_DCE_GetJmpList(dce), CAST_BLEN_2_BLN((jmpListNode)));
+
+    return errCode;
 }
 
 static void
@@ -138,7 +148,7 @@ _VSC_DCE_WorkListDequeue(
     vscMM_Free(VSC_DCE_GetMM(dce), worklistNode);
 }
 
-static void
+static VSC_ErrCode
 _VSC_DCE_Init(
     IN OUT VSC_DCE          *dce,
     IN VIR_Shader           *shader,
@@ -148,11 +158,13 @@ _VSC_DCE_Init(
     IN VSC_MM               *pMM
     )
 {
+    VSC_ErrCode         errCode     = VSC_ERR_NONE;
     VIR_FuncIterator    func_iter;
     VIR_FunctionNode   *func_node;
     gctINT              maxInstId   = 0;
     gctUINT             maxBBId     = 0;
     gctUINT             maxFuncId   = 0;
+    VSC_DCE_BBInfo     *BBInfo      = gcvNULL;
 
     VSC_DCE_SetShader(dce, shader);
     VSC_DCE_SetDUInfo(dce, du_info);
@@ -199,8 +211,10 @@ _VSC_DCE_Init(
 
     if (maxInstId > 0)
     {
-        VSC_DCE_SetMark(dce, (VSC_DCE_Mark *)vscMM_Alloc(VSC_DCE_GetMM(dce),
-            sizeof(VSC_DCE_Mark) * maxInstId));
+        void* mark = vscMM_Alloc(VSC_DCE_GetMM(dce), sizeof(VSC_DCE_Mark) * maxInstId);
+        if(!mark)
+            return VSC_ERR_OUT_OF_MEMORY;
+        VSC_DCE_SetMark(dce, (VSC_DCE_Mark *)mark);
         memset(VSC_DCE_GetMark(dce), 0, sizeof(VSC_DCE_Mark) * maxInstId);
     }
 
@@ -210,11 +224,16 @@ _VSC_DCE_Init(
     dce->maxBBCount = maxBBId;
     dce->maxInstCount = maxInstId;
 
-    VSC_DCE_SetBBInfo(dce, (VSC_DCE_BBInfo *)vscMM_Alloc(VSC_DCE_GetMM(dce),
-        sizeof(VSC_DCE_BBInfo) * maxBBId * maxFuncId));
+    BBInfo = (VSC_DCE_BBInfo *)vscMM_Alloc(VSC_DCE_GetMM(dce),
+        sizeof(VSC_DCE_BBInfo) * maxBBId * maxFuncId);
+    if(!BBInfo)
+        return VSC_ERR_OUT_OF_MEMORY;
+    VSC_DCE_SetBBInfo(dce, BBInfo);
     memset(VSC_DCE_GetBBInfo(dce), 0, sizeof(VSC_DCE_BBInfo) * maxBBId * maxFuncId);
 
     dce->rebuildCFG = gcvFALSE;
+
+    return errCode;
 }
 
 static void
@@ -229,13 +248,14 @@ _VSC_DCE_Final(
     vscBILST_Finalize(&VSC_DCE_GetJmpList(dce));
 }
 
-static void
+static VSC_ErrCode
 _VSC_DCE_MarkAndQueueOutput(
     IN VSC_DCE         *dce,
     IN VIR_Instruction *inst,
     IN VIR_OperandInfo *dest_info
     )
 {
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
     VIR_Operand        *dest  = VIR_Inst_GetDest(inst);
     gctUINT8            channel = 0;
     VIR_Enable          enable;
@@ -244,20 +264,20 @@ _VSC_DCE_MarkAndQueueOutput(
 
     if(!dest)
     {
-        return;
+        return errCode;
     }
 
 
     if(!VIR_OpndInfo_Is_Virtual_Reg(dest_info))
     {
-        return;
+        return errCode;
     }
 
     enable = VIR_Operand_GetEnable(dest);
 
     if(!dest_info->isOutput)
     {
-        return;
+        return errCode;
     }
 
     sym = VIR_Operand_GetSymbol(dest);
@@ -268,13 +288,13 @@ _VSC_DCE_MarkAndQueueOutput(
 
     if (isSymUnused(sym) || isSymVectorizedOut(sym))
     {
-        return;
+        return errCode;
     }
 
     /* This inst has been marked. */
     if((gctINT8)enable == VSC_DCE_GetMarkByInst(dce, inst).isAlive)
     {
-        return;
+        return errCode;
     }
 
     /* If it has a fixed type, use its componentCount. */
@@ -321,19 +341,20 @@ _VSC_DCE_MarkAndQueueOutput(
 
     if(VSC_DCE_GetMarkByInst(dce, inst).isAlive)
     {
-        _VSC_DCE_WorkListQueue(dce, inst);
+        errCode = _VSC_DCE_WorkListQueue(dce, inst);
     }
 
-    return;
+    return errCode;
 }
 
-static void
+static VSC_ErrCode
 _VSC_DCE_MarkInstAll(
     IN     VSC_DCE          *dce,
     IN     VIR_Instruction  *inst,
     IN     VIR_OperandInfo  *dest_info
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VIR_Enable enable = VIR_ENABLE_XYZW;
     VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
 
@@ -358,16 +379,22 @@ _VSC_DCE_MarkInstAll(
         }
     }
 
-   _VSC_DCE_WorkListQueue(dce, inst);
+    errCode  = _VSC_DCE_WorkListQueue(dce, inst);
+    ON_ERROR(errCode, "Fail to add the worklist.");
+
     VSC_DCE_SetAliveByInst(dce, inst, enable);
+
+    OnError:
+    return errCode;
 }
 
-static void
+static VSC_ErrCode
 _VSC_DCE_InitDCEOnFunction(
     IN     VSC_DCE      *dce,
     IN OUT VIR_Function *func
     )
 {
+    VSC_ErrCode          errCode = VSC_ERR_NONE;
     VIR_Instruction     *inst    = func->instList.pHead;
     VSC_OPTN_DCEOptions *options = VSC_DCE_GetOptions(dce);
 
@@ -377,11 +404,13 @@ _VSC_DCE_InitDCEOnFunction(
 
         if (VIR_OPCODE_isVX(opcode))
         {
-            _VSC_DCE_MarkInstAll(dce, inst, gcvNULL);
+            errCode = _VSC_DCE_MarkInstAll(dce, inst, gcvNULL);
+            ON_ERROR(errCode, "Fail to MarkInstAll.");
         }
         else if (!VIR_OPCODE_hasDest(opcode))
         {
-            _VSC_DCE_MarkInstAll(dce, inst, gcvNULL);
+            errCode = _VSC_DCE_MarkInstAll(dce, inst, gcvNULL);
+            ON_ERROR(errCode, "Fail to MarkInstAll.");
         }
         else
         {
@@ -395,24 +424,28 @@ _VSC_DCE_InitDCEOnFunction(
             if (VIR_OPCODE_LoadsOrStores(opcode) &&
                 !VIR_OPCODE_LoadsOnly(opcode))
             {
-                _VSC_DCE_MarkInstAll(dce, inst, &dest_info);
+                errCode = _VSC_DCE_MarkInstAll(dce, inst, &dest_info);
+                ON_ERROR(errCode, "Fail to MarkInstAll.");
             }
             else if (VIR_OPCODE_isBranch(opcode))
             {
                 if (VSC_UTILS_MASK(VSC_OPTN_DCEOptions_GetOPTS(options),
                     VSC_OPTN_DCEOptions_OPTS_CONTROL))
                 {
-                    _VSC_DCE_JmpListAdd(dce, inst);
+                    errCode = _VSC_DCE_JmpListAdd(dce, inst);
+                    ON_ERROR(errCode, "Fail to JmpListAdd.");
                 }
                 else
                 {
-                    _VSC_DCE_MarkInstAll(dce, inst, &dest_info);
+                    errCode = _VSC_DCE_MarkInstAll(dce, inst, &dest_info);
+                    ON_ERROR(errCode, "Fail to MarkInstAll.");
                 }
             }
             else if(VIR_OpndInfo_Is_Virtual_Reg(&dest_info))
             {
                 /* If inst's dest is output, mark it. */
-                _VSC_DCE_MarkAndQueueOutput(dce, inst, &dest_info);
+                errCode = _VSC_DCE_MarkAndQueueOutput(dce, inst, &dest_info);
+                ON_ERROR(errCode, "Fail to MarkAndQueueOutput.");
             }
             else if (opcode == VIR_OP_LABEL)
             {
@@ -420,12 +453,16 @@ _VSC_DCE_InitDCEOnFunction(
             }
             else
             {
-                _VSC_DCE_MarkInstAll(dce, inst, &dest_info);
+                errCode = _VSC_DCE_MarkInstAll(dce, inst, &dest_info);
+                ON_ERROR(errCode, "Fail to MarkInstAll.");
             }
         }
 
         inst = VIR_Inst_GetNext(inst);
     }
+
+    OnError:
+    return errCode;
 }
 
 static VSC_ErrCode
@@ -493,10 +530,12 @@ _VSC_DCE_MarkAndQueueAllDefs(
         if (VSC_DCE_GetMarkByInst(dce, def_inst).isAlive != 0 &&
             VSC_DCE_GetMarkByInst(dce, def_inst).isAlive != isAlive)
         {
-            _VSC_DCE_WorkListQueue(dce, def_inst);
+            errCode = _VSC_DCE_WorkListQueue(dce, def_inst);
+            ON_ERROR(errCode, "Fail to add the worklist.");
         }
     }
 
+    OnError:
     return errCode;
 }
 
@@ -546,8 +585,10 @@ _VSC_DCE_AnalysisDeadCodeOnShader(
                     vscBV_TestBit(&bb->cdSet, jmpBB->dgNode.id))
                 {
                     /* Add to workList */
-                    _VSC_DCE_WorkListQueue(dce, jmpInst);
-                     VSC_DCE_SetAliveByInst(dce, jmpInst, VIR_ENABLE_XYZW);
+                    errCode = _VSC_DCE_WorkListQueue(dce, jmpInst);
+                    ON_ERROR(errCode, "Fail to add worklist.");
+
+                    VSC_DCE_SetAliveByInst(dce, jmpInst, VIR_ENABLE_XYZW);
 
                     /* Delete from jmpList */
                     vscBILST_Remove(&VSC_DCE_GetJmpList(dce), CAST_BLEN_2_BLN(jmpList));
@@ -574,10 +615,12 @@ _VSC_DCE_AnalysisDeadCodeOnShader(
 
         for (; opnd != gcvNULL; opnd = VIR_SrcOperand_Iterator_Next(&opndIter))
         {
-            _VSC_DCE_MarkAndQueueAllDefs(dce, inst, opnd);
+            errCode = _VSC_DCE_MarkAndQueueAllDefs(dce, inst, opnd);
+            ON_ERROR(errCode, "Fail to MarkAndQueueAllDefs.");
         }
     }
 
+    OnError:
     return errCode;
 }
 
@@ -1036,7 +1079,8 @@ _VSC_DCE_PerformOnShader(
         func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
     {
         VIR_Function *func = func_node->function;
-        _VSC_DCE_InitDCEOnFunction(dce, func);
+        errcode = _VSC_DCE_InitDCEOnFunction(dce, func);
+        ON_ERROR(errcode, "Fail to InitDCEOnFunction.");
     }
 
     if(VSC_UTILS_MASK(VSC_OPTN_DCEOptions_GetTrace(options),
@@ -1071,6 +1115,7 @@ _VSC_DCE_PerformOnShader(
         VIR_Shader_Dump(gcvNULL, "DCE End", shader, gcvTRUE);
     }
 
+    OnError:
     return errcode;
 }
 
@@ -1101,12 +1146,15 @@ VSC_DCE_Perform(
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_DCE dce;
 
-    _VSC_DCE_Init(&dce, shader, du_info, options, dumper, pPassWorker->basePassWorker.pMM);
+    errCode = _VSC_DCE_Init(&dce, shader, du_info, options, dumper, pPassWorker->basePassWorker.pMM);
+    ON_ERROR(errCode, "Fail to Init DCE.");
     errCode = _VSC_DCE_PerformOnShader(&dce);
+    ON_ERROR(errCode, "PerformOnShader failed.");
     _VSC_DCE_Final(&dce);
 
     pPassWorker->pResDestroyReq->s.bInvalidateCfg = dce.rebuildCFG;
 
+    OnError:
     return errCode;
 }
 

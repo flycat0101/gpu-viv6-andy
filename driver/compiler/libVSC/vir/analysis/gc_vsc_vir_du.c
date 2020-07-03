@@ -5117,6 +5117,7 @@ _IsRedefineBetweenInsts(
     OUT VIR_Instruction         **redefInst
     )
 {
+    VSC_ErrCode     errCode = VSC_ERR_NONE;
     VSC_MM          *pMM = pResInfo->pMM;
     gctBOOL         retValue = gcvFALSE;
     VIR_Instruction *pDefInst = gcvNULL;
@@ -5293,33 +5294,55 @@ _IsRedefineBetweenInsts(
                         if (pBBFlowMask == gcvNULL)
                         {
                             pBBFlowMask = vscBV_Create(pMM, bbCount);
+                            if(pBBFlowMask == gcvNULL)
+                            {
+                                gcmASSERT(pBBFlowMask);
+                                errCode = VSC_ERR_OUT_OF_MEMORY;
+                                ON_ERROR(errCode, "_IsRedefineBetweenInsts");
+                            }
                             pResInfo->pBBFlowMask = pBBFlowMask;
                         }
                         else
                         {
-                            vscBV_Resize(pBBFlowMask, bbCount, gcvFALSE);
+                            errCode = vscBV_Resize(pBBFlowMask, bbCount, gcvFALSE);
+                            ON_ERROR(errCode, "_IsRedefineBetweenInsts");
                         }
 
                         /* Create or resize the BB check status mask. */
                         if (pBBCheckStatusMask == gcvNULL)
                         {
                             pBBCheckStatusMask = vscBV_Create(pMM, bbCount);
+                            if(pBBCheckStatusMask == gcvNULL)
+                            {
+                                gcmASSERT(pBBCheckStatusMask);
+                                errCode = VSC_ERR_OUT_OF_MEMORY;
+                                ON_ERROR(errCode, "_IsRedefineBetweenInsts");
+                            }
+
                             pResInfo->pBBCheckStatusMask = pBBCheckStatusMask;
                         }
                         else
                         {
-                            vscBV_Resize(pBBCheckStatusMask, bbCount, gcvFALSE);
+                            errCode = vscBV_Resize(pBBCheckStatusMask, bbCount, gcvFALSE);
+                            ON_ERROR(errCode, "_IsRedefineBetweenInsts");
                         }
 
                         /* Create or resize the BB check value mask. */
                         if (pBBCheckValueMask == gcvNULL)
                         {
                             pBBCheckValueMask = vscBV_Create(pMM, bbCount);
+                            if(pBBCheckValueMask == gcvNULL)
+                            {
+                                gcmASSERT(pBBCheckValueMask);
+                                errCode = VSC_ERR_OUT_OF_MEMORY;
+                                ON_ERROR(errCode, "_IsRedefineBetweenInsts");
+                            }
                             pResInfo->pBBCheckValueMask = pBBCheckValueMask;
                         }
                         else
                         {
-                            vscBV_Resize(pBBCheckValueMask, bbCount, gcvFALSE);
+                            errCode = vscBV_Resize(pBBCheckValueMask, bbCount, gcvFALSE);
+                            ON_ERROR(errCode, "_IsRedefineBetweenInsts");
                         }
 
                         if (_vscVIR_DefBBInBetween(pStartBB,
@@ -5351,6 +5374,9 @@ _IsRedefineBetweenInsts(
     vscHTBL_Reset(pInstHashTable);
     vscHTBL_Reset(pBBHashTable);
 
+OnError:
+    if(errCode != VSC_ERR_NONE)
+        retValue = gcvFALSE;
     return retValue;
 }
 

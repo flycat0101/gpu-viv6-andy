@@ -196,6 +196,8 @@ static VSC_PH_OpndTarget* _VSC_PH_Peephole_NewOpndTarget(
     )
 {
     VSC_PH_OpndTarget* ot = (VSC_PH_OpndTarget*)vscMM_Alloc(VSC_PH_Peephole_GetMM(ph), sizeof(VSC_PH_OpndTarget));
+    if(!ot)
+        return ot;
     ot->inst = usage->usageKey.pUsageInst;
     ot->opnd = usage->usageKey.pOperand;
     ot->pPrivData = gcvNULL;
@@ -250,6 +252,8 @@ static VSC_PH_MergeKey* _HKCMP_NewMergeKey(
     )
 {
     VSC_PH_MergeKey* outputKey = (VSC_PH_MergeKey*)vscMM_Alloc(VSC_PH_Peephole_GetMM(ph), sizeof(VSC_PH_MergeKey));
+    if(!outputKey)
+        return outputKey;
     outputKey->defKey = defKey;
     outputKey->opcode = opcode;
     outputKey->src1_imm = src1_imm;
@@ -270,6 +274,8 @@ static VSC_PH_MergedInst* _VSC_PH_Peephole_NewMergedInst(
     )
 {
     VSC_PH_MergedInst *mergedInst = (VSC_PH_MergedInst*)vscMM_Alloc(VSC_PH_Peephole_GetMM(ph), sizeof(VSC_PH_MergedInst));
+    if(!mergedInst)
+        return mergedInst;
     mergedInst->inst = inst;
     mergedInst->enable = (VIR_Enable) (1 << channel);
     return mergedInst;
@@ -2562,6 +2568,7 @@ static VSC_ErrCode _VSC_PH_GenerateLValueModifier(
         {
             VIR_GENERAL_DU_ITERATOR inst_du_iter;
             VIR_USAGE* inst_usage;
+            VSC_PH_OpndTarget* ot;
 
             ON_ERROR(_VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_UsageSet(ph), _VSC_PH_OpndTarget_HFUNC, _VSC_PH_OpndTarget_HKCMP, 512),
                      "Failed to initialize Hashtable");
@@ -2582,7 +2589,13 @@ static VSC_ErrCode _VSC_PH_GenerateLValueModifier(
                     {
                         continue;
                     }
-                    vscHTBL_DirectSet(inst_usage_set, (void*)_VSC_PH_Peephole_NewOpndTarget(ph, inst_usage), gcvNULL);
+                    ot = _VSC_PH_Peephole_NewOpndTarget(ph, inst_usage);
+                    if(ot == gcvNULL)
+                    {
+                        errCode = VSC_ERR_OUT_OF_MEMORY;
+                        return errCode;
+                    }
+                    vscHTBL_DirectSet(inst_usage_set, (void*)ot, gcvNULL);
                 }
             }
         }
@@ -2831,6 +2844,7 @@ static VSC_ErrCode _VSC_PH_GenerateRValueModifier(
             VIR_Operand* usage_opnd;
             VIR_Swizzle usage_opnd_swizzle;
             VIR_Enable usage_opnd_enable;
+            VSC_PH_OpndTarget* ot;
 
             if(vscHTBL_DirectTestAndGet(work_set, (void*)&(usage->usageKey), gcvNULL))
             {
@@ -2980,8 +2994,13 @@ static VSC_ErrCode _VSC_PH_GenerateRValueModifier(
                     next = VIR_Inst_GetNext(next);
                 }
             }
-
-            vscHTBL_DirectSet(work_set, (void*)_VSC_PH_Peephole_NewOpndTarget(ph, usage), gcvNULL);
+            ot = _VSC_PH_Peephole_NewOpndTarget(ph, usage);
+            if(ot == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                return errCode;
+            }
+            vscHTBL_DirectSet(work_set, (void*)ot, gcvNULL);
         }
 
         if(invalid_case)
@@ -3342,6 +3361,7 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
             VIR_Instruction* use_inst;
             VIR_Operand* use_inst_dest;
             VIR_Operand* use_inst_opnd;
+            VSC_PH_OpndTarget* ot;
 
             if(vscHTBL_DirectTestAndGet(add_sub_set, (void*)&(usage->usageKey), gcvNULL))
             {
@@ -3545,8 +3565,13 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
                     next = VIR_Inst_GetNext(next);
                 }
             }
-
-            vscHTBL_DirectSet(add_sub_set, (void*)_VSC_PH_Peephole_NewOpndTarget(ph, usage), gcvNULL);
+            ot = _VSC_PH_Peephole_NewOpndTarget(ph, usage);
+            if(ot == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                return errCode;
+            }
+            vscHTBL_DirectSet(add_sub_set, (void*)ot, gcvNULL);
         }
 
         if(invalid_case)
@@ -4012,6 +4037,11 @@ static VSC_ErrCode _VSC_PH_MergeAddSubSameValue(
             }
 
             pOpndTarget = _VSC_PH_Peephole_NewOpndTarget(pPh, pUsage);
+            if(pOpndTarget == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                return errCode;
+            }
             pOpndTarget->pPrivData = (void*)(gctUINTPTR_T)matchSrcIndex;
             vscHTBL_DirectSet(pAddSubSet, (void*)pOpndTarget, gcvNULL);
         }
@@ -4284,6 +4314,7 @@ static VSC_ErrCode _VSC_PH_GenerateRSQ(
             VIR_Instruction* use_inst;
             VIR_Operand* use_inst_dest;
             VIR_Operand* use_inst_opnd;
+            VSC_PH_OpndTarget* ot;
 
             if(vscHTBL_DirectTestAndGet(rcp_set, (void*)&(usage->usageKey), gcvNULL))
             {
@@ -4420,8 +4451,13 @@ static VSC_ErrCode _VSC_PH_GenerateRSQ(
                     next = VIR_Inst_GetNext(next);
                 }
             }
-
-            vscHTBL_DirectSet(rcp_set, (void*)_VSC_PH_Peephole_NewOpndTarget(ph, usage), gcvNULL);
+            ot = _VSC_PH_Peephole_NewOpndTarget(ph, usage);
+            if(ot == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                return errCode;
+            }
+            vscHTBL_DirectSet(rcp_set, (void*)ot, gcvNULL);
         }
 
         if(invalid_case)
@@ -4667,6 +4703,7 @@ static VSC_ErrCode _VSC_PH_GenerateLShiftedLS(
             VIR_Instruction* use_inst;
             VIR_Operand* use_inst_dest;
             VIR_Operand* use_inst_opnd;
+            VSC_PH_OpndTarget* ot;
 
             if(vscHTBL_DirectTestAndGet(ls_set, (void*)&(usage->usageKey), gcvNULL))
             {
@@ -4802,8 +4839,13 @@ static VSC_ErrCode _VSC_PH_GenerateLShiftedLS(
                     next = VIR_Inst_GetNext(next);
                 }
             }
-
-            vscHTBL_DirectSet(ls_set, (void*)_VSC_PH_Peephole_NewOpndTarget(ph, usage), gcvNULL);
+            ot = _VSC_PH_Peephole_NewOpndTarget(ph, usage);
+            if(ot == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                return errCode;
+            }
+            vscHTBL_DirectSet(ls_set, (void*)ot, gcvNULL);
         }
 
         if(invalid_case)
@@ -5029,6 +5071,7 @@ static VSC_ErrCode _VSC_PH_GenerateLoadStore(
             VIR_Operand*        pBaseOpnd = gcvNULL;
             VIR_Operand*        pOffsetOpnd = gcvNULL;
             gctUINT             newOffset = 0;
+            VSC_PH_OpndTarget* ot;
 
             /* Skip the exist one. */
             if (vscHTBL_DirectTestAndGet(pWorkingSet, (void*)&(pUsage->usageKey), gcvNULL))
@@ -5095,7 +5138,13 @@ static VSC_ErrCode _VSC_PH_GenerateLoadStore(
             }
 
             /* Save the valid case. */
-            vscHTBL_DirectSet(pWorkingSet, (void*)_VSC_PH_Peephole_NewOpndTarget(ph, pUsage), gcvNULL);
+            ot = _VSC_PH_Peephole_NewOpndTarget(ph, pUsage);
+            if(ot == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                return errCode;
+            }
+            vscHTBL_DirectSet(pWorkingSet, (void*)ot, gcvNULL);
         }
     }
 
@@ -5266,13 +5315,19 @@ static VSC_ErrCode _VSC_PH_RecordUsages(
         for(pUsage = vscVIR_GeneralDuIterator_First(&du_iter); pUsage != gcvNULL;
             pUsage = vscVIR_GeneralDuIterator_Next(&du_iter))
         {
+            VSC_PH_OpndTarget* ot;
             if(vscHTBL_DirectTestAndGet(usages_set, (void*)&(pUsage->usageKey), gcvNULL))
             {
                 continue;
             }
-
+            ot = _VSC_PH_Peephole_NewOpndTarget(ph, pUsage);
+            if(ot == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                return errCode;
+            }
             vscHTBL_DirectSet(usages_set,
-                (void*)_VSC_PH_Peephole_NewOpndTarget(ph, pUsage),
+                (void*)ot,
                 gcvNULL);
         }
     }
@@ -5469,6 +5524,11 @@ static VSC_ErrCode _VSC_PH_VEC_MergeInst(
     {
         VSC_PH_MergedInst   *currInst = gcvNULL;
         mergeKey = _HKCMP_NewMergeKey(ph, &pDef->defKey, inst_opcode, inst_src1_immediate);
+        if(mergeKey == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            return errCode;
+        }
 
         /* only consider one def for now */
         if (++defCount > 1)
@@ -5486,6 +5546,11 @@ static VSC_ErrCode _VSC_PH_VEC_MergeInst(
             if(!vscHTBL_DirectTestAndGet(vec_def_set, (void*)mergeKey, (void **)&currInst))
             {
                 currInst = _VSC_PH_Peephole_NewMergedInst(ph, inst, pDef->defKey.channel);
+                if(currInst == gcvNULL)
+                {
+                    errCode = VSC_ERR_OUT_OF_MEMORY;
+                    return errCode;
+                }
                 vscHTBL_DirectSet(vec_def_set, (void*)mergeKey, (void*) currInst);
                 if (merged_inst == gcvNULL)
                 {
@@ -5519,6 +5584,11 @@ static VSC_ErrCode _VSC_PH_VEC_MergeInst(
                 if (merged_inst == gcvNULL)
                 {
                     currInst = _VSC_PH_Peephole_NewMergedInst(ph, inst, pDef->defKey.channel);
+                    if(currInst == gcvNULL)
+                    {
+                        errCode = VSC_ERR_OUT_OF_MEMORY;
+                        ON_ERROR(errCode, "Fail to add NewMergedInst.");
+                    }
                     vscHTBL_DirectSet(vec_def_set, (void*)(curr_mova), (void*) currInst);
                     merged_inst = currInst;
                 }
@@ -6312,6 +6382,11 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
                  "Failed to initialize Hashtable");
         vec_def_set = VSC_PH_Peephole_DefSet(ph);
         curr_mova = (VSC_PH_MergeKey*)vscMM_Alloc(VSC_PH_Peephole_GetMM(ph), sizeof(VSC_PH_MergeKey));
+        if(curr_mova == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR(errCode, "Fail to Alloc MergeKey.");
+        }
         curr_mova->opcode = VIR_OP_MOVA;
         curr_mova->src1_imm = 0;
         curr_mova->defKey = gcvNULL;

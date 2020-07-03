@@ -726,6 +726,11 @@ _VIR_LoopInfo_AddBreakBB(
     {
         VSC_UNI_LIST_NODE_EXT* node = (VSC_UNI_LIST_NODE_EXT*)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VSC_UNI_LIST_NODE_EXT));
 
+        if(node == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            return errCode;
+        }
         vscULNDEXT_Initialize(node, (void*)breakBB);
         vscUNILST_Append(VIR_LoopInfo_GetBreakBBSet(loopInfo), CAST_ULEN_2_ULN(node));
     }
@@ -805,6 +810,11 @@ _VIR_LoopInfo_AddContinueBB(
     {
         VSC_UNI_LIST_NODE_EXT* node = (VSC_UNI_LIST_NODE_EXT*)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VSC_UNI_LIST_NODE_EXT));
 
+        if(node == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            return errCode;
+        }
         vscULNDEXT_Initialize(node, (void*)continueBB);
         vscUNILST_Append(VIR_LoopInfo_GetContinueBBSet(loopInfo), CAST_ULEN_2_ULN(node));
     }
@@ -884,6 +894,11 @@ _VIR_LoopInfo_AddBackBoneBB(
     {
         VSC_UNI_LIST_NODE_EXT* node = (VSC_UNI_LIST_NODE_EXT*)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VSC_UNI_LIST_NODE_EXT));
 
+        if(node == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            return errCode;
+        }
         vscULNDEXT_Initialize(node, (void*)backBoneBB);
         vscUNILST_Append(VIR_LoopInfo_GetBackBoneBBSet(loopInfo), CAST_ULEN_2_ULN(node));
     }
@@ -932,6 +947,11 @@ _VIR_LoopInfo_AddLoopEndDominator(
     {
         VSC_UNI_LIST_NODE_EXT* node = (VSC_UNI_LIST_NODE_EXT*)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VSC_UNI_LIST_NODE_EXT));
 
+        if(node == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            return errCode;
+        }
         vscULNDEXT_Initialize(node, (void*)loopEndDominator);
         vscUNILST_Append(VIR_LoopInfo_GetLoopEndDominatorSet(loopInfo), CAST_ULEN_2_ULN(node));
     }
@@ -950,6 +970,11 @@ _VIR_LoopInfo_AddChildLoop(
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_UNI_LIST_NODE_EXT* node = (VSC_UNI_LIST_NODE_EXT*)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VSC_UNI_LIST_NODE_EXT));
 
+    if(node == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        return errCode;
+    }
     vscULNDEXT_Initialize(node, (void*)childLoopInfo);
     vscUNILST_Append(VIR_LoopInfo_GetChildLoopSet(loopInfo), CAST_ULEN_2_ULN(node));
 
@@ -1180,6 +1205,11 @@ _VIR_LoopInfo_BBIterator_InitDepthFirst(
     bbArray = (VIR_BB**)vscMM_Alloc(VIR_LoopInfo_BBIterator_GetMM(iter), sizeof(VIR_BB*) * bbCount);
     bbStack = (VIR_BB**)vscMM_Alloc(VIR_LoopInfo_BBIterator_GetMM(iter), sizeof(VIR_BB*) * bbCount);
     if(bbArray == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        return errCode;
+    }
+    if(bbStack == gcvNULL)
     {
         errCode = VSC_ERR_OUT_OF_MEMORY;
         return errCode;
@@ -1620,7 +1650,11 @@ _VIR_LoopInfo_NewDU(
     else
     {
         du = (VIR_LoopDU*)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VIR_LoopDU));
-        if(du)
+        if(!du)
+        {
+            return du;
+        }
+        else
         {
             _VIR_LoopDU_Init(du, VIR_LoopInfo_GetMM(loopInfo));
         }
@@ -1642,6 +1676,8 @@ _VIR_LoopInfo_CollectDefs(
     VIR_BB* bb;
 
     gcmASSERT(du);
+    if(du == gcvNULL)
+        return VSC_ERR_OUT_OF_MEMORY;
 
     VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_Arbitrary);
     for(bb = VIR_LoopInfo_BBIterator_First(&bbIter);
@@ -2017,7 +2053,11 @@ _VIR_LoopInfo_NewIVMgr(
     else
     {
         ivMgr = (VIR_IVMgr*)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VIR_IVMgr));
-        if(ivMgr)
+        if(!ivMgr)
+        {
+            return ivMgr;
+        }
+        else
         {
             _VIR_IVMgr_Init(ivMgr, VIR_LoopInfo_GetMM(loopInfo));
         }
@@ -2041,7 +2081,12 @@ _VIR_LoopInfo_NewUpbound(
     }
 
     upbound = (VIR_LoopUpbound*)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VIR_LoopUpbound));
-    if(upbound)
+
+    if(!upbound)
+    {
+        return upbound;
+    }
+    else
     {
         gcoOS_ZeroMemory(upbound, sizeof(VIR_LoopUpbound));
         VIR_LoopUpbound_SetUpboundOpndTypeId(upbound, VIR_TYPE_UNKNOWN);
@@ -2064,7 +2109,11 @@ _VIR_LoopInfo_NewLowbound(
     }
 
     lowbound = (VIR_LoopLowbound*)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VIR_LoopLowbound));
-    if(lowbound)
+    if(!lowbound)
+    {
+        return lowbound;
+    }
+    else
     {
         gcoOS_ZeroMemory(lowbound, sizeof(VIR_LoopLowbound));
     }
@@ -2132,6 +2181,8 @@ _VIR_LoopInfo_IdentifyBasicIVs(
     VIR_BB* bb;
     VSC_HASH_TABLE definedSymbols;
 
+    if(ivMgr == gcvNULL)
+        return VSC_ERR_OUT_OF_MEMORY;
     _VIR_LoopInfo_BuildLoopEndDominators(loopInfo);
     vscHTBL_Initialize(&definedSymbols, VIR_LoopInfo_GetMM(loopInfo), vscHFUNC_Default, vscHKCMP_Default, 256);
 
@@ -2222,7 +2273,8 @@ _VIR_LoopInfo_IdentifyBasicIVs(
                                     {
                                         VIR_Const* constFactor;
                                         VIR_IV* iv = _VIR_IVMgr_AddIV(ivMgr);
-
+                                        if(iv == gcvNULL)
+                                            return VSC_ERR_OUT_OF_MEMORY;
                                         _VIR_IV_Init(iv, destSym, i, inst);
                                         constFactor = VIR_IV_GetConstFactor(iv);
                                         if(VIR_Operand_isImm(addSrc1))
@@ -2260,6 +2312,8 @@ _VIR_LoopInfo_IdentifyBasicIVs(
                                     {
                                         VIR_Const* constFactor;
                                         VIR_IV* iv = _VIR_IVMgr_AddIV(ivMgr);
+                                        if(iv == gcvNULL)
+                                            return VSC_ERR_OUT_OF_MEMORY;
                                         _VIR_IV_Init(iv, destSym, i, inst);
                                         constFactor = VIR_IV_GetConstFactor(iv);
                                         if(VIR_Operand_isImm(addSrc0))
@@ -2305,6 +2359,8 @@ _VIR_LoopInfo_IdentifyBasicIVs(
                                         VIR_Const* constFactor;
 
                                         VIR_IV* iv = _VIR_IVMgr_AddIV(ivMgr);
+                                        if(iv == gcvNULL)
+                                            return VSC_ERR_OUT_OF_MEMORY;
                                         _VIR_IV_Init(iv, destSym, i, inst);
                                         constFactor = VIR_IV_GetConstFactor(iv);
                                         if(VIR_Operand_isImm(subSrc1))
@@ -2345,6 +2401,8 @@ _VIR_LoopInfo_IdentifyBasicIVs(
                                         VIR_Const* constFactor;
 
                                         VIR_IV* iv = _VIR_IVMgr_AddIV(ivMgr);
+                                        if(iv == gcvNULL)
+                                            return VSC_ERR_OUT_OF_MEMORY;
                                         _VIR_IV_Init(iv, destSym, i, inst);
                                         constFactor = VIR_IV_GetConstFactor(iv);
                                         if(VIR_Operand_isImm(mulSrc1))
@@ -2387,6 +2445,8 @@ _VIR_LoopInfo_IdentifyBasicIVs(
                                         VIR_Const* constFactor;
 
                                         VIR_IV* iv = _VIR_IVMgr_AddIV(ivMgr);
+                                        if(iv == gcvNULL)
+                                            return VSC_ERR_OUT_OF_MEMORY;
                                         _VIR_IV_Init(iv, destSym, i, inst);
                                         constFactor = VIR_IV_GetConstFactor(iv);
                                         if(VIR_Operand_isImm(rshiftSrc1))
@@ -2670,6 +2730,8 @@ VIR_LoopOpts_NewLoopInfoMgr(
 {
     VIR_LoopInfoMgr* loopInfoMgr = (VIR_LoopInfoMgr*)vscMM_Alloc(VIR_LoopOpts_GetMM(loopOpts), sizeof(VIR_LoopInfoMgr));
 
+    if(!loopInfoMgr)
+        return loopInfoMgr;
     gcmASSERT(VIR_LoopOpts_GetLoopInfoMgr(loopOpts) == gcvNULL);
 
     VIR_LoopOpts_SetLoopInfoMgr(loopOpts, loopInfoMgr);
@@ -2853,19 +2915,20 @@ VIR_LoopOpts_IsBBHeadBlockOfOneLoop(
     return bFound;
 }
 
-static void
+static VSC_ErrCode
 _VIR_LoopInfo_ComputeLoopBody(
     VIR_LoopInfo* loopInfo
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VIR_BB* loopHead = VIR_LoopInfo_GetLoopHead(loopInfo);
     VIR_BB* loopEnd = VIR_LoopInfo_GetLoopEnd(loopInfo);
 
     if(loopHead == loopEnd)
     {
-        _VIR_LoopInfo_AddBB(loopInfo, loopHead, gcvNULL);
-
-        return;
+        errCode = _VIR_LoopInfo_AddBB(loopInfo, loopHead, gcvNULL);
+        ON_ERROR(errCode, "Fail to AddBB.");
+        return errCode;
     }
     else
     {
@@ -2875,10 +2938,17 @@ _VIR_LoopInfo_ComputeLoopBody(
 
         STACK_INITIALIZE(&stack);
 
-        _VIR_LoopInfo_AddBB(loopInfo, loopHead, gcvNULL);
-        _VIR_LoopInfo_AddBB(loopInfo, loopEnd, gcvNULL);
+        errCode = _VIR_LoopInfo_AddBB(loopInfo, loopHead, gcvNULL);
+        ON_ERROR(errCode, "Fail to AddBB.");
+        errCode = _VIR_LoopInfo_AddBB(loopInfo, loopEnd, gcvNULL);
+        ON_ERROR(errCode, "Fail to AddBB.");
 
         node = (VSC_UNI_LIST_NODE_EXT*)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VSC_UNI_LIST_NODE_EXT));
+        if(node == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR(errCode, "Fail to allocate List Node.");
+        }
         vscULNDEXT_Initialize(node, loopEnd);
         STACK_PUSH_ENTRY(&stack, node);
 
@@ -2902,19 +2972,27 @@ _VIR_LoopInfo_ComputeLoopBody(
                 if(newlyAdded)
                 {
                     node = (VSC_UNI_LIST_NODE_EXT*)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VSC_UNI_LIST_NODE_EXT));
+                    if(node  == gcvNULL)
+                    {
+                        errCode = VSC_ERR_OUT_OF_MEMORY;
+                        return errCode;
+                    }
                     vscULNDEXT_Initialize(node, predBB);
                     STACK_PUSH_ENTRY(&stack, node);
                 }
             }
         }
     }
+    OnError:
+    return errCode;
 }
 
-void
+VSC_ErrCode
 VIR_LoopOpts_ComputeLoopBodies(
     VIR_LoopOpts* loopOpts
     )
 {
+    VSC_ErrCode     errCode     = VSC_ERR_NONE;
     VIR_LoopInfoMgr* loopInfoMgr = VIR_LoopOpts_GetLoopInfoMgr(loopOpts);
     VIR_LoopInfo* loopInfo;
     VSC_UL_ITERATOR iter;
@@ -2926,7 +3004,9 @@ VIR_LoopOpts_ComputeLoopBodies(
         loopInfo != gcvNULL;
         loopInfo = (VIR_LoopInfo*)vscULIterator_Next(&iter))
     {
-        _VIR_LoopInfo_ComputeLoopBody(loopInfo);
+        errCode = _VIR_LoopInfo_ComputeLoopBody(loopInfo);
+        if(errCode != VSC_ERR_NONE)
+            return errCode;
     }
 
     if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(VIR_LoopOpts_GetOptions(loopOpts)), VSC_OPTN_LoopOptsOptions_TRACE_FUNC_LOOP_ANALYSIS))
@@ -2934,6 +3014,8 @@ VIR_LoopOpts_ComputeLoopBodies(
         VIR_LOG(VIR_LoopOpts_GetDumper(loopOpts), "after compute loop bodies:\n");
         VIR_LoopInfoMgr_Dump(loopInfoMgr, gcvTRUE);
     }
+
+    return errCode;
 }
 
 static gctBOOL
@@ -3629,6 +3711,11 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
                             VSC_UNI_LIST_NODE_EXT* node = (VSC_UNI_LIST_NODE_EXT*)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VSC_UNI_LIST_NODE_EXT));
                             VIR_Symbol* defSym = VIR_Operand_GetSymbol(VIR_Inst_GetDest(inst));
 
+                            if(node == gcvNULL)
+                            {
+                                errCode = VSC_ERR_OUT_OF_MEMORY;
+                                return errCode;
+                            }
                             if(VIR_Symbol_isVreg(defSym) && VIR_Symbol_GetVregVariable(defSym))
                             {
                                 defSym = VIR_Symbol_GetVregVariable(defSym);
@@ -3715,11 +3802,12 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
     return errCode;
 }
 
-static void
+static VSC_ErrCode
 _VIR_LoopInfo_DetectLoopUpbound(
     VIR_LoopInfo* loopInfo
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VIR_BB* loopEnd = VIR_LoopInfo_GetLoopEnd(loopInfo);
     VIR_Instruction* lastInst = BB_GET_END_INST(loopEnd);
 
@@ -3779,6 +3867,8 @@ _VIR_LoopInfo_DetectLoopUpbound(
                     {
                         VIR_LoopUpbound* upbound = _VIR_LoopInfo_NewUpbound(loopInfo);
 
+                        if(upbound == gcvNULL)
+                            return VSC_ERR_OUT_OF_MEMORY;
                         VIR_LoopUpbound_SetIV(upbound, iv0);
                         VIR_LoopUpbound_SetCmpInst(upbound, cmpInst);
                         if(VIR_Operand_isSymbol(cmpSrc1))
@@ -3882,6 +3972,8 @@ _VIR_LoopInfo_DetectLoopUpbound(
                 {
                     VIR_LoopUpbound* upbound = _VIR_LoopInfo_NewUpbound(loopInfo);
 
+                    if(upbound == gcvNULL)
+                        return VSC_ERR_OUT_OF_MEMORY;;
                     VIR_LoopUpbound_SetIV(upbound, iv0);
                     VIR_LoopUpbound_SetCmpInst(upbound, lastInst);
                     if(VIR_Operand_isSymbol(jmpcSrc1))
@@ -3948,14 +4040,17 @@ _VIR_LoopInfo_DetectLoopUpbound(
             }
         }
     }
+
+    return errCode;
 }
 
-static void
+static VSC_ErrCode
 _VIR_LoopInfo_DetectLoopLowbound(
     VIR_LoopInfo* loopInfo,
     VIR_IV* iv
     )
 {
+    VSC_ErrCode     errCode     = VSC_ERR_NONE;
     VIR_Symbol* ivSym = VIR_IV_GetSym(iv);
     gctUINT ivSymChannel = VIR_IV_GetChannel(iv);
     VIR_BB* loopHead = VIR_LoopInfo_GetLoopHead(loopInfo);
@@ -3964,7 +4059,7 @@ _VIR_LoopInfo_DetectLoopLowbound(
 
     if(BB_GET_IN_DEGREE(loopHead) != 2)
     {
-        return;
+        return errCode;
     }
     else
     {
@@ -4010,6 +4105,8 @@ _VIR_LoopInfo_DetectLoopLowbound(
                         VIR_LoopLowbound* lowbound = _VIR_LoopInfo_NewLowbound(loopInfo);
                         VIR_Operand* src = VIR_Inst_GetSource(inst, 0);
 
+                        if(lowbound == gcvNULL)
+                            return VSC_ERR_OUT_OF_MEMORY;
                         VIR_LoopLowbound_SetIV(lowbound, iv);
                         if(VIR_Operand_isSymbol(src))
                         {
@@ -4086,18 +4183,23 @@ _VIR_LoopInfo_DetectLoopLowbound(
         }
     }
 
+    return errCode;
 }
 
-static void
+static VSC_ErrCode
 _VIR_LoopInfo_DetectLoopBound(
     VIR_LoopInfo* loopInfo
     )
 {
-    _VIR_LoopInfo_DetectLoopUpbound(loopInfo);
+    VSC_ErrCode     errCode     = VSC_ERR_NONE;
+    errCode = _VIR_LoopInfo_DetectLoopUpbound(loopInfo);
+    if(errCode != VSC_ERR_NONE)
+        return errCode;
     if(VIR_LoopInfo_GetUpbound(loopInfo))
     {
-        _VIR_LoopInfo_DetectLoopLowbound(loopInfo, VIR_LoopUpbound_GetIV(VIR_LoopInfo_GetUpbound(loopInfo)));
+        errCode = _VIR_LoopInfo_DetectLoopLowbound(loopInfo, VIR_LoopUpbound_GetIV(VIR_LoopInfo_GetUpbound(loopInfo)));
     }
+    return errCode;
 }
 
 static gctINT
@@ -4530,7 +4632,8 @@ _VIR_LoopInfo_CopyLoop(
             VIR_LoopInfo_SetParentLoop(pNewLoopInfo, loopInfo);
             _VIR_LoopInfo_AddChildLoop(loopInfo, pNewLoopInfo);
 
-            _VIR_LoopInfo_ComputeLoopBody(pNewLoopInfo);
+            errCode = _VIR_LoopInfo_ComputeLoopBody(pNewLoopInfo);
+            ON_ERROR(errCode, "Fail to ComputeLoopBody.");
 
             /* Copy all the BBs. */
             if (pChildLoopInfo != gcvNULL)
@@ -4658,6 +4761,7 @@ _VIR_LoopInfo_CopyLoop(
     vscHTBL_Destroy(labelToNewLabelMap);
     vscHTBL_Destroy(childLoopInfoMap);
 
+    OnError:
     return errCode;
 }
 
@@ -4756,6 +4860,11 @@ _VIR_LoopInfo_StaticallyUnroll(
 
     gcmASSERT(copyCount > 0);
 
+    if(bbToNewBBMaps == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        return errCode;
+    }
     VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_CoveringIRSequence);
 
     for(i = 0; i < copyCount; i++)
@@ -5165,6 +5274,11 @@ _VIR_LoopInfo_DynamicallyUnroll(
         gctUINT i;
 
         gcmASSERT(factor >= 2);
+        if(bbToNewBBMaps == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            return errCode;
+        }
 
         VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_CoveringIRSequence);
 
@@ -5313,7 +5427,8 @@ _VIR_LoopInfo_PerformLoopUnrollingOnLoop(
         return errCode;
     }
 
-    _VIR_LoopInfo_DetectLoopBound(loopInfo);
+    errCode = _VIR_LoopInfo_DetectLoopBound(loopInfo);
+    ON_ERROR(errCode, "Fail to DetectLoopBound.");
     if(VIR_LoopInfo_GetUpbound(loopInfo) != gcvNULL &&
        VIR_LoopInfo_GetLowbound(loopInfo) != gcvNULL)
     {
@@ -5385,6 +5500,7 @@ OnError:
 static gctBOOL _VIR_LoopInfo_InnestLoopBoundIsNonConst(
     VIR_LoopInfo* loopInfo)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     if (VIR_LoopInfo_GetChildLoopCount(loopInfo) > 0)
     {
         /* not innest loop */
@@ -5395,7 +5511,8 @@ static gctBOOL _VIR_LoopInfo_InnestLoopBoundIsNonConst(
     {
         VIR_LoopUpbound *upperBound = gcvNULL;
         VIR_LoopLowbound *lowBound = gcvNULL;
-        _VIR_LoopInfo_DetectLoopBound(loopInfo);
+        errCode = _VIR_LoopInfo_DetectLoopBound(loopInfo);
+        ON_ERROR(errCode, "Fail to DetectLoopBound.");
         upperBound = VIR_LoopInfo_GetUpbound(loopInfo);
         lowBound = VIR_LoopInfo_GetLowbound(loopInfo);
         if (upperBound != gcvNULL && lowBound!= gcvNULL)
@@ -5408,6 +5525,8 @@ static gctBOOL _VIR_LoopInfo_InnestLoopBoundIsNonConst(
                 }
         }
     }
+
+    OnError:
     return gcvFALSE;
 }
 
@@ -5534,11 +5653,16 @@ VIR_LoopOpts_PerformOnFunction(
         VIR_Function_Dump(dumper, func);
     }
 
-    VIR_LoopOpts_NewLoopInfoMgr(loopOpts);
+    if(VIR_LoopOpts_NewLoopInfoMgr(loopOpts) == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR(errCode, "Fail to allocate NewLoopInfoMgr.");
+    }
     if(VIR_LoopOpts_DetectNaturalLoops(loopOpts))
     {
         /* Compute the loop body and some other information, we need to call these after add a new loopInfo. */
-        VIR_LoopOpts_ComputeLoopBodies(loopOpts);
+        errCode = VIR_LoopOpts_ComputeLoopBodies(loopOpts);
+        ON_ERROR(errCode, "Fail to ComputeLoopBodies.");
         VIR_LoopOpts_ComputeLoopTree(loopOpts);
         VIR_LoopOpts_IdentifyBreakContinues(loopOpts);
 
@@ -5670,6 +5794,7 @@ VIR_LoopOpts_PerformOnFunction(
         VIR_Function_Dump(dumper, func);
     }
 
+    OnError:
     return errCode;
 }
 

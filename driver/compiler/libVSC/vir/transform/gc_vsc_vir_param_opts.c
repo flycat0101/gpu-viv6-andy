@@ -1684,6 +1684,11 @@ VSC_ErrCode VIR_PARAM_Optimization_PerformOnShader(
     ppFuncBlkRPO = (VIR_FUNC_BLOCK**)vscMM_Alloc(pPassWorker->basePassWorker.pMM,
         sizeof(VIR_FUNC_BLOCK*)*countOfFuncBlk);
 
+    if(ppFuncBlkRPO == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        return errCode;
+    }
     errCode = vscDG_PstOrderTraversal(&pCG->dgGraph,
                             VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                             gcvFALSE,

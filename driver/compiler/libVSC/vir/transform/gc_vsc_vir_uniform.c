@@ -264,7 +264,10 @@ VSC_GlobalUniformTable_NewItem(
     )
 {
     VSC_GlobalUniformItem* item = (VSC_GlobalUniformItem*)vscMM_Alloc(VSC_GlobalUniformTable_GetMM(global_uniform_table), sizeof(VSC_GlobalUniformItem));
-
+    if(item == gcvNULL)
+    {
+        return item;
+    }
     VSC_GlobalUniformItem_Initialize(item, VSC_GlobalUniformTable_GetAllShaders(global_uniform_table), VSC_GlobalUniformTable_GetItemCount(global_uniform_table));
     VSC_GlobalUniformTable_IncItemCount(global_uniform_table);
     vscUNILST_Append(VSC_GlobalUniformTable_GetItemList(global_uniform_table), (VSC_UNI_LIST_NODE*)item);
@@ -425,6 +428,11 @@ VSC_GlobalUniformTable_InsertShaderUniform(
     if(!item)
     {
         item = VSC_GlobalUniformTable_NewItem(global_uniform_table);
+        if(item == gcvNULL)
+        {
+            error_code = VSC_ERR_OUT_OF_MEMORY;
+            return error_code;
+        }
     }
     VSC_GlobalUniformItem_Update(item, shader, uniform);
 
@@ -1378,6 +1386,10 @@ _VSC_UF_AUBO_ConstructDefaultUBO(
             VSC_UF_AUBO_SetDUBO(aubo, i, VIR_Symbol_GetIndex(dubo_sym));
             dubo_ub->blockSize = VSC_UF_AUBO_GetDUBOByteSize(aubo);
             dubo_ub->uniforms = (VIR_Uniform **)vscMM_Alloc(&shader->pmp.mmWrapper, sizeof(VIR_Uniform*) * count);
+            if(dubo_ub->uniforms == gcvNULL)
+            {
+                return VSC_ERR_OUT_OF_MEMORY;
+            }
             VIR_Symbol_SetFlag(dubo_addr_sym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
             VSC_UF_AUBO_SetDUBOAddr(aubo, i, VIR_Symbol_GetIndex(dubo_addr_sym));
         }
@@ -1424,6 +1436,10 @@ _VSC_UF_AUBO_ConstructConstantUBO(
             VSC_UF_AUBO_SetCUBO(aubo, i, VIR_Symbol_GetIndex(cubo_sym));
             cubo_ub->blockSize = VSC_UF_AUBO_GetCUBOByteSize(aubo);
             cubo_ub->uniforms = (VIR_Uniform **)vscMM_Alloc(&shader->pmp.mmWrapper, sizeof(VIR_Uniform*) * count);
+            if(cubo_ub->uniforms == gcvNULL)
+            {
+                return VSC_ERR_OUT_OF_MEMORY;
+            }
             VIR_Symbol_SetFlag(cubo_addr_sym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
             VSC_UF_AUBO_SetCUBOAddr(aubo, i, VIR_Symbol_GetIndex(cubo_addr_sym));
         }
@@ -2208,6 +2224,9 @@ _VSC_UF_AUBO_GetAuxAddress(
     VIR_Symbol* auxAddrSym;
     VIR_SymId auxAddrSymId;
 
+    if(key == gcvNULL)
+        virErrCode = VSC_ERR_OUT_OF_MEMORY;
+    if(virErrCode != VSC_ERR_NONE) return VIR_INVALID_ID;
     if(auxAddressTable == gcvNULL)
     {
         auxAddressTable = vscHTBL_Create(VSC_UF_AUBO_GetMM(aubo), _VSC_UF_AUBO_GetAuxAddress_HashFunc, _VSC_UF_AUBO_GetAuxAddress_KeyCmp, 16);
@@ -2636,6 +2655,8 @@ _VSC_UF_AUBO_UniformInfoList_NewNode(
     )
 {
     VSC_UF_AUBO_UniformInfoNode* uin = (VSC_UF_AUBO_UniformInfoNode*)vscMM_Alloc(VSC_UF_AUBO_UniformInfoList_GetMM(uil), sizeof(VSC_UF_AUBO_UniformInfoNode));
+    if(!uin)
+        return uin;
     vscUNILST_Append(VSC_UF_AUBO_UniformInfoList_GetList(uil), (VSC_UNI_LIST_NODE*)uin);
 
     return uin;
@@ -2691,6 +2712,11 @@ _VSC_UF_AUBO_BuildUpInfoList(
                     VIR_TypeId uniformBaseTypeId = VIR_Type_GetBaseTypeId(uniformType);
                     VIR_Type* uniformBaseType = VIR_Shader_GetTypeFromId(shader, uniformBaseTypeId);
                     VSC_UF_AUBO_UniformInfoNode* uin = _VSC_UF_AUBO_UniformInfoList_NewNode(uil);
+                    if(uin == gcvNULL)
+                    {
+                        virErrCode = VSC_ERR_OUT_OF_MEMORY;
+                        return virErrCode;
+                    }
                     _VSC_UF_AUBO_UniformInfoNode_Init(uin, inst, src, uniformSym);
 
                     if(VIR_Inst_GetOpcode(inst) == VIR_OP_LDARR)
@@ -2784,6 +2810,11 @@ _VSC_UF_AUBO_BuildUpInfoList(
                             if(VIR_Symbol_HasFlag(uniformSym, VIR_SYMUNIFORMFLAG_MOVED_TO_DUBO))
                             {
                                 VSC_UF_AUBO_UniformInfoNode* uin = _VSC_UF_AUBO_UniformInfoList_NewNode(uil);
+                                if(uin == gcvNULL)
+                                {
+                                    virErrCode = VSC_ERR_OUT_OF_MEMORY;
+                                    return virErrCode;
+                                }
 
                                 _VSC_UF_AUBO_UniformInfoNode_Init(uin, inst, tm, uniformSym);
                             }

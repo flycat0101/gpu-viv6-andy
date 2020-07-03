@@ -6522,6 +6522,11 @@ VSC_ErrCode _VIR_RA_LS_BuildLRTableBB(
         &pFuncFlow->tsBlkFlowArray,
         pBB->dgNode.id);
     tempVec = vscBV_Create(pMM, VIR_RA_LS_GetNumDef(pRA));
+    if(tempVec == gcvNULL)
+    {
+        retValue = VSC_ERR_OUT_OF_MEMORY;
+        return retValue;
+    }
     vscBV_Xor(tempVec, &pBlkFlow->outFlow, VIR_RA_LS_GetLiveLRVec(pRA));
     i = 0;
     while ((thisDefId = vscBV_FindSetBitForward(tempVec, i)) != (gctUINT)INVALID_BIT_LOC)

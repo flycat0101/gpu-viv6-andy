@@ -98,8 +98,9 @@ static gcmINLINE void _ClearResidualVB(VSC_BIT_VECTOR *pBV)
     }
 }
 
-void vscBV_Resize(VSC_BIT_VECTOR *pBV, gctINT newBVSize, gctBOOL bKeep)
+VSC_ErrCode vscBV_Resize(VSC_BIT_VECTOR *pBV, gctINT newBVSize, gctBOOL bKeep)
 {
+    VSC_ErrCode     errCode = VSC_ERR_NONE;
     VSC_BIT_VECTOR  orgBV;
     gctINT          newNumOfUINT, i;
 
@@ -118,6 +119,10 @@ void vscBV_Resize(VSC_BIT_VECTOR *pBV, gctINT newBVSize, gctBOOL bKeep)
     if (newNumOfUINT > orgBV.numOfUINT)
     {
         pBV->pBits = (gctUINT*)vscMM_Alloc(pBV->pMM, newNumOfUINT*sizeof(gctUINT));
+        if(pBV->pBits == gcvNULL)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         pBV->numOfUINT = newNumOfUINT;
     }
 
@@ -154,6 +159,7 @@ void vscBV_Resize(VSC_BIT_VECTOR *pBV, gctINT newBVSize, gctBOOL bKeep)
     {
         vscMM_Free(pBV->pMM, orgBV.pBits);
     }
+    return errCode;
 }
 
 void vscBV_Finalize(VSC_BIT_VECTOR* pBV)

@@ -76,6 +76,8 @@ static VSC_CPF_CONSTKEY* _VSC_CPF_NewConstKey(
     )
 {
     VSC_CPF_CONSTKEY* constKey = (VSC_CPF_CONSTKEY*)vscMM_Alloc(pMM, sizeof(VSC_CPF_CONSTKEY));
+    if(!constKey)
+        return constKey;
     constKey->bbId = bbId;
     constKey->index = index;
     constKey->isIN = isIN;
@@ -89,6 +91,8 @@ static VSC_CPF_Const* _VSC_CPF_NewConstVal(
     )
 {
     VSC_CPF_Const* constVal = (VSC_CPF_Const*)vscMM_Alloc(pMM, sizeof(VSC_CPF_Const));
+    if(!constVal)
+        return constVal;
     constVal->value = constValue;
     constVal->type = constType;
     return constVal;
@@ -301,16 +305,20 @@ _VSC_CPF_isTypeBOOL(
 }
 
 /* put the BB into the tail of worklist */
-static void
+static VSC_ErrCode
 _VSC_CPF_WorkListQueue(
     IN VSC_CPF         *pCPF,
     IN VIR_BASIC_BLOCK *pBB
     )
 {
+    VSC_ErrCode     errCode     = VSC_ERR_NONE;
     VSC_UNI_LIST_NODE_EXT *worklistNode = (VSC_UNI_LIST_NODE_EXT *)
         vscMM_Alloc(VSC_CPF_GetMM(pCPF), sizeof(VSC_UNI_LIST_NODE_EXT));
 
     VSC_OPTN_CPFOptions  *pOptions      = VSC_CPF_GetOptions(pCPF);
+
+    if(!worklistNode)
+        return VSC_ERR_OUT_OF_MEMORY;
 
     if(VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
         VSC_OPTN_CPFOptions_TRACE_ALGORITHM) && VSC_CPF_GetDumper(pCPF))
@@ -322,6 +330,8 @@ _VSC_CPF_WorkListQueue(
     }
     vscULNDEXT_Initialize(worklistNode, pBB);
     QUEUE_PUT_ENTRY(VSC_CPF_GetWorkList(pCPF), worklistNode);
+
+    return errCode;
 }
 
 /* get the BB from the head of worklist */
@@ -495,12 +505,14 @@ _VSC_CPF_InitFunction(
                 VSC_CPF_GetBlkFlowArray(pCPF),
                 VSC_CPF_GetMM(pCPF),
                 tempCount);
+    ON_ERROR(errCode, "Fail to init the constant data flow.");
 
     /* init the worklist */
     QUEUE_INITIALIZE(VSC_CPF_GetWorkList(pCPF));
 
     /* add the entry bb to the worklist */
-    _VSC_CPF_WorkListQueue(pCPF, CFG_GET_ENTRY_BB(pCfg));
+    errCode = _VSC_CPF_WorkListQueue(pCPF, CFG_GET_ENTRY_BB(pCfg));
+    ON_ERROR(errCode, "Fail to add the entry bb to the worklist.");
 
     /* initialize the const hash table */
     vscHTBL_Initialize(VSC_CPF_GetConstTable(pCPF),
@@ -519,6 +531,7 @@ _VSC_CPF_InitFunction(
                       VSC_CPF_GetMM(pCPF),
                       VSC_CPF_GetHwCfg(pCPF));
 
+    OnError:
     return errCode;
 };
 
@@ -630,14 +643,18 @@ _VSC_CPF_SetConstVal(
     }
     else
     {
+        VSC_CPF_CONSTKEY* pHashKey = _VSC_CPF_NewConstKey(VSC_CPF_GetMM(pCPF),
+                                                          bbId,
+                                                          index,
+                                                          isIN);
+        VSC_CPF_Const* pVal = _VSC_CPF_NewConstVal(VSC_CPF_GetMM(pCPF),
+                                                   constValue,
+                                                   constType);
+        if(!pHashKey || !pVal)
+            return gcvFALSE;
         vscHTBL_DirectSet(VSC_CPF_GetConstTable(pCPF),
-                          _VSC_CPF_NewConstKey(VSC_CPF_GetMM(pCPF),
-                            bbId,
-                            index,
-                            isIN),
-                          _VSC_CPF_NewConstVal(VSC_CPF_GetMM(pCPF),
-                            constValue,
-                            constType));
+                          (void*)pHashKey,
+                          (void*)pVal);
         changed = gcvTRUE;
     }
 
@@ -3063,7 +3080,8 @@ _VSC_CPF_AnalysisOnBlock(
 
         /* init the worklist */
         QUEUE_INITIALIZE(VSC_CPF_GetWorkList(pCPF));
-        _VSC_CPF_WorkListQueue(pCPF, pBB);
+        errCode = _VSC_CPF_WorkListQueue(pCPF, pBB);
+        ON_ERROR(errCode, "Fail to init the worklist.");
 
         /* Calculate the in/out of the loop. */
         while(!QUEUE_CHECK_EMPTY(VSC_CPF_GetWorkList(pCPF)))
@@ -3124,7 +3142,8 @@ _VSC_CPF_AnalysisOnBlock(
     }
     else if (VSC_CPF_GetFlowSize(pCPF) > (gctUINT)pTmpFlow->svSize)
     {
-        vscSV_Resize(pTmpFlow, VSC_CPF_GetFlowSize(pCPF), gcvFALSE);
+        errCode = vscSV_Resize(pTmpFlow, VSC_CPF_GetFlowSize(pCPF), gcvFALSE);
+        ON_ERROR(errCode, "vscSV_Resize");
     }
     gcmASSERT(pTmpFlow != gcvNULL && (gctUINT)pTmpFlow->svSize >= VSC_CPF_GetFlowSize(pCPF));
 
@@ -3292,7 +3311,8 @@ _VSC_CPF_AnalysisOnBlock(
                     {
                         if (!_VSC_CPF_InWorkList(pCPF, psuccBasicBlk))
                         {
-                            _VSC_CPF_WorkListQueue(pCPF, psuccBasicBlk);
+                            errCode = _VSC_CPF_WorkListQueue(pCPF, psuccBasicBlk);
+                            ON_ERROR(errCode, "Fail to add the worklist.");
                         }
                     }
                 }
@@ -3311,6 +3331,7 @@ _VSC_CPF_AnalysisOnBlock(
 
     vscSV_Reset(pTmpFlow);
 
+    OnError:
     return errCode;
 }
 
@@ -3340,7 +3361,8 @@ _VSC_CPF_TransformOnBlock(
     }
     else if (VSC_CPF_GetFlowSize(pCPF) > (gctUINT)pTmpFlow->svSize)
     {
-        vscSV_Resize(pTmpFlow, VSC_CPF_GetFlowSize(pCPF), gcvFALSE);
+        errCode = vscSV_Resize(pTmpFlow, VSC_CPF_GetFlowSize(pCPF), gcvFALSE);
+        ON_ERROR(errCode, "vscSV_Resize");
     }
     gcmASSERT(pTmpFlow != gcvNULL && (gctUINT)pTmpFlow->svSize >= VSC_CPF_GetFlowSize(pCPF));
 
@@ -3364,6 +3386,7 @@ _VSC_CPF_TransformOnBlock(
 
     vscSV_Reset(pTmpFlow);
 
+OnError:
     return errCode;
 }
 
@@ -3388,7 +3411,11 @@ _VSC_CPF_PerformOnFunction(
     /* We need to detect the loopInfo to analyze the back edge flow. */
     if (VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_HAS_LOOP))
     {
-        VIR_LoopOpts_NewLoopInfoMgr(pLoopOpts);
+         if (VIR_LoopOpts_NewLoopInfoMgr(pLoopOpts) == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR(errCode, "Fail to allocate NewLoopInfoMgr.");
+        }
         VIR_LoopOpts_DetectNaturalLoops(pLoopOpts);
     }
 
@@ -3436,6 +3463,7 @@ _VSC_CPF_PerformOnFunction(
     VIR_LoopOpts_DeleteLoopInfoMgr(pLoopOpts);
     _VSC_CPF_FinalizeFunction(pCPF, pFunc);
 
+    OnError:
     return errCode;
 }
 
