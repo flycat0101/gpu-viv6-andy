@@ -4273,8 +4273,9 @@ static gctBOOL __SpvUseLoadStoreToAccessBlock(gcSPV spv, VIR_Shader * virShader,
     return ret;
 }
 
-static gctUINT __SpvGetValidInternalIdIndex(gcSPV spv)
+static VSC_ErrCode __SpvGetValidInternalIdIndex(gcSPV spv, gctUINT *id)
 {
+    VSC_ErrCode         virErrCode = VSC_ERR_NONE;
     /* If there is no enough internal ID, increase it. */
     if (spv->nextValidInternelIdIndex == (gctUINT)spv->internalIdMask.bitCount)
     {
@@ -4282,7 +4283,10 @@ static gctUINT __SpvGetValidInternalIdIndex(gcSPV spv)
         gctUINT         newInternalIdLength = spv->internalIdMask.bitCount + SPV_INTERNAL_ID_NUM;
 
         /* Allocate the new internal ID. */
-        spvAllocate(spv->spvMemPool, gcmSIZEOF(SpvId) * newInternalIdLength, (gctPOINTER *)&pNewInternalIds);
+        if (gcmIS_ERROR(spvAllocate(spv->spvMemPool, gcmSIZEOF(SpvId) * newInternalIdLength, (gctPOINTER *)&pNewInternalIds)))
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         gcoOS_ZeroMemory(pNewInternalIds, gcmSIZEOF(SpvId) * newInternalIdLength);
 
         /* Copy the original IDs. */
@@ -4292,14 +4296,16 @@ static gctUINT __SpvGetValidInternalIdIndex(gcSPV spv)
         spvFree(gcvNULL, spv->internalIds);
         spv->internalIds = pNewInternalIds;
 
-        /* Increate the internalID mask. */
-        vscBV_Resize(&spv->internalIdMask, newInternalIdLength, gcvTRUE);
+        /* Increase the internalID mask. */
+        virErrCode = vscBV_Resize(&spv->internalIdMask, newInternalIdLength, gcvTRUE);
+        CHECK_ERROR(virErrCode, "Failed to resize BV");
 
         /* Increase the ID descriptor. */
         SPV_CHECK_IDDESCRIPTOR(spv, spv->idDescSize + SPV_INTERNAL_ID_NUM);
     }
 
-    return spv->nextValidInternelIdIndex;
+    *id = spv->nextValidInternelIdIndex;
+    return virErrCode;
 }
 
 static gctBOOL __SpvIsResultMemoryAddress(gcSPV spv, VIR_Shader * virShader)
@@ -4701,7 +4707,10 @@ VSC_ErrCode __SpvEmitType(gcSPV spv, VIR_Shader * virShader)
 
         if (spv->operandSize > 1)
         {
-            spvAllocate(spv->spvMemPool, sizeof(gctUINT) * (spv->operandSize - 1), (gctPOINTER *)&SPV_ID_TYPE_FUNC_ARG_SPV_TYPE(spv->resultId));
+            if (gcmIS_ERROR(spvAllocate(spv->spvMemPool, sizeof(gctUINT) * (spv->operandSize - 1), (gctPOINTER *)&SPV_ID_TYPE_FUNC_ARG_SPV_TYPE(spv->resultId))))
+            {
+                return VSC_ERR_OUT_OF_MEMORY;
+            }
             for(i = 1; i < spv->operandSize; i++)
             {
                 /* Always save the pointer type if exist. */
@@ -4804,7 +4813,10 @@ static VSC_ErrCode __SpvConstructWorkgroup(
         VIR_Symbol         *sym;
         VIR_StorageBlock   *sbo;
 
-        spvAllocate(spv->spvMemPool, gcmSIZEOF(SpvWorkGroupInfo), (gctPOINTER *)&spv->workgroupInfo);
+        if (gcmIS_ERROR(spvAllocate(spv->spvMemPool, gcmSIZEOF(SpvWorkGroupInfo), (gctPOINTER *)&spv->workgroupInfo)))
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         gcoOS_MemFill(spv->workgroupInfo, 0, gcmSIZEOF(SpvWorkGroupInfo));
         SPV_WORKGROUP_INFO()->curOffsetSymId = VIR_INVALID_ID;
         SPV_WORKGROUP_INFO()->groupOffsetSymId = VIR_INVALID_ID;
@@ -5188,10 +5200,16 @@ static VSC_ErrCode __SpvAddComplexTypeConstant(gcSPV spv, VIR_Shader * virShader
     if (constantCount > 0)
     {
         /* Initialize sym list. */
-        spvAllocate(spv->spvMemPool, constantCount * gcmSIZEOF(VIR_SymId), (gctPOINTER *)&compositeSymId);
+        if (gcmIS_ERROR(spvAllocate(spv->spvMemPool, constantCount * gcmSIZEOF(VIR_SymId), (gctPOINTER *)&compositeSymId)))
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         gcoOS_ZeroMemory(compositeSymId, constantCount * gcmSIZEOF(VIR_SymId));
 
-        spvAllocate(spv->spvMemPool, constantCount * gcmSIZEOF(VIR_SymbolKind), (gctPOINTER *)&compositeSymKind);
+        if (gcmIS_ERROR(spvAllocate(spv->spvMemPool, constantCount * gcmSIZEOF(VIR_SymbolKind), (gctPOINTER *)&compositeSymKind)))
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         gcoOS_ZeroMemory(compositeSymKind, constantCount * gcmSIZEOF(VIR_SymbolKind));
 
         /* Get composite source sym id. */
@@ -5889,8 +5907,14 @@ VSC_ErrCode __SpvEmitFunctionCall(gcSPV spv, VIR_Shader * virShader)
 
         if (SPV_ID_FUNC_ARG_NUM(func) > 0)
         {
-            spvAllocate(spv->spvMemPool,sizeof (SpvId) * SPV_ID_FUNC_ARG_NUM(func), (gctPOINTER *)&SPV_ID_FUNC_SPV_ARG(func));
-            spvAllocate(spv->spvMemPool,sizeof (SpvParameterStorage) * SPV_ID_FUNC_ARG_NUM(func), (gctPOINTER *)&SPV_ID_FUNC_ARG_STORAGE(func));
+            if (gcmIS_ERROR(spvAllocate(spv->spvMemPool,sizeof (SpvId) * SPV_ID_FUNC_ARG_NUM(func), (gctPOINTER *)&SPV_ID_FUNC_SPV_ARG(func))))
+            {
+                return VSC_ERR_OUT_OF_MEMORY;
+            }
+            if (gcmIS_ERROR(spvAllocate(spv->spvMemPool,sizeof (SpvParameterStorage) * SPV_ID_FUNC_ARG_NUM(func), (gctPOINTER *)&SPV_ID_FUNC_ARG_STORAGE(func))))
+            {
+                return VSC_ERR_OUT_OF_MEMORY;
+            }
         }
     }
 
@@ -5924,8 +5948,10 @@ VSC_ErrCode __SpvEmitFunctionCall(gcSPV spv, VIR_Shader * virShader)
     if (spv->operandSize > 1)
     {
         /* not define, add parameter to caller */
-        spvAllocate(spv->spvMemPool, sizeof(SpvId) * (spv->operandSize - 1), (gctPOINTER *)&SPV_ID_FUNC_CALLER_SPV_ARG(func, index));
-
+        if (gcmIS_ERROR(spvAllocate(spv->spvMemPool, sizeof(SpvId) * (spv->operandSize - 1), (gctPOINTER *)&SPV_ID_FUNC_CALLER_SPV_ARG(func, index))))
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         for (i = 1; i < spv->operandSize; i++)
         {
             SPV_ID_FUNC_CALLER_SPV_ARG(func, index)[i - 1] = spv->operands[i];
@@ -5978,7 +6004,10 @@ VSC_ErrCode __SpvEmitFunctionParameter(gcSPV spv, VIR_Shader * virShader)
 
     if (SPV_ID_FUNC_SPV_ARG(spv->func) == gcvNULL)
     {
-        spvAllocate(spv->spvMemPool, (SPV_ID_FUNC_ARG_NUM(spv->func) + 1) * gcmSIZEOF(SpvId), (gctPOINTER *)&SPV_ID_FUNC_SPV_ARG(spv->func));
+        if (gcmIS_ERROR(spvAllocate(spv->spvMemPool, (SPV_ID_FUNC_ARG_NUM(spv->func) + 1) * gcmSIZEOF(SpvId), (gctPOINTER *)&SPV_ID_FUNC_SPV_ARG(spv->func))))
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
     }
 
     SPV_ID_FUNC_SPV_ARG(spv->func)[spv->argIndex] = spv->resultId;
@@ -6636,8 +6665,14 @@ VSC_ErrCode __SpvEmitFunction(gcSPV spv, VIR_Shader * virShader)
         SPV_ID_FUNC_ARG_NUM(spv->resultId) = SPV_ID_TYPE_FUNC_ARG_NUM(spv->operands[1]);
         if (SPV_ID_FUNC_ARG_NUM(spv->resultId) > 0)
         {
-            spvAllocate(spv->spvMemPool,sizeof (SpvId) * SPV_ID_FUNC_ARG_NUM(spv->resultId), (gctPOINTER *)&SPV_ID_FUNC_SPV_ARG(spv->resultId));
-            spvAllocate(spv->spvMemPool,sizeof (SpvParameterStorage) * SPV_ID_FUNC_ARG_NUM(spv->resultId), (gctPOINTER *)&SPV_ID_FUNC_ARG_STORAGE(spv->resultId));
+            if (gcmIS_ERROR(spvAllocate(spv->spvMemPool,sizeof (SpvId) * SPV_ID_FUNC_ARG_NUM(spv->resultId), (gctPOINTER *)&SPV_ID_FUNC_SPV_ARG(spv->resultId))))
+            {
+                return VSC_ERR_OUT_OF_MEMORY;
+            }
+            if (gcmIS_ERROR(spvAllocate(spv->spvMemPool,sizeof (SpvParameterStorage) * SPV_ID_FUNC_ARG_NUM(spv->resultId), (gctPOINTER *)&SPV_ID_FUNC_ARG_STORAGE(spv->resultId))))
+            {
+                return VSC_ERR_OUT_OF_MEMORY;
+            }
 
             for(i = 0; i < SPV_ID_FUNC_ARG_NUM(spv->resultId); i++)
             {
@@ -6771,9 +6806,15 @@ VSC_ErrCode __SpvEmitAccessChain(gcSPV spv, VIR_Shader * virShader)
 
     /* Create the index array. */
     accessChainLength = spv->operandSize - 1;
-    spvAllocate(spv->spvMemPool, accessChainLength * gcmSIZEOF(gctUINT), (gctPOINTER *)&accessChain);
+    if (gcmIS_ERROR(spvAllocate(spv->spvMemPool, accessChainLength * gcmSIZEOF(gctUINT), (gctPOINTER *)&accessChain)))
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
     gcoOS_ZeroMemory(accessChain, accessChainLength * gcmSIZEOF(gctUINT));
-    spvAllocate(spv->spvMemPool, accessChainLength * gcmSIZEOF(VIR_SymbolKind), (gctPOINTER *)&accessChainType);
+    if (gcmIS_ERROR(spvAllocate(spv->spvMemPool, accessChainLength * gcmSIZEOF(VIR_SymbolKind), (gctPOINTER *)&accessChainType)))
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
     gcoOS_ZeroMemory(accessChainType, accessChainLength * gcmSIZEOF(VIR_SymbolKind));
 
     /* Set the index type and value. */
@@ -7419,9 +7460,15 @@ VSC_ErrCode __SpvEmitCompositeExtract(gcSPV spv, VIR_Shader * virShader)
 
         /* Create the index array. */
         accessChainLength = spv->operandSize - 1;
-        spvAllocate(spv->spvMemPool, accessChainLength * gcmSIZEOF(gctUINT), (gctPOINTER *)&accessChain);
+        if (gcmIS_ERROR(spvAllocate(spv->spvMemPool, accessChainLength * gcmSIZEOF(gctUINT), (gctPOINTER *)&accessChain)))
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         gcoOS_ZeroMemory(accessChain, accessChainLength * gcmSIZEOF(gctUINT));
-        spvAllocate(spv->spvMemPool, accessChainLength * gcmSIZEOF(VIR_SymbolKind), (gctPOINTER *)&accessChainType);
+        if (gcmIS_ERROR(spvAllocate(spv->spvMemPool, accessChainLength * gcmSIZEOF(VIR_SymbolKind), (gctPOINTER *)&accessChainType)))
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
         gcoOS_ZeroMemory(accessChainType, accessChainLength * gcmSIZEOF(VIR_SymbolKind));
 
         /* check its base offset to see if this is a nested type */
@@ -8085,10 +8132,16 @@ VSC_ErrCode __SpvEmitCompositeConstruct(gcSPV spv, VIR_Shader * virShader)
     (void)dstVirType;
 
     /* Initialize sym list. */
-    spvAllocate(spv->spvMemPool, spv->operandSize * gcmSIZEOF(VIR_SymId), (gctPOINTER *)&compositeSymId);
+    if (gcmIS_ERROR(spvAllocate(spv->spvMemPool, spv->operandSize * gcmSIZEOF(VIR_SymId), (gctPOINTER *)&compositeSymId)))
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
     gcoOS_ZeroMemory(compositeSymId, spv->operandSize * gcmSIZEOF(VIR_SymId));
 
-    spvAllocate(spv->spvMemPool, spv->operandSize * gcmSIZEOF(VIR_SymbolKind), (gctPOINTER *)&compositeSymKind);
+    if (gcmIS_ERROR(spvAllocate(spv->spvMemPool, spv->operandSize * gcmSIZEOF(VIR_SymbolKind), (gctPOINTER *)&compositeSymKind)))
+    {
+        return VSC_ERR_OUT_OF_MEMORY;
+    }
     gcoOS_ZeroMemory(compositeSymKind, spv->operandSize * gcmSIZEOF(VIR_SymbolKind));
 
     /* Get result sym id. */
@@ -10769,8 +10822,12 @@ VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
     if (isDstMemory || dstBlockSym)
     {
         /* Add a temp variable to hold the data. */
-        gctUINT             internalIdIndex = __SpvGetValidInternalIdIndex(spv);
-        SpvId               internalId = spv->internalIds[internalIdIndex];
+        gctUINT             internalIdIndex;
+        SpvId               internalId;
+
+        virErrCode = __SpvGetValidInternalIdIndex(spv, &internalIdIndex);
+        CHECK_ERROR(virErrCode, "Failed to get interal ID index.");
+        internalId = spv->internalIds[internalIdIndex];
 
         /* Add a temp variable to hold the data. */
         __SpvGenerateCopyMemoryName(spv, targetId);
@@ -12486,11 +12543,14 @@ static gceSTATUS __SpvCreateEntryPoint(
     gctUINT entryPointNameLength;
     gctCHAR *entryPointName = gcvNULL;
     gctUINT i;
+    gceSTATUS status = gcvSTATUS_OK;
 
     /* decode the entry point name. */
     __SpvDecodeLiteralString(spv, &entryPointNameLength, entryPointName, gcvFALSE);
     gcmASSERT(entryPointNameLength);
-    spvAllocate(spv->spvMemPool, entryPointNameLength, (gctPOINTER *)&entryPointName);
+    status = spvAllocate(spv->spvMemPool, entryPointNameLength, (gctPOINTER *)&entryPointName);
+    if (status != gcvSTATUS_OK)
+        return status;
     gcoOS_ZeroMemory(entryPointName, entryPointNameLength);
     __SpvDecodeLiteralString(spv, gcvNULL, entryPointName, gcvTRUE);
 
@@ -12556,21 +12616,24 @@ static gceSTATUS __SpvCreateEntryPoint(
 
     gcmASSERT(spv->word == spv->nextInst);
 
-    return gcvSTATUS_OK;
+    return status;
 }
 
-void __SpvCreateFuncCallInfo(
+gceSTATUS __SpvCreateFuncCallInfo(
     SpvMemPool * memPool,
     INOUT SpvFuncCallInfo ** FuncInfo)
 {
     SpvFuncCallInfo * funcInfo = gcvNULL;
+    gceSTATUS status = gcvSTATUS_OK;
 
     if (FuncInfo == gcvNULL)
     {
-        return;
+        return status;
     }
 
-    spvAllocate(memPool, gcmSIZEOF(SpvFuncCallInfo), (gctPOINTER *)&funcInfo);
+    status = spvAllocate(memPool, gcmSIZEOF(SpvFuncCallInfo), (gctPOINTER *)&funcInfo);
+    if (status != gcvSTATUS_OK)
+        return status;
 
     funcInfo->funcId = SPV_INVALID_ID;
     funcInfo->isEntry = gcvFALSE;
@@ -12584,6 +12647,7 @@ void __SpvCreateFuncCallInfo(
     funcInfo->varIds = gcvNULL;
 
     *FuncInfo = funcInfo;
+    return status;
 }
 
 gctBOOL __SpvIsFuncCallInTable(SpvFuncCallTable * funcTable, gctUINT funcId)
@@ -12761,6 +12825,8 @@ static gceSTATUS __SpvProcessFuncCall(
     IN SpvFuncCallTable * funcTable)
 {
     SpvFuncCallInfo * curFuncInfo = gcvNULL;
+    gceSTATUS status = gcvSTATUS_OK;
+
     spv->word = SPV_INSTRUCTION_START;
 
     gcmASSERT(MemPoolForFuncTable == funcTable->memPool);
@@ -12813,8 +12879,9 @@ static gceSTATUS __SpvProcessFuncCall(
             if (!__SpvIsFuncCallInTable(funcTable, entryId))
             {
                 SpvFuncCallInfo * funcInfo = gcvNULL;
-                __SpvCreateFuncCallInfo(MemPoolForFuncTable, &funcInfo);
-
+                status = __SpvCreateFuncCallInfo(MemPoolForFuncTable, &funcInfo);
+                if (status != gcvSTATUS_OK)
+                    return status;
                 funcInfo->funcId = entryId;
                 funcInfo->isEntry = gcvTRUE;
 
@@ -12838,7 +12905,9 @@ static gceSTATUS __SpvProcessFuncCall(
             }
             else
             {
-                __SpvCreateFuncCallInfo(MemPoolForFuncTable, &curFuncInfo);
+                status = __SpvCreateFuncCallInfo(MemPoolForFuncTable, &curFuncInfo);
+                if (status != gcvSTATUS_OK)
+                    return status;
 
                 curFuncInfo->funcId = funcId;
 
@@ -12860,7 +12929,7 @@ static gceSTATUS __SpvProcessFuncCall(
 
     __SpvIntegrateCalls(MemPoolForFuncTable, funcTable);
 
-    return gcvSTATUS_OK;
+    return status;
 }
 
 static void __SpvUpdateValidArea(gcSPV spv)
@@ -13036,7 +13105,10 @@ static gceSTATUS __SpvValidate(
     {
         spv->internalIds[i] = spv->bound + i;
     }
-    vscBV_Initialize(&spv->internalIdMask, &spv->pmp.mmWrapper, SPV_INTERNAL_ID_NUM);
+    if (vscBV_Initialize(&spv->internalIdMask, &spv->pmp.mmWrapper, SPV_INTERNAL_ID_NUM) != VSC_ERR_NONE)
+    {
+        gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
+    }
     spv->nextValidInternelIdIndex = 0;
 
     /* reserved schema, must be 0 for now */
@@ -13633,7 +13705,9 @@ gceSTATUS __SpvCreateFuncCallTable(
 {
     gceSTATUS status = gcvSTATUS_OK;
 
-    spvAllocate(MemPool, gcmSIZEOF(SpvFuncCallTable), (gctPOINTER *)FuncCallTable);
+    status = spvAllocate(MemPool, gcmSIZEOF(SpvFuncCallTable), (gctPOINTER *)FuncCallTable);
+    if (status != gcvSTATUS_OK)
+        return status;
 
     (*FuncCallTable)->funcAllocated = 0;
     (*FuncCallTable)->funcCount = 0;

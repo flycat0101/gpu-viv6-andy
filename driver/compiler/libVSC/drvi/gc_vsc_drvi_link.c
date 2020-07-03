@@ -957,10 +957,12 @@ static VSC_ErrCode _CheckIoAliasedLocationPerExeObj(VSC_BASE_LINKER_HELPER* pBas
     ** Since in Vulkan, GL440 and above, IOs can consume the individual components within a location,
     ** so we need to make the locationMask per-component.
     */
-    vscBV_Initialize(&locationMask, pBaseLinkHelper->pMM, MAX_SHADER_IO_NUM * VIR_CHANNEL_NUM);
+    errCode = vscBV_Initialize(&locationMask, pBaseLinkHelper->pMM, MAX_SHADER_IO_NUM * VIR_CHANNEL_NUM);
+    ON_ERROR(errCode, "Check aliased location");
     if (bCheckComponentMapping)
     {
-        vscBV_Initialize(&visitedIoIdx, pBaseLinkHelper->pMM, virIoCount);
+        errCode = vscBV_Initialize(&visitedIoIdx, pBaseLinkHelper->pMM, virIoCount);
+        ON_ERROR(errCode, "Check aliased location");
     }
 
     for (virIo = 0; virIo < virIoCount; virIo ++)
@@ -1110,8 +1112,10 @@ static VSC_ErrCode _LinkSVIoBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pBase
     gctUINT                    thisOutputRegCount, thisAttrRegCount;
     VSC_BIT_VECTOR             outputMask, attrMask;
 
-    vscBV_Initialize(&outputMask, pBaseLinkHelper->pMM, outputCount);
-    vscBV_Initialize(&attrMask, pBaseLinkHelper->pMM, attrCount);
+    errCode = vscBV_Initialize(&outputMask, pBaseLinkHelper->pMM, outputCount);
+    CHECK_ERROR(errCode, "Failed to initailize BV");
+    errCode = vscBV_Initialize(&attrMask, pBaseLinkHelper->pMM, attrCount);
+    CHECK_ERROR(errCode, "Failed to initailize BV");
 
     /* Link the matched IO first cause we need to make sure the ioIdx is matched. */
     for (outputIdx = 0; outputIdx < outputCount; outputIdx ++)
@@ -1460,7 +1464,8 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
         }
     }
 
-    vscBV_Initialize(&outputWorkingMask, pBaseLinkHelper->pMM, outputCount);
+    errCode = vscBV_Initialize(&outputWorkingMask, pBaseLinkHelper->pMM, outputCount);
+    CHECK_ERROR(errCode, "Check io aliased location");
 
     /* Mark all outputs of upper-shader as not used */
     for (outputIdx = 0; outputIdx < outputCount; outputIdx ++)
@@ -1782,7 +1787,8 @@ static VSC_ErrCode _CalcInputLowLevelSlotPerExeObj(VSC_BASE_LINKER_HELPER* pBase
     gctBOOL                    bDirectlyUseLocation = (pShader->shaderKind != VIR_SHADER_VERTEX) && bSeperatedShaders;
     gctBOOL                    bHasAliasedAttribute = VIR_Shader_HasAliasedAttribute(pShader);
 
-    vscBV_Initialize(&inputWorkingMask, pBaseLinkHelper->pMM, MAX_SHADER_IO_NUM);
+    errCode = vscBV_Initialize(&inputWorkingMask, pBaseLinkHelper->pMM, MAX_SHADER_IO_NUM);
+    ON_ERROR(errCode, "Calc input ll slot");
 
     for (attrIdx = 0; attrIdx < attrCount; attrIdx ++)
     {
@@ -2042,7 +2048,8 @@ static VSC_ErrCode _CalcOutputLowLevelSlotPerExeObj(VSC_BASE_LINKER_HELPER* pBas
     VSC_PROGRAM_LINKER_HELPER* pPgLinkHelper = gcvNULL;
     gctBOOL                    bHasNoAssignedLocation = gcvFALSE;
 
-    vscBV_Initialize(&outputWorkingMask, pBaseLinkHelper->pMM, MAX_SHADER_IO_NUM);
+    errCode = vscBV_Initialize(&outputWorkingMask, pBaseLinkHelper->pMM, MAX_SHADER_IO_NUM);
+    ON_ERROR(errCode, "Calc output ll slot");
 
     for (outputIdx = 0; outputIdx < outputCount; outputIdx ++)
     {
@@ -2304,7 +2311,8 @@ static VSC_ErrCode _CheckUniformAliasedLocation(VSC_BASE_LINKER_HELPER* pBaseLin
         return VSC_ERR_NONE;
     }
 
-    vscBV_Initialize(&locationMask, pBaseLinkHelper->pMM, GetGLMaxUniformLocations());
+    errCode = vscBV_Initialize(&locationMask, pBaseLinkHelper->pMM, GetGLMaxUniformLocations());
+    ON_ERROR(errCode, "Check uniform aliased location");
 
     for (uniformIdx = 0; uniformIdx < uniformCount; uniformIdx++)
     {
@@ -2418,7 +2426,8 @@ static VSC_ErrCode _LinkUniformsBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* p
         return VSC_ERR_NONE;
     }
 
-    vscBV_Initialize(&uniformWorkingMask, pBaseLinkHelper->pMM, upperUniformCount);
+    errCode = vscBV_Initialize(&uniformWorkingMask, pBaseLinkHelper->pMM, upperUniformCount);
+    ON_ERROR(errCode, "Link uniform between two shader stages");
 
     for (uniformIdx = 0; uniformIdx < lowerUniformCount; uniformIdx++)
     {
@@ -2519,7 +2528,8 @@ static VSC_ErrCode _LinkUbosBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pBase
         return VSC_ERR_NONE;
     }
 
-    vscBV_Initialize(&uboWorkingMask, pBaseLinkHelper->pMM, upperUBOCount);
+    errCode = vscBV_Initialize(&uboWorkingMask, pBaseLinkHelper->pMM, upperUBOCount);
+    ON_ERROR(errCode, "Failed to initialize BV");
 
     for (uboIdx = 0; uboIdx < lowerUBOCount; uboIdx++)
     {
@@ -2645,7 +2655,8 @@ static VSC_ErrCode _LinkIOBlockBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pB
         return VSC_ERR_NONE;
     }
 
-    vscBV_Initialize(&outputWorkingMask, pBaseLinkHelper->pMM, outputCount);
+    errCode = vscBV_Initialize(&outputWorkingMask, pBaseLinkHelper->pMM, outputCount);
+    ON_ERROR(errCode, "Failed to initialize BV");
 
     for (inputIdx = 0; inputIdx < inputCount; inputIdx ++)
     {
@@ -5258,15 +5269,17 @@ static VSC_ErrCode _CalcInputHwCompIndexPerExeObj(VSC_BASE_LINKER_HELPER* pBaseL
     /* HW reserve 8 packed components for TES's per-patch data for tess-factors and other specials */
     if (pShader->shaderKind == VIR_SHADER_TESSELLATION_EVALUATION && bPerPrim)
     {
-        vscBV_Initialize(&inputWorkingMask, pBaseLinkHelper->pMM,
+        errCode = vscBV_Initialize(&inputWorkingMask, pBaseLinkHelper->pMM,
                          pBaseLinkHelper->pHwCfg->maxTcsOutPatchVectors * CHANNEL_NUM + 8);
+        ON_ERROR(errCode, "Calc input hw-comp-index");
         hwChannelIdx = 2 * CHANNEL_NUM;
         vscBV_SetInRange(&inputWorkingMask, 0, (2 * CHANNEL_NUM));
     }
     else
     {
-        vscBV_Initialize(&inputWorkingMask, pBaseLinkHelper->pMM,
+        errCode = vscBV_Initialize(&inputWorkingMask, pBaseLinkHelper->pMM,
                          pBaseLinkHelper->pHwCfg->maxAttributeCount * CHANNEL_NUM);
+        ON_ERROR(errCode, "Calc input hw-comp-index");
     }
 
     /* Firstly for all inputs with 'location' */
@@ -5424,15 +5437,17 @@ static VSC_ErrCode _CalcOutputHwCompIndexPerExeObj(VSC_BASE_LINKER_HELPER* pBase
     /* HW reserve 8 packed components for TES's per-patch data for tess-factors and other specials */
     if (pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL && bPerPrim)
     {
-        vscBV_Initialize(&outputWorkingMask, pBaseLinkHelper->pMM,
+        errCode = vscBV_Initialize(&outputWorkingMask, pBaseLinkHelper->pMM,
                          pBaseLinkHelper->pHwCfg->maxTcsOutPatchVectors * CHANNEL_NUM + 8);
+        ON_ERROR(errCode, "Calc output hw-comp-index");
         hwChannelIdx = 2 * CHANNEL_NUM;
         vscBV_SetInRange(&outputWorkingMask, 0, (2 * CHANNEL_NUM));
     }
     else
     {
-        vscBV_Initialize(&outputWorkingMask, pBaseLinkHelper->pMM,
+        errCode = vscBV_Initialize(&outputWorkingMask, pBaseLinkHelper->pMM,
                          pBaseLinkHelper->pHwCfg->maxAttributeCount * CHANNEL_NUM);
+        ON_ERROR(errCode, "Calc output hw-comp-index");
     }
 
     /* Firstly for all outputs with 'location' */

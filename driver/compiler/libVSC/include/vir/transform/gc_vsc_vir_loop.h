@@ -321,9 +321,10 @@ VIR_LoopOpts_DeleteLoopInfoMgr(
     VIR_LoopOpts* loopOpts
     );
 
-gctBOOL
+VSC_ErrCode
 VIR_LoopOpts_DetectNaturalLoops(
-    VIR_LoopOpts* loopOpts
+    VIR_LoopOpts* loopOpts,
+    gctBOOL*      bLoopDetected
     );
 
 VSC_ErrCode

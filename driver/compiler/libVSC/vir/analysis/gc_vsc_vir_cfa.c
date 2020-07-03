@@ -128,13 +128,14 @@ static void _RemoveFuncBlockFromCallGraph(VIR_CALL_GRAPH* pCg, VIR_FUNC_BLOCK* p
     vscMM_Free(&pCg->pmp.mmWrapper, pFuncBlk);
 }
 
-static void _RemoveUnreachableFunctions(VIR_CALL_GRAPH* pCg)
+static VSC_ErrCode _RemoveUnreachableFunctions(VIR_CALL_GRAPH* pCg)
 {
     CG_ITERATOR             funcBlkIter;
     VIR_FUNC_BLOCK*         pFuncBlk;
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
 
     /* Firstly do traversal CG to find unreachable func-blocks which are not visisted ones */
-    vscDG_TraversalCB(&pCg->dgGraph,
+    errCode = vscDG_TraversalCB(&pCg->dgGraph,
                       VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                       gcvFALSE,
                       (PFN_DG_NODE_HANLDER)_RootFuncBlkHandlerDFSPost,
@@ -144,6 +145,7 @@ static void _RemoveUnreachableFunctions(VIR_CALL_GRAPH* pCg)
                       gcvNULL,
                       gcvNULL,
                       gcvNULL);
+    ON_ERROR0(errCode);
 
     CG_ITERATOR_INIT(&funcBlkIter, pCg);
     pFuncBlk = (VIR_FUNC_BLOCK *)CG_ITERATOR_FIRST(&funcBlkIter);
@@ -155,6 +157,9 @@ static void _RemoveUnreachableFunctions(VIR_CALL_GRAPH* pCg)
             _RemoveFuncBlockFromCallGraph(pCg, pFuncBlk, gcvTRUE);
         }
     }
+
+OnError:
+    return errCode;
 }
 
 /* Parameter passing into traversal callbacks of CG */
@@ -315,7 +320,8 @@ VSC_ErrCode vscVIR_BuildCallGraph(VSC_MM* pScratchMemPool, VIR_Shader* pShader, 
     }
 
     /* At this time, we have CG built, let's remove all unreachable functions from main routine */
-    _RemoveUnreachableFunctions(pCg);
+    errCode = _RemoveUnreachableFunctions(pCg);
+    CHECK_ERROR(errCode, "Build call graph");
 
     pMainFunc = (VIR_Function*)CG_GET_MAIN_FUNC(pCg);
     gcmASSERT(vscDG_GetRootCount(&pCg->dgGraph) == 1 && pShader->mainFunction == pMainFunc);
@@ -661,7 +667,7 @@ static VIR_CFG_EDGE* _AddEdgeForCFG(VIR_CONTROL_FLOW_GRAPH* pCfg, VIR_BASIC_BLOC
     return pEdge;
 }
 
-static void _AddEdgesForCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
+static VSC_ErrCode _AddEdgesForCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
 {
     CFG_ITERATOR            basicBlkIter;
     VIR_BASIC_BLOCK*        pEntryBlock = (VIR_BASIC_BLOCK*)DGNLST_GET_FIRST_NODE(&pCFG->dgGraph.nodeList);
@@ -669,6 +675,8 @@ static void _AddEdgesForCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
     VIR_BASIC_BLOCK*        pStartBlock = (VIR_BASIC_BLOCK*)DGND_GET_NEXT_NODE(&pExitBlock->dgNode);
     VIR_BASIC_BLOCK*        pThisBlock;
     VIR_BASIC_BLOCK*        pBranchTargetBB;
+    VSC_ErrCode             errCode  = VSC_ERR_NONE;
+    VIR_CFG_EDGE*           pEdge;
 
     CFG_ITERATOR_INIT(&basicBlkIter, pCFG);
     pThisBlock = (VIR_BASIC_BLOCK *)CFG_ITERATOR_FIRST(&basicBlkIter);
@@ -683,7 +691,12 @@ static void _AddEdgesForCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
         /* We must add an edge between entry block and first block of this function */
         if (pThisBlock == pStartBlock)
         {
-            _AddEdgeForCFG(pCFG, pEntryBlock, pThisBlock, VIR_CFG_EDGE_TYPE_ALWAYS);
+            pEdge = _AddEdgeForCFG(pCFG, pEntryBlock, pThisBlock, VIR_CFG_EDGE_TYPE_ALWAYS);
+            if (!pEdge)
+            {
+                errCode = VSC_ERR_INVALID_DATA;
+                ON_ERROR(errCode, "Fail to add edge for CFG.");
+            }
         }
 
         gcmASSERT(pThisBlock->pEndInst != gcvNULL);
@@ -697,36 +710,61 @@ static void _AddEdgesForCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
             if (VIR_OPCODE_isConditionBranch(VIR_Inst_GetOpcode(pThisBlock->pEndInst)))
             {
                 /* Add a TRUE edge to next */
-                _AddEdgeForCFG(pCFG, pThisBlock,
+                pEdge = _AddEdgeForCFG(pCFG, pThisBlock,
                                DGND_GET_NEXT_NODE(&pThisBlock->dgNode) ?
                                (VIR_BASIC_BLOCK*)DGND_GET_NEXT_NODE(&pThisBlock->dgNode) : pExitBlock,
                                VIR_CFG_EDGE_TYPE_TRUE);
+                if (!pEdge)
+                {
+                    errCode = VSC_ERR_INVALID_DATA;
+                    ON_ERROR(errCode, "Fail to add edge for CFG.");
+                }
 
                 /* Add a FALSE edge to its branch target */
-                _AddEdgeForCFG(pCFG, pThisBlock,
+                pEdge = _AddEdgeForCFG(pCFG, pThisBlock,
                                pBranchTargetBB,
                                VIR_CFG_EDGE_TYPE_FALSE);
+                if (!pEdge)
+                {
+                    errCode = VSC_ERR_INVALID_DATA;
+                    ON_ERROR(errCode, "Fail to add edge for CFG.");
+                }
             }
             /* Non-conditional branch case */
             else
             {
                 /* Just add ALWAYS edge to branch target */
-                _AddEdgeForCFG(pCFG, pThisBlock,
+                pEdge = _AddEdgeForCFG(pCFG, pThisBlock,
                                pBranchTargetBB,
                                VIR_CFG_EDGE_TYPE_ALWAYS);
+                if (!pEdge)
+                {
+                    errCode = VSC_ERR_INVALID_DATA;
+                    ON_ERROR(errCode, "Fail to add edge for CFG.");
+                }
             }
         }
         else if (VIR_Inst_GetOpcode(pThisBlock->pEndInst) == VIR_OP_RET)
         {
             /* Add a ALWAYS edge to exit block from RET basic block */
-            _AddEdgeForCFG(pCFG, pThisBlock, pExitBlock, VIR_CFG_EDGE_TYPE_ALWAYS);
+            pEdge = _AddEdgeForCFG(pCFG, pThisBlock, pExitBlock, VIR_CFG_EDGE_TYPE_ALWAYS);
+            if (!pEdge)
+            {
+                errCode = VSC_ERR_INVALID_DATA;
+                ON_ERROR(errCode, "Fail to add edge for CFG.");
+            }
         }
         else if (DGND_GET_NEXT_NODE(&pThisBlock->dgNode))
         {
             /* Add a ALWAYS edge to next */
-            _AddEdgeForCFG(pCFG, pThisBlock,
+            pEdge = _AddEdgeForCFG(pCFG, pThisBlock,
                            (VIR_BASIC_BLOCK*)DGND_GET_NEXT_NODE(&pThisBlock->dgNode),
                            VIR_CFG_EDGE_TYPE_ALWAYS);
+            if (!pEdge)
+            {
+                errCode = VSC_ERR_INVALID_DATA;
+                ON_ERROR(errCode, "Fail to add edge for CFG.");
+            }
         }
     }
 
@@ -743,12 +781,19 @@ static void _AddEdgesForCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
 
         if (DGND_GET_OUT_DEGREE(&pThisBlock->dgNode) == 0)
         {
-            _AddEdgeForCFG(pCFG, pThisBlock,
+            pEdge = _AddEdgeForCFG(pCFG, pThisBlock,
                            pExitBlock,
                            VIR_CFG_EDGE_TYPE_ALWAYS);
+            if (!pEdge)
+            {
+                errCode = VSC_ERR_INVALID_DATA;
+                ON_ERROR(errCode, "Fail to add edge for CFG.");
+            }
             break;
         }
     }
+OnError:
+    return errCode;
 }
 
 /* Callback for unreachability of basic block */
@@ -894,15 +939,17 @@ static void _RemoveBasicBlockFromCFG(
     vscMM_Free(&pCFG->pmp.mmWrapper, pBasicBlk);
 }
 
-static gctBOOL _RemoveUnreachableBasicBlocks(VIR_CONTROL_FLOW_GRAPH* pCFG)
+static VSC_ErrCode _RemoveUnreachableBasicBlocks(VIR_CONTROL_FLOW_GRAPH* pCFG, gctBOOL *bRemoved)
 {
     VIR_Shader*             pShader = VIR_Function_GetShader(pCFG->pOwnerFuncBlk->pVIRFunc);
     CFG_ITERATOR            basicBlkIter;
     VIR_BASIC_BLOCK*        pThisBlock;
-    gctBOOL                 bRemoved = gcvFALSE;
+    VSC_ErrCode             errCode  = VSC_ERR_NONE;
+
+    *bRemoved = gcvFALSE;
 
     /* I: do the post-order CFG from the head node: for those not-visisted nodes, they are unreachable. */
-    vscDG_TraversalCB(&pCFG->dgGraph,
+    errCode = vscDG_TraversalCB(&pCFG->dgGraph,
                       VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                       gcvFALSE,
                       (PFN_DG_NODE_HANLDER)_RootBasicBlkHandlerDFSPostFromHead,
@@ -912,6 +959,7 @@ static gctBOOL _RemoveUnreachableBasicBlocks(VIR_CONTROL_FLOW_GRAPH* pCFG)
                       gcvNULL,
                       gcvNULL,
                       gcvNULL);
+    CHECK_ERROR0(errCode);
 
     CFG_ITERATOR_INIT(&basicBlkIter, pCFG);
     pThisBlock = (VIR_BASIC_BLOCK *)CFG_ITERATOR_FIRST(&basicBlkIter);
@@ -922,7 +970,7 @@ static gctBOOL _RemoveUnreachableBasicBlocks(VIR_CONTROL_FLOW_GRAPH* pCFG)
         {
             _RemoveBasicBlockFromCFG(pCFG, pThisBlock, gcvTRUE);
 
-            bRemoved = gcvTRUE;
+            *bRemoved = gcvTRUE;
         }
     }
 
@@ -933,10 +981,10 @@ static gctBOOL _RemoveUnreachableBasicBlocks(VIR_CONTROL_FLOW_GRAPH* pCFG)
     /* So far we only enable this optimization for spir-v case only. */
     if (!VIR_Shader_IsVulkan(pShader))
     {
-        return bRemoved;
+        return errCode;
     }
 
-    vscDG_TraversalCB(&pCFG->dgGraph,
+    errCode = vscDG_TraversalCB(&pCFG->dgGraph,
                       VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                       gcvTRUE,
                       (PFN_DG_NODE_HANLDER)_RootBasicBlkHandlerDFSPostFromTail,
@@ -946,6 +994,7 @@ static gctBOOL _RemoveUnreachableBasicBlocks(VIR_CONTROL_FLOW_GRAPH* pCFG)
                       gcvNULL,
                       gcvNULL,
                       gcvNULL);
+    CHECK_ERROR0(errCode);
 
     CFG_ITERATOR_INIT(&basicBlkIter, pCFG);
     pThisBlock = (VIR_BASIC_BLOCK *)CFG_ITERATOR_FIRST(&basicBlkIter);
@@ -956,17 +1005,18 @@ static gctBOOL _RemoveUnreachableBasicBlocks(VIR_CONTROL_FLOW_GRAPH* pCFG)
         {
             _RemoveBasicBlockFromCFG(pCFG, pThisBlock, gcvTRUE);
 
-            bRemoved = gcvTRUE;
+            *bRemoved = gcvTRUE;
         }
     }
 
-    return bRemoved;
+    return errCode;
 }
 
 VSC_ErrCode vscVIR_BuildCFGPerFunc(VSC_MM* pScratchMemPool, VIR_Function* pFunc)
 {
     VSC_ErrCode             errCode  = VSC_ERR_NONE;
     VIR_CONTROL_FLOW_GRAPH* pCFG;
+    gctBOOL                 bRemoved = gcvFALSE;
 
     /* If no CG built, just return */
     if (pFunc->pFuncBlock == gcvNULL)
@@ -985,10 +1035,12 @@ VSC_ErrCode vscVIR_BuildCFGPerFunc(VSC_MM* pScratchMemPool, VIR_Function* pFunc)
     CHECK_ERROR(errCode, "Build CFG per function");
 
     /* Go through all basic blocks in CFG to build topology by branch info */
-    _AddEdgesForCFG(pCFG);
+    errCode = _AddEdgesForCFG(pCFG);
+    CHECK_ERROR(errCode, "Build CFG per function");
 
     /* Remove all unreachable basic blocks */
-    _RemoveUnreachableBasicBlocks(pCFG);
+    errCode = _RemoveUnreachableBasicBlocks(pCFG, &bRemoved);
+    CHECK_ERROR(errCode, "Build CFG per function");
 
     /* A cfg must have only one entry block and exit block */
     gcmASSERT(vscDG_GetRootCount(&pCFG->dgGraph) == 1 && vscDG_GetTailCount(&pCFG->dgGraph) == 1);

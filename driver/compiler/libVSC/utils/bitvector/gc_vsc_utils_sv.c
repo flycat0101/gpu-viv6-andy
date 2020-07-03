@@ -16,6 +16,7 @@
 VSC_ErrCode vscSV_Initialize(VSC_STATE_VECTOR* pSV, VSC_MM* pMM, gctINT svSize, gctUINT stateCount)
 {
     gctINT bvIdx;
+    VSC_ErrCode errCode = VSC_ERR_NONE;
 
     if (pMM == gcvNULL && svSize <= 0)
     {
@@ -56,7 +57,9 @@ VSC_ErrCode vscSV_Initialize(VSC_STATE_VECTOR* pSV, VSC_MM* pMM, gctINT svSize, 
 
         for (bvIdx = 0; bvIdx < pSV->bvCount; bvIdx ++)
         {
-            vscBV_Initialize(&pSV->pBVs[bvIdx], pMM, svSize);
+            errCode = vscBV_Initialize(&pSV->pBVs[bvIdx], pMM, svSize);
+            if(errCode != VSC_ERR_NONE)
+                return errCode;
         }
     }
     return VSC_ERR_NONE;

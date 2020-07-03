@@ -2826,9 +2826,10 @@ static void _EdgeHandlerDFSOnRevisit(VIR_CONTROL_FLOW_GRAPH* pCFG, VIR_CFG_EDGE*
     }
 }
 
-gctBOOL
+VSC_ErrCode
 VIR_LoopOpts_DetectNaturalLoops(
-    VIR_LoopOpts* loopOpts
+    VIR_LoopOpts* loopOpts,
+    gctBOOL*      bLoopDetected
     )
 {
     VIR_Function*                func = VIR_LoopOpts_GetFunc(loopOpts);
@@ -2841,7 +2842,9 @@ VIR_LoopOpts_DetectNaturalLoops(
     VSC_ADJACENT_LIST_ITERATOR   succEdgeIter;
     VIR_CFG_EDGE*                pSuccEdge;
     VSC_CFG_DFS_VISIT_ORDER      visitOrder = {0};
-    gctBOOL                      bLoopDetected = gcvFALSE;
+    VSC_ErrCode                  errCode  = VSC_ERR_NONE;
+
+    *bLoopDetected = gcvFALSE;
 
     /* We use the instruction ID to do some rough analyses, so we need to re-number the instruction ID here.*/
     VIR_Shader_RenumberInstId(VIR_LoopOpts_GetShader(loopOpts));
@@ -2850,7 +2853,7 @@ VIR_LoopOpts_DetectNaturalLoops(
     vscVIR_BuildDOMTreePerCFG(cfg);
 
     /* Use DFS to build spanning tree, so we can get dfs edge type */
-    vscDG_TraversalCB(&cfg->dgGraph,
+    errCode = vscDG_TraversalCB(&cfg->dgGraph,
                       VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                       gcvFALSE,
                       gcvNULL,
@@ -2860,6 +2863,7 @@ VIR_LoopOpts_DetectNaturalLoops(
                       gcvNULL,
                       (PFN_DG_EDGE_HANLDER)_EdgeHandlerDFSOnRevisit,
                       &visitOrder);
+    ON_ERROR0(errCode);
 
     /* Check back-edge t->h, t is the loop tail and h is the loop head */
     CFG_ITERATOR_INIT(&basicBlkIter, cfg);
@@ -2886,7 +2890,7 @@ VIR_LoopOpts_DetectNaturalLoops(
             pTailBlock = pThisBlock;
             VIR_LoopInfoMgr_NewLoopInfo(loopInfoMgr, pHeadBlock, pTailBlock, gcvNULL);
 
-            bLoopDetected = gcvTRUE;
+            *bLoopDetected = gcvTRUE;
         }
     }
 
@@ -2901,7 +2905,9 @@ VIR_LoopOpts_DetectNaturalLoops(
         VIR_LOG(VIR_LoopOpts_GetDumper(loopOpts), "after natual loop detection:\n");
         VIR_LoopInfoMgr_Dump(loopInfoMgr, gcvFALSE);
     }
-    return bLoopDetected;
+
+OnError:
+    return errCode;
 }
 
 gctBOOL
@@ -5715,6 +5721,7 @@ VIR_LoopOpts_PerformOnFunction(
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VIR_Function* func = VIR_LoopOpts_GetFunc(loopOpts);
     VSC_OPTN_LoopOptsOptions* options = VIR_LoopOpts_GetOptions(loopOpts);
+    gctBOOL bDetectLoop;
 
     if(VSC_OPTN_LoopOptsOptions_GetOpts(options) == VSC_OPTN_LoopOptsOptions_OPTS_NONE)
     {
@@ -5734,7 +5741,9 @@ VIR_LoopOpts_PerformOnFunction(
         errCode = VSC_ERR_OUT_OF_MEMORY;
         ON_ERROR(errCode, "Fail to allocate NewLoopInfoMgr.");
     }
-    if(VIR_LoopOpts_DetectNaturalLoops(loopOpts))
+    errCode = VIR_LoopOpts_DetectNaturalLoops(loopOpts, &bDetectLoop);
+    ON_ERROR(errCode, "Fail to detect natural loops.");
+    if (bDetectLoop)
     {
         /* Compute the loop body and some other information, we need to call these after add a new loopInfo. */
         errCode = VIR_LoopOpts_ComputeLoopBodies(loopOpts);
