@@ -7126,6 +7126,7 @@ static VSC_ErrCode _ProgramHwShadersStates(VSC_SYS_CONTEXT*                pSysC
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     VSC_CHIP_STATES_PROGRAMMER chipStatesPgmer;
     gctUINT                    stageIdx;
+    SHADER_HW_INFO*            pLowerShHwInfo = gcvNULL;
 
     gcmASSERT(pOutHwShdsStates);
 
@@ -7143,7 +7144,18 @@ static VSC_ErrCode _ProgramHwShadersStates(VSC_SYS_CONTEXT*                pSysC
     {
         if (pHwShsLinkInfo->shHwInfoArray[stageIdx].pSEP)
         {
-            errCode = vscProgramShaderStates(&pHwShsLinkInfo->shHwInfoArray[stageIdx], &chipStatesPgmer);
+            if ((stageIdx + 1) < VSC_MAX_HW_PIPELINE_SHADER_STAGE_COUNT
+                &&
+                pHwShsLinkInfo->shHwInfoArray[stageIdx + 1].pSEP)
+            {
+                pLowerShHwInfo = &pHwShsLinkInfo->shHwInfoArray[stageIdx + 1];
+            }
+            else
+            {
+                pLowerShHwInfo = gcvNULL;
+            }
+
+            errCode = vscProgramShaderStates(&pHwShsLinkInfo->shHwInfoArray[stageIdx], pLowerShHwInfo, &chipStatesPgmer);
             ON_ERROR(errCode, "Shader states programming");
         }
     }
@@ -9558,6 +9570,34 @@ static gctUINT _GetInputVerticesCountPerHwTGForGs(SHADER_EXECUTABLE_PROFILE* pGs
             pGsSEP->exeHints.nativeHints.prvStates.gs.inputVtxCount);
 }
 
+static gctBOOL _SetMaxPatchesForDs(SHADER_EXECUTABLE_PROFILE* pDsSEP, SHADER_HW_INFO* pDsHwInfo)
+{
+    gctUINT                             sizePerPrimitive = 1;
+
+    switch (pDsSEP->exeHints.nativeHints.prvStates.ts.tessDomainType)
+    {
+    case SHADER_TESSELLATOR_DOMAIN_ISOLINE:
+        sizePerPrimitive = 1;
+        break;
+
+    case SHADER_TESSELLATOR_DOMAIN_TRIANGLE:
+        sizePerPrimitive = 3;
+        break;
+
+    case SHADER_TESSELLATOR_DOMAIN_QUAD:
+        sizePerPrimitive = 4;
+        break;
+
+    default:
+        gcmASSERT(gcvFALSE);
+        break;
+    }
+
+    pDsHwInfo->hwProgrammingHints.tsMaxPatches = pDsHwInfo->hwProgrammingHints.maxThreadsPerHwTG / sizePerPrimitive;
+
+    return gcvTRUE;
+}
+
 static gctBOOL _NeedAnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM*  pHwPipelineShsParam,
                                                  VSC_HW_SHADERS_LINK_INFO*       pOutHwShdsLinkInfo,
                                                  gctUINT                         maxHwTGThreadCount,
@@ -9658,6 +9698,11 @@ static gctBOOL _NeedAnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
                     (SHADER_TYPE)DECODE_SHADER_TYPE(pSEP->shVersionType) != SHADER_TYPE_GENERAL)
                 {
                     pOutHwShdsLinkInfo->shHwInfoArray[stageIdx].hwProgrammingHints.maxThreadsPerHwTG = maxHwTGThreadCount;
+
+                    if ((SHADER_TYPE)DECODE_SHADER_TYPE(pSEP->shVersionType) == SHADER_TYPE_DOMAIN)
+                    {
+                        _SetMaxPatchesForDs(pSEP, &pOutHwShdsLinkInfo->shHwInfoArray[stageIdx]);
+                    }
                 }
             }
         }
@@ -10069,7 +10114,11 @@ static VSC_ErrCode _AnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
                     pOutHwShdsLinkInfo->shHwInfoArray[stageIdx].hwProgrammingHints.maxThreadsPerHwTG =
                                                                                 expectedMaxThreadsPerHwTG[stageIdx];
 
-                    if (stageIdx == VSC_GFX_SHADER_STAGE_GS)
+                    if (stageIdx == VSC_GFX_SHADER_STAGE_DS)
+                    {
+                        _SetMaxPatchesForDs(pOutHwShdsLinkInfo->shHwInfoArray[stageIdx].pSEP, &pOutHwShdsLinkInfo->shHwInfoArray[stageIdx]);
+                    }
+                    else if (stageIdx == VSC_GFX_SHADER_STAGE_GS)
                     {
                         pOutHwShdsLinkInfo->shHwInfoArray[stageIdx].hwProgrammingHints.gsMetaDataSizePerHwTGInBtye =
                                                                                 expectedGsMetaDataSizePerHwTG;

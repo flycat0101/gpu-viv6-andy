@@ -2377,7 +2377,7 @@ extern gctUINT _GetHsValidMaxPatchesPerHwTG(SHADER_EXECUTABLE_PROFILE* pHsSEP,
     return (maxPatchesPerHwTG == 0) ? 1 : maxPatchesPerHwTG;
 }
 
-static VSC_ErrCode _ProgramHS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
+static VSC_ErrCode _ProgramHS(SHADER_HW_INFO* pShHwInfo, SHADER_HW_INFO* pLowerShHwInfo, VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     SHADER_EXECUTABLE_PROFILE* pHsSEP = pShHwInfo->pSEP;
@@ -2389,6 +2389,7 @@ static VSC_ErrCode _ProgramHS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     gctUINT                    remapMode, maxPatchesPerHwTG, totalOutputCountPerhwTG;
     gctINT                     maxPerPatchOutputLinkNo = -1;
     gctUINT                    minUscSize, maxUscSize, extraUscSize;
+    gctUINT                    patchSize;
 
     gcmASSERT(pHsSEP->inputMapping.ioVtxPxl.ioMode == SHADER_IO_MODE_ACTIVE ||
               pHsSEP->inputMapping.ioVtxPxl.countOfIoRegMapping == 0);
@@ -2496,7 +2497,8 @@ static VSC_ErrCode _ProgramHS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
                                                      (remapMode == 0x0),
                                                      pShHwInfo->hwProgrammingHints.maxParallelFactor);
     totalCPOutputCount = hsPerCPOutputCount * pHsSEP->exeHints.nativeHints.prvStates.ts.outputCtrlPointCount;
-    totalOutputCountPerhwTG = (totalCPOutputCount + hsPerPatchOutputCount) * maxPatchesPerHwTG;
+    patchSize = totalCPOutputCount + hsPerPatchOutputCount;
+    totalOutputCountPerhwTG = patchSize * maxPatchesPerHwTG;
 
     /* Program TPG control */
     if (DECODE_SHADER_CLIENT(pHsSEP->shVersionType) == SHADER_CLIENT_DX)
@@ -2628,10 +2630,12 @@ static VSC_ErrCode _ProgramHS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
  ~0U : (~(~0U << ((1 ?
  30:20) - (0 ?
  30:20) + 1))))))) << (0 ?
- 30:20))) | (((gctUINT32) ((gctUINT32) (totalCPOutputCount + hsPerPatchOutputCount) & ((gctUINT32) ((((1 ?
+ 30:20))) | (((gctUINT32) ((gctUINT32) (patchSize) & ((gctUINT32) ((((1 ?
  30:20) - (0 ?
  30:20) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 30:20) - (0 ? 30:20) + 1))))))) << (0 ? 30:20))) |
+ ~0U : (~(~0U << ((1 ?
+ 30:20) - (0 ?
+ 30:20) + 1))))))) << (0 ? 30:20)))                                  |
              ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:31) - (0 ?
  31:31) + 1) == 32) ?
@@ -2689,6 +2693,38 @@ static VSC_ErrCode _ProgramHS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
  19:12) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 19:12) - (0 ? 19:12) + 1))))))) << (0 ? 19:12)));
     VSC_LOAD_HW_STATE(0x5286, state);
+
+    /* To make sure that the value of 5:0 is valid, we may need to modify the maxPatches of DS. */
+    if (pLowerShHwInfo != gcvNULL)
+    {
+        /* Use the same policy as cmodel does. */
+        gctUINT         dsMaxPatches = pLowerShHwInfo->hwProgrammingHints.tsMaxPatches;
+        gctUINT         maxPatches = maxPatchesPerHwTG + dsMaxPatches - 1;
+        gctUINT         expectedTotalSize = maxPatches * (patchSize << 4);
+        gctUINT         expectedPages = VSC_UTILS_ALIGN(expectedTotalSize, 1024);
+
+        expectedPages = (expectedPages >> 10) + 1;
+
+        while (maxUscSize < expectedPages && dsMaxPatches != 0)
+        {
+            dsMaxPatches--;
+
+            maxPatches = maxPatchesPerHwTG + dsMaxPatches;
+            expectedTotalSize = maxPatches * (patchSize << 4);
+            expectedPages = VSC_UTILS_ALIGN(expectedTotalSize, 1024);
+
+            expectedPages = (expectedPages >> 10) + 1;
+        }
+
+        if (dsMaxPatches == 0)
+        {
+            /* Something is wrong here. */
+            gcmASSERT(gcvFALSE);
+            dsMaxPatches = 1;
+        }
+
+        pLowerShHwInfo->hwProgrammingHints.tsMaxPatches = dsMaxPatches;
+    }
 
     /* Program sampler-related. */
     if (pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasSamplerBaseOffset)
@@ -3199,7 +3235,7 @@ static VSC_ErrCode _ProgramDS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
  ~0U : (~(~0U << ((1 ?
  7:0) - (0 ?
  7:0) + 1))))))) << (0 ?
- 7:0))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 7:0))) | (((gctUINT32) ((gctUINT32) (pShHwInfo->hwProgrammingHints.tsMaxPatches) & ((gctUINT32) ((((1 ?
  7:0) - (0 ?
  7:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 7:0) - (0 ? 7:0) + 1))))))) << (0 ? 7:0)));
@@ -7954,7 +7990,7 @@ OnError:
     return errCode;
 }
 
-VSC_ErrCode vscProgramShaderStates(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
+VSC_ErrCode vscProgramShaderStates(SHADER_HW_INFO* pShHwInfo, SHADER_HW_INFO* pLowerShHwInfo, VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
 {
     VSC_ErrCode   errCode = VSC_ERR_NONE;
     SHADER_TYPE   shType = (SHADER_TYPE)DECODE_SHADER_TYPE(pShHwInfo->pSEP->shVersionType);
@@ -7974,7 +8010,7 @@ VSC_ErrCode vscProgramShaderStates(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PR
     case SHADER_TYPE_HULL:
         gcsHINT_SetProgramStageBit(pStatesPgmer->pHints, gcvPROGRAM_STAGE_TCS);
 
-        errCode = _ProgramHS(pShHwInfo, pStatesPgmer);
+        errCode = _ProgramHS(pShHwInfo, pLowerShHwInfo, pStatesPgmer);
         ON_ERROR(errCode, "Program HS states");
         break;
 

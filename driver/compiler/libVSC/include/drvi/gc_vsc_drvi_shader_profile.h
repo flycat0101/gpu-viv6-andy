@@ -1472,6 +1472,7 @@ typedef enum HW_SAMPLER_FETCH_MODE
 
 typedef struct SHADER_HW_PROGRAMMING_HINTS
 {
+    /* Word 1*/
     /* Inst fetch mode */
     gctUINT                                     hwInstFetchMode               : 2;
 
@@ -1493,6 +1494,7 @@ typedef struct SHADER_HW_PROGRAMMING_HINTS
        HW_SAMPLER_FETCH_MODE_UNIFIED_REG_FILE, for other cases, it must be set to 0 */
     gctUINT                                     hwSamplerRegAddrOffset        : 7;
 
+    /* Word 2*/
     /* Result-cache is used to queue missed data streamming from up-stage and release them
        after they are used. This window-size is the size of queue. Note that this result-$
        occupies some space of USC storage (uscSizeInKbyte). The ocuppied space is calc'ed
@@ -1507,6 +1509,7 @@ typedef struct SHADER_HW_PROGRAMMING_HINTS
        maxHwTGThreadCount, i.e, (maxCoreCount * 4) */
     gctUINT                                     maxThreadsPerHwTG             : 7;
 
+    /* Word 3*/
     /* USC is shared by all shader stages, so we need allocate proper size for each stage
        to get best perf of pipeline. The relation between these two members are
        1. minUscSizeInKbyte can not be greater than maxUscSizeInKbyte.
@@ -1520,6 +1523,13 @@ typedef struct SHADER_HW_PROGRAMMING_HINTS
 
     /* Iteration factor to time 'min parallel shader stage combination' when analyzing USC */
     gctUINT                                     maxParallelFactor             : 16;
+
+    /* Word 4*/
+    /* Max patches number. */
+    gctUINT                                     tsMaxPatches                  : 6;
+
+    /* Reserved bits */
+    gctUINT                                     reserved                      : 26;
 }SHADER_HW_PROGRAMMING_HINTS;
 
 typedef struct SHADER_HW_INFO

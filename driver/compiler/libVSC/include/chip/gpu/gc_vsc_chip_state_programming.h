@@ -51,7 +51,7 @@ VSC_ErrCode vscInitializeChipStatesProgrammer(VSC_CHIP_STATES_PROGRAMMER* pState
                                               struct _gcsHINT* pHints);
 VSC_ErrCode vscFinalizeChipStatesProgrammer(VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer);
 
-VSC_ErrCode vscProgramShaderStates(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer);
+VSC_ErrCode vscProgramShaderStates(SHADER_HW_INFO* pShHwInfo, SHADER_HW_INFO* pLowerShHwInfo, VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer);
 
 VSC_ErrCode vscVerifyShaderStates(VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer);
 
