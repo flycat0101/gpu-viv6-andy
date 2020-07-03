@@ -1436,6 +1436,7 @@ static gctINT _GetSamplerType(gceTEXTURE_TYPE textureType, gctBOOL *isArray)
 {
     gctINT type;
     gctBOOL isTexArray = gcvFALSE;
+    gceAPI currentApi;
 
     switch (textureType)
     {
@@ -1464,7 +1465,8 @@ static gctINT _GetSamplerType(gceTEXTURE_TYPE textureType, gctBOOL *isArray)
         break;
 
     case gcvTEXTURE_1D:
-        type = 0x1;
+        gcoHARDWARE_GetAPI(gcvNULL, &currentApi, gcvNULL);
+        type = (currentApi != gcvAPI_OPENGL) ? 0x1 : 0x2;
         break;
 
     case gcvTEXTURE_1D_ARRAY:
