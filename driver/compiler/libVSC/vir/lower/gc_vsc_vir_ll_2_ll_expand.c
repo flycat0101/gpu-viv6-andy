@@ -10510,7 +10510,7 @@ _setColumn1PackedSwizzle(
         vConst.type = VIR_TYPE_UINT_X2;
         vConst.index = VIR_INVALID_ID;
 
-        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, &pImmUniform, &swizzle);
+        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, gcvTRUE, &pImmUniform, &swizzle);
 
         /* Set this uniform as operand and set correct swizzle */
         sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -10638,7 +10638,7 @@ _setColumn2PackedSwizzle(
         vConst.type = VIR_TYPE_UINT_X2;
         vConst.index = VIR_INVALID_ID;
 
-        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, &pImmUniform, &swizzle);
+        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, gcvTRUE, &pImmUniform, &swizzle);
 
         /* Set this uniform as operand and set correct swizzle */
         sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -10764,7 +10764,7 @@ _setColumn3PackedSwizzle(
         vConst.type = VIR_TYPE_UINT_X2;
         vConst.index = VIR_INVALID_ID;
 
-        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, &pImmUniform, &swizzle);
+        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, gcvTRUE, &pImmUniform, &swizzle);
 
         /* Set this uniform as operand and set correct swizzle */
         sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -10950,7 +10950,7 @@ _setUnPackedSwizzle(
         vConst.type = VIR_TYPE_UINT_X2;
         vConst.index = VIR_INVALID_ID;
 
-        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, &pImmUniform, &swizzle);
+        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, gcvTRUE, &pImmUniform, &swizzle);
 
         /* Set this uniform as operand and set correct swizzle */
         sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -11194,7 +11194,7 @@ _setRowOrder0UnPackedSwizzle(
         vConst.type = VIR_TYPE_UINT_X2;
         vConst.index = VIR_INVALID_ID;
 
-        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, &pImmUniform, &swizzle);
+        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, gcvTRUE, &pImmUniform, &swizzle);
 
         /* Set this uniform as operand and set correct swizzle */
         sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -11287,7 +11287,7 @@ _setRowOrder1UnPackedSwizzle(
         vConst.type = VIR_TYPE_UINT_X2;
         vConst.index = VIR_INVALID_ID;
 
-        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, &pImmUniform, &swizzle);
+        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, gcvTRUE, &pImmUniform, &swizzle);
 
         /* Set this uniform as operand and set correct swizzle */
         sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -11464,7 +11464,7 @@ _setColumn1UnPackedSwizzle(
         vConst.type = VIR_TYPE_UINT_X2;
         vConst.index = VIR_INVALID_ID;
 
-        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, &pImmUniform, &swizzle);
+        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, gcvTRUE, &pImmUniform, &swizzle);
 
         /* Set this uniform as operand and set correct swizzle */
         sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -11542,7 +11542,7 @@ _setColumn2UnPackedSwizzle(
         vConst.type = VIR_TYPE_UINT_X2;
         vConst.index = VIR_INVALID_ID;
 
-        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, &pImmUniform, &swizzle);
+        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, gcvTRUE, &pImmUniform, &swizzle);
 
         /* Set this uniform as operand and set correct swizzle */
         sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -11619,7 +11619,7 @@ _setColumn3UnPackedSwizzle(
         vConst.type = VIR_TYPE_UINT_X2;
         vConst.index = VIR_INVALID_ID;
 
-        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, &pImmUniform, &swizzle);
+        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, gcvTRUE, &pImmUniform, &swizzle);
 
         /* Set this uniform as operand and set correct swizzle */
         sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -12071,7 +12071,7 @@ _setConvPackedSwizzle(
         vConst.type = VIR_TYPE_UINT_X2;
         vConst.index = VIR_INVALID_ID;
 
-        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, &pImmUniform, &swizzle);
+        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, gcvTRUE, &pImmUniform, &swizzle);
 
         /* Set this uniform as operand and set correct swizzle */
         sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -14225,7 +14225,7 @@ _setChar3UnpackSwizzle(
     virConst.index = VIR_INVALID_ID;
     memcpy(virConst.value.vecVal.i8Value, byteSwzl, sizeof(byteSwzl));
 
-    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, &pImmUniform, &swizzle);
+    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
 
     /* Set this uniform as operand and set correct swizzle */
     sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -15445,7 +15445,7 @@ _setScharrXUniform1To4(
     virConst.index = VIR_INVALID_ID;
     memcpy(virConst.value.vecVal.u32Value, byteSwzl, sizeof(byteSwzl));
 
-    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, &pImmUniform, &swizzle);
+    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
 
     /* Set this uniform as operand and set correct swizzle */
     sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -15476,7 +15476,7 @@ _setScharrXUniform5To8(
     virConst.index = VIR_INVALID_ID;
     memcpy(virConst.value.vecVal.u32Value, byteSwzl, sizeof(byteSwzl));
 
-    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, &pImmUniform, &swizzle);
+    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
 
     /* Set this uniform as operand and set correct swizzle */
     sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -15507,7 +15507,7 @@ _setScharrXUniform9To12(
     virConst.index = VIR_INVALID_ID;
     memcpy(virConst.value.vecVal.u32Value, byteSwzl, sizeof(byteSwzl));
 
-    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, &pImmUniform, &swizzle);
+    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
 
     /* Set this uniform as operand and set correct swizzle */
     sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -15538,7 +15538,7 @@ _setScharrYUniform1To4(
     virConst.index = VIR_INVALID_ID;
     memcpy(virConst.value.vecVal.u32Value, byteSwzl, sizeof(byteSwzl));
 
-    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, &pImmUniform, &swizzle);
+    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
 
     /* Set this uniform as operand and set correct swizzle */
     sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -15569,7 +15569,7 @@ _setScharrYUniform5To8(
     virConst.index = VIR_INVALID_ID;
     memcpy(virConst.value.vecVal.u32Value, byteSwzl, sizeof(byteSwzl));
 
-    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, &pImmUniform, &swizzle);
+    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
 
     /* Set this uniform as operand and set correct swizzle */
     sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -15600,7 +15600,7 @@ _setScharrYUniform9To12(
     virConst.index = VIR_INVALID_ID;
     memcpy(virConst.value.vecVal.u32Value, byteSwzl, sizeof(byteSwzl));
 
-    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, &pImmUniform, &swizzle);
+    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
 
     /* Set this uniform as operand and set correct swizzle */
     sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -15631,7 +15631,7 @@ _setBoxUniform1To4(
     virConst.index = VIR_INVALID_ID;
     memcpy(virConst.value.vecVal.u32Value, byteSwzl, sizeof(byteSwzl));
 
-    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, &pImmUniform, &swizzle);
+    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
 
     /* Set this uniform as operand and set correct swizzle */
     sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -15662,7 +15662,7 @@ _setBoxUniform5To8(
     virConst.index = VIR_INVALID_ID;
     memcpy(virConst.value.vecVal.u32Value, byteSwzl, sizeof(byteSwzl));
 
-    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, &pImmUniform, &swizzle);
+    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
 
     /* Set this uniform as operand and set correct swizzle */
     sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -15693,7 +15693,7 @@ _setBoxUniform9To12(
     virConst.index = VIR_INVALID_ID;
     memcpy(virConst.value.vecVal.u32Value, byteSwzl, sizeof(byteSwzl));
 
-    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, &pImmUniform, &swizzle);
+    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
 
     /* Set this uniform as operand and set correct swizzle */
     sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -15721,7 +15721,7 @@ _setBoxUniform13(
     virConst.index = VIR_INVALID_ID;
     memcpy(virConst.value.vecVal.u32Value, byteSwzl, sizeof(byteSwzl));
 
-    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, &pImmUniform, &swizzle);
+    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
 
     /* Set this uniform as operand and set correct swizzle */
     sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -16034,7 +16034,7 @@ _setBiUniform(
     virConst.index = VIR_INVALID_ID;
     memcpy(virConst.value.vecVal.u32Value, byteSwzl, sizeof(byteSwzl));
 
-    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, &pImmUniform, &swizzle);
+    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
 
     /* Set this uniform as operand and set correct swizzle */
     sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -16155,7 +16155,7 @@ _setIAddUniform1(
     virConst.index = VIR_INVALID_ID;
     memcpy(virConst.value.vecVal.u32Value, byteSwzl, sizeof(byteSwzl));
 
-    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, &pImmUniform, &swizzle);
+    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
 
     /* Set this uniform as operand and set correct swizzle */
     sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -16186,7 +16186,7 @@ _setIAddUniform2(
     virConst.index = VIR_INVALID_ID;
     memcpy(virConst.value.vecVal.u32Value, byteSwzl, sizeof(byteSwzl));
 
-    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, &pImmUniform, &swizzle);
+    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
 
     /* Set this uniform as operand and set correct swizzle */
     sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -16514,7 +16514,7 @@ _setINT16Uniform(
     virConst.index = VIR_INVALID_ID;
     memcpy(virConst.value.vecVal.u32Value, byteSwzl, sizeof(byteSwzl));
 
-    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, &pImmUniform, &swizzle);
+    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
 
     /* Set this uniform as operand and set correct swizzle */
     sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -16543,7 +16543,7 @@ _setINT8Uniform(
     virConst.index = VIR_INVALID_ID;
     memcpy(virConst.value.vecVal.u32Value, byteSwzl, sizeof(byteSwzl));
 
-    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, &pImmUniform, &swizzle);
+    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
 
     /* Set this uniform as operand and set correct swizzle */
     sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -16832,7 +16832,7 @@ _setBitRplConst1(
     virConst.index = VIR_INVALID_ID;
     memcpy(virConst.value.vecVal.u32Value, byteSwzl, sizeof(byteSwzl));
 
-    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, &pImmUniform, &swizzle);
+    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
 
     /* Set this uniform as operand and set correct swizzle */
     sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -16886,7 +16886,7 @@ _setSwizzleCommon(
         vConst.value.vecVal.u32Value[0] = 0x76543210;
         vConst.value.vecVal.u32Value[1] = 0xFEDCBA98;
 
-        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, &pImmUniform, &swizzle);
+        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, gcvTRUE, &pImmUniform, &swizzle);
 
         /* Set this uniform as operand and set correct swizzle */
         sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -17094,7 +17094,7 @@ _setSobelXUniform8X2(
     virConst.index = VIR_INVALID_ID;
     memcpy(virConst.value.vecVal.u32Value, byteSwzl, sizeof(byteSwzl));
 
-    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, &pImmUniform, &swizzle);
+    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
 
     /* Set this uniform as operand and set correct swizzle */
     sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -17128,7 +17128,7 @@ _setSobelXUniform4X4(
     virConst.index = VIR_INVALID_ID;
     memcpy(virConst.value.vecVal.u32Value, byteSwzl, sizeof(byteSwzl));
 
-    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, &pImmUniform, &swizzle);
+    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
 
     /* Set this uniform as operand and set correct swizzle */
     sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -17359,7 +17359,7 @@ _setSobelYUniform8X2(
     virConst.index = VIR_INVALID_ID;
     memcpy(virConst.value.vecVal.u32Value, byteSwzl, sizeof(byteSwzl));
 
-    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, &pImmUniform, &swizzle);
+    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
 
     /* Set this uniform as operand and set correct swizzle */
     sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -17393,7 +17393,7 @@ _setSobelYUniform4X4(
     virConst.index = VIR_INVALID_ID;
     memcpy(virConst.value.vecVal.u32Value, byteSwzl, sizeof(byteSwzl));
 
-    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, &pImmUniform, &swizzle);
+    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
 
     /* Set this uniform as operand and set correct swizzle */
     sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -17612,7 +17612,7 @@ _setGaussianUniform8X2(
     virConst.index = VIR_INVALID_ID;
     memcpy(virConst.value.vecVal.u32Value, byteSwzl, sizeof(byteSwzl));
 
-    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, &pImmUniform, &swizzle);
+    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
 
     /* Set this uniform as operand and set correct swizzle */
     sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
@@ -17648,7 +17648,7 @@ _setGaussianUniform4X4(
     virConst.index = VIR_INVALID_ID;
     memcpy(virConst.value.vecVal.u32Value, byteSwzl, sizeof(byteSwzl));
 
-    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, &pImmUniform, &swizzle);
+    VIR_Shader_AddInitializedUniform(Context->shader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
 
     /* Set this uniform as operand and set correct swizzle */
     sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);

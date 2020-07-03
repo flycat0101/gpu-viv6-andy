@@ -904,7 +904,7 @@ VSC_ErrCode vscVIR_PutImmValueToUniform(VSC_SH_PASS_WORKER* pPassWorker)
                 VIR_Shader_AddConstant(pShader, dstType, &new_const_val, &new_const_id);
                 new_const = VIR_Shader_GetConstFromId(pShader, new_const_id);
                 new_const->type = dstType;
-                VIR_Shader_AddInitializedUniform(pShader, new_const, &pImmUniform, &swizzle);
+                VIR_Shader_AddInitializedUniform(pShader, new_const, gcvTRUE, &pImmUniform, &swizzle);
                 sym = VIR_Shader_GetSymFromId(pShader, pImmUniform->sym);
 
                 constChannel = 0;
@@ -943,7 +943,7 @@ VSC_ErrCode vscVIR_PutImmValueToUniform(VSC_SH_PASS_WORKER* pPassWorker)
                     virConst.index = VIR_INVALID_ID;
                     virConst.type = immTypeId[i];
                     virConst.value = ImmValues[i];
-                    VIR_Shader_AddInitializedUniform(pShader, &virConst, &pImmUniform, &swizzle);
+                    VIR_Shader_AddInitializedUniform(pShader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
                     /* Mapping the swizzle for a VECTOR constant. */
                     if (VIR_Operand_GetOpKind(opnd) == VIR_OPND_CONST)
                     {

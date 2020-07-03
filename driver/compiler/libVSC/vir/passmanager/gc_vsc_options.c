@@ -1870,7 +1870,8 @@ void VSC_OPTN_RAOptions_SetDefault(
                                         VSC_OPTN_RAOptions_MAX_LS_EXTENED_END_POINT |
                                         */
                                         VSC_OPTN_RAOptions_DISABLE_DUAL16_FOR_A0B0  |
-                                        VSC_OPTN_RAOptions_SPILL_DEST_OPT);
+                                        VSC_OPTN_RAOptions_SPILL_DEST_OPT           |
+                                        VSC_OPTN_RAOptions_OPTIMIZE_CST_REG_READ_PORT);
     VSC_OPTN_RAOptions_SetRegisterCount(options, 0);
     VSC_OPTN_RAOptions_SetRegWaterMark(options, 0);
     VSC_OPTN_RAOptions_SetSTBubbleSize(options, 8);

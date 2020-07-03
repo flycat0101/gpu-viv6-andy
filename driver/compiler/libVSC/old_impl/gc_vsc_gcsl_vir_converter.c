@@ -6713,7 +6713,7 @@ _ConvCode2VirInstruction(
                         virConst.index = VIR_INVALID_ID;
                         virConst.type = VIR_TYPE_UINT_X16;
                         virConst.value.vecVal = *(VIR_VecConstVal *)pEvisData->data;
-                        VIR_Shader_AddInitializedUniform(VirShader, &virConst, &virUniform, &swizzle);
+                        VIR_Shader_AddInitializedUniform(VirShader, &virConst, gcvTRUE, &virUniform, &swizzle);
                         sym = VIR_Shader_GetSymFromId(VirShader, virUniform->sym);
                         opnd = VIR_Inst_GetSource(virInst, VIR_Inst_GetSrcNum(virInst) - src2Add + 1);
                         VIR_Operand_SetOpKind(opnd, VIR_OPND_SYMBOL);

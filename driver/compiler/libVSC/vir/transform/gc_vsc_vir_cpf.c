@@ -1129,6 +1129,62 @@ _VSC_CPF_isScalarConst(
     return lattic == VSC_CPF_CONSTANT;
 }
 
+static void
+_VSC_CPF_ProcessSrcModifier(
+    VIR_Instruction*        pInst,
+    gctUINT                 srcIndex,
+    VIR_TypeId              dstTypeId,
+    VSC_CPF_Const*          pConstVal
+    )
+{
+    VIR_ScalarConstVal      imm;
+    VIR_Operand*            pOpnd = VIR_Inst_GetSource(pInst, srcIndex);
+    VIR_OpCode              opCode = VIR_Inst_GetOpcode(pInst);
+    gctBOOL                 bUseDstType = gcvTRUE;
+    VIR_TypeId              typeId;
+
+    switch (opCode)
+    {
+    case VIR_OP_CONVERT:
+    case VIR_OP_I2F:
+    case VIR_OP_F2I:
+    case VIR_OP_I2I:
+    case VIR_OP_COMPARE:
+    case VIR_OP_CSELECT:
+    case VIR_OP_SELECT:
+        bUseDstType = gcvFALSE;
+        break;
+
+    case VIR_OP_LSHIFT:
+    case VIR_OP_RSHIFT:
+        if (srcIndex == 1)
+        {
+            bUseDstType = gcvFALSE;
+        }
+        break;
+
+    default:
+        break;
+    }
+
+    typeId = bUseDstType ? dstTypeId : pConstVal->type;
+
+    imm.uValue = pConstVal->value;
+
+    /* First handle ABS, then NEG. */
+    if ((VIR_Operand_GetModifier(pOpnd) & VIR_MOD_ABS))
+    {
+        VIR_ScalarConstVal_GetAbs(typeId, &imm, &imm);
+    }
+
+    if ((VIR_Operand_GetModifier(pOpnd) & VIR_MOD_NEG))
+    {
+        VIR_ScalarConstVal_GetNeg(typeId, &imm, &imm);
+    }
+
+    pConstVal->value = imm.uValue;
+}
+
 /* only called when all defined channels are constant */
 void
 _VSC_CPF_SetDestConst(
@@ -1786,7 +1842,19 @@ _VSC_CPF_EvaluateConst(
 {
     VIR_OpCode opcode = VIR_Inst_GetOpcode(pInst);
     VIR_PrimitiveTypeId dstType = VIR_TYPE_VOID;
+    gctUINT i;
+
     _VSC_CPF_typeToChannelType(VIR_Operand_GetTypeId(VIR_Inst_GetDest(pInst)), &dstType);
+
+    for (i = 0; i < VIR_Inst_GetSrcNum(pInst); i++)
+    {
+        if (srcLattice[i] != VSC_CPF_CONSTANT)
+        {
+            continue;
+        }
+
+        _VSC_CPF_ProcessSrcModifier(pInst, i, dstType, &constVal[i]);
+    }
 
     switch (opcode)
     {

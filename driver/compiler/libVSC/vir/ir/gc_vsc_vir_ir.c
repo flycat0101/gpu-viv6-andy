@@ -3783,6 +3783,7 @@ VSC_ErrCode
 VIR_Shader_AddInitializedUniform(
     IN  VIR_Shader *      Shader,
     IN  VIR_Const *       Constant,
+    IN  gctBOOL           bUsedInShader,
     OUT VIR_Uniform **    Uniform,
     OUT VIR_Swizzle *     Swizzle
     )
@@ -3833,6 +3834,11 @@ VIR_Shader_AddInitializedUniform(
     VIR_Symbol_SetLocation(uniformSym, -1);
     VIR_Symbol_SetFlag(uniformSym, VIR_SYMUNIFORMFLAG_COMPILETIME_INITIALIZED);
     VIR_Symbol_SetFlag(uniformSym, VIR_SYMFLAG_COMPILER_GEN);
+
+    if (bUsedInShader)
+    {
+        VIR_Symbol_SetFlag(uniformSym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
+    }
 
     switch (VIR_GetTypeComponents(Constant->type))
     {
@@ -17780,21 +17786,33 @@ VIR_ScalarConstVal_GetNeg(
 {
     switch(type)
     {
+    /* Floating. */
     case VIR_TYPE_FLOAT32:
         out_imm->fValue = -in_imm->fValue;
         break;
+
+    /* Signed integer. */
     case VIR_TYPE_INT32:
     case VIR_TYPE_INT16:
     case VIR_TYPE_INT8:
-    case VIR_TYPE_UINT32:
-    case VIR_TYPE_UINT16:
-    case VIR_TYPE_UINT8:
         out_imm->iValue = -in_imm->iValue;
         break;
-    case VIR_TYPE_UINT64:
+
     case VIR_TYPE_INT64:
         out_imm->lValue = -in_imm->lValue;
         break;
+
+    /* Unsigned integer. */
+    case VIR_TYPE_UINT32:
+    case VIR_TYPE_UINT16:
+    case VIR_TYPE_UINT8:
+        out_imm->lValue = ~in_imm->iValue + 1;
+        break;
+
+    case VIR_TYPE_UINT64:
+        out_imm->lValue = ~in_imm->lValue + 1;
+        break;
+
     default:
         gcmASSERT(gcvFALSE);
     }

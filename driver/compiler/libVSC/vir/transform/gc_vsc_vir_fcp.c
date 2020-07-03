@@ -756,7 +756,7 @@ _InsertCMPInst(
             virConst.index = VIR_INVALID_ID;
             virConst.type = VIR_TYPE_FLOAT32;
             virConst.value.scalarVal.fValue = 1.0f;
-            VIR_Shader_AddInitializedUniform(pShader, &virConst, &pImmUniform, &swizzle);
+            VIR_Shader_AddInitializedUniform(pShader, &virConst, gcvTRUE, &pImmUniform, &swizzle);
             /* Set this uniform as operand and set correct swizzle */
             sym = VIR_Shader_GetSymFromId(pShader, pImmUniform->sym);
             VIR_Operand_SetTypeId(VIR_Inst_GetSource(newInst, 2), VIR_TYPE_FLOAT32);
