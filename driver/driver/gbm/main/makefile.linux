@@ -16,7 +16,8 @@
 include $(AQROOT)/makefile.linux.def
 
 TARGET_NAME   := libgbm.so
-TARGET_SONAME := libgbm.so
+TARGET_SONAME := libgbm.so.1
+TARGET_LINKS  := libgbm.so.1
 
 TARGET_MODULE := $(OBJ_DIR)/$(TARGET_NAME)
 
@@ -60,6 +61,9 @@ install: all
 	@-cp $(TARGET_MODULE) $(INSTALL_DIR)
 	@mkdir -p $(SDK_DIR)/include
 	@-cp -f gbm.h $(SDK_DIR)/include
+	@for lib in $(TARGET_LINKS); do \
+		ln -sf $(notdir $(TARGET_MODULE)) $(INSTALL_DIR)/$$lib; \
+	done
 
 $(TARGET_MODULE): $(OBJECTS)
 	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
