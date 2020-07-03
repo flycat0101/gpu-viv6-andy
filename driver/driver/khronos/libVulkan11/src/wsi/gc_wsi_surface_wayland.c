@@ -1349,8 +1349,8 @@ static VkResult __QueuePresentSwapchainImage(
     {
         if(imageBuffer->client_fence_fd > 0)
         {
-            __WaitNativeFence(imageBuffer->client_fence_fd);
             close(imageBuffer->client_fence_fd);
+            imageBuffer->client_fence_fd = -1;
         }
 
         if(fence_fd > 0)
