@@ -3537,9 +3537,6 @@ _PFNwritePixel gcoSURF_GetWritePixelFunc(gcoSURF surf)
     case gcvSURF_X24S8_1_A8R8G8B8:
         return _WritePixelTo_X24S8;
 
-    case gcvSURF_B8G8R8:
-        return _WritePixelTo_B8G8R8;
-
     case gcvSURF_S8:
         return _WritePixelTo_S8;
 
