@@ -5375,7 +5375,7 @@ _Attach(
 
     gcmONERROR(iface.status);
 
-    for (i = 0; i < gcdCONTEXT_BUFFER_NUM; i++)
+    for (i = 0; i < gcdCONTEXT_BUFFER_COUNT; i++)
     {
         gcmONERROR(gcoOS_Allocate(gcvNULL, iface.u.Attach.captureSize, &iface.u.Attach.contextLogical[i]));
     }

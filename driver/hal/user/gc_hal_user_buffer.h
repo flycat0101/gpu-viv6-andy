@@ -22,9 +22,6 @@ extern "C" {
 ************************ Command Buffer and Event Objects **********************
 \******************************************************************************/
 
-/* The number of context buffers per user. */
-#define gcdCONTEXT_BUFFER_COUNT 2
-
 #define gcdRENDER_FENCE_LENGTH                      (6 * gcmSIZEOF(gctUINT32))
 #define gcdBLT_FENCE_LENGTH                         (10 * gcmSIZEOF(gctUINT32))
 #define gcdRESERVED_FLUSHCACHE_LENGTH               (2 * gcmSIZEOF(gctUINT32))

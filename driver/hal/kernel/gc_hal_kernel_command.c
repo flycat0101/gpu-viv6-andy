@@ -2451,7 +2451,7 @@ _CommitWaitLinkOnce(
             ));
 
 #if gcdCAPTURE_ONLY_MODE
-        for (i = 0; i < gcdCONTEXT_BUFFER_NUM; ++i)
+        for (i = 0; i < gcdCONTEXT_BUFFER_COUNT; ++i)
         {
             gcsCONTEXT_PTR buffer = contextBuffer;
 
