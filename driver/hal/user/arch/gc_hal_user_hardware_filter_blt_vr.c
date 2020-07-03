@@ -1266,7 +1266,7 @@ static gceSTATUS _StartVR(
 
         Hardware->hw2DCmdBuffer = gcvNULL;
         Hardware->hw2DCmdSize = 0;
-        Hardware->hw2DCmdIndex = (type == gceFILTER_BLIT_TYPE_ONE_PASS)? 280 : 180;
+        Hardware->hw2DCmdIndex = (type == gceFILTER_BLIT_TYPE_ONE_PASS)? 280 : 184;
 
         if (Hardware->hw3DEngine)
         {
