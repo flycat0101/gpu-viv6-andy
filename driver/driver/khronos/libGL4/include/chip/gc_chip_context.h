@@ -1236,7 +1236,7 @@ gcChipLockOutComputeIndirectBuf(
     );
 
 #ifdef OPENGL40
-extern GLvoid
+extern GLboolean
     __glChipAccum(
     __GLcontext* gc,
     GLenum op,
