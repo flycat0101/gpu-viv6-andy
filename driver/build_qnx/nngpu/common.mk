@@ -23,7 +23,7 @@ define PINFO
 PINFO DESCRIPTION="OpenVX nngpu libraries"
 endef
 
-NAME=libnngpu
+NAME=libNNGPUBinary
 
 
 include $(qnx_build_dir)/common.mk
