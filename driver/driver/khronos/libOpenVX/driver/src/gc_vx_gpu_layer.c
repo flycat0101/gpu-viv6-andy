@@ -5503,16 +5503,16 @@ vxnne_shader_executable vxnneGetGPUHashLUTShaderExecutable(
     vx_enum       valueFormat                = TENSOR_DATA_TYPE(value);
     vx_enum       outputFormat               = TENSOR_DATA_TYPE(output);
     vx_uint32     dims                       = TENSOR_DIM_NUM(input);
-    vx_uint32     width                      = TENSOR_VIEW_SIZE_INDEX(input, 0);
-    vx_uint32     input_count                = 0;
     vx_uint32     kDims                      = TENSOR_DIM_NUM(key);
-    vx_uint32     kw                         = TENSOR_VIEW_SIZE_INDEX(key, 0);
     vx_uint32     vDims                      = TENSOR_DIM_NUM(value);
-    vx_uint32     vw                         = TENSOR_VIEW_SIZE_INDEX(value, 0);
     vx_uint32     oDims                      = TENSOR_DIM_NUM(output);
-    vx_uint32     ow                         = TENSOR_VIEW_SIZE_INDEX(output, 0);
     vx_uint32     tDims                      = TENSOR_DIM_NUM(hit);
-    vx_uint32     tw                         = TENSOR_VIEW_SIZE_INDEX(hit, 0);
+    vx_uint32     width                      = 1;
+    vx_uint32     input_count                = 1;
+    vx_uint32     key_count                  = 1;
+    vx_uint32     val_count                  = 1;
+    vx_uint32     out_count                  = 1;
+    vx_uint32     hit_count                  = 1;
     vx_tensor     input_rs                   = NULL;
     vx_tensor     key_rs                     = NULL;
     vx_tensor     value_rs                   = NULL;
@@ -5520,6 +5520,7 @@ vxnne_shader_executable vxnneGetGPUHashLUTShaderExecutable(
     vx_tensor     output_rs                  = NULL;
     vx_int32      rs_sizes[4]                = {1, 1, 1, 1};
     vx_scalar     inOutScale_scl             = NULL;
+    vx_uint32     i                          = 0;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input=%p, output=%p", context, kernelEnum, input, output);
 
@@ -5546,82 +5547,61 @@ vxnne_shader_executable vxnneGetGPUHashLUTShaderExecutable(
         borderMode->constant_value.S32 = 0;
     }
 
-    if (dims == 1)
+    for(i = 0; i < dims; i++)
     {
-        rs_sizes[0] = width;
+        input_count *= TENSOR_VIEW_SIZE_INDEX(input, i);
+    }
+    for(i = 0; i < kDims; i++)
+    {
+        key_count *= TENSOR_VIEW_SIZE_INDEX(key, i);
+    }
+    for(i = 0; i < vDims; i++)
+    {
+        val_count *= TENSOR_VIEW_SIZE_INDEX(value, i);
+    }
+    for(i = 0; i < oDims; i++)
+    {
+        out_count *= TENSOR_VIEW_SIZE_INDEX(output, i);
+    }
+    for(i = 0; i < tDims; i++)
+    {
+        hit_count *= TENSOR_VIEW_SIZE_INDEX(hit, i);
+    }
+    width = val_count / key_count;
+    if((input_count * width != out_count) || (hit_count != input_count))
+    {
+        gcmPRINT("hashtable look up size incorrect.");
+        goto OnError;
+    }
+
+    {
+        rs_sizes[0] = input_count;
+        rs_sizes[1] = 1;
         input_rs = vxoTensor_ReshapeTensor(input, rs_sizes, 2);
         parameters[0] = (vx_reference)input_rs;
-    }
-    input_count = rs_sizes[0];
 
-    if (kDims == 1)
-    {
-        rs_sizes[0] = kw;
+        rs_sizes[0] = key_count;
+        rs_sizes[1] = 1;
         key_rs = vxoTensor_ReshapeTensor(key, rs_sizes, 2);
         parameters[1] = (vx_reference)key_rs;
-    }
 
-    if (vDims == 1)
-    {
-        rs_sizes[0] = vw;
+        rs_sizes[0] = width;
+        rs_sizes[1] = key_count;
         value_rs = vxoTensor_ReshapeTensor(value, rs_sizes, 2);
         parameters[2] = (vx_reference)value_rs;
-    }
-    else if(vDims == 3)
-    {
-        vx_uint32 vh = TENSOR_VIEW_SIZE_INDEX(value, 1);
-        vx_uint32 vc = TENSOR_VIEW_SIZE_INDEX(value, 2);
-        rs_sizes[0] = vw * vh;
-        rs_sizes[1] = vc;
-        value_rs = vxoTensor_ReshapeTensor(value, rs_sizes, 2);
-        parameters[2] = (vx_reference)value_rs;
-    }
-    else if(vDims == 4)
-    {
-        vx_uint32 vh = TENSOR_VIEW_SIZE_INDEX(value, 1);
-        vx_uint32 vc = TENSOR_VIEW_SIZE_INDEX(value, 2);
-        vx_uint32 vn = TENSOR_VIEW_SIZE_INDEX(value, 3);
-        rs_sizes[0] = vw * vh * vc;
-        rs_sizes[1] = vn;
-        value_rs = vxoTensor_ReshapeTensor(value, rs_sizes, 2);
-        parameters[2] = (vx_reference)value_rs;
-    }
 
-    rs_sizes[1] = 1;
-    if (tDims == 1)
-    {
-        rs_sizes[0] = tw;
+        rs_sizes[0] = hit_count;
+        rs_sizes[1] = 1;
         hit_rs = vxoTensor_ReshapeTensor(hit, rs_sizes, 2);
         parameters[3] = (vx_reference)hit_rs;
-    }
 
-    if (oDims == 1)
-    {
-        rs_sizes[0] = ow;
+        rs_sizes[0] = width;
+        rs_sizes[1] = input_count;
         output_rs = vxoTensor_ReshapeTensor(output, rs_sizes, 2);
         parameters[4] = (vx_reference)output_rs;
     }
-    else if(oDims == 3)
-    {
-        vx_uint32 oh = TENSOR_VIEW_SIZE_INDEX(value, 1);
-        vx_uint32 oc = TENSOR_VIEW_SIZE_INDEX(value, 2);
-        rs_sizes[0] = ow * oh;
-        rs_sizes[1] = oc;
-        value_rs = vxoTensor_ReshapeTensor(value, rs_sizes, 2);
-        parameters[2] = (vx_reference)value_rs;
-    }
-    else if(oDims == 4)
-    {
-        vx_uint32 oh = TENSOR_VIEW_SIZE_INDEX(value, 1);
-        vx_uint32 oc = TENSOR_VIEW_SIZE_INDEX(value, 2);
-        vx_uint32 on = TENSOR_VIEW_SIZE_INDEX(value, 3);
-        rs_sizes[0] = ow * oh * oc;
-        rs_sizes[1] = on;
-        value_rs = vxoTensor_ReshapeTensor(value, rs_sizes, 2);
-        parameters[2] = (vx_reference)value_rs;
-    }
 
-    execution_parameters.globalWorkSize[0]   = vw;
+    execution_parameters.globalWorkSize[0]   = width;
     execution_parameters.globalWorkSize[1]   = input_count;
 
     kernel = vxnneGetKernelShadersByEnum(context, kernelEnum);
