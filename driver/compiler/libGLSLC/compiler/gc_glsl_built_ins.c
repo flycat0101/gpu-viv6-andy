@@ -13515,7 +13515,7 @@ _GenSmoothStepCode(
     gceSTATUS       status;
     slsIOPERAND     intermIOperands[7];
     slsROPERAND     intermROperands[7];
-    slsROPERAND     constantROperand;
+    slsROPERAND     constantROperand, constantROperand1;
 
     gcmHEADER();
 
@@ -13619,17 +13619,19 @@ _GenSmoothStepCode(
                     &intermIOperands[5],
                     intermIOperands[3].dataType,
                     intermIOperands[3].precision);
-
+    /* immediate value 2.0 */
+    slsROPERAND_InitializeFloatOrVecOrMatConstant(&constantROperand1,
+                                                  gcSHADER_FLOAT_X1,
+                                                  gcSHADER_PRECISION_MEDIUM,
+                                                  (gctFLOAT)2.0);
     status = slGenArithmeticExprCode(
                                     Compiler,
                                     PolynaryExpr->exprBase.base.lineNo,
                                     PolynaryExpr->exprBase.base.stringNo,
-                                    slvOPCODE_ADD,
+                                    slvOPCODE_MUL,
                                     &intermIOperands[5],
                                     &intermROperands[3],
-                                    &intermROperands[3]);
-
-    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+                                    &constantROperand1);
 
     /* sub t6, 3.0, t5 */
     slsIOPERAND_New(Compiler,

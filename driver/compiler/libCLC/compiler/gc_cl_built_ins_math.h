@@ -7666,7 +7666,7 @@ _GenSinCosCode(
 
 
     /* determine if negative */
-    clsIOPERAND_New(Compiler, &negIOperand, clmGenCodeDataType(T_UINT));
+    clsIOPERAND_New(Compiler, &negIOperand, clmGenCodeDataType(T_FLOAT));
 
 
 
