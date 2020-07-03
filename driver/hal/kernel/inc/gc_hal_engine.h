@@ -499,6 +499,13 @@ gcoSURF_DrawBlit(
     gscSURF_BLITDRAW_BLIT *Args
     );
 
+gceSTATUS
+gcoSURF_DrawBlitDepth(
+    gcsSURF_VIEW *SrcView,
+    gcsSURF_VIEW *DstView,
+    gscSURF_BLITDRAW_BLIT *Args
+);
+
 
 /******************************************************************************\
 ******************************** gcoINDEX Object *******************************

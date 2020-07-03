@@ -34432,6 +34432,7 @@ static gceSTATUS _InitBlitProgram(
     gctUINT32 vsShaderVersion[2] = {(_SHADER_GL_LANGUAGE_TYPE |  gcSHADER_TYPE_VERTEX << 16), compilerVersion};
     gctUINT32 psShaderVersion[2] = {(_SHADER_GL_LANGUAGE_TYPE |  gcSHADER_TYPE_FRAGMENT << 16), compilerVersion};
     const gctSTRING outputColorName = NeedRecompile ? "Color" : "#Color";
+    const gctSTRING outputDepthName = NeedRecompile ? "Depth" : "#Depth";
     gcsVSC_APIS *vscAPIs;
 
 #if gcdSTATIC_LINK || defined(__CHROME_OS__)
@@ -34510,6 +34511,69 @@ static gceSTATUS _InitBlitProgram(
 
             gcmONERROR((*vscAPIs->gcSHADER_SetCompilerVersion)(blitPSShader, psShaderVersion));
         } while(gcvFALSE);
+    }
+
+    /* Initial blit depth buffer program */
+    if ((type == gcvBLITDRAW_BLIT_DEPTH) && (blitDraw->vsShader[gcvBLITDRAW_BLIT_DEPTH] == gcvNULL))
+    {
+        gcmONERROR((*vscAPIs->gcSHADER_Construct)(gcSHADER_TYPE_VERTEX, &blitDraw->vsShader[gcvBLITDRAW_BLIT_DEPTH]));
+        do
+        {
+            gcATTRIBUTE pos;
+            gcATTRIBUTE texCoord;
+
+            gcSHADER blitVSShader = blitDraw->vsShader[gcvBLITDRAW_BLIT_DEPTH];
+            gcmONERROR((*vscAPIs->gcSHADER_AddAttribute)(blitVSShader, "in_position", gcSHADER_FLOAT_X3, 1, gcvFALSE, gcSHADER_SHADER_DEFAULT, gcSHADER_PRECISION_HIGH, &pos));
+            gcmONERROR((*vscAPIs->gcSHADER_AddAttribute)(blitVSShader, "in_texCoord", gcSHADER_FLOAT_X2, 1, gcvFALSE, gcSHADER_SHADER_DEFAULT, gcSHADER_PRECISION_HIGH, &texCoord));
+            gcmONERROR((*vscAPIs->gcSHADER_AddOpcode)(blitVSShader, gcSL_MOV, 1, gcSL_ENABLE_XYZ, gcSL_FLOAT, pos->precision, 0));
+            gcmONERROR((*vscAPIs->gcSHADER_AddSourceAttribute)(blitVSShader, pos, gcSL_SWIZZLE_XYZZ, 0));
+            gcmONERROR((*vscAPIs->gcSHADER_AddOpcode)(blitVSShader, gcSL_MOV, 1, gcSL_ENABLE_W, gcSL_FLOAT, gcSHADER_PRECISION_HIGH, 0));
+            gcmONERROR((*vscAPIs->gcSHADER_AddSourceConstant)(blitVSShader, 1.0));
+            gcmONERROR((*vscAPIs->gcSHADER_AddOutput)(blitVSShader, "#Position", gcSHADER_FLOAT_X4, 1, 1, gcSHADER_PRECISION_HIGH));
+            gcmONERROR((*vscAPIs->gcSHADER_AddOpcode)(blitVSShader, gcSL_MOV, 2, gcSL_ENABLE_XY, gcSL_FLOAT, texCoord->precision, 0));
+            gcmONERROR((*vscAPIs->gcSHADER_AddSourceAttribute)(blitVSShader, texCoord, gcSL_SWIZZLE_XYYY, 0));
+            gcmONERROR((*vscAPIs->gcSHADER_AddOutput)(blitVSShader, "vTexCoord", gcSHADER_FLOAT_X2, 1, 2, gcSHADER_PRECISION_HIGH));
+            gcmONERROR((*vscAPIs->gcSHADER_Pack)(blitVSShader));
+
+            gcmONERROR((*vscAPIs->gcSHADER_SetCompilerVersion)(blitVSShader, vsShaderVersion));
+        } while (gcvFALSE);
+    }
+
+    if ((type == gcvBLITDRAW_BLIT_DEPTH) && (blitDraw->psShader[gcvBLITDRAW_BLIT_DEPTH] == gcvNULL))
+    {
+        gcATTRIBUTE texcoord0;
+
+        gcmONERROR((*vscAPIs->gcSHADER_Construct)(gcSHADER_TYPE_FRAGMENT, &blitDraw->psShader[gcvBLITDRAW_BLIT_DEPTH]));
+        do
+        {
+            gcSHADER blitPSShader = blitDraw->psShader[gcvBLITDRAW_BLIT_DEPTH];
+            gcmONERROR((*vscAPIs->gcSHADER_AddAttribute)(blitPSShader, "vTexCoord", gcSHADER_FLOAT_X2, 1, gcvTRUE, gcSHADER_SHADER_DEFAULT, gcSHADER_PRECISION_HIGH, &texcoord0));
+            gcmONERROR((*vscAPIs->gcSHADER_AddUniform)(blitPSShader, "unit0", gcSHADER_SAMPLER_2D, 1, gcSHADER_PRECISION_HIGH, &blitDraw->bliterSampler));
+
+            gcmONERROR((*vscAPIs->gcSHADER_AddOpcodeConditional)(blitPSShader, gcSL_KILL, gcSL_LESS, 0, 0));
+            gcmONERROR((*vscAPIs->gcSHADER_AddSourceAttribute)(blitPSShader, texcoord0, gcSL_SWIZZLE_XYYY, 0));
+            gcmONERROR((*vscAPIs->gcSHADER_AddSourceConstant)(blitPSShader, 0.0f));
+            gcmONERROR((*vscAPIs->gcSHADER_AddOpcodeConditional)(blitPSShader, gcSL_KILL, gcSL_GREATER, 0, 0));
+            gcmONERROR((*vscAPIs->gcSHADER_AddSourceAttribute)(blitPSShader, texcoord0, gcSL_SWIZZLE_XYYY, 0));
+            gcmONERROR((*vscAPIs->gcSHADER_AddSourceConstant)(blitPSShader, 1.0f));
+
+            gcmONERROR((*vscAPIs->gcSHADER_AddOpcode)(blitPSShader, gcSL_TEXLD, 1, gcSL_ENABLE_X, gcSL_FLOAT, blitDraw->bliterSampler->precision, 0));
+            gcmONERROR((*vscAPIs->gcSHADER_AddSourceUniformIndexedFormattedWithPrecision)(
+                blitPSShader,
+                blitDraw->bliterSampler,
+                gcSL_SWIZZLE_XYZW,
+                0,
+                gcSL_NOT_INDEXED,
+                gcSL_NONE_INDEXED,
+                0,
+                gcSL_FLOAT,
+                gcSHADER_PRECISION_HIGH));
+            gcmONERROR((*vscAPIs->gcSHADER_AddSourceAttribute)(blitPSShader, texcoord0, gcSL_SWIZZLE_XYYY, 0));
+            gcmONERROR((*vscAPIs->gcSHADER_AddOutput)(blitPSShader, outputDepthName, gcSHADER_FLOAT_X1, 1, 1, gcSHADER_PRECISION_HIGH));
+            gcmONERROR((*vscAPIs->gcSHADER_Pack)(blitPSShader));
+
+            gcmONERROR((*vscAPIs->gcSHADER_SetCompilerVersion)(blitPSShader, psShaderVersion));
+        } while (gcvFALSE);
     }
 
     /* Initial clear program */
@@ -36054,6 +36118,762 @@ gcoHARDWARE_DrawBlit(
     /* MC dirty reset. */
     hardware->MCDirty->hwTxSamplerTSDirty = hardware->MCDirty->texTileStatusSlotDirty = 0xFF;
     hardware->MCDirty->cacheDirty= gcvTRUE;
+
+    /* Query dirty reset. */
+    hardware->QUERYDirty->queryDirty[gcvQUERY_OCCLUSION] = gcvTRUE;
+
+    if (hardware->features[gcvFEATURE_HW_TFB])
+    {
+        hardware->QUERYDirty->queryDirty[gcvQUERY_XFB_WRITTEN] = gcvTRUE;
+        hardware->QUERYDirty->queryDirty[gcvQUERY_PRIM_GENERATED] = gcvTRUE;
+
+        /* XFB dirty reset. */
+        hardware->XFBDirty->xfbDirty = 0xFFFFFFFF;
+    }
+
+    /* Free temp states. */
+    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, FEStates));
+    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, PAAndSEStates));
+    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, MsaaStates));
+    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, SHStates));
+    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, PEStates));
+    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, TXStates));
+    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, MCStates));
+    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, QueryStates));
+    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, XfbStates));
+
+    if (hardware->PEStates->colorStates.target[0].surface != gcvNULL)
+    {
+        if (hardware->PEStates->colorStates.target[0].surface->tileStatusNode.pool != gcvPOOL_UNKNOWN)
+        {
+            gcmGETHARDWAREADDRESS(hardware->PEStates->colorStates.target[0].surface->tileStatusNode, tileStatusAddress);
+        }
+        else
+        {
+            tileStatusAddress = 0;
+        }
+
+        tmpView.surf = hardware->PEStates->colorStates.target[0].surface;
+        tmpView.firstSlice = hardware->PEStates->colorStates.target[0].sliceIndex;
+        tmpView.numSlice = hardware->PEStates->colorStates.target[0].sliceNum;
+
+        /* Enable the tile status for the requested surface. */
+        status = gcoHARDWARE_EnableTileStatus(
+            hardware,
+            &tmpView,
+            tileStatusAddress,
+            &hardware->PEStates->colorStates.target[0].surface->hzTileStatusNode,
+            0);
+    }
+#endif
+
+OnError:
+#if !gcdENABLE_APPCTXT_BLITDRAW
+    if (savedHardware)
+    {
+        gcmVERIFY_OK(gcoHARDWARE_Set3DHardware(savedHardware));
+    }
+#endif
+    return status;
+}
+
+gceSTATUS
+gcoHARDWARE_DrawBlitDepth(
+    gcsSURF_VIEW *SrcView,
+    gcsSURF_VIEW *DstView,
+    gscSURF_BLITDRAW_BLIT *args
+)
+{
+    gceSTATUS status;
+    gcoHARDWARE hardware = gcvNULL;
+    gcsSAMPLER samplerInfo = { 0 };
+    gcsTEXTURE texParamInfo = { 0 };
+    gcoSURF srcSurf = SrcView->surf;
+    gcoSURF dstSurf = DstView->surf;
+    gcsHARDWARE_BLITDRAW_PTR blitDraw;
+    gcsSURF_FORMAT_INFO_PTR dstFmtInfo = gcvNULL;
+    gcsSURF_FORMAT_INFO_PTR srcFmtInfo = gcvNULL;
+    gcsPROGRAM_STATE *programState = gcvNULL;
+    gctINT32 i;
+    gctUINT32 tileStatusAddress;
+
+#if gcdENABLE_APPCTXT_BLITDRAW
+    gcsFESTATES *FEStates;
+    gcsPAANDSESTATES *PAAndSEStates;
+    gcsMSAASTATES *MsaaStates;
+    gcsSHSTATES *SHStates;
+    gcsPESTATES *PEStates;
+    gcsTXSTATES *TXStates;
+    gcsMCSTATES *MCStates;
+    gcsQUERYSTATES *QueryStates;
+    gcsXFBSTATES *XfbStates;
+    gcsSURF_VIEW tmpView;
+#endif
+
+    static const gceTEXTURE_SWIZZLE baseComponents_rgba[] =
+    {
+        gcvTEXTURE_SWIZZLE_R,
+        gcvTEXTURE_SWIZZLE_G,
+        gcvTEXTURE_SWIZZLE_B,
+        gcvTEXTURE_SWIZZLE_A
+    };
+
+#if gcdENABLE_APPCTXT_BLITDRAW
+    /* Get current hardware. */
+    gcmGETHARDWARE(hardware);
+#else
+    gcoHARDWARE savedHardware = gcvNULL;
+
+    /* Get current hardware. */
+    gcmGETHARDWARE(hardware);
+#endif
+
+    /* Can only handle single slice.*/
+    gcmASSERT(SrcView->numSlices == 1);
+    gcmASSERT(DstView->numSlices == 1);
+
+    srcFmtInfo = &srcSurf->formatInfo;
+    dstFmtInfo = &dstSurf->formatInfo;
+
+    /* explicit unsupported cases for source:
+    ** 1, msaa source, We may support it later.
+    ** 2, TX can't read it.
+    */
+    if (srcSurf->isMsaa ||
+        (!hardware->features[gcvFEATURE_SUPERTILED_TEXTURE] && (srcSurf->tiling & gcvSUPERTILED)) ||
+        (!hardware->features[gcvFEATURE_TEXTURE_LINEAR] && (srcSurf->tiling & gcvLINEAR))
+        )
+    {
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+    }
+
+    /* Bail out if dst surface is not renderable*/
+    if (gcvSTATUS_OK != gcoHARDWARE_QuerySurfaceRenderable(hardware, dstSurf))
+    {
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+    }
+
+    /* Disable source tile status if TX can not read. */
+    if (
+        (srcSurf->tileStatusDisabled[SrcView->firstSlice] == gcvFALSE &&
+        !hardware->features[gcvFEATURE_TEXTURE_TILE_STATUS_READ]) ||
+        (srcSurf->compressed &&
+        !hardware->features[gcvFEATURE_TX_DECOMPRESSOR]) ||
+        !hardware->features[gcvFEATURE_TX_MULTISAMPLER_FC_FIX]
+        )
+    {
+        /*
+        * NOTICE: Must call disable tile status in rendering context before
+        * switching back to blitdraw context, to make hardware states match in
+        * the two contexts.
+        */
+        gcoHARDWARE_DisableTileStatus(hardware, SrcView, gcvTRUE);
+        samplerInfo.hasTileStatus = gcvFALSE;
+    }
+#if gcdENABLE_APPCTXT_BLITDRAW
+    gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsFESTATES), (gctPOINTER *)&FEStates));
+    gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsPAANDSESTATES), (gctPOINTER *)&PAAndSEStates));
+    gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsMSAASTATES), (gctPOINTER *)&MsaaStates));
+    gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsSHSTATES), (gctPOINTER *)&SHStates));
+    gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsPESTATES), (gctPOINTER *)&PEStates));
+    gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsTXSTATES), (gctPOINTER *)&TXStates));
+    gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsMCSTATES), (gctPOINTER *)&MCStates));
+    gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsQUERYSTATES), (gctPOINTER *)&QueryStates));
+    gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsXFBSTATES), (gctPOINTER *)&XfbStates));
+
+    /* Save the states of the last draw. */
+    gcoOS_MemCopy(FEStates, hardware->FEStates, gcmSIZEOF(gcsFESTATES));
+    gcoOS_MemCopy(PAAndSEStates, hardware->PAAndSEStates, gcmSIZEOF(gcsPAANDSESTATES));
+    gcoOS_MemCopy(MsaaStates, hardware->MsaaStates, gcmSIZEOF(gcsMSAASTATES));
+    gcoOS_MemCopy(SHStates, hardware->SHStates, gcmSIZEOF(gcsSHSTATES));
+    gcoOS_MemCopy(PEStates, hardware->PEStates, gcmSIZEOF(gcsPESTATES));
+    gcoOS_MemCopy(TXStates, hardware->TXStates, gcmSIZEOF(gcsTXSTATES));
+    gcoOS_MemCopy(MCStates, hardware->MCStates, gcmSIZEOF(gcsMCSTATES));
+    gcoOS_MemCopy(QueryStates, hardware->QUERYStates, gcmSIZEOF(gcsQUERYSTATES));
+    gcoOS_MemCopy(XfbStates, hardware->XFBStates, gcmSIZEOF(gcsXFBSTATES));
+
+    gcmONERROR(_InitDefaultState(hardware));
+#else
+    gcmONERROR(gcoHARDWARE_Get3DHardware(&savedHardware));
+    /* Kick off current hardware and switch to default hardware */
+    gcmONERROR(gcoHARDWARE_Set3DHardware(gcvNULL));
+
+    hardware = gcvNULL;
+    gcmGETHARDWARE(hardware);
+
+    /* Currently it's a must that default hardware is current */
+    gcmASSERT(hardware->threadDefault);
+#endif
+
+    gcmONERROR(_InitBlitDraw(hardware));
+    blitDraw = hardware->blitDraw;
+
+    /* We must link program before bind texture so that we can know the base sampler offset. */
+    gcmONERROR(
+        _PickBlitDrawShader(hardware,
+        gcvBLITDRAW_BLIT_DEPTH,
+        srcFmtInfo,
+        dstFmtInfo,
+        &programState));
+
+    gcmONERROR(gcoHARDWARE_LoadProgram(hardware,
+        programState->hints->stageBits,
+        programState));
+
+    /* Prepare sampler info. */
+    samplerInfo.width = srcSurf->requestW;
+    samplerInfo.height = srcSurf->requestH;
+    samplerInfo.depth = 1;
+    samplerInfo.faces = 1;
+
+    samplerInfo.endianHint = ((srcFmtInfo->txFormat == 0x05) ||
+        (srcFmtInfo->txFormat == 0x06) ||
+        (srcFmtInfo->txFormat == 0x0C) ||
+        (srcFmtInfo->txFormat == 0x0D) ||
+        (srcFmtInfo->txFormat == 0x0B)) ?
+    gcvENDIAN_SWAP_WORD : gcvENDIAN_NO_SWAP;
+
+    samplerInfo.filterable = gcvTRUE;
+    samplerInfo.format = srcSurf->format;
+    samplerInfo.formatInfo = &srcSurf->formatInfo;
+
+    switch (srcSurf->tiling)
+    {
+    case gcvLINEAR:
+        samplerInfo.hAlignment = gcvSURF_SIXTEEN;
+        samplerInfo.addressing = gcvSURF_STRIDE_LINEAR;
+
+        switch (samplerInfo.format)
+        {
+        case gcvSURF_YV12:
+        case gcvSURF_I420:
+        case gcvSURF_NV12:
+        case gcvSURF_NV21:
+        case gcvSURF_NV16:
+        case gcvSURF_NV61:
+            /* Need YUV assembler. */
+            samplerInfo.lodNum = 3;
+            break;
+
+        case gcvSURF_YUY2:
+        case gcvSURF_UYVY:
+        case gcvSURF_YVYU:
+        case gcvSURF_VYUY:
+        default:
+            /* Need linear texture. */
+            samplerInfo.lodNum = 1;
+            break;
+        }
+        break;
+
+    case gcvTILED:
+        samplerInfo.hAlignment = srcSurf->hAlignment;
+        samplerInfo.lodNum = 1;
+        break;
+
+    case gcvSUPERTILED:
+        samplerInfo.hAlignment = gcvSURF_SUPER_TILED;
+        samplerInfo.lodNum = 1;
+        break;
+
+    case gcvMULTI_TILED:
+        samplerInfo.hAlignment = gcvSURF_SPLIT_TILED;
+        samplerInfo.lodNum = 2;
+        break;
+
+    case gcvMULTI_SUPERTILED:
+        samplerInfo.hAlignment = gcvSURF_SPLIT_SUPER_TILED;
+        samplerInfo.lodNum = 2;
+        break;
+
+    default:
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+    }
+
+    /* Set all the LOD levels. */
+    gcmGETHARDWAREADDRESS(srcSurf->node, samplerInfo.lodAddr[0]);
+
+    samplerInfo.baseLevelSurf = srcSurf;
+
+    if (samplerInfo.lodNum == 3)
+    {
+        /* YUV-assembler needs 3 lods. */
+        if (srcSurf->flags & gcvSURF_FLAG_MULTI_NODE)
+        {
+            gcmGETHARDWAREADDRESS(srcSurf->node2, samplerInfo.lodAddr[1]);
+            gcmGETHARDWAREADDRESS(srcSurf->node3, samplerInfo.lodAddr[2]);
+        }
+        else
+        {
+            samplerInfo.lodAddr[1] = samplerInfo.lodAddr[0] + srcSurf->uOffset;
+            samplerInfo.lodAddr[2] = samplerInfo.lodAddr[0] + srcSurf->vOffset;
+        }
+
+        /* Save strides. */
+        samplerInfo.lodStride[0] = srcSurf->stride;
+        samplerInfo.lodStride[1] = srcSurf->uStride;
+        samplerInfo.lodStride[2] = srcSurf->vStride;
+    }
+    else if (samplerInfo.lodNum == 2)
+    {
+        samplerInfo.lodAddr[1] = srcSurf->node.physicalBottom;
+    }
+
+    samplerInfo.hasTileStatus = !srcSurf->tileStatusDisabled[SrcView->firstSlice];
+
+    samplerInfo.texType = gcvTEXTURE_2D;
+    samplerInfo.textureInfo = &texParamInfo;
+    texParamInfo.anisoFilter = 1;
+    texParamInfo.baseLevel = 0;
+    texParamInfo.compareMode = gcvTEXTURE_COMPARE_MODE_NONE;
+    texParamInfo.lodBias = 0;
+    texParamInfo.lodMin = 0;
+    texParamInfo.lodMax = 0;
+    texParamInfo.mipFilter = gcvTEXTURE_NONE;
+    texParamInfo.minFilter =
+        texParamInfo.magFilter = args->filterMode;
+    texParamInfo.maxLevel = 0;
+    gcoOS_MemCopy(&texParamInfo.swizzle, baseComponents_rgba, sizeof(baseComponents_rgba));
+    texParamInfo.r =
+        texParamInfo.s =
+        texParamInfo.t = gcvTEXTURE_CLAMP;
+
+    samplerInfo.unsizedDepthTexture = gcvTRUE;
+
+    if (hardware->features[gcvFEATURE_TX_DESCRIPTOR])
+    {
+        gcsTXDESC_UPDATE_INFO updateInfo;
+        gctINT arrayIdx;
+
+        gcoOS_ZeroMemory((gctPOINTER)&updateInfo, gcmSIZEOF(updateInfo));
+
+        updateInfo.baseLevelWidth = srcSurf->requestW;
+        updateInfo.baseLevelHeight = srcSurf->requestH;
+        updateInfo.baseLevelDepth = 1;
+        updateInfo.type = gcvTEXTURE_2D;
+        updateInfo.baseLevelSurf = srcSurf;
+        updateInfo.endianHint = ((srcFmtInfo->txFormat == 0x05) ||
+            (srcFmtInfo->txFormat == 0x06) ||
+            (srcFmtInfo->txFormat == 0x0C) ||
+            (srcFmtInfo->txFormat == 0x0D) ||
+            (srcFmtInfo->txFormat == 0x0B)) ?
+        gcvENDIAN_SWAP_WORD : gcvENDIAN_NO_SWAP;
+
+        updateInfo.levels = 1;
+
+        updateInfo.unsizedDepthTexture = gcvTRUE;
+
+        gcmGETHARDWAREADDRESS(srcSurf->node, updateInfo.lodAddr[0]);
+
+        if (srcSurf->formatInfo.fmtClass == gcvFORMAT_CLASS_ASTC)
+        {
+            updateInfo.astcSize[0] = srcSurf->format -
+                (srcSurf->formatInfo.sRGB ? gcvSURF_ASTC4x4_SRGB : gcvSURF_ASTC4x4);
+            updateInfo.astcSRGB[0] = srcSurf->formatInfo.sRGB;
+        }
+
+        if (blitDraw->descCurIndex >= (gcdMAX_TXDESC_ARRAY_SIZE - 1))
+        {
+            gcoHAL_FreeTXDescArray(blitDraw->descArray, blitDraw->descCurIndex);
+            blitDraw->descCurIndex = -1;
+        }
+
+        arrayIdx = ++blitDraw->descCurIndex;
+
+        for (i = 0; i < srcFmtInfo->layers; i++)
+        {
+            gcsTXDescNode *pDescNode = &blitDraw->descArray[arrayIdx];
+            gcmASSERT(i < 2);
+
+            updateInfo.lodAddr[0] += i * srcSurf->layerSize;
+
+            if (!pDescNode->descNode[i])
+            {
+                gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsSURF_NODE), (gctPOINTER *)&pDescNode->descNode[i]);
+                gcoOS_ZeroMemory((gctPOINTER)pDescNode->descNode[i], gcmSIZEOF(gcsSURF_NODE));
+                gcmONERROR(gcsSURF_NODE_Construct(pDescNode->descNode[i],
+                    256,
+                    64,
+                    gcvSURF_TXDESC,
+                    0,
+                    gcvPOOL_DEFAULT
+                    ));
+            }
+            else
+            {
+                gcmASSERT(0);
+            }
+
+            if (!pDescNode->descLocked[i])
+            {
+                gcmONERROR(gcoSURF_LockNode(pDescNode->descNode[i],
+                    gcvNULL,
+                    &pDescNode->descLocked[i]));
+            }
+
+            updateInfo.desc = pDescNode->descLocked[i];
+
+#if gcdDUMP
+            gcmGETHARDWAREADDRESSP(pDescNode->descNode[i], updateInfo.physical);
+#endif
+
+            gcmONERROR(gcoHARDWARE_UpdateTextureDesc(hardware,
+                &texParamInfo,
+                &updateInfo));
+
+            samplerInfo.descNode = pDescNode->descNode[i];
+
+            gcmONERROR(gcoHARDWARE_BindTextureDesc(hardware,
+                i + programState->hints->samplerBaseOffset[gcvPROGRAM_STAGE_FRAGMENT],
+                &samplerInfo));
+        }
+    }
+    else
+    {
+        if (srcSurf->formatInfo.fmtClass == gcvFORMAT_CLASS_ASTC)
+        {
+            samplerInfo.astcSize[0] = srcSurf->format -
+                (srcSurf->formatInfo.sRGB ? gcvSURF_ASTC4x4_SRGB : gcvSURF_ASTC4x4);
+            samplerInfo.astcSRGB[0] = srcSurf->formatInfo.sRGB;
+        }
+        for (i = 0; i < srcFmtInfo->layers; i++)
+        {
+            samplerInfo.lodAddr[0] += i * srcSurf->layerSize;
+
+            if (samplerInfo.lodNum == 2)
+            {
+                samplerInfo.lodAddr[1] += i * srcSurf->layerSize;
+            }
+
+            gcmONERROR(gcoHARDWARE_BindTexture(hardware,
+                i + programState->hints->samplerBaseOffset[gcvPROGRAM_STAGE_FRAGMENT],
+                &samplerInfo));
+        }
+    }
+
+    gcmONERROR(gcoHARDWARE_BindTextureTS(hardware));
+
+#if gcdENABLE_APPCTXT_BLITDRAW
+    /* For dispatchCompute dump texture, when switch RT, disable previous tileStatus.*/
+    if (srcSurf->tileStatusNode.pool != gcvPOOL_UNKNOWN)
+    {
+        /* Disable tile status. */
+        gcmONERROR(
+            gcoHARDWARE_DisableTileStatus(hardware, srcSurf, gcvFALSE));
+    }
+
+    gcmONERROR(gcoHARDWARE_Semaphore(
+        hardware, gcvWHERE_COMMAND, gcvWHERE_PIXEL, gcvHOW_SEMAPHORE, gcvNULL
+        ));
+#endif
+
+    /* When using 3d draw clear to clear a depth/stencil buffer only,
+       The render target must set be to NULL since it decide if use the temp RT or not */
+    gcmONERROR(gcoHARDWARE_SetRenderTarget(hardware,
+        0,
+        gcvNULL,
+        0,
+        1,
+        0));
+
+    gcmONERROR(gcoHARDWARE_SetColorWrite(hardware, 0, 0));
+    gcmONERROR(gcoHARDWARE_SetColorOutCount(hardware, 0));
+
+    gcmASSERT(dstSurf);
+    dstFmtInfo = &dstSurf->formatInfo;
+
+    gcmONERROR(gcoHARDWARE_SetDepthBuffer(hardware, dstSurf, DstView->firstSlice, DstView->numSlices));
+
+    if (dstSurf->tileStatusNode.pool != gcvPOOL_UNKNOWN)
+    {
+        gcmGETHARDWAREADDRESS(dstSurf->tileStatusNode, tileStatusAddress);
+    }
+    else
+    {
+        tileStatusAddress = 0;
+    }
+
+    tileStatusAddress += hardware->PEStates->depthStates.sliceIndex * dstSurf->tileStatusSliceSize;
+
+    gcmONERROR(gcoHARDWARE_EnableTileStatus(hardware,
+        DstView,
+        tileStatusAddress,
+        &dstSurf->hzTileStatusNode,
+        0));
+    gcmONERROR(gcoHARDWARE_SetDepthMode(hardware, gcvDEPTH_Z));
+    gcmONERROR(gcoHARDWARE_SetDepthOnly(hardware, gcvTRUE));
+    gcmONERROR(gcoHARDWARE_SetDepthRangeF(hardware, gcvDEPTH_Z, 0.0f, 1.0f));
+    gcmONERROR(gcoHARDWARE_SetDepthWrite(hardware, 1));
+    gcmONERROR(gcoHARDWARE_SetDepthCompare(hardware, gcvCOMPARE_ALWAYS));
+    gcmONERROR(gcoHARDWARE_SetStencilMode(hardware, gcvSTENCIL_NONE));
+
+    gcmONERROR(gcoHARDWARE_SetCulling(hardware, gcvCULL_NONE));
+    gcmONERROR(gcoHARDWARE_SetFill(hardware, gcvFILL_SOLID));
+
+    gcmONERROR(gcoHARDWARE_SetViewport(hardware,
+        0,
+        dstSurf->requestH,
+        dstSurf->requestW,
+        0));
+
+    if (args->scissorEnabled)
+    {
+        gcmONERROR(
+            gcoHARDWARE_SetScissors(hardware,
+            gcmMAX(args->scissor.left, args->dstRect.left),
+            gcmMAX(args->scissor.top, args->dstRect.top),
+            gcmMIN(args->scissor.right, args->dstRect.right),
+            gcmMIN(args->scissor.bottom, args->dstRect.bottom)));
+    }
+    else
+    {
+        gcmONERROR(
+            gcoHARDWARE_SetScissors(hardware,
+            gcmMAX(0, args->dstRect.left),
+            gcmMAX(0, args->dstRect.top),
+            gcmMIN((gctINT)dstSurf->requestW, args->dstRect.right),
+            gcmMIN((gctINT)dstSurf->requestH, args->dstRect.bottom)));
+    }
+
+    /* Set up vertex stream.*/
+    do
+    {
+        gcsVERTEXARRAY_BUFOBJ streamPos, streamTexCoord;
+        gcsVERTEXARRAY_BUFOBJ_PTR streamPosPtr = &streamPos;
+        gcsVERTEXARRAY_BUFOBJ_PTR streamTexCoordPtr = &streamTexCoord;
+        gcsVERTEXARRAY_BUFOBJ_ATTRIBUTE attribPos, attribTexCoord;
+        gcsVERTEXARRAY_BUFOBJ_ATTRIBUTE_PTR attribPosPtr = &attribPos;
+        gcsVERTEXARRAY_BUFOBJ_ATTRIBUTE_PTR attribTexCoordPtr = &attribTexCoord;
+
+        gctFLOAT positionData[3 * 2];
+        gctFLOAT texCoordData[3 * 2];
+
+        /* Rectangle coordinates. */
+        gctFLOAT left, top, right, bottom;
+
+        /* Transform coordinates. */
+        left = 2.0f * args->dstRect.left / dstSurf->requestW - 1.0f;
+        top = 2.0f * args->dstRect.top / dstSurf->requestH - 1.0f;
+        right = 2.0f * (2.0f * args->dstRect.right - args->dstRect.left) / dstSurf->requestW - 1.0f;
+        bottom = 2.0f * (2.0f * args->dstRect.bottom - args->dstRect.top) / dstSurf->requestH - 1.0f;
+
+        /* Create 2 triangles in a strip. */
+        positionData[0] = left;
+        positionData[1] = top;
+
+        positionData[2] = right;
+        positionData[3] = top;
+
+        positionData[4] = left;
+        positionData[5] = bottom;
+
+        /* Normalize coordinates.*/
+        left = (gctFLOAT)args->srcRect.left / srcSurf->requestW;
+        top = (gctFLOAT)args->srcRect.top / srcSurf->requestH;
+        right = (2 * (gctFLOAT)args->srcRect.right - (gctFLOAT)args->srcRect.left) / srcSurf->requestW;
+        bottom = (2 * (gctFLOAT)args->srcRect.bottom - (gctFLOAT)args->srcRect.top) / srcSurf->requestH;
+
+        if (args->xReverse)
+        {
+            left = (gctFLOAT)args->srcRect.right / srcSurf->requestW;
+            right = (2 * (gctFLOAT)args->srcRect.left - (gctFLOAT)args->srcRect.right) / srcSurf->requestW;
+        }
+
+        if (args->yReverse)
+        {
+            top = (gctFLOAT)args->srcRect.bottom / srcSurf->requestH;
+            bottom = (2 * (gctFLOAT)args->srcRect.top - (gctFLOAT)args->srcRect.bottom) / srcSurf->requestH;
+        }
+
+        /* Create two triangles. */
+        texCoordData[0] = left;
+        texCoordData[1] = top;
+
+        texCoordData[2] = right;
+        texCoordData[3] = top;
+
+        texCoordData[4] = left;
+        texCoordData[5] = bottom;
+
+        gcoOS_ZeroMemory(streamPosPtr, sizeof(gcsVERTEXARRAY_BUFOBJ));
+        gcoOS_ZeroMemory(streamTexCoordPtr, sizeof(gcsVERTEXARRAY_BUFOBJ));
+        gcoOS_ZeroMemory(attribPosPtr, sizeof(gcsVERTEXARRAY_BUFOBJ_ATTRIBUTE));
+        gcoOS_ZeroMemory(attribTexCoordPtr, sizeof(gcsVERTEXARRAY_BUFOBJ_ATTRIBUTE));
+
+        /* set pos steam. */
+        streamPosPtr->stride = 0x8;
+        streamPosPtr->divisor = 0x0;
+        streamPosPtr->count = 0x3;
+        /* vertex and texcoord.*/
+        streamPosPtr->attributeCount = 0x1;
+
+        /* set attrib.*/
+        attribPosPtr->bytes = 0x8;
+        attribPosPtr->format = gcvVERTEX_FLOAT;
+        attribPosPtr->linkage = 0x0; /* Pos.*/
+        attribPosPtr->size = 0x2;
+        attribPosPtr->normalized = 0x0;
+        attribPosPtr->offset = gcmPTR2SIZE(positionData);
+        attribPosPtr->enabled = gcvTRUE;
+        attribPosPtr->isPosition = 0x0;
+        attribPosPtr->stride = 0x8;
+        attribPosPtr->pointer = &positionData;
+
+        streamPosPtr->attributePtr = attribPosPtr;
+
+        /* Set tex coord stream.*/
+        streamTexCoordPtr->stride = 0x8;
+        streamTexCoordPtr->divisor = 0x0;
+        streamTexCoordPtr->count = 0x3;
+        streamTexCoordPtr->attributeCount = 0x1;
+
+        /* set attrib.*/
+        attribTexCoordPtr->bytes = 0x8;
+        attribTexCoordPtr->format = gcvVERTEX_FLOAT;
+        attribTexCoordPtr->linkage = 0x1; /* tex coord */
+        attribTexCoordPtr->size = 0x2;
+        attribTexCoordPtr->normalized = 0x0;
+        attribTexCoordPtr->offset = gcmPTR2SIZE(positionData);
+        attribTexCoordPtr->enabled = gcvTRUE;
+        attribTexCoordPtr->isPosition = 0x0;
+        attribTexCoordPtr->stride = 0x8;
+        attribTexCoordPtr->pointer = &texCoordData;
+
+        streamTexCoordPtr->attributePtr = attribTexCoordPtr;
+        streamTexCoordPtr->next = streamPosPtr;
+
+        gcmONERROR(
+            gcoSTREAM_CacheAttributesEx(blitDraw->dynamicStream,
+            0x2,
+            streamTexCoordPtr,
+            0x0,
+            gcvNULL));
+
+        gcmONERROR(gcoHARDWARE_SetVertexArrayEx(gcvNULL,
+            1,
+            0,
+            2,
+            streamTexCoordPtr,
+            0,
+            0,
+            0xffffffff
+            ));
+
+        if (hardware->features[gcvFEATURE_HALTI0])
+        {
+            /* Draw command.*/
+            gcmONERROR(
+                gcoHARDWARE_DrawInstancedPrimitives(hardware,
+                0,
+                gcvPRIMITIVE_TRIANGLE_STRIP,
+                0,
+                0,
+                1,
+                3,
+                1));
+        }
+        else
+        {
+            /* Draw command.*/
+            gcmONERROR(
+                gcoHARDWARE_DrawPrimitives(hardware,
+                gcvPRIMITIVE_TRIANGLE_STRIP,
+                0,
+                1));
+        }
+
+        gcmONERROR(gcoHARDWARE_DisableTileStatus(hardware, DstView, gcvFALSE));
+        gcmONERROR(gcoHARDWARE_SetDepthBuffer(hardware, gcvNULL, 0, 1));
+
+    } while (gcvFALSE);
+
+#if gcdENABLE_APPCTXT_BLITDRAW
+    /* Restore states. */
+    gcoOS_MemCopy(hardware->FEStates, FEStates, gcmSIZEOF(gcsFESTATES));
+    gcoOS_MemCopy(hardware->PAAndSEStates, PAAndSEStates, gcmSIZEOF(gcsPAANDSESTATES));
+    gcoOS_MemCopy(hardware->MsaaStates, MsaaStates, gcmSIZEOF(gcsMSAASTATES));
+    gcoOS_MemCopy(hardware->SHStates, SHStates, gcmSIZEOF(gcsSHSTATES));
+    gcoOS_MemCopy(hardware->PEStates, PEStates, gcmSIZEOF(gcsPESTATES));
+    gcoOS_MemCopy(hardware->TXStates, TXStates, gcmSIZEOF(gcsTXSTATES));
+    gcoOS_MemCopy(hardware->MCStates, MCStates, gcmSIZEOF(gcsMCSTATES));
+    gcoOS_MemCopy(hardware->QUERYStates, QueryStates, gcmSIZEOF(gcsQUERYSTATES));
+    gcoOS_MemCopy(hardware->XFBStates, XfbStates, gcmSIZEOF(gcsXFBSTATES));
+
+
+    /* Reset some intermediate generated states to invalid. Thus, in the next compasion, it will work.
+    ** For example, clear1->blit->clear2, if clear2 has the same cacheMode with clear1, but the blit has the different one.
+    ** If we didn't reset the caseMode after blit, clear2 will not program the correct value about cacheMode.
+    */
+    hardware->PEStates->colorStates.cacheMode = hardware->PEStates->singlePEpipe
+        = hardware->PEStates->colorStates.destinationRead = gcvINVALID_VALUE;
+
+    /* Reset all the dirty to make sure the next time, it will flush the right states. */
+    /* FE dirty reset. */
+    if (hardware->FEStates->indexHeadAddress)
+    {
+        hardware->FEDirty->indexHeadDirty = gcvTRUE;
+    }
+
+    if (hardware->FEStates->indexTailAddress)
+    {
+        hardware->FEDirty->indexTailDirty = gcvTRUE;
+    }
+    hardware->FEDirty->indexDirty = gcvTRUE;
+    /* PA and SE dirty reset. */
+    hardware->PAAndSEDirty->paConfigDirty = hardware->PAAndSEDirty->paLineDirty
+        = hardware->PAAndSEDirty->scissorDirty
+        = hardware->PAAndSEDirty->viewportDirty = gcvTRUE;
+    /* Msaa dirty reset. */
+    hardware->MsaaDirty->centroidsDirty = hardware->MsaaDirty->msaaConfigDirty = hardware->MsaaDirty->msaaModeDirty = gcvTRUE;
+    /* SH dirty reset. */
+    hardware->SHDirty->shaderDirty |= (gcvPROGRAM_STAGE_VERTEX_BIT | gcvPROGRAM_STAGE_FRAGMENT_BIT);
+    hardware->SHDirty->programSwitched = gcvTRUE;
+    /* PE dirty reset. */
+    hardware->PEDirty->alphaDirty = hardware->PEDirty->colorConfigDirty
+        = hardware->PEDirty->colorTargetDirty
+        = hardware->PEDirty->depthConfigDirty
+        = hardware->PEDirty->depthNormalizationDirty
+        = hardware->PEDirty->depthRangeDirty
+        = hardware->PEDirty->depthTargetDirty
+        = hardware->PEDirty->peDitherDirty
+        = hardware->PEDirty->stencilDirty = gcvTRUE;
+    /* Texture dirty reset. */
+    hardware->TXDirty->hwTxDirty = hardware->TXDirty->hwTxSamplerModeDirty
+        = hardware->TXDirty->hwTxSamplerSizeDirty
+        = hardware->TXDirty->hwTxSamplerSizeLogDirty
+        = hardware->TXDirty->hwTxSampler3DDirty
+        = hardware->TXDirty->hwTxSamplerLODDirty
+        = hardware->TXDirty->hwTxSamplerBaseLODDirty
+        = hardware->TXDirty->hwTxSamplerYUVControlDirty
+        = hardware->TXDirty->hwTxSamplerYUVStrideDirty
+        = hardware->TXDirty->hwTxSamplerLinearStrideDirty
+        = hardware->TXDirty->hwTxSamplerSizeLogExtDirty
+        = hardware->TXDirty->hwTxSampler3DExtDirty
+        = hardware->TXDirty->hwTxSamplerLodExtDirty
+        = hardware->TXDirty->hwTxSamplerLodBiasExtDirty
+        = hardware->TXDirty->hwTxSamplerAnisoCtrlDirty
+        = hardware->TXDirty->hwTxSamplerConfig3Dirty
+        = hardware->TXDirty->hwTxSamplerDirty = 0xFFFFFFFF;
+
+    gcsBITMASK_InitAllOne(&hardware->TXDirty->hwSamplerControl0Dirty, gcdTXDESCRIPTORS);
+    gcsBITMASK_InitAllOne(&hardware->TXDirty->hwSamplerControl1Dirty, gcdTXDESCRIPTORS);
+    gcsBITMASK_InitAllOne(&hardware->TXDirty->hwSamplerLodMinMaxDirty, gcdTXDESCRIPTORS);
+    gcsBITMASK_InitAllOne(&hardware->TXDirty->hwSamplerLODBiasDirty, gcdTXDESCRIPTORS);
+    gcsBITMASK_InitAllOne(&hardware->TXDirty->hwSamplerAnisCtrlDirty, gcdTXDESCRIPTORS);
+    gcsBITMASK_InitAllOne(&hardware->TXDirty->hwTxDescAddressDirty, gcdTXDESCRIPTORS);
+    gcsBITMASK_InitAllOne(&hardware->TXDirty->hwTxDescDirty, gcdTXDESCRIPTORS);
+    gcsBITMASK_InitAllOne(&hardware->TXDirty->hwTextureControlDirty, gcdTXDESCRIPTORS);
+
+    hardware->TXDirty->hwTxDirty = hardware->TXDirty->textureDirty
+        = hardware->TXDirty->hwTxFlushPS
+        = hardware->TXDirty->hwTxFlushVS = gcvTRUE;
+
+    gcoOS_MemFill(hardware->TXDirty->hwTxSamplerAddressDirty, 0xFF, gcmSIZEOF(hardware->TXDirty->hwTxSamplerAddressDirty));
+    gcoOS_MemFill(hardware->TXDirty->hwTxSamplerASTCDirty, 0xFF, gcmSIZEOF(hardware->TXDirty->hwTxSamplerASTCDirty));
+
+    /* MC dirty reset. */
+    hardware->MCDirty->hwTxSamplerTSDirty = hardware->MCDirty->texTileStatusSlotDirty = 0xFF;
+    hardware->MCDirty->cacheDirty = gcvTRUE;
 
     /* Query dirty reset. */
     hardware->QUERYDirty->queryDirty[gcvQUERY_OCCLUSION] = gcvTRUE;

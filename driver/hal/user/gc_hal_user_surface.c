@@ -12998,6 +12998,22 @@ gcoSURF_DrawBlit(
 }
 
 gceSTATUS
+gcoSURF_DrawBlitDepth(
+    gcsSURF_VIEW *SrcView,
+    gcsSURF_VIEW *DstView,
+    gscSURF_BLITDRAW_BLIT *Args
+)
+{
+    gceSTATUS status;
+    gcmHEADER_ARG("SrcView=0x%x DstView=0x%x Args=0x%x", SrcView, DstView, Args);
+
+    status = gcoHARDWARE_DrawBlitDepth(SrcView, DstView, Args);
+
+    gcmFOOTER_NO();
+    return status;
+}
+
+gceSTATUS
 gcoSURF_Preserve(
     IN gcoSURF SrcSurf,
     IN gcoSURF DstSurf,

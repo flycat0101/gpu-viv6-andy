@@ -5330,6 +5330,13 @@ gcoHARDWARE_DrawBlit(
     );
 
 gceSTATUS
+gcoHARDWARE_DrawBlitDepth(
+    gcsSURF_VIEW *SrcView,
+    gcsSURF_VIEW *DstView,
+    gscSURF_BLITDRAW_BLIT *args
+    );
+
+gceSTATUS
 gcoHARDWARE_QueryHostInterface1(
     IN gcoHARDWARE Hardware,
     OUT gctBOOL *hasHI1);

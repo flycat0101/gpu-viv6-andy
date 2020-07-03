@@ -1520,6 +1520,128 @@ OnError:
 
 /********************************************************************
 **
+**  _BlitFramebufferDrawblit
+**
+**  Function to use shader to do the framebuffer blit.
+**  called when resolve blit and 3dblit failed.
+**
+**  Parameters: The framebuffer blit arguments
+**  Return Value: Blit successful
+**
+********************************************************************/
+__GL_INLINE gceSTATUS
+gcChipBlitFramebufferDrawblit(
+    __GLcontext *gc,
+    GLint srcX0,
+    GLint srcY0,
+    GLint srcX1,
+    GLint srcY1,
+    GLint dstX0,
+    GLint dstY0,
+    GLint dstX1,
+    GLint dstY1,
+    GLbitfield *mask,
+    GLboolean   xReverse,
+    GLboolean   yReverse,
+    GLenum      filter
+)
+{
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+    gscSURF_BLITDRAW_BLIT blitArgs;
+    gceSTATUS status = gcvSTATUS_OK;
+    gcsSURF_VIEW srcView;
+    gcsSURF_VIEW dstView;
+    GLint srcWidth = 0;
+    GLint srcHeight = 0;
+    GLint dstWidth = 0;
+    GLint dstHeight = 0;
+
+    gcmHEADER_ARG("gc=0x%x srcX0=%d srcY0=%d srcX1=%d srcY1=%d dstX0=%d dstY0=%d "
+        "dstX1=%d desY1=%d mask=0x%x xReverse=%d yReverse=%d filter=0x%04x",
+        gc, srcX0, srcY0, srcX1, srcY1, dstX0, dstX1, dstY1,
+        mask, xReverse, yReverse, filter);
+
+    /*
+    ** If size of blit is too small, we will skip it and use CPU blit.
+    */
+    srcWidth = srcX1 > srcX0 ? srcX1 - srcX0 : srcX0 - srcX1;
+    dstWidth = dstX1 > dstX0 ? dstX1 - dstX0 : dstX0 - dstX1;
+    srcHeight = srcY1 > srcY0 ? srcY1 - srcY0 : srcY0 - srcY1;
+    dstHeight = dstY1 > dstY0 ? dstY1 - dstY0 : dstY0 - dstY1;
+
+    if (srcWidth <= 64 && srcHeight <= 64 && dstWidth <= 64 && dstHeight <= 64)
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+
+
+    /*
+    ** We can use 3Dblt to do framebuffer blit.
+    */
+    if (*mask & (GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT))
+    {
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+    }
+
+    /*
+    ** Add shader blit.
+    */
+
+    do
+    {
+        status = gcvSTATUS_OK;
+
+        if (*mask & GL_COLOR_BUFFER_BIT)
+        {
+            gcsSURF_VIEW tmpView = { chipCtx->drawRtViews[0].surf,
+                chipCtx->drawRtViews[0].firstSlice, chipCtx->drawRtViews[0].numSlices };
+            srcView = chipCtx->readRtView;
+            dstView = tmpView;
+        }
+
+        if (*mask & GL_DEPTH_BUFFER_BIT)
+        {
+            srcView = chipCtx->readDepthView;
+            dstView = chipCtx->drawDepthView;
+        }
+
+        /*
+        ** We have done x/y reverse in __glChipBlitFramebuffer,
+        ** here, we only transfer xReverse/yReverse to blit arguments.
+        */
+        __GL_MEMZERO(&blitArgs, sizeof(blitArgs));
+        blitArgs.srcRect.left = srcX0;
+        blitArgs.srcRect.top = srcY0;
+        blitArgs.srcRect.right = srcX1;
+        blitArgs.srcRect.bottom = srcY1;
+        blitArgs.dstRect.left = dstX0;
+        blitArgs.dstRect.top = dstY0;
+        blitArgs.dstRect.right = dstX1;
+        blitArgs.dstRect.bottom = dstY1;
+        blitArgs.filterMode = gcvTEXTURE_POINT;
+        blitArgs.yReverse = yReverse;
+        blitArgs.xReverse = xReverse;
+
+        if (*mask & GL_COLOR_BUFFER_BIT)
+        {
+            status = gcoSURF_DrawBlit(&srcView, &dstView, &blitArgs);
+            if (gcmIS_SUCCESS(status))
+                *mask &= ~GL_COLOR_BUFFER_BIT;
+        }
+
+        if (*mask & GL_DEPTH_BUFFER_BIT)
+        {
+            status = gcoSURF_DrawBlitDepth(&srcView, &dstView, &blitArgs);
+            if (gcmIS_SUCCESS(status))
+                *mask &= ~GL_DEPTH_BUFFER_BIT;
+        }
+    } while (0);
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+/********************************************************************
+**
 **  _BlitFramebufferSoftware
 **
 **  Function to use software path to do the framebuffer blit.
@@ -1849,6 +1971,31 @@ GLvoid __glChipBlitFramebuffer(__GLcontext *gc,
                                              xReverse,
                                              yReverse,
                                              filter);
+    }
+
+    if (mask)
+    {
+        gctUINT32 width = srcX0 < srcX1 ? srcX1 - srcX0 : srcX0 - srcX1;
+        gctUINT32 height = srcY0 < srcY1 ? srcY1 - srcY0 : srcY0 - srcY1;
+
+        /* Only blit surface size is greater than 256x256, we will use draw blit */
+        if (width > 256 && height > 256)
+        {
+            /* Use draw blit to do depth buffer blit */
+            status = gcChipBlitFramebufferDrawblit(gc,
+                                                   srcX0,
+                                                   srcY0,
+                                                   srcX1,
+                                                   srcY1,
+                                                   dstX0,
+                                                   dstY0,
+                                                   dstX1,
+                                                   dstY1,
+                                                   &mask,
+                                                   xReverse,
+                                                   yReverse,
+                                                   filter);
+        }
     }
 
     if (mask)
