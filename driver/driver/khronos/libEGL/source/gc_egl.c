@@ -38,12 +38,18 @@ static gctCONST_STRING _dispatchNames[] =
 
 
 extern veglClientApiEntry eglApiEntryTbl[];
+#if gcdENABLE_3D
 extern veglClientApiEntry gles11ApiEntryTbl[];
 extern veglClientApiEntry gles32ApiEntryTbl[];
-extern veglClientApiEntry gl4xApiEntryTbl[];
 extern veglClientApiEntry glesCommonApiEntryTbl[];
 extern veglCommonEsApiDispatch glesCommonApiDispatchTbl[];
+#if !defined(VIVANTE_NO_GL4)
+extern veglClientApiEntry gl4xApiEntryTbl[];
+#endif
+#endif
+#if !defined(VIVANTE_NO_VG)
 extern veglClientApiEntry vgApiEntryTbl[];
+#endif
 
 extern void veglInitClientApiProcTbl(gctHANDLE library, veglClientApiEntry *lookupTbl, const char *suffix, const char *info);
 extern void veglInitEsCommonApiDispatchTbl(gctHANDLE es11lib, gctHANDLE es2xlib, veglCommonEsApiDispatch *lookupTbl, const char *suffix);
@@ -270,6 +276,7 @@ static void _InitDispatchTables(
     if (!apiTblInitialized)
     {
         veglInitClientApiProcTbl(client_lib[vegl_EGL], eglApiEntryTbl, "", "EGL");
+#if gcdENABLE_3D
         veglInitClientApiProcTbl(client_lib[vegl_EGL], glesCommonApiEntryTbl, "forward_gl", "ES_Common");
         veglInitClientApiProcTbl(client_lib[vegl_OPENGL_ES11], gles11ApiEntryTbl, "gl", "GLES11");
         veglInitClientApiProcTbl(client_lib[vegl_OPENGL_ES20], gles32ApiEntryTbl, "gl", "GLES32");
@@ -277,6 +284,7 @@ static void _InitDispatchTables(
             client_lib[vegl_OPENGL_ES11], client_lib[vegl_OPENGL_ES20], glesCommonApiDispatchTbl, "gl");
 #if !defined(VIVANTE_NO_GL4)
         veglInitClientApiProcTbl(client_lib[vegl_OPENGL], gl4xApiEntryTbl, "gl", "GL4X");
+#endif
 #endif
 #if !defined(VIVANTE_NO_VG)
         veglInitClientApiProcTbl(client_lib[vegl_OPENVG], vgApiEntryTbl, "vg", "OpenVG");
