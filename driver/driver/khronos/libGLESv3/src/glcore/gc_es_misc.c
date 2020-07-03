@@ -634,7 +634,7 @@ GLboolean __glDeleteSyncObj(__GLcontext *gc, __GLsyncObject *syncObj)
     return GL_TRUE;
 }
 
-GLvoid __glInitSyncState(__GLcontext *gc)
+GLboolean __glInitSyncState(__GLcontext *gc)
 {
     /* Sync objects can be shared across contexts */
     if (gc->shareCtx)
@@ -649,7 +649,7 @@ GLvoid __glInitSyncState(__GLcontext *gc)
         {
             if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(VEGLLock), (gctPOINTER*)&gc->sync.shared->lock)))
             {
-                return;
+                return gcvFALSE;
             }
 
             gcoOS_ZeroMemory(gc->sync.shared->lock, sizeof(VEGLLock));
@@ -664,7 +664,7 @@ GLvoid __glInitSyncState(__GLcontext *gc)
 
         if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(__GLsharedObjectMachine), (gctPOINTER*)&gc->sync.shared)))
         {
-            return;
+            return gcvFALSE;
         }
 
         gcoOS_ZeroMemory(gc->sync.shared, sizeof(__GLsharedObjectMachine));
@@ -675,7 +675,7 @@ GLvoid __glInitSyncState(__GLcontext *gc)
         if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, gc->sync.shared->linearTableSize * sizeof(GLvoid*), (gctPOINTER*)&gc->sync.shared->linearTable)))
         {
             gcmOS_SAFE_FREE(gcvNULL, gc->sync.shared);
-            return;
+            return gcvFALSE;
         }
 
         gcoOS_ZeroMemory(gc->sync.shared->linearTable, gc->sync.shared->linearTableSize * sizeof(GLvoid*));
@@ -686,6 +686,7 @@ GLvoid __glInitSyncState(__GLcontext *gc)
         gc->sync.shared->deleteObject = (__GLdeleteObjectFunc)__glDeleteSyncObj;
         gc->sync.shared->immediateInvalid = GL_TRUE;
     }
+    return gcvTRUE;
 }
 
 GLvoid __glFreeSyncState(__GLcontext *gc)
@@ -730,7 +731,11 @@ GLsync GL_APIENTRY __gles_FenceSync(__GLcontext *gc, GLenum condition, GLbitfiel
     gcoOS_ZeroMemory(syncObject, sizeof(__GLsyncObject));
 
     __glInitSyncObj(gc, syncObject, sync, condition, flags);
-    __glAddObject(gc, gc->sync.shared, sync, syncObject);
+    if (__glAddObject(gc, gc->sync.shared, sync, syncObject) == gcvFALSE)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, syncObject);
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
 
     retVal = (*gc->dp.createSync)(gc, syncObject);
 

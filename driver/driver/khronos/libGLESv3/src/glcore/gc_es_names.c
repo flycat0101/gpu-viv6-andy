@@ -491,10 +491,11 @@ GLvoid __glFreeSharedObjectState(__GLcontext *gc, __GLsharedObjectMachine *share
     gcoOS_UnLockPLS();
 }
 
-GLvoid __glCheckLinearTableSize(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint size)
+GLboolean __glCheckLinearTableSize(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint size)
 {
     GLvoid **oldLinearTable, *obj;
     GLuint oldTableSize, i, allocSize;
+    GLboolean ret = gcvTRUE;
 
     if (shared->lock)
     {
@@ -522,9 +523,14 @@ GLvoid __glCheckLinearTableSize(__GLcontext *gc, __GLsharedObjectMachine *shared
 
                 /* Copy the data from the old linear table to the new linear table */
                 __GL_MEMCOPY(shared->linearTable, oldLinearTable, oldTableSize * sizeof(GLvoid *));
+                /* Free the old linear table */
+                gcmOS_SAFE_FREE(gcvNULL, oldLinearTable);
             }
-            /* Free the old linear table */
-            gcmOS_SAFE_FREE(gcvNULL, oldLinearTable);
+            else
+            {
+                ret = gcvFALSE;
+                __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+            }
         }
         else
         {
@@ -548,8 +554,11 @@ GLvoid __glCheckLinearTableSize(__GLcontext *gc, __GLsharedObjectMachine *shared
         }
     }
 
+OnError:
     if (shared->lock)
     {
         (*gc->imports.unlockMutex)(shared->lock);
     }
+
+    return ret;
 }
