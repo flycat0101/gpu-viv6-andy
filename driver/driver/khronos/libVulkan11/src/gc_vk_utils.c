@@ -536,6 +536,35 @@ static VkResult __vk_utils_saveResFile(
     void *pBaseBGR  = gcvNULL;
     VkResult result = VK_SUCCESS;
 
+#if defined(ANDROID)
+    {
+        enum DUMP_FLAG
+        {
+            DUMP_UNINITIALIZED,
+            DUMP_TRUE,
+            DUMP_FALSE,
+        };
+        static gctINT dump = DUMP_UNINITIALIZED;
+
+        if (DUMP_UNINITIALIZED == dump)
+        {
+            if (gcvSTATUS_TRUE == gcoOS_DetectProcessByName(gcdDUMP_KEY))
+            {
+                dump = DUMP_TRUE;
+            }
+            else
+            {
+                dump = DUMP_FALSE;
+            }
+        }
+
+        if (DUMP_TRUE != dump)
+        {
+            return VK_SUCCESS;
+        }
+    }
+#endif
+
     if (!res->isImage)
     {
         return VK_ERROR_FEATURE_NOT_PRESENT;
@@ -704,8 +733,8 @@ static VkResult __vk_utils_saveResFile(
         tgaHeader[16] = 24;
         tgaHeader[17] = (0x01 << 5);
 
-        __VK_VERIFY_OK(gcoOS_PrintStrSafe(fName, gcdMAX_PATH, gcvNULL, "f%04u_%s%s",
-                                          sFileSeq++, res->tag, suffix));
+        __VK_VERIFY_OK(gcoOS_PrintStrSafe(fName, gcdMAX_PATH, gcvNULL, "%sf%04u_%s%s",
+                                          gcdDUMP_PATH ,sFileSeq++, res->tag, suffix));
 
         /* Open tga file for write. */
         __VK_VERIFY_OK(gcoOS_Open(gcvNULL, fName, gcvFILE_CREATE, &file));
