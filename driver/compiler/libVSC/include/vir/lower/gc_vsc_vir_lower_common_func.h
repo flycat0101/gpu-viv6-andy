@@ -777,6 +777,12 @@ VIR_Lower_jmp_2_succ(
     );
 
 gctBOOL
+VIR_Lower_jmp_2_succ1(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
 VIR_Lower_jmp_2_succ2(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst

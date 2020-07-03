@@ -926,7 +926,7 @@ static VSC_ErrCode _RemoveBasicBlockFromCFG(
                 }
             }
 
-            VIR_Function_DeleteInstruction(pCFG->pOwnerFuncBlk->pVIRFunc, pInst);
+            VIR_Function_DeleteInstruction(pCFG->pOwnerFuncBlk->pVIRFunc, pInst, gcvTRUE);
         }
         else
         {

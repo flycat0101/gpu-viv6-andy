@@ -1734,6 +1734,15 @@ VIR_Lower_jmp_2_succ(
 }
 
 gctBOOL
+VIR_Lower_jmp_2_succ1(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return VIR_Lower_jmp_2_succ(Context, Inst, 1);
+}
+
+gctBOOL
 VIR_Lower_jmp_2_succ2(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst

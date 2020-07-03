@@ -635,7 +635,8 @@ _Pattern_FreeMatchedInsts(
             VIR_Inst_SetDest(curInst, gcvNULL);
         }
 
-        VIR_Function_DeleteInstruction(Function, curInst);
+        VIR_Function_DeleteInstruction(Function, curInst,
+            Pattern->flags & VIR_PATN_FLAG_NO_REPLACE_LABEL ? gcvFALSE: gcvTRUE);
         curInst = nxtInst;
     }
 
@@ -689,7 +690,8 @@ _Pattern_ReplaceNormal(
             VIR_Inst_SetResOpType(insertedInst, resOpType);
         }
 
-        if (VIR_Inst_GetOpcode(insertedInst) == VIR_OP_LABEL)
+        if (VIR_Inst_GetOpcode(insertedInst) == VIR_OP_LABEL &&
+            !(Pattern->flags & VIR_PATN_FLAG_NO_REPLACE_LABEL))
         {
             VIR_LabelId labelID;
             VIR_Label *virLabel;
