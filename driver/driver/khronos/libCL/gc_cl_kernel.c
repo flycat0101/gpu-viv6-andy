@@ -3847,7 +3847,7 @@ clfFlushVIRKernelResource(
                             Columns = arg->size / elemSize;
                             bytes = Columns * 4;
 
-                            gcoOS_Allocate(gcvNULL, bytes, &tmpPointer);
+                            gcmONERROR(gcoOS_Allocate(gcvNULL, bytes, &tmpPointer));
                             gcoOS_ZeroMemory(tmpPointer, bytes);
                             tmpData = (gctUINT32 *) tmpPointer;
                             for (i=0; i<Columns; i++)
@@ -3877,7 +3877,7 @@ clfFlushVIRKernelResource(
 
                             Columns = arg->size / elemSize;
 
-                            gcoOS_Allocate(gcvNULL, arg->size, &tmpPointer);
+                            gcmONERROR(gcoOS_Allocate(gcvNULL, arg->size, &tmpPointer));
                             gcoOS_ZeroMemory(tmpPointer, arg->size);
                             tmpData = (gctUINT32 *) tmpPointer;
 
@@ -6923,15 +6923,14 @@ clfCreateVirInstanceHash(
     )
 {
     clsVIRInstanceHashRec_PTR pHash = gcvNULL;
-    gceSTATUS       status = gcvSTATUS_OK;
     gctPOINTER                pointer = gcvNULL;
+    gceSTATUS       status = gcvSTATUS_OK;
     gcmHEADER_ARG("tbEntryNum=%d maxEntryObjs=%d",
                    tbEntryNum, maxEntryObjs);
 
     gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsVIRInstanceHashRec), &pointer));
     gcoOS_ZeroMemory(pointer, sizeof(clsVIRInstanceHashRec));
     pHash = (clsVIRInstanceHashRec_PTR)pointer;
-
     pHash->tbEntryNum = tbEntryNum;
     pHash->maxEntryObjs = maxEntryObjs;
     pHash->year = 0;
@@ -6939,11 +6938,11 @@ clfCreateVirInstanceHash(
     gcmONERROR(gcoOS_Allocate(gcvNULL, tbEntryNum * sizeof(clsVIRInstanceKey_PTR), &pointer));
     gcoOS_ZeroMemory(pointer, tbEntryNum * sizeof(clsVIRInstanceKey_PTR));
     pHash->ppHashTable = (clsVIRInstanceKey_PTR *)pointer;
+
     gcmONERROR(gcoOS_Allocate(gcvNULL, tbEntryNum * sizeof(gctUINT), &pointer));
     gcoOS_ZeroMemory(pointer, tbEntryNum * sizeof(gctUINT));
     pHash->pEntryCounts = (gctUINT *)pointer;
     gcmASSERT(pHash->ppHashTable && pHash->pEntryCounts);
-
     gcmFOOTER_ARG("return=0x%x", pHash);
     return pHash;
 
@@ -7716,8 +7715,8 @@ clfRecompileVIRKernel(
     }
 
     return status;
-OnError:
 
+OnError:
     if (ptrImage)
     {
         gcmOS_SAFE_FREE(gcvNULL, ptrImage);
@@ -7730,7 +7729,7 @@ OnError:
 
     if (Kernel->recompileThreadRemap == gcvTRUE)
     {
-        clfEnableOpencvENVConfig(Kernel);
+        status = clfEnableOpencvENVConfig(Kernel);
     }
 
     return status;

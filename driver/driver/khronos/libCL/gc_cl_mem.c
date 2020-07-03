@@ -1269,7 +1269,7 @@ clfWriteImage(
     /* Decrease reference count of memory object */
     clfReleaseMemObject(image);
 
-    return CL_SUCCESS;
+    status = CL_SUCCESS;
 
 OnError:
     gcmFOOTER_ARG("%d", status);

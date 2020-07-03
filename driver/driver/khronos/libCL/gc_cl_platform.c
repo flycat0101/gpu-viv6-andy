@@ -217,7 +217,21 @@ void clfAllocateVidMemoryCB(
 
     if (initialData)
     {
+#if gcdENDIAN_BIG
+        gctSIZE_T i;
+        gctUINT_PTR pDst = (gctUINT_PTR)logical;
+        gctUINT_PTR pSrc = (gctUINT_PTR)initialData;
+
+        gcmASSERT(size % 4 == 0);
+
+        for (i = 0; i < size / 4; ++i)
+        {
+            gctUINT src = *pSrc++;
+            *pDst++ = gcmBSWAP32(src);
+        }
+#else
         gcoOS_MemCopy(logical, initialData, size);
+#endif
     }
     else if (zeroMemory)
     {
