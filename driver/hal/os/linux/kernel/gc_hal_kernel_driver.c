@@ -819,7 +819,7 @@ static long drv_ioctl(
     gcsHAL_INTERFACE iface;
 
 #if VIVANTE_PROFILER
-    static gcsHAL_PROFILER_INTERFACE iface_profiler;
+    gcsHAL_PROFILER_INTERFACE iface_profiler;
 #endif
 
     gctUINT32 copyLen;
