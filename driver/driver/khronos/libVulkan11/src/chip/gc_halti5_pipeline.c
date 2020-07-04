@@ -210,7 +210,7 @@ VkResult halti5_helper_convert_VertexAttribDesc(
     uint32_t fetchSize = 0;
     VkBool32 fetchBreak;
 
-    static const struct
+    struct s_FormatEntry
     {
         VkFormat format;
         uint32_t hwDataType;
@@ -218,8 +218,12 @@ VkResult halti5_helper_convert_VertexAttribDesc(
         uint32_t hwNormalized;
         VkBool32 integer;
         uint32_t sizeInByte;
-    }
-    s_vkFormatToHwVsInputInfos[] =
+    };
+
+    static const struct s_FormatEntry *pVkFormatToHwVsInputInfos = 0;
+    uint32_t formatToHwVsInputInfosCount = 0;
+
+    static const struct s_FormatEntry s_vkFormatToHwVsInputInfosOld[] =
     {
         /* mandated formats */
         {VK_FORMAT_R8G8B8A8_UNORM, 0x1, 0x0, 0x2, VK_FALSE, 4},
@@ -318,27 +322,137 @@ VkResult halti5_helper_convert_VertexAttribDesc(
         {VK_FORMAT_A2B10G10R10_SSCALED_PACK32, 0x6, 0x0, 0x0, VK_FALSE, 4},
     };
 
+    static const struct s_FormatEntry s_vkFormatToHwVsInputInfos630[] =
+    {
+        /* mandated formats */
+        {VK_FORMAT_R8G8B8A8_UNORM, 0x01, 0x0, 0x2, VK_FALSE, 4},
+        {VK_FORMAT_R8G8B8_UNORM, 0x01, 0x3, 0x2, VK_FALSE, 3},
+        {VK_FORMAT_R8G8_UNORM, 0x01, 0x2, 0x2, VK_FALSE, 2},
+        {VK_FORMAT_R8_UNORM, 0x01, 0x1, 0x2, VK_FALSE, 1},
+
+        {VK_FORMAT_R8G8B8A8_USCALED, 0x01, 0x0, 0x0, VK_FALSE, 4},
+        {VK_FORMAT_R8G8B8_USCALED, 0x01, 0x3, 0x0, VK_FALSE, 3},
+        {VK_FORMAT_R8G8_USCALED, 0x01, 0x2, 0x0, VK_FALSE, 2},
+        {VK_FORMAT_R8_USCALED, 0x01, 0x1, 0x0, VK_FALSE, 1},
+
+        {VK_FORMAT_R8G8B8A8_UINT, 0x0E, 0x0, 0x0, VK_TRUE, 4},
+        {VK_FORMAT_R8G8B8_UINT, 0x0E, 0x3, 0x0, VK_TRUE, 3},
+        {VK_FORMAT_R8G8_UINT, 0x0E, 0x2, 0x0, VK_TRUE, 2},
+        {VK_FORMAT_R8_UINT, 0x0E, 0x1, 0x0, VK_TRUE, 1},
+
+        {VK_FORMAT_R8G8B8A8_SNORM, 0x00, 0x0, 0x2, VK_FALSE, 4},
+        {VK_FORMAT_R8G8B8_SNORM, 0x00, 0x3, 0x2, VK_FALSE, 3},
+        {VK_FORMAT_R8G8_SNORM, 0x00, 0x2, 0x2, VK_FALSE, 2},
+        {VK_FORMAT_R8_SNORM, 0x00, 0x1, 0x2, VK_FALSE, 1},
+
+        {VK_FORMAT_R8G8B8A8_SSCALED, 0x00, 0x0, 0x0, VK_FALSE, 4},
+        {VK_FORMAT_R8G8B8_SSCALED, 0x00, 0x3, 0x0, VK_FALSE, 3},
+        {VK_FORMAT_R8G8_SSCALED, 0x00, 0x2, 0x0, VK_FALSE, 2},
+        {VK_FORMAT_R8_SSCALED, 0x00, 0x1, 0x0, VK_FALSE, 1},
+
+        {VK_FORMAT_R8G8B8A8_SINT, 0x0E, 0x0, 0x2, VK_TRUE, 4},
+        {VK_FORMAT_R8G8B8_SINT, 0x0E, 0x3, 0x2, VK_TRUE, 3},
+        {VK_FORMAT_R8G8_SINT, 0x0E, 0x2, 0x2, VK_TRUE, 2},
+        {VK_FORMAT_R8_SINT, 0x0E, 0x1, 0x2, VK_TRUE, 1},
+
+        {VK_FORMAT_R16G16B16A16_UNORM, 0x03, 0x0, 0x2, VK_FALSE, 8},
+        {VK_FORMAT_R16G16B16_UNORM, 0x03, 0x3, 0x2, VK_FALSE, 6},
+        {VK_FORMAT_R16G16_UNORM, 0x03, 0x2, 0x2, VK_FALSE, 4},
+        {VK_FORMAT_R16_UNORM, 0x03, 0x1, 0x2, VK_FALSE, 2},
+
+        {VK_FORMAT_R16G16B16A16_USCALED, 0x03, 0x0, 0x0, VK_FALSE, 8},
+        {VK_FORMAT_R16G16B16_USCALED, 0x03, 0x3, 0x0, VK_FALSE, 6},
+        {VK_FORMAT_R16G16_USCALED, 0x03, 0x2, 0x0, VK_FALSE, 4},
+        {VK_FORMAT_R16_USCALED, 0x03, 0x1, 0x0, VK_FALSE, 2},
+
+        {VK_FORMAT_R16G16B16A16_UINT, 0x0F, 0x0, 0x0, VK_TRUE, 8},
+        {VK_FORMAT_R16G16B16_UINT, 0x0F, 0x3, 0x0, VK_TRUE, 6},
+        {VK_FORMAT_R16G16_UINT, 0x0F, 0x2, 0x0, VK_TRUE, 4},
+        {VK_FORMAT_R16_UINT, 0x0F, 0x1, 0x0, VK_TRUE, 2},
+
+        {VK_FORMAT_R16G16B16A16_SNORM, 0x02, 0x0, 0x2, VK_FALSE, 8},
+        {VK_FORMAT_R16G16B16_SNORM, 0x02, 0x3, 0x2, VK_FALSE, 6},
+        {VK_FORMAT_R16G16_SNORM, 0x02, 0x2, 0x2, VK_FALSE, 4},
+        {VK_FORMAT_R16_SNORM, 0x02, 0x1, 0x2, VK_FALSE, 2},
+
+        {VK_FORMAT_R16G16B16A16_SSCALED, 0x02, 0x0, 0x0, VK_FALSE, 8},
+        {VK_FORMAT_R16G16B16_SSCALED, 0x02, 0x3, 0x0, VK_FALSE, 6},
+        {VK_FORMAT_R16G16_SSCALED, 0x02, 0x2, 0x0, VK_FALSE, 4},
+        {VK_FORMAT_R16_SSCALED, 0x02, 0x1, 0x0, VK_FALSE, 2},
+
+        {VK_FORMAT_R16G16B16A16_SINT, 0x0F, 0x0, 0x2, VK_TRUE, 8},
+        {VK_FORMAT_R16G16B16_SINT, 0x0F, 0x3, 0x2, VK_TRUE, 6},
+        {VK_FORMAT_R16G16_SINT, 0x0F, 0x2, 0x2, VK_TRUE, 4},
+        {VK_FORMAT_R16_SINT, 0x0F, 0x1, 0x2, VK_TRUE, 2},
+
+        {VK_FORMAT_R32G32B32A32_SFLOAT, 0x08, 0x0, 0x0, VK_FALSE, 16},
+        {VK_FORMAT_R32G32B32_SFLOAT, 0x08, 0x3, 0x0, VK_FALSE, 12},
+        {VK_FORMAT_R32G32_SFLOAT, 0x08, 0x2, 0x0, VK_FALSE, 8},
+        {VK_FORMAT_R32_SFLOAT, 0x08, 0x1, 0x0, VK_FALSE, 4},
+
+        {VK_FORMAT_R32G32B32A32_SINT, 0x10, 0x0, 0x2, VK_TRUE, 16},
+        {VK_FORMAT_R32G32B32_SINT, 0x10, 0x3, 0x2, VK_TRUE, 12},
+        {VK_FORMAT_R32G32_SINT, 0x10, 0x2, 0x2, VK_TRUE, 8 },
+        {VK_FORMAT_R32_SINT, 0x10, 0x1, 0x2, VK_TRUE, 4 },
+
+        {VK_FORMAT_R32G32B32A32_UINT, 0x10, 0x0, 0x0, VK_TRUE, 16},
+        {VK_FORMAT_R32G32B32_UINT, 0x10, 0x3, 0x0, VK_TRUE, 12},
+        {VK_FORMAT_R32G32_UINT, 0x10, 0x2, 0x0, VK_TRUE, 8 },
+        {VK_FORMAT_R32_UINT, 0x10, 0x1, 0x0, VK_TRUE, 4 },
+
+        {VK_FORMAT_R16G16B16A16_SFLOAT, 0x09, 0x0, 0x0, VK_FALSE, 8},
+        {VK_FORMAT_R16G16B16_SFLOAT, 0x09, 0x3, 0x0, VK_FALSE, 6},
+        {VK_FORMAT_R16G16_SFLOAT, 0x09, 0x2, 0x0, VK_FALSE, 4},
+        {VK_FORMAT_R16_SFLOAT, 0x09, 0x1, 0x0, VK_FALSE, 2},
+
+        {VK_FORMAT_A8B8G8R8_UNORM_PACK32, 0x1, 0x0, 0x2, VK_FALSE, 4},
+        {VK_FORMAT_A8B8G8R8_SNORM_PACK32, 0x0, 0x0, 0x2, VK_FALSE, 4},
+        {VK_FORMAT_A8B8G8R8_UINT_PACK32, 0xE, 0x0, 0x0, VK_TRUE, 4},
+        {VK_FORMAT_A8B8G8R8_SINT_PACK32, 0xE, 0x0, 0x2, VK_TRUE, 4},
+
+
+        {VK_FORMAT_A2B10G10R10_UNORM_PACK32, 0x7, 0x0, 0x2, VK_FALSE,4},
+
+        {VK_FORMAT_B8G8R8A8_UNORM, 0xA, 0x0, 0x2, VK_FALSE, 4},
+
+        /* Not mandated formats */
+        {VK_FORMAT_A2B10G10R10_USCALED_PACK32, 0x7, 0x0, 0x0, VK_FALSE, 4},
+        {VK_FORMAT_A2B10G10R10_SNORM_PACK32, 0x6, 0x0, 0x2, VK_FALSE, 4},
+        {VK_FORMAT_A2B10G10R10_SSCALED_PACK32, 0x6, 0x0, 0x0, VK_FALSE, 4},
+    };
+
+    if(devCtx->database->MULTI_CLUSTER)
+    {
+        pVkFormatToHwVsInputInfos = s_vkFormatToHwVsInputInfos630;
+        formatToHwVsInputInfosCount = __VK_COUNTOF(s_vkFormatToHwVsInputInfos630);
+    }
+    else
+    {
+        pVkFormatToHwVsInputInfos = s_vkFormatToHwVsInputInfosOld;
+        formatToHwVsInputInfosCount = __VK_COUNTOF(s_vkFormatToHwVsInputInfosOld);
+    }
+
     /* sort attribute desc with binding and offset */
     qsort(hwVertxAttribDesc, count, sizeof(HwVertexAttribDesc), cmpfunc);
 
     for (j = 0; j  < count; j ++)
     {
-        for (i = 0; i< __VK_COUNTOF(s_vkFormatToHwVsInputInfos); i++)
+        for (i = 0; i< formatToHwVsInputInfosCount; i++)
         {
-            if (s_vkFormatToHwVsInputInfos[i].format == hwVertxAttribDesc[j].sortedAttributeDescPtr->format)
+            if (pVkFormatToHwVsInputInfos[i].format == hwVertxAttribDesc[j].sortedAttributeDescPtr->format)
             {
                 break;
             }
         }
 
-        if (i >= __VK_COUNTOF(s_vkFormatToHwVsInputInfos))
+        if (i >= formatToHwVsInputInfosCount)
         {
             __VK_ASSERT(0);
             return VK_ERROR_FORMAT_NOT_SUPPORTED;
         }
         else
         {
-            fetchSize += s_vkFormatToHwVsInputInfos[i].sizeInByte;
+            fetchSize += pVkFormatToHwVsInputInfos[i].sizeInByte;
 
             if (j == (count -1))
             {
@@ -355,7 +469,7 @@ VkResult halti5_helper_convert_VertexAttribDesc(
                 else
                 {
                     /* same stream */
-                    if ((hwVertxAttribDesc[j].sortedAttributeDescPtr->offset + s_vkFormatToHwVsInputInfos[i].sizeInByte)
+                    if ((hwVertxAttribDesc[j].sortedAttributeDescPtr->offset + pVkFormatToHwVsInputInfos[i].sizeInByte)
                         == hwVertxAttribDesc[j+1].sortedAttributeDescPtr->offset)
                     {
                         /* neighborhood is connected */
@@ -368,18 +482,18 @@ VkResult halti5_helper_convert_VertexAttribDesc(
                 }
             }
 
-            hwVertxAttribDesc[j].hwDataType   = s_vkFormatToHwVsInputInfos[i].hwDataType;
-            hwVertxAttribDesc[j].hwSize       = s_vkFormatToHwVsInputInfos[i].hwsize;
-            hwVertxAttribDesc[j].hwNormalized = s_vkFormatToHwVsInputInfos[i].hwNormalized;
-            hwVertxAttribDesc[j].integer      = s_vkFormatToHwVsInputInfos[i].integer;
+            hwVertxAttribDesc[j].hwDataType   = pVkFormatToHwVsInputInfos[i].hwDataType;
+            hwVertxAttribDesc[j].hwSize       = pVkFormatToHwVsInputInfos[i].hwsize;
+            hwVertxAttribDesc[j].hwNormalized = pVkFormatToHwVsInputInfos[i].hwNormalized;
+            hwVertxAttribDesc[j].integer      = pVkFormatToHwVsInputInfos[i].integer;
             hwVertxAttribDesc[j].hwFetchSize  = fetchSize;
             hwVertxAttribDesc[j].hwFetchBreak = fetchBreak;
 
             if (hwVertxAttribDesc[j].is16Bit &&
-                (s_vkFormatToHwVsInputInfos[i].format == VK_FORMAT_R16_SFLOAT ||
-                 s_vkFormatToHwVsInputInfos[i].format == VK_FORMAT_R16G16_SFLOAT ||
-                 s_vkFormatToHwVsInputInfos[i].format == VK_FORMAT_R16G16B16_SFLOAT ||
-                 s_vkFormatToHwVsInputInfos[i].format == VK_FORMAT_R16G16B16A16_SFLOAT))
+                (pVkFormatToHwVsInputInfos[i].format == VK_FORMAT_R16_SFLOAT ||
+                 pVkFormatToHwVsInputInfos[i].format == VK_FORMAT_R16G16_SFLOAT ||
+                 pVkFormatToHwVsInputInfos[i].format == VK_FORMAT_R16G16B16_SFLOAT ||
+                 pVkFormatToHwVsInputInfos[i].format == VK_FORMAT_R16G16B16A16_SFLOAT))
             {
                 hwVertxAttribDesc[j].hwDataType = 0xF;
             }
@@ -442,7 +556,7 @@ VkResult halti5_pip_emit_vsinput(
         {
             uint32_t firstValidIoChannel = shAttribTable[entryIdx].pIoRegMapping[0].firstValidIoChannel;
 
-            __VK_ASSERT(shAttribTable[entryIdx].arraySize == 1);
+            __VK_ASSERT(shAttribTable[entryIdx].arraySize > 0 && shAttribTable[entryIdx].arraySize <= devCtx->pPhyDevice->phyDevProp.limits.maxVertexInputAttributes);
 
             if (shAttribTable[entryIdx].pIoRegMapping[0].ioChannelMapping[firstValidIoChannel].ioUsage == SHADER_IO_USAGE_VERTEXID)
             {
@@ -538,6 +652,16 @@ VkResult halti5_pip_emit_vsinput(
  3:0) - (0 ?
  3:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ? 3:0)))
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1))))))) << (0 ?
+ 7:7))) | (((gctUINT32) ((gctUINT32) (hwVertexAttribDesc[attribIdx].hwDataType >> 4) & ((gctUINT32) ((((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)))
                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
@@ -857,6 +981,7 @@ static VkResult halti5_pip_emit_viewport(
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
     const gcsFEATURE_DATABASE *database = devCtx->database;
     halti5_pipeline *chipPipeline = (halti5_pipeline *)pip->chipPriv;
+    float maxPointSize = devCtx->pPhyDevice->phyDevProp.limits.pointSizeRange[1];
 
     if(database->REG_BugFixes22 && database->REG_PAEnhancements3)
     {
@@ -871,7 +996,7 @@ static VkResult halti5_pip_emit_viewport(
 
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x02A3, VK_FALSE, *(uint32_t*)&wSmall);
 
-    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x02A1, VK_TRUE, 8192 << 16);
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x02A1, VK_TRUE, ((int32_t)maxPointSize) << 16);
 
     if ((!(pip->dynamicStates & __VK_DYNAMIC_STATE_VIEWPORT_BIT))
         && info->pViewportState)
@@ -1963,16 +2088,23 @@ static int32_t get_used_color_count(
     __vkRenderSubPassInfo *subPass
     )
 {
-    uint32_t i;
-    int32_t colorOutCount = 0;
+    int32_t i;
+    int32_t colorOutCount = subPass->colorCount;
 
-    for (i = 0; i < subPass->colorCount; i++)
+    for (i = subPass->colorCount - 1; i >= 0; i--)
     {
-        if (hints->psOutput2RtIndex[i] != -1 && subPass->color_attachment_index[i] != VK_ATTACHMENT_UNUSED)
+        if (subPass->color_attachment_index[i] == VK_ATTACHMENT_UNUSED)
         {
-            colorOutCount++;
+            colorOutCount--;
         }
-        __VK_ASSERT(!(colorOutCount > 0 && hints->psOutput2RtIndex[i] != -1 && subPass->color_attachment_index[i] == VK_ATTACHMENT_UNUSED) );
+        else if (hints->psOutput2RtIndex[i] == -1)
+        {
+            colorOutCount--;
+        }
+        else
+        {
+            break;
+        }
     }
 
     return colorOutCount;
@@ -2613,8 +2745,10 @@ static VkResult halti5_pip_emit_rt(
     VkBool32 fullfuncZ;
     uint32_t regDepthConfig = 0, regRAControl = 0;
     VkBool32 hasDsSurface = (subPass->dsAttachIndex != VK_ATTACHMENT_UNUSED) ? VK_TRUE : VK_FALSE;
-    uint32_t i;
+    uint32_t i, j;
     VkBool32 rtEnabled = gcvFALSE;
+    VkBool32 noShader = VK_FALSE;
+    VkBool32 enabledRt0 = VK_FALSE;
 
     static const gctINT32 s_xlateDepthCompare[] =
     {
@@ -2678,12 +2812,16 @@ static VkResult halti5_pip_emit_rt(
 
     depthOnly = (subPass->colorCount == 0) || (!(hints->stageBits & gcvPROGRAM_STAGE_FRAGMENT_BIT));
     /* ps shader is not necessary to be excuted */
-    depthOnly &= !(hints->hasKill
+    noShader = !(hints->hasKill
         || hints->psHasFragDepthOut
         || psHasMemoryAccess
         || (hints->rtArrayComponent != -1)
         || (hints->sampleMaskLoc != -1)
         || msaaFragmentOp);
+    if (depthOnly && (noShader == VK_FALSE))
+    {
+        depthOnly = VK_FALSE;
+    }
 
     chipGfxPipeline->depthOnly = depthOnly;
 
@@ -2749,7 +2887,7 @@ static VkResult halti5_pip_emit_rt(
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x038D, VK_FALSE, chipGfxPipeline->raControlEx);
 
     /* step 2: rt programming */
-    for (i = 0; fragOutTable != VK_NULL_HANDLE && blendInfo != NULL && i < subPass->colorCount; i++)
+    for (i = 0, j = 0; fragOutTable != VK_NULL_HANDLE && blendInfo != NULL && i < subPass->colorCount; i++)
     {
         const VkPipelineColorBlendAttachmentState *blendAttach = blendInfo->pAttachments;
         VkColorComponentFlags colorMask;
@@ -2762,8 +2900,12 @@ static VkResult halti5_pip_emit_rt(
 
         __VK_ASSERT(subPass->colorCount == blendInfo->attachmentCount);
 
+        if (subPass->color_attachment_index[i] == VK_ATTACHMENT_UNUSED)
+        {
+            continue;
+        }
         attachMent = &rdp->attachments[subPass->color_attachment_index[i]];
-        is16BitStorage = (fragOutTable[i].resEntryBit & VSC_RES_ENTRY_BIT_16BIT) != 0;
+        is16BitStorage = (fragOutTable[j].resEntryBit & VSC_RES_ENTRY_BIT_16BIT) != 0;
         __VK_VERIFY_OK(halti5_helper_convertHwPEDesc(devCtx, attachMent->formatInfo->residentImgFormat, is16BitStorage, &hwPEDesc));
         switch (attachMent->formatInfo->residentImgFormat)
         {
@@ -2908,6 +3050,7 @@ static VkResult halti5_pip_emit_rt(
  30:30) - (0 ?
  30:30) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:30) - (0 ? 30:30) + 1))))))) << (0 ? 30:30)))));
+                enabledRt0 = VK_TRUE;
             }
             else
             {
@@ -2935,19 +3078,54 @@ static VkResult halti5_pip_emit_rt(
             }
             partIndex++;
         }
+        j++;
+    }
+
+    if (!enabledRt0)
+    {
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x050B, VK_FALSE, (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 11:8) - (0 ?
+ 11:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 11:8) - (0 ?
+ 11:8) + 1))))))) << (0 ?
+ 11:8))) | (((gctUINT32) ((gctUINT32) (0x0) & ((gctUINT32) ((((1 ?
+ 11:8) - (0 ?
+ 11:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 11:8) - (0 ?
+ 11:8) + 1))))))) << (0 ?
+ 11:8))) &((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 12:12) - (0 ?
+ 12:12) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 12:12) - (0 ?
+ 12:12) + 1))))))) << (0 ?
+ 12:12))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 12:12) - (0 ?
+ 12:12) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:12) - (0 ? 12:12) + 1))))))) << (0 ? 12:12)))));
     }
 
     /* step 3: depth programming */
     if (dsInfo && subPass->dsAttachIndex != VK_ATTACHMENT_UNUSED)
     {
         __vkAttachmentDesc *attachMent;
+        VkBool32 frontNotKeep = VK_FALSE;
+        VkBool32 backNotKeep = VK_FALSE;
+
+        frontNotKeep = ((dsInfo->front.passOp != VK_STENCIL_OP_KEEP) ||
+                        (dsInfo->front.failOp != VK_STENCIL_OP_KEEP) ||
+                        (dsInfo->front.depthFailOp != VK_STENCIL_OP_KEEP));
+        backNotKeep = ((dsInfo->back.passOp != VK_STENCIL_OP_KEEP) ||
+                        (dsInfo->back.failOp != VK_STENCIL_OP_KEEP) ||
+                        (dsInfo->back.depthFailOp != VK_STENCIL_OP_KEEP));
+
         chipGfxPipeline->earlyZ = VK_TRUE;
         attachMent = &rdp->attachments[subPass->dsAttachIndex];
+
         if ((dsInfo->depthCompareOp == VK_COMPARE_OP_NOT_EQUAL) ||
-            (dsInfo->stencilTestEnable &&
-             ((dsInfo->front.passOp != VK_STENCIL_OP_KEEP) ||
-              (dsInfo->front.failOp != VK_STENCIL_OP_KEEP) ||
-              (dsInfo->front.depthFailOp != VK_STENCIL_OP_KEEP))) ||
+            (dsInfo->stencilTestEnable && (frontNotKeep || backNotKeep)) ||
               (psEarlyFragmentTest ? VK_FALSE :((hints->psHasFragDepthOut)||psHasMemoryAccess)))
         {
             chipGfxPipeline->earlyZ = VK_FALSE;
@@ -5114,6 +5292,7 @@ static void halti5_pip_build_patchKeyMask(
     )
 {
     halti5_pipeline *chipPipeline = (halti5_pipeline *)pip->chipPriv;
+    PROGRAM_EXECUTABLE_PROFILE *pep = &chipPipeline->curInstance->pep;
     uint32_t setIdx;
 
     for (setIdx = 0; setIdx < __VK_MAX_DESCRIPTOR_SETS; setIdx++)
@@ -5291,14 +5470,17 @@ static void halti5_pip_build_patchKeyMask(
                                 break;
                             }
                         }
-                        __VK_ASSERT(entryIdx < resSet->separatedTexTable.countOfEntries);
+                        if (entryIdx == resSet->separatedTexTable.countOfEntries)
+                            break;
 
                         for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; arrayIdx++)
                         {
                             VSC_RES_OP_BIT *pResOp = &tableEntry->pResOpBits[arrayIdx];
                             halti5_patch_key patchKey = 0;
                             uint32_t stageIndex = 0;
-                            uint32_t i;
+                            uint32_t i, j;
+                            uint32_t* pctsHmEntryIdxArray = VK_NULL_HANDLE;
+                            uint32_t privCombindMappingCount = VK_NULL_HANDLE;
 
                             for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
                             {
@@ -5306,6 +5488,34 @@ static void halti5_pip_build_patchKeyMask(
                                 {
                                     stageIndex = i;
                                     break;
+                                }
+                            }
+
+                            pctsHmEntryIdxArray = tableEntry->hwMappings[stageIndex].s.texHwMappingList.pPctsHmEntryIdxArray;
+                            privCombindMappingCount = tableEntry->hwMappings[stageIndex].s.texHwMappingList.arraySize;
+
+                            for (j = 0; j < privCombindMappingCount; j++)
+                            {
+                                VSC_SHADER_RESOURCE_BINDING *vscSamplerBinding = VK_NULL_HANDLE;
+                                VSC_SHADER_RESOURCE_BINDING *vscTextureBinding = VK_NULL_HANDLE;
+                                PROG_VK_PRIV_COMB_TEX_SAMP_HW_MAPPING *privCombinedMapping =
+                                    &pep->u.vk.privateCombTsHwMappingPool.pPrivCombTsHwMappingArray[pctsHmEntryIdxArray[j]];
+
+                                vscTextureBinding = privCombinedMapping->texSubBinding.pResBinding;
+                                vscSamplerBinding = privCombinedMapping->samplerSubBinding.pResBinding;
+
+                                if (vscTextureBinding->set == setIdx &&
+                                    vscTextureBinding->binding == binding->std.binding)
+                                {
+                                    if (pResOp != gcvNULL)
+                                    {
+                                        if (*pResOp & (VSC_RES_OP_BIT_GATHER_PCF | VSC_RES_OP_BIT_TEXLD_BIAS_PCF | VSC_RES_OP_BIT_TEXLD_LOD_PCF))
+                                        {
+                                            chipPipeline->patchTextureSampler[setIdx][keyIndex].enabled = VK_TRUE;
+                                            chipPipeline->patchTextureSampler[setIdx][keyIndex].set = vscSamplerBinding->set;
+                                            chipPipeline->patchTextureSampler[setIdx][keyIndex].binding = vscSamplerBinding->binding;
+                                        }
+                                    }
                                 }
                             }
 
@@ -5360,7 +5570,9 @@ static void halti5_pip_build_patchKeyMask(
                                 break;
                             }
                         }
-                        __VK_ASSERT(entryIdx < resSet->inputAttachmentTable.countOfEntries);
+
+                        if (entryIdx == resSet->inputAttachmentTable.countOfEntries)
+                            break;
                         for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; arrayIdx++)
                         {
                             VSC_RES_OP_BIT *pResOp = &inputAttachmentEntry->pResOpBits[arrayIdx];
@@ -5901,13 +6113,18 @@ static VkResult halti5_pip_build_gfxshaders(
                         (VSC_IMAGE_FORMAT *)__VK_ALLOC(sizeof(VSC_IMAGE_FORMAT) * chipPipeline->patchKeyCount[i], 8,
                                                        VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
                     chipPipeline->patchCombinedImgFormat[i] =
-                    (VSC_IMAGE_FORMAT *)__VK_ALLOC(sizeof(VSC_IMAGE_FORMAT) * chipPipeline->patchKeyCount[i], 8,
+                        (VSC_IMAGE_FORMAT *)__VK_ALLOC(sizeof(VSC_IMAGE_FORMAT) * chipPipeline->patchKeyCount[i], 8,
+                                                    VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+                    chipPipeline->patchTextureSampler[i] =
+                        (halti5_resourceBinding *)__VK_ALLOC(sizeof(halti5_resourceBinding) * chipPipeline->patchKeyCount[i], 8,
                                                     VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 
                     __VK_ONERROR(chipPipeline->patchSampledImgFormat[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
                     __VK_MEMZERO(chipPipeline->patchSampledImgFormat[i], sizeof(VSC_IMAGE_FORMAT) * chipPipeline->patchKeyCount[i]);
                     __VK_ONERROR(chipPipeline->patchCombinedImgFormat[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
                     __VK_MEMZERO(chipPipeline->patchCombinedImgFormat[i], sizeof(VSC_IMAGE_FORMAT) * chipPipeline->patchKeyCount[i]);
+                    __VK_ONERROR(chipPipeline->patchTextureSampler[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+                    __VK_MEMZERO(chipPipeline->patchTextureSampler[i], sizeof(halti5_resourceBinding) * chipPipeline->patchKeyCount[i]);
                 }
 
                 __VK_ONERROR(chipPipeline->patchKeys[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
@@ -6103,19 +6320,19 @@ static VkResult halti5_pip_build_gfxshaders(
             }
 
             __VK_ONERROR((gcvSTATUS_OK == gcSPV_Decode(decodeInfo, &vscHandle))
-                                        ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
+                                        ? VK_SUCCESS : VK_ERROR_INVALID_SHADER_NV);
             hShaderArray[shaderType] = halti5_CreateVkShader(vscHandle);
             __VK_ASSERT(hShaderArray[shaderType]);
 
             /*save the decoded shader info before compile*/
             __VK_ONERROR((VK_SUCCESS == halti5_CopyVkShader(&chipPipeline->vkShaderDecoded[shaderType], hShaderArray[shaderType]))
-                                    ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
+                                    ? VK_SUCCESS : VK_ERROR_INVALID_SHADER_NV);
 
             __VK_ONERROR(halti5_helper_createVscShaderResLayout(pip, chipPipeline->vscResLayout, shaderType, &vscShaderResLayout));
             vscCompileParams.hShader = vscHandle;
             vscCompileParams.pShResourceLayout = &vscShaderResLayout;
             __VK_ONERROR((gcvSTATUS_OK == vscCompileShader(&vscCompileParams, gcvNULL))
-                                        ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
+                                        ? VK_SUCCESS : VK_ERROR_INVALID_SHADER_NV);
             halti5_helper_destroyVscShaderResLayout(pip, &vscShaderResLayout);
 
             if (pip->cache)
@@ -6152,7 +6369,7 @@ static VkResult halti5_pip_build_gfxshaders(
 #endif
 
         __VK_ONERROR((VK_SUCCESS == halti5_CopyVkShader(&hShaderArrayCopy[shaderType], hShaderArray[shaderType]))
-                                    ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
+                                    ? VK_SUCCESS : VK_ERROR_INVALID_SHADER_NV);
     }
 
     __VK_MEMZERO(&vscLinkParams, sizeof(vscLinkParams));
@@ -6165,7 +6382,9 @@ static VkResult halti5_pip_build_gfxshaders(
     __VK_MEMCOPY(&vscLinkParams.cfg, &vscCompileParams.cfg, sizeof(VSC_COMPILER_CONFIG));
     vscLinkParams.cfg.cFlags |= (VSC_COMPILER_FLAG_COMPILE_FULL_LEVELS | VSC_COMPILER_FLAG_COMPILE_CODE_GEN);
 
-    if (devCtx->pPhyDevice->pInst->patchID == gcvPATCH_VK_T3DSTRESSTEST || devCtx->pPhyDevice->pInst->patchID == gcvPATCH_VK_HDR02_FBBASICTONEMAPPING)
+    if (devCtx->pPhyDevice->pInst->patchID == gcvPATCH_VK_T3DSTRESSTEST ||
+        devCtx->pPhyDevice->pInst->patchID == gcvPATCH_VK_HDR02_FBBASICTONEMAPPING ||
+        devCtx->pPhyDevice->pInst->patchID == gcvPATCH_VK_BLOOM)
     {
         vscLinkParams.cfg.cFlags |= (VSC_COMPILER_FLAG_ENABLE_DUAL16_FOR_VK | VSC_COMPILER_FLAG_USE_CONST_REG_FOR_UBO);
     }
@@ -6247,7 +6466,7 @@ static VkResult halti5_pip_build_gfxshaders(
     }
 
     __VK_ONERROR((gcvSTATUS_OK == vscLinkProgram(&vscLinkParams, &masterInstance->pep, &masterInstance->hwStates))
-                                ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
+                                ? VK_SUCCESS : VK_ERROR_INVALID_SHADER_NV);
 
     hints = &masterInstance->hwStates.hints;
 
@@ -6424,6 +6643,10 @@ OnError:
         {
             __VK_FREE(chipPipeline->patchResOpBit[i]);
         }
+        if (chipPipeline->patchTextureSampler[i])
+        {
+            __VK_FREE(chipPipeline->patchTextureSampler[i]);
+        }
     }
 
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
@@ -6589,11 +6812,16 @@ static VkResult halti5_pip_build_computeshader(
                     chipPipeline->patchCombinedImgFormat[i] =
                     (VSC_IMAGE_FORMAT *)__VK_ALLOC(sizeof(VSC_IMAGE_FORMAT) * chipPipeline->patchKeyCount[i], 8,
                                                     VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+                    chipPipeline->patchTextureSampler[i] =
+                        (halti5_resourceBinding *)__VK_ALLOC(sizeof(halti5_resourceBinding) * chipPipeline->patchKeyCount[i], 8,
+                                                    VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 
                     __VK_ONERROR(chipPipeline->patchSampledImgFormat[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
                     __VK_MEMZERO(chipPipeline->patchSampledImgFormat[i], sizeof(VSC_IMAGE_FORMAT) * chipPipeline->patchKeyCount[i]);
                     __VK_ONERROR(chipPipeline->patchCombinedImgFormat[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
                     __VK_MEMZERO(chipPipeline->patchCombinedImgFormat[i], sizeof(VSC_IMAGE_FORMAT) * chipPipeline->patchKeyCount[i]);
+                    __VK_ONERROR(chipPipeline->patchTextureSampler[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+                    __VK_MEMZERO(chipPipeline->patchTextureSampler[i], sizeof(halti5_resourceBinding) * chipPipeline->patchKeyCount[i]);
                 }
 
                 __VK_ONERROR(chipPipeline->patchKeys[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
@@ -6863,6 +7091,10 @@ OnError:
         if (chipPipeline->patchResOpBit[i])
         {
             __VK_FREE(chipPipeline->patchResOpBit[i]);
+        }
+        if (chipPipeline->patchTextureSampler[i])
+        {
+            __VK_FREE(chipPipeline->patchTextureSampler[i]);
         }
     }
     if (virShaderCopy)
@@ -7335,6 +7567,10 @@ VkResult halti5_destroyPipeline(
         {
             __VK_FREE(chipPipeline->patchResOpBit[i]);
         }
+        if (chipPipeline->patchTextureSampler[i])
+        {
+            __VK_FREE(chipPipeline->patchTextureSampler[i]);
+        }
     }
 
     __VK_FREE(pip->chipPriv);
@@ -7379,6 +7615,17 @@ VkResult halti5_patch_pipeline(
     {
         keyCount = chipPipeline->keyCount;
         j = 0;
+
+        while (patchMask & (1 << j))
+        {
+            if (j + 1 > keyCount)
+            {
+                descSetInfo->patchMask &= ~(1 << j);
+            }
+            patchMask &= ~(1 << j);
+            j++;
+        }
+
         for (i = 0; i < keyCount; i++)
         {
             for (j = 0; j < __VK_MAX_DESCRIPTOR_SETS; j++)
@@ -7817,6 +8064,7 @@ VkResult halti5_patch_pipeline(
                         {
                             halti5_patch_key validPatchKey = chipDescSet->patchKeys[j] & chipPipeline->patchKeys[i][j];
                             halti5_patch_info *patchInfo = &chipDescSet->patchInfos[j];
+                            halti5_resourceBinding *resBinding = &chipPipeline->patchTextureSampler[i][j];
                             uint32_t k = 0;
 
                             while (validPatchKey)
@@ -7867,6 +8115,8 @@ VkResult halti5_patch_pipeline(
                                                                                                     8,
                                                                                                     VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
                                         __VK_ONERROR(vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+                                        __VK_MEMZERO(vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts, sizeof(VSC_LIB_SPECIALIZATION_CONSTANT) *
+                                                        vscLinkEntriesCur[entryIdx].shLibLinkEntry.libSpecializationConstantCount);
 
                                         for (idx = 0; idx < (int32_t)vscLinkEntriesCur[entryIdx].shLibLinkEntry.libSpecializationConstantCount; idx++)
                                         {
@@ -7967,9 +8217,28 @@ VkResult halti5_patch_pipeline(
                                         __VK_MEMCOPY(&vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[0].value, patchInfo->swizzles, sizeof(patchInfo->swizzles));
                                         if (k == HALTI5_PATCH_TX_GATHER_PCF)
                                         {
+                                            VkCompareOp compareOp = VK_COMPARE_OP_NEVER;
+
+                                            if (resBinding->enabled)
+                                            {
+                                                __vkSampler **samplers;
+                                                __vkDescriptorResourceRegion curSamplerRegion;
+                                                __vkDescriptorSet *samplerDescSet = descSetInfo->descSets[resBinding->set];
+                                                __vkDescriptorSetLayoutBinding *samplerBinding =
+                                                        halti5_findBinding(samplerDescSet->descSetLayout->binding, samplerDescSet->descSetLayout->bindingCount, resBinding->binding);
+
+                                                __vk_utils_region_mad(&curSamplerRegion, &samplerBinding->perElementSize, 0, &samplerBinding->offset);
+                                                samplers = (__vkSampler **)((uint8_t*)samplerDescSet->samplers + curSamplerRegion.sampler);
+                                                compareOp = samplers[0]->createInfo.compareOp;
+                                            }
+                                            else
+                                            {
+                                                compareOp = patchInfo->compareOp;
+                                            }
+
                                             vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[1].varName = "comparemode";
                                             vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[1].type = VSC_SHADER_DATA_TYPE_INTEGER_X4;
-                                            vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[1].value.uValue[0] = patchInfo->compareOp;
+                                            vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[1].value.uValue[0] = compareOp;
                                         }
 
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPointCount = 1;

@@ -382,6 +382,8 @@ static VkResult waylandGetPhysicalDeviceSurfaceFormats(
     )
 {
     static const VkFormat supportedPresentFormats[] = {
+        VK_FORMAT_R8G8B8A8_UNORM,
+        VK_FORMAT_R8G8B8A8_SRGB,
         VK_FORMAT_B8G8R8A8_UNORM,
         VK_FORMAT_B8G8R8A8_SRGB,
         VK_FORMAT_R5G6B5_UNORM_PACK16,
@@ -718,13 +720,23 @@ static VkResult __CreateImageBuffer(
 
         switch (sc->imageFormat)
         {
-        case VK_FORMAT_B8G8R8A8_UNORM:
+        case VK_FORMAT_R8G8B8A8_UNORM:
             format = devCtx->database->PE_A8B8G8R8 ? gcvSURF_A8B8G8R8 : gcvSURF_A8R8G8B8;
             stride = alignedWidth * 4;
             break;
 
-        case VK_FORMAT_B8G8R8A8_SRGB:
+        case VK_FORMAT_R8G8B8A8_SRGB:
             format = devCtx->database->PE_A8B8G8R8 ? gcvSURF_A8B8G8R8 : gcvSURF_A8R8G8B8;
+            stride = alignedWidth * 4;
+            break;
+
+        case VK_FORMAT_B8G8R8A8_UNORM:
+            format = gcvSURF_A8R8G8B8;
+            stride = alignedWidth * 4;
+            break;
+
+        case VK_FORMAT_B8G8R8A8_SRGB:
+            format = gcvSURF_A8R8G8B8;
             stride = alignedWidth * 4;
             break;
 
@@ -1312,7 +1324,22 @@ static VkResult __QueuePresentSwapchainImage(
     {
         __VK_ONERROR(__GenPresentCommand(devCtx, sc, imageBuffer));
     }
-     __VK_ONERROR(__CommitPresentCommand(queue, sc, &fence_fd));
+
+    __VK_ONERROR(__CommitPresentCommand(queue, sc, &fence_fd));
+
+#if gcdDUMP
+    if (sc->renderMode == __VK_WSI_INDIRECT_RENDERING)
+    {
+        __vkImage *dstImage = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imageBuffer->resolveTarget);
+
+        gcmDUMP(gcvNULL,
+                "@[swap 0x%08X %dx%d +%u]",
+                dstImage->memory->devAddr,
+                dstImage->pImgLevels[0].alignedW,
+                dstImage->pImgLevels[0].alignedH,
+                dstImage->pImgLevels[0].stride);
+    }
+#endif
 
     if (sc->opaque_region)
         wl_surface_set_opaque_region(surf->surface, sc->opaque_region);
@@ -1485,6 +1512,8 @@ static VkResult waylandCreateSwapchain(
 
     switch (pCreateInfo->imageFormat)
     {
+    case VK_FORMAT_R8G8B8A8_UNORM:
+    case VK_FORMAT_R8G8B8A8_SRGB:
     case VK_FORMAT_B8G8R8A8_UNORM:
     case VK_FORMAT_B8G8R8A8_SRGB:
     case VK_FORMAT_R5G6B5_UNORM_PACK16:

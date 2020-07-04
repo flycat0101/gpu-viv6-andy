@@ -33,59 +33,6 @@
             | (b); \
     *(*a)++ = 0; \
 
-/* Check if any tileStatus enable*/
-#define __VK_AnyTSEnable(tsResource, pRange, anyTsEnable) \
-{\
-    uint32_t i = pRange->baseMipLevel;\
-    uint32_t j = pRange->baseArrayLayer;\
-    for (; i < (pRange->baseMipLevel + pRange->levelCount); i++)\
-    {\
-        for (; j < (pRange->baseArrayLayer + pRange->layerCount); j++)\
-        {\
-            if ((tsResource) && (tsResource->tileStatusDisable[i][j] == VK_FALSE))\
-            {\
-                *anyTsEnable = VK_TRUE;\
-                break;\
-            }\
-        }\
-    }\
-}\
-
-/* Check whether the tileStatus can enable or not, there are three cases:
-** 1)tileStatus has been disabled;
-** 2)For multi-slice, if fcValue is different, tileStatus should be disabled;
-** 3)For multi-slice, if fcValueUpper is different, tileStatus should be disabled.
-*/
-#define __VK_CanTSEnable(tsResource, pRange, canTsEnable) \
-{\
-    if (tsResource)\
-    {\
-        uint32_t i = pRange->baseMipLevel;\
-        uint32_t j = pRange->baseArrayLayer;\
-        for (; i < (pRange->baseMipLevel + pRange->levelCount); i++)\
-        {\
-            for (j = pRange->baseArrayLayer; j < (pRange->layerCount + pRange->baseArrayLayer); j++)\
-            {\
-                if (tsResource->tileStatusDisable[i][j] == VK_TRUE)\
-                {\
-                    *canTsEnable = VK_FALSE;\
-                    break;\
-                }\
-                if (tsResource->fcValue[i][j] != tsResource->fcValue[pRange->baseMipLevel][pRange->baseArrayLayer])\
-                {\
-                    *canTsEnable = VK_FALSE;\
-                    break;\
-                }\
-                if (tsResource->fcValueUpper[i][j] != tsResource->fcValueUpper[pRange->baseMipLevel][pRange->baseArrayLayer])\
-                {\
-                    *canTsEnable = VK_FALSE;\
-                    break;\
-                }\
-            }\
-        }\
-    }\
-}\
-
 #define TX_COMP_RED_SWIZZLE_SHIFT    0
 #define TX_COMP_GREEN_SWIZZLE_SHIFT  3
 #define TX_COMP_BLUE_SWIZZLE_SHIFT   6
@@ -415,6 +362,7 @@ enum
     __PACK_FORMAT_R32G32B32A32 = 6,
     __PACK_FORMAT_R16G16B16A16 = 7,
     __PACK_FORMAT_R32G32       = 8,
+    __PACK_FORMAT_A2R10G10B10  = 9,
 
 };
 
@@ -547,7 +495,7 @@ VkResult halti5_tweak_detect(
     __vkDevContext *devCtx
     );
 
-#define HALTI5_INIT_CMD_SIZE_INUINT 12
+#define HALTI5_INIT_CMD_SIZE_INUINT 20
 
 typedef struct
 {
@@ -706,6 +654,14 @@ typedef struct
 
 typedef struct
 {
+    uint32_t binding;
+    uint32_t set;
+    VkBool32 enabled;
+
+}halti5_resourceBinding;
+
+typedef struct
+{
     halti5_vscprogram_instance *masterInstance;
     halti5_vscprogram_instance *curInstance;
     __vkUtilsHash *vscProgInstanceHash;
@@ -732,6 +688,7 @@ typedef struct
     VSC_IMAGE_FORMAT *patchSampledImgFormat[__VK_MAX_DESCRIPTOR_SETS];
     VSC_IMAGE_FORMAT *patchCombinedImgFormat[__VK_MAX_DESCRIPTOR_SETS];
     VSC_RES_OP_BIT *patchResOpBit[__VK_MAX_DESCRIPTOR_SETS];
+    halti5_resourceBinding *patchTextureSampler[__VK_MAX_DESCRIPTOR_SETS];
     /* number of valid key array */
     uint32_t keyCount;
 
@@ -1313,6 +1270,22 @@ VkResult halti5_helper_convertHwBltDesc(
     HwBLTDesc *hwBltDesc
     );
 
+VkResult halti5_fillTileStatusBuffer(
+    __vkDevContext *devCtx,
+    uint32_t **commandBuffer,
+    uint32_t tileStatusBufAddr,
+    uint32_t offset,
+    uint32_t size,
+    uint32_t fillValue
+    );
+
+VkResult halti5_dirtyTileStatus(
+    __vkCommandBuffer *cmdBuf,
+    uint32_t **commandBuffer,
+    __vkImage *img,
+    VkImageSubresourceRange* pRanges
+    );
+
 VkResult halti5_decompressTileStatus(
     __vkCommandBuffer *cmdBuf,
     uint32_t **commandBuffer,
@@ -1326,6 +1299,12 @@ VkResult halti5_setRtTileStatus(
     __vkImage *img,
     VkImageSubresourceRange* pRanges,
     uint32_t hwRtIndex
+    );
+
+__vkDescriptorSetLayoutBinding* halti5_findBinding(
+    __vkDescriptorSetLayoutBinding *bindings,
+    uint32_t count,
+    uint32_t binding
     );
 
 #define TX_HW_DESCRIPTOR_MEM_SIZE   256

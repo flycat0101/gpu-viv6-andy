@@ -693,7 +693,7 @@ static VkResult __vk_utils_saveResFile(
         __VK_ERR_BREAK(__vk_MapMemory(device, dstMemory, 0, imgMemReq.size, 0, &pBaseARGB));
         __vk_GetImageSubresourceLayout(device, dstImage, &imgSubRes, &imgLayout);
 
-        gcoOS_Allocate(gcvNULL, width * height * 3, &pBaseBGR);
+        __VK_ONERROR(gcoOS_Allocate(gcvNULL, width * height * 3, &pBaseBGR));
 
         /* Color format conversion: ARGB to RGB. */
         pBGR = (gctUINT8_PTR)pBaseBGR;
@@ -755,6 +755,7 @@ static VkResult __vk_utils_saveResFile(
         }
     }
 
+OnError:
     if (pBaseBGR)
     {
         gcoOS_Free(gcvNULL, pBaseBGR);

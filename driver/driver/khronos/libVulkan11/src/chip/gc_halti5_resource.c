@@ -583,6 +583,15 @@ VkResult __vkComputeClearVal(
         pClearVals[1] = pClearVals[0];
         break;
 
+    case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
+        pClearVals[1] =
+            pClearVals[0]
+            = (__vkConvertSFLOAT(gcvVALUE_FLAG_UNSIGNED_DENORM, vkClearValue->color.float32[B], 10)      )
+            | (__vkConvertSFLOAT(gcvVALUE_FLAG_UNSIGNED_DENORM, vkClearValue->color.float32[G], 10) << 10)
+            | (__vkConvertSFLOAT(gcvVALUE_FLAG_UNSIGNED_DENORM, vkClearValue->color.float32[R], 10) << 20)
+            | (__vkConvertSFLOAT(gcvVALUE_FLAG_UNSIGNED_DENORM, vkClearValue->color.float32[A], 2) << 30);
+        break;
+
     case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
         pClearVals[1] =
             pClearVals[0]
@@ -2533,8 +2542,12 @@ VkResult halti5_clearImage(
     VkBool32 fastClear = VK_TRUE;
     VkBool32 compression = VK_FALSE;
     int32_t compressionFormat = -1;
-    uint32_t tileStatusAddress = tsResource ? tsResource->devAddr : VK_NULL_HANDLE;
+    uint32_t tileStatusAddress = tsResource ? tsResource->devAddr[subResource->mipLevel][subResource->arrayLayer] : VK_NULL_HANDLE;
     VkImageSubresourceRange imgvRange = {subResource->aspectMask, subResource->mipLevel, 1, subResource->arrayLayer, 1};
+
+#if __VK_ENABLE_LEGACY_TS_WAR
+    __vkColorCheckPoint * pColorCheckpoint = gcvNULL;
+#endif
 #endif
     VkBool32 forceSGPU = VK_FALSE;
 
@@ -2688,28 +2701,19 @@ VkResult halti5_clearImage(
         {
             if (tsResource)
             {
-                fcClearValue[0] = tsResource->fcValue[imgvRange.baseMipLevel][imgvRange.baseArrayLayer];
-                fcClearValue[1] = tsResource->fcValueUpper[imgvRange.baseMipLevel][imgvRange.baseArrayLayer];
+                fcClearValue[0] = devCtx->vulkanTS? clearVals[0] ^ 0xFF : tsResource->fcValue[imgvRange.baseMipLevel][imgvRange.baseArrayLayer];
+                fcClearValue[1] = devCtx->vulkanTS? clearVals[1] ^ 0xFF : tsResource->fcValueUpper[imgvRange.baseMipLevel][imgvRange.baseArrayLayer];
             }
         }
 
         if (tsResource)
         {
-            fastClear &= !tsResource->tileStatusDisable[subResource->mipLevel][subResource->arrayLayer];
+            compression = tsResource->compressed;
+            compressionFormat = tsResource->compressedFormat;
         }
         else
         {
             fastClear = VK_FALSE;
-        }
-
-        if (!fastClear)
-        {
-            halti5_decompressTileStatus(cmd, &pCmdBuffer, img, &imgvRange);
-        }
-        else
-        {
-            compression = tsResource->compressed;
-            compressionFormat = tsResource->compressedFormat;
         }
 #endif
 
@@ -2939,7 +2943,11 @@ VkResult halti5_clearImage(
 #if __VK_ENABLETS
         if (fastClear)
         {
-            tileStatusAddress = halti5_computeTileStatusAddr(devCtx, img, offset);
+            tileStatusAddress = img->memory->ts->devAddr[subResource->mipLevel][subResource->arrayLayer];
+        }
+        else if (devCtx->vulkanTS)
+        {
+            tileStatusAddress = 0x0;
         }
 #endif
         if ((devCtx)->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE) {halti5_setMultiGpuSync((VkDevice)(devCtx), &(pCmdBuffer), VK_NULL_HANDLE);
@@ -2980,13 +2988,79 @@ VkResult halti5_clearImage(
  ~0U : (~(~0U << ((1 ? 9:7) - (0 ? 9:7) + 1))))))) << (0 ? 9:7)))
             );
 
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5006, VK_FALSE, address);
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5000, VK_FALSE, address);
+
+#if __VK_ENABLETS
+        if (devCtx->vulkanTS || (fastClear && devCtx->legacyTS))
+        {
+             /* DestTileStatusAddress. */
+             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5008, VK_FALSE, tileStatusAddress);
+            /* Set SrcTileStatusAddress. */
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5004, VK_FALSE, tileStatusAddress);
+        }
+
+        if (fastClear)
+        {
+            /* SrcClearValue. */
+            __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x500D, VK_FALSE, 2, fcClearValue);
+            /* DstClearValue. */
+            __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x500F, VK_FALSE, 2, fcClearValue);
+
+#if __VK_ENABLE_LEGACY_TS_WAR
+            if (fastClear && devCtx->legacyTS)
+            {
+                __vkImageLevelTarget * imgTargetLevel =  NULL;
+                __VK_SET_ALLOCATIONCB(&devCtx->memCb);
+
+                /* find the image target level info */
+                imgTargetLevel = __vkFindImageLevelTarget(devCtx, address);
+
+                if (!imgTargetLevel)
+                {
+                    /* allocate the image target level info node */
+                    imgTargetLevel = (__vkImageLevelTarget *) __VK_ALLOC(sizeof(__vkImageLevelTarget), 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+                    __VK_ONERROR(imgTargetLevel ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+                    __VK_MEMZERO(imgTargetLevel, sizeof(__vkImageLevelTarget));
+
+                    imgTargetLevel->imageLevelHandle = address;
+                    imgTargetLevel->isFirstRecord = VK_TRUE;
+
+                    /* insert this node to the list */
+                    __vkInsertImageLevelTarget(devCtx, imgTargetLevel);
+                }
+            }
+
+            /* src image */
+            pColorCheckpoint = &cmd->tempCheckPointArray[cmd->curCheckPointIndex++];
+            pColorCheckpoint->programmedColorValue = fcClearValue[0];
+            pColorCheckpoint->programmedColorValue64 = fcClearValue[1];
+            pColorCheckpoint->imageTargetHandle = address;
+            pColorCheckpoint->clearValueInsertIndex = pCmdBuffer - 8;
+            pColorCheckpoint->clearValue64InsertIndex = pCmdBuffer - 8;
+            pColorCheckpoint->clearValueRegAddr = 0x500D;
+            pColorCheckpoint->clearValue64RegAddr = 0x500D + 1;
+            pColorCheckpoint->type = __VK_COLOR_CHECKPOINT_CLEAR;
+
+            /* dst image */
+            pColorCheckpoint = &cmd->tempCheckPointArray[cmd->curCheckPointIndex++];
+            pColorCheckpoint->programmedColorValue = fcClearValue[0];
+            pColorCheckpoint->programmedColorValue64 = fcClearValue[1];
+            pColorCheckpoint->imageTargetHandle = address;
+            pColorCheckpoint->clearValueInsertIndex = pCmdBuffer - 4;
+            pColorCheckpoint->clearValue64InsertIndex = pCmdBuffer - 4;
+            pColorCheckpoint->clearValueRegAddr = 0x500F;
+            pColorCheckpoint->clearValue64RegAddr = 0x500F + 1;
+            pColorCheckpoint->type = __VK_COLOR_CHECKPOINT_CLEAR;
+#endif
+        }
+#endif
+
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5009, VK_FALSE, config);
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500A, VK_FALSE, dstConfigEx);
-        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5006, VK_FALSE, address);
 
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5002, VK_FALSE, config);
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5003, VK_FALSE, srcConfigEx);
-        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5000, VK_FALSE, address);
 
         if (devCtx->enabledFeatures.robustBufferAccess &&
             devCtx->database->ROBUSTNESS &&
@@ -3025,19 +3099,7 @@ VkResult halti5_clearImage(
 
         __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x5011, VK_FALSE, 2, clearVals);
         __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x5013, VK_FALSE, 2, clearMasks);
-#if __VK_ENABLETS
-        if (fastClear)
-        {
-            /* DestTileStatusAddress. */
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5008, VK_FALSE, tileStatusAddress);
-            /* Set SrcTileStatusAddress. */
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5004, VK_FALSE, tileStatusAddress);
-            /* DstClearValue. */
-            __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x500F, VK_FALSE, 2, fcClearValue);
-            /* SrcClearValue. */
-            __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x500D, VK_FALSE, 2, fcClearValue);
-        }
-#endif
+
         originX = rect->offset.x * img->sampleInfo.x;
         originY = rect->offset.y * img->sampleInfo.y;
         width   = rect->extent.width  * img->sampleInfo.x;
@@ -3282,9 +3344,6 @@ VkResult halti5_clearImage(
             /* Record FC value. */
             tsResource->fcValue[subResource->mipLevel][subResource->arrayLayer] = fcClearValue[0];
             tsResource->fcValueUpper[subResource->mipLevel][subResource->arrayLayer] = fcClearValue[1];
-
-            /* Turn the tile status on again. */
-            tsResource->tileStatusDisable[subResource->mipLevel][subResource->arrayLayer] = gcvFALSE;
         }
 #endif
         partIndex++;
@@ -3298,6 +3357,38 @@ VkResult halti5_clearImage(
     {
         __vk_CmdAquireBuffer(cmdBuf, cmd->curScrachBufIndex, &states);
         __VK_MEMCOPY(states, cmd->scratchCmdBuffer, cmd->curScrachBufIndex * sizeof(uint32_t));
+
+#if __VK_ENABLE_LEGACY_TS_WAR
+        __VK_ASSERT(cmd->curCheckPointIndex < (COLOR_CHECKPOINT_MAX >> 4));
+
+        if (cmd->curCheckPointIndex > 0)
+        {
+            uint32_t icp = 0;
+            uint32_t index = cmd->stateBufferTail->currentCheckPointIndex;
+
+            /* Copy those temp checkpoints to the checkpoints array */
+            for (icp = 0; icp < cmd->curCheckPointIndex; icp++)
+            {
+                pColorCheckpoint = &cmd->tempCheckPointArray[icp];
+
+                cmd->stateBufferTail->colorCheckPointArray[index + icp].imageTargetHandle = pColorCheckpoint->imageTargetHandle;
+                cmd->stateBufferTail->colorCheckPointArray[index + icp].programmedColorValue = pColorCheckpoint->programmedColorValue;
+                cmd->stateBufferTail->colorCheckPointArray[index + icp].programmedColorValue64 = pColorCheckpoint->programmedColorValue64;
+                cmd->stateBufferTail->colorCheckPointArray[index + icp].type = pColorCheckpoint->type;
+                cmd->stateBufferTail->colorCheckPointArray[index + icp].clearValueRegAddr = pColorCheckpoint->clearValueRegAddr;
+                cmd->stateBufferTail->colorCheckPointArray[index + icp].clearValue64RegAddr = pColorCheckpoint->clearValue64RegAddr;
+
+                cmd->stateBufferTail->colorCheckPointArray[index + icp].clearValueInsertIndex = states + (uint32_t)(pColorCheckpoint->clearValueInsertIndex - pCmdBufferBegin);
+                cmd->stateBufferTail->colorCheckPointArray[index + icp].clearValue64InsertIndex = states + (uint32_t)(pColorCheckpoint->clearValue64InsertIndex - pCmdBufferBegin);
+            }
+            cmd->stateBufferTail->currentCheckPointIndex += cmd->curCheckPointIndex;
+            __VK_ASSERT(cmd->stateBufferTail->currentCheckPointIndex < COLOR_CHECKPOINT_MAX);
+
+            __VK_MEMZERO(&cmd->tempCheckPointArray[0], cmd->curCheckPointIndex * sizeof(__vkColorCheckPoint));
+            cmd->curCheckPointIndex = 0;
+        }
+#endif
+
         __vk_CmdReleaseBuffer(cmdBuf, cmd->curScrachBufIndex);
     }
 
@@ -3347,6 +3438,13 @@ VkResult halti5_copyImage(
     VkBool32 srcCompression = VK_FALSE;
     __vkTileStatus * srcTsResource = VK_NULL_HANDLE;
     uint32_t color64 = 0;
+    uint32_t destTileStausAddress = 0;
+    VkBool32 dstFastClear = VK_FALSE;
+    int32_t dstCompressionFormat = -1;
+    VkBool32 dstCompression = VK_FALSE;
+#if __VK_ENABLE_LEGACY_TS_WAR
+    __vkColorCheckPoint * pColorCheckpoint = gcvNULL;
+#endif
 #endif
     uint32_t offset = 0;
     __vkImage *srcImg = VK_NULL_HANDLE;
@@ -3408,14 +3506,11 @@ VkResult halti5_copyImage(
         {
             /* Flush the tile status cache. */
             __VK_ONERROR(halti5_flushCache((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE, HW_CACHE_ALL));
-            srcTileStatusAddress = halti5_computeTileStatusAddr(devCtx, srcImg, offset);;
+            srcTileStatusAddress = srcTsResource->devAddr[srcRes->u.img.subRes.mipLevel][srcRes->u.img.subRes.arrayLayer];
 
-            color64 = (srcTsResource->fcValue[srcRes->u.img.subRes.mipLevel][srcRes->u.img.subRes.arrayLayer] !=
-                srcTsResource->fcValueUpper[srcRes->u.img.subRes.mipLevel][srcRes->u.img.subRes.arrayLayer]);
-
-            srcFastClear = !srcTsResource->tileStatusDisable[srcRes->u.img.subRes.mipLevel][srcRes->u.img.subRes.arrayLayer];
-            srcCompressionFormat = srcTsResource->compressedFormat;
+            srcFastClear = srcTileStatusAddress ? VK_TRUE : VK_FALSE;
             srcCompression = srcTsResource->compressed;
+            srcCompressionFormat = srcTsResource->compressedFormat;
         }
 #endif
         if (devCtx->database->CACHE128B256BPERLINE)
@@ -3493,18 +3588,34 @@ VkResult halti5_copyImage(
         const __vkFormatInfo *fmtInfo = VK_NULL_HANDLE;
         __vkImage *dstImg = dstRes->u.img.pImage;
         __vkImageLevel *pDstLevel = &dstImg->pImgLevels[dstRes->u.img.subRes.mipLevel];
+
 #if __VK_ENABLETS
-        VkImageSubresourceRange *imgvRange;
-        VkBool32 dstAnyTsEnable = VK_FALSE;
         __vkTileStatus * dstTsResource = dstImg->memory->ts;
 
-        __VK_SET_ALLOCATIONCB(&dstImg->memCb);
+        if (dstTsResource)
+        {
+            /* the legacy HW FC can not support that the dst image enable TS when do blit */
+            if (devCtx->legacyTS)
+            {
+                VkImageSubresourceRange pRanges;
+                pRanges.aspectMask =  dstRes->u.img.subRes.aspectMask;
+                pRanges.baseArrayLayer = dstRes->u.img.subRes.arrayLayer;
+                pRanges.baseMipLevel = dstRes->u.img.subRes.mipLevel;
+                pRanges.layerCount = 1;
+                pRanges.levelCount = 1;
 
-        imgvRange = (VkImageSubresourceRange*)__VK_ALLOC(sizeof(VkImageSubresourceRange), 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
-        imgvRange->aspectMask = dstRes->u.img.subRes.aspectMask;
-        imgvRange->baseArrayLayer = dstRes->u.img.subRes.arrayLayer;
-        imgvRange->baseMipLevel = dstRes->u.img.subRes.mipLevel;
-        imgvRange->layerCount = imgvRange->levelCount = 1;
+                /* Need to do decompress and dity the tiles status at the same time */
+                halti5_decompressTileStatus(cmd, &pCmdBuffer, dstImg, &pRanges);
+                halti5_dirtyTileStatus(cmd, &pCmdBuffer, dstImg, &pRanges);
+            }
+            else /* the new vulkan FC can support that the dst image with TS */
+            {
+                dstFastClear = VK_TRUE;
+                dstCompression = dstTsResource->compressed;
+                dstCompressionFormat = dstTsResource->compressedFormat;
+                destTileStausAddress = dstTsResource->devAddr[dstRes->u.img.subRes.mipLevel][dstRes->u.img.subRes.arrayLayer];
+            }
+        }
 #endif
         dstOffset = dstRes->u.img.offset;
         dstExtent = dstRes->u.img.extent;
@@ -3538,9 +3649,7 @@ VkResult halti5_copyImage(
 
         halti5_helper_configMSAA(dstImg, &dstMsaa, &dstCacheMode);
         halti5_helper_configTiling(dstImg, &dstTiling, &dstSuperTile);
-#if __VK_ENABLETS
-        __VK_AnyTSEnable(dstTsResource, imgvRange, &dstAnyTsEnable);
-#endif
+
         if (devCtx->database->CACHE128B256BPERLINE)
         {
             if (dstImg->halTiling == gcvSUPERTILED)
@@ -3580,15 +3689,6 @@ VkResult halti5_copyImage(
  ~0U : (~(~0U << ((1 ? 27:26) - (0 ? 27:26) + 1))))))) << (0 ? 27:26)));
             }
         }
-#if __VK_ENABLETS
-        if (dstAnyTsEnable)
-        {
-            result = halti5_decompressTileStatus(cmd, &pCmdBuffer, dstImg, imgvRange);
-        }
-
-        __VK_FREE(imgvRange);
-#endif
-        __VK_ONERROR(result);
     }
     else
     {
@@ -3671,13 +3771,13 @@ VkResult halti5_copyImage(
                 dstExtent.width  *= 2;
             }
         }
+    }
 
-        if (__vk_GetVkFormatInfo((VkFormat) dstFormat)->bitsPerBlock >= 64 &&
-            srcMsaa != dstMsaa)
-        {
-            useComputeBlit = VK_TRUE;
-            rawCopy = VK_FALSE;
-        }
+    if (__vk_GetVkFormatInfo((VkFormat) dstFormat)->bitsPerBlock >= 64 &&
+        srcMsaa != dstMsaa)
+    {
+        useComputeBlit = VK_TRUE;
+        rawCopy = VK_FALSE;
     }
 
     if (srcParts != dstParts)
@@ -4208,7 +4308,50 @@ VkResult halti5_copyImage(
         ;
 
     dstConfigEx
-        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        =
+#if __VK_ENABLETS
+        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 0:0) - (0 ?
+ 0:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 0:0) - (0 ?
+ 0:0) + 1))))))) << (0 ?
+ 0:0))) | (((gctUINT32) ((gctUINT32) (dstFastClear) & ((gctUINT32) ((((1 ?
+ 0:0) - (0 ?
+ 0:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 1:1) - (0 ?
+ 1:1) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 1:1) - (0 ?
+ 1:1) + 1))))))) << (0 ?
+ 1:1))) | (((gctUINT32) ((gctUINT32) (dstCompression) & ((gctUINT32) ((((1 ?
+ 1:1) - (0 ?
+ 1:1) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:4) - (0 ?
+ 7:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:4) - (0 ?
+ 7:4) + 1))))))) << (0 ?
+ 7:4))) | (((gctUINT32) ((gctUINT32) (dstCompressionFormat) & ((gctUINT32) ((((1 ?
+ 7:4) - (0 ?
+ 7:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ? 7:4)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 20:20) - (0 ?
+ 20:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 20:20) - (0 ?
+ 20:20) + 1))))))) << (0 ?
+ 20:20))) | (((gctUINT32) ((gctUINT32) (color64) & ((gctUINT32) ((((1 ?
+ 20:20) - (0 ?
+ 20:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 20:20) - (0 ? 20:20) + 1))))))) << (0 ? 20:20)))
+#else
+        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ?
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4228,6 +4371,7 @@ VkResult halti5_copyImage(
  1:1) - (0 ?
  1:1) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1)))
+#endif
         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  8:8) - (0 ?
  8:8) + 1) == 32) ?
@@ -4322,6 +4466,18 @@ VkResult halti5_copyImage(
 
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5016, VK_FALSE, ~0U);
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5017, VK_FALSE, ~0U);
+
+#if __VK_ENABLETS
+        if (devCtx->vulkanTS || (srcTileStatusAddress && devCtx->legacyTS))
+        {
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5004, VK_FALSE, srcTileStatusAddress);
+        }
+
+        if (devCtx->vulkanTS)
+        {
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5008, VK_FALSE, destTileStausAddress);
+        }
+#endif
 
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5002, VK_FALSE, srcConfig);
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5003, VK_FALSE, srcConfigEx);
@@ -4582,17 +4738,30 @@ VkResult halti5_copyImage(
  31:16) - (0 ?
  31:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16))));
+
 #if __VK_ENABLETS
-        /* Set SrcTileStatusAddress. */
-        if (srcFastClear)
+        if (srcFastClear && devCtx->legacyTS)
         {
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5004, VK_FALSE, srcTileStatusAddress);
             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500D, VK_FALSE,
                 srcTsResource->fcValue[srcRes->u.img.subRes.mipLevel][srcRes->u.img.subRes.arrayLayer]);
             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500E, VK_FALSE,
                 srcTsResource->fcValueUpper[srcRes->u.img.subRes.mipLevel][srcRes->u.img.subRes.arrayLayer]);
+
+#if __VK_ENABLE_LEGACY_TS_WAR
+            /* src image */
+            pColorCheckpoint = &cmd->tempCheckPointArray[cmd->curCheckPointIndex++];
+            pColorCheckpoint->programmedColorValue = srcTsResource->fcValue[srcRes->u.img.subRes.mipLevel][srcRes->u.img.subRes.arrayLayer];
+            pColorCheckpoint->programmedColorValue64 = srcTsResource->fcValueUpper[srcRes->u.img.subRes.mipLevel][srcRes->u.img.subRes.arrayLayer];
+            pColorCheckpoint->imageTargetHandle = srcAddress;
+            pColorCheckpoint->clearValueInsertIndex = pCmdBuffer - 4;
+            pColorCheckpoint->clearValue64InsertIndex = pCmdBuffer - 2;
+            pColorCheckpoint->clearValueRegAddr = 0x500D;
+            pColorCheckpoint->clearValue64RegAddr = 0x500E;
+            pColorCheckpoint->type = __VK_COLOR_CHECKPOINT_BLIT;
+#endif
         }
 #endif
+
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x502B, VK_FALSE,
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:1) - (0 ?
@@ -4615,6 +4784,7 @@ VkResult halti5_copyImage(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))
             );
+
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5018, VK_FALSE,
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
@@ -4684,14 +4854,7 @@ VkResult halti5_copyImage(
  }halti5_setMultiGpuSync((VkDevice)(devCtx), &(pCmdBuffer), VK_NULL_HANDLE);
  };
 
-#if __VK_ENABLETS
-        if (srcFastClear)
-        {
-            __VK_ASSERT(srcImg != VK_NULL_HANDLE);
-            offset += srcPartSize;
-            srcTileStatusAddress = halti5_computeTileStatusAddr(devCtx, srcImg, offset);;
-        }
-#endif
+
         srcAddress += srcPartSize;
         dstAddress += dstPartSize;
     }
@@ -4706,6 +4869,37 @@ VkResult halti5_copyImage(
 
         __VK_MEMCOPY(states, cmd->scratchCmdBuffer, cmd->curScrachBufIndex * sizeof(uint32_t));
 
+#if __VK_ENABLE_LEGACY_TS_WAR
+        __VK_ASSERT(cmd->curCheckPointIndex < (COLOR_CHECKPOINT_MAX >> 4));
+
+        if (cmd->curCheckPointIndex > 0)
+        {
+            uint32_t icp = 0;
+            uint32_t index = cmd->stateBufferTail->currentCheckPointIndex;
+
+            /* Copy those temp checkpoints to the checkpoints array */
+            for (icp = 0; icp < cmd->curCheckPointIndex; icp++)
+            {
+                pColorCheckpoint = &cmd->tempCheckPointArray[icp];
+
+                cmd->stateBufferTail->colorCheckPointArray[index + icp].imageTargetHandle = pColorCheckpoint->imageTargetHandle;
+                cmd->stateBufferTail->colorCheckPointArray[index + icp].programmedColorValue = pColorCheckpoint->programmedColorValue;
+                cmd->stateBufferTail->colorCheckPointArray[index + icp].programmedColorValue64 = pColorCheckpoint->programmedColorValue64;
+                cmd->stateBufferTail->colorCheckPointArray[index + icp].type = pColorCheckpoint->type;
+                cmd->stateBufferTail->colorCheckPointArray[index + icp].clearValueRegAddr = pColorCheckpoint->clearValueRegAddr;
+                cmd->stateBufferTail->colorCheckPointArray[index + icp].clearValue64RegAddr = pColorCheckpoint->clearValue64RegAddr;
+
+                cmd->stateBufferTail->colorCheckPointArray[index + icp].clearValueInsertIndex = states + (uint32_t)(pColorCheckpoint->clearValueInsertIndex - pCmdBufferBegin);
+                cmd->stateBufferTail->colorCheckPointArray[index + icp].clearValue64InsertIndex = states + (uint32_t)(pColorCheckpoint->clearValue64InsertIndex - pCmdBufferBegin);
+            }
+
+            cmd->stateBufferTail->currentCheckPointIndex += cmd->curCheckPointIndex;
+            __VK_ASSERT(cmd->stateBufferTail->currentCheckPointIndex < COLOR_CHECKPOINT_MAX);
+
+            __VK_MEMZERO(&cmd->tempCheckPointArray[0], cmd->curCheckPointIndex * sizeof(__vkColorCheckPoint));
+            cmd->curCheckPointIndex = 0;
+        }
+#endif
         __vk_CmdReleaseBuffer(cmdBuf, cmd->curScrachBufIndex);
     }
 
@@ -6511,6 +6705,7 @@ VkResult halti5_helper_convertHwTxDesc(
     uint32_t tmpResidentImgFormat = 0;
     VkBool32 isFakedSize = VK_FALSE;
     uint32_t originalWidth = 0, originalHeight = 0;
+    uint32_t levelCnt = 0;
 
     __VK_ASSERT(hwTxDesc);
 
@@ -6525,6 +6720,8 @@ VkResult halti5_helper_convertHwTxDesc(
         baseLevel = &img->pImgLevels[subResourceRange->baseMipLevel];
         residentFormatInfo = (__vkFormatInfo *)imgv->formatInfo;
         tmpResidentImgFormat = residentFormatInfo->residentImgFormat;
+        levelCnt = subResourceRange->levelCount;
+
         __VK_ASSERT(!bufv);
 
         if (!devCtx->database->PE_A8B8G8R8 &&
@@ -6578,6 +6775,7 @@ VkResult halti5_helper_convertHwTxDesc(
         __VK_ASSERT(!imgv);
         residentFormatInfo = &bufv->formatInfo;
         tmpResidentImgFormat = residentFormatInfo->residentImgFormat;
+        levelCnt = 1;
 
         sizeInByte = (bufv->createInfo.range == VK_WHOLE_SIZE)
                    ? (uint32_t)(buf->createInfo.size - bufv->createInfo.offset)
@@ -6777,6 +6975,7 @@ VkResult halti5_helper_convertHwTxDesc(
         if (subResourceRange->levelCount == VK_REMAINING_MIP_LEVELS)
         {
             levelCount = img->createInfo.mipLevels - subResourceRange->baseMipLevel;
+            levelCnt = levelCount;
         }
 
         if (subResourceRange->layerCount == VK_REMAINING_ARRAY_LAYERS)
@@ -7246,7 +7445,7 @@ VkResult halti5_helper_convertHwTxDesc(
  ~0U : (~(~0U << ((1 ?
  11:8) - (0 ?
  11:8) + 1))))))) << (0 ?
- 11:8))) | (((gctUINT32) ((gctUINT32) (subResourceRange->levelCount - 1) & ((gctUINT32) ((((1 ?
+ 11:8))) | (((gctUINT32) ((gctUINT32) (levelCnt - 1) & ((gctUINT32) ((((1 ?
  11:8) - (0 ?
  11:8) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ? 11:8)));
@@ -10675,6 +10874,88 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
             break;
+        case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 9:6) - (0 ?
+ 9:6) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 9:6) - (0 ?
+ 9:6) + 1))))))) << (0 ?
+ 9:6))) | (((gctUINT32) (0xA & ((gctUINT32) ((((1 ?
+ 9:6) - (0 ?
+ 9:6) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1))))))) << (0 ?
+ 2:0))) | (((gctUINT32) ((gctUINT32) (2) & ((gctUINT32) ((((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:14) - (0 ?
+ 15:14) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 15:14) - (0 ?
+ 15:14) + 1))))))) << (0 ?
+ 15:14))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 15:14) - (0 ?
+ 15:14) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 18:16) - (0 ?
+ 18:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 18:16) - (0 ?
+ 18:16) + 1))))))) << (0 ?
+ 18:16))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ?
+ 18:16) - (0 ?
+ 18:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 22:20) - (0 ?
+ 22:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 22:20) - (0 ?
+ 22:20) + 1))))))) << (0 ?
+ 22:20))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 22:20) - (0 ?
+ 22:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:24) - (0 ?
+ 26:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 26:24) - (0 ?
+ 26:24) + 1))))))) << (0 ?
+ 26:24))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 26:24) - (0 ?
+ 26:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 30:28) - (0 ?
+ 30:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 30:28) - (0 ?
+ 30:28) + 1))))))) << (0 ?
+ 30:28))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ?
+ 30:28) - (0 ?
+ 30:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:4) - (0 ?
+ 5:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:4) - (0 ?
+ 5:4) + 1))))))) << (0 ?
+ 5:4))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 5:4) - (0 ?
+ 5:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
+            break;
         case __VK_FORMAT_D24_UNORM_X8_PACKED32:
             imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
@@ -11199,9 +11480,12 @@ VkResult halti5_createImageView(
             }
             break;
         default:
+            if (ext->sType != VK_STRUCTURE_TYPE_MAX_ENUM ||
+                ext->pNext != VK_NULL_HANDLE)
             {
                 __VK_ASSERT(!"unknown pNext in imageView createInfo ");
             }
+            ext = (VkBaseInStructure *)ext->pNext;
             break;
         }
     }
@@ -11335,7 +11619,7 @@ VkResult halti5_createImageView(
     case VK_FORMAT_R32G32_SINT:
     case VK_FORMAT_R32G32_SFLOAT:
         chipImgv->patchFormat = residentImgFormat;
-        chipImgv->patchKey |= HALTI5_PATCH_TX_GATHER_BIT;
+        chipImgv->patchKey |= HALTI5_PATCH_TX_GATHER_BIT | HALTI5_PATCH_TX_GATHER_PCF_BIT;
         break;
     case VK_FORMAT_D32_SFLOAT:
         chipImgv->patchFormat = residentImgFormat;
@@ -11930,6 +12214,15 @@ const char * halti5_helper_patchFuc(
             VSC_RES_OP_BIT_GATHER,
             0,
             VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGATHER_EXTRA_LAYTER
+        },
+        {
+            VK_FORMAT_R32_SFLOAT,
+            HALTI5_PATCH_TX_GATHER_PCF,
+            0,
+            "_inputgather_pcf_R32SFLOAT",
+            VSC_RES_OP_BIT_GATHER_PCF,
+            0,
+            VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGATHERPCF_D32F
         },
         {
             VK_FORMAT_D32_SFLOAT,

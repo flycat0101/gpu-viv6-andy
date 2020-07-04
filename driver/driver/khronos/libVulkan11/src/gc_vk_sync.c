@@ -145,6 +145,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateFence(
     __vkDevContext *devCtx = (__vkDevContext *)device;
     __vkFence *fce;
     VkResult result = VK_SUCCESS;
+    VkBaseInStructure *ext = (VkBaseInStructure *)pCreateInfo->pNext;
 
     *pFence = VK_NULL_HANDLE;
 
@@ -158,7 +159,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateFence(
         __VK_ONERROR(gcoOS_Signal(gcvNULL, fce->signal, VK_TRUE));
     }
 
-    if (pCreateInfo->pNext != VK_NULL_HANDLE)
+    if (pCreateInfo->pNext != VK_NULL_HANDLE &&
+        ext->sType != VK_STRUCTURE_TYPE_MAX_ENUM)
     {
          VkExportFenceCreateInfo *exportInfo = (VkExportFenceCreateInfo *)pCreateInfo->pNext;
          __VK_ASSERT(exportInfo->sType == VK_STRUCTURE_TYPE_EXPORT_FENCE_CREATE_INFO);
@@ -316,6 +318,11 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_WaitForFences(
     else
         waitTimeout = gcmMAX(1, (uint32_t)(timeout / 1000000 / fenceCount));
 
+#if defined(_WINDOWS)
+    if (waitTimeout < 30000 && timeout >= 1000000)
+        waitTimeout = gcvINFINITE;
+#endif
+
     gcoOS_GetTime(&startTime);
     do
     {
@@ -417,6 +424,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateSemaphore(
     else
     {
         __vk_DestroyObject(devCtx, __VK_OBJECT_SEMAPHORE, (__vkObject*)sph);
+        return result;
     }
 
     if (pCreateInfo->pNext != VK_NULL_HANDLE)

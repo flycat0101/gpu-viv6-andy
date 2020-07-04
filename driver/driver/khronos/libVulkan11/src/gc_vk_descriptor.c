@@ -519,7 +519,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_UpdateDescriptorSets(
         }
         __VK_ASSERT(index < dstDescLayout->bindingCount);
 
-        __vk_utils_region_mad(&srcBegin, &srcBinding->perElementSize, pCopy->dstArrayElement, &srcBinding->offset);
+        __vk_utils_region_mad(&srcBegin, &srcBinding->perElementSize, pCopy->srcArrayElement, &srcBinding->offset);
         __vk_utils_region_mad(&srcEnd, &srcBinding->perElementSize, pCopy->descriptorCount, &srcBegin);
         __VK_ASSERT(__vk_utils_region_gequal(&srcDescLayout->size, &srcEnd));
         __vk_utils_region_add(&srcBegin, &srcBegin, &srcDesc->begin);

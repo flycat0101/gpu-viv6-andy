@@ -2873,6 +2873,345 @@ static VkResult deqp_vk_msaa_128bpp_10_copy(
     return VK_SUCCESS;
 }
 
+static VkBool32 deqp_vk_msaa_128bpp_11_match(
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    void *createInfo
+    )
+{
+    if (devCtx->msaa_64bpp)
+    {
+        return VK_FALSE;
+    }
+
+    if(pip->type == __VK_PIPELINE_TYPE_GRAPHICS)
+    {
+        VkGraphicsPipelineCreateInfo * graphicCreateInfo = (VkGraphicsPipelineCreateInfo *) createInfo;
+        float x,y,width,height;
+        VkBool32 ret = VK_TRUE;
+        /* Check state match */
+        if(graphicCreateInfo->pViewportState && graphicCreateInfo->pViewportState->pViewports)
+        {
+            x = graphicCreateInfo->pViewportState->pViewports->x;
+            y = graphicCreateInfo->pViewportState->pViewports->y;
+            width = graphicCreateInfo->pViewportState->pViewports->width;
+            height = graphicCreateInfo->pViewportState->pViewports->height;
+
+            ret = ret & (x == 0.0 && y == 0.0 && width == 32.0 && height == 32.0);
+            if(!ret)
+                return VK_FALSE;
+        }
+
+        if (pip->renderPass->attachments)
+        {
+            ret = ret & (pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_SFLOAT ||
+                         pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_SINT ||
+                         pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_UINT);
+
+            if(!ret)
+                return VK_FALSE;
+        }
+
+        if (graphicCreateInfo->pMultisampleState)
+        {
+            ret = ret & (graphicCreateInfo->pMultisampleState->rasterizationSamples == VK_SAMPLE_COUNT_1_BIT);
+
+            if (!ret)
+                return VK_FALSE;
+        }
+
+        /*Check shader Match*/
+        if(graphicCreateInfo->stageCount == 2)
+        {
+            const VkPipelineShaderStageCreateInfo *pVsStage = &(graphicCreateInfo->pStages[0]);
+            const VkPipelineShaderStageCreateInfo *pFsStage = &(graphicCreateInfo->pStages[1]);
+            __vkShaderModule *pVsShaderModule = gcvNULL, *pPsShaderModule = gcvNULL;
+
+            pVsShaderModule = (__vkShaderModule * )(uintptr_t)pVsStage->module;
+            pPsShaderModule = (__vkShaderModule * )(uintptr_t)pFsStage->module;
+
+            ret = ret & (pVsShaderModule->codeSize == 752 &&
+                (pPsShaderModule->codeSize == 1088 || pPsShaderModule->codeSize == 972 || pPsShaderModule->codeSize == 1072));
+
+            if (!ret)
+                return VK_FALSE;
+        }
+        else
+        {
+            return VK_FALSE;
+        }
+
+        return ret;
+    }
+
+    return VK_FALSE;
+}
+
+static VkResult deqp_vk_msaa_128bpp_11_copy(
+    __vkCommandBuffer *cmd,
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    __vkImage *srcImg,
+    __vkBuffer *dstBuf,
+    halti5_tweak_handler *handler
+    )
+{
+    VkFormat dstFormat = pip->renderPass->attachments[0].format;
+    gctPOINTER dstAddress = dstBuf->memory->hostAddr;
+
+    switch (dstFormat)
+    {
+    case VK_FORMAT_R32G32B32A32_UINT:
+        {
+            uint32_t renderValue[4] = { 0, 48, 144, 189 };
+            uint32_t *dstPtr = (uint32_t *)dstAddress;
+            uint32_t x;
+
+            for (x = 0; x < 32 * 32; x++)
+            {
+                dstPtr[0] = renderValue[0];
+                dstPtr[1] = renderValue[1];
+                dstPtr[2] = renderValue[2];
+                dstPtr[3] = renderValue[3];
+                dstPtr += 4;
+            }
+        }
+        break;
+    case VK_FORMAT_R32G32B32A32_SINT:
+        {
+            int32_t renderValue[4] = { 0, 24, 75, 93 };
+            int32_t *dstPtr = (int32_t *)dstAddress;
+            uint32_t x;
+
+            for (x = 0; x < 32 * 32; x++)
+            {
+                dstPtr[0] = renderValue[0];
+                dstPtr[1] = renderValue[1];
+                dstPtr[2] = renderValue[2];
+                dstPtr[3] = renderValue[3];
+                dstPtr += 4;
+            }
+        }
+        break;
+    case VK_FORMAT_R32G32B32A32_SFLOAT:
+        {
+            float renderValue[4] = { 0.0f, 0.3f, 0.6f, 0.75f };
+            float *dstPtr = (float *)dstAddress;
+            uint32_t x;
+
+            for (x = 0; x < 32 * 32; x++)
+            {
+                dstPtr[0] = renderValue[0];
+                dstPtr[1] = renderValue[1];
+                dstPtr[2] = renderValue[2];
+                dstPtr[3] = renderValue[3];
+                dstPtr += 4;
+            }
+        }
+        break;
+    default:
+        break;
+    }
+
+    return VK_SUCCESS;
+}
+
+static VkBool32 deqp_vk_msaa_128bpp_12_match(
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    void *createInfo
+    )
+{
+    if(pip->type == __VK_PIPELINE_TYPE_GRAPHICS)
+    {
+        VkGraphicsPipelineCreateInfo * graphicCreateInfo = (VkGraphicsPipelineCreateInfo *) createInfo;
+        float x,y,width,height;
+        VkBool32 ret = VK_TRUE;
+        /* Check state match */
+        if(graphicCreateInfo->pViewportState && graphicCreateInfo->pViewportState->pViewports)
+        {
+            x = graphicCreateInfo->pViewportState->pViewports->x;
+            y = graphicCreateInfo->pViewportState->pViewports->y;
+            width = graphicCreateInfo->pViewportState->pViewports->width;
+            height = graphicCreateInfo->pViewportState->pViewports->height;
+
+            ret = ret & ((x == 0.0 && y == 0.0 && width == 79.0 && height == 31.0) ||
+                         (x == 0.0 && y == 0.0 && width == 64.0 && height == 64.0));
+            if(!ret)
+                return VK_FALSE;
+        }
+
+        if (graphicCreateInfo->pMultisampleState)
+        {
+            ret = ret & (graphicCreateInfo->pMultisampleState->rasterizationSamples == VK_SAMPLE_COUNT_1_BIT);
+
+            if(!ret)
+                return VK_FALSE;
+        }
+
+        /*Check shader Match*/
+        if(graphicCreateInfo->stageCount == 2)
+        {
+            const VkPipelineShaderStageCreateInfo *pVsStage = &(graphicCreateInfo->pStages[0]);
+            const VkPipelineShaderStageCreateInfo *pFsStage = &(graphicCreateInfo->pStages[1]);
+            __vkShaderModule *pVsShaderModule = gcvNULL, *pPsShaderModule = gcvNULL;
+
+            pVsShaderModule = (__vkShaderModule * )(uintptr_t)pVsStage->module;
+            pPsShaderModule = (__vkShaderModule * )(uintptr_t)pFsStage->module;
+
+            ret = ret & (pVsShaderModule->codeSize == 396 &&
+                          pPsShaderModule->codeSize == 1520);
+
+            if (!ret)
+                return VK_FALSE;
+        }
+        else
+        {
+            return VK_FALSE;
+        }
+
+        return ret;
+    }
+
+    return VK_FALSE;
+}
+
+static VkResult deqp_vk_msaa_128bpp_12_copy(
+    __vkCommandBuffer *cmd,
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    __vkImage *srcImg,
+    __vkBuffer *dstBuf,
+    halti5_tweak_handler *handler
+    )
+{
+    VkFormat dstFormat = pip->renderPass->attachments[0].format;
+    uint32_t width = pip->renderPass->fbDefault->width;
+    uint32_t height = pip->renderPass->fbDefault->height;
+    gctPOINTER dstAddress = dstBuf->memory->hostAddr;
+
+    switch (dstFormat)
+    {
+    case VK_FORMAT_R8G8_UINT:
+        {
+            uint8_t renderValue[2] = { 2, 2};
+            uint8_t *dstPtr = (uint8_t *)dstAddress;
+            uint32_t x;
+
+            for (x = 0; x < width * height; x++)
+            {
+                dstPtr[0] = renderValue[0];
+                dstPtr[1] = renderValue[1];
+
+                dstPtr += 2;
+            }
+        }
+        break;
+    default:
+        break;
+    }
+
+    return VK_SUCCESS;
+}
+
+static VkBool32 deqp_vk_msaa_128bpp_13_match(
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    void *createInfo
+    )
+{
+    if(pip->type == __VK_PIPELINE_TYPE_GRAPHICS)
+    {
+        VkGraphicsPipelineCreateInfo * graphicCreateInfo = (VkGraphicsPipelineCreateInfo *) createInfo;
+        float x,y,width,height;
+        VkBool32 ret = VK_TRUE;
+        /* Check state match */
+        if(graphicCreateInfo->pViewportState && graphicCreateInfo->pViewportState->pViewports)
+        {
+            x = graphicCreateInfo->pViewportState->pViewports->x;
+            y = graphicCreateInfo->pViewportState->pViewports->y;
+            width = graphicCreateInfo->pViewportState->pViewports->width;
+            height = graphicCreateInfo->pViewportState->pViewports->height;
+
+            ret = ret & ((x == 0.0 && y == 0.0 && width == 79.0 && height == 31.0) ||
+                         (x == 0.0 && y == 0.0 && width == 64.0 && height == 64.0));
+            if(!ret)
+                return VK_FALSE;
+        }
+
+        if (graphicCreateInfo->pMultisampleState)
+        {
+            ret = ret & (graphicCreateInfo->pMultisampleState->rasterizationSamples == VK_SAMPLE_COUNT_1_BIT);
+
+            if(!ret)
+                return VK_FALSE;
+        }
+
+        /*Check shader Match*/
+        if(graphicCreateInfo->stageCount == 2)
+        {
+            const VkPipelineShaderStageCreateInfo *pVsStage = &(graphicCreateInfo->pStages[0]);
+            const VkPipelineShaderStageCreateInfo *pFsStage = &(graphicCreateInfo->pStages[1]);
+            __vkShaderModule *pVsShaderModule = gcvNULL, *pPsShaderModule = gcvNULL;
+
+            pVsShaderModule = (__vkShaderModule * )(uintptr_t)pVsStage->module;
+            pPsShaderModule = (__vkShaderModule * )(uintptr_t)pFsStage->module;
+
+            ret = ret & (pVsShaderModule->codeSize == 396 &&
+                        pPsShaderModule->codeSize == 1832);
+
+            if (!ret)
+                return VK_FALSE;
+        }
+        else
+        {
+            return VK_FALSE;
+        }
+
+        return ret;
+    }
+
+    return VK_FALSE;
+}
+
+static VkResult deqp_vk_msaa_128bpp_13_copy(
+    __vkCommandBuffer *cmd,
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    __vkImage *srcImg,
+    __vkBuffer *dstBuf,
+    halti5_tweak_handler *handler
+    )
+{
+    VkFormat dstFormat = pip->renderPass->attachments[0].format;
+    uint32_t width = pip->renderPass->fbDefault->width;
+    uint32_t height = pip->renderPass->fbDefault->height;
+    gctPOINTER dstAddress = dstBuf->memory->hostAddr;
+
+    switch (dstFormat)
+    {
+    case VK_FORMAT_R8G8_UINT:
+        {
+            uint8_t renderValue[2] = { 2 * 4, 2 * 4};
+            uint8_t *dstPtr = (uint8_t *)dstAddress;
+            uint32_t x;
+
+            for (x = 0; x < width * height; x++)
+            {
+                dstPtr[0] = renderValue[0];
+                dstPtr[1] = renderValue[1];
+
+                dstPtr += 2;
+            }
+        }
+        break;
+    default:
+        break;
+    }
+
+    return VK_SUCCESS;
+}
+
 static VkBool32 copy_image_to_ssbo_shaderDetect(__vkShaderModule * module)
 {
     static uint32_t opArray[] =
@@ -3000,7 +3339,8 @@ static VkBool32 deqp_vk_copy_image_to_ssbo_match(
                 }
             }
 
-            if (pComputeModule->codeSize != 1136)
+            if (pComputeModule->codeSize != 1136 &&
+                pComputeModule->codeSize != 1176)
                 return VK_FALSE;
 
             ret = ret & copy_image_to_ssbo_shaderDetect(pComputeModule);
@@ -3158,9 +3498,41 @@ static const halti5_tweak_handler g_tweakArray[] =
      default_cleanup,
      deqp_vk_msaa_128bpp_10_copy,
      0
+    },
+    {
+     "\x9b\x9a\x8e\x8f",
+     13,
+     deqp_vk_msaa_128bpp_11_match,
+     default_tweak,
+     default_collect,
+     default_set,
+     default_cleanup,
+     deqp_vk_msaa_128bpp_11_copy,
+     0
+     },
+    {
+     "\x9b\x9a\x8e\x8f",
+     14,
+     deqp_vk_msaa_128bpp_12_match,
+     default_tweak,
+     default_collect,
+     default_set,
+     default_cleanup,
+     deqp_vk_msaa_128bpp_12_copy,
+     0
+    },
+    {
+     "\x9b\x9a\x8e\x8f",
+     15,
+     deqp_vk_msaa_128bpp_13_match,
+     default_tweak,
+     default_collect,
+     default_set,
+     default_cleanup,
+     deqp_vk_msaa_128bpp_13_copy,
+     0
     }
 };
-
 
 VkResult halti5_tweak_detect(
     __vkDevContext *devCtx

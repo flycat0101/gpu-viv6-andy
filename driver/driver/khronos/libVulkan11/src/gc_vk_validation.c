@@ -303,7 +303,9 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceFormatProperties(VkPhysicalD
         result = __VK_ERROR_INVALID_HANDLE;
         goto vk_Exit;
     }
-    if (format > VK_FORMAT_END_RANGE)
+    if (format > VK_FORMAT_END_RANGE &&
+        !(format >= VK_FORMAT_YCBCR_START &&
+        format <= VK_FROMAT_YCBCR_END))
     {
         result = __VK_ERROR_INVALID_FORMAT;
         goto vk_Exit;
@@ -333,7 +335,9 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceImageFormatProperties(Vk
         result = __VK_ERROR_INVALID_HANDLE;
         goto vk_Exit;
     }
-    if (format > VK_FORMAT_END_RANGE)
+    if (format > VK_FORMAT_END_RANGE &&
+        !(format >= VK_FORMAT_YCBCR_START &&
+        format <= VK_FROMAT_YCBCR_END))
     {
         result = __VK_ERROR_INVALID_FORMAT;
         goto vk_Exit;
@@ -981,7 +985,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_FlushMappedMemoryRanges(VkDevice device, 
         const VkMappedMemoryRange *pMemRange = &pMemRanges[i];
         __vkDeviceMemory *pMem = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory*, pMemRange->memory);
 
-        if (pMemRange->sType != VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE || pMemRange->pNext)
+        if (pMemRange->sType != VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE)
         {
             result = __VK_ERROR_INVALID_HANDLE;
             goto vk_Exit;
@@ -1036,7 +1040,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_InvalidateMappedMemoryRanges(VkDevice dev
         const VkMappedMemoryRange *pMemRange = &pMemRanges[i];
         __vkDeviceMemory *pMem = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory*, pMemRange->memory);
 
-        if (pMemRange->sType != VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE || pMemRange->pNext)
+        if (pMemRange->sType != VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE)
         {
             result = __VK_ERROR_INVALID_HANDLE;
             goto vk_Exit;
@@ -1344,7 +1348,9 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceSparseImageFormatProperties(
         result = __VK_ERROR_INVALID_HANDLE;
         goto vk_Exit;
     }
-    if (format > VK_FORMAT_END_RANGE)
+    if (format > VK_FORMAT_END_RANGE &&
+        !(format >= VK_FORMAT_YCBCR_START &&
+        format <= VK_FROMAT_YCBCR_END))
     {
         result = __VK_ERROR_INVALID_FORMAT;
         goto vk_Exit;
@@ -2001,7 +2007,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateBuffer(VkDevice device, const VkBuf
         result = __VK_ERROR_INVALID_HANDLE;
         goto vk_Exit;
     }
-    if (!pCreateInfo || pCreateInfo->sType != VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO || pCreateInfo->pNext)
+    if (!pCreateInfo || pCreateInfo->sType != VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO)
     {
         result = __VK_ERROR_INVALID_HANDLE;
         goto vk_Exit;

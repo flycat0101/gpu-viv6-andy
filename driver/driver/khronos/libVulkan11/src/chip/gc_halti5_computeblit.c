@@ -229,6 +229,13 @@ static VkResult halti5_program_blit_src_tex(
 
         txType = (pSrcImg->createInfo.imageType == VK_IMAGE_TYPE_3D) ? 0x3 : 0x2;
         txAddressing = (pSrcImg->halTiling == gcvLINEAR) ? 0x3 : 0x0;
+
+        if (!cmdBuf->devCtx->database->REG_BltEngine &&
+            pSrcImg->formatInfo.compressed && (pSrcImg->halTiling == gcvTILED))
+        {
+                txAddressing = 0x3;
+        }
+
         txHAlign = pSrcImg->hAlignment;
         txMsaa = (pSrcImg->sampleInfo.product > 1) ? 1 : 0;
 
@@ -2708,6 +2715,11 @@ static uint32_t halti5_detect_blit_kind(
             params->dstFormat = VK_FORMAT_R32_UINT;
             params->packFormat = __PACK_FORMAT_A2B10G10R10;
             break;
+        case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
+            kind = HALTI5_BLIT_2D_UNORM_TO_PACK16;
+            params->dstFormat = VK_FORMAT_R32_UINT;
+            params->packFormat = __PACK_FORMAT_A2R10G10B10;
+            break;
         case VK_FORMAT_A2B10G10R10_UINT_PACK32:
             kind = HALTI5_BLIT_2D_UINT_TO_A2B10G10R10_PACK;
             params->dstFormat = VK_FORMAT_R32_UINT;
@@ -3358,6 +3370,7 @@ VkResult halti5_computeBlit(
 {
     __vkCommandBuffer *pCmdBuf = (__vkCommandBuffer*)cmdBuf;
     __vkDevContext *devCtx = pCmdBuf->devCtx;
+    halti5_module *chipModule = (halti5_module *)devCtx->chipPriv;
     uint32_t *states;
     uint32_t *scatch = VK_NULL_HANDLE;
     uint32_t *scatchBegin = VK_NULL_HANDLE;
@@ -3431,7 +3444,6 @@ VkResult halti5_computeBlit(
     if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
     {
         halti5_setMultiGpuSync((VkDevice)devCtx, &scatch, VK_NULL_HANDLE);
-
         *(*&scatch)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -3445,8 +3457,13 @@ VkResult halti5_computeBlit(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_0_MASK << (0));*(*&scatch)++ = 0;
 ;
 
+        if (devCtx->database->MULTI_CLUSTER)
+        {
+            __vkCmdLoadSingleHWState(&scatch, 0x0E44 + 1, VK_FALSE, 0);
+        }
 
-        __vkCmdLoadSingleHWState(&scatch, 0x0E80, VK_FALSE, 1);
+        pCmdBuf->gpuRenderingMode = gcvMULTI_GPU_RENDERING_MODE_SPLIT_WIDTH;
+        __vkCmdLoadSingleHWState(&scatch, 0x0E80, VK_FALSE, gcvMULTI_GPU_RENDERING_MODE_SPLIT_WIDTH);
     }
 
     /*when treat the src image as the texture, need flush the texture data cache*/
@@ -3469,6 +3486,10 @@ VkResult halti5_computeBlit(
 
     if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
     {
+        if (devCtx->database->MULTI_CLUSTER)
+        {
+            __vkCmdLoadSingleHWState(&scatch, 0x0E44 + 1, VK_FALSE, chipModule->clusterInfo.clusterAliveMask);
+        }
         *(*&scatch)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -3481,7 +3502,6 @@ VkResult halti5_computeBlit(
  ~0U : (~(~0U << ((1 ?
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_ALL_MASK);*(*&scatch)++ = 0;
 ;
-
 
         halti5_setMultiGpuSync((VkDevice)devCtx, &scatch, VK_NULL_HANDLE);
     }
@@ -3569,6 +3589,7 @@ VkResult halti5_computeClear(
 {
     __vkCommandBuffer *pCmdBuf = (__vkCommandBuffer*)cmdBuf;
     __vkDevContext *devCtx = pCmdBuf->devCtx;
+    halti5_module *chipModule = (halti5_module *)devCtx->chipPriv;
     uint32_t *scatch, *scatchBegin, *states;
     VkResult result = VK_SUCCESS;
     __vkComputeBlitParams params;
@@ -3610,7 +3631,6 @@ VkResult halti5_computeClear(
     if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
     {
         halti5_setMultiGpuSync((VkDevice)devCtx, &scatch, VK_NULL_HANDLE);
-
         *(*&scatch)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -3624,8 +3644,13 @@ VkResult halti5_computeClear(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_0_MASK << (0));*(*&scatch)++ = 0;
 ;
 
+        if(devCtx->database->MULTI_CLUSTER)
+        {
+            __vkCmdLoadSingleHWState(&scatch, 0x0E44 + 1, VK_FALSE, 0);
+        }
 
-        __vkCmdLoadSingleHWState(&scatch, 0x0E80, VK_FALSE, 1);
+        pCmdBuf->gpuRenderingMode = gcvMULTI_GPU_RENDERING_MODE_SPLIT_WIDTH;
+        __vkCmdLoadSingleHWState(&scatch, 0x0E80, VK_FALSE, gcvMULTI_GPU_RENDERING_MODE_SPLIT_WIDTH);
     }
 
      __VK_MEMZERO(&params, sizeof(params));
@@ -3704,6 +3729,10 @@ VkResult halti5_computeClear(
 
     if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
     {
+        if(devCtx->database->MULTI_CLUSTER)
+        {
+            __vkCmdLoadSingleHWState(&scatch, 0x0E44 + 1, VK_FALSE, chipModule->clusterInfo.clusterAliveMask);
+        }
         *(*&scatch)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -3716,7 +3745,6 @@ VkResult halti5_computeClear(
  ~0U : (~(~0U << ((1 ?
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_ALL_MASK);*(*&scatch)++ = 0;
 ;
-
 
         halti5_setMultiGpuSync((VkDevice)devCtx, &scatch, VK_NULL_HANDLE);
     }
@@ -3741,6 +3769,7 @@ VkResult halti5_computeCopyOQQueryPool(
 {
     __vkCommandBuffer *pCmdBuf = (__vkCommandBuffer*)cmdBuf;
     __vkDevContext *devCtx = pCmdBuf->devCtx;
+    halti5_module *chipModule = (halti5_module *)devCtx->chipPriv;
     uint32_t *scatch, *scatchBegin, *states;
     VkResult result = VK_SUCCESS;
     __vkComputeBlitParams params;
@@ -3757,7 +3786,6 @@ VkResult halti5_computeCopyOQQueryPool(
     if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
     {
         halti5_setMultiGpuSync((VkDevice)devCtx, &scatch, VK_NULL_HANDLE);
-
         *(*&scatch)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -3771,8 +3799,13 @@ VkResult halti5_computeCopyOQQueryPool(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_0_MASK << (0));*(*&scatch)++ = 0;
 ;
 
+        if(devCtx->database->MULTI_CLUSTER)
+        {
+            __vkCmdLoadSingleHWState(&scatch, 0x0E44 + 1, VK_FALSE, 0);
+        }
 
-        __vkCmdLoadSingleHWState(&scatch, 0x0E80, VK_FALSE, 1);
+        pCmdBuf->gpuRenderingMode = gcvMULTI_GPU_RENDERING_MODE_SPLIT_WIDTH;
+        __vkCmdLoadSingleHWState(&scatch, 0x0E80, VK_FALSE, gcvMULTI_GPU_RENDERING_MODE_SPLIT_WIDTH);
     }
 
     __VK_MEMZERO(&params, sizeof(params));
@@ -3790,6 +3823,10 @@ VkResult halti5_computeCopyOQQueryPool(
 
     if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
     {
+        if(devCtx->database->MULTI_CLUSTER)
+        {
+            __vkCmdLoadSingleHWState(&scatch, 0x0E44 + 1, VK_FALSE, chipModule->clusterInfo.clusterAliveMask);
+        }
         *(*&scatch)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -3802,7 +3839,6 @@ VkResult halti5_computeCopyOQQueryPool(
  ~0U : (~(~0U << ((1 ?
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_ALL_MASK);*(*&scatch)++ = 0;
 ;
-
 
         halti5_setMultiGpuSync((VkDevice)devCtx, &scatch, VK_NULL_HANDLE);
     }

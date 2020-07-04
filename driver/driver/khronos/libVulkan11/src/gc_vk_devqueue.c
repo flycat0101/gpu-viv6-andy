@@ -327,6 +327,26 @@ OnError:
     return result;
 }
 
+#if gcdENABLE_SW_PREEMPTION
+static VkResult __vk_QueueEnd(
+    __vkDevQueue *devQueue
+    )
+{
+    VkResult result = VK_SUCCESS;
+    gcsHAL_INTERFACE iface;
+
+    iface.commitMutex = devQueue->commitMutex ? gcvTRUE : gcvFALSE;
+    iface.engine = gcvENGINE_RENDER;
+    iface.command = gcvHAL_COMMIT_DONE;
+    iface.u.CommitDone.priorityID = devQueue->priorityID;
+
+    __VK_ONERROR(__vk_DeviceControl(&iface, devQueue->pDevContext->option->affinityCoreID));
+
+OnError:
+    return result;
+}
+#endif
+
 static void __vki_QueueFinalize(
     __vkDevContext *devCtx,
     __vkDevQueue *devQueue
@@ -357,6 +377,11 @@ static void __vki_QueueFinalize(
 
     /*** Event management ***/
     __VK_VERIFY_OK(__vk_QueueCommitEvents(devQueue, VK_TRUE));
+
+#if gcdENABLE_SW_PREEMPTION
+    __VK_VERIFY_OK(__vk_QueueEnd(devQueue));
+#endif
+
     while (devQueue->eventChunks != gcvNULL)
     {
         _chunkHead_PTR p;
@@ -667,6 +692,10 @@ VkResult __vk_QueueCommit(
                 /* Event queue is executed on the first core only. */
                 subCommit[coreIdx].queue   = coreIdx == 0 ? gcmPTR_TO_UINT64(devQueue->eventHead) : 0;
                 subCommit[coreIdx].next    = gcmPTR_TO_UINT64(&subCommit[coreIdx+1]);
+#if gcdENABLE_SW_PREEMPTION
+                subCommit[coreIdx].priorityID  = devQueue->priorityID;
+                subCommit[coreIdx].topPriority = gcvFALSE;
+#endif
 
                 if (commandBufferMirrors && (coreIdx > 0))
                 {
@@ -706,6 +735,10 @@ VkResult __vk_QueueCommit(
             subCommit->context = devCtx->context[coreIdx];
             subCommit->queue   = gcmPTR_TO_UINT64(devQueue->eventHead);
             subCommit->next    = 0;
+#if gcdENABLE_SW_PREEMPTION
+            subCommit->priorityID  = devQueue->priorityID;
+            subCommit->topPriority = gcvFALSE;
+#endif
 
             _BuildCommandBufferList(&subCommit->commandBuffer, commandBuffer);
 
@@ -946,6 +979,10 @@ VkResult __vk_QueueCommitEvents(
         iface.commitMutex   = devQueue->commitMutex ? gcvTRUE : gcvFALSE;
         iface.command       = gcvHAL_EVENT_COMMIT;
         iface.u.Event.queue = gcmPTR_TO_UINT64(devQueue->eventHead);
+#if gcdENABLE_SW_PREEMPTION
+        iface.u.Event.priorityID  = devQueue->priorityID;
+        iface.u.Event.topPriority = devQueue->topPriority;
+#endif
         iface.engine = s_xlateQueueFamily[devQueue->queueFamilyIndex];
         /* For combine or native mode, affinityCoreID is always zero */
         __VK_ONERROR(__vk_DeviceControl(&iface, devQueue->pDevContext->option->affinityCoreID));
@@ -966,7 +1003,6 @@ OnError:
     return result;
 }
 
-
 VkResult __vk_CreateDeviceQueues(
     __vkDevContext *devCtx,
     uint32_t queueCreateInfoCount,
@@ -976,6 +1012,16 @@ VkResult __vk_CreateDeviceQueues(
     __VK_DEBUG_ONLY(__vkPhysicalDevice *phyDev = devCtx->pPhyDevice;)
     VkResult result = VK_SUCCESS;
     uint32_t i, j;
+#if gcdENABLE_SW_PREEMPTION
+    gctINT priorityID = -1;
+    gctSTRING affinity = gcvNULL;
+    gcoOS_GetEnv(gcvNULL, "VIV_PRIORITY", &affinity);
+
+    if (affinity)
+    {
+        __VK_ONERROR(gcoOS_StrToInt(affinity, &priorityID));
+    }
+#endif
 
     __VK_SET_ALLOCATIONCB(&devCtx->memCb);
     /* Initialize devQueue structures */
@@ -1005,6 +1051,25 @@ VkResult __vk_CreateDeviceQueues(
             devQueue->flags = pQueueCreateInfos[i].flags;
             devQueue->queueFamilyIndex = queueFamilyIndex;
             devQueue->queuePriority = (float)pQueueCreateInfos[i].pQueuePriorities[j];
+#if gcdENABLE_SW_PREEMPTION
+            if (priorityID >= 0)
+            {
+                /* Get from property if set. */
+                devQueue->priorityID = (gctUINT32)priorityID;
+            }
+            else if ((gctUINT32)pQueueCreateInfos[i].pQueuePriorities[j] > 0)
+            {
+                /* Get from high level API. */
+                devQueue->priorityID = (gctUINT32)pQueueCreateInfos[i].pQueuePriorities[j];
+            }
+            else
+            {
+                /* Set to 0 by default. */
+                devQueue->priorityID = 0;
+            }
+
+            devQueue->topPriority = gcvFALSE;
+#endif
             __VK_ONERROR(__vki_QueueInitialize(devCtx, devQueue));
             /* Signal for queue idle */
             __VK_ONERROR(gcoOS_CreateSignal(gcvNULL, VK_FALSE, &devQueue->signal));
