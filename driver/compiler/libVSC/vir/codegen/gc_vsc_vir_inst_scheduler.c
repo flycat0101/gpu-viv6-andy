@@ -636,11 +636,11 @@ static VSC_IS_DepDagNode* _VSC_IS_DepDag_NewNode(
     return node;
 }
 
-static void _VSC_IS_DepDag_AddNode(
+static VSC_ErrCode _VSC_IS_DepDag_AddNode(
     IN VSC_IS_DepDag* dag,
     IN VSC_IS_DepDagNode* node)
 {
-    vscDG_AddNode(VSC_IS_DepDag_GetDGraph(dag), VSC_IS_DepDagNode_GetNode(node));
+    return vscDG_AddNode(VSC_IS_DepDag_GetDGraph(dag), VSC_IS_DepDagNode_GetNode(node));
 }
 
 static VSC_IS_DepDagEdge* _VSC_IS_DepDag_GetEdge(
@@ -1134,7 +1134,8 @@ static gctBOOL _VSC_IS_InstSched_NewDepDag(
         return gcvFALSE;
     }
 
-    _VSC_IS_DepDag_Init(dag, VSC_IS_InstSched_GetMM(is));
+    if(_VSC_IS_DepDag_Init(dag, VSC_IS_InstSched_GetMM(is)) != VSC_ERR_NONE)
+        return gcvFALSE;
     VSC_IS_InstSched_SetCurrDepDag(is, dag);
     return gcvTRUE;
 }
@@ -1760,7 +1761,8 @@ static VSC_ErrCode _VSC_IS_BuildDAGForBB_Basic(
 
         err_code = vscHTBL_DirectSet(inst2node, inst, node);
         CHECK_ERROR0(err_code);
-        _VSC_IS_DepDag_AddNode(dag, node);
+        err_code = _VSC_IS_DepDag_AddNode(dag, node);
+        CHECK_ERROR0(err_code);
         for(j = i - 1, prev = VIR_Inst_GetPrev(inst); j >= 0; j--, prev = VIR_Inst_GetPrev(prev))
         {
             VSC_IS_DepDagNode* prev_node = gcvNULL;
@@ -1811,7 +1813,7 @@ static VSC_ErrCode _VSC_IS_DepDag_UpdateMemLdBubble(
     VSC_SIMPLE_RESIZABLE_ARRAY ldnodeArray;
 
     err_code = vscSRARR_Initialize(&ldnodeArray, is->pMM, 0, sizeof(VSC_IS_DepDagNode*), gcvNULL);
-    ON_ERROR0(err_code);
+    ON_ERROR(err_code,"");
 
     vscDG_ITERATOR_Initialize(&iter, VSC_IS_DepDag_GetDGraph(dag),
         VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_WIDE, VSC_GRAPH_TRAVERSAL_ORDER_PREV, gcvFALSE);
@@ -1890,7 +1892,8 @@ static VSC_ErrCode _VSC_IS_BuildDAGForBB(
     VSC_OPTN_ISOptions* options = VSC_IS_InstSched_GetOptions(is);
 
     /* build DAG */
-    _VSC_IS_BuildDAGForBB_Basic(is);
+    err_code = _VSC_IS_BuildDAGForBB_Basic(is);
+    ON_ERROR(err_code, "");
 
     /* sometimes we need to bind instructions in case other instructions be scheduled in between*/
     _VSC_IS_BindNodesOnCurrentBB(bb, dag);
@@ -1923,7 +1926,8 @@ static VSC_ErrCode _VSC_IS_BuildDAGForBB(
             ERR_REPORT(err_code, "Failed to allocate memory in New DepDag Node.");
             return err_code;
         }
-        _VSC_IS_DepDag_AddNode(dag, pseudo_end);
+        err_code = _VSC_IS_DepDag_AddNode(dag, pseudo_end);
+        ON_ERROR(err_code, "");
         /* add the pseudo_end node */
         for(i = 0; i < tail_count; i++)
         {
@@ -1960,6 +1964,7 @@ static VSC_ErrCode _VSC_IS_BuildDAGForBB(
         _VSC_IS_DepDag_Dump(dag, dumper);
     }
 
+OnError:
     return err_code;
 }
 
@@ -2112,7 +2117,8 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PreferRange(
     VSC_HASH_ITERATOR iter;
     VSC_DIRECT_HNODE_PAIR pair;
 
-    _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    error_code = _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    ON_ERROR(error_code,"");
     out_set = VSC_IS_Heuristic_GetOutSet(heur);
     vscHTBLIterator_Init(&iter, in_set);
     if(!VSC_OPTN_InRange(VSC_IS_Heuristic_GetToSchedule(heur), VSC_OPTN_ISOptions_GetBeforeInst(options), VSC_OPTN_ISOptions_GetAfterInst(options)))
@@ -2124,7 +2130,7 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PreferRange(
             if(VSC_IS_DepDagNode_GetID(node) == VSC_IS_Heuristic_GetToSchedule(heur))
             {
                 error_code = vscHTBL_DirectSet(out_set, node, gcvNULL);
-                ON_ERROR0(error_code);
+                ON_ERROR(error_code,"");
                 break;
             }
         }
@@ -2139,7 +2145,7 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PreferRange(
             if(VSC_OPTN_InRange(VSC_IS_DepDagNode_GetID(node), VSC_OPTN_ISOptions_GetBeforeInst(options), VSC_OPTN_ISOptions_GetAfterInst(options)))
             {
                 error_code = vscHTBL_DirectSet(out_set, node, gcvNULL);
-                ON_ERROR0(error_code);
+                ON_ERROR(error_code,"");
             }
         }
         gcmASSERT(HTBL_GET_ITEM_COUNT(out_set) > 0);
@@ -2179,12 +2185,13 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PreferBinding(
         {
             VSC_HASH_TABLE* out_set;
 
-            _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+            error_code = _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+            ON_ERROR(error_code,"");
             out_set = VSC_IS_Heuristic_GetOutSet(heur);
             gcmASSERT(vscHTBL_DirectTestAndGet(in_set, VSC_IS_DepDagEdge_GetToNode(succ_edge), gcvNULL));
             gcmASSERT(VSC_IS_DepDagNode_HasFlag(VSC_IS_DepDagEdge_GetToNode(succ_edge), VSC_IS_DEPDAGNODE_FLAG_HAS_BINDING_PRED));
             error_code = vscHTBL_DirectSet(out_set, VSC_IS_DepDagEdge_GetToNode(succ_edge), gcvNULL);
-            ON_ERROR0(error_code);
+            ON_ERROR(error_code,"");
             break;
         }
     }
@@ -2205,7 +2212,8 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PreferKill(
     VSC_HASH_ITERATOR iter;
     VSC_DIRECT_HNODE_PAIR pair;
 
-    _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    error_code = _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    ON_ERROR(error_code,"");
     out_set = VSC_IS_Heuristic_GetOutSet(heur);
 
     vscHTBLIterator_Init(&iter, in_set);
@@ -2217,7 +2225,7 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PreferKill(
         if(VIR_Inst_GetOpcode(VSC_IS_DepDagNode_GetInst(node)) == VIR_OP_KILL)
         {
             error_code = vscHTBL_DirectSet(out_set, node, gcvNULL);
-            ON_ERROR0(error_code);
+            ON_ERROR(error_code,"");
         }
     }
 OnError:
@@ -2243,7 +2251,8 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PreferKillDep(
     {
         return error_code;
     }
-    _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    error_code = _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    ON_ERROR(error_code,"");
     out_set = VSC_IS_Heuristic_GetOutSet(heur);
 
     vscHTBLIterator_Init(&iter, in_set);
@@ -2284,7 +2293,7 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PreferKillDep(
         if(vscHTBL_DirectTestAndGet(smallest_kill_dep_set, (void*)node, gcvNULL))
         {
             error_code = vscHTBL_DirectSet(out_set, node, gcvNULL);
-            ON_ERROR0(error_code);
+            ON_ERROR(error_code,"");
         }
     }
 OnError:
@@ -2309,7 +2318,8 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PrePreferTexld(
         VSC_IS_FW_Heuristic_SetResult(heur, VSC_OPTN_ISOptions_FW_HEUR_PRE_PREFER_TEXLD_ID, VSC_IS_Heuristic_Result_PrerequisiteFail);
         return error_code;
     }
-    _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    error_code = _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    ON_ERROR(error_code,"");
     out_set = VSC_IS_Heuristic_GetOutSet(heur);
 
     vscHTBLIterator_Init(&iter, in_set);
@@ -2321,7 +2331,7 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PrePreferTexld(
         if(VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(VSC_IS_DepDagNode_GetInst(node))))
         {
             error_code = vscHTBL_DirectSet(out_set, node, gcvNULL);
-            ON_ERROR0(error_code);
+            ON_ERROR(error_code,"");
         }
     }
 OnError:
@@ -2345,7 +2355,8 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PrePreferMemld(
     {
         return error_code;
     }
-    _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    error_code = _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    ON_ERROR(error_code,"");
     out_set = VSC_IS_Heuristic_GetOutSet(heur);
 
     vscHTBLIterator_Init(&iter, in_set);
@@ -2357,7 +2368,7 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PrePreferMemld(
         if(VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(VSC_IS_DepDagNode_GetInst(node))))
         {
             error_code = vscHTBL_DirectSet(out_set, node, gcvNULL);
-            ON_ERROR0(error_code);
+            ON_ERROR(error_code,"");
         }
     }
 OnError:
@@ -2383,7 +2394,8 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PreferAntiBubble(
         VSC_IS_FW_Heuristic_SetResult(heur, VSC_OPTN_ISOptions_FW_HEUR_PREFER_ANTI_BUBBLE_ID, VSC_IS_Heuristic_Result_PrerequisiteFail);
         return error_code;
     }
-    _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    error_code = _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    CHECK_ERROR0(error_code);
     out_set = VSC_IS_Heuristic_GetOutSet(heur);
 
     vscHTBLIterator_Init(&iter, in_set);
@@ -2453,7 +2465,8 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PostPreferTexld(
     {
         return error_code;
     }
-    _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    error_code = _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    ON_ERROR(error_code,"");
     out_set = VSC_IS_Heuristic_GetOutSet(heur);
 
     vscHTBLIterator_Init(&iter, in_set);
@@ -2465,7 +2478,7 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PostPreferTexld(
         if(VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(VSC_IS_DepDagNode_GetInst(node))))
         {
             error_code = vscHTBL_DirectSet(out_set, node, gcvNULL);
-            ON_ERROR0(error_code);
+            ON_ERROR(error_code,"");
         }
     }
 OnError:
@@ -2487,7 +2500,8 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PostPreferMemld(
     {
         return error_code;
     }
-    _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    error_code = _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    CHECK_ERROR0(error_code);
     out_set = VSC_IS_Heuristic_GetOutSet(heur);
 
     vscHTBLIterator_Init(&iter, in_set);
@@ -2515,7 +2529,8 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_DelayTexLd(
     VSC_HASH_TABLE* out_set;
     VSC_HASH_ITERATOR iter;
 
-    _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    error_code = _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    CHECK_ERROR0(error_code);
     out_set = VSC_IS_Heuristic_GetOutSet(heur);
 
     error_code = vscHTBL_DirectDuplicate(out_set, in_set);
@@ -2549,7 +2564,8 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_DelayMemLd(
     VSC_HASH_TABLE* out_set;
     VSC_HASH_ITERATOR iter;
 
-    _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    error_code = _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    CHECK_ERROR0(error_code);
     out_set = VSC_IS_Heuristic_GetOutSet(heur);
 
     error_code = vscHTBL_DirectDuplicate(out_set, in_set);
@@ -2584,7 +2600,8 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PostPreferTexldMemld(
     VSC_HASH_ITERATOR iter;
     VSC_DIRECT_HNODE_PAIR pair;
 
-    _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    error_code = _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    CHECK_ERROR0(error_code);
     out_set = VSC_IS_Heuristic_GetOutSet(heur);
 
     vscHTBLIterator_Init(&iter, in_set);
@@ -2616,7 +2633,8 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PreferOrder(
     gctUINT32 min_id = gcvMAXUINT32;
     VSC_IS_DepDagNode* min_node = gcvNULL;
 
-    _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    error_code = _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    CHECK_ERROR0(error_code);
     out_set = VSC_IS_Heuristic_GetOutSet(heur);
 
     vscHTBLIterator_Init(&iter, in_set);
@@ -2757,7 +2775,8 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_Init(
     if(VSC_UTILS_MASK(VSC_OPTN_ISOptions_GetFwHeuristics(options), VSC_OPTN_ISOptions_FW_HEUR_PRE_PREFER_KILLDEP)
         || VSC_UTILS_MASK(VSC_OPTN_ISOptions_GetFwHeuristics(options), VSC_OPTN_ISOptions_FW_HEUR_POST_PREFER_KILLDEP))
     {
-        _VSC_IS_FW_Heuristic_CollectKillDepSets(heur);
+        errCode = _VSC_IS_FW_Heuristic_CollectKillDepSets(heur);
+        ON_ERROR0(errCode);
     }
 
 OnError:
@@ -2802,7 +2821,8 @@ static VSC_ErrCode _VSC_IS_BW_Heuristic_PreferRange(
     VSC_HASH_ITERATOR iter;
     VSC_DIRECT_HNODE_PAIR pair;
 
-    _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    error_code = _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    CHECK_ERROR0(error_code);
     out_set = VSC_IS_Heuristic_GetOutSet(heur);
     vscHTBLIterator_Init(&iter, in_set);
     if(!VSC_OPTN_InRange(VSC_IS_Heuristic_GetToSchedule(heur), VSC_OPTN_ISOptions_GetBeforeInst(options), VSC_OPTN_ISOptions_GetAfterInst(options)))
@@ -2850,7 +2870,8 @@ static VSC_ErrCode _VSC_IS_BW_Heuristic_PreferOrder(
     gctUINT32 max_id = gcvMINUINT32;
     VSC_IS_DepDagNode* max_node = gcvNULL;
 
-    _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    error_code = _VSC_IS_Heuristic_NewOutSet(VSC_IS_FW_Heuristic_GetBase(heur));
+    CHECK_ERROR0(error_code);
     out_set = VSC_IS_Heuristic_GetOutSet(heur);
 
     vscHTBLIterator_Init(&iter, in_set);
@@ -3109,7 +3130,10 @@ static VSC_IS_DepDagNode* _VSC_IS_FW_DoHeuristics(
 
         gcmASSERT(VSC_IS_Heuristic_GetOutSetCount(heur) == 1);
     }
-    _VSC_IS_FW_Heuristic_Update(heur, result);
+    if(_VSC_IS_FW_Heuristic_Update(heur, result) != VSC_ERR_NONE)
+    {
+        return gcvNULL;
+    }
     VSC_IS_Heuristic_SetOutSet(heur, gcvNULL);
 
     return result;
@@ -3212,7 +3236,8 @@ static VSC_ErrCode _VSC_IS_FW_ListScheduling_Init(
     VSC_IS_ListScheduling_SetIS(ls, is);
     errCode = vscHTBL_Initialize(VSC_IS_ListScheduling_GetCands(ls), VSC_IS_ListScheduling_GetMM(ls), vscHFUNC_Default, vscHKCMP_Default, 512);
     ON_ERROR0(errCode);
-    _VSC_IS_FW_Heuristic_Init(VSC_IS_ListScheduling_GetFwHeur(ls), is);
+    errCode = _VSC_IS_FW_Heuristic_Init(VSC_IS_ListScheduling_GetFwHeur(ls), is);
+    ON_ERROR0(errCode);
 
     root_array = DG_GET_ROOT_ARRAY_P(VSC_IS_DepDag_GetDGraph(VSC_IS_ListScheduling_GetDag(ls)));
     for(i = 0; i < vscSRARR_GetElementCount(root_array); i++)
@@ -3299,8 +3324,8 @@ static VSC_ErrCode _VSC_IS_DoListScheduling(
         VIR_Instruction* scheduled_tail = gcvNULL;
 
         /* initializations */
-        _VSC_IS_FW_ListScheduling_Init(&ls, is);
-
+        err_code = _VSC_IS_FW_ListScheduling_Init(&ls, is);
+        CHECK_ERROR0(err_code);
 
         /* scheduling */
         while(gcvTRUE)
@@ -3319,6 +3344,11 @@ static VSC_ErrCode _VSC_IS_DoListScheduling(
             /* do heuristics */
             VSC_IS_Heuristic_SetInSet(heur, VSC_IS_ListScheduling_GetCands(&ls));
             selected_node = _VSC_IS_FW_DoHeuristics(heur);
+            if(selected_node == gcvNULL)
+            {
+                err_code = VSC_ERR_OUT_OF_MEMORY;
+                CHECK_ERROR0(err_code);
+            }
 
             /* dump selected node */
             if(VSC_UTILS_MASK(VSC_OPTN_ISOptions_GetTrace(options), VSC_OPTN_ISOptions_TRACE_HEURISTIC))
@@ -3415,8 +3445,8 @@ static VSC_ErrCode _VSC_IS_DoListScheduling(
         VIR_Instruction* scheduled_head = gcvNULL;
 
         /* initializations */
-        _VSC_IS_BW_ListScheduling_Init(&ls, is);
-
+        err_code = _VSC_IS_BW_ListScheduling_Init(&ls, is);
+        CHECK_ERROR0(err_code);
 
         /* scheduling */
         while(gcvTRUE)
@@ -5504,12 +5534,13 @@ static VSC_ErrCode _VSC_IS_DoInstructionSchedulingForBB(
         ERR_REPORT(err_code, "Failed to allocate memory in InstSched New DepDag Node.");
         return VSC_ERR_OUT_OF_MEMORY;
     }
-    _VSC_IS_BuildDAGForBB(is);
+    err_code = _VSC_IS_BuildDAGForBB(is);
+    ON_ERROR(err_code, "");
 
     switch(VSC_OPTN_ISOptions_GetAlgorithm(options))
     {
         case VSC_OPTN_ISOptions_ALGORITHM_LISTSCHEDULING:
-            _VSC_IS_DoListScheduling(is);
+            err_code = _VSC_IS_DoListScheduling(is);
             break;
         case VSC_OPTN_ISOptions_ALGORITHM_BUBBLESCHEDULING:
             _VSC_IS_DoBubbleScheduling(is);
@@ -5527,6 +5558,7 @@ static VSC_ErrCode _VSC_IS_DoInstructionSchedulingForBB(
         VIR_BasicBlock_Dump(dumper, VSC_IS_InstSched_GetCurrBB(is), gcvTRUE);
     }
 
+OnError:
     _VSC_IS_InstSched_DeleteDepDag(is);
 
     return err_code;

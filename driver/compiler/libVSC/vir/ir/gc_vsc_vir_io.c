@@ -242,7 +242,8 @@ VIR_IO_writeBlockTable(VIR_Shader_IOBuffer * Buf,
                         /* skip the data before the start to write point */
                         continue;
                     }
-                    ON_ERROR(fp(Buf, pBlockTbl->ppBlockArray[i] + offset), "write block elem");
+                    errCode = fp(Buf, pBlockTbl->ppBlockArray[i] + offset);
+                    ON_ERROR(errCode, "write block elem");
                 }
             }
             else
@@ -283,7 +284,8 @@ VIR_IO_writeBlockTable(VIR_Shader_IOBuffer * Buf,
                         /* skip the data before the start to write point */
                         continue;
                     }
-                    ON_ERROR(fp(Buf, pBlockTbl->ppBlockArray[i] + offset), "write block elem");
+                    errCode = fp(Buf, pBlockTbl->ppBlockArray[i] + offset);
+                    ON_ERROR(errCode, "write block elem");
                 }
             }
             else
@@ -2939,7 +2941,7 @@ VIR_IO_readSymbol(VIR_Shader_IOBuffer *Buf, VIR_Symbol* pSymbol)
     case VIR_SYM_IMAGE:
     case VIR_SYM_IMAGE_T:
         ON_ERROR0(VIR_IO_readUint(Buf, &uVal));
-        VIR_Shader_AddSymbolContents(Buf->shader, pSymbol, uVal, gcvFALSE);
+        ON_ERROR0(VIR_Shader_AddSymbolContents(Buf->shader, pSymbol, uVal, gcvFALSE));
         uniform = (pSymbol)->u2.uniform;
         ON_ERROR0(VIR_IO_readUniform(Buf, uniform, symKind));
         break;
@@ -2952,7 +2954,7 @@ VIR_IO_readSymbol(VIR_Shader_IOBuffer *Buf, VIR_Symbol* pSymbol)
         {
             VIR_StorageBlock* storageBlock;
             ON_ERROR0(VIR_IO_readUint(Buf, &uVal));
-            VIR_Shader_AddSymbolContents(Buf->shader, pSymbol, uVal, gcvFALSE);
+            ON_ERROR0(VIR_Shader_AddSymbolContents(Buf->shader, pSymbol, uVal, gcvFALSE));
             storageBlock = VIR_Symbol_GetSBO(pSymbol);
             ON_ERROR0(VIR_IO_readStorageBlock(Buf, storageBlock));
         }
@@ -2961,7 +2963,7 @@ VIR_IO_readSymbol(VIR_Shader_IOBuffer *Buf, VIR_Symbol* pSymbol)
         {
             VIR_UniformBlock* ubo;
             ON_ERROR0(VIR_IO_readUint(Buf, &uVal));
-            VIR_Shader_AddSymbolContents(Buf->shader, pSymbol, uVal, gcvFALSE);
+            ON_ERROR0(VIR_Shader_AddSymbolContents(Buf->shader, pSymbol, uVal, gcvFALSE));
             ubo = VIR_Symbol_GetUBO(pSymbol);
             ON_ERROR0(VIR_IO_readUniformBlock(Buf, ubo));
         }
@@ -2970,7 +2972,7 @@ VIR_IO_readSymbol(VIR_Shader_IOBuffer *Buf, VIR_Symbol* pSymbol)
         {
             VIR_IOBlock* iob;
             ON_ERROR0(VIR_IO_readUint(Buf, &uVal));
-            VIR_Shader_AddSymbolContents(Buf->shader, pSymbol, uVal, gcvFALSE);
+            ON_ERROR0(VIR_Shader_AddSymbolContents(Buf->shader, pSymbol, uVal, gcvFALSE));
             iob = VIR_Symbol_GetIOB(pSymbol);
             ON_ERROR0(VIR_IO_readIOBlock(Buf, iob));
         }
@@ -2999,7 +3001,7 @@ VIR_IO_readSymbol(VIR_Shader_IOBuffer *Buf, VIR_Symbol* pSymbol)
         break;
     case VIR_SYM_VIRREG:
         ON_ERROR0(VIR_IO_readUint(Buf, &pSymbol->u2.varSymId));
-        VIR_Shader_AddSymbolContents(Buf->shader, pSymbol, VIR_Symbol_GetVregIndex(pSymbol), gcvFALSE);
+        ON_ERROR0(VIR_Shader_AddSymbolContents(Buf->shader, pSymbol, VIR_Symbol_GetVregIndex(pSymbol), gcvFALSE));
         break;
     case VIR_SYM_TYPE:
     case VIR_SYM_LABEL:
@@ -3644,7 +3646,7 @@ VIR_CopyBlockTable(VIR_CopyContext *    Ctx,
     /* copy hash table */
     if (hTbl != gcvNULL)
     {
-        VIR_CopyHashTable(Ctx, pToBlockTbl, pToBlockTbl->pHashTable, hTbl, fpGetKey);
+        ON_ERROR0(VIR_CopyHashTable(Ctx, pToBlockTbl, pToBlockTbl->pHashTable, hTbl, fpGetKey));
     }
 OnError:
     return errCode;
@@ -4527,14 +4529,14 @@ VIR_Copy_FixSymbol(VIR_CopyContext * Ctx, VIR_Symbol* pSymbol)
         break;
     case VIR_SYM_VARIABLE:
     case VIR_SYM_TEXTURE:
-        VIR_Shader_AddSymbolContents(Ctx->toShader, pSymbol, VIR_Symbol_GetVariableVregIndex(pSymbol), gcvFALSE);
+        ON_ERROR0(VIR_Shader_AddSymbolContents(Ctx->toShader, pSymbol, VIR_Symbol_GetVariableVregIndex(pSymbol), gcvFALSE));
         break;
     case VIR_SYM_SBO:
         {
             VIR_StorageBlock* storageBlock =  VIR_Symbol_GetSBO(pSymbol);
             if (storageBlock)
             {
-                VIR_Shader_AddSymbolContents(Ctx->toShader, pSymbol, storageBlock->blockIndex, gcvFALSE);
+                ON_ERROR0(VIR_Shader_AddSymbolContents(Ctx->toShader, pSymbol, storageBlock->blockIndex, gcvFALSE));
                 ON_ERROR0(VIR_CopyStorageBlock(Ctx, VIR_Symbol_GetSBO(pSymbol), storageBlock));
             }
         }
@@ -4544,7 +4546,7 @@ VIR_Copy_FixSymbol(VIR_CopyContext * Ctx, VIR_Symbol* pSymbol)
             VIR_UniformBlock* ubo = VIR_Symbol_GetUBO(pSymbol);
             if (ubo)
             {
-                VIR_Shader_AddSymbolContents(Ctx->toShader, pSymbol, ubo->blockIndex, gcvFALSE);
+                ON_ERROR0(VIR_Shader_AddSymbolContents(Ctx->toShader, pSymbol, ubo->blockIndex, gcvFALSE));
                 ON_ERROR0(VIR_CopyUniformBlock(Ctx, VIR_Symbol_GetUBO(pSymbol), ubo));
             }
         }
@@ -4554,7 +4556,7 @@ VIR_Copy_FixSymbol(VIR_CopyContext * Ctx, VIR_Symbol* pSymbol)
             VIR_IOBlock* iob = VIR_Symbol_GetIOB(pSymbol);
             if (iob)
             {
-                VIR_Shader_AddSymbolContents(Ctx->toShader, pSymbol, iob->blockIndex, gcvFALSE);
+                ON_ERROR0(VIR_Shader_AddSymbolContents(Ctx->toShader, pSymbol, iob->blockIndex, gcvFALSE));
                 ON_ERROR0(VIR_CopyIOBlock(Ctx, VIR_Symbol_GetIOB(pSymbol), iob));
             }
         }

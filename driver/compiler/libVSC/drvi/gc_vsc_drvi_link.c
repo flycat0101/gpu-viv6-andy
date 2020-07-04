@@ -3089,14 +3089,15 @@ static void _CollectVectorizableIoPacketsFromSoPairs(VSC_BASE_LINKER_HELPER* pBa
     }
 }
 
-static void _CollectVectorizableIoPacketsFromNormalPairs(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
-                                                         ATTR_OUTPUT_PAIR** ppNormalIoPairArray,
-                                                         gctUINT* pNormalPairArraySize,
-                                                         VIR_IO_VECTORIZABLE_PACKET* pAVPArray,
-                                                         gctUINT* pAvpArraySize,
-                                                         VIR_IO_VECTORIZABLE_PACKET* pOVPArray,
-                                                         gctUINT* pOvpArraySize)
+static VSC_ErrCode _CollectVectorizableIoPacketsFromNormalPairs(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
+                                                                ATTR_OUTPUT_PAIR** ppNormalIoPairArray,
+                                                                gctUINT* pNormalPairArraySize,
+                                                                VIR_IO_VECTORIZABLE_PACKET* pAVPArray,
+                                                                gctUINT* pAvpArraySize,
+                                                                VIR_IO_VECTORIZABLE_PACKET* pOVPArray,
+                                                                gctUINT* pOvpArraySize)
 {
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
     gctINT                      i, j, k, l, m;
     gctUINT                     accumChannelCount;
     VSC_BIT_VECTOR              globalChannelsPairMask[3] = {{0}};
@@ -3110,8 +3111,10 @@ static void _CollectVectorizableIoPacketsFromNormalPairs(VSC_BASE_LINKER_HELPER*
     {
         if (pNormalPairArraySize[i])
         {
-            vscBV_Initialize(&globalChannelsPairMask[i], pBaseLinkHelper->pMM, pNormalPairArraySize[i]);
-            vscBV_Initialize(&localChannelsPairMask[i], pBaseLinkHelper->pMM, pNormalPairArraySize[i]);
+            errCode = vscBV_Initialize(&globalChannelsPairMask[i], pBaseLinkHelper->pMM, pNormalPairArraySize[i]);
+            ON_ERROR(errCode, "Fail in _CollectVectorizableIoPacketsFromNormalPairs.");
+            errCode = vscBV_Initialize(&localChannelsPairMask[i], pBaseLinkHelper->pMM, pNormalPairArraySize[i]);
+            ON_ERROR(errCode, "Fail in _CollectVectorizableIoPacketsFromNormalPairs.");
         }
     }
 
@@ -3239,6 +3242,9 @@ static void _CollectVectorizableIoPacketsFromNormalPairs(VSC_BASE_LINKER_HELPER*
             vscBV_Finalize(&localChannelsPairMask[i]);
         }
     }
+
+OnError:
+    return errCode;
 }
 
 static gctBOOL _CanCollectIoPairsBaseOnSO(VIR_Shader*           pUpperShader,
@@ -3294,16 +3300,17 @@ static gctBOOL _CanCollectIoPairsBaseOnIO(VIR_Shader*           pUpperShader,
     return gcvTRUE;
 }
 
-static void _CollectVectorizableIoPairs(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
-                                        VIR_Shader* pUpperShader,
-                                        VIR_Shader* pLowerShader,
-                                        VIR_AttributeIdList* pAttrIdLstsOfLowerShader,
-                                        VIR_OutputIdList* pOutputIdLstsOfUpperShader,
-                                        ATTR_OUTPUT_PAIR* pSoIoPairArray,
-                                        gctUINT* pSoPairArraySize,
-                                        ATTR_OUTPUT_PAIR** ppNormalIoPairArray,
-                                        gctUINT* pNormalPairArraySize)
+static VSC_ErrCode _CollectVectorizableIoPairs(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
+                                                VIR_Shader* pUpperShader,
+                                                VIR_Shader* pLowerShader,
+                                                VIR_AttributeIdList* pAttrIdLstsOfLowerShader,
+                                                VIR_OutputIdList* pOutputIdLstsOfUpperShader,
+                                                ATTR_OUTPUT_PAIR* pSoIoPairArray,
+                                                gctUINT* pSoPairArraySize,
+                                                ATTR_OUTPUT_PAIR** ppNormalIoPairArray,
+                                                gctUINT* pNormalPairArraySize)
 {
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
     gctUINT                     attrIdx, outputIdx, i, j;
     gctUINT                     attrCount = VIR_IdList_Count(pAttrIdLstsOfLowerShader);
     gctUINT                     outputCount = VIR_IdList_Count(pOutputIdLstsOfUpperShader);
@@ -3318,7 +3325,8 @@ static void _CollectVectorizableIoPairs(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
        2. Normal user defined IOs. For SVs, dont consider them.
     */
 
-    vscBV_Initialize(&outputWorkingMask, pBaseLinkHelper->pMM, outputCount);
+    errCode = vscBV_Initialize(&outputWorkingMask, pBaseLinkHelper->pMM, outputCount);
+    ON_ERROR(errCode, "Fail in _CollectVectorizableIoPairs.");
 
     /* Collect SO related pairs */
     if (pUpperShader->transformFeedback.varyings)
@@ -3489,7 +3497,9 @@ static void _CollectVectorizableIoPairs(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
         gcmASSERT(outputIdx < outputCount);
     }
 
+OnError:
     vscBV_Finalize(&outputWorkingMask);
+    return errCode;
 }
 
 static VSC_ErrCode _FindVectorizableIoPackets(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
@@ -3533,15 +3543,16 @@ static VSC_ErrCode _FindVectorizableIoPackets(VSC_BASE_LINKER_HELPER* pBaseLinkH
     }
 
     /* Collect io-pairs */
-    _CollectVectorizableIoPairs(pBaseLinkHelper,
-                                pUpperShader,
-                                pLowerShader,
-                                pAttrIdLstsOfLowerShader,
-                                pOutputIdLstsOfUpperShader,
-                                pSoIoPairArray,
-                                &soPairArraySize,
-                                pNormalIoPairArray,
-                                normalPairArraySize);
+    errCode = _CollectVectorizableIoPairs(pBaseLinkHelper,
+                                        pUpperShader,
+                                        pLowerShader,
+                                        pAttrIdLstsOfLowerShader,
+                                        pOutputIdLstsOfUpperShader,
+                                        pSoIoPairArray,
+                                        &soPairArraySize,
+                                        pNormalIoPairArray,
+                                        normalPairArraySize);
+    ON_ERROR0(errCode);
 
     /* Collect vectorizable-packet from pairs */
     if (normalPairArraySize[0] > 0 ||
@@ -3601,13 +3612,14 @@ static VSC_ErrCode _FindVectorizableIoPackets(VSC_BASE_LINKER_HELPER* pBaseLinkH
         normalPairArraySize[2] > 0)
     {
         /* Consider normal pairs. NOTE they can be out of order to get better vectorizability */
-        _CollectVectorizableIoPacketsFromNormalPairs(pBaseLinkHelper,
-                                                     pNormalIoPairArray,
-                                                     normalPairArraySize,
-                                                     pAVPArray,
-                                                     &avpArraySize,
-                                                     pOVPArray,
-                                                     &ovpArraySize);
+        errCode = _CollectVectorizableIoPacketsFromNormalPairs(pBaseLinkHelper,
+                                                                pNormalIoPairArray,
+                                                                normalPairArraySize,
+                                                                pAVPArray,
+                                                                &avpArraySize,
+                                                                pOVPArray,
+                                                                &ovpArraySize);
+        ON_ERROR(errCode, "Fail in _FindVectorizableIoPackets.");
     }
 
     /* Finalization */
@@ -3645,6 +3657,7 @@ static VSC_ErrCode _FindVectorizableIoPackets(VSC_BASE_LINKER_HELPER* pBaseLinkH
         }
     }
 
+OnError:
     return errCode;
 }
 
@@ -4840,7 +4853,8 @@ static VSC_ErrCode _CalcIoHwCompIndexBetweenTwoShaderStagesPerExeObj(VSC_BASE_LI
         hwChannelIdx = CHANNEL_NUM;
     }
 
-    vscBV_Initialize(&outputWorkingMask, pBaseLinkHelper->pMM, outputCount);
+    errCode = vscBV_Initialize(&outputWorkingMask, pBaseLinkHelper->pMM, outputCount);
+    ON_ERROR(errCode, "Fail in _CalcIoHwCompIndexBetweenTwoShaderStagesPerExeObj.");
 
     /* For each attribute of lower-shader, find whether upper-shader has corresponding output */
     for (attrIdx = 0; attrIdx < attrCount; attrIdx ++)
@@ -5169,6 +5183,7 @@ static VSC_ErrCode _CalcIoHwCompIndexBetweenTwoShaderStagesPerExeObj(VSC_BASE_LI
                               hwChannelIdxForPtCoord);
     }
 
+OnError:
     vscBV_Finalize(&outputWorkingMask);
 
     return errCode;
@@ -6021,11 +6036,13 @@ static void _DumpProgramResLayout(VIR_Dumper* pDumper,
     VIR_LOG_FLUSH(pDumper);
 }
 
-static gctBOOL _InitializeShResLayout(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
-                                      VSC_PROGRAM_RESOURCE_LAYOUT* pPgResourceLayout,
-                                      gctUINT shStage,
-                                      VSC_SHADER_RESOURCE_LAYOUT* pOutShResourceLayout)
+static VSC_ErrCode _InitializeShResLayout(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
+                                          VSC_PROGRAM_RESOURCE_LAYOUT* pPgResourceLayout,
+                                          gctUINT shStage,
+                                          VSC_SHADER_RESOURCE_LAYOUT* pOutShResourceLayout,
+                                          gctBOOL_PTR result)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     gctUINT  i, j, resBindingCount = 0, pushCnstRangeCount = 0;
 
     gcmASSERT (pPgResourceLayout);
@@ -6050,6 +6067,13 @@ static gctBOOL _InitializeShResLayout(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
             pOutShResourceLayout->resourceBindingCount = resBindingCount;
             pOutShResourceLayout->pResBindings = (VSC_SHADER_RESOURCE_BINDING*)vscMM_Alloc(pBaseLinkHelper->pMM,
                                                                       resBindingCount*sizeof(VSC_SHADER_RESOURCE_BINDING));
+            if(pOutShResourceLayout->pResBindings == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+                ERR_REPORT(errCode, "fail in _InitializeShResLayout");
+                *result = gcvFALSE;
+                return errCode;
+            }
 
             resBindingCount = 0;
             for (i = 0; i < pPgResourceLayout->resourceSetCount; i ++)
@@ -6104,7 +6128,8 @@ static gctBOOL _InitializeShResLayout(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
         }
     }
 
-    return ((resBindingCount > 0) || (pushCnstRangeCount > 0));
+    *result = ((resBindingCount > 0) || (pushCnstRangeCount > 0));
+    return errCode;
 }
 
 static void _FinalizeShResLayout(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
@@ -6364,6 +6389,7 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
     VIR_ShLevel                   maxShLevelAmongLinkLibs = VIR_SHLEVEL_Unknown, finalTrueLibShLevel = VIR_SHLEVEL_Unknown;
     VIR_ShLevel                   trueLibShLevel = VIR_SHLEVEL_Unknown;
     gctBOOL                       beInitialized = gcvFALSE;
+    gctBOOL                       bInitResLayout = gcvFALSE;
 
     gcmASSERT(pPgLinkParam->cfg.cFlags & VSC_COMPILER_FLAG_COMPILE_TO_MC);
 
@@ -6445,8 +6471,10 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
             {
                 _DumpProgramResLayout(&dumper, &options, pPgLinkParam->pPgResourceLayout);
 
-                if (_InitializeShResLayout(&pgLinkHelper.baseHelper, pPgLinkParam->pPgResourceLayout,
-                                           stageIdx, &shResLayoutArray[stageIdx]))
+                errCode = _InitializeShResLayout(&pgLinkHelper.baseHelper, pPgLinkParam->pPgResourceLayout,
+                                                 stageIdx, &shResLayoutArray[stageIdx], &bInitResLayout);
+                ON_ERROR0(errCode);
+                if (bInitResLayout)
                 {
                     shCompParamArray[stageIdx].pShResourceLayout = &shResLayoutArray[stageIdx];
                 }

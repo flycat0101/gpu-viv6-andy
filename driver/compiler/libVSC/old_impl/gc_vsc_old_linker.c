@@ -6596,6 +6596,7 @@ static gceSTATUS
 _CheckIoAliasedLocation(gcLINKTREE  Tree)
 {
     gceSTATUS            status = gcvSTATUS_OK;
+    VSC_ErrCode          errCode = VSC_ERR_NONE;
     gctUINT              i, j;
     VSC_BIT_VECTOR       locationMask;
     VSC_PRIMARY_MEM_POOL pmp;
@@ -6603,7 +6604,8 @@ _CheckIoAliasedLocation(gcLINKTREE  Tree)
     /* Initialize 512KB PMP for shader use. */
     vscPMP_Intialize(&pmp, gcvNULL, 8, sizeof(void *), gcvTRUE);
 
-    vscBV_Initialize(&locationMask, &pmp.mmWrapper, MAX_SHADER_IO_NUM);
+    errCode = vscBV_Initialize(&locationMask, &pmp.mmWrapper, MAX_SHADER_IO_NUM);
+    ON_ERROR2STATUS0(errCode);
 
     /* attributes */
     for (i = 0; i < Tree->attributeCount; ++i)
@@ -17531,7 +17533,7 @@ gcLinkShaders(
                     vscDumper_Initialize(&dumper.baseDumper, gcvNULL, gcvNULL, buffer, sizeof(buffer));
 
                     vscPMP_Intialize(&allShadersPmp, gcvNULL, 512*1024, sizeof(void *), gcvTRUE /*pooling*/);
-                    VSC_AllShaders_Initialize(&all_shaders, vsShader, gcvNULL, gcvNULL, gcvNULL, psShader, gcvNULL, gcvNULL, &dumper, &allShadersPmp.mmWrapper);
+                    gcmERR_BREAK(VSC_AllShaders_Initialize(&all_shaders, vsShader, gcvNULL, gcvNULL, gcvNULL, psShader, gcvNULL, gcvNULL, &dumper, &allShadersPmp.mmWrapper));
 
                     /* */
                     VSC_AllShaders_LinkUniforms(&all_shaders);
@@ -19104,7 +19106,7 @@ _gcLinkComputeShader(
                 vscDumper_Initialize(&dumper.baseDumper, gcvNULL, gcvNULL, buffer, sizeof(buffer));
 
                 vscPMP_Intialize(&allShadersPmp, gcvNULL, 512*1024, sizeof(void *), gcvTRUE /*pooling*/);
-                VSC_AllShaders_Initialize(&all_shaders, gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL, computeShader, gcvNULL, &dumper, &allShadersPmp.mmWrapper);
+                gcmONERROR(VSC_AllShaders_Initialize(&all_shaders, gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL, computeShader, gcvNULL, &dumper, &allShadersPmp.mmWrapper));
 
                 /* */
                 VSC_AllShaders_LinkUniforms(&all_shaders);

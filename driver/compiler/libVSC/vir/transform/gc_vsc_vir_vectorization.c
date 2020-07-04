@@ -2274,7 +2274,7 @@ static VSC_ErrCode _VectorizeSimm2SimmOpnds(VIR_VECTORIZER_INFO* pVectorizerInfo
         VIR_Operand_SetTypeId(pSeedOpnd, vConstType);
         VIR_Operand_SetSwizzle(pSeedOpnd, _GetImmOperandSwizzleByCompCount(compCount));
 
-        _UpdateVectorizedVImmHashTable(pVectorizerInfo, pSeedOpnd, pOpnd);
+        CHECK_ERROR0(_UpdateVectorizedVImmHashTable(pVectorizerInfo, pSeedOpnd, pOpnd));
     }
 
     return VSC_ERR_NONE;
@@ -2328,7 +2328,7 @@ static VSC_ErrCode _VectorizeVimm2SimmOpnds(VIR_VECTORIZER_INFO* pVectorizerInfo
     VIR_Operand_SetTypeId(pSeedOpnd, vConstType);
     VIR_Operand_SetSwizzle(pSeedOpnd, _GetImmOperandSwizzleByCompCount(compCount));
 
-    _UpdateVectorizedVImmHashTable(pVectorizerInfo, pSeedOpnd, pOpnd);
+    CHECK_ERROR0(_UpdateVectorizedVImmHashTable(pVectorizerInfo, pSeedOpnd, pOpnd));
 
     return VSC_ERR_NONE;
 }
@@ -2382,7 +2382,7 @@ static VSC_ErrCode _VectorizeSimm2VimmOpnds(VIR_VECTORIZER_INFO* pVectorizerInfo
     VIR_Operand_SetTypeId(pSeedOpnd, vConstType);
     VIR_Operand_SetSwizzle(pSeedOpnd, _GetImmOperandSwizzleByCompCount(compCount));
 
-    _UpdateVectorizedVImmHashTable(pVectorizerInfo, pSeedOpnd, pOpnd);
+    CHECK_ERROR0(_UpdateVectorizedVImmHashTable(pVectorizerInfo, pSeedOpnd, pOpnd));
 
     return VSC_ERR_NONE;
 }
@@ -2440,7 +2440,7 @@ static VSC_ErrCode _VectorizeVimm2VimmOpnds(VIR_VECTORIZER_INFO* pVectorizerInfo
     VIR_Operand_SetTypeId(pSeedOpnd, vConstType);
     VIR_Operand_SetSwizzle(pSeedOpnd, _GetImmOperandSwizzleByCompCount(compCount));
 
-    _UpdateVectorizedVImmHashTable(pVectorizerInfo, pSeedOpnd, pOpnd);
+    CHECK_ERROR0(_UpdateVectorizedVImmHashTable(pVectorizerInfo, pSeedOpnd, pOpnd));
 
     return VSC_ERR_NONE;
 }

@@ -13147,6 +13147,7 @@ static gceSTATUS _SpvCheckUnhandleVariables(
     )
 {
     gceSTATUS           status = gcvSTATUS_OK;
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
     VIR_SymAliasTable  *symAliasTable = VIR_Shader_GetCreatedSymAliasTable(virShader);
     gctUINT             unHandledCount;
     SpvUnhandleInfo    *infoList = gcvNULL;
@@ -13157,6 +13158,11 @@ static gceSTATUS _SpvCheckUnhandleVariables(
     VIR_Swizzle         operandSwizzle;
     gctUINT             i;
 
+    if(symAliasTable == gcvNULL)
+    {
+        status = gcvSTATUS_OUT_OF_MEMORY;
+        gcmONERROR(status);
+    }
     unHandledCount = SPV_IDDESCRIPTOR_VAR(spv, spvId).listCount;
     infoList = SPV_IDDESCRIPTOR_VAR(spv, spvId).infoList;
 
@@ -13172,7 +13178,12 @@ static gceSTATUS _SpvCheckUnhandleVariables(
         {
             VIR_Symbol* sym = SPV_ID_VIR_SYM(spvId);
             VIR_Operand_SetSym(operand, sym);
-            VIR_SymAliasTable_Insert(symAliasTable, sym, VIR_Operand_GetSymbol(dest));
+            errCode = VIR_SymAliasTable_Insert(symAliasTable, sym, VIR_Operand_GetSymbol(dest));
+            if(errCode == VSC_ERR_OUT_OF_MEMORY)
+            {
+                status = gcvSTATUS_OUT_OF_MEMORY;
+                gcmONERROR(status);
+            }
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
             VIR_Operand_SetTypeId(operand, VIR_Operand_GetTypeId(dest));
             _SpvSetOperandPrecision(spv, operand);
@@ -13196,6 +13207,7 @@ static gceSTATUS _SpvCheckUnhandleVariables(
         }
     }
 
+OnError:
     return status;
 }
 

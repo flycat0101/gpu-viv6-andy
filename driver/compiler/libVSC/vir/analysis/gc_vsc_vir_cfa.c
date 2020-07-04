@@ -76,7 +76,8 @@ static VIR_FUNC_BLOCK* _TryAddFuncBlockToCallGraph(VIR_CALL_GRAPH* pCg, VIR_Func
         memset(&pFuncBlk->cfg, 0, sizeof(VIR_CONTROL_FLOW_GRAPH));
         if(vscSRARR_Initialize(&pFuncBlk->mixedCallSiteArray, &pCg->pmp.mmWrapper, 2, sizeof(VIR_Instruction*), CALL_SITE_CMP) != VSC_ERR_NONE)
             return gcvNULL;
-        vscDG_AddNode(&pCg->dgGraph, &pFuncBlk->dgNode);
+        if(vscDG_AddNode(&pCg->dgGraph, &pFuncBlk->dgNode) != VSC_ERR_NONE)
+            return gcvNULL;
     }
 
     return pFuncBlk;
@@ -235,7 +236,8 @@ static VIR_CG_EDGE* _AddEdgeForCG(VIR_CALL_GRAPH* pCg, VIR_FUNC_BLOCK* pFromFB,
 
     if (bIsNewEdge)
     {
-        vscSRARR_Initialize(&pEdge->callSiteArray, &pCg->pmp.mmWrapper, 2, sizeof(VIR_Instruction*), CALL_SITE_CMP);
+        if(vscSRARR_Initialize(&pEdge->callSiteArray, &pCg->pmp.mmWrapper, 2, sizeof(VIR_Instruction*), CALL_SITE_CMP) != VSC_ERR_NONE)
+            return gcvNULL;
     }
 
     /* Add this call site */
@@ -262,7 +264,8 @@ VSC_ErrCode vscVIR_BuildCallGraph(VSC_MM* pScratchMemPool, VIR_Shader* pShader, 
     gcmASSERT(VIR_Shader_CanRemoveUnusedFunctions(pShader));
 
     /* Intialize call graph */
-    _IntializeCallGraph(pScratchMemPool, pCg, pShader);
+    errCode = _IntializeCallGraph(pScratchMemPool, pCg, pShader);
+    CHECK_ERROR0(errCode);
 
     /* Go through all functions to build function blocks and call graph */
     VIR_FuncIterator_Init(&funcIter, &pShader->functions);
@@ -399,10 +402,13 @@ static VSC_ErrCode _IntializeCFG(VIR_CONTROL_FLOW_GRAPH* pCfg, VSC_MM* pScratchM
     vscPMP_Intialize(&pCfg->pmp, gcvNULL,
                      20*(sizeof(VIR_BASIC_BLOCK) + 2*sizeof(VIR_DOM_TREE_NODE) + 4*sizeof(VIR_CFG_EDGE)),
                      sizeof(void*), gcvTRUE);
-    vscDG_Initialize(&pCfg->dgGraph, &pCfg->pmp.mmWrapper, 10, 10, sizeof(VIR_CFG_EDGE));
+    errCode = vscDG_Initialize(&pCfg->dgGraph, &pCfg->pmp.mmWrapper, 10, 10, sizeof(VIR_CFG_EDGE));
+    ON_ERROR0(errCode);
 
-    ON_ERROR0(vscTREE_Initialize(&pCfg->domTree.tree, &pCfg->pmp.mmWrapper, 4));
-    ON_ERROR0(vscTREE_Initialize(&pCfg->postDomTree.tree, &pCfg->pmp.mmWrapper, 4));
+    errCode = vscTREE_Initialize(&pCfg->domTree.tree, &pCfg->pmp.mmWrapper, 4);
+    ON_ERROR0(errCode);
+    errCode = vscTREE_Initialize(&pCfg->postDomTree.tree, &pCfg->pmp.mmWrapper, 4);
+    ON_ERROR0(errCode);
 
     pCfg->domTree.pOwnerCFG = pCfg;
     pCfg->postDomTree.pOwnerCFG = pCfg;
@@ -957,7 +963,8 @@ VSC_ErrCode vscVIR_BuildCFGPerFunc(VSC_MM* pScratchMemPool, VIR_Function* pFunc)
     pCFG = &pFunc->pFuncBlock->cfg;
 
     /* Intialize CFG */
-    _IntializeCFG(pCFG, pScratchMemPool, pFunc->pFuncBlock);
+    errCode = _IntializeCFG(pCFG, pScratchMemPool, pFunc->pFuncBlock);
+    CHECK_ERROR0(errCode);
 
     /* Try add all basic blocks to CFG */
     errCode = _AddBasicBlocksToCFG(pCFG, pFunc);
@@ -1086,6 +1093,8 @@ VIR_BASIC_BLOCK* vscVIR_AddBasicBlockToCFG(VIR_CONTROL_FLOW_GRAPH* pCFG,
     gcmASSERT(VIR_Inst_GetBasicBlock(pStartInst) == gcvNULL && VIR_Inst_GetBasicBlock(pEndInst) == gcvNULL);
 
     pNewBasicBlk = _AddBasicBlockToCFG(pCFG);
+    if(pNewBasicBlk == gcvNULL)
+        return gcvNULL;
 
     pNewBasicBlk->pStartInst = pStartInst;
     pNewBasicBlk->pEndInst = pEndInst;
@@ -1518,6 +1527,11 @@ VIR_BB_CopyBBBefore(
 
         newBB = vscVIR_AddBasicBlockToCFG(BB_GET_CFG(source), newBBStart, newBBEnd, BB_GET_FLOWTYPE(source));
 
+        if(newBB == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            return errCode;
+        }
         if(copy)
         {
             *copy = newBB;
@@ -1578,6 +1592,11 @@ VIR_BB_CopyBBAfter(
 
         newBB = vscVIR_AddBasicBlockToCFG(BB_GET_CFG(source), newBBStart, newBBEnd, BB_GET_FLOWTYPE(source));
 
+        if(newBB == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            return errCode;
+        }
         if(copy)
         {
             *copy = newBB;
@@ -2821,8 +2840,9 @@ static void _BbReach_Init_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLO
     /* Nothing needs to do */
 }
 
-static gctBOOL _BbReach_Iterate_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow)
+static VSC_ErrCode _BbReach_Iterate_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow, gctBOOL_PTR bResult)
 {
+    VSC_ErrCode            errCode = VSC_ERR_NONE;
     VSC_BIT_VECTOR*        pInFlow = &pTsBlockFlow->inFlow;
     VSC_BIT_VECTOR*        pOutFlow = &pTsBlockFlow->outFlow;
     VSC_BIT_VECTOR*        pGenFlow = &pTsBlockFlow->genFlow;
@@ -2830,7 +2850,7 @@ static gctBOOL _BbReach_Iterate_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLO
     VSC_BIT_VECTOR         tmpFlow;
     gctBOOL                bChanged = gcvFALSE;
 
-    vscBV_Initialize(&tmpFlow, (pBaseTsDFA->baseDFA).pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
+    ON_ERROR0(vscBV_Initialize(&tmpFlow, (pBaseTsDFA->baseDFA).pScratchMemPool, pBaseTsDFA->baseDFA.flowSize));
 
     /* Out = Gen U (In - Kill) */
     vscBV_Minus2(&tmpFlow, pInFlow, pKillFlow);
@@ -2842,13 +2862,16 @@ static gctBOOL _BbReach_Iterate_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLO
         vscBV_Copy(pOutFlow, &tmpFlow);
     }
 
+OnError:
     vscBV_Finalize(&tmpFlow);
-
-    return bChanged;
+    if(bResult)
+        *bResult = bChanged;
+    return errCode;
 }
 
-static gctBOOL _BbReach_Combine_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow)
+static VSC_ErrCode _BbReach_Combine_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow, gctBOOL_PTR bResult)
 {
+    VSC_ErrCode                  errCode = VSC_ERR_NONE;
     VIR_BASIC_BLOCK*             pPredBasicBlk;
     VSC_ADJACENT_LIST_ITERATOR   predEdgeIter;
     VIR_CFG_EDGE*                pPredEdge;
@@ -2860,10 +2883,13 @@ static gctBOOL _BbReach_Combine_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLO
     /* If there is no predecessors, then just reture FALSE */
     if (DGND_GET_IN_DEGREE(&pBasicBlock->dgNode) == 0)
     {
-        return gcvFALSE;
+        if(bResult)
+            *bResult = gcvFALSE;
+        return errCode;
     }
 
-    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
+    errCode = vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
+    ON_ERROR0(errCode);
 
     /* In = U all-pred-Outs */
     VSC_ADJACENT_LIST_ITERATOR_INIT(&predEdgeIter, &pBasicBlock->dgNode.predList);
@@ -2880,13 +2906,16 @@ static gctBOOL _BbReach_Combine_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLO
         vscBV_Copy(pInFlow, &tmpFlow);
     }
 
+OnError:
     vscBV_Finalize(&tmpFlow);
-
-    return bChanged;
+    if(bResult)
+        *bResult = bChanged;
+    return errCode;
 }
 
-static gctBOOL _BbReach_Block_Flow_Combine_From_Callee_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pCallerTsBlockFlow)
+static VSC_ErrCode _BbReach_Block_Flow_Combine_From_Callee_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pCallerTsBlockFlow, gctBOOL_PTR bResult)
 {
+    VSC_ErrCode            errCode = VSC_ERR_NONE;
     VIR_BASIC_BLOCK*       pBasicBlock = pCallerTsBlockFlow->pOwnerBB;
     VSC_BIT_VECTOR*        pOutFlow = &pCallerTsBlockFlow->outFlow;
     VSC_BIT_VECTOR*        pInFlow = &pCallerTsBlockFlow->inFlow;
@@ -2897,7 +2926,7 @@ static gctBOOL _BbReach_Block_Flow_Combine_From_Callee_Resolver(VIR_BASE_TS_DFA*
 
     gcmASSERT(pBasicBlock->flowType == VIR_FLOW_TYPE_CALL);
 
-    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
+    ON_ERROR0(vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize));
 
     /* Out = In U (out flow of callee) */
     vscBV_Or2(&tmpFlow, pInFlow, &pCalleeFuncFlow->outFlow);
@@ -2908,13 +2937,16 @@ static gctBOOL _BbReach_Block_Flow_Combine_From_Callee_Resolver(VIR_BASE_TS_DFA*
         vscBV_Copy(pOutFlow, &tmpFlow);
     }
 
+OnError:
     vscBV_Finalize(&tmpFlow);
-
-    return bChanged;
+    if(bResult)
+        *bResult = bChanged;
+    return errCode;
 }
 
-static gctBOOL _BbReach_Func_Flow_Combine_From_Callers_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_FUNC_FLOW* pCalleeTsFuncFlow)
+static VSC_ErrCode _BbReach_Func_Flow_Combine_From_Callers_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_FUNC_FLOW* pCalleeTsFuncFlow, gctBOOL_PTR bResult)
 {
+    VSC_ErrCode                  errCode = VSC_ERR_NONE;
     gctUINT                      callerIdx;
     VIR_BASIC_BLOCK*             pCallerBasicBlk;
     VIR_Instruction*             pCallSiteInst;
@@ -2925,7 +2957,7 @@ static gctBOOL _BbReach_Func_Flow_Combine_From_Callers_Resolver(VIR_BASE_TS_DFA*
     VSC_BIT_VECTOR               tmpFlow;
     gctBOOL                      bChanged = gcvFALSE;
 
-    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
+    ON_ERROR0(vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize));
 
     /* U all in flow of caller at every call site */
     VSC_ADJACENT_LIST_ITERATOR_INIT(&callerIter, &pCalleeFuncBlock->dgNode.predList);
@@ -2956,9 +2988,11 @@ static gctBOOL _BbReach_Func_Flow_Combine_From_Callers_Resolver(VIR_BASE_TS_DFA*
         vscBV_Copy(pInFlow, &tmpFlow);
     }
 
+OnError:
     vscBV_Finalize(&tmpFlow);
-
-    return bChanged;
+    if(bResult)
+        *bResult = bChanged;
+    return errCode;
 }
 
 VSC_ErrCode vscVIR_BuildBbReachRelation(VIR_Shader* pShader)

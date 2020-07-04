@@ -2412,8 +2412,8 @@ static VSC_ErrCode _VSC_PH_GenerateLValueModifier(
     }
 
     /* check prerequisite and collect work set at the same time */
-    ON_ERROR(_VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_WorkSet(ph), vscHFUNC_Default, vscHKCMP_Default, 512),
-             "Failed to initialize Hashtable");
+    errCode = _VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_WorkSet(ph), vscHFUNC_Default, vscHKCMP_Default, 512);
+    ON_ERROR(errCode, "Failed to initialize Hashtable");
     work_set = VSC_PH_Peephole_WorkSet(ph);
     vscVIR_InitGeneralUdIterator(&ud_iter, VSC_PH_Peephole_GetDUInfo(ph), inst, inst_src0, gcvFALSE, gcvFALSE);
     def = vscVIR_GeneralUdIterator_First(&ud_iter);
@@ -2581,8 +2581,8 @@ static VSC_ErrCode _VSC_PH_GenerateLValueModifier(
             VIR_USAGE* inst_usage;
             VSC_PH_OpndTarget* ot;
 
-            ON_ERROR(_VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_UsageSet(ph), _VSC_PH_OpndTarget_HFUNC, _VSC_PH_OpndTarget_HKCMP, 512),
-                     "Failed to initialize Hashtable");
+            errCode = _VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_UsageSet(ph), _VSC_PH_OpndTarget_HFUNC, _VSC_PH_OpndTarget_HKCMP, 512);
+            ON_ERROR(errCode, "Failed to initialize Hashtable");
             inst_usage_set = VSC_PH_Peephole_UsageSet(ph);
             for(channel = 0; channel < VIR_CHANNEL_NUM; channel++)
             {
@@ -2845,8 +2845,8 @@ static VSC_ErrCode _VSC_PH_GenerateRValueModifier(
         return errCode;
     }
 
-    ON_ERROR(_VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_WorkSet(ph), _VSC_PH_OpndTarget_HFUNC, _VSC_PH_OpndTarget_HKCMP, 512),
-             "Failed to initialize Hashtable");
+    errCode = _VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_WorkSet(ph), _VSC_PH_OpndTarget_HFUNC, _VSC_PH_OpndTarget_HKCMP, 512);
+    ON_ERROR(errCode, "Failed to initialize Hashtable");
     work_set = VSC_PH_Peephole_WorkSet(ph);
     for(channel = 0; channel < VIR_CHANNEL_NUM; channel++)
     {
@@ -3038,8 +3038,8 @@ static VSC_ErrCode _VSC_PH_GenerateRValueModifier(
             VIR_GENERAL_UD_ITERATOR inst_ud_iter;
             VIR_DEF* def;
 
-            ON_ERROR(_VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_DefSet(ph), vscHFUNC_Default, vscHKCMP_Default, 512),
-                     "Failed to initialize Hashtable");
+            errCode = _VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_DefSet(ph), vscHFUNC_Default, vscHKCMP_Default, 512);
+            ON_ERROR(errCode, "Failed to initialize Hashtable");
             def_inst_set = VSC_PH_Peephole_DefSet(ph);
 
             vscVIR_InitGeneralUdIterator(&inst_ud_iter, VSC_PH_Peephole_GetDUInfo(ph), inst, inst_src0, gcvFALSE, gcvFALSE);
@@ -3366,8 +3366,8 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
     mul_src1_swizzle = VIR_Operand_GetSwizzle(mul_src1);
     mul_src1_enable = VIR_Swizzle_2_Enable(mul_src1_swizzle);
 
-    ON_ERROR(_VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_WorkSet(ph), _VSC_PH_OpndTarget_HFUNC, _VSC_PH_OpndTarget_HKCMP, 512),
-             "Failed to initialize Hashtable");
+    errCode = _VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_WorkSet(ph), _VSC_PH_OpndTarget_HFUNC, _VSC_PH_OpndTarget_HKCMP, 512);
+    ON_ERROR(errCode, "Failed to initialize Hashtable");
     add_sub_set = VSC_PH_Peephole_WorkSet(ph);
     /* get usage of MUL's dest in per channel way*/
     for(channel = 0; channel < VIR_CHANNEL_NUM; channel++)
@@ -3613,11 +3613,11 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
         VIR_Swizzle mapping_swizzle0 = VIR_Enable_GetMappingSwizzle(mul_enable, mul_src0_swizzle);
         VIR_Swizzle mapping_swizzle1 = VIR_Enable_GetMappingSwizzle(mul_enable, mul_src1_swizzle);
 
-        ON_ERROR(_VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_DefSet0(ph), vscHFUNC_Default, vscHKCMP_Default, 512),
-                 "Failed to initialize Hashtable");
+        errCode = _VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_DefSet0(ph), vscHFUNC_Default, vscHKCMP_Default, 512);
+        ON_ERROR(errCode, "Failed to initialize Hashtable");
         def_inst_set0 = VSC_PH_Peephole_DefSet0(ph);
-        ON_ERROR(_VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_DefSet1(ph), vscHFUNC_Default, vscHKCMP_Default, 512),
-                 "Failed to initialize Hashtable");
+        errCode = _VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_DefSet1(ph), vscHFUNC_Default, vscHKCMP_Default, 512);
+        ON_ERROR(errCode, "Failed to initialize Hashtable");
         def_inst_set1 = VSC_PH_Peephole_DefSet1(ph);
         /* collect the def of the src0 and src1 of the mul inst, and delete the usage between mul's src0/src1's def and mul's src0/src1 */
         {
@@ -4328,8 +4328,8 @@ static VSC_ErrCode _VSC_PH_GenerateRSQ(
     sqrt_src0_swizzle = VIR_Operand_GetSwizzle(sqrt_src0);
     sqrt_src0_enable = VIR_Swizzle_2_Enable(sqrt_src0_swizzle);
 
-    ON_ERROR(_VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_WorkSet(ph), _VSC_PH_OpndTarget_HFUNC, _VSC_PH_OpndTarget_HKCMP, 512),
-             "Failed to initialize Hashtable");
+    errCode = _VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_WorkSet(ph), _VSC_PH_OpndTarget_HFUNC, _VSC_PH_OpndTarget_HKCMP, 512);
+    ON_ERROR(errCode, "Failed to initialize Hashtable");
     rcp_set = VSC_PH_Peephole_WorkSet(ph);
     /* get usage of sqrt's dest in per channel way*/
     for(channel = 0; channel < VIR_CHANNEL_NUM; channel++)
@@ -4507,8 +4507,8 @@ static VSC_ErrCode _VSC_PH_GenerateRSQ(
         VSC_DIRECT_HNODE_PAIR pair;
         VIR_Swizzle mapping_swizzle0 = VIR_Enable_GetMappingSwizzle(sqrt_enable, sqrt_src0_swizzle);
 
-        ON_ERROR(_VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_DefSet0(ph), _VSC_PH_OpndTarget_HFUNC, _VSC_PH_OpndTarget_HKCMP, 512),
-                 "Failed to initialize Hashtable");
+        errCode = _VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_DefSet0(ph), _VSC_PH_OpndTarget_HFUNC, _VSC_PH_OpndTarget_HKCMP, 512);
+        ON_ERROR(errCode, "Failed to initialize Hashtable");
         def_inst_set0 = VSC_PH_Peephole_DefSet0(ph);
         /* collect the def of the src0 of the sqrt inst, and delete the usage between sqrt's src0's def and sqrt's src0 */
         {
@@ -4721,8 +4721,8 @@ static VSC_ErrCode _VSC_PH_GenerateLShiftedLS(
     lshift_src0_swizzle = VIR_Operand_GetSwizzle(lshift_src0);
     lshift_src0_enable = VIR_Swizzle_2_Enable(lshift_src0_swizzle);
 
-    ON_ERROR(_VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_WorkSet(ph), _VSC_PH_OpndTarget_HFUNC, _VSC_PH_OpndTarget_HKCMP, 512),
-             "Failed to initialize Hashtable");
+    errCode = _VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_WorkSet(ph), _VSC_PH_OpndTarget_HFUNC, _VSC_PH_OpndTarget_HKCMP, 512);
+    ON_ERROR(errCode, "Failed to initialize Hashtable");
     ls_set = VSC_PH_Peephole_WorkSet(ph);
     /* get usage of lshift's dest in per channel way*/
     for(channel = 0; channel < VIR_CHANNEL_NUM; channel++)
@@ -4899,8 +4899,8 @@ static VSC_ErrCode _VSC_PH_GenerateLShiftedLS(
         VSC_DIRECT_HNODE_PAIR pair;
         VIR_Swizzle mapping_swizzle0 = VIR_Enable_GetMappingSwizzle(lshift_enable, lshift_src0_swizzle);
 
-        ON_ERROR(_VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_DefSet0(ph), vscHFUNC_Default, vscHKCMP_Default, 512),
-                 "Failed to initialize Hashtable");
+        errCode = _VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_DefSet0(ph), vscHFUNC_Default, vscHKCMP_Default, 512);
+        ON_ERROR(errCode, "Failed to initialize Hashtable");
         def_inst_set0 = VSC_PH_Peephole_DefSet0(ph);
         /* collect the def of the src0 of the lshift inst, and delete the usage between lshift's src0's def and lshift's src0 */
         {
@@ -5089,8 +5089,8 @@ static VSC_ErrCode _VSC_PH_GenerateLoadStore(
     }
 
     /* Initialize the working hash table. */
-    ON_ERROR(_VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_WorkSet(ph), _VSC_PH_OpndTarget_HFUNC, _VSC_PH_OpndTarget_HKCMP, 512),
-             "Failed to initialize Hashtable");
+    errCode = _VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_WorkSet(ph), _VSC_PH_OpndTarget_HFUNC, _VSC_PH_OpndTarget_HKCMP, 512);
+    ON_ERROR(errCode, "Failed to initialize Hashtable");
     pWorkingSet = VSC_PH_Peephole_WorkSet(ph);
 
     for (channel = 0; channel < VIR_CHANNEL_NUM; channel++)
@@ -5700,7 +5700,7 @@ static VSC_ErrCode _VSC_PH_VEC_MergeInst(
                          "Failed to initialize Hashtable");
                 usages_set = VSC_PH_Peephole_UsageSet(ph);
 
-                _VSC_PH_RecordUsages(ph, merged_inst->inst, usages_set);
+                ON_ERROR0(_VSC_PH_RecordUsages(ph, merged_inst->inst, usages_set));
 
                 channelMapping = VIR_Enable_GetMappingSwizzle(VIR_Operand_GetEnable(VIR_Inst_GetDest(merged_inst->inst)),
                                                               VIR_Operand_GetSwizzle(VIR_Inst_GetSource(merged_inst->inst, 0)));
@@ -5781,10 +5781,10 @@ static VSC_ErrCode _VSC_PH_VEC_MergeInst(
             channelMapping = VIR_Swizzle_MergeMappingSwizzles(instDst2SrcMapping, mergedSrc2DstMapping);
 
             /* change the usage of mova_dst to use first_def_mova_dst */
-            ON_ERROR(_VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_UsageSet(ph), _VSC_PH_OpndTarget_HFUNC, _VSC_PH_OpndTarget_HKCMP, 512),
-                        "Failed to initialize Hashtable");
+            errCode = _VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_UsageSet(ph), _VSC_PH_OpndTarget_HFUNC, _VSC_PH_OpndTarget_HKCMP, 512);
+            ON_ERROR(errCode, "Failed to initialize Hashtable");
             usages_set = VSC_PH_Peephole_UsageSet(ph);
-            _VSC_PH_RecordUsages(ph, inst, usages_set);
+            ON_ERROR0(_VSC_PH_RecordUsages(ph, inst, usages_set));
             _VSC_PH_ReplaceUsages(ph, merged_inst->inst, channelMapping, usages_set);
             _VSC_PH_ResetHashTable(usages_set);
 
@@ -5981,24 +5981,31 @@ OnError:
     return errCode;
 }
 
-static gctBOOL _VSC_PH_LocalVariable(
+static VSC_ErrCode _VSC_PH_LocalVariable(
     IN OUT VSC_PH_Peephole  *ph,
     VIR_Instruction         *pInst,
     VIR_Operand             *pOpnd,
-    IN OUT VSC_HASH_TABLE   *visitSet)
+    IN OUT VSC_HASH_TABLE   *visitSet,
+    gctBOOL_PTR              bResult)
 {
+    VSC_ErrCode  errCode = VSC_ERR_NONE;
     VIR_Shader  *pShader = ph->shader;
     VIR_DEF_USAGE_INFO* duInfo = VSC_PH_Peephole_GetDUInfo(ph);
     VIR_Symbol  *sym = VIR_Operand_GetSymbol(pOpnd);
+    gctBOOL      bCheck = gcvFALSE;
 
     if (!VIR_Operand_isSymbol(pOpnd))
     {
-        return gcvFALSE;
+        if(bResult)
+            *bResult = gcvFALSE;
+        return errCode;
     }
 
     if (vscHTBL_DirectTestAndGet(visitSet, (void*) pOpnd, gcvNULL))
     {
-        return gcvFALSE;
+        if(bResult)
+            *bResult = gcvFALSE;
+        return errCode;
     }
 
     vscHTBL_DirectSet(visitSet, (void*) pOpnd, gcvNULL);
@@ -6007,7 +6014,9 @@ static gctBOOL _VSC_PH_LocalVariable(
         (strcmp(VIR_Shader_GetSymNameString(pShader, sym), _sldLocalStorageAddressName) == 0 ||
          strcmp(VIR_Shader_GetSymNameString(pShader, sym), _sldSharedVariableStorageBlockName) == 0))
     {
-        return gcvTRUE;
+        if(bResult)
+            *bResult = gcvTRUE;
+        return errCode;
     }
     else
     {
@@ -6027,16 +6036,23 @@ static gctBOOL _VSC_PH_LocalVariable(
             {
                 for (i = 0; i < VIR_Inst_GetSrcNum(defInst);i++)
                 {
-                    if (_VSC_PH_LocalVariable(ph, defInst, VIR_Inst_GetSource(defInst, i), visitSet))
+                    errCode = _VSC_PH_LocalVariable(ph, defInst, VIR_Inst_GetSource(defInst, i), visitSet, &bCheck);
+                    ON_ERROR0(errCode);
+                    if (bCheck)
                     {
-                        return gcvTRUE;
+                        if(bResult)
+                            *bResult = gcvTRUE;
+                        return errCode;
                     }
                 }
             }
         }
     }
 
-    return gcvFALSE;
+OnError:
+    if(bResult)
+        *bResult = gcvFALSE;
+    return errCode;
 }
 
 static VSC_ErrCode _VSC_PH_LocalInst(
@@ -6049,6 +6065,7 @@ static VSC_ErrCode _VSC_PH_LocalInst(
     VIR_Operand         *baseOpnd = VIR_Inst_GetSource(lsInst, 0);
     VIR_OpCode          opc = VIR_Inst_GetOpcode(lsInst);
     VIR_Symbol          *baseSym = VIR_Operand_GetUnderlyingSymbol(baseOpnd);
+    gctBOOL             bLocalVariable = gcvFALSE;
 
     VSC_HASH_TABLE      *visitSet = gcvNULL;
 
@@ -6058,11 +6075,13 @@ static VSC_ErrCode _VSC_PH_LocalInst(
         return errCode;
     }
 
-    ON_ERROR(_VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_WorkSet(ph), vscHFUNC_Default, vscHKCMP_Default, 512),
-                "Failed to initialize Hashtable");
+    errCode = _VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_WorkSet(ph), vscHFUNC_Default, vscHKCMP_Default, 512);
+    ON_ERROR(errCode, "Failed to initialize Hashtable");
     visitSet = VSC_PH_Peephole_WorkSet(ph);
 
-    if (_VSC_PH_LocalVariable(ph, lsInst, baseOpnd, visitSet))
+    errCode = _VSC_PH_LocalVariable(ph, lsInst, baseOpnd, visitSet, &bLocalVariable);
+    ON_ERROR0(errCode);
+    if (bLocalVariable)
     {
         *useLocalMem = gcvTRUE;
         switch (opc)
@@ -6339,7 +6358,8 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
             opc = VIR_Inst_GetOpcode(inst);
             if(opc == VIR_OP_MUL || opc == VIR_OP_MULSAT)
             {
-                _VSC_PH_GenerateMAD(ph, inst, gcvNULL);
+                errCode = _VSC_PH_GenerateMAD(ph, inst, gcvNULL);
+                ON_ERROR(errCode, "Failed to Generate MAD");
             }
             inst = VIR_Inst_GetNext(inst);
         }
@@ -6362,7 +6382,8 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
 
             if (opCode == VIR_OP_ADD || opCode == VIR_OP_SUB || opCode == VIR_OP_MAD)
             {
-                _VSC_PH_MergeAddSubSameValue(ph, inst, &bChanged);
+                errCode = _VSC_PH_MergeAddSubSameValue(ph, inst, &bChanged);
+                ON_ERROR(errCode, "Failed to MergeAddSubSameValue");
             }
             inst = VIR_Inst_GetNext(inst);
         }
@@ -6385,7 +6406,8 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
             opc = VIR_Inst_GetOpcode(inst);
             if(opc == VIR_OP_SQRT)
             {
-                _VSC_PH_GenerateRSQ(ph, inst, gcvNULL);
+                errCode = _VSC_PH_GenerateRSQ(ph, inst, gcvNULL);
+                ON_ERROR(errCode, "Failed to Generate RSQ");
             }
             inst = VIR_Inst_GetNext(inst);
         }
@@ -6415,7 +6437,8 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
             opc = VIR_Inst_GetOpcode(inst);
             if(opc == VIR_OP_LSHIFT)
             {
-                _VSC_PH_GenerateLShiftedLS(ph, inst, gcvNULL);
+                errCode = _VSC_PH_GenerateLShiftedLS(ph, inst, gcvNULL);
+                ON_ERROR(errCode, "Failed to Generate LShiftedLS");
             }
             inst = VIR_Inst_GetNext(inst);
         }
@@ -6439,8 +6462,8 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
             VIR_LOG(dumper, "%s\npeephole vectorization started\n%s\n", VSC_TRACE_SHARP_LINE, VSC_TRACE_SHARP_LINE);
             VIR_LOG_FLUSH(dumper);
         }
-        ON_ERROR(_VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_DefSet(ph), _HKCMP_MergeKeyHFUNC, _HKCMP_MergeKeyEqual, 2048),
-                 "Failed to initialize Hashtable");
+        errCode = _VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_DefSet(ph), _HKCMP_MergeKeyHFUNC, _HKCMP_MergeKeyEqual, 2048);
+        ON_ERROR(errCode, "Failed to initialize Hashtable");
         vec_def_set = VSC_PH_Peephole_DefSet(ph);
         curr_mova = (VSC_PH_MergeKey*)vscMM_Alloc(VSC_PH_Peephole_GetMM(ph), sizeof(VSC_PH_MergeKey));
         if(curr_mova == gcvNULL)
@@ -6459,7 +6482,8 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
             opc = VIR_Inst_GetOpcode(inst);
             if (_VSC_PH_VEC_mergable(opc))
             {
-                _VSC_PH_VEC_MergeInst(ph, inst, vec_def_set, curr_mova);
+                errCode = _VSC_PH_VEC_MergeInst(ph, inst, vec_def_set, curr_mova);
+                ON_ERROR(errCode, "Failed to MergeInst");
             }
             inst = VIR_Inst_GetNext(inst);
         }
@@ -6662,7 +6686,8 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
                     opc == VIR_OP_STORE ||
                     VIR_OPCODE_isAtom(opc))
                 {
-                    _VSC_PH_LocalInst(ph, inst, &useLocalMem);
+                    errCode = _VSC_PH_LocalInst(ph, inst, &useLocalMem);
+                    ON_ERROR(errCode, "Failed to LocalInst");
                 }
 
                 inst = VIR_Inst_GetNext(inst);
@@ -6694,7 +6719,8 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
             opc = VIR_Inst_GetOpcode(inst);
             if (opc == VIR_OP_ADD)
             {
-                _VSC_PH_GenerateLoadStore(ph, inst, gcvNULL);
+                errCode = _VSC_PH_GenerateLoadStore(ph, inst, gcvNULL);
+                ON_ERROR(errCode, "Failed to Generate LoadStore");
             }
             inst = pNextInst;
         }
@@ -6798,7 +6824,9 @@ static VSC_ErrCode VSC_PH_Peephole_PerformOnFunction(
 
                 VSC_PH_Peephole_SetCurrBB(ph, bb);
                 errCode = _VSC_PH_PerformOnBB(ph);
+                ON_ERROR(errCode, "Failed PerformOnBB");
                 errCode = _VSC_PH_DoPeepholeForBB(ph);
+                ON_ERROR(errCode, "Failed DoPeepholeForBB");
                 scheduled = gcvTRUE;
             }
 
@@ -6832,6 +6860,7 @@ static VSC_ErrCode VSC_PH_Peephole_PerformOnFunction(
     }
     counter++;
 
+OnError:
     return errCode;
 }
 

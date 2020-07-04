@@ -749,7 +749,7 @@ static VSC_ErrCode _VSC_LCSE_ReplaceInst(
                 pReplacedInstInHt = pNewAttrLdInst;
 
                 /* Replace the commonEval first. */
-                _VSC_LCSE_ReplaceInst(lcse, expMap, pReplacedInstInHt, commonEval);
+                CHECK_ERROR0(_VSC_LCSE_ReplaceInst(lcse, expMap, pReplacedInstInHt, commonEval));
             }
 
             pReplacedInst = pReplacedInstInHt;
@@ -924,12 +924,12 @@ static VSC_ErrCode _VSC_LCSE_PerformOnBBForAttrLd(
             {
                 if (pCommonEval)
                 {
-                    _VSC_LCSE_ReplaceInst(pLcse, pFuncExpMap, pCommonEval, pInstIter);
+                    ON_ERROR0(_VSC_LCSE_ReplaceInst(pLcse, pFuncExpMap, pCommonEval, pInstIter));
                 }
                 else
                 {
                     _VSC_LCSE_ExpMap_Update(pFuncExpMap, pFirstEval, pFirstEval);
-                    _VSC_LCSE_ReplaceInst(pLcse, pFuncExpMap, pFirstEval, pInstIter);
+                    ON_ERROR0(_VSC_LCSE_ReplaceInst(pLcse, pFuncExpMap, pFirstEval, pInstIter));
                 }
             }
             else
@@ -957,7 +957,7 @@ static VSC_ErrCode _VSC_LCSE_PerformOnBBForAttrLd(
 
     VSC_LCSE_ExpMap_SetVectorizeAttrLd(pFuncExpMap, gcvFALSE);
 
-    OnError:
+OnError:
     return errCode;
 }
 
@@ -980,7 +980,8 @@ static VSC_ErrCode _VSC_LCSE_PerformOnBB(
         VIR_BasicBlock_Dump(dumper, bb, gcvTRUE);
     }
 
-    _VSC_LCSE_ExpMap_Init(&expMap, lcse, gcvFALSE);
+    errCode = _VSC_LCSE_ExpMap_Init(&expMap, lcse, gcvFALSE);
+    ON_ERROR0(errCode);
     for(instIter = BB_GET_START_INST(bb); instIter != BB_GET_END_INST(bb); instIter = VIR_Inst_GetNext(instIter))
     {
         VIR_Instruction* commonEval = gcvNULL;
@@ -1057,7 +1058,7 @@ static VSC_ErrCode _VSC_LCSE_PerformOnBB(
             {
                 if(commonEval)
                 {
-                    _VSC_LCSE_ReplaceInst(lcse, &expMap, commonEval, instIter);
+                    ON_ERROR0(_VSC_LCSE_ReplaceInst(lcse, &expMap, commonEval, instIter));
                 }
                 else
                 {
@@ -1069,7 +1070,7 @@ static VSC_ErrCode _VSC_LCSE_PerformOnBB(
                     }
 
                     _VSC_LCSE_ExpMap_Update(&expMap, firstEval, firstEval);
-                    _VSC_LCSE_ReplaceInst(lcse, &expMap, firstEval, instIter);
+                    ON_ERROR0(_VSC_LCSE_ReplaceInst(lcse, &expMap, firstEval, instIter));
                 }
             }
             else
@@ -1099,7 +1100,7 @@ static VSC_ErrCode _VSC_LCSE_PerformOnBB(
         VIR_BasicBlock_Dump(dumper, bb, gcvTRUE);
     }
 
-    OnError:
+OnError:
     return errCode;
 }
 
@@ -1141,7 +1142,8 @@ static VSC_ErrCode _VSC_LCSE_PerformOnFunction(
     }
 
     /* Initialize a expression mapping for the entire function. */
-    _VSC_LCSE_ExpMap_Init(&funcExpMap, lcse, gcvTRUE);
+    errCode = _VSC_LCSE_ExpMap_Init(&funcExpMap, lcse, gcvTRUE);
+    ON_ERROR0(errCode);
     VSC_LCSE_SetFuncExpMap(lcse, &funcExpMap);
 
     CFG_ITERATOR_INIT(&cfg_iter, cfg);
@@ -1193,6 +1195,7 @@ static VSC_ErrCode _VSC_LCSE_PerformOnFunction(
         VIR_LOG_FLUSH(dumper);
     }
 
+OnError:
     return errCode;
 }
 

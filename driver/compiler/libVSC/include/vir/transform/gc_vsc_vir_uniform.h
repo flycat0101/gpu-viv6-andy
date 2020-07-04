@@ -214,7 +214,7 @@ struct VSC_ALLSHADERS
 #define VSC_AllShaders_GetMM(as)                        (&(as)->mem_pool)
 #define VSC_AllShaders_SetMM(as, m)                     ((as)->mem_pool = *(m))
 
-void
+VSC_ErrCode
 VSC_AllShaders_Initialize(
     IN OUT VSC_AllShaders* all_shaders,
     IN VIR_Shader* vs_shader,

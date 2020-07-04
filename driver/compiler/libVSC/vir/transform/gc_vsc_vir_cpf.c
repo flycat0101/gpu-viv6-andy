@@ -523,14 +523,15 @@ _VSC_CPF_InitFunction(
     ON_ERROR0(errCode);
 
     /* Initialize the loopOpts. */
-    VIR_LoopOpts_Init(&VSC_CPF_GetLoopOpts(pCPF),
-                      gcvNULL,
-                      VSC_CPF_GetShader(pCPF),
-                      pFunc,
-                      pLoopOptsOptions,
-                      VSC_CPF_GetDumper(pCPF),
-                      VSC_CPF_GetMM(pCPF),
-                      VSC_CPF_GetHwCfg(pCPF));
+    errCode = VIR_LoopOpts_Init(&VSC_CPF_GetLoopOpts(pCPF),
+                                gcvNULL,
+                                VSC_CPF_GetShader(pCPF),
+                                pFunc,
+                                pLoopOptsOptions,
+                                VSC_CPF_GetDumper(pCPF),
+                                VSC_CPF_GetMM(pCPF),
+                                VSC_CPF_GetHwCfg(pCPF));
+    ON_ERROR0(errCode);
 
     OnError:
     return errCode;
@@ -609,16 +610,18 @@ _VSC_CPF_GetConstVal(
     return retConst;
 }
 
-static gctBOOL
+static VSC_ErrCode
 _VSC_CPF_SetConstVal(
     VSC_CPF             *pCPF,
     gctUINT             bbId,
     gctUINT             index,
     gctBOOL             isIN,
     gctUINT             constValue,
-    VIR_PrimitiveTypeId constType
+    VIR_PrimitiveTypeId constType,
+    gctBOOL_PTR         bResult
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_CPF_Const *dstConstVal = _VSC_CPF_GetConstVal(pCPF, bbId, index, isIN);
     gctBOOL changed = gcvFALSE;
 
@@ -652,13 +655,19 @@ _VSC_CPF_SetConstVal(
                                                    constValue,
                                                    constType);
         if(!pHashKey || !pVal)
-            return gcvFALSE;
-        if(vscHTBL_DirectSet(VSC_CPF_GetConstTable(pCPF), (void*)pHashKey, (void*)pVal) != VSC_ERR_NONE)
-            return gcvFALSE;
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR(errCode, "Fail in _VSC_CPF_SetConstVal.");
+        }
+        errCode = vscHTBL_DirectSet(VSC_CPF_GetConstTable(pCPF), (void*)pHashKey, (void*)pVal);
+        ON_ERROR(errCode, "Fail in _VSC_CPF_SetConstVal.");
         changed = gcvTRUE;
     }
 
-    return changed;
+OnError:
+    if(bResult)
+        *bResult = changed;
+    return errCode;
 }
 
 static void
@@ -677,7 +686,7 @@ _VSC_CPF_RemoveConstVal(
     vscHTBL_DirectRemove(VSC_CPF_GetConstTable(pCPF), &constKey);
 }
 
-static void
+static VSC_ErrCode
 _VSC_CPF_SetConst(
     VSC_CPF             *pCPF,
     VSC_STATE_VECTOR    *tmpFlow,
@@ -688,11 +697,15 @@ _VSC_CPF_SetConst(
     VIR_PrimitiveTypeId constType
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    gctBOOL     bCheck = gcvFALSE;
     /* set the lattice */
     _VSC_CPF_DF_SetLatticeConst(tmpFlow, index);
 
     /* set the const val in the hash table */
-    _VSC_CPF_SetConstVal(pCPF, bbId, index, isIN, constValue, constType);
+    errCode = _VSC_CPF_SetConstVal(pCPF, bbId, index, isIN, constValue, constType, &bCheck);
+
+    return errCode;
 }
 
 static void
@@ -711,11 +724,12 @@ _VSC_CPF_SetNotConst(
     _VSC_CPF_RemoveConstVal(pCPF, bbId, index, isIN);
 }
 
-static void
+static VSC_ErrCode
 _VSC_CPF_CopyConstKey(
     VSC_CPF             *pCPF,
     gctUINT             bbId)
 {
+    VSC_ErrCode          errCode = VSC_ERR_NONE;
     VSC_CPF_BLOCK_FLOW  *pBlkFlow = (VSC_CPF_BLOCK_FLOW*)
         vscSRARR_GetElement(VSC_CPF_GetBlkFlowArray(pCPF), bbId);
 
@@ -727,10 +741,14 @@ _VSC_CPF_CopyConstKey(
     {
         VSC_CPF_Const   *constVal = _VSC_CPF_GetConstVal(pCPF, bbId, constIdx, gcvTRUE);
         gcmASSERT(constVal);
-        _VSC_CPF_SetConstVal(pCPF, bbId, constIdx, gcvFALSE, constVal->value, constVal->type);
+        errCode = _VSC_CPF_SetConstVal(pCPF, bbId, constIdx, gcvFALSE, constVal->value, constVal->type, gcvNULL);
+        ON_ERROR0(errCode);
 
         i = constIdx + 1;
     }
+
+OnError:
+    return errCode;
 }
 
 /* Dump the constant data flow. */
@@ -882,7 +900,7 @@ _VSC_CPF_CopyFlowLattice(
 }
 
 /*   dstFlow = srcFlow */
-static void
+static VSC_ErrCode
 _VSC_CPF_CopyFlow(
     VSC_CPF           *pCPF,
     gctUINT           dstBBId,
@@ -890,6 +908,7 @@ _VSC_CPF_CopyFlow(
     gctUINT            srcBBId,
     VSC_STATE_VECTOR  *srcFlow)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     gctUINT i = 0, constIdx;
 
     _VSC_CPF_CopyFlowLattice(dstFlow, srcFlow);
@@ -907,23 +926,29 @@ _VSC_CPF_CopyFlow(
                 when merging the data flow, we only need to change IN const key,
                 the other one is copy from IN const key at the beginning of BB
                 analysis and changed inside the block. */
-            _VSC_CPF_SetConstVal(pCPF, dstBBId, constIdx, gcvTRUE, constVal->value, constVal->type);
+            errCode = _VSC_CPF_SetConstVal(pCPF, dstBBId, constIdx, gcvTRUE, constVal->value, constVal->type, gcvNULL);
+            ON_ERROR0(errCode);
         }
 
         i = constIdx + 1;
     }
+
+OnError:
+    return errCode;
 }
 
 /* this is AND operation of all predecessors' OUT to get IN
    dstFlow = dstFlow ^ srcFlow */
-static gctBOOL
+static VSC_ErrCode
 _VSC_CPF_AndFlow(
     VSC_CPF           *pCPF,
     gctUINT           dstBBId,
     VSC_STATE_VECTOR  *dstFlow,
     gctUINT            srcBBId,
-    VSC_STATE_VECTOR  *srcFlow)
+    VSC_STATE_VECTOR  *srcFlow,
+    gctBOOL_PTR        bResult)
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     gctUINT i;
     gctBOOL changed = gcvFALSE;
     VSC_CPF_LATTICE dstLattice, srcLattice;
@@ -965,7 +990,8 @@ _VSC_CPF_AndFlow(
             VSC_CPF_Const   *srcConstVal = _VSC_CPF_GetConstVal(pCPF, srcBBId, i, gcvFALSE);
             gcmASSERT(srcLattice == VSC_CPF_CONSTANT);
             gcmASSERT(srcConstVal != gcvNULL);
-            _VSC_CPF_SetConst(pCPF, dstFlow, dstBBId, i, gcvTRUE, srcConstVal->value, srcConstVal->type);
+            errCode = _VSC_CPF_SetConst(pCPF, dstFlow, dstBBId, i, gcvTRUE, srcConstVal->value, srcConstVal->type);
+            ON_ERROR0(errCode);
             changed = gcvTRUE;
         }
         else
@@ -974,7 +1000,10 @@ _VSC_CPF_AndFlow(
         }
     }
 
-    return changed;
+OnError:
+    if(bResult != gcvNULL)
+        *bResult = changed;
+    return errCode;
 }
 
 static gctBOOL
@@ -1203,7 +1232,7 @@ _VSC_CPF_ProcessSrcModifier(
 }
 
 /* only called when all defined channels are constant */
-void
+VSC_ErrCode
 _VSC_CPF_SetDestConst(
     VSC_CPF                 *pCPF,
     gctUINT                 srcBBId,
@@ -1214,6 +1243,7 @@ _VSC_CPF_SetDestConst(
     VSC_CPF_Const           *constVal
     )
 {
+    VSC_ErrCode          errCode = VSC_ERR_NONE;
     VIR_Operand         *dstOpnd = VIR_Inst_GetDest(pInst);
     VIR_PrimitiveTypeId type = VIR_TYPE_VOID;
     gctUINT             regNo = VIR_INVALID_ID;
@@ -1231,9 +1261,11 @@ _VSC_CPF_SetDestConst(
         }
 
         /* we change the const value key for non isIN one */
-        _VSC_CPF_SetConst(pCPF, tmpFlow, srcBBId, (regNo + opndOffset) * 4 + channel, gcvFALSE,
+        errCode = _VSC_CPF_SetConst(pCPF, tmpFlow, srcBBId, (regNo + opndOffset) * 4 + channel, gcvFALSE,
                           constVal->value, constVal->type);
     }
+
+    return errCode;
 }
 
 void
@@ -2525,7 +2557,7 @@ _VSC_CPF_PerformOnInst(
                 }
                 if (evaluable[channel])
                 {
-                    _VSC_CPF_SetDestConst(pCPF, srcBBId, pInst, channel, 0, tmpFlow, &resultVal[channel]);
+                    ON_ERROR0(_VSC_CPF_SetDestConst(pCPF, srcBBId, pInst, channel, 0, tmpFlow, &resultVal[channel]));
                 }
                 else
                 {
@@ -2624,7 +2656,7 @@ _VSC_CPF_PerformOnInst(
                     if (_VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, src0Opnd, channel, opndOffset, tmpFlow, &vecVal[0], &srcLattic[0]))
                     {
                         _VSC_CPF_ProcessSrcModifier(pInst, 0, vecVal[0].type, &vecVal[0]);
-                        _VSC_CPF_SetDestConst(pCPF, srcBBId, pInst, channel, 0, tmpFlow, &vecVal[0]);
+                        ON_ERROR0(_VSC_CPF_SetDestConst(pCPF, srcBBId, pInst, channel, 0, tmpFlow, &vecVal[0]));
                     }
                     else
                     {
@@ -2718,7 +2750,7 @@ _VSC_CPF_PerformOnInst(
                     if (_VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, src1Opnd, channel, 0, tmpFlow, &vecVal[1], &srcLattic[1]))
                     {
                         _VSC_CPF_ProcessSrcModifier(pInst, 1, vecVal[1].type, &vecVal[1]);
-                        _VSC_CPF_SetDestConst(pCPF, srcBBId, pInst, channel, opndOffset, tmpFlow, &vecVal[1]);
+                        ON_ERROR0(_VSC_CPF_SetDestConst(pCPF, srcBBId, pInst, channel, opndOffset, tmpFlow, &vecVal[1]));
                     }
                     else
                     {
@@ -2813,7 +2845,7 @@ _VSC_CPF_PerformOnInst(
                         if(srcLattic[2] == VSC_CPF_CONSTANT)
                         {
                             resultVal[channel] = vecVal[2];
-                            _VSC_CPF_SetDestConst(pCPF, srcBBId, pInst, channel, 0, tmpFlow, &resultVal[channel]);
+                            ON_ERROR0(_VSC_CPF_SetDestConst(pCPF, srcBBId, pInst, channel, 0, tmpFlow, &resultVal[channel]));
                             constChannelCount++;
                         }
                         else
@@ -2987,6 +3019,7 @@ _VSC_CPF_PerformOnInst(
         }
     }
 
+OnError:
     return errCode;
 }
 
@@ -3094,7 +3127,8 @@ _VSC_CPF_AnalysisOnBlock(
         {
             VIR_BASIC_BLOCK*    pWorkingBB = gcvNULL;
             _VSC_CPF_WorkListDequeue(pCPF, &pWorkingBB);
-            _VSC_CPF_AnalysisOnBlock(pCPF, pWorkingBB, pLoopInfo, pLoopBBTable);
+            errCode = _VSC_CPF_AnalysisOnBlock(pCPF, pWorkingBB, pLoopInfo, pLoopBBTable);
+            ON_ERROR0(errCode);
         }
 
         /* Clean the working list. */
@@ -3205,13 +3239,13 @@ _VSC_CPF_AnalysisOnBlock(
             if (firstPred)
             {
                 /* tmpFlow = pred->out */
-                _VSC_CPF_CopyFlow(pCPF, pBB->dgNode.id, pTmpFlow, pPredBasicBlk->dgNode.id, &predBlkFlow->outFlow);
+                ON_ERROR0(_VSC_CPF_CopyFlow(pCPF, pBB->dgNode.id, pTmpFlow, pPredBasicBlk->dgNode.id, &predBlkFlow->outFlow));
                 firstPred = gcvFALSE;
             }
             else
             {
                 /* tmpFlow = tmpFlow ^ pred->out */
-                _VSC_CPF_AndFlow(pCPF, pBB->dgNode.id, pTmpFlow, pPredBasicBlk->dgNode.id, &predBlkFlow->outFlow);
+                ON_ERROR0(_VSC_CPF_AndFlow(pCPF, pBB->dgNode.id, pTmpFlow, pPredBasicBlk->dgNode.id, &predBlkFlow->outFlow, gcvNULL));
             }
 
             inChanged = gcvTRUE;
@@ -3227,7 +3261,7 @@ _VSC_CPF_AnalysisOnBlock(
         }
     }
 
-    _VSC_CPF_CopyConstKey(pCPF, pBB->dgNode.id);
+    ON_ERROR0(_VSC_CPF_CopyConstKey(pCPF, pBB->dgNode.id));
 
     if(VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
         VSC_OPTN_CPFOptions_TRACE_ALGORITHM) && VSC_CPF_GetDumper(pCPF))
@@ -3380,7 +3414,7 @@ _VSC_CPF_TransformOnBlock(
 
     _VSC_CPF_CopyFlowLattice(pTmpFlow, inFlow);
 
-    _VSC_CPF_CopyConstKey(pCPF, pBB->dgNode.id);
+    ON_ERROR0(_VSC_CPF_CopyConstKey(pCPF, pBB->dgNode.id));
 
     /* go through all the instructions to
        propagate the constant. call simplification to do folding. */
@@ -3419,6 +3453,7 @@ _VSC_CPF_PerformOnFunction(
     memset(&loopOptions, 0, sizeof(VSC_OPTN_LoopOptsOptions));
 
     errCode = _VSC_CPF_InitFunction(pCPF, pFunc, &loopOptions);
+    ON_ERROR0(errCode);
 
     /* We need to detect the loopInfo to analyze the back edge flow. */
     if (VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_HAS_LOOP))
@@ -3455,7 +3490,8 @@ _VSC_CPF_PerformOnFunction(
             VIR_LOG_FLUSH(pDumper);
         }
 
-        _VSC_CPF_AnalysisOnBlock(pCPF, pBB, gcvNULL, gcvNULL);
+        errCode = _VSC_CPF_AnalysisOnBlock(pCPF, pBB, gcvNULL, gcvNULL);
+        ON_ERROR0(errCode);
     }
 
     if(VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
@@ -3513,7 +3549,8 @@ _VSC_CPF_PerformOnShader(
             continue;
         }
 
-        _VSC_CPF_PerformOnFunction(pCPF, func);
+        errcode = _VSC_CPF_PerformOnFunction(pCPF, func);
+        ON_ERROR(errcode, "");
     }
 
     if(VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
@@ -3523,6 +3560,7 @@ _VSC_CPF_PerformOnShader(
         VIR_Shader_Dump(gcvNULL, "Shader after Constant Propagation and Folding", pShader, gcvTRUE);
     }
 
+OnError:
     return errcode;
 }
 
@@ -3622,7 +3660,7 @@ VSC_ErrCode VSC_CPF_PerformOnFunction(
 
     _VSC_CPF_Init(&cpf, gcvPATCH_INVALID, pHwCfg, pShader, &cpfOptions, gcvNULL, pMM);
 
-    _VSC_CPF_PerformOnFunction(&cpf, pFunc);
+    errCode = _VSC_CPF_PerformOnFunction(&cpf, pFunc);
 
     _VSC_CPF_Final(&cpf);
 

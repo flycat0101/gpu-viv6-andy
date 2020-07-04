@@ -606,8 +606,9 @@ static void _Liveness_Init_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FL
     }
 }
 
-static gctBOOL _Liveness_Iterate_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow)
+static VSC_ErrCode _Liveness_Iterate_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow, gctBOOL_PTR bResult)
 {
+    VSC_ErrCode            errCode = VSC_ERR_NONE;
     VSC_BIT_VECTOR*        pInFlow = &pTsBlockFlow->inFlow;
     VSC_BIT_VECTOR*        pOutFlow = &pTsBlockFlow->outFlow;
     VSC_BIT_VECTOR*        pGenFlow = &pTsBlockFlow->genFlow;
@@ -615,7 +616,8 @@ static gctBOOL _Liveness_Iterate_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BL
     VSC_BIT_VECTOR         tmpFlow;
     gctBOOL                bChanged = gcvFALSE;
 
-    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
+    errCode = vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
+    ON_ERROR0(errCode);
 
     /* In = Gen U (Out - Kill) */
     vscBV_Minus2(&tmpFlow, pOutFlow, pKillFlow);
@@ -627,13 +629,16 @@ static gctBOOL _Liveness_Iterate_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BL
         vscBV_Copy(pInFlow, &tmpFlow);
     }
 
+OnError:
     vscBV_Finalize(&tmpFlow);
-
-    return bChanged;
+    if(bResult)
+        *bResult = bChanged;
+    return errCode;
 }
 
-static gctBOOL _Liveness_Combine_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow)
+static VSC_ErrCode _Liveness_Combine_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow, gctBOOL_PTR bResult)
 {
+    VSC_ErrCode                  errCode = VSC_ERR_NONE;
     VIR_BASIC_BLOCK*             pSuccBasicBlk;
     VSC_ADJACENT_LIST_ITERATOR   succEdgeIter;
     VIR_CFG_EDGE*                pSuccEdge;
@@ -645,10 +650,12 @@ static gctBOOL _Liveness_Combine_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BL
     /* If there is no successors, then just reture FALSE */
     if (DGND_GET_OUT_DEGREE(&pBasicBlock->dgNode) == 0)
     {
-        return gcvFALSE;
+        if(bResult)
+            *bResult = gcvFALSE;
+        return errCode;
     }
 
-    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
+    ON_ERROR0(vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize));
 
     /* Out = U all-succ-Ins */
     VSC_ADJACENT_LIST_ITERATOR_INIT(&succEdgeIter, &pBasicBlock->dgNode.succList);
@@ -665,14 +672,17 @@ static gctBOOL _Liveness_Combine_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BL
         vscBV_Copy(pOutFlow, &tmpFlow);
     }
 
+OnError:
     vscBV_Finalize(&tmpFlow);
-
-    return bChanged;
+    if(bResult)
+        *bResult = bChanged;
+    return errCode;
 }
 
 #if SUPPORT_IPA_DFA
-static gctBOOL _Liveness_Block_Flow_Combine_From_Callee_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pCallerTsBlockFlow)
+static VSC_ErrCode _Liveness_Block_Flow_Combine_From_Callee_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pCallerTsBlockFlow, gctBOOL_PTR bResult)
 {
+    VSC_ErrCode            errCode = VSC_ERR_NONE;
     VIR_BASIC_BLOCK*       pBasicBlock = pCallerTsBlockFlow->pOwnerBB;
     VSC_BIT_VECTOR*        pInFlow = &pCallerTsBlockFlow->inFlow;
 #if ENABLE_AGGRESSIVE_IPA_LIVENESS
@@ -685,7 +695,7 @@ static gctBOOL _Liveness_Block_Flow_Combine_From_Callee_Resolver(VIR_BASE_TS_DFA
 
     gcmASSERT(pBasicBlock->flowType == VIR_FLOW_TYPE_CALL);
 
-    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
+    ON_ERROR0(vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize));
 
 #if ENABLE_AGGRESSIVE_IPA_LIVENESS
     /* U flow that not flows into callee and in flow of callee */
@@ -701,13 +711,16 @@ static gctBOOL _Liveness_Block_Flow_Combine_From_Callee_Resolver(VIR_BASE_TS_DFA
         vscBV_Copy(pInFlow, &tmpFlow);
     }
 
+OnError:
     vscBV_Finalize(&tmpFlow);
-
-    return bChanged;
+    if(bResult)
+        *bResult = bChanged;
+    return errCode;
 }
 
-static gctBOOL _Liveness_Func_Flow_Combine_From_Callers_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_FUNC_FLOW* pCalleeTsFuncFlow)
+static VSC_ErrCode _Liveness_Func_Flow_Combine_From_Callers_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_FUNC_FLOW* pCalleeTsFuncFlow, gctBOOL_PTR bResult)
 {
+    VSC_ErrCode                  errCode = VSC_ERR_NONE;
     gctUINT                      callerIdx;
     VIR_BASIC_BLOCK*             pCallerBasicBlk;
     VIR_Instruction*             pCallSiteInst;
@@ -718,7 +731,7 @@ static gctBOOL _Liveness_Func_Flow_Combine_From_Callers_Resolver(VIR_BASE_TS_DFA
     VSC_BIT_VECTOR               tmpFlow;
     gctBOOL                      bChanged = gcvFALSE;
 
-    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
+    ON_ERROR0(vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize));
 
 #if ENABLE_AGGRESSIVE_IPA_LIVENESS
     vscBV_SetAll(&tmpFlow);
@@ -751,9 +764,11 @@ static gctBOOL _Liveness_Func_Flow_Combine_From_Callers_Resolver(VIR_BASE_TS_DFA
         vscBV_Copy(pOutFlow, &tmpFlow);
     }
 
+OnError:
     vscBV_Finalize(&tmpFlow);
-
-    return bChanged;
+    if(bResult)
+        *bResult = bChanged;
+    return errCode;
 }
 #endif
 

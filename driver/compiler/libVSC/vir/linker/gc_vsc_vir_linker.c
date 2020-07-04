@@ -223,6 +223,7 @@ VIR_intrinsic_LibSource(
     )
 {
     VSC_ErrCode                  errCode = VSC_ERR_NONE;
+    gceSTATUS                    status  = gcvSTATUS_OK;
     VIR_Shader                  *virIntrinsicLibrary = gcvNULL;
     gceSTATUS                    status = gcvSTATUS_OK;
     gcSHADER                     binary = gcvNULL;
@@ -303,7 +304,7 @@ VIR_intrinsic_LibSource(
                                    virIntrinsicLibrary);
     ON_ERROR(errCode, "VIR_CompileIntrinsicLib");
 
-    gcSHADER_Conv2VIR(binary, pHwCfg, virIntrinsicLibrary);
+    gcmONERROR(gcSHADER_Conv2VIR(binary, pHwCfg, virIntrinsicLibrary));
 
     if (DumpShader)
     {
@@ -329,6 +330,11 @@ OnError:
     if (log)
     {
         gcmOS_SAFE_FREE(gcvNULL, log);
+    }
+
+    if (status  != gcvSTATUS_OK)
+    {
+        errCode = vscERR_CastGcStatus2ErrCode(status);
     }
 
     return errCode;
@@ -1144,7 +1150,7 @@ _CreateIntrinsicLib(
                                            virIntrinsicLibrary[i]);
             ON_ERROR(errCode, "VIR_CompileIntrinsicLib");
 
-            gcSHADER_Conv2VIR(binary[i], pHwCfg, virIntrinsicLibrary[i]);
+            gcmONERROR(gcSHADER_Conv2VIR(binary[i], pHwCfg, virIntrinsicLibrary[i]));
         }
     }
 
@@ -1666,7 +1672,7 @@ _CreateCLIntrinsicLib(
                                             virIntrinsicLibrary[i]);
             ON_ERROR(errCode, "VIR_CompileCLIntrinsicLib");
 
-            gcSHADER_Conv2VIR(binary[i], pHwCfg, virIntrinsicLibrary[i]);
+            gcmONERROR(gcSHADER_Conv2VIR(binary[i], pHwCfg, virIntrinsicLibrary[i]));
 
         }
         /* restore saved option */
@@ -3137,7 +3143,7 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
             }
             else
             {
-                _VIR_LinkIntrinsicLib_AddVregSymbol(pShader,
+                errCode = _VIR_LinkIntrinsicLib_AddVregSymbol(pShader,
                                                     pLibShader,
                                                     pFunc,
                                                     libFunc,
@@ -3146,6 +3152,7 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
                                                     tempIndexStart,
                                                     &newVirRegId,
                                                     pTempSet);
+                CHECK_ERROR0(errCode);
 
                 newVirRegSym = VIR_Function_GetSymFromId(pFunc, newVirRegId);
             }
@@ -3968,19 +3975,20 @@ VIR_Lib_LinkFunctions(
         for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
              inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
         {
-            _VIR_LinkIntrinsicLib_CopyInst(pShader,
-                                           pLibShader,
-                                           libFunc,
-                                           pFunc,
-                                           inst,
-                                           pMM,
-                                           pAddLibFuncSet,
-                                           pLabelSet,
-                                           pJmpSet,
-                                           pTempSet,
-                                           pWorkList,
-                                           pCallSites,
-                                           &tempIndexStart);
+            errCode = _VIR_LinkIntrinsicLib_CopyInst(pShader,
+                                                    pLibShader,
+                                                    libFunc,
+                                                    pFunc,
+                                                    inst,
+                                                    pMM,
+                                                    pAddLibFuncSet,
+                                                    pLabelSet,
+                                                    pJmpSet,
+                                                    pTempSet,
+                                                    pWorkList,
+                                                    pCallSites,
+                                                    &tempIndexStart);
+            ON_ERROR0(errCode);
         }
 
         /* fixup the jmp instruction's label */

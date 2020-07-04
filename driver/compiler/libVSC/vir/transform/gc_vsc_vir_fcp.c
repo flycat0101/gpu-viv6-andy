@@ -2175,7 +2175,8 @@ VSC_ErrCode vscVIR_PostMCCleanup(
             {
                 if (opCode == VIR_OP_VX_ICASTP)
                 {
-                    _VIR_MergeICASTP(pDuInfo, pShader, pOptions, inst, pMM, pDumper, &bInvalidCfg);
+                    errCode = _VIR_MergeICASTP(pDuInfo, pShader, pOptions, inst, pMM, pDumper, &bInvalidCfg);
+                    ON_ERROR0(errCode);
                 }
                 else if (opCode == VIR_OP_VX_ICASTD)
                 {
@@ -2969,17 +2970,20 @@ static gctBOOL _VIR_CheckMemOp(
 
 #if gcmIS_DEBUG(gcdDEBUG_ASSERT)
 /* check the dest of Load instruction is used by a texld */
-static gctBOOL _VIR_CheckDestIsUsedByTexld(
+static VSC_ErrCode _VIR_CheckDestIsUsedByTexld(
     VIR_Instruction *pInst,
     VIR_Operand     *pDestOpnd,
     VIR_DEF_USAGE_INFO  *pDuInfo,
-    VSC_HASH_TABLE*     visitedInstSet)
+    VSC_HASH_TABLE*     visitedInstSet,
+    gctBOOL_PTR      bResult)
 {
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
     gctUINT8                channel;
     VIR_Enable              enable;
     VIR_OperandInfo         destOpndInfo;
     VIR_GENERAL_DU_ITERATOR du_iter;
     VIR_USAGE*              pUsage = gcvNULL;
+    gctBOOL                 bCheck = gcvFALSE;
 
     enable = VIR_Operand_GetEnable(pDestOpnd);
     VIR_Operand_GetOperandInfo(pInst, pDestOpnd, &destOpndInfo);
@@ -3009,7 +3013,9 @@ static gctBOOL _VIR_CheckDestIsUsedByTexld(
                 if (VIR_OPCODE_isTexLd(op))
                 {
                     /* if usage is texld instruction, return true */
-                    return gcvTRUE;
+                    if(bResult)
+                        *bResult = gcvTRUE;
+                    return errCode;
                 }
                 else if (_VIR_CheckMemOp(op) || VIR_Inst_GetDest(pUsageInst) == gcvNULL || pUsageInst == pInst ||
                          (op == VIR_OP_MOVA))
@@ -3021,26 +3027,36 @@ static gctBOOL _VIR_CheckDestIsUsedByTexld(
                 {
                     /* usage is used in ALU instruction, recursively check the usage of dest */
 
-                    if (_VIR_CheckDestIsUsedByTexld(pUsageInst, VIR_Inst_GetDest(pUsageInst), pDuInfo, visitedInstSet))
+                    errCode = _VIR_CheckDestIsUsedByTexld(pUsageInst, VIR_Inst_GetDest(pUsageInst), pDuInfo, visitedInstSet, &bCheck);
+                    ON_ERROR0(errCode);
+                    if (bCheck)
                     {
-                        return gcvTRUE;
+                        if(bResult)
+                            *bResult = gcvTRUE;
+                        return errCode;
                     }
                 }
             }
         }
     }
 
-    return gcvFALSE;
+OnError:
+    if(bResult)
+        *bResult = gcvFALSE;
+    return errCode;
 }
 #endif
 
-static gctBOOL _VIR_CheckSourceDefinedBySkHp(
+static VSC_ErrCode _VIR_CheckSourceDefinedBySkHp(
     VIR_Instruction *pInst,
     VIR_Operand     *pSrc,
     VIR_DEF_USAGE_INFO  *pDuInfo,
-    VSC_HASH_TABLE*     visitedInstSet)
+    VSC_HASH_TABLE*     visitedInstSet,
+    gctBOOL_PTR      bResult)
 {
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
     VIR_OperandInfo     opndInfo;
+    gctBOOL             bCheck = gcvFALSE;
     /* If the operand is a temp register, find its DEF. */
     VIR_Operand_GetOperandInfo(pInst, pSrc, &opndInfo);
     if (opndInfo.isVreg)
@@ -3059,10 +3075,13 @@ static gctBOOL _VIR_CheckSourceDefinedBySkHp(
                 (!vscHTBL_DirectTestAndGet(visitedInstSet, ((void *)pDefInst), gcvNULL)))
             {
                 VIR_OpCode op = VIR_Inst_GetOpcode(pDefInst);
-                vscHTBL_DirectSet(visitedInstSet, (void *)(pDefInst), gcvNULL);
+                errCode = vscHTBL_DirectSet(visitedInstSet, (void *)(pDefInst), gcvNULL);
+                ON_ERROR0(errCode);
                 if (VIR_Inst_IsSkipHelper(pDefInst) || VIR_OPCODE_NeedSkHpFlag(op))
                 {
-                    return gcvTRUE;
+                    if(bResult)
+                        *bResult = gcvTRUE;
+                    return errCode;
                 }
                 else if (_VIR_CheckMemOp(op))
                 {
@@ -3076,9 +3095,13 @@ static gctBOOL _VIR_CheckSourceDefinedBySkHp(
                     for (i = 0; i < srcNum; i++)
                     {
                         VIR_Operand* src = VIR_Inst_GetSource(pDefInst, i);
-                        if (_VIR_CheckSourceDefinedBySkHp(pDefInst, src, pDuInfo, visitedInstSet))
+                        errCode = _VIR_CheckSourceDefinedBySkHp(pDefInst, src, pDuInfo, visitedInstSet, &bCheck);
+                        ON_ERROR0(errCode);
+                        if (bCheck)
                         {
-                            return gcvTRUE;
+                            if(bResult)
+                                *bResult = gcvTRUE;
+                            return errCode;
                         }
                     }
                 }
@@ -3086,25 +3109,38 @@ static gctBOOL _VIR_CheckSourceDefinedBySkHp(
         }
     }
 
-    return gcvFALSE;
+OnError:
+    if(bResult)
+        *bResult = gcvFALSE;
+    return errCode;
 }
 
-static gctBOOL _VIR_CheckSrcDefinedBySkHp(
+static VSC_ErrCode _VIR_CheckSrcDefinedBySkHp(
     VIR_Instruction *pInst,
     VIR_DEF_USAGE_INFO  *pDuInfo,
-    VSC_HASH_TABLE*     visitedInstSet)
+    VSC_HASH_TABLE*     visitedInstSet,
+    gctBOOL_PTR         bResult)
 {
     gctUINT i;
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     gctUINT srcNum = VIR_Inst_GetSrcNum(pInst);
+    gctBOOL bCheck = gcvFALSE;
     for (i = 0; i < srcNum; i++)
     {
         VIR_Operand* src = VIR_Inst_GetSource(pInst, i);
-        if (_VIR_CheckSourceDefinedBySkHp(pInst, src, pDuInfo, visitedInstSet))
+        errCode = _VIR_CheckSourceDefinedBySkHp(pInst, src, pDuInfo, visitedInstSet, &bCheck);
+        ON_ERROR0(errCode);
+        if (bCheck)
         {
-            return gcvTRUE;
+            if(bResult)
+                *bResult = gcvTRUE;
+            return errCode;
         }
     }
-    return gcvFALSE;
+OnError:
+    if(bResult)
+        *bResult = gcvFALSE;
+    return errCode;
 }
 
 static VSC_ErrCode _VIR_CheckAndSetSkHpForLdInst(
@@ -3142,7 +3178,10 @@ static VSC_ErrCode _VIR_CheckAndSetSkHpForLdInst(
             {
                 /* if the dest is not used by texld and any source is defined by a .skhp instruction,
                  * set skhp flag to load instruction */
-                if (_VIR_CheckSrcDefinedBySkHp(inst, pDuInfo, srcvisitedInstSet))
+                gctBOOL srcDefinedBySkHp = gcvFALSE;
+                status = _VIR_CheckSrcDefinedBySkHp(inst, pDuInfo, srcvisitedInstSet, &srcDefinedBySkHp);
+                ON_ERROR(status, "");
+                if (srcDefinedBySkHp)
                 {
                     VIR_Inst_SetFlag(inst, VIR_INSTFLAG_SKIP_HELPER);
                 }
@@ -3150,7 +3189,10 @@ static VSC_ErrCode _VIR_CheckAndSetSkHpForLdInst(
                 if (hasTexld)
                 {
 #if gcmIS_DEBUG(gcdDEBUG_ASSERT)
-                    gcmASSERT(!_VIR_CheckDestIsUsedByTexld(inst, VIR_Inst_GetDest(inst), pDuInfo, visitedInstSet));
+                    gctBOOL bCheck;
+                    status = _VIR_CheckDestIsUsedByTexld(inst, VIR_Inst_GetDest(inst), pDuInfo, visitedInstSet, &bCheck);
+                    ON_ERROR(status, "");
+                    gcmASSERT(!bCheck || !srcDefinedBySkHp);
 #endif
                 }
                 vscHTBL_Reset(visitedInstSet);
@@ -3159,6 +3201,7 @@ static VSC_ErrCode _VIR_CheckAndSetSkHpForLdInst(
         }
     }
 
+OnError:
     vscHTBL_Destroy(visitedInstSet);
     vscHTBL_Destroy(srcvisitedInstSet);
 

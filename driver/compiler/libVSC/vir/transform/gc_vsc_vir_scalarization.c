@@ -153,7 +153,8 @@ static VSC_SCL_ArrayInfo* _VSC_SCL_Scalarization_NewArrayInfo(
     VSC_SCL_ArrayInfo* array_info = (VSC_SCL_ArrayInfo*)vscMM_Alloc(VSC_SCL_Scalarization_GetMM(scl), sizeof(VSC_SCL_ArrayInfo));
     if(array_info == gcvNULL)
         return array_info;
-    _VSC_SCL_ArrayInfo_Init(array_info, VSC_SCL_Scalarization_GetMM(scl));
+    if(_VSC_SCL_ArrayInfo_Init(array_info, VSC_SCL_Scalarization_GetMM(scl)) != VSC_ERR_NONE)
+        return gcvNULL;
 
     return array_info;
 }
@@ -242,21 +243,24 @@ static VSC_ErrCode _VSC_SCL_CollectInformationFromInst(
     IN VIR_Instruction* inst
     )
 {
-    VSC_ErrCode errcode  = VSC_ERR_NONE;
+    VSC_ErrCode errCode  = VSC_ERR_NONE;
     VIR_Operand* dest;
     gctUINT32 i;
 
     dest = VIR_Inst_GetDest(inst);
-    _VSC_SCL_CollectInformationFromOper(scl, dest);
+    errCode = _VSC_SCL_CollectInformationFromOper(scl, dest);
+    ON_ERROR0(errCode);
 
     for(i = 0; i < VIR_Inst_GetSrcNum(inst); i++)
     {
         VIR_Operand* src = VIR_Inst_GetSource(inst, i);
 
-        _VSC_SCL_CollectInformationFromOper(scl, src);
+        errCode = _VSC_SCL_CollectInformationFromOper(scl, src);
+        ON_ERROR0(errCode);
     }
 
-    return errcode;
+OnError:
+    return errCode;
 }
 
 static VSC_ErrCode _VSC_SCL_CollectInformationforFunction(
@@ -305,7 +309,8 @@ static VSC_ErrCode _VSC_SCL_CollectInformationforShader(
         }
 
         VIR_Shader_SetCurrentFunction(shader, func);
-        _VSC_SCL_CollectInformationforFunction(scl);
+        errcode = _VSC_SCL_CollectInformationforFunction(scl);
+        ON_ERROR(errcode, "");
     }
 
     /* dump collected info */
@@ -329,6 +334,7 @@ static VSC_ErrCode _VSC_SCL_CollectInformationforShader(
         }
     }
 
+OnError:
     return errcode;
 }
 
@@ -395,7 +401,9 @@ static VSC_ErrCode _VSC_SCL_GenerateNewSymbolForShader(
             {
                 VIR_Symbol* new_sym = gcvNULL;
                 errcode = _VSC_SCL_GenerateNewSymbol(scl, sym, index, &new_sym);
-                _VSC_SCL_ArrayInfo_MapNewSymbol(array_info, index, new_sym);
+                ON_ERROR(errcode,"");
+                errcode = _VSC_SCL_ArrayInfo_MapNewSymbol(array_info, index, new_sym);
+                ON_ERROR(errcode,"");
                 index = vscBV_FindSetBitForward(VSC_SCL_ArrayInfo_GetConstIndexes(array_info), index);
             }
         }
@@ -407,6 +415,7 @@ static VSC_ErrCode _VSC_SCL_GenerateNewSymbolForShader(
         }
     }
 
+OnError:
     return errcode;
 }
 
@@ -506,17 +515,21 @@ VSC_ErrCode VSC_SCL_Scalarization_PerformOnShader(
         /* VIR_Shader_Dump(dumper, shader); */
     }
 
-    VSC_SCL_Scalarization_Init(&scl, shader, options, pPassWorker->basePassWorker.pDumper,
-                               pPassWorker->basePassWorker.pMM);
+    errCode = VSC_SCL_Scalarization_Init(&scl, shader, options, pPassWorker->basePassWorker.pDumper,
+                                         pPassWorker->basePassWorker.pMM);
+    CHECK_ERROR0(errCode);
 
     /* collect array information */
     errCode = _VSC_SCL_CollectInformationforShader(&scl);
+    ON_ERROR0(errCode);
 
     /* generate new symbols */
     errCode = _VSC_SCL_GenerateNewSymbolForShader(&scl);
+    ON_ERROR0(errCode);
 
     /* do symbol substitution */
     errCode = _VSC_SCL_DoSubstitutionForShader(&scl);
+    ON_ERROR0(errCode);
 
     VSC_SCL_Scalarization_Final(&scl);
 
@@ -548,6 +561,7 @@ VSC_ErrCode VSC_SCL_Scalarization_PerformOnShader(
 
     VIR_Shader_SetCurrentFunction(shader, old_curr_func);
 
+OnError:
     return errCode;
 }
 

@@ -3024,7 +3024,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                  VIR_Symbol_GetUniformKind(sym) == VIR_UNIFORM_STORAGE_BLOCK_ADDRESS))
             {
                 retValue = vscHTBL_DirectSet(pUnbindUniformHash, (void *)sym, gcvNULL);
-                ON_ERROR0(retValue);
+                ON_ERROR(retValue,"");
 
                 VIR_Symbol_ClrFlag(sym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
                 VIR_Symbol_SetFlag(sym, VIR_SYMFLAG_INACTIVE);
@@ -3038,16 +3038,18 @@ OnError:
     return retValue;
 }
 
-static gctBOOL
+static VSC_ErrCode
 VIR_CG_CheckUnBindUniformRelated(
     IN VIR_DEF_USAGE_INFO*          pDuInfo,
     IN VIR_Shader*                  pShader,
     IN VSC_HASH_TABLE*              pUnbindUniformHash,
     IN VIR_Instruction*             pInst,
     IN VIR_Operand*                 pOpnd,
-    IN VIR_Symbol*                  pSymbol
+    IN VIR_Symbol*                  pSymbol,
+    IN OUT gctBOOL_PTR              bResult
     )
 {
+    VSC_ErrCode                     errCode = VSC_ERR_NONE;
     gctBOOL                         bFound = gcvFALSE;
 
     /*
@@ -3089,28 +3091,34 @@ VIR_CG_CheckUnBindUniformRelated(
                 }
                 pSrcOpndSym = VIR_Operand_GetSymbol(pSrcOpnd);
 
-                bFound = VIR_CG_CheckUnBindUniformRelated(pDuInfo,
-                                                          pShader,
-                                                          pUnbindUniformHash,
-                                                          pDefInst,
-                                                          pSrcOpnd,
-                                                          pSrcOpndSym);
+                errCode = VIR_CG_CheckUnBindUniformRelated(pDuInfo,
+                                                           pShader,
+                                                           pUnbindUniformHash,
+                                                           pDefInst,
+                                                           pSrcOpnd,
+                                                           pSrcOpndSym,
+                                                           &bFound);
+                ON_ERROR0(errCode);
                 if (bFound)
                 {
-                    vscHTBL_DirectSet(pUnbindUniformHash, (void *)pSrcOpndSym, gcvNULL);
+                    errCode = vscHTBL_DirectSet(pUnbindUniformHash, (void *)pSrcOpndSym, gcvNULL);
+                    ON_ERROR0(errCode);
                     break;
                 }
             }
 
             if (bFound)
             {
-                vscHTBL_DirectSet(pUnbindUniformHash, (void *)pSymbol, gcvNULL);
+                errCode = vscHTBL_DirectSet(pUnbindUniformHash, (void *)pSymbol, gcvNULL);
+                ON_ERROR0(errCode);
                 break;
             }
         }
     }
 
-    return bFound;
+OnError:
+    *bResult = bFound;
+    return errCode;
 }
 
 /* Remove all instructions that related to a unbind sbo/ubo. */
@@ -3168,12 +3176,14 @@ VIR_CG_RemoveInstRelatedToUnbindRes(
             pAddrSym = VIR_Operand_GetSymbol(pAddrOpnd);
 
             /* Check if the address symbol is within the hash table. */
-            bFound = VIR_CG_CheckUnBindUniformRelated(pDuInfo,
-                                                      pShader,
-                                                      pUnbindUniformHash,
-                                                      pInst,
-                                                      pAddrOpnd,
-                                                      pAddrSym);
+            retValue = VIR_CG_CheckUnBindUniformRelated(pDuInfo,
+                                                        pShader,
+                                                        pUnbindUniformHash,
+                                                        pInst,
+                                                        pAddrOpnd,
+                                                        pAddrSym,
+                                                        &bFound);
+            ON_ERROR(retValue, "Fail to CheckUnBindUniformRelated.");
             if (!bFound)
             {
                 continue;
@@ -3212,6 +3222,7 @@ VIR_CG_RemoveInstRelatedToUnbindRes(
         }
     }
 
+OnError:
     if (pChanged)
     {
         *pChanged = bChanged;

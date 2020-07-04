@@ -140,10 +140,10 @@ typedef struct _VIR_BASE_TS_DFA VIR_BASE_TS_DFA;
    resolved, if changed return TRUE, otherwise, return FALSE */
 typedef VSC_ErrCode (*PFN_TS_BLOCK_FLOW_LOCAL_GENKILL_RESOLVER)(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow);
 typedef void (*PFN_TS_BLOCK_FLOW_INIT_RESOLVER)(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow);
-typedef gctBOOL (*PFN_TS_BLOCK_FLOW_ITERATE_RESOLVER)(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow);
-typedef gctBOOL (*PFN_TS_BLOCK_FLOW_COMBINE_RESOLVER)(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow); /* n-to-1 */
-typedef gctBOOL (*PFN_TS_BLOCK_FLOW_COMBINE_FROM_CALLEE_RESOLVER)(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pCallerTsBlockFlow); /* 1-to-1 */
-typedef gctBOOL (*PFN_TS_FUNC_FLOW_COMBINE_FROM_CALLERS_RESOLVER)(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_FUNC_FLOW* pCalleeTsFuncFlow); /* n-to-1 */
+typedef VSC_ErrCode (*PFN_TS_BLOCK_FLOW_ITERATE_RESOLVER)(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow, gctBOOL_PTR bResult);
+typedef VSC_ErrCode (*PFN_TS_BLOCK_FLOW_COMBINE_RESOLVER)(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow, gctBOOL_PTR bResult); /* n-to-1 */
+typedef VSC_ErrCode (*PFN_TS_BLOCK_FLOW_COMBINE_FROM_CALLEE_RESOLVER)(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pCallerTsBlockFlow, gctBOOL_PTR bResult); /* 1-to-1 */
+typedef VSC_ErrCode (*PFN_TS_FUNC_FLOW_COMBINE_FROM_CALLERS_RESOLVER)(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_FUNC_FLOW* pCalleeTsFuncFlow, gctBOOL_PTR bResult); /* n-to-1 */
 
 /* Resolvers for iterative ts-DFA */
 typedef struct _VIR_TS_DFA_RESOLVERS
@@ -778,9 +778,10 @@ gctBOOL vscVIR_IsInstDefiniteWrite(VIR_DEF_USAGE_INFO*   pDuInfo,
                                    VIR_VirRegId          regNo,
                                    gctBOOL               bCheckDef);
 
-gctBOOL vscVIR_IsDefInstAndUsageInstSameBranch(VIR_DEF_USAGE_INFO* pDuInfo,
-                                               VIR_Instruction*    pUsageInst,
-                                               VIR_Instruction*    pDefInst);
+VSC_ErrCode vscVIR_IsDefInstAndUsageInstSameBranch(VIR_DEF_USAGE_INFO* pDuInfo,
+                                                   VIR_Instruction*    pUsageInst,
+                                                   VIR_Instruction*    pDefInst,
+                                                   gctBOOL_PTR         bResult);
 
 /* Check whether a def (or usage) has unique usage (or def), if yes, just return this
    unique one. */
@@ -819,12 +820,13 @@ typedef struct _VSC_CHECK_REDEFINED_RES
     VSC_BIT_VECTOR*     pBBCheckValueMask;
 } VSC_CHECK_REDEFINED_RES;
 
-gctBOOL vscVIR_RedefineBetweenInsts(IN VSC_CHECK_REDEFINED_RES  *pResInfo,
-                                    IN VIR_DEF_USAGE_INFO       *duInfo,
-                                    IN VIR_Instruction          *startInst,
-                                    IN VIR_Instruction          *endInst,
-                                    IN VIR_Operand              *srcOpndOfStartInst,
-                                    OUT VIR_Instruction         **redefInst);
+VSC_ErrCode vscVIR_RedefineBetweenInsts(IN VSC_CHECK_REDEFINED_RES  *pResInfo,
+                                        IN VIR_DEF_USAGE_INFO       *duInfo,
+                                        IN VIR_Instruction          *startInst,
+                                        IN VIR_Instruction          *endInst,
+                                        IN VIR_Operand              *srcOpndOfStartInst,
+                                        OUT VIR_Instruction         **redefInst,
+                                        IN OUT gctBOOL_PTR          bResult);
 
 /* Find the unique nearest defined instruction. */
 typedef gctBOOL (*PFN_VSC_DEF_CMP)(VIR_Instruction* pDefInst);
