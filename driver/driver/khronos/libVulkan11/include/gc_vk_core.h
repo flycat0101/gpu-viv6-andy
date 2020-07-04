@@ -126,6 +126,11 @@ extern VkAllocationCallbacks __vkAllocatorWrapper;
 /* 0 means disable TS. while 1 means enable TS. */
 #define __VK_ENABLETS               0
 
+#if __VK_ENABLETS
+#define __VK_ENABLE_LEGACY_TS_WAR     1
+#endif
+#define __VK_PRINT_COSTINFO               0
+
 VkResult __vk_DeviceControl(
     gcsHAL_INTERFACE * iface,
     uint32_t coreIdex

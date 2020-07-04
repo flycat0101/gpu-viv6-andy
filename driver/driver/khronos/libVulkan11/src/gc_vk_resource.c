@@ -17,7 +17,7 @@
    Disalbe for now
 */
 #if __VK_ENABLETS
-static VkBool32 g_dbgNoTS = VK_TRUE;
+static VkBool32 g_dbgNoTS = VK_FALSE;
 #endif
 __vkFormatInfo g_vkFormatInfoTable[] =
 {
@@ -242,8 +242,10 @@ __vkFormatInfo g_vkFormatInfoTable[] =
      __VK_FORMAT_SAMPLE_IMAGE_FILTERABLE_FEATURES | __VK_FORMAT_COLOR_BLEND_FEATURES,
      0}},
      /*    VK_FORMAT_A2R10G10B10_UNORM_PACK32, */
-    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 1, 1}, 32, 1, VK_FORMAT_UNDEFINED,
-    {0, 0, 0}},
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 1, 1}, 32, 1, VK_FORMAT_A2R10G10B10_UNORM_PACK32,
+    {__VK_FORMAT_SAMPLE_IMAGE_FILTERABLE_FEATURES | VK_FORMAT_FEATURE_BLIT_DST_BIT,
+     __VK_FORMAT_SAMPLE_IMAGE_FILTERABLE_FEATURES | VK_FORMAT_FEATURE_BLIT_DST_BIT,
+     __VK_FORMAT_SAMPLE_TEXEL_BUFFER_FEATURES}},
     /*    VK_FORMAT_A2R10G10B10_SNORM_PACK32, */
     {__VK_FMT_CATEGORY_SNORM, VK_FALSE, { 1, 1}, 32, 1, VK_FORMAT_UNDEFINED,
     {0, 0, 0}},
@@ -2068,6 +2070,10 @@ VKAPI_ATTR void VKAPI_CALL __vk_FreeMemory(
         __vkDevContext *devCtx = (__vkDevContext*)device;
         __vkDeviceMemory *dvm = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory*, memory);
 #if __VK_ENABLETS
+#if __VK_ENABLE_LEGACY_TS_WAR
+        __vkImageLevelTarget * pTemp = gcvNULL;
+        __vkImageLevelTarget * pPre = gcvNULL;
+#endif
         /* Set the allocator to the parent allocator or API defined allocator if valid */
         __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
 #endif
@@ -2082,22 +2088,78 @@ VKAPI_ATTR void VKAPI_CALL __vk_FreeMemory(
 
         __VK_VERIFY_OK(__vki_UnlockSurfNode(devCtx, &dvm->node));
         __VK_VERIFY_OK(__vki_DestroySurfNode(devCtx, &dvm->node));
+
 #if __VK_ENABLETS
+#if __VK_ENABLE_LEGACY_TS_WAR
+        /* Lock the devCtx->imageLTlistMutex*/
+        gcoOS_AcquireMutex(gcvNULL, devCtx->imageLTlistMutex, gcvINFINITE);
+
+        pPre = devCtx->imageLevelTargetList;
+
+        if (pPre)
+        {
+            pTemp = pPre->next;
+
+            while(pTemp)
+            {
+                if (pTemp->imageLevelHandle >= dvm->devAddr && pTemp->imageLevelHandle < (dvm->devAddr + (uint32_t)dvm->size))
+                {
+                    pPre->next = pTemp->next;
+
+                    /* free */
+                    __VK_FREE(pTemp);
+
+                    pTemp = pPre->next;
+                }
+                else
+                {
+                    pPre = pPre->next;
+                    pTemp = pTemp->next;
+                }
+            }
+
+            pTemp = devCtx->imageLevelTargetList;
+
+            if (pTemp->imageLevelHandle >= dvm->devAddr && pTemp->imageLevelHandle < (dvm->devAddr + (uint32_t)dvm->size))
+            {
+                devCtx->imageLevelTargetList = pTemp->next;
+
+                /* free */
+                __VK_FREE(pTemp);
+            }
+        }
+        /* Release the devCtx->imageLTlistMutex */
+        gcoOS_ReleaseMutex(gcvNULL, devCtx->imageLTlistMutex);
+#endif
+
         /* Free TS related information. */
         if (dvm->ts)
         {
-            uint32_t i = 0;
-            __VK_VERIFY_OK(__vki_UnlockSurfNode(devCtx, &dvm->ts->tsNode));
-            __VK_VERIFY_OK(__vki_DestroySurfNode(devCtx, &dvm->ts->tsNode));
+            uint32_t i = 0, j = 0;
+
             for (i = 0; i < dvm->ts->mipLevels; i++)
             {
-                __VK_FREE(dvm->ts->tileStatusDisable[i]);
+                for (j = 0; j < dvm->ts->arrayLayers; j++)
+                {
+                    if (dvm->ts->devAddr[i][j])
+                    {
+                        __VK_VERIFY_OK(__vki_UnlockSurfNode(devCtx, &dvm->ts->tsNode[i][j]));
+                        __VK_VERIFY_OK(__vki_DestroySurfNode(devCtx, &dvm->ts->tsNode[i][j]));
+                    }
+                }
+                __VK_FREE(dvm->ts->tsNode[i]);
                 __VK_FREE(dvm->ts->fcValue[i]);
                 __VK_FREE(dvm->ts->fcValueUpper[i]);
+                __VK_FREE(dvm->ts->hostAddr[i]);
+                __VK_FREE(dvm->ts->devAddr[i]);
+                __VK_FREE(dvm->ts->tsSize[i]);
             }
-            __VK_FREE(dvm->ts->tileStatusDisable);
+            __VK_FREE(dvm->ts->tsNode);
             __VK_FREE(dvm->ts->fcValue);
             __VK_FREE(dvm->ts->fcValueUpper);
+            __VK_FREE(dvm->ts->hostAddr);
+            __VK_FREE(dvm->ts->devAddr);
+            __VK_FREE(dvm->ts->tsSize);
             __VK_FREE(dvm->ts);
         }
 #endif
@@ -2215,14 +2277,29 @@ VkResult __vki_AllocateTileStatus(
     VkResult result = VK_SUCCESS;
     uint32_t i = 0;
     uint32_t j = 0;
-    gctSIZE_T totalBytes = 0;
     int32_t compressedFormat = -1;
+    gctUINT32 resolveAlignX, resolveAlignY;
+    gctUINT32 alignment;
+    uint32_t layers = img->createInfo.arrayLayers;
 
     __VK_SET_ALLOCATIONCB(&img->memCb);
 
     do
     {
-        if (g_dbgNoTS) return VK_SUCCESS;
+        if (g_dbgNoTS)
+        {
+            return VK_SUCCESS;
+        }
+
+        if (!devCtx->vulkanTS && !devCtx->legacyTS)
+        {
+            return VK_SUCCESS;
+        }
+
+        if (img->halTiling == gcvINVALIDTILED || img->halTiling == gcvLINEAR)
+        {
+            return VK_SUCCESS;
+        }
 
         if (img->createInfo.usage &
             (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT))
@@ -2247,21 +2324,55 @@ VkResult __vki_AllocateTileStatus(
                 return VK_SUCCESS;
             }
 
+            if (img->createInfo.extent.depth > 64)
+            {
+                return VK_SUCCESS;
+            }
+            else if (img->createInfo.extent.depth > 1)
+            {
+                __VK_ASSERT(img->createInfo.arrayLayers == 1);
+                layers *= img->createInfo.extent.depth;
+            }
+
             tsResource = (__vkTileStatus*)__VK_ALLOC(sizeof(__vkTileStatus), 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 
             __VK_MEMZERO(tsResource, sizeof(__vkTileStatus));
 
             /* Allocate ts information. */
-            tsResource->tileStatusDisable = (VkBool32**)__VK_ALLOC(img->createInfo.mipLevels * sizeof(VkBool32*),
+            tsResource->tsNode = (gcsSURF_NODE**)__VK_ALLOC(img->createInfo.mipLevels * sizeof(gcsSURF_NODE*),
                 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
-            __VK_ONERROR(tsResource->tileStatusDisable ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+            tsResource->devAddr = (uint32_t**)__VK_ALLOC(img->createInfo.mipLevels * sizeof(uint32_t*),
+                8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+            tsResource->hostAddr = (gctPOINTER**)__VK_ALLOC(img->createInfo.mipLevels * sizeof(gctPOINTER*),
+                8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+            tsResource->tsSize = (gctSIZE_T **)__VK_ALLOC(img->createInfo.mipLevels * sizeof(gctSIZE_T *),
+                8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+
+            __VK_ONERROR(tsResource->tsNode ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+            __VK_ONERROR(tsResource->devAddr ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+            __VK_ONERROR(tsResource->hostAddr ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+            __VK_ONERROR(tsResource->tsSize ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
 
             for (i = 0; i < img->createInfo.mipLevels; i++)
             {
-                *(tsResource->tileStatusDisable + i) = (VkBool32*)__VK_ALLOC(img->createInfo.arrayLayers * sizeof(VkBool32),
+                *(tsResource->tsNode + i) = (gcsSURF_NODE*)__VK_ALLOC(layers * sizeof(gcsSURF_NODE),
                     8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
-                __VK_ONERROR(*(tsResource->tileStatusDisable + i) ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
-                __VK_MEMZERO(*(tsResource->tileStatusDisable + i), img->createInfo.arrayLayers * sizeof(VkBool32));
+                *(tsResource->devAddr + i) = (uint32_t*)__VK_ALLOC(layers * sizeof(uint32_t),
+                    8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+                *(tsResource->hostAddr + i) = (gctPOINTER*)__VK_ALLOC(layers * sizeof(gctPOINTER),
+                    8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+                *(tsResource->tsSize + i) = (gctSIZE_T*)__VK_ALLOC(layers * sizeof(gctSIZE_T),
+                    8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+
+                __VK_ONERROR(*(tsResource->tsNode + i) ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+                __VK_ONERROR(*(tsResource->devAddr + i) ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+                __VK_ONERROR(*(tsResource->hostAddr + i) ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+                __VK_ONERROR(*(tsResource->tsSize + i) ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+
+                __VK_MEMZERO(*(tsResource->tsNode + i), layers * sizeof(gcsSURF_NODE));
+                __VK_MEMZERO(*(tsResource->devAddr + i), layers * sizeof(uint32_t));
+                __VK_MEMZERO(*(tsResource->hostAddr + i), layers * sizeof(gctPOINTER));
+                __VK_MEMZERO(*(tsResource->tsSize + i), layers * sizeof(gctSIZE_T));
             }
 
             tsResource->fcValue = (uint32_t**)__VK_ALLOC(img->createInfo.mipLevels * sizeof(uint32_t*),
@@ -2270,10 +2381,10 @@ VkResult __vki_AllocateTileStatus(
 
             for (i = 0; i < img->createInfo.mipLevels; i++)
             {
-                *(tsResource->fcValue + i) = (uint32_t*)__VK_ALLOC(img->createInfo.arrayLayers * sizeof(uint32_t),
+                *(tsResource->fcValue + i) = (uint32_t*)__VK_ALLOC(layers * sizeof(uint32_t),
                     8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
                 __VK_ONERROR(*(tsResource->fcValue + i) ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
-                __VK_MEMZERO(*(tsResource->fcValue + i), img->createInfo.arrayLayers * sizeof(uint32_t));
+                __VK_MEMZERO(*(tsResource->fcValue + i), layers * sizeof(uint32_t));
             }
 
             tsResource->fcValueUpper = (uint32_t**)__VK_ALLOC(img->createInfo.mipLevels * sizeof(uint32_t*),
@@ -2282,20 +2393,27 @@ VkResult __vki_AllocateTileStatus(
 
             for (i = 0; i < img->createInfo.mipLevels; i++)
             {
-                *(tsResource->fcValueUpper + i) = (uint32_t*)__VK_ALLOC(img->createInfo.arrayLayers * sizeof(uint32_t),
+                *(tsResource->fcValueUpper + i) = (uint32_t*)__VK_ALLOC(layers * sizeof(uint32_t),
                     8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
                 __VK_ONERROR(*(tsResource->fcValueUpper + i) ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
-                __VK_MEMZERO(*(tsResource->fcValueUpper + i), img->createInfo.arrayLayers * sizeof(uint32_t));
+                __VK_MEMZERO(*(tsResource->fcValueUpper + i), layers * sizeof(uint32_t));
             }
 
             tsResource->mipLevels = img->createInfo.mipLevels;
+            tsResource->arrayLayers = layers;
+
+            resolveAlignX = (devCtx->database->REG_BltEngine) ? 1 : 16;
+            resolveAlignY = (devCtx->database->REG_BltEngine) ? 1 : 4;
+
+            alignment = resolveAlignX * resolveAlignY * 4;
 
             for (i = 0; i < img->createInfo.mipLevels; i++)
             {
-                for (j = 0; j < img->createInfo.arrayLayers; j++)
+                for (j = 0; j < layers; j++)
                 {
-                    /* Set tile status disabled at the beginning to be consistent with POOL value */
-                    tsResource->tileStatusDisable[i][j] = VK_FALSE;
+                    gctSIZE_T tmpSize = 0;
+
+                    tsResource->tileStatusInvalidFiller = 0;
 
                     /* Set default fill color. */
                     switch (img->formatInfo.residentImgFormat)
@@ -2311,44 +2429,69 @@ VkResult __vki_AllocateTileStatus(
                         tsResource->fcValue[i][j] = tsResource->fcValueUpper[i][j] = 0x00000000;
                         break;
                     }
-                }
+
+                    if (devCtx->database->CACHE128B256BPERLINE)
+                    {
+                       tmpSize = (gctSIZE_T)((img->sampleInfo.product == 4) ?
+                                    (img->pImgLevels[i].sliceSize >> 9) : (img->pImgLevels[i].sliceSize >> 8));
+
+                    }
+                    else
+                    {
+                        tmpSize = (gctSIZE_T)(is2BitPerTile ? (img->pImgLevels[i].sliceSize >> 8) : (img->pImgLevels[i].sliceSize >> 7));
+                        if (img->sampleInfo.product > 1)
+                        {
+                            __VK_ASSERT(is2BitPerTile);
+                            tmpSize >>= 2;
+                        }
+                    }
+
+                    if (tmpSize == 0)
+                    {
+                        continue;
+                    }
+
+                    if (devCtx->vulkanTS)
+                    {
+                        tmpSize += 128;
+                    }
+
+                    tmpSize = gcmALIGN(tmpSize, alignment);
+
+                    tsResource->tsSize[i][j] = tmpSize;
+
+                    __VK_ERR_BREAK(__vki_CreateSurfNode(devCtx, &tsResource->tsNode[i][j], tmpSize, 64, gcvSURF_TYPE_UNKNOWN,
+                        gcvALLOC_FLAG_NONE, gcvPOOL_DEFAULT));
+
+                    __VK_ERR_BREAK(__vki_LockSurfNode(devCtx, &tsResource->tsNode[i][j], &tsResource->devAddr[i][j], &tsResource->hostAddr[i][j]));
+
+                    /* Fill the tile status memory with the invalid filler.
+                       APP may give memory with context, we set TS to be invalid, and make it enable
+                    */
+                    __VK_MEMSET(tsResource->tsNode[i][j].logical,
+                            (uint8_t)tsResource->tileStatusInvalidFiller, tmpSize);
+
+#if gcdDUMP
+
+                    gcmDUMP(gcvNULL, "#[info: initialize TS buffer mipLevel:%d arrayLayer:%d]", i, j);
+                    gcmDUMP_BUFFER(gcvNULL,
+                                    gcvDUMP_BUFFER_MEMORY,
+                                    tsResource->devAddr[i][j],
+                                    tsResource->hostAddr[i][j],
+                                    0,
+                                    tmpSize);
+#endif
+               }
             }
 
-            /* Query tileStatus size. */
             if (devCtx->database->CACHE128B256BPERLINE)
             {
-                /*Todo: 128B cache mode.*/
+                tsResource->tileStatusFiller = 0xFFFFFFFF;
             }
             else
             {
-                totalBytes = (is2BitPerTile ? (img->memory->node.size >> 8) : (img->memory->node.size >> 7));
-                if (img->sampleInfo.product > 1)
-                {
-                    __VK_ASSERT(is2BitPerTile);
-                    totalBytes >>= 2;
-                }
+                tsResource->tileStatusFiller = is2BitPerTile ? 0x55555555 : 0x11111111;
             }
-
-            tsResource->tileStatusFiller = is2BitPerTile ? 0x55555555 : 0x11111111;
-            tsResource->tileStatusInvalidFiller = 0;
-
-            /* Tile status supported? */
-            if (totalBytes == 0)
-            {
-                break;
-            }
-
-            __VK_ERR_BREAK(__vki_CreateSurfNode(devCtx, &tsResource->tsNode, totalBytes, 1, gcvSURF_TYPE_UNKNOWN,
-                gcvALLOC_FLAG_NONE, gcvPOOL_DEFAULT));
-
-            __VK_ERR_BREAK(__vki_LockSurfNode(devCtx, &tsResource->tsNode, &tsResource->devAddr, &tsResource->hostAddr));
-
-            /* Fill the tile status memory with the invalid filler.
-               APP may give memory with context, we set TS to be invalid, and make it enable
-            */
-            __VK_MEMSET(tsResource->tsNode.logical,
-                    (uint8_t)tsResource->tileStatusInvalidFiller,
-                    tsResource->tsNode.size);
 
             /* Get surface compression setting.*/
             if (devCtx->database->REG_ZCompression)
@@ -3252,6 +3395,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyImage(
 
         /* Set the allocator to the parent allocator or API defined allocator if valid */
         __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
+
         if (img->residentMemory)
         {
             __vk_FreeMemory(device, (VkDeviceMemory)(uintptr_t)img->memory, pAllocator);

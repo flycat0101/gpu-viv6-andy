@@ -104,6 +104,20 @@ typedef struct __vkSemaphoreNodeRec
 }
 __vkSemaphoreNode;
 
+#if __VK_ENABLE_LEGACY_TS_WAR
+typedef struct __vkImageLevelTargetRec
+{
+    uint32_t imageLevelHandle;
+    uint32_t latestColorValue;
+    uint32_t latestColorValue64;
+
+    VkBool32 isFirstRecord;
+
+    struct  __vkImageLevelTargetRec * next;
+}
+__vkImageLevelTarget;
+#endif
+
 struct __vkDevContextRec
 {
     /*
@@ -172,9 +186,24 @@ struct __vkDevContextRec
     struct __vkDevContextRec *pNext;
     VkBool32  msaa_64bpp;
 
+    VkBool32  vulkanTS;
+    VkBool32  legacyTS;
+
+#if __VK_ENABLE_LEGACY_TS_WAR
+    __vkImageLevelTarget * imageLevelTargetList;
+    /* There may be mutli-thread could acess this list, need mutex to protect */
+    gctPOINTER  imageLTlistMutex;
+#endif
+
     /* Store extension enable state */
     __vkExtension *pEnabledExtensions;
 };
+
+#if __VK_ENABLE_LEGACY_TS_WAR
+__vkImageLevelTarget * __vkFindImageLevelTarget(__vkDevContext *device, uint32_t imageLevelHandle);
+VkResult __vkInsertImageLevelTarget(__vkDevContext *device, __vkImageLevelTarget* imageLevelTarget);
+VkResult __vkDeleteImageLevelTarget(__vkDevContext *device, uint32_t imageLevelHandle);
+#endif
 
 typedef struct __vkDebugCallbackEXTRec
 {

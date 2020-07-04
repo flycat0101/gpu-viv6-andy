@@ -260,13 +260,91 @@ static void __vki_InitializeDrvOption(
     return;
 }
 
+static VkBool32 __vki_IsUTF8(const char* str)
+{
+    uint32_t length = (uint32_t)gcoOS_StrLen(str, gcvNULL);
+    uint32_t i = 0;
+    VkBool32 allChinese = VK_TRUE;
+
+    if (length > 1024 || length == 0)
+    {
+        return VK_FALSE;
+    }
+
+    while (i < length)
+    {
+        int step = 0;
+
+        if ((i == length - 1) &&
+            (str[i] == 0x29))
+        {
+            return VK_FALSE;
+        }
+
+        if ((str[i] & 0xfe) == 0xfe)
+        {
+            return VK_FALSE;
+        }
+
+        if ((str[i] & 0x80) == 0x00)
+        {
+            step = 1;
+            if (i != length - 1)
+            {
+                allChinese = VK_FALSE;
+            }
+        }
+        else if ((str[i] & 0xe0) == 0xc0)
+        {
+            if (i + 1 >= length)
+            {
+                return VK_FALSE;
+            }
+            if ((str[i + 1] & 0xc0) != 0x80)
+            {
+                return VK_FALSE;
+            }
+            step = 2;
+            allChinese = VK_FALSE;
+        }
+        else if ((str[i] & 0xf0) == 0xe0)
+        {
+            if (i + 2 >= length)
+            {
+                return VK_FALSE;
+            }
+            if ((str[i + 1] & 0xc0) != 0x80)
+            {
+                return VK_FALSE;
+            }
+            if ((str[i + 2] & 0xc0) != 0x80)
+            {
+                return VK_FALSE;
+            }
+            step = 3;
+        }
+        else
+        {
+            return VK_FALSE;
+        }
+        i += step;
+    }
+
+    if (i == length && !allChinese)
+    {
+        return VK_TRUE;
+    }
+
+    return VK_FALSE;
+}
+
 VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateInstance(
     const VkInstanceCreateInfo* pCreateInfo,
     const VkAllocationCallbacks* pAllocator,
     VkInstance* pInstance
     )
 {
-    uint32_t iExt;
+    uint32_t iExt, iLayer;
     __vkInstance *inst = VK_NULL_HANDLE;
     VkResult result = VK_SUCCESS;
     gcsHAL_INTERFACE iface;
@@ -290,6 +368,16 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateInstance(
     }
 #endif
 
+
+    for (iLayer = 0; iLayer < pCreateInfo->enabledLayerCount; iLayer++)
+    {
+        const char *pLayerName = pCreateInfo->ppEnabledLayerNames[iLayer];
+
+        if (!__vki_IsUTF8(pLayerName))
+        {
+            __VK_ONERROR(VK_ERROR_LAYER_NOT_PRESENT);
+        }
+    }
 
     for (iExt = 0; iExt < pCreateInfo->enabledExtensionCount; iExt++)
     {
@@ -338,6 +426,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateInstance(
             const char* vkMarkName = "\x89\x94\x92\x9e\x8d\x94";/*vkmark*/
             const char* vkT3DStressTest = "\xa9\x8a\x93\x94\x9e\x91\xd1\xab\xcc\xbb\xac\x8b\x8d\x9a\x8c\x8c\xab\x9a\x8c\x8b"; /* Vulkan.T3DStressTest */
             const char* vkHDR02FBBasicToneMapping = "\xa9\x8a\x93\x94\x9e\x91\xd1\xb7\xbb\xad\xcf\xcd\xa0\xb9\xbd\xbd\x9e\x8c\x96\x9c\xab\x90\x91\x9a\xb2\x9e\x8f\x8f\x96\x91\x98"; /* Vulkan.HDR02_FBBasicToneMapping */
+            const char* vkBloom = "\xa9\x8a\x93\x94\x9e\x91\xd1\xbd\x93\x90\x90\x92";/*Vulkan.Bloom*/
 
             gcoOS_StrCopySafe((gctSTRING)inst->applicationName, __VK_MAX_NAME_LENGTH, pAppInfo->pApplicationName);
 
@@ -360,6 +449,10 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateInstance(
             else if (__vk_utils_reverseMatch(inst->applicationName, vkHDR02FBBasicToneMapping))
             {
                 inst->patchID = gcvPATCH_VK_HDR02_FBBASICTONEMAPPING;
+            }
+            else if (__vk_utils_reverseMatch(inst->applicationName, vkBloom))
+            {
+                inst->patchID = gcvPATCH_VK_BLOOM;
             }
         }
         if (pAppInfo->pEngineName)

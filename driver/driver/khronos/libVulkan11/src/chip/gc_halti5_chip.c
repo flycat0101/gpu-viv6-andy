@@ -742,10 +742,103 @@ VkResult halti5_initializeChipModule(
         chipModule->sampleLocations[i][1] = (((((gctUINT32) (sampleCoords)) >> (0 ? 7:4)) & ((gctUINT32) ((((1 ? 7:4) - (0 ? 7:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:4) - (0 ? 7:4) + 1)))))) ) / 16.0f;
     }
 
+    if (devCtx->database->REG_Halti5)
+    {
+        chipModule->minorTable.helper_convertHwTxDesc = halti5_helper_convertHwTxDesc;
+        chipModule->minorTable.helper_convertHwSampler = halti5_helper_convertHwSampler;
+        chipModule->minorTable.helper_setSamplerStates = halti5_helper_setSamplerStates;
+        chipModule->minorTable.pip_emit_vsinput = halti5_pip_emit_vsinput;
+    }
+    else if (devCtx->database->REG_Halti3 && devCtx->database->REG_TX6bitFrac)
+    {
+
+        chipModule->minorTable.helper_convertHwTxDesc = halti3_helper_convertHwTxDesc;
+        chipModule->minorTable.helper_convertHwSampler = halti3_helper_convertHwSampler;
+        chipModule->minorTable.helper_setSamplerStates = halti3_helper_setSamplerStates;
+        chipModule->minorTable.pip_emit_vsinput = halti2_pip_emit_vsinput;
+    }
+    else
+    {
+        chipModule->minorTable.helper_convertHwTxDesc = halti2_helper_convertHwTxDesc;
+        chipModule->minorTable.helper_convertHwSampler = halti2_helper_convertHwSampler;
+        chipModule->minorTable.helper_setSamplerStates = halti2_helper_setSamplerStates;
+        chipModule->minorTable.pip_emit_vsinput = halti2_pip_emit_vsinput;
+    }
+
+    __VK_ONERROR(gcInitializeRecompilation());
+
+    __VK_MEMZERO(&decodeInfo, sizeof(decodeInfo));
+    decodeInfo.binary = (gctUINT *)gc_halti5_patchlib_frag;
+    decodeInfo.sizeInByte = (gctUINT)sizeof(gc_halti5_patchlib_frag);
+    decodeInfo.stageInfo = gcvNULL;
+    decodeInfo.specFlag = SPV_SPECFLAG_NONE | SPV_SPECFLAG_INTERNAL_LIBRARY;
+    decodeInfo.tcsInputVertices = 0;
+    decodeInfo.isLibraryShader = gcvTRUE;
+    decodeInfo.defaultImageFormat = VSC_IMAGE_FORMAT_NONE;
+
+    __VK_ONERROR((gcvSTATUS_OK == gcSPV_Decode(&decodeInfo, &vscpatchLib)) ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
+    chipModule->patchLib = halti5_CreateVkShader(vscpatchLib);
+    __VK_ASSERT(chipModule->patchLib);
+
+    __VK_MEMZERO(&vscCompileParams, sizeof(VSC_SHADER_COMPILER_PARAM));
+    vscCompileParams.cfg.ctx.clientAPI = gcvAPI_OPENVK;
+    vscCompileParams.cfg.ctx.appNameId = devCtx->pPhyDevice->pInst->patchID;
+    vscCompileParams.cfg.ctx.isPatchLib = gcvTRUE;
+    vscCompileParams.cfg.ctx.pSysCtx = &devCtx->vscSysCtx;
+    vscCompileParams.cfg.cFlags = VSC_COMPILER_FLAG_COMPILE_TO_ML
+                                | VSC_COMPILER_FLAG_FLUSH_DENORM_TO_ZERO
+                                | VSC_COMPILER_FLAG_UNI_SAMPLER_UNIFIED_ALLOC;
+    vscCompileParams.cfg.optFlags = (VSC_COMPILER_OPT_FULL & (~VSC_COMPILER_OPT_ILF_LINK)) | VSC_COMPILER_OPT_NO_ILF_LINK;
+    vscCompileParams.hShader = chipModule->patchLib->vscHandle;
+
+    __VK_ONERROR((gcvSTATUS_OK == vscCompileShader(&vscCompileParams, gcvNULL))
+                                ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
+
+#if __VK_SAVE_THEN_LOAD_SHADER_BIN
+    __VK_ONERROR(__vkSaveThenLoadShaderBin(&devCtx->memCb, &chipModule->patchLib));
+#endif
+
+    devCtx->chipPriv = chipModule;
+
+    /* init cluster info.*/
+    __VK_ONERROR(halti5_initializeClusterInfo(devCtx));
 
     chipModule->curInitCmdIndex = 0;
 
     pCmdBuffer = pCmdBufferBegin = &chipModule->initialCmds[chipModule->curInitCmdIndex];
+
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E80, VK_FALSE,
+        (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE ?
+        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1))))))) << (0 ?
+ 2:0))) | (((gctUINT32) (0x7 & ((gctUINT32) ((((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))) :
+        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1))))))) << (0 ?
+ 2:0))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:28) - (0 ?
+ 31:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:28) - (0 ?
+ 31:28) + 1))))))) << (0 ?
+ 31:28))) | (((gctUINT32) ((gctUINT32) (3) & ((gctUINT32) ((((1 ?
+ 31:28) - (0 ?
+ 31:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:28) - (0 ? 31:28) + 1))))))) << (0 ? 31:28))));
 
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x01F6, VK_FALSE,
         ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -846,67 +939,6 @@ VkResult halti5_initializeChipModule(
     chipModule->curInitCmdIndex = (uint32_t)(pCmdBuffer - pCmdBufferBegin);
 
     __VK_ASSERT(chipModule->curInitCmdIndex <= HALTI5_INIT_CMD_SIZE_INUINT);
-
-    if (devCtx->database->REG_Halti5)
-    {
-        chipModule->minorTable.helper_convertHwTxDesc = halti5_helper_convertHwTxDesc;
-        chipModule->minorTable.helper_convertHwSampler = halti5_helper_convertHwSampler;
-        chipModule->minorTable.helper_setSamplerStates = halti5_helper_setSamplerStates;
-        chipModule->minorTable.pip_emit_vsinput = halti5_pip_emit_vsinput;
-    }
-    else if (devCtx->database->REG_Halti3 && devCtx->database->REG_TX6bitFrac)
-    {
-
-        chipModule->minorTable.helper_convertHwTxDesc = halti3_helper_convertHwTxDesc;
-        chipModule->minorTable.helper_convertHwSampler = halti3_helper_convertHwSampler;
-        chipModule->minorTable.helper_setSamplerStates = halti3_helper_setSamplerStates;
-        chipModule->minorTable.pip_emit_vsinput = halti2_pip_emit_vsinput;
-    }
-    else
-    {
-        chipModule->minorTable.helper_convertHwTxDesc = halti2_helper_convertHwTxDesc;
-        chipModule->minorTable.helper_convertHwSampler = halti2_helper_convertHwSampler;
-        chipModule->minorTable.helper_setSamplerStates = halti2_helper_setSamplerStates;
-        chipModule->minorTable.pip_emit_vsinput = halti2_pip_emit_vsinput;
-    }
-
-    __VK_ONERROR(gcInitializeRecompilation());
-
-    __VK_MEMZERO(&decodeInfo, sizeof(decodeInfo));
-    decodeInfo.binary = (gctUINT *)gc_halti5_patchlib_frag;
-    decodeInfo.sizeInByte = (gctUINT)sizeof(gc_halti5_patchlib_frag);
-    decodeInfo.stageInfo = gcvNULL;
-    decodeInfo.specFlag = SPV_SPECFLAG_NONE | SPV_SPECFLAG_INTERNAL_LIBRARY;
-    decodeInfo.tcsInputVertices = 0;
-    decodeInfo.isLibraryShader = gcvTRUE;
-    decodeInfo.defaultImageFormat = VSC_IMAGE_FORMAT_NONE;
-
-    __VK_ONERROR((gcvSTATUS_OK == gcSPV_Decode(&decodeInfo, &vscpatchLib)) ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
-    chipModule->patchLib = halti5_CreateVkShader(vscpatchLib);
-    __VK_ASSERT(chipModule->patchLib);
-
-    __VK_MEMZERO(&vscCompileParams, sizeof(VSC_SHADER_COMPILER_PARAM));
-    vscCompileParams.cfg.ctx.clientAPI = gcvAPI_OPENVK;
-    vscCompileParams.cfg.ctx.appNameId = devCtx->pPhyDevice->pInst->patchID;
-    vscCompileParams.cfg.ctx.isPatchLib = gcvTRUE;
-    vscCompileParams.cfg.ctx.pSysCtx = &devCtx->vscSysCtx;
-    vscCompileParams.cfg.cFlags = VSC_COMPILER_FLAG_COMPILE_TO_ML
-                                | VSC_COMPILER_FLAG_FLUSH_DENORM_TO_ZERO
-                                | VSC_COMPILER_FLAG_UNI_SAMPLER_UNIFIED_ALLOC;
-    vscCompileParams.cfg.optFlags = (VSC_COMPILER_OPT_FULL & (~VSC_COMPILER_OPT_ILF_LINK)) | VSC_COMPILER_OPT_NO_ILF_LINK;
-    vscCompileParams.hShader = chipModule->patchLib->vscHandle;
-
-    __VK_ONERROR((gcvSTATUS_OK == vscCompileShader(&vscCompileParams, gcvNULL))
-                                ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
-
-#if __VK_SAVE_THEN_LOAD_SHADER_BIN
-    __VK_ONERROR(__vkSaveThenLoadShaderBin(&devCtx->memCb, &chipModule->patchLib));
-#endif
-
-    devCtx->chipPriv = chipModule;
-
-    /* init cluster info.*/
-    __VK_ONERROR(halti5_initializeClusterInfo(devCtx));
 
     __VK_ONERROR(halti5_tweak_detect(devCtx));
 
@@ -1387,6 +1419,8 @@ VkResult halti5_helper_convertHwPEDesc(
         {VK_FORMAT_A8B8G8R8_UINT_PACK32, {0x19, VK_FALSE, VK_FALSE, 0x3}},
         {VK_FORMAT_A8B8G8R8_SINT_PACK32, {0x19, VK_FALSE, VK_FALSE, 0x5}},
         {VK_FORMAT_A8B8G8R8_SRGB_PACK32, {0x2B, VK_TRUE, VK_TRUE, 0x0}},
+
+        {VK_FORMAT_A2R10G10B10_UNORM_PACK32, {0x16, VK_FALSE, VK_TRUE, 0x0}},
 
         {VK_FORMAT_A2B10G10R10_UNORM_PACK32, {0x16, VK_FALSE, VK_TRUE, 0x0}},
         {VK_FORMAT_A2B10G10R10_UINT_PACK32, {0x1E, VK_FALSE, VK_FALSE, 0x4}},

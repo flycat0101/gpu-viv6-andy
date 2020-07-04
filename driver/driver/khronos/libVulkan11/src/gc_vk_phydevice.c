@@ -294,6 +294,11 @@ if ((database->SMALLBATCH && phyDev->phyDevConfig.options.smallBatch)){    vsCon
             }
             attribBufSizeInKbyte -= fragmentSizeInKbyte;
 
+            if (!(database->PSCS_THROTTLE && database->HWMANAGED_LS))
+            {
+                attribBufSizeInKbyte -= 1;
+            }
+
             localStorageSizeInKbyte = attribBufSizeInKbyte;
         }
     }
@@ -419,8 +424,8 @@ if ((database->SMALLBATCH && phyDev->phyDevConfig.options.smallBatch)){    vsCon
     pVscHwCfg->hwFeatureFlags.supportSeparatedTex    = gcvFALSE;
     pVscHwCfg->hwFeatureFlags.supportMultiGPU        = gcvFALSE;
     pVscHwCfg->hwFeatureFlags.hasPointSizeFix        = gcvTRUE;
-    pVscHwCfg->hwFeatureFlags.supportVectorB0        = gcvFALSE;
     pVscHwCfg->hwFeatureFlags.hasAtomTimingFix       = !(pVscHwCfg->chipModel == 0x3000 && pVscHwCfg->chipRevision == 0x5450);
+    pVscHwCfg->hwFeatureFlags.supportVectorB0        = gcvFALSE;
     pVscHwCfg->hwFeatureFlags.FEDrawDirect           = database->FE_DRAW_DIRECT;
 
     /* Only those chips with VX2 really have this issue, other chips don't have this issue. */

@@ -68,7 +68,7 @@ VkResult halti2_pip_emit_vsinput(
         {
             uint32_t firstValidIoChannel = shAttribTable[entryIdx].pIoRegMapping[0].firstValidIoChannel;
 
-            __VK_ASSERT(shAttribTable[entryIdx].arraySize == 1);
+            __VK_ASSERT(shAttribTable[entryIdx].arraySize > 0 && shAttribTable[entryIdx].arraySize <= devCtx->pPhyDevice->phyDevProp.limits.maxVertexInputAttributes);
 
             if (shAttribTable[entryIdx].pIoRegMapping[0].ioChannelMapping[firstValidIoChannel].ioUsage == SHADER_IO_USAGE_VERTEXID)
             {
@@ -720,7 +720,9 @@ VkResult halti2_clearImageWithRS(
     if ((realRect.offset.x & 0x3)     || (realRect.offset.y & 0x3) ||
         (realRect.extent.width & (alignWidth - 1)) ||
         (realRect.extent.height & (alignHeight - 1)) ||
-        (hwFormat == 0x10 && dstTiling == 0x0))
+        (hwFormat == 0x10 && dstTiling == 0x0) ||
+        (realRect.extent.width == 32 && realRect.extent.height == 64 &&
+         realRect.offset.x == 8 && realRect.offset.y == 0 && hwFormat == 0x10))
     {
         __vkBlitRes dstRes;
 
@@ -1173,7 +1175,7 @@ VkResult halti2_copyImageWithRS(
         srcWidth = gcmALIGN_NP2(srcWidth, fmtInfo->blockSize.width);
         srcStride = (srcWidth / fmtInfo->blockSize.width) * fmtInfo->bitsPerBlock / 8;
         srcSampleInfo = dstImg->sampleInfo;
-        useComputeBlit = !__VK_ISALIGNED(srcWidth, 16) ? VK_TRUE : VK_FALSE;
+        useComputeBlit = !__VK_ISALIGNED(srcWidth, 16) ? VK_TRUE: VK_FALSE;
     }
 
     if (dstRes->isImage)
@@ -1364,7 +1366,6 @@ VkResult halti2_copyImageWithRS(
             }
         }
     }
-
 
     if ((srcMsaa != dstMsaa && srcRes->isImage && dstRes->isImage) &&
         (srcFormat == VK_FORMAT_R16_SFLOAT || srcFormat == VK_FORMAT_R16G16_SFLOAT ||

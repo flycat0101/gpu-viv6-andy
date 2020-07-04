@@ -319,7 +319,9 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDevice(
         }
 
         if (!found)
-            return VK_ERROR_EXTENSION_NOT_PRESENT;
+        {
+            __VK_ONERROR(VK_ERROR_EXTENSION_NOT_PRESENT);
+        }
     }
 
     if (pCreateInfo->pEnabledFeatures)
@@ -334,7 +336,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDevice(
                 }
                 else
                 {
-                    return VK_ERROR_FEATURE_NOT_PRESENT;
+                    __VK_ONERROR(VK_ERROR_FEATURE_NOT_PRESENT);
                 }
             }
         }
@@ -360,10 +362,22 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDevice(
         devCtx->enabledFeatures.robustBufferAccess = VK_TRUE;
     }
 
-    if (devCtx->database->customerID != 0x4 &&
-        devCtx->database->customerID != 0x11)
+    if (devCtx->database->MSAA_FLOAT_64BIT)
     {
-        devCtx->msaa_64bpp = devCtx->database->CACHE128B256BPERLINE;
+        devCtx->msaa_64bpp = 1;
+    }
+
+    if (devCtx->database->REG_FastClear && devCtx->database->REG_FcFlushStall
+        && devCtx->database->REG_TileFiller)
+    {
+        devCtx->legacyTS = VK_TRUE;
+    }
+
+    if (devCtx->database->TS_FC_VULKAN_SUPPORT && devCtx->database->REG_TileFiller
+       && devCtx->database->REG_FcFlushStall)
+    {
+        devCtx->vulkanTS = VK_TRUE;
+        devCtx->legacyTS = VK_FALSE;
     }
 
 #if __VK_RESOURCE_INFO
@@ -422,6 +436,19 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDevice(
 
     /* Release the phyDev->mutex */
     __VK_ONERROR(gcoOS_ReleaseMutex(gcvNULL, phyDev->mutex));
+
+#if __VK_ENABLE_LEGACY_TS_WAR
+    __VK_ONERROR(gcoOS_CreateMutex(gcvNULL, &devCtx->imageLTlistMutex));
+
+    /* Lock the &devCtx->imageLTlistMutex to initailize */
+    __VK_ONERROR(gcoOS_AcquireMutex(gcvNULL, devCtx->imageLTlistMutex, gcvINFINITE));
+
+    devCtx->imageLevelTargetList = gcvNULL;
+
+    /* Release the &devCtx->imageLTlistMutex */
+    __VK_ONERROR(gcoOS_ReleaseMutex(gcvNULL, devCtx->imageLTlistMutex));
+
+#endif
 
     /* Return the device context */
     *pDevice = (VkDevice)devCtx;
@@ -575,6 +602,35 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyDevice(
             __VK_ASSERT(devCtx->fenceMutex);
             gcoOS_DeleteMutex(gcvNULL, devCtx->fenceMutex);
 
+#if __VK_ENABLE_LEGACY_TS_WAR
+        {
+            __vkImageLevelTarget * pTemp = gcvNULL;
+            __vkImageLevelTarget * pNext = gcvNULL;
+
+            /* Lock the &devCtx->imageLTlistMutex to initailize */
+            gcoOS_AcquireMutex(gcvNULL, devCtx->imageLTlistMutex, gcvINFINITE);
+
+            /* free the image level target list here */
+            pTemp = devCtx->imageLevelTargetList;
+
+            while (pTemp)
+            {
+                /* free every image level target info node */
+                pNext = pTemp->next;
+
+                /* free this image level target */
+                __VK_FREE(pTemp);
+
+                pTemp = pNext;
+            }
+
+            devCtx->imageLevelTargetList = gcvNULL;
+
+            /* Release the &devCtx->imageLTlistMutex */
+            gcoOS_ReleaseMutex(gcvNULL, devCtx->imageLTlistMutex);
+        }
+#endif
+
             __vk_DestroyDeviceQueues(devCtx);
 
             __vki_DetachDevice(devCtx);
@@ -583,8 +639,9 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyDevice(
             {
                 __VK_FREE(devCtx->pEnabledExtensions);
             }
-
             __VK_FREE(devCtx);
+
+            vscFreeVirIntrinsicLib();
         }
     }
 }
@@ -702,6 +759,17 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL __vk_GetDeviceProcAddr(
              }
             continue;
         }
+#if defined(_WIN32)
+        if (strcmp(g_DeviceExtensions[i].extensionName, VK_KHR_EXTERNAL_FENCE_WIN32_EXTENSION_NAME) == 0)
+        {
+            if (!devCtx->pEnabledExtensions[i].bEnabled)
+            {
+                if (strcmp(pName, "vkImportFenceWin32HandleKHR") == 0)return VK_NULL_HANDLE;
+                if (strcmp(pName, "vkGetFenceWin32HandleKHR") == 0)return VK_NULL_HANDLE;
+            }
+            continue;
+        }
+#endif
     }
 
     return __vk_GetApiProcAddr(pName);
@@ -741,6 +809,120 @@ OnError:
 
     return result;
 }
+
+#if __VK_ENABLE_LEGACY_TS_WAR
+__vkImageLevelTarget * __vkFindImageLevelTarget(__vkDevContext *device, uint32_t imageLevelHandle)
+{
+    __vkDevContext *devCtx = (__vkDevContext *)device;
+    __vkImageLevelTarget * pTemp  = gcvNULL;
+
+    /* Lock the &devCtx->imageLTlistMutex to initailize */
+    gcoOS_AcquireMutex(gcvNULL, devCtx->imageLTlistMutex, gcvINFINITE);
+
+    pTemp  = devCtx->imageLevelTargetList;
+
+    while (pTemp)
+    {
+        if (pTemp->imageLevelHandle == imageLevelHandle)
+        {
+            break;
+        }
+        else
+        {
+            pTemp = pTemp->next;
+        }
+    }
+
+    /* Release the &devCtx->imageLTlistMutex */
+    gcoOS_ReleaseMutex(gcvNULL, devCtx->imageLTlistMutex);
+
+     return pTemp;
+}
+
+VkResult __vkInsertImageLevelTarget(__vkDevContext *device, __vkImageLevelTarget* imageLevelTarget)
+{
+    __vkDevContext *devCtx = (__vkDevContext *)device;
+
+    __vkImageLevelTarget * pTemp  = gcvNULL;
+
+    /* Lock the &devCtx->imageLTlistMutex to initailize */
+    gcoOS_AcquireMutex(gcvNULL, devCtx->imageLTlistMutex, gcvINFINITE);
+
+    pTemp  = devCtx->imageLevelTargetList;
+
+    if (!imageLevelTarget)
+    {
+        return VK_SUCCESS;
+    }
+
+    if (!pTemp)
+    {
+        devCtx->imageLevelTargetList = imageLevelTarget;
+    }
+    else
+    {
+        imageLevelTarget->next = pTemp;
+        devCtx->imageLevelTargetList = imageLevelTarget;
+    }
+
+    /* Release the &devCtx->imageLTlistMutex */
+    gcoOS_ReleaseMutex(gcvNULL, devCtx->imageLTlistMutex);
+
+    return VK_SUCCESS;
+}
+
+VkResult __vkDeleteImageLevelTarget(__vkDevContext *device, uint32_t imageLevelHandle)
+{
+    __vkDevContext *devCtx = (__vkDevContext *)device;
+    __vkImageLevelTarget * pTemp  = gcvNULL;
+    __vkImageLevelTarget * pNext  = gcvNULL;
+    __VK_SET_ALLOCATIONCB(&devCtx->memCb);
+
+    /* Lock the &devCtx->imageLTlistMutex to initailize */
+    gcoOS_AcquireMutex(gcvNULL, devCtx->imageLTlistMutex, gcvINFINITE);
+
+    pTemp  = devCtx->imageLevelTargetList;
+
+    if (!imageLevelHandle)
+    {
+        return VK_SUCCESS;
+    }
+
+    if (!pTemp)
+    {
+        return VK_SUCCESS;
+    }
+    else if (pTemp->imageLevelHandle == imageLevelHandle)
+    {
+        devCtx->imageLevelTargetList = devCtx->imageLevelTargetList->next;
+        __VK_FREE(pTemp);
+        pTemp = gcvNULL;
+    }
+
+    pNext = pTemp->next;
+
+    while (pNext)
+    {
+        if (pNext->imageLevelHandle == imageLevelHandle)
+        {
+            pTemp->next = pNext->next;
+
+            /* Free this node */
+            __VK_FREE(pNext);
+            pNext = gcvNULL;
+            break;
+        }
+
+        pTemp = pNext;
+        pNext = pNext->next;
+    }
+
+    /* Release the &devCtx->imageLTlistMutex */
+    gcoOS_ReleaseMutex(gcvNULL, devCtx->imageLTlistMutex);
+
+    return VK_SUCCESS;
+}
+#endif
 
 
 

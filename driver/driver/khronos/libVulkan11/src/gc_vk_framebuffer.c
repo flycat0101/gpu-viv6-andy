@@ -52,6 +52,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateFramebuffer(
     }
 
     *pFramebuffer = (VkFramebuffer)(uintptr_t)fb;
+    fb->renderPass->fbDefault = fb;
 
     return VK_SUCCESS;
 

@@ -502,12 +502,18 @@ VkBool32 __vk_SearchObject(
     if (list->objList == gcvNULL)
         return VK_FALSE;
 
+     /* Lock down the linked list */
+    gcoOS_AcquireMutex(gcvNULL, list->objMutex, gcvINFINITE);
+
     /* try to find the obj from the linked list */
     tmpobj = list->objList;
     while (tmpobj != obj && tmpobj->pNext)
     {
         tmpobj = tmpobj->pNext;
     }
+
+    /* Release the linked list */
+    gcoOS_ReleaseMutex(gcvNULL, list->objMutex);
 
     if (tmpobj == obj)
     {

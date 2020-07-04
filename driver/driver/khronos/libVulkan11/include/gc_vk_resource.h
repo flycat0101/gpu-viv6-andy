@@ -94,10 +94,10 @@ typedef struct __vkYCbCrFormatInfoRec
 
 typedef struct __vkTileStatusRec
 {
-    gcsSURF_NODE tsNode;
+    gcsSURF_NODE **tsNode;
+
 
     /* ts related information. */
-    VkBool32 **tileStatusDisable;
     uint32_t **fcValue;
     uint32_t **fcValueUpper;
     VkBool32 compressed;
@@ -105,8 +105,10 @@ typedef struct __vkTileStatusRec
     uint32_t tileStatusFiller;
     uint32_t tileStatusInvalidFiller;
     uint32_t mipLevels;
-    uint32_t devAddr;
-    gctPOINTER hostAddr;
+    uint32_t arrayLayers;
+    uint32_t **devAddr;
+    gctPOINTER **hostAddr;
+    gctSIZE_T **tsSize;
 } __vkTileStatus;
 
 typedef struct __vkDeviceMemoryRec

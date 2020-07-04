@@ -90,6 +90,37 @@ typedef struct __vkCmdExecuteCommandsInfoRec
     struct __vkCmdExecuteCommandsInfoRec *next;
 } __vkCmdExecuteCommandsInfo;
 
+#if __VK_ENABLE_LEGACY_TS_WAR
+
+typedef enum
+{
+    __VK_COLOR_CHECKPOINT_NONE = 0,
+    __VK_COLOR_CHECKPOINT_CLEAR,
+    __VK_COLOR_CHECKPOINT_DRAW_COLOR,
+    __VK_COLOR_CHECKPOINT_DRAW_COLOR64,
+    __VK_COLOR_CHECKPOINT_BLIT,
+    __VK_COLOR_CHECKPOINT_COUNT
+} __vkColorCheckPointType;
+
+typedef struct __vkColorCheckPointRec
+{
+    uint32_t programmedColorValue;
+    uint32_t programmedColorValue64;
+
+    uint32_t* clearValueInsertIndex;
+    uint32_t* clearValue64InsertIndex;
+    uint32_t clearValueRegAddr;
+    uint32_t clearValue64RegAddr;
+    __vkColorCheckPointType  type;
+    uint32_t imageTargetHandle;
+
+}__vkColorCheckPoint;
+#endif
+
+#if __VK_ENABLE_LEGACY_TS_WAR
+#define COLOR_CHECKPOINT_MAX 1024
+#endif
+
 typedef struct __vkStateBufferRec
 {
     uint8_t *bufStart;          // Beginning of state buffer
@@ -97,6 +128,12 @@ typedef struct __vkStateBufferRec
     uint32_t bufOffset;
     uint32_t bufPipe;
     uint32_t secBufCount;       // Count of secondary buffers inserted in this state buffer
+
+#if __VK_ENABLE_LEGACY_TS_WAR
+     __vkColorCheckPoint colorCheckPointArray[COLOR_CHECKPOINT_MAX];
+     uint32_t currentCheckPointIndex;
+#endif
+
     struct __vkStateBufferRec *next;
 } __vkStateBuffer;
 
@@ -306,6 +343,11 @@ typedef struct __vkCommandBufferRec
     uint32_t scratchCmdBuffer[__VK_CMDBUF_SCRATCH_BUFFER_SIZE];
     uint32_t curScrachBufIndex;
 
+#if __VK_ENABLE_LEGACY_TS_WAR
+     __vkColorCheckPoint tempCheckPointArray[COLOR_CHECKPOINT_MAX >> 4];
+     uint32_t curCheckPointIndex;
+#endif
+
     __vkScratchMem *scratchHead;
 
     __vkRenderPassInfo *renderPassInfo;
@@ -336,6 +378,9 @@ typedef struct __vk_CommitInfoRec
     uint8_t *stateStart;
     uint32_t stateSize;
     uint32_t statePipe;
+#if __VK_ENABLE_LEGACY_TS_WAR
+    __vkStateBuffer * curStateBuffer;
+#endif
 } __vk_CommitInfo;
 
 void __vk_CmdAquireBuffer(

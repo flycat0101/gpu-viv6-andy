@@ -48,6 +48,102 @@ void __vk_FreeStateBuffer(
     }
 }
 
+VKAPI_ATTR VkResult VKAPI_CALL __vki_ResetCommandBuffer(
+    VkCommandBuffer commandBuffer,
+    VkCommandBufferResetFlags flags
+    )
+{
+    __vkCommandBuffer *cmd = (__vkCommandBuffer *)commandBuffer;
+    __vkStateBuffer *state = cmd->stateBufferList;
+    __vkCommandPool *cdp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkCommandPool *, cmd->commandPool);
+    __vkScratchMem *pScratch = cmd->scratchHead;
+
+    __VK_SET_ALLOCATIONCB(&cdp->memCb);
+
+    cmd->state = __VK_CMDBUF_STATE_FREE;
+
+    /* Reset all state buffers (Should we free all but one always???) */
+    while (state)
+    {
+        __vkStateBuffer *temp = state;
+
+        /* If VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT is set free all but the first state buffer */
+        if (flags & VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT)
+        {
+            if (state != cmd->stateBufferList)
+            {
+                state = state->next;
+                __vk_FreeStateBuffer(cmd->commandPool, temp->bufStart);
+                __VK_FREE(temp);
+            }
+            else
+            {
+                state->bufOffset = 0;
+                state->bufPipe = (uint32_t)gcvPIPE_INVALID;
+                state->secBufCount = 0;
+#if __VK_ENABLE_LEGACY_TS_WAR
+                __VK_MEMZERO(state->colorCheckPointArray, COLOR_CHECKPOINT_MAX * sizeof(__vkColorCheckPoint));
+                state->currentCheckPointIndex = 0;
+#endif
+                state = state->next;
+                cmd->stateBufferList->next = gcvNULL;
+            }
+        }
+        else
+        {
+            state->bufOffset = 0;
+            state->bufPipe = (uint32_t)gcvPIPE_INVALID;
+            state->secBufCount = 0;
+#if __VK_ENABLE_LEGACY_TS_WAR
+            __VK_MEMZERO(state->colorCheckPointArray, COLOR_CHECKPOINT_MAX * sizeof(__vkColorCheckPoint));
+            state->currentCheckPointIndex = 0;
+#endif
+            state = state->next;
+            temp->next = gcvNULL;
+        }
+    }
+    cmd->stateBufferTail = cmd->stateBufferList;
+    cmd->lastStateBufferIndex = 0;
+    cmd->curScrachBufIndex = 0;
+    cmd->bindInfo.pipeline.graphics = 0;
+    cmd->bindInfo.pipeline.compute = 0;
+    cmd->bindInfo.pipeline.activePipeline = VK_PIPELINE_BIND_POINT_MAX_ENUM;
+    cmd->sequenceID = 0;
+    cmd->gpuRenderingMode = gcvMULTI_GPU_RENDERING_MODE_INVALID;
+
+    /* Free all the scratch memory used in this command buffer */
+    while (pScratch)
+    {
+        __vkScratchMem *pCurrent = pScratch;
+        pScratch = pScratch->next;
+
+        __vk_FreeMemory((VkDevice)cmd->devCtx, (VkDeviceMemory)(uintptr_t)pCurrent->memory, VK_NULL_HANDLE);
+
+        __VK_FREE(pCurrent);
+    }
+    cmd->scratchHead = gcvNULL;
+
+#if __VK_ENABLE_LEGACY_TS_WAR
+    cmd->curCheckPointIndex = 0;
+    __VK_MEMZERO(&cmd->tempCheckPointArray[0], (COLOR_CHECKPOINT_MAX >> 4) * sizeof(__vkColorCheckPoint));
+#endif
+
+    /* Free any secondary execute info */
+    while (cmd->executeList)
+    {
+        __vkCmdExecuteCommandsInfo *temp = cmd->executeList;
+
+        cmd->executeList = cmd->executeList->next;
+        __VK_FREE(temp);
+    }
+    cmd->executeTail = cmd->executeList;
+
+#if __VK_RESOURCE_INFO
+    __vk_utils_freeCmdRes(cmd);
+#endif
+    return VK_SUCCESS;
+}
+
 VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateCommandPool(
     VkDevice device,
     const VkCommandPoolCreateInfo* pCreateInfo,
@@ -121,7 +217,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_ResetCommandPool(
     /* Loop through the command pool's command buffers */
     while (cmd)
     {
-        __vk_ResetCommandBuffer((VkCommandBuffer)cmd, flags);
+        __vki_ResetCommandBuffer((VkCommandBuffer)cmd, flags);
         cmd = cmd->next;
     }
 
@@ -189,6 +285,11 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateCommandBuffers(
 
         cmd->curScrachBufIndex = 0;
         cmd->bindInfo.pipeline.activePipeline = VK_PIPELINE_BIND_POINT_MAX_ENUM;
+
+#if __VK_ENABLE_LEGACY_TS_WAR
+        cmd->curCheckPointIndex = 0;
+        __VK_MEMZERO(&cmd->tempCheckPointArray[0], (COLOR_CHECKPOINT_MAX >> 4) * sizeof(__vkColorCheckPoint));
+#endif
 
         if (!__VK_IS_SUCCESS((*devCtx->chipFuncs->AllocateCommandBuffer)(device, (VkCommandBuffer)(uintptr_t)cmd)))
         {
@@ -377,85 +478,13 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_ResetCommandBuffer(
     )
 {
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)commandBuffer;
-    __vkStateBuffer *state = cmd->stateBufferList;
     __vkCommandPool *cdp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkCommandPool *, cmd->commandPool);
-    __vkScratchMem *pScratch = cmd->scratchHead;
-
-    __VK_SET_ALLOCATIONCB(&cdp->memCb);
 
     /* Have to reset the command pool if pool was created without VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT */
     if (!(cdp->flags & VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT))
         return VK_INCOMPLETE;
 
-    cmd->state = __VK_CMDBUF_STATE_FREE;
-
-    /* Reset all state buffers (Should we free all but one always???) */
-    while (state)
-    {
-        __vkStateBuffer *temp = state;
-
-        /* If VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT is set free all but the first state buffer */
-        if (flags & VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT)
-        {
-            if (state != cmd->stateBufferList)
-            {
-                 state = state->next;
-                __vk_FreeStateBuffer(cmd->commandPool, temp->bufStart);
-                __VK_FREE(temp);
-            }
-            else
-            {
-                state->bufOffset = 0;
-                state->bufPipe = (uint32_t)gcvPIPE_INVALID;
-                state->secBufCount = 0;
-                state = state->next;
-                cmd->stateBufferList->next = gcvNULL;
-            }
-        }
-        else
-        {
-            state->bufOffset = 0;
-            state->bufPipe = (uint32_t)gcvPIPE_INVALID;
-            state->secBufCount = 0;
-            state = state->next;
-            temp->next = gcvNULL;
-        }
-    }
-    cmd->stateBufferTail = cmd->stateBufferList;
-    cmd->lastStateBufferIndex = 0;
-    cmd->curScrachBufIndex = 0;
-    cmd->bindInfo.pipeline.graphics = 0;
-    cmd->bindInfo.pipeline.compute = 0;
-    cmd->bindInfo.pipeline.activePipeline = VK_PIPELINE_BIND_POINT_MAX_ENUM;
-    cmd->sequenceID = 0;
-    cmd->gpuRenderingMode = gcvMULTI_GPU_RENDERING_MODE_INVALID;
-
-    /* Free all the scratch memory used in this command buffer */
-    while (pScratch)
-    {
-        __vkScratchMem *pCurrent = pScratch;
-        pScratch = pScratch->next;
-
-        __vk_FreeMemory((VkDevice)cmd->devCtx, (VkDeviceMemory)(uintptr_t)pCurrent->memory, VK_NULL_HANDLE);
-
-        __VK_FREE(pCurrent);
-    }
-    cmd->scratchHead = gcvNULL;
-
-    /* Free any secondary execute info */
-    while (cmd->executeList)
-    {
-        __vkCmdExecuteCommandsInfo *temp = cmd->executeList;
-
-        cmd->executeList = cmd->executeList->next;
-        __VK_FREE(temp);
-    }
-    cmd->executeTail = cmd->executeList;
-
-#if __VK_RESOURCE_INFO
-    __vk_utils_freeCmdRes(cmd);
-#endif
-    return VK_SUCCESS;
+    return __vki_ResetCommandBuffer(commandBuffer, flags);
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __vk_BeginCommandBuffer(
@@ -471,7 +500,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_BeginCommandBuffer(
     if (((cmd->state == __VK_CMDBUF_STATE_EXECUTABLE) || (cmd->state == __VK_CMDBUF_STATE_RESET_REQUIRED)) &&
         (cdp->flags & VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT))
     {
-        __vk_ResetCommandBuffer(commandBuffer, 0);
+        __vki_ResetCommandBuffer(commandBuffer, 0);
     }
 
     cmd->state = __VK_CMDBUF_STATE_RECORDING;
@@ -523,10 +552,12 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdExecuteCommands(
     __vkCommandBuffer *primary = (__vkCommandBuffer *)commandBuffer;
     __vkCommandPool *cdp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkCommandPool *, primary->commandPool);
     uint32_t i;
+    gceMULTI_GPU_RENDERING_MODE mode;
 
     __VK_SET_ALLOCATIONCB(&cdp->memCb);
 
     primary = (__vkCommandBuffer *)commandBuffer;
+    mode    = primary->gpuRenderingMode;
 
     for (i = 0; i < commandBuffersCount; i++)
     {
@@ -534,6 +565,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdExecuteCommands(
         __vkCmdExecuteCommandsInfo *info = gcvNULL;
 
         secondary = (__vkCommandBuffer *)pCmdBuffers[i];
+        mode      = secondary->gpuRenderingMode;
 
 
         /* Set secondary state */
@@ -574,6 +606,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdExecuteCommands(
         __vk_utils_mergeCmdRes(primary, secondary);
 #endif
     }
+    primary->gpuRenderingMode = mode;
 
     /* re-reprogram render pass states after 2nd command buffer execution. */
     if (commandBuffersCount)
@@ -740,6 +773,180 @@ OnError:
     return result;
 }
 
+#if __VK_ENABLE_LEGACY_TS_WAR
+VkResult __vk_ReProgramColorValueWAR(
+    VkQueue queue,
+    __vk_CommitInfo** pCommits,
+    uint32_t curPoolIndex,
+    uint32_t commitCount
+    )
+{
+    __vkDevQueue *devQueue = (__vkDevQueue *)queue;
+    VkResult result = VK_SUCCESS;
+    uint32_t icommits;
+    uint32_t icommitPool;
+
+    for (icommitPool = 0; icommitPool <= curPoolIndex; ++icommitPool)
+    {
+        VkBool32 bLast = (icommitPool == curPoolIndex);
+        uint32_t count = bLast ? commitCount : (uint32_t)(__VK_MAX_COMMITS << icommitPool);
+
+        for (icommits = 0; icommits < count; icommits++)
+        {
+            /* Process the clear value here */
+            uint8_t * pAddr = pCommits[icommitPool][icommits].stateStart;
+            uint32_t stateSize = pCommits[icommitPool][icommits].stateSize;
+            __vkStateBuffer * curStateBuffer = pCommits[icommitPool][icommits].curStateBuffer;
+            uint32_t index = 0;
+            __vkColorCheckPoint * pTempCCP = gcvNULL;
+            __vkImageLevelTarget * pImageLevelT = devQueue->pDevContext->imageLevelTargetList;
+
+            for(index = 0; index < curStateBuffer->currentCheckPointIndex; index++)
+            {
+                pTempCCP = &curStateBuffer->colorCheckPointArray[index];
+
+                if ((!(curStateBuffer->bufStart <= (uint8_t * )pTempCCP->clearValueInsertIndex &&
+                    (curStateBuffer->bufStart + curStateBuffer->bufOffset) > (uint8_t * )pTempCCP->clearValueInsertIndex)) ||
+                    (pTempCCP->type != __VK_COLOR_CHECKPOINT_DRAW_COLOR &&
+                    (!(curStateBuffer->bufStart <= (uint8_t * )pTempCCP->clearValue64InsertIndex &&
+                    (curStateBuffer->bufStart + curStateBuffer->bufOffset) > (uint8_t * )pTempCCP->clearValue64InsertIndex))))
+                {
+                    /* There must be something wrong! */
+                    __VK_ASSERT(0);
+                    continue;
+                }
+
+                /* Sometimes the primary command buffer will be split into several segments for second command buffer,
+                   skip some checkpoints that are out of valid range */
+                if ((!(pAddr <= (uint8_t * )pTempCCP->clearValueInsertIndex &&
+                    (pAddr + stateSize) > (uint8_t * )pTempCCP->clearValueInsertIndex)) ||
+                    (pTempCCP->type != __VK_COLOR_CHECKPOINT_DRAW_COLOR &&
+                    (!(pAddr <= (uint8_t * )pTempCCP->clearValue64InsertIndex &&
+                    (pAddr + stateSize) > (uint8_t * )pTempCCP->clearValue64InsertIndex))))
+                {
+                    continue;
+                }
+
+                pImageLevelT = __vkFindImageLevelTarget(devQueue->pDevContext, pTempCCP->imageTargetHandle);
+
+                if (pImageLevelT)
+                {
+                    switch (pTempCCP->type)
+                    {
+                    case __VK_COLOR_CHECKPOINT_CLEAR:
+                        {
+                            /* For the clear operation, just update the color value to image level target */
+                            if (pImageLevelT->isFirstRecord)
+                            {
+                                pImageLevelT->latestColorValue = pTempCCP->programmedColorValue;
+                                pImageLevelT->latestColorValue64 = pTempCCP->programmedColorValue64;
+                                pImageLevelT->isFirstRecord = VK_FALSE;
+                            }else if (!((pImageLevelT->latestColorValue == pTempCCP->programmedColorValue) &&
+                                      (pImageLevelT->latestColorValue64 == pTempCCP->programmedColorValue64)))
+                            {
+                                pImageLevelT->latestColorValue = pTempCCP->programmedColorValue;
+                                pImageLevelT->latestColorValue64 = pTempCCP->programmedColorValue64;
+                            }
+                        }
+                        break;
+
+                    case __VK_COLOR_CHECKPOINT_DRAW_COLOR:
+                        {
+                            if (!(pImageLevelT->latestColorValue == pTempCCP->programmedColorValue))
+                            {
+                                uint32_t * pCmdBuffer = gcvNULL;
+                                pCmdBuffer = pTempCCP->clearValueInsertIndex;
+
+                                __vkCmdLoadSingleHWState(&pCmdBuffer,pTempCCP->clearValueRegAddr, VK_FALSE, pImageLevelT->latestColorValue);
+
+                                pTempCCP->programmedColorValue = pImageLevelT->latestColorValue;
+                            }
+
+                        }
+                        break;
+
+                    case __VK_COLOR_CHECKPOINT_DRAW_COLOR64:
+                        {
+                            if (!((pImageLevelT->latestColorValue == pTempCCP->programmedColorValue) &&
+                                (pImageLevelT->latestColorValue64 == pTempCCP->programmedColorValue64)))
+                            {
+                                /* re-program the color value */
+                                uint32_t * pCmdBuffer = gcvNULL;
+                                uint32_t clearValue[2] = {0};
+
+                                clearValue[0] = pImageLevelT->latestColorValue;
+                                clearValue[1] = pImageLevelT->latestColorValue64;
+
+                                if (pTempCCP->clearValueInsertIndex == pTempCCP->clearValue64InsertIndex)
+                                {
+                                    pCmdBuffer = pTempCCP->clearValueInsertIndex;
+                                    __vkCmdLoadBatchHWStates(&pCmdBuffer, pTempCCP->clearValueRegAddr, VK_FALSE, 2, clearValue);
+                                }
+                                else
+                                {
+                                    pCmdBuffer = pTempCCP->clearValueInsertIndex;
+                                    __vkCmdLoadSingleHWState(&pCmdBuffer,pTempCCP->clearValueRegAddr, VK_FALSE, clearValue[0]);
+
+                                    pCmdBuffer = pTempCCP->clearValue64InsertIndex;
+                                    __vkCmdLoadSingleHWState(&pCmdBuffer,pTempCCP->clearValue64RegAddr, VK_FALSE, clearValue[1]);
+                                }
+
+                                pTempCCP->programmedColorValue = pImageLevelT->latestColorValue;
+                                pTempCCP->programmedColorValue64 = pImageLevelT->latestColorValue64;
+                            }
+
+                        }
+                        break;
+                    case __VK_COLOR_CHECKPOINT_BLIT:
+                        {
+                            if (!((pImageLevelT->latestColorValue == pTempCCP->programmedColorValue) &&
+                                (pImageLevelT->latestColorValue64 == pTempCCP->programmedColorValue64)))
+                            {
+                                /* re-program the color value */
+                                uint32_t * pCmdBuffer = gcvNULL;
+                                uint32_t clearValue[2] = {0};
+
+                                clearValue[0] = pImageLevelT->latestColorValue;
+                                clearValue[1] = pImageLevelT->latestColorValue64;
+
+                                if (pTempCCP->clearValueInsertIndex == pTempCCP->clearValue64InsertIndex)
+                                {
+                                    pCmdBuffer = pTempCCP->clearValueInsertIndex;
+                                    __vkCmdLoadBatchHWStates(&pCmdBuffer, pTempCCP->clearValueRegAddr, VK_FALSE, 2, clearValue);
+                                }
+                                else
+                                {
+                                    pCmdBuffer = pTempCCP->clearValueInsertIndex;
+                                    __vkCmdLoadSingleHWState(&pCmdBuffer,pTempCCP->clearValueRegAddr, VK_FALSE, clearValue[0]);
+
+                                    pCmdBuffer = pTempCCP->clearValue64InsertIndex;
+                                    __vkCmdLoadSingleHWState(&pCmdBuffer,pTempCCP->clearValue64RegAddr, VK_FALSE, clearValue[1]);
+                                }
+
+                                pTempCCP->programmedColorValue = pImageLevelT->latestColorValue;
+                                pTempCCP->programmedColorValue64 = pImageLevelT->latestColorValue64;
+                            }
+                        }
+                        break;
+
+                    default:
+                        {
+                            /* There must be something wrong! */
+                            __VK_ASSERT(0);
+                        }
+                        break;
+                    }
+                }
+
+            }
+        }
+    }
+
+    return result;
+}
+#endif
+
+
 VkResult __vk_CommitStateBuffers(
     VkQueue queue,
     __vk_CommitInfo** pCommits,
@@ -846,6 +1053,11 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueSubmit(
     uint32_t isub, icmd, istate, iexe;
     VkResult result = VK_SUCCESS;
     uint32_t icommitPool = 0;
+#if __VK_PRINT_COSTINFO
+    uint64_t startTimeusec = 0;
+    uint64_t endTimeusec = 0;
+    uint64_t deltaValue = 0;
+#endif
 
     __VK_SET_ALLOCATIONCB(&devQueue->pDevContext->memCb);
 
@@ -884,6 +1096,9 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueSubmit(
                 uint8_t *stateStart = stateBuffer->bufStart;
                 uint32_t stateSize  = stateBuffer->bufOffset;
                 uint32_t statePipe  = stateBuffer->bufPipe;
+#if __VK_ENABLE_LEGACY_TS_WAR
+                __vkStateBuffer * curStateBuf   = stateBuffer;
+#endif
 
                 /* First commit */
                 if (stateBuffer->secBufCount)
@@ -906,6 +1121,9 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueSubmit(
                         pCommits[icommitPool][icommits].stateStart = stateStart;
                         pCommits[icommitPool][icommits].stateSize  = stateSize;
                         pCommits[icommitPool][icommits].statePipe  = statePipe;
+#if __VK_ENABLE_LEGACY_TS_WAR
+                        pCommits[icommitPool][icommits].curStateBuffer = curStateBuf;
+#endif
 
                         icommits++;
                         if (icommits >= ((uint32_t)__VK_MAX_COMMITS << icommitPool))
@@ -942,6 +1160,9 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueSubmit(
                         pCommits[icommitPool][icommits].stateStart = secStateBuffer->bufStart;
                         pCommits[icommitPool][icommits].stateSize  = secStateBuffer->bufOffset;
                         pCommits[icommitPool][icommits].statePipe  = secStateBuffer->bufPipe;
+#if __VK_ENABLE_LEGACY_TS_WAR
+                        pCommits[icommitPool][icommits].curStateBuffer = secStateBuffer;
+#endif
 
                         icommits++;
                         if (icommits >= ((uint32_t)__VK_MAX_COMMITS << icommitPool))
@@ -967,6 +1188,9 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueSubmit(
                     pCommits[icommitPool][icommits].stateStart = stateStart;
                     pCommits[icommitPool][icommits].stateSize  = stateSize;
                     pCommits[icommitPool][icommits].statePipe  = statePipe;
+#if __VK_ENABLE_LEGACY_TS_WAR
+                    pCommits[icommitPool][icommits].curStateBuffer = curStateBuf;
+#endif
 
                     icommits++;
                 }
@@ -981,6 +1205,9 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueSubmit(
             /* Commit all the remaining commits for this command buffer */
             if (icommitPool || icommits)
             {
+#if __VK_ENABLE_LEGACY_TS_WAR
+                __vk_ReProgramColorValueWAR(queue, pCommits, icommitPool, icommits);
+#endif
                 result = __vk_CommitStateBuffers(queue, pCommits, icommitPool, icommits);
                 if (result != VK_SUCCESS)
                 {
@@ -1005,6 +1232,14 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueSubmit(
     }
 
     result = __vk_CommitSubmitFence(queue, fence);
+
+#if __VK_PRINT_COSTINFO
+    gcoOS_GetTime(&startTimeusec);
+    __vk_QueueWaitIdle(queue);
+    gcoOS_GetTime(&endTimeusec);
+    deltaValue = endTimeusec - startTimeusec;
+    gcmPRINT("####VIV: execute submitted command cost:%llu(microsec)",deltaValue);
+#endif
 
 vk_OnError:
     for (icommitPool = 0; icommitPool < __VK_MAX_COMMITS_POOL_COUNT; ++icommitPool)
@@ -1218,6 +1453,13 @@ void __vki_CmdResolveSubPass(
                 VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
                 VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
             };
+            const VkMemoryBarrier memBarrier1 =
+            {
+                VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+                0,
+                VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+                VK_ACCESS_TRANSFER_WRITE_BIT
+            };
             __VK_MEMZERO(&regions, sizeof(VkImageCopy));
 
             regions.dstOffset.x = regions.dstOffset.y = regions.dstOffset.z = 0;
@@ -1241,6 +1483,9 @@ void __vki_CmdResolveSubPass(
                 1, &memBarrier, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE);
 
             __vk_CmdCopyImage(commandBuffer, srcImg, colorImg->createInfo.initialLayout, dstImg, resolveImg->createInfo.initialLayout, 1, &regions);
+
+            __vk_CmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                1, &memBarrier1, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE);
         }
     }
 }
@@ -1337,6 +1582,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdClearAttachments(
     VkBool32 enableView = VK_FALSE;
     VkResult result = VK_SUCCESS;
     uint32_t ia, ir, j;
+    VkBool32 cleared = VK_FALSE;
 
     const VkMemoryBarrier memBarrier =
     {
@@ -1361,6 +1607,10 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdClearAttachments(
             imgViewIndex = cmd->bindInfo.renderPass.subPass->color_attachment_index[pAttachments[ia].colorAttachment];
         else
             imgViewIndex = cmd->bindInfo.renderPass.subPass->dsAttachIndex;
+        if (imgViewIndex == VK_ATTACHMENT_UNUSED)
+        {
+            continue;
+        }
 
         for (ir = 0; ir < rectCount; ir++)
         {
@@ -1385,6 +1635,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdClearAttachments(
                     (VkClearValue *)&pAttachments[ia].clearValue,
                     (VkRect2D *)&pRects[ir].rect
                     ));
+
+                    cleared = VK_TRUE;
                 }
             }
             else
@@ -1399,6 +1651,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdClearAttachments(
                         (VkClearValue *)&pAttachments[ia].clearValue,
                         (VkRect2D *)&pRects[ir].rect
                         ));
+
+                    cleared = VK_TRUE;
                 }
             }
         }
@@ -1407,8 +1661,11 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdClearAttachments(
     /* For clear in renderPass, if TS enable, postphone setTS in drawValidate. */
     cmd->bindInfo.renderPass.dirty = VK_TRUE;
 
-    __vk_CmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
-        1, &memBarrier, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE);
+    if (cleared)
+    {
+        __vk_CmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
+            1, &memBarrier, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE);
+    }
 
 
 OnError:
@@ -2136,11 +2393,19 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImage(
                 }
                 else
                 {
+                    VkBool32 rawCopy = VK_TRUE;
+                    /* float and normalized downsample isn't rawCopy */
+                    if (pSrcRes->isImage && pDstRes->isImage &&
+                        pSrcRes->u.img.pImage->sampleInfo.product > 1 &&
+                        pDstRes->u.img.pImage->sampleInfo.product == 1)
+                    {
+                        rawCopy = VK_FALSE;
+                    }
                      __VK_ERR_BREAK(devCtx->chipFuncs->CopyImage(
                         commandBuffer,
                         pSrcRes,
                         pDstRes,
-                        VK_TRUE,
+                        rawCopy,
                         VK_FILTER_NEAREST,
                         VK_TRUE
                         ));
@@ -2664,7 +2929,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImageToBuffer(
     __vkBuffer *pDstBuf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, dstBuffer);
     VkResult result = VK_SUCCESS;
 
-    if (pSrcImg->formatInfo.bitsPerBlock == 128 &&
+    if ((pSrcImg->formatInfo.bitsPerBlock == 128 || pSrcImg->formatInfo.bitsPerBlock == 16) &&
         !devCtx->msaa_64bpp)
     {
         if (devCtx->chipFuncs->tweakCopy(commandBuffer, srcImage, dstBuffer))
@@ -3327,6 +3592,10 @@ void __vk_CmdAquireBuffer(
         }
         cmd->stateBufferTail->bufSize = cdp->sizeOfEachStateBuffer;
         cmd->stateBufferTail->bufOffset = 0;
+#if __VK_ENABLE_LEGACY_TS_WAR
+        __VK_MEMZERO(cmd->stateBufferTail->colorCheckPointArray, COLOR_CHECKPOINT_MAX * sizeof(__vkColorCheckPoint));
+        cmd->stateBufferTail->currentCheckPointIndex = 0;
+#endif
     }
 
     bytesAvailable = cmd->stateBufferTail->bufSize - cmd->stateBufferTail->bufOffset - pipeSelectFlushDMASize;
@@ -3358,6 +3627,10 @@ void __vk_CmdAquireBuffer(
             cmd->stateBufferTail->bufOffset = 0;
             cmd->stateBufferTail->secBufCount = 0;
             cmd->stateBufferTail->next = gcvNULL;
+#if __VK_ENABLE_LEGACY_TS_WAR
+            __VK_MEMZERO(cmd->stateBufferTail->colorCheckPointArray, COLOR_CHECKPOINT_MAX * sizeof(__vkColorCheckPoint));
+            cmd->stateBufferTail->currentCheckPointIndex = 0;
+#endif
         }
         else
         {

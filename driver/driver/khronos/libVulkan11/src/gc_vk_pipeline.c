@@ -344,7 +344,7 @@ __vkPlcMergeData(
         __VK_MEMCOPY(dstEntry, pEntry, sizeof(__vkModuleCacheEntry));
         halti5_ReferenceVkShader(dstEntry->handle);
 
-        if (__vk_utils_hashAddObj(pMemCb, pDstCache->moduleHash, dstEntry, pEntry->head.hashKey, VK_FALSE))
+        if (!__vk_utils_hashAddObj(pMemCb, pDstCache->moduleHash, dstEntry, pEntry->head.hashKey, VK_FALSE))
         {
             __VK_VERIFY_OK(halti5_DestroyVkShader(dstEntry->handle));
             __VK_FREE(dstEntry);
@@ -354,9 +354,10 @@ __vkPlcMergeData(
         pDstCache->numModules++;
         pDstCache->totalBytes += (pEntry->head.headBytes + pEntry->head.alignBytes);
     }
+    return VK_SUCCESS;
 
 OnError:
-    return VK_SUCCESS;
+    return result;
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __vk_MergePipelineCaches(

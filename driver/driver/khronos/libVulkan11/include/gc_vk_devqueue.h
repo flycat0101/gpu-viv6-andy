@@ -62,6 +62,11 @@ struct __vkDevQueueRec
     VkBool32                    commitMutex;
     /*mark the last QueueSubmit whether have command buffer commit*/
     VkBool32                    commitFlag;
+
+#if gcdENABLE_SW_PREEMPTION
+    gctUINT32                   priorityID;
+    gctBOOL                     topPriority;
+#endif
 };
 
 VkResult __vk_CreateDeviceQueues(
