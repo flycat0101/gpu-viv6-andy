@@ -7373,15 +7373,17 @@ VSC_ErrCode vscVIR_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
                     break;
                 }
 
-                VIR_Inst_Check4Dual16(pInst,
-                                      pWorkingInstSet,
-                                      &needRunSingleT,
-                                      &dual16NotSupported,
-                                      &isDual16Highpvec2,
-                                      options,
-                                      dumper,
-                                      HWSUPPORTDUAL16HIGHVEC2
-                                      );
+                errCode = VIR_Inst_Check4Dual16(pInst,
+                                                pWorkingInstSet,
+                                                &needRunSingleT,
+                                                &dual16NotSupported,
+                                                &isDual16Highpvec2,
+                                                options,
+                                                dumper,
+                                                HWSUPPORTDUAL16HIGHVEC2
+                                                );
+                ON_ERROR0(errCode);
+
                 if(dual16NotSupported && VSC_UTILS_MASK(VSC_OPTN_DUAL16Options_GetTrace(options), VSC_OPTN_DUAL16Options_TRACE_DETAIL))
                 {
                     VIR_LOG(dumper, "inst not supported by dual16.\n", i);
@@ -11772,14 +11774,15 @@ VSC_ErrCode vscVIR_PreprocessCGShader(VSC_SH_PASS_WORKER* pPassWorker)
                 gctBOOL bNeedRunSingleT = gcvFALSE;
                 gctBOOL bDual16NotSupported = gcvFALSE;
 
-                VIR_Inst_Check4Dual16(inst,
-                                      gcvNULL,
-                                      &bNeedRunSingleT,
-                                      &bDual16NotSupported,
-                                      gcvNULL,
-                                      gcvNULL,
-                                      gcvNULL,
-                                      HWSUPPORTDUAL16HIGHVEC2);
+                errCode = VIR_Inst_Check4Dual16(inst,
+                                                gcvNULL,
+                                                &bNeedRunSingleT,
+                                                &bDual16NotSupported,
+                                                gcvNULL,
+                                                gcvNULL,
+                                                gcvNULL,
+                                                HWSUPPORTDUAL16HIGHVEC2);
+                ON_ERROR0(errCode);
 
                 /* We need to set this status before RA because RA uses this to set LR live range. */
                 if (bNeedRunSingleT)
@@ -12686,13 +12689,17 @@ static VSC_ErrCode _vscVIR_ReplaceAtomWithExtCall(
     {
         _vscVIR_ConstructAtomFuncName(pInst, maxcoreCount, ocl, &libFuncName);
         /* create FuncOperand*/
-        ON_ERROR(VIR_Function_NewOperand(func, &funcName), "Failed to new operand");
-        ON_ERROR(VIR_Shader_AddString(func->hostShader, libFuncName, &funcNameId), "");
+        errCode = VIR_Function_NewOperand(func, &funcName);
+        ON_ERROR(errCode, "Failed to new operand");
+        errCode = VIR_Shader_AddString(func->hostShader, libFuncName, &funcNameId);
+        ON_ERROR(errCode, "");
         VIR_Operand_SetName(funcName, funcNameId);
-        ON_ERROR(VIR_Function_NewOperand(func, &parameters), "Failed to new operand");
+        errCode = VIR_Function_NewOperand(func, &parameters);
+        ON_ERROR(errCode, "Failed to new operand");
 
         /* create a new VIR_ParmPassing */
-        ON_ERROR(VIR_Function_NewParameters(func, argCount, &parm), "Failed to copy operand");
+        errCode = VIR_Function_NewParameters(func, argCount, &parm);
+        ON_ERROR(errCode, "Failed to copy operand");
         for (i = 0; i < argCount; i++)
         {
              VIR_Operand_Copy(parm->args[i], VIR_Inst_GetSource(pInst, i));
@@ -13427,7 +13434,7 @@ _vscVIR_InitializeCutDownWGS(
     pContext->pInitializationEndInst = gcvNULL;
 
     /* Initialize the loopOpts. */
-    VIR_LoopOpts_Init(&pContext->loopOpts,
+    errCode = VIR_LoopOpts_Init(&pContext->loopOpts,
                       pDuInfo,
                       pShader,
                       VIR_Shader_GetMainFunction(pShader),
@@ -13435,6 +13442,7 @@ _vscVIR_InitializeCutDownWGS(
                       VIR_Shader_GetDumper(pShader),
                       pMM,
                       pHwCfg);
+    ON_ERROR0(errCode);
 
     pContext->pSameJmpBBSet = (VSC_HASH_TABLE*)vscHTBL_Create(pContext->pMM, vscHFUNC_Default, vscHKCMP_Default, 4);
     if(pContext->pSameJmpBBSet == gcvNULL)
@@ -13442,6 +13450,7 @@ _vscVIR_InitializeCutDownWGS(
         errCode = VSC_ERR_OUT_OF_MEMORY;
         return errCode;
     }
+OnError:
     return errCode;
 }
 
@@ -13599,7 +13608,8 @@ _vscVIR_DetectSingleLoopInfo(
             VIR_LoopInfo* pChildLoopInfo = (VIR_LoopInfo*)vscULNDEXT_GetContainedUserData(pNode);
             gctBOOL bChildLoopHasBarrier = gcvFALSE;
 
-            _vscVIR_DetectSingleLoopInfo(pContext, pChildLoopInfo, pSameJmpBBSet, pLoopInfoWorkingSet, pBBWorkingSet, &bChildLoopHasBarrier);
+            errCode = _vscVIR_DetectSingleLoopInfo(pContext, pChildLoopInfo, pSameJmpBBSet, pLoopInfoWorkingSet, pBBWorkingSet, &bChildLoopHasBarrier);
+            ON_ERROR0(errCode);
 
             bHasBarrier |= bChildLoopHasBarrier;
         }

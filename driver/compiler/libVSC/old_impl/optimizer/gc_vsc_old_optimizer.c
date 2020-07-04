@@ -4841,16 +4841,16 @@ gcOpt_InlineFunctions(
                 continue;
             }
 
-            _InlineSinglelFunction(Optimizer,
-                                   function,
-                                   inlineDepthComparison,
-                                   inlineFormatConversion,
-                                   inlineLevel,
-                                   imagePatch,
-                                   gcvTRUE,
-                                   &imageFunctionInlined,
-                                   &currentBudget,
-                                   &functionRemoved);
+            gcmONERROR(_InlineSinglelFunction(Optimizer,
+                                              function,
+                                              inlineDepthComparison,
+                                              inlineFormatConversion,
+                                              inlineLevel,
+                                              imagePatch,
+                                              gcvTRUE,
+                                              &imageFunctionInlined,
+                                              &currentBudget,
+                                              &functionRemoved));
         }
     }
 
@@ -4866,16 +4866,16 @@ gcOpt_InlineFunctions(
         {
             gcOPT_FUNCTION function = Optimizer->functionArray + i;
 
-            _InlineSinglelFunction(Optimizer,
-                                   function,
-                                   inlineDepthComparison,
-                                   inlineFormatConversion,
-                                   inlineLevel,
-                                   imagePatch,
-                                   AlwaysInline,
-                                   &imageFunctionInlined,
-                                   &currentBudget,
-                                   &functionRemoved);
+            gcmONERROR(_InlineSinglelFunction(Optimizer,
+                                              function,
+                                              inlineDepthComparison,
+                                              inlineFormatConversion,
+                                              inlineLevel,
+                                              imagePatch,
+                                              AlwaysInline,
+                                              &imageFunctionInlined,
+                                              &currentBudget,
+                                              &functionRemoved));
         }
     }
     while (imageFunctionInlined);
@@ -4912,6 +4912,9 @@ gcOpt_InlineFunctions(
         gcmFOOTER_NO();
         return gcvSTATUS_OK;
     }
+
+OnError:
+    return status;
 }
 
 #define TREAT_DP_AS_ANYP 1
@@ -5368,6 +5371,7 @@ gcOpt_OptimizeCallStackDepth(
                 gcOpt_UpdateCallStackDepth(Optimizer, gcvTRUE);
                 i = Optimizer->functionCount;
             }
+            gcmERR_RETURN(status);
             break;
         }
     }

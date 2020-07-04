@@ -2833,6 +2833,7 @@ VSC_ErrCode _VIR_RA_LS_removableLDARR(
     VIR_Swizzle     mappingSwizzle = VIR_SWIZZLE_INVALID;
     VIR_Operand     *newOpnd = gcvNULL;
     VIR_OperandInfo srcInfo;
+    gctBOOL         bRedefineBetweenInsts = gcvFALSE;
 
     gcmASSERT(VIR_Inst_GetOpcode(pInst) == VIR_OP_LDARR);
 
@@ -2926,7 +2927,8 @@ VSC_ErrCode _VIR_RA_LS_removableLDARR(
             }
 
             /* check baseOpnd is redefined between pInst and pUseInst */
-            if (vscVIR_RedefineBetweenInsts(&pRA->checkRedefinedResInfo, pLvInfo->pDuInfo, pInst, pUseInst, pBaseOpnd, &redefinedBase))
+            ON_ERROR0(vscVIR_RedefineBetweenInsts(&pRA->checkRedefinedResInfo, pLvInfo->pDuInfo, pInst, pUseInst, pBaseOpnd, &redefinedBase, &bRedefineBetweenInsts));
+            if (bRedefineBetweenInsts)
             {
                 retValue = gcvFALSE;
                 continue;
@@ -9256,7 +9258,7 @@ _VIR_RA_LS_InsertFill_STARR(
     }
 
     /* remove STARR instruction */
-    _VIR_RA_LS_AddDeadInst(pRA, pInst);
+    retErrCode = _VIR_RA_LS_AddDeadInst(pRA, pInst);
 
     return retErrCode;
 }
@@ -10226,12 +10228,13 @@ _VIR_RA_LS_SetLoadStoreAttr(
     }
 }
 
-void _VIR_RA_LS_GenLoadAttr_SetEnable(
+VSC_ErrCode _VIR_RA_LS_GenLoadAttr_SetEnable(
     VIR_RA_LS       *pRA,
     VIR_Instruction *pInst,
     VIR_Instruction *newInst,
     VIR_Enable      ldEnable)
 {
+    VSC_ErrCode      retValue = VSC_ERR_NONE;
     VIR_Shader      *pShader = VIR_RA_LS_GetShader(pRA);
     VIR_LIVENESS_INFO   *pLvInfo = VIR_RA_LS_GetLvInfo(pRA);
     VIR_Function    *pFunc = VIR_Shader_GetCurrentFunction(pShader);
@@ -10360,7 +10363,8 @@ void _VIR_RA_LS_GenLoadAttr_SetEnable(
             }
 
             /* remove ldarr */
-            _VIR_RA_LS_AddDeadInst(pRA, pInst);
+            retValue = _VIR_RA_LS_AddDeadInst(pRA, pInst);
+            ON_ERROR(retValue,"");
         }
     }
     else
@@ -10374,8 +10378,11 @@ void _VIR_RA_LS_GenLoadAttr_SetEnable(
         _VIR_RA_LS_RewriteColor_Dest(pRA, pInst, newDest);
 
         /* remove ldarr */
-        _VIR_RA_LS_AddDeadInst(pRA, pInst);
+        retValue = _VIR_RA_LS_AddDeadInst(pRA, pInst);
+        ON_ERROR(retValue,"");
     }
+OnError:
+    return retValue;
 }
 
 /* generate load_attr for per-vertex data */
@@ -10903,7 +10910,7 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Vertex(
         VIR_Operand_SetSwizzle(baseOpnd, VIR_SWIZZLE_X);
     }
 
-    _VIR_RA_LS_GenLoadAttr_SetEnable(pRA, pInst, newInst, ldEnable);
+    retValue = _VIR_RA_LS_GenLoadAttr_SetEnable(pRA, pInst, newInst, ldEnable);
 
     return retValue;
 }
@@ -11049,7 +11056,7 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Patch(
         VIR_Operand_SetSwizzle(newSrc, VIR_SWIZZLE_X);
     }
 
-    _VIR_RA_LS_GenLoadAttr_SetEnable(pRA, pInst, newInst, ldEnable);
+    retValue = _VIR_RA_LS_GenLoadAttr_SetEnable(pRA, pInst, newInst, ldEnable);
 
     return retValue;
 }
@@ -11430,7 +11437,7 @@ VSC_ErrCode _VIR_RA_LS_GenStoreAttr(
               VIR_Symbol_GetName(sym) == VIR_NAME_TESS_LEVEL_INNER);
 
     /* remove attr_st */
-    _VIR_RA_LS_AddDeadInst(pRA, pInst);
+    retValue = _VIR_RA_LS_AddDeadInst(pRA, pInst);
 
     return retValue;
 }
@@ -11680,7 +11687,7 @@ VSC_ErrCode _VIR_RA_LS_GenEmitRestart(
     VIR_Operand_SetEnable(newInst->dest, VIR_ENABLE_XYZW);
 
     /* remove emit */
-    _VIR_RA_LS_AddDeadInst(pRA, pInst);
+    retValue  = _VIR_RA_LS_AddDeadInst(pRA, pInst);
 
     return retValue;
 }
@@ -11783,7 +11790,8 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
                 }
                 else
                 {
-                    _VIR_RA_LS_AddDeadInst(pRA, pInst);
+                    retValue = _VIR_RA_LS_AddDeadInst(pRA, pInst);
+                    ON_ERROR(retValue,"");
                 }
             }
         }
@@ -11816,7 +11824,8 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
                 pBaseLR =  _VIR_RA_LS_Def2ColorLR(pRA, defIdx);
                 if (isLRSpilled(pBaseLR))
                 {
-                    _VIR_RA_LS_InsertFill_STARR(pRA, pInst, pDestOpnd, pBaseLR);
+                    retValue = _VIR_RA_LS_InsertFill_STARR(pRA, pInst, pDestOpnd, pBaseLR);
+                    ON_ERROR(retValue,"");
                     break;
                 }
             }
@@ -11843,11 +11852,13 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
         pSrcOpnd = VIR_Inst_GetSource(pInst, VIR_Operand_Src0);
         if (VIR_Operand_IsArrayedPerVertex(pSrcOpnd))
         {
-            _VIR_RA_LS_GenLoadAttr_Vertex(pRA, pInst);
+            retValue = _VIR_RA_LS_GenLoadAttr_Vertex(pRA, pInst);
+            ON_ERROR(retValue,"");
         }
         else if (VIR_Operand_IsPerPatch(pSrcOpnd))
         {
-            _VIR_RA_LS_GenLoadAttr_Patch(pRA, pInst);
+            retValue = _VIR_RA_LS_GenLoadAttr_Patch(pRA, pInst);
+            ON_ERROR(retValue,"");
         }
         else
         {
@@ -11855,7 +11866,8 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
                       isSymVectorizedOut(VIR_Operand_GetUnderlyingSymbol(pSrcOpnd)));
 
             /* unused attr/output */
-            _VIR_RA_LS_AddDeadInst(pRA, pInst);
+            retValue = _VIR_RA_LS_AddDeadInst(pRA, pInst);
+            ON_ERROR(retValue,"");
         }
         break;
     case VIR_OP_ATTR_ST:
@@ -11863,11 +11875,13 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
         pDestOpnd = pInst->dest;
         if (VIR_Operand_IsArrayedPerVertex(pDestOpnd))
         {
-            _VIR_RA_LS_GenStoreAttr(pRA, pInst, pDestOpnd, gcvTRUE);
+            retValue = _VIR_RA_LS_GenStoreAttr(pRA, pInst, pDestOpnd, gcvTRUE);
+            ON_ERROR(retValue,"");
         }
         else if (VIR_Operand_IsPerPatch(pDestOpnd))
         {
-            _VIR_RA_LS_GenStoreAttr(pRA, pInst, pDestOpnd, gcvFALSE);
+            retValue = _VIR_RA_LS_GenStoreAttr(pRA, pInst, pDestOpnd, gcvFALSE);
+            ON_ERROR(retValue,"");
         }
         else
         {
@@ -11875,7 +11889,9 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
                       isSymVectorizedOut(VIR_Operand_GetUnderlyingSymbol(pDestOpnd)));
 
             /* unused attr/output */
-            _VIR_RA_LS_AddDeadInst(pRA, pInst);
+            retValue = _VIR_RA_LS_AddDeadInst(pRA, pInst);
+            ON_ERROR(retValue,"");
+
         }
         break;
     case VIR_OP_STORE_ATTR:
@@ -11885,7 +11901,8 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
         break;
     case VIR_OP_EMIT0:
     case VIR_OP_EMIT_STREAM:
-        _VIR_RA_LS_GenEmitRestart(pRA, pInst, gcvTRUE);
+        retValue = _VIR_RA_LS_GenEmitRestart(pRA, pInst, gcvTRUE);
+        ON_ERROR(retValue,"");
         break;
     case VIR_OP_RESTART0:
     case VIR_OP_RESTART_STREAM:
@@ -11893,11 +11910,14 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
            output primitive type is point */
         if (VIR_Shader_GS_HasRestartOp(pShader))
         {
-            _VIR_RA_LS_GenEmitRestart(pRA, pInst, gcvFALSE);
+            retValue = _VIR_RA_LS_GenEmitRestart(pRA, pInst, gcvFALSE);
+            ON_ERROR(retValue,"");
         }
         else
         {
-            _VIR_RA_LS_AddDeadInst(pRA, pInst);
+            retValue = _VIR_RA_LS_AddDeadInst(pRA, pInst);
+            ON_ERROR(retValue,"");
+
         }
         break;
     case VIR_OP_ATOMCMPXCHG:
@@ -12334,7 +12354,8 @@ VSC_ErrCode _VIR_RA_LS_AssignColorForA0B0Inst(
                 _VIR_RA_LS_ExpireActiveLRs(pRA, VIR_Inst_GetId(pInst));
 
                 /* This MOVA is unused and can be deleted. */
-                _VIR_RA_LS_AddDeadInst(pRA, pInst);
+                retValue = _VIR_RA_LS_AddDeadInst(pRA, pInst);
+                ON_ERROR(retValue,"");
 
                 if (pRA->bReservedMovaReg)
                 {

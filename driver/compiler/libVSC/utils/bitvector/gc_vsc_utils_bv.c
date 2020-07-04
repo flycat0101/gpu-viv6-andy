@@ -40,6 +40,7 @@ VSC_ErrCode vscBV_Initialize(VSC_BIT_VECTOR* pBV, VSC_MM* pMM, gctINT bvSize)
         if (pBV->pBits == gcvNULL)
         {
             gcmASSERT(gcvFALSE);
+            ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "Fail in vscBV_Initialize.");
             return VSC_ERR_OUT_OF_MEMORY;
         }
         else
@@ -170,6 +171,8 @@ void vscBV_Finalize(VSC_BIT_VECTOR* pBV)
         gcoOS_Print("vscBV_Finalize(pBV->pBits:0x%X, pMM:0x%X, bvSize:%d)\n", pBV->pBits, pBV->pMM, pBV->bitCount);
     }
 #endif
+    if (pBV == gcvNULL)
+        return;
     if (pBV->pMM)
     {
         vscMM_Free(pBV->pMM, pBV->pBits);

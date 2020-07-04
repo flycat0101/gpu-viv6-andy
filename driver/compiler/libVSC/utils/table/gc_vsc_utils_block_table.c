@@ -324,7 +324,10 @@ static gctUINT _AllocContinuousEntries(VSC_BLOCK_TABLE* pBT, void* pData, gctUIN
         gcmASSERT(pData);
 
         /* Add the newly added entry to hash table */
-        vscBT_AddToHash(pBT, firstEntryId, pFirstEntry);
+        if (vscBT_AddToHash(pBT, firstEntryId, pFirstEntry) != VSC_ERR_NONE)
+        {
+            return INVALID_BT_ENTRY_ID;
+        }
     }
 
     return firstEntryId;

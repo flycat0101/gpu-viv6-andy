@@ -444,7 +444,7 @@ VSC_GlobalUniformTable_InsertShaderUniform(
             return error_code;
         }
     }
-    VSC_GlobalUniformItem_Update(item, shader, uniform);
+    error_code = VSC_GlobalUniformItem_Update(item, shader, uniform);
 
     return error_code;
 }
@@ -505,7 +505,7 @@ VSC_GlobalUniformTable_Dump(
 }
 
 /* VSC_AllShaders methods */
-void
+VSC_ErrCode
 VSC_AllShaders_Initialize(
     IN OUT VSC_AllShaders* all_shaders,
     IN VIR_Shader* vs_shader,
@@ -519,8 +519,9 @@ VSC_AllShaders_Initialize(
     IN VSC_COMPILER_CONFIG* compilerCfg
     )
 {
-    gctBOOL    needBoundsCheck = (compilerCfg->cFlags & VSC_COMPILER_FLAG_NEED_OOB_CHECK) != 0;
-    gctINT     i;
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    gctBOOL     needBoundsCheck = (compilerCfg->cFlags & VSC_COMPILER_FLAG_NEED_OOB_CHECK) != 0;
+    gctINT      i;
 
     if(cs_shader)
     {
@@ -554,9 +555,13 @@ VSC_AllShaders_Initialize(
 
         }
     }
-    VSC_GlobalUniformTable_Initialize(VSC_AllShaders_GetGlobalUniformTable(all_shaders), all_shaders, mem_pool);
+    errCode = VSC_GlobalUniformTable_Initialize(VSC_AllShaders_GetGlobalUniformTable(all_shaders), all_shaders, mem_pool);
+    ON_ERROR0(errCode);
     VSC_AllShaders_SetDumper(all_shaders, dumper);
     VSC_AllShaders_SetMM(all_shaders, mem_pool);
+
+OnError:
+    return errCode;
 }
 
 void
@@ -2235,8 +2240,11 @@ _VSC_UF_AUBO_GetAuxAddress(
     VIR_SymId auxAddrSymId;
 
     if(key == gcvNULL)
+    {
         virErrCode = VSC_ERR_OUT_OF_MEMORY;
-    if(virErrCode != VSC_ERR_NONE) return VIR_INVALID_ID;
+        ERR_REPORT(VSC_ERR_OUT_OF_MEMORY, "fail in _VSC_UF_AUBO_GetAuxAddress");
+        return VIR_INVALID_ID;
+    }
     if(auxAddressTable == gcvNULL)
     {
         auxAddressTable = vscHTBL_Create(VSC_UF_AUBO_GetMM(aubo), _VSC_UF_AUBO_GetAuxAddress_HashFunc, _VSC_UF_AUBO_GetAuxAddress_KeyCmp, 16);
@@ -3337,6 +3345,9 @@ _VSC_UF_AUBO_InsertInstructions(
                 VIR_Operand_SetEnable(loadDest, VIR_TypeId_Conv2Enable(uniformSymRegTypeId));
 
                 addressSymId = _VSC_UF_AUBO_GetAuxAddress(aubo, shader, uniformSym, VSC_UF_AUBO_UniformInfoNode_GetConstOffset(uin));
+                if(addressSymId == VIR_INVALID_ID)
+                    virErrCode = VSC_ERR_OUT_OF_MEMORY;
+                ON_ERROR(virErrCode,"");
                 VIR_Operand_SetSymbol(loadSrc0, func, addressSymId);
                 VIR_Operand_SetSwizzle(loadSrc0, VIR_Shader_IsEnableRobustCheck(shader) ? VIR_SWIZZLE_XYZZ : VIR_SWIZZLE_X);
 
@@ -3584,6 +3595,9 @@ _VSC_UF_AUBO_InsertInstructions(
                         VIR_Operand_SetEnable(loadDest, VIR_TypeId_Conv2Enable(uniformSymRegTypeId));
 
                         addressSymId = _VSC_UF_AUBO_GetAuxAddress(aubo, shader, uniformSym, VSC_UF_AUBO_UniformInfoNode_GetConstOffset(uin));
+                        if(addressSymId == VIR_INVALID_ID)
+                            virErrCode = VSC_ERR_OUT_OF_MEMORY;
+                        ON_ERROR(virErrCode,"");
                         VIR_Operand_SetTempRegister(loadSrc0, func, addressSymId, VIR_TYPE_UINT32);
                         VIR_Operand_SetSwizzle(loadSrc0, VIR_Shader_IsEnableRobustCheck(shader) ? VIR_SWIZZLE_XYZZ : VIR_SWIZZLE_X);
 
@@ -3877,6 +3891,7 @@ _VSC_UF_AUBO_InsertInstructions(
         }
     }
 
+OnError:
     return virErrCode;
 }
 
@@ -4460,17 +4475,18 @@ VSC_UF_CreateAUBO(
     VSC_OPTN_UF_AUBOOptions*   aubo_options = (VSC_OPTN_UF_AUBOOptions*)pPassWorker->basePassWorker.pBaseOption;
     gctBOOL                    trans = gcvFALSE;
 
-    VSC_AllShaders_Initialize(&all_shaders,
-                              (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_VS],
-                              (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_HS],
-                              (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_DS],
-                              (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_GS],
-                              (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_PS],
-                              (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_CS],
-                              pPassWorker->basePassWorker.pDumper,
-                              pPassWorker->basePassWorker.pMM,
-                              &pPassWorker->pPgmLinkerParam->cfg
-                              );
+    errCode = VSC_AllShaders_Initialize(&all_shaders,
+                                        (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_VS],
+                                        (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_HS],
+                                        (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_DS],
+                                        (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_GS],
+                                        (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_PS],
+                                        (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_CS],
+                                        pPassWorker->basePassWorker.pDumper,
+                                        pPassWorker->basePassWorker.pMM,
+                                        &pPassWorker->pPgmLinkerParam->cfg
+                                        );
+    ON_ERROR(errCode, "AllShaders Initialize");
 
     /* Create Default UBO now */
     errCode = VSC_AllShaders_LinkUniforms(&all_shaders);
@@ -4528,17 +4544,18 @@ VSC_UF_UnifiedUniformAlloc(
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     VSC_AllShaders             all_shaders;
 
-    VSC_AllShaders_Initialize(&all_shaders,
-                              (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_VS],
-                              (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_HS],
-                              (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_DS],
-                              (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_GS],
-                              (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_PS],
-                              (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_CS],
-                              pPassWorker->basePassWorker.pDumper,
-                              pPassWorker->basePassWorker.pMM,
-                              &pPassWorker->pPgmLinkerParam->cfg
-                              );
+    errCode = VSC_AllShaders_Initialize(&all_shaders,
+                                        (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_VS],
+                                        (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_HS],
+                                        (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_DS],
+                                        (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_GS],
+                                        (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_PS],
+                                        (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_CS],
+                                        pPassWorker->basePassWorker.pDumper,
+                                        pPassWorker->basePassWorker.pMM,
+                                        &pPassWorker->pPgmLinkerParam->cfg
+                                        );
+    ON_ERROR(errCode, "AllShaders Initialize");
 
     /* Link uniforms. */
     errCode = VSC_AllShaders_LinkUniforms(&all_shaders);
@@ -4596,9 +4613,10 @@ VSC_ErrCode VSC_UF_CreateAUBOForCLShader(
     gcmASSERT((pShader->clientApiVersion == gcvAPI_OPENCL) &&
               (VIR_Shader_GetKind(pShader) == VIR_SHADER_COMPUTE));
 
-    VSC_AllShaders_Initialize(&all_shaders, gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL,
-                             pShader, pPassWorker->basePassWorker.pDumper, pPassWorker->basePassWorker.pMM,
-                             &pPassWorker->pCompilerParam->cfg);
+    errCode = VSC_AllShaders_Initialize(&all_shaders, gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL,
+                                        pShader, pPassWorker->basePassWorker.pDumper, pPassWorker->basePassWorker.pMM,
+                                        &pPassWorker->pCompilerParam->cfg);
+    ON_ERROR(errCode, "AllShaders Initialize");
 
     VSC_AllShaders_LinkUniforms(&all_shaders);
 
@@ -4614,6 +4632,8 @@ VSC_ErrCode VSC_UF_CreateAUBOForCLShader(
     }
 
     pPassWorker->pResDestroyReq->s.bInvalidateCfg = trans;
+
+OnError:
     return errCode;
 }
 

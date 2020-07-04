@@ -6797,7 +6797,7 @@ _ConvCode2VirInstruction(
         if(externOpcode != 0)
         {
             virErrCode = vscHTBL_DirectSet(ExternOpcodeTable, (void *)(gctUINTPTR_T)virInst, (void *)externOpcode);
-            ON_ERROR0(virErrCode);
+            ON_ERROR(virErrCode,"");
         }
 
         if(gcmSL_OPCODE_GET(Code->opcode, Round))

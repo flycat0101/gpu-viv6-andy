@@ -5627,7 +5627,8 @@ VIR_Shader_GetCreatedSymAliasTable(
 
     if(!VIR_SymAliasTable_IsCreated(table))
     {
-        VIR_Shader_CreateSymAliasTable(Shader);
+        if(VIR_Shader_CreateSymAliasTable(Shader) != VSC_ERR_NONE)
+            return gcvNULL;
     }
 
     return table;
@@ -7069,7 +7070,7 @@ VSC_ErrCode VIR_SymAliasTable_Insert(
 
         if(knownAlias != Alias)
         {
-            VIR_SymAliasTable_Insert(Table, (VIR_Symbol*)knownAlias, Alias);
+            CHECK_ERROR0(VIR_SymAliasTable_Insert(Table, (VIR_Symbol*)knownAlias, Alias));
         }
     }
     else
@@ -10334,8 +10335,8 @@ VIR_Shader_ReplaceBuiltInAttribute(
             VIR_Symbol_SetTyQualifier(pAttributeSym, VIR_TYQUAL_CONST);
             VIR_Symbol_SetLayoutQualifier(pAttributeSym, VIR_LAYQUAL_NONE);
 
-            ON_ERROR(VIR_Shader_AddSymbolContents(pShader, pAttributeSym, VIR_INVALID_ID, gcvTRUE),
-                "Add uniform content fail.");
+            errCode = VIR_Shader_AddSymbolContents(pShader, pAttributeSym, VIR_INVALID_ID, gcvTRUE);
+            ON_ERROR(errCode, "Add uniform content fail.");
             bRemoveAttr = gcvTRUE;
         }
 
@@ -12722,7 +12723,8 @@ VIR_Function_AddPhiOperandArrayForInst(
     VIR_PhiOperandArray* phiOperandArray;
 
     gcmASSERT(VIR_Inst_GetOpcode(Inst) == VIR_OP_PHI || VIR_Inst_GetOpcode(Inst) == VIR_OP_SPV_PHI);
-    ON_ERROR(VIR_Function_NewPhiOperandArray(Function, PhiOperandCount, &phiOperandArray), "VIR_Function_NewPhiOperandArray");
+    errCode = VIR_Function_NewPhiOperandArray(Function, PhiOperandCount, &phiOperandArray);
+    ON_ERROR(errCode, "VIR_Function_NewPhiOperandArray");
     VIR_Operand_SetPhiOperands(VIR_Inst_GetSource(Inst, 0), phiOperandArray);
     VIR_Operand_SetOpKind(VIR_Inst_GetSource(Inst, 0), VIR_OPND_PHI);
 
@@ -12742,7 +12744,8 @@ VIR_Function_FreePhiOperandArray(
     for(i = 0; i < VIR_PhiOperandArray_GetCount(PhiOperandArray); i++)
     {
         VIR_PhiOperand* phiOperand = VIR_PhiOperandArray_GetNthOperand(PhiOperandArray, i);
-        ON_ERROR(VIR_Function_FreeOperand(Function, VIR_PhiOperand_GetValue(phiOperand)), "VIR_Function_FreeOperand");
+        errCode = VIR_Function_FreeOperand(Function, VIR_PhiOperand_GetValue(phiOperand));
+        ON_ERROR(errCode, "VIR_Function_FreeOperand");
     }
     /* free the whole PhiOperandArray which contains N PhiValues */
     vscMM_Free(&Function->hostShader->pmp.mmWrapper, PhiOperandArray);
@@ -12764,7 +12767,8 @@ VIR_Function_FreeOperandList(
     {
         VIR_OperandList * node = ptr;
         ptr = ptr->next;
-        ON_ERROR(VIR_Function_FreeOperand(Function, node->value), "VIR_Function_FreeOperand");
+        errCode = VIR_Function_FreeOperand(Function, node->value);
+        ON_ERROR(errCode, "VIR_Function_FreeOperand");
         vscMM_Free(&Function->hostShader->pmp.mmWrapper, node);
     }
 
@@ -12785,7 +12789,8 @@ VIR_Function_FreeyParmPassing(
     {
         if (pParmPassing->args[i])
         {
-            ON_ERROR(VIR_Function_FreeOperand(Function, pParmPassing->args[i]), "VIR_Function_FreeOperand");
+            errCode = VIR_Function_FreeOperand(Function, pParmPassing->args[i]);
+            ON_ERROR(errCode, "VIR_Function_FreeOperand");
         }
     }
     /* free the whole PhiOperandArray which contains N PhiValues */
@@ -12868,7 +12873,8 @@ VIR_Function_BuildLabelLinks(
         {
             VIR_Label *label     = VIR_Operand_GetLabel(VIR_Inst_GetDest(inst));
             VIR_Link  *pNewLink  = gcvNULL;
-            ON_ERROR(VIR_Function_NewLink(pFunction, &pNewLink), "VIR_Function_NewLink");
+            errCode = VIR_Function_NewLink(pFunction, &pNewLink);
+            ON_ERROR(errCode, "VIR_Function_NewLink");
             VIR_Link_SetReference(pNewLink, (gctUINTPTR_T)inst);
             VIR_Link_AddLink(&(label->referenced), pNewLink);
         }

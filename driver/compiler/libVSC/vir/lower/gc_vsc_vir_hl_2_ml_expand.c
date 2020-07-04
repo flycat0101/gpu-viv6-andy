@@ -2520,9 +2520,10 @@ _processEvisIntrinsic(
             }
         }
     }
-
-    ON_ERROR(VIR_Function_FreeOperand(func, src0), "VIR_Function_FreeOperand");
-    ON_ERROR(VIR_Function_FreeOperand(func, src1), "VIR_Function_FreeOperand");
+    errCode = VIR_Function_FreeOperand(func, src0);
+    ON_ERROR(errCode, "VIR_Function_FreeOperand");
+    errCode = VIR_Function_FreeOperand(func, src1);
+    ON_ERROR(errCode, "VIR_Function_FreeOperand");
     /* handling extra dest for some inst */
     if (!VIR_OPCODE_hasDest(opCode) && VIR_Inst_GetDest(pInst) != gcvNULL)
     {
@@ -2725,9 +2726,10 @@ _processIntrinsic(
     {
         VIR_Inst_SetSource(pInst, i, argList->args[i]);
     }
-
-    ON_ERROR(VIR_Function_FreeOperand(func, src0), "VIR_Function_FreeOperand");
-    ON_ERROR(VIR_Function_FreeOperand(func, src1), "VIR_Function_FreeOperand");
+    errCode = VIR_Function_FreeOperand(func, src0);
+    ON_ERROR(errCode, "VIR_Function_FreeOperand");
+    errCode = VIR_Function_FreeOperand(func, src1);
+    ON_ERROR(errCode, "VIR_Function_FreeOperand");
     /* handling extra dest for some inst */
     if (!VIR_OPCODE_hasDest(opCode) && VIR_Inst_GetDest(pInst) != gcvNULL)
     {

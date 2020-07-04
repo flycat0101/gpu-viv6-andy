@@ -494,7 +494,8 @@ static VSC_ErrCode _AddNewDefToTable(VIR_DEF_USAGE_INFO* pDuInfo,
             }
 
             /* Lastly, add defIdx to hash */
-            vscBT_AddToHash(pDefTable, newDefIdx, &pNewDef->defKey);
+            errCode = vscBT_AddToHash(pDefTable, newDefIdx, &pNewDef->defKey);
+            ON_ERROR0(errCode);
 
             if (bNewDefAdded)
             {
@@ -503,6 +504,7 @@ static VSC_ErrCode _AddNewDefToTable(VIR_DEF_USAGE_INFO* pDuInfo,
         }
     }
 
+OnError:
     return errCode;
 }
 
@@ -1105,14 +1107,15 @@ OnError:
     return errCode;
 }
 
-static void _Update_ReachDef_Local_Kill_Output_Defs_By_Emit(VIR_Shader* pShader,
-                                                            VIR_DEF_USAGE_INFO* pDuInfo,
-                                                            VSC_BLOCK_TABLE* pDefTable,
-                                                            VSC_BIT_VECTOR* pGenFlow,
-                                                            VSC_BIT_VECTOR* pKillFlow,
-                                                            gctBOOL bCheckAllOutput,
-                                                            gctINT streamNumber)
+static VSC_ErrCode _Update_ReachDef_Local_Kill_Output_Defs_By_Emit(VIR_Shader* pShader,
+                                                                    VIR_DEF_USAGE_INFO* pDuInfo,
+                                                                    VSC_BLOCK_TABLE* pDefTable,
+                                                                    VSC_BIT_VECTOR* pGenFlow,
+                                                                    VSC_BIT_VECTOR* pKillFlow,
+                                                                    gctBOOL bCheckAllOutput,
+                                                                    gctINT streamNumber)
 {
+    VSC_ErrCode              errCode = VSC_ERR_NONE;
     gctUINT                  defCount = pDuInfo->baseTsDFA.baseDFA.flowSize;
     VIR_DEF*                 pDef;
     VIR_DEF*                 pThisDef;
@@ -1121,7 +1124,8 @@ static void _Update_ReachDef_Local_Kill_Output_Defs_By_Emit(VIR_Shader* pShader,
     gctUINT                  thisDefIdx, defIdx;
     VSC_BIT_VECTOR           tmpMask;
 
-    vscBV_Initialize(&tmpMask, pDuInfo->baseTsDFA.baseDFA.pScratchMemPool, pDuInfo->baseTsDFA.baseDFA.flowSize);
+    errCode = vscBV_Initialize(&tmpMask, pDuInfo->baseTsDFA.baseDFA.pScratchMemPool, pDuInfo->baseTsDFA.baseDFA.flowSize);
+    ON_ERROR0(errCode);
 
     for (thisDefIdx = 0; thisDefIdx < defCount; thisDefIdx ++)
     {
@@ -1179,7 +1183,9 @@ static void _Update_ReachDef_Local_Kill_Output_Defs_By_Emit(VIR_Shader* pShader,
         }
     }
 
+OnError:
     vscBV_Finalize(&tmpMask);
+    return errCode;
 }
 
 static void _Update_ReachDef_Local_GenKill(VIR_DEF_USAGE_INFO* pDuInfo,
@@ -1331,13 +1337,14 @@ static VSC_ErrCode _ReachDef_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA,
                 streamNumber = VIR_Operand_GetImmediateInt(VIR_Inst_GetSource(pInst, 0));
             }
 
-            _Update_ReachDef_Local_Kill_Output_Defs_By_Emit(pShader,
+            errCode = _Update_ReachDef_Local_Kill_Output_Defs_By_Emit(pShader,
                                                             (VIR_DEF_USAGE_INFO*)pBaseTsDFA,
                                                             pDefTable,
                                                             pGenFlow,
                                                             pKillFlow,
                                                             bCheckAllOutput,
                                                             streamNumber);
+            ON_ERROR0(errCode);
         }
 
         /* If current inst is the last inst of block, just bail out */
@@ -1354,7 +1361,9 @@ static VSC_ErrCode _ReachDef_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA,
        fully killed in basic-block, or it is not fully killed. */
     gcmASSERT(vscSV_All(&localHalfChannelKillFlow, VIR_HALF_CHANNEL_MASK_NONE));
 
+OnError:
     vscSV_Finalize(&localHalfChannelKillFlow);
+
     return errCode;
 }
 
@@ -1399,8 +1408,9 @@ static void _ReachDef_Init_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FL
     }
 }
 
-static gctBOOL _ReachDef_Iterate_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow)
+static VSC_ErrCode _ReachDef_Iterate_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow, gctBOOL_PTR bResult)
 {
+    VSC_ErrCode            errCode = VSC_ERR_NONE;
     VSC_BIT_VECTOR*        pInFlow = &pTsBlockFlow->inFlow;
     VSC_BIT_VECTOR*        pOutFlow = &pTsBlockFlow->outFlow;
     VSC_BIT_VECTOR*        pGenFlow = &pTsBlockFlow->genFlow;
@@ -1408,7 +1418,8 @@ static gctBOOL _ReachDef_Iterate_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BL
     VSC_BIT_VECTOR         tmpFlow;
     gctBOOL                bChanged = gcvFALSE;
 
-    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
+    errCode = vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
+    ON_ERROR0(errCode);
 
     /* Out = Gen U (In - Kill) */
     vscBV_Minus2(&tmpFlow, pInFlow, pKillFlow);
@@ -1420,13 +1431,16 @@ static gctBOOL _ReachDef_Iterate_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BL
         vscBV_Copy(pOutFlow, &tmpFlow);
     }
 
+OnError:
     vscBV_Finalize(&tmpFlow);
-
-    return bChanged;
+    if(bResult)
+        *bResult = bChanged;
+    return errCode;
 }
 
-static gctBOOL _ReachDef_Combine_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow)
+static VSC_ErrCode _ReachDef_Combine_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow, gctBOOL_PTR bResult)
 {
+    VSC_ErrCode                  errCode = VSC_ERR_NONE;
     VIR_BASIC_BLOCK*             pPredBasicBlk;
     VSC_ADJACENT_LIST_ITERATOR   predEdgeIter;
     VIR_CFG_EDGE*                pPredEdge;
@@ -1438,10 +1452,12 @@ static gctBOOL _ReachDef_Combine_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BL
     /* If there is no predecessors, then just reture FALSE */
     if (DGND_GET_IN_DEGREE(&pBasicBlock->dgNode) == 0)
     {
-        return gcvFALSE;
+        if(bResult)
+            *bResult = gcvFALSE;
+        return errCode;
     }
 
-    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
+    ON_ERROR0(vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize));
 
     /* In = U all-pred-Outs */
     VSC_ADJACENT_LIST_ITERATOR_INIT(&predEdgeIter, &pBasicBlock->dgNode.predList);
@@ -1458,14 +1474,17 @@ static gctBOOL _ReachDef_Combine_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BL
         vscBV_Copy(pInFlow, &tmpFlow);
     }
 
+OnError:
     vscBV_Finalize(&tmpFlow);
-
-    return bChanged;
+    if(bResult)
+        *bResult = bChanged;
+    return errCode;
 }
 
 #if SUPPORT_IPA_DFA
-static gctBOOL _ReachDef_Block_Flow_Combine_From_Callee_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pCallerTsBlockFlow)
+static VSC_ErrCode _ReachDef_Block_Flow_Combine_From_Callee_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pCallerTsBlockFlow, gctBOOL_PTR bResult)
 {
+    VSC_ErrCode            errCode = VSC_ERR_NONE;
     VIR_BASIC_BLOCK*       pBasicBlock = pCallerTsBlockFlow->pOwnerBB;
     VSC_BIT_VECTOR*        pOutFlow = &pCallerTsBlockFlow->outFlow;
     VSC_BIT_VECTOR*        pInFlow = &pCallerTsBlockFlow->inFlow;
@@ -1476,9 +1495,9 @@ static gctBOOL _ReachDef_Block_Flow_Combine_From_Callee_Resolver(VIR_BASE_TS_DFA
 
     gcmASSERT(pBasicBlock->flowType == VIR_FLOW_TYPE_CALL);
 
-    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
-    vscBV_Initialize(&tmpFlow1, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
-    vscBV_Initialize(&tmpFlow2, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
+    ON_ERROR0(vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize));
+    ON_ERROR0(vscBV_Initialize(&tmpFlow1, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize));
+    ON_ERROR0(vscBV_Initialize(&tmpFlow2, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize));
 
     /* U flow that not flows into callee and out flow of callee excluding flows that are from other callers */
     vscBV_And2(&tmpFlow1, &pCalleeFuncFlow->inFlow, pInFlow);
@@ -1495,25 +1514,29 @@ static gctBOOL _ReachDef_Block_Flow_Combine_From_Callee_Resolver(VIR_BASE_TS_DFA
         vscBV_Copy(pOutFlow, &tmpFlow);
     }
 
+OnError:
     vscBV_Finalize(&tmpFlow);
     vscBV_Finalize(&tmpFlow1);
     vscBV_Finalize(&tmpFlow2);
 
-    return bChanged;
+    if(bResult)
+        *bResult = bChanged;
+    return errCode;
 }
 
-static void _And_Def_BVs_On_Same_Reg_No(VSC_MM* pScratchMemPool, VSC_BLOCK_TABLE* pDefTable,
-                                        VSC_BIT_VECTOR* pDefBV1, VSC_BIT_VECTOR* pDefBV2,
-                                        gctUINT maxVirRegNo)
+static VSC_ErrCode _And_Def_BVs_On_Same_Reg_No(VSC_MM* pScratchMemPool, VSC_BLOCK_TABLE* pDefTable,
+                                               VSC_BIT_VECTOR* pDefBV1, VSC_BIT_VECTOR* pDefBV2,
+                                               gctUINT maxVirRegNo)
 {
+    VSC_ErrCode                  errCode = VSC_ERR_NONE;
     VSC_BIT_VECTOR               regNoBV1, regNoBV2, andResBV;
     gctUINT                      regNoBVSize = (maxVirRegNo + 1) * VIR_CHANNEL_NUM;
     gctUINT                      defIdx, startBitOrdinal;
     VIR_DEF*                     pDef;
 
-    vscBV_Initialize(&regNoBV1, pScratchMemPool, regNoBVSize);
-    vscBV_Initialize(&regNoBV2, pScratchMemPool, regNoBVSize);
-    vscBV_Initialize(&andResBV, pScratchMemPool, regNoBVSize);
+    ON_ERROR0(vscBV_Initialize(&regNoBV1, pScratchMemPool, regNoBVSize));
+    ON_ERROR0(vscBV_Initialize(&regNoBV2, pScratchMemPool, regNoBVSize));
+    ON_ERROR0(vscBV_Initialize(&andResBV, pScratchMemPool, regNoBVSize));
 
     /* Convert BV on def to BV on regNo */
     startBitOrdinal = 0;
@@ -1568,13 +1591,17 @@ static void _And_Def_BVs_On_Same_Reg_No(VSC_MM* pScratchMemPool, VSC_BLOCK_TABLE
         startBitOrdinal = defIdx + 1;
     }
 
+OnError:
     vscBV_Finalize(&regNoBV1);
     vscBV_Finalize(&regNoBV2);
     vscBV_Finalize(&andResBV);
+
+    return errCode;
 }
 
-static gctBOOL _ReachDef_Func_Flow_Combine_From_Callers_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_FUNC_FLOW* pCalleeTsFuncFlow)
+static VSC_ErrCode _ReachDef_Func_Flow_Combine_From_Callers_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_FUNC_FLOW* pCalleeTsFuncFlow, gctBOOL_PTR bResult)
 {
+    VSC_ErrCode                  errCode = VSC_ERR_NONE;
     gctUINT                      callerIdx;
     VIR_BASIC_BLOCK*             pCallerBasicBlk;
     VIR_Instruction*             pCallSiteInst;
@@ -1587,8 +1614,8 @@ static gctBOOL _ReachDef_Func_Flow_Combine_From_Callers_Resolver(VIR_BASE_TS_DFA
     gctUINT                      maxVirRegNo = ((VIR_DEF_USAGE_INFO*)pBaseTsDFA)->maxVirRegNo;
     VSC_BLOCK_TABLE*             pDefTable = &((VIR_DEF_USAGE_INFO*)pBaseTsDFA)->defTable;
 
-    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
-    vscBV_Initialize(&callerInFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
+    ON_ERROR0(vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize));
+    ON_ERROR0(vscBV_Initialize(&callerInFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize));
 
     /* U all in flow of caller at every call site */
     VSC_ADJACENT_LIST_ITERATOR_INIT(&callerIter, &pCalleeFuncBlock->dgNode.predList);
@@ -1617,7 +1644,8 @@ static gctBOOL _ReachDef_Func_Flow_Combine_From_Callers_Resolver(VIR_BASE_TS_DFA
             }
             else
             {
-                _And_Def_BVs_On_Same_Reg_No(pBaseTsDFA->baseDFA.pScratchMemPool, pDefTable, &tmpFlow, &callerInFlow, maxVirRegNo);
+                errCode = _And_Def_BVs_On_Same_Reg_No(pBaseTsDFA->baseDFA.pScratchMemPool, pDefTable, &tmpFlow, &callerInFlow, maxVirRegNo);
+                ON_ERROR0(errCode);
             }
 
             vscBV_Or1(&tmpFlow, &callerInFlow);
@@ -1630,10 +1658,13 @@ static gctBOOL _ReachDef_Func_Flow_Combine_From_Callers_Resolver(VIR_BASE_TS_DFA
         vscBV_Copy(pInFlow, &tmpFlow);
     }
 
+OnError:
     vscBV_Finalize(&tmpFlow);
     vscBV_Finalize(&callerInFlow);
 
-    return bChanged;
+    if(bResult)
+        *bResult = bChanged;
+    return errCode;
 }
 #endif
 
@@ -1825,7 +1856,7 @@ static VSC_ErrCode _AddNewUsageToTable(VIR_DEF_USAGE_INFO* pDuInfo,
                          bIsIndexingRegUsage, defEnableMask, halfChannelMask);
 
         /* Add usageIdx to hash */
-        vscBT_AddToHash(pUsageTable, newUsageIdx, &pNewUsage->usageKey);
+        ON_ERROR0(vscBT_AddToHash(pUsageTable, newUsageIdx, &pNewUsage->usageKey));
 
         bNewUsageAdded = gcvTRUE;
     }
@@ -2314,7 +2345,7 @@ static VSC_ErrCode _AddOutputUsages(VIR_Shader* pShader,
                          pThisDef->halfChannelMask);
 
         /* Add usageIdx to hash */
-        vscBT_AddToHash(pUsageTable, newUsageIdx, &pNewUsage->usageKey);
+        ON_ERROR0(vscBT_AddToHash(pUsageTable, newUsageIdx, &pNewUsage->usageKey));
 
         defIdx = vscVIR_FindFirstDefIndex(pDuInfo, pThisDef->defKey.regNo);
 
@@ -2613,13 +2644,14 @@ static VSC_ErrCode _BuildDUUDChainPerBB(VIR_BASIC_BLOCK* pBasicBlk, VIR_DEF_USAG
                 streamNumber = VIR_Operand_GetImmediateInt(VIR_Inst_GetSource(pInst, 0));
             }
 
-            _Update_ReachDef_Local_Kill_Output_Defs_By_Emit(pShader,
-                                                            pDuInfo,
-                                                            pDefTable,
-                                                            &workingDefFlow,
-                                                            gcvNULL,
-                                                            bCheckAllOutput,
-                                                            streamNumber);
+            errCode = _Update_ReachDef_Local_Kill_Output_Defs_By_Emit(pShader,
+                                                                    pDuInfo,
+                                                                    pDefTable,
+                                                                    &workingDefFlow,
+                                                                    gcvNULL,
+                                                                    bCheckAllOutput,
+                                                                    streamNumber);
+            ON_ERROR0(errCode);
         }
 
         /* If current inst is the last inst of block, just bail out */
@@ -2980,9 +3012,10 @@ static VSC_ErrCode _BuildNewWeb(VIR_DEF_USAGE_INFO* pDuInfo,
        webs */
     if (bPartialUpdate)
     {
-        vscBV_Initialize(&extendedDefFlow,
-                         pDuInfo->baseTsDFA.baseDFA.pScratchMemPool,
-                         BT_GET_MAX_VALID_ID(&pDuInfo->defTable));
+        errCode = vscBV_Initialize(&extendedDefFlow,
+                                    pDuInfo->baseTsDFA.baseDFA.pScratchMemPool,
+                                    BT_GET_MAX_VALID_ID(&pDuInfo->defTable));
+        ON_ERROR(errCode, "Fail in _BuildNewWeb.");
 
         /* Un-indexing-reg defs who have true usages for same instruction must be in the
            same web. So we need firstly find out these extended defs as def candidates
@@ -3259,6 +3292,7 @@ static VSC_ErrCode _BuildNewWeb(VIR_DEF_USAGE_INFO* pDuInfo,
         _PostProcessNewWeb(pDuInfo, newWebIdx);
     }
 
+OnError:
     return errCode;
 }
 
@@ -4802,10 +4836,12 @@ OnError:
     return result;
 }
 
-gctBOOL vscVIR_IsDefInstAndUsageInstSameBranch(VIR_DEF_USAGE_INFO* pDuInfo,
-                                               VIR_Instruction*    pUsageInst,
-                                               VIR_Instruction*    pDefInst)
+VSC_ErrCode vscVIR_IsDefInstAndUsageInstSameBranch(VIR_DEF_USAGE_INFO* pDuInfo,
+                                                   VIR_Instruction*    pUsageInst,
+                                                   VIR_Instruction*    pDefInst,
+                                                   gctBOOL_PTR         bResult)
 {
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
     gctBOOL                 bSameBranch = gcvFALSE;
     VIR_BB*                 pUsageBB = VIR_Inst_GetBasicBlock(pUsageInst);
     VIR_BB*                 pDefBB = VIR_Inst_GetBasicBlock(pDefInst);
@@ -4816,16 +4852,21 @@ gctBOOL vscVIR_IsDefInstAndUsageInstSameBranch(VIR_DEF_USAGE_INFO* pDuInfo,
 
     if (pUsageFunc != pDefFunc)
     {
-        return bSameBranch;
+        if(bResult)
+            *bResult = bSameBranch;
+        return errCode;
     }
 
     bbCount = CG_GET_HIST_GLOBAL_BB_COUNT(VIR_Function_GetFuncBlock(pUsageFunc)->pOwnerCG);
-    vscBV_Initialize(&bbMask, pDuInfo->baseTsDFA.baseDFA.pScratchMemPool, bbCount);
+    ON_ERROR0(vscBV_Initialize(&bbMask, pDuInfo->baseTsDFA.baseDFA.pScratchMemPool, bbCount));
 
     bSameBranch = _CheckTwoBasicBlockSameBranch(pDuInfo, pDefBB, pUsageBB, &bbMask);
 
+OnError:
     vscBV_Finalize(&bbMask);
-    return bSameBranch;
+    if(bResult)
+        *bResult = bSameBranch;
+    return errCode;
 }
 
 gctBOOL vscVIR_DoesDefInstHaveUniqueUsageInst(VIR_DEF_USAGE_INFO* pDuInfo,
@@ -5094,34 +5135,41 @@ gctBOOL vscVIR_IsUniqueDefInstOfUsagesInItsDUChain(VIR_DEF_USAGE_INFO* pDuInfo,
     if the currBB is already visited, return gcvFALSE;
 */
 
-static gctBOOL _vscVIR_DefInstInBetween(
+static VSC_ErrCode _vscVIR_DefInstInBetween(
     IN VIR_Instruction      *startInst,
     IN VIR_Instruction      *endInst,
     IN VIR_Instruction      *defInst,
-    IN OUT VSC_HASH_TABLE   *visitSet
+    IN OUT VSC_HASH_TABLE   *visitSet,
+    IN OUT gctBOOL_PTR       result
     )
 {
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VIR_BASIC_BLOCK     *currBB = VIR_Inst_GetBasicBlock(defInst);
     VIR_Instruction     *currInst;
+    gctBOOL             bTemp = gcvFALSE;
 
     if (vscHTBL_DirectTestAndGet(visitSet, (void*) currBB, gcvNULL))
     {
-        return gcvFALSE;
+        *result = gcvFALSE;
+        return errCode;
     }
 
-    vscHTBL_DirectSet(visitSet, (void*) currBB, gcvNULL);
+    errCode = vscHTBL_DirectSet(visitSet, (void*) currBB, gcvNULL);
+    ON_ERROR0(errCode);
 
     currInst = defInst;
     while (currInst)
     {
         if (currInst == endInst)
         {
-            return gcvFALSE;
+            *result = gcvFALSE;
+            return errCode;
         }
 
         if (currInst == startInst)
         {
-            return gcvTRUE;
+            *result = gcvTRUE;
+            return errCode;
         }
 
         currInst = VIR_Inst_GetPrev(currInst);
@@ -5135,7 +5183,8 @@ static gctBOOL _vscVIR_DefInstInBetween(
 
         if (DGND_GET_IN_DEGREE(&currBB->dgNode) == 0)
         {
-            return gcvFALSE;
+            *result = gcvFALSE;
+            return errCode;
         }
 
         VSC_ADJACENT_LIST_ITERATOR_INIT(&predEdgeIter, &currBB->dgNode.predList);
@@ -5152,14 +5201,19 @@ static gctBOOL _vscVIR_DefInstInBetween(
                 continue;
             }
 
-            if (_vscVIR_DefInstInBetween(startInst, endInst, BB_GET_END_INST(pPredBasicBlk), visitSet))
+            errCode = _vscVIR_DefInstInBetween(startInst, endInst, BB_GET_END_INST(pPredBasicBlk), visitSet, &bTemp);
+            ON_ERROR0(errCode);
+            if (bTemp)
             {
-                return gcvTRUE;
+                *result = gcvTRUE;
+                return errCode;
             }
         }
     }
 
-    return gcvFALSE;
+OnError:
+    *result = gcvFALSE;
+    return errCode;
 }
 
 static gctBOOL _vscVIR_DefBBInBetween(
@@ -5264,7 +5318,7 @@ static gctBOOL _vscVIR_DefBBInBetween(
     }
 }
 
-static gctBOOL
+static VSC_ErrCode
 _IsRedefineBetweenInsts(
     IN VSC_CHECK_REDEFINED_RES  *pResInfo,
     IN VIR_DEF_USAGE_INFO       *duInfo,
@@ -5273,7 +5327,8 @@ _IsRedefineBetweenInsts(
     IN VIR_Operand              *srcOpndOfStartInst,
     IN gctBOOL                  bCheckSameBBOnly,
     IN gctBOOL                  bCheckDifferentBBOnly,
-    OUT VIR_Instruction         **redefInst
+    OUT VIR_Instruction         **redefInst,
+    IN OUT gctBOOL_PTR          bResult
     )
 {
     VSC_ErrCode     errCode = VSC_ERR_NONE;
@@ -5290,6 +5345,7 @@ _IsRedefineBetweenInsts(
     gctUINT8        channel;
     VIR_DEF         *pDef;
     gctBOOL         bIsStartEndInSameBB = gcvFALSE;
+    gctBOOL         bDefInstInBetween = gcvFALSE;
 
     if (VIR_Inst_GetBasicBlock(startInst) == VIR_Inst_GetBasicBlock(endInst))
     {
@@ -5304,6 +5360,11 @@ _IsRedefineBetweenInsts(
     if (pInstHashTable == gcvNULL)
     {
         pInstHashTable = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 512);
+        if (pInstHashTable == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+            ON_ERROR0(errCode);
+        }
         pResInfo->pInstHashTable = pInstHashTable;
     }
 
@@ -5432,7 +5493,9 @@ _IsRedefineBetweenInsts(
                 vscHTBL_Reset(pBBHashTable);
                 /* If any of the instructions in the workSet, that is between
                     endInst and startInst, return gcvTURE.*/
-                if (_vscVIR_DefInstInBetween(startInst, endInst, pDef->defKey.pDefInst, pBBHashTable))
+                errCode = _vscVIR_DefInstInBetween(startInst, endInst, pDef->defKey.pDefInst, pBBHashTable, &bDefInstInBetween);
+                ON_ERROR(errCode, "_DefInstInBetween");
+                if (bDefInstInBetween)
                 {
                     retValue = gcvTRUE;
                     *redefInst = pDefInst;
@@ -5542,7 +5605,9 @@ _IsRedefineBetweenInsts(
 OnError:
     if(errCode != VSC_ERR_NONE)
         retValue = gcvFALSE;
-    return retValue;
+    if(bResult)
+        *bResult = retValue;
+    return errCode;
 }
 
 /*
@@ -5586,15 +5651,17 @@ OnError:
     }
 
 */
-gctBOOL vscVIR_RedefineBetweenInsts(
+VSC_ErrCode vscVIR_RedefineBetweenInsts(
     IN VSC_CHECK_REDEFINED_RES  *pResInfo,
     IN VIR_DEF_USAGE_INFO       *duInfo,
     IN VIR_Instruction          *startInst,
     IN VIR_Instruction          *endInst,
     IN VIR_Operand              *srcOpndOfStartInst,
-    OUT VIR_Instruction         **redefInst
+    OUT VIR_Instruction         **redefInst,
+    IN OUT gctBOOL_PTR          bResult
     )
 {
+    VSC_ErrCode     errCode = VSC_ERR_NONE;
     gctBOOL         retValue = gcvFALSE;
     gctBOOL         bIsStartEndInSameBB = gcvFALSE;
 
@@ -5606,7 +5673,9 @@ gctBOOL vscVIR_RedefineBetweenInsts(
     /* If there is no other instruction between start and end, just return. */
     if (bIsStartEndInSameBB && VIR_Inst_GetNext(startInst) == endInst)
     {
-        return retValue;
+        if(bResult)
+            *bResult = retValue;
+        return errCode;
     }
 
     /*
@@ -5615,22 +5684,23 @@ gctBOOL vscVIR_RedefineBetweenInsts(
     */
     if (bIsStartEndInSameBB)
     {
-        retValue = _IsRedefineBetweenInsts(pResInfo, duInfo, startInst, endInst, srcOpndOfStartInst, gcvTRUE, gcvFALSE, redefInst);
-
-        if (retValue)
-        {
-            return gcvTRUE;
-        }
-        else
-        {
-            return gcvFALSE;
-        }
+        errCode = _IsRedefineBetweenInsts(pResInfo, duInfo, startInst, endInst, srcOpndOfStartInst, gcvTRUE, gcvFALSE, redefInst, &retValue);
+        ON_ERROR0(errCode);
+        if(bResult)
+            *bResult = retValue;
+        return errCode;
     }
     else
     {
-        retValue = _IsRedefineBetweenInsts(pResInfo, duInfo, startInst, endInst, srcOpndOfStartInst, gcvFALSE, gcvFALSE, redefInst);
-        return retValue;
+        errCode = _IsRedefineBetweenInsts(pResInfo, duInfo, startInst, endInst, srcOpndOfStartInst, gcvFALSE, gcvFALSE, redefInst, &retValue);
+        ON_ERROR0(errCode);
+        if(bResult)
+            *bResult = retValue;
+        return errCode;
     }
+
+OnError:
+    return errCode;
 }
 
 /* Find the unique nearest defined instruction. */

@@ -830,6 +830,7 @@ VSC_ErrCode VSC_IL_InlineSingleFunction(
                                                                pCallSiteInst,
                                                                gcvTRUE,
                                                                pTempSet);
+                ON_ERROR(retValue, "");
             }
             /* move the kernel info to main if the callee is the currentKernel function
              * and change the currentKernel function to main */
@@ -845,6 +846,7 @@ VSC_ErrCode VSC_IL_InlineSingleFunction(
         }
     }
 
+OnError:
     /* update the call graph accordingly */
     vscDG_RemoveEdge((VSC_DIRECTED_GRAPH*)pCG,
         (VSC_DG_NODE*) VIR_Function_GetFuncBlock(pCallerFunc),
@@ -1001,6 +1003,7 @@ VSC_ErrCode VSC_IL_OptimizeCallStackDepth(
                 if (callerBlk->maxCallDepth == pFuncBlk->maxCallDepth - 1)
                 {
                     retValue = VSC_IL_InlineSingleFunction(pInliner, callerBlk->pVIRFunc, pFunc);
+                    ON_ERROR(retValue,"");
                     codeChanged = gcvTRUE;
                 }
             }
@@ -1015,6 +1018,8 @@ VSC_ErrCode VSC_IL_OptimizeCallStackDepth(
             }
         }
     }
+
+OnError:
     if (changed)
     {
         *changed = codeChanged;
@@ -1076,7 +1081,7 @@ VSC_ErrCode VSC_IL_TopDownInline(
                         VIR_Shader_GetSymNameString(pShader, VIR_Function_GetSymbol(pFunc)));
                     VIR_LOG_FLUSH(pDumper);
                 }
-                VSC_IL_SelectInlineFunctions(pInliner, pFunc, gcvTRUE);
+                CHECK_ERROR0(VSC_IL_SelectInlineFunctions(pInliner, pFunc, gcvTRUE));
             }
         }
     }
@@ -1098,7 +1103,7 @@ VSC_ErrCode VSC_IL_TopDownInline(
                         VIR_Shader_GetSymNameString(pShader, VIR_Function_GetSymbol(pFunc)));
                     VIR_LOG_FLUSH(pDumper);
                 }
-                VSC_IL_SelectInlineFunctions(pInliner, pFunc, gcvTRUE);
+                CHECK_ERROR0(VSC_IL_SelectInlineFunctions(pInliner, pFunc, gcvTRUE));
             }
         }
 
@@ -1121,7 +1126,7 @@ VSC_ErrCode VSC_IL_TopDownInline(
                             VIR_Shader_GetSymNameString(pShader, VIR_Function_GetSymbol(pFunc)));
                         VIR_LOG_FLUSH(pDumper);
                     }
-                    VSC_IL_SelectInlineFunctions(pInliner, pFunc, gcvFALSE);
+                    CHECK_ERROR0(VSC_IL_SelectInlineFunctions(pInliner, pFunc, gcvFALSE));
                 }
             }
         }
@@ -1167,6 +1172,7 @@ VSC_ErrCode VSC_IL_TopDownInline(
                 {
                     VIR_FUNC_BLOCK *callerBlk = CG_EDGE_GET_TO_FB(pEdge);
                     retValue = VSC_IL_InlineSingleFunction(pInliner, callerBlk->pVIRFunc, pFunc);
+                    ON_ERROR(retValue,"");
                 }
 
                 _VSC_IL_UpdateMaxCallDepth(pInliner, pFuncBlk);
@@ -1181,6 +1187,7 @@ VSC_ErrCode VSC_IL_TopDownInline(
         }
     }
 
+OnError:
     vscMM_Free(VSC_IL_GetMM(pInliner), ppFuncBlkRPO);
 
     return retValue;
@@ -1374,8 +1381,9 @@ VSC_ErrCode VSC_IL_PerformOnShader(
         ILPassData = *(VSC_IL_PASS_DATA *)pPassWorker->basePassWorker.pPassSpecificData;
     }
 
-    _VSC_IL_Init(&inliner, pShader, &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg,
-                 pOption, pDumper, pCG, pPassWorker->basePassWorker.pMM, &ILPassData);
+    retValue = _VSC_IL_Init(&inliner, pShader, &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg,
+                            pOption, pDumper, pCG, pPassWorker->basePassWorker.pMM, &ILPassData);
+    ON_ERROR(retValue,"");
 
     /* dump */
     if (VSC_UTILS_MASK(VSC_OPTN_ILOptions_GetTrace(pOption),
@@ -1403,6 +1411,7 @@ VSC_ErrCode VSC_IL_PerformOnShader(
         {
             retValue = VSC_IL_TopDownInline(&inliner);
             codeChanged |= (HTBL_GET_ITEM_COUNT(VSC_IL_GetCandidates(&inliner)) > 0);
+            ON_ERROR(retValue,"");
         }
     }
 
@@ -1420,6 +1429,8 @@ VSC_ErrCode VSC_IL_PerformOnShader(
         VIR_LOG_FLUSH(pDumper);
         pShader->dumper->invalidCFG = oldCFGFlag;
     }
+
+OnError:
     if (codeChanged)
     {
         pPassWorker->pResDestroyReq->s.bInvalidateCg = gcvTRUE;

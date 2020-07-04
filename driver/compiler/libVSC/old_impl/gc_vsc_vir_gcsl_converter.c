@@ -69,12 +69,12 @@ VIR_Inst_GetRelEnable(
     IN VIR_Operand     *Opnd
     );
 
-static VSC_ErrCode
+static gceSTATUS
 _InitialConverter(
     IN OUT Converter *Converter
     )
 {
-    VSC_ErrCode errCode = VSC_ERR_NONE;
+    gceSTATUS status = gcvSTATUS_OK;
     vscPMP_Intialize(&Converter->MemPool, gcvNULL, 1024, sizeof(void *), gcvTRUE/*pooling*/);
 
     Converter->InstTable = vscHTBL_Create(&Converter->MemPool.mmWrapper,
@@ -85,8 +85,8 @@ _InitialConverter(
         vscHFUNC_Default, vscHKCMP_Default, 32);
     if(Converter->InstTable == gcvNULL || Converter->FuncTable == gcvNULL || Converter->UniformTable == gcvNULL)
     {
-        errCode = VSC_ERR_OUT_OF_MEMORY;
-        return errCode;
+        status = gcvSTATUS_OUT_OF_MEMORY;
+        return status;
     }
 #if SAVE_TEMP_REGISTER
     {
@@ -98,7 +98,7 @@ _InitialConverter(
     }
 #endif
 
-    return errCode;
+    return status;
 }
 
 static void
@@ -120,16 +120,20 @@ _FindValue(
     return (gctSIZE_T)vscHTBL_DirectGet(Table, Key);
 }
 
-static VSC_ErrCode
+static gceSTATUS
 _AddValue(
     IN OUT VSC_HASH_TABLE *Table,
     IN void          *Key,
     IN gctSIZE_T      Value
     )
 {
+    gceSTATUS status    = gcvSTATUS_OK;
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     gcmASSERT(Table != gcvNULL);
+    errCode = vscHTBL_DirectSet(Table, Key, (void *)Value);
+    status = vscERR_CastErrCode2GcStatus(errCode);
 
-    return vscHTBL_DirectSet(Table, Key, (void *)Value);
+    return status;
 }
 
 static gctBOOL
@@ -2897,7 +2901,12 @@ _BuildLabelByFunction(
         if (opCode == VIR_OP_LABEL)
         {
             gcSHADER_LABEL label;
-            _AddValue(Converter->InstTable, inst, *InstCount);
+            status = _AddValue(Converter->InstTable, inst, *InstCount);
+            if (gcmIS_ERROR(status))
+            {
+                /* Error. */
+                return status;
+            }
 
             /* Allocate a new gcSHADER_LABEL structure.  */
             status = gcoOS_Allocate(gcvNULL,
@@ -3134,7 +3143,7 @@ gcSHADER_ConvFromVIR(
         return gcvSTATUS_INVALID_ARGUMENT;
     }
 
-    _InitialConverter(&converter);
+    gcmONERROR(_InitialConverter(&converter));
 
     /* convert shader flags */
     if (VIR_Shader_IsOldHeader(VirShader))
@@ -3241,7 +3250,8 @@ gcSHADER_ConvFromVIR(
                 gcmASSERT(Shader->uniformCount > j);
             }
 
-            _AddValue(converter.UniformTable, virUniform, virUniform->index);
+            status = _AddValue(converter.UniformTable, virUniform, virUniform->index);
+            gcmONERROR(status);
         }
         /******************************************************************************
 
@@ -3290,7 +3300,8 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
                     &gcUniform
                     );
 
-                _AddValue(converter.UniformTable, virUniform, gcUniform->index);
+                status = _AddValue(converter.UniformTable, virUniform, gcUniform->index);
+                gcmONERROR(status);
             }
         }
     }
@@ -4230,7 +4241,8 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
                     gcSHADER_AddFunction(Shader, name, &func);
 
                     /* Save the gcSL label. */
-                    _AddValue(converter.FuncTable, virFunc, GetFunctionLable(func));
+                    status = _AddValue(converter.FuncTable, virFunc, GetFunctionLable(func));
+                    gcmONERROR(status);
 
                     _ConvVirFunction2Function(&converter, func, virFunc);
                 }

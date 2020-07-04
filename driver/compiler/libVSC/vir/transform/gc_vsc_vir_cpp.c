@@ -121,18 +121,23 @@ static void VSC_CPP_Final(
     if the currBB is already visited, return gcvFALSE;
 */
 
-static gctBOOL _VSC_CPP_CallInstInBetween(
+static VSC_ErrCode _VSC_CPP_CallInstInBetween(
     IN VIR_Instruction      *startInst,
     IN VIR_Instruction      *endInst,
-    IN OUT VSC_HASH_TABLE   *visitSet
+    IN OUT VSC_HASH_TABLE   *visitSet,
+    IN OUT gctBOOL_PTR      bResult
     )
 {
+    VSC_ErrCode          errCode = VSC_ERR_NONE;
     VIR_BASIC_BLOCK     *currBB = VIR_Inst_GetBasicBlock(endInst);
     VIR_Instruction     *currInst;
+    gctBOOL              bCallInstInBetween = gcvFALSE;
 
     if (vscHTBL_DirectTestAndGet(visitSet, (void*) currBB, gcvNULL))
     {
-        return gcvFALSE;
+        if(bResult)
+            *bResult = gcvFALSE;
+        return errCode;
     }
 
     vscHTBL_DirectSet(visitSet, (void*) currBB, gcvNULL);
@@ -143,12 +148,16 @@ static gctBOOL _VSC_CPP_CallInstInBetween(
         /* if there is a call instruction in between, we should treat it as black box */
         if (VIR_Inst_GetOpcode(currInst) == VIR_OP_CALL)
         {
-            return gcvTRUE;
+            if(bResult)
+                *bResult = gcvTRUE;
+            return errCode;
         }
 
         if (currInst == startInst)
         {
-            return gcvFALSE;
+            if(bResult)
+                *bResult = gcvFALSE;
+            return errCode;
         }
 
         currInst = VIR_Inst_GetPrev(currInst);
@@ -162,7 +171,9 @@ static gctBOOL _VSC_CPP_CallInstInBetween(
 
         if (DGND_GET_IN_DEGREE(&currBB->dgNode) == 0)
         {
-            return gcvFALSE;
+            if(bResult)
+                *bResult = gcvFALSE;
+            return errCode;
         }
 
         VSC_ADJACENT_LIST_ITERATOR_INIT(&predEdgeIter, &currBB->dgNode.predList);
@@ -178,15 +189,21 @@ static gctBOOL _VSC_CPP_CallInstInBetween(
             {
                 continue;
             }
-
-            if (_VSC_CPP_CallInstInBetween(startInst, BB_GET_END_INST(pPredBasicBlk), visitSet))
+            errCode = _VSC_CPP_CallInstInBetween(startInst, BB_GET_END_INST(pPredBasicBlk), visitSet, &bCallInstInBetween);
+            ON_ERROR0(errCode);
+            if (bCallInstInBetween)
             {
-                return gcvTRUE;
+                if(bResult)
+                    *bResult = gcvTRUE;
+                return errCode;
             }
         }
     }
 
-    return gcvFALSE;
+OnError:
+    if(bResult)
+        *bResult = gcvFALSE;
+    return errCode;
 }
 
 static VSC_ErrCode _VSC_CPP_RemoveDefInst(
@@ -1148,18 +1165,21 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                                   VIR_Symbol_isUniform(VIR_Operand_GetSymbol(movSrc)) ||
                                   VIR_Symbol_isSampler(VIR_Operand_GetSymbol(movSrc)) ||
                                   VIR_Symbol_isImage(VIR_Operand_GetSymbol(movSrc)) ||
-                                  VIR_Symbol_isImageT(VIR_Operand_GetSymbol(movSrc)))
-                                 &&
-                                _VSC_CPP_CallInstInBetween(defInst, inst, visitSet))
+                                  VIR_Symbol_isImageT(VIR_Operand_GetSymbol(movSrc))))
                             {
-                                if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                                gctBOOL bCallInstInBetween = gcvFALSE;
+                                ON_ERROR0(_VSC_CPP_CallInstInBetween(defInst, inst, visitSet, &bCallInstInBetween));
+                                if(bCallInstInBetween)
                                 {
-                                    VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                                    VIR_LOG(dumper, "[FW] ==> bail out because of call\n");
-                                    VIR_LOG_FLUSH(dumper);
+                                    if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                                    {
+                                        VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                                        VIR_LOG(dumper, "[FW] ==> bail out because of call\n");
+                                        VIR_LOG_FLUSH(dumper);
+                                    }
+                                    vscHTBL_Reset(visitSet);
+                                    break;
                                 }
-                                vscHTBL_Reset(visitSet);
-                                break;
                             }
                             vscHTBL_Reset(visitSet);
                         }
@@ -1169,20 +1189,23 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                             if (!(VIR_Symbol_isUniform(VIR_Operand_GetSymbol(movSrc)) ||
                                   VIR_Symbol_isSampler(VIR_Operand_GetSymbol(movSrc)) ||
                                   VIR_Symbol_isImage(VIR_Operand_GetSymbol(movSrc)) ||
-                                  VIR_Symbol_isImageT(VIR_Operand_GetSymbol(movSrc)))
-                                &&
-                                vscVIR_RedefineBetweenInsts(&cpp->checkRedefinedResInfo, VSC_CPP_GetDUInfo(cpp),
-                                    defInst, inst, movSrc, &redefInst))
+                                  VIR_Symbol_isImageT(VIR_Operand_GetSymbol(movSrc))))
                             {
-                                if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                                gctBOOL bRedefineBetweenInsts = gcvFALSE;
+                                ON_ERROR0(vscVIR_RedefineBetweenInsts(&cpp->checkRedefinedResInfo, VSC_CPP_GetDUInfo(cpp),
+                                                                      defInst, inst, movSrc, &redefInst, &bRedefineBetweenInsts));
+                                if (bRedefineBetweenInsts)
                                 {
-                                    VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                                    VIR_LOG(dumper, "[FW] ==> bail out because of redefine\n");
-                                    VIR_LOG_FLUSH(dumper);
-                                    VIR_Inst_Dump(dumper, redefInst);
-                                    VIR_LOG_FLUSH(dumper);
+                                    if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                                    {
+                                        VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                                        VIR_LOG(dumper, "[FW] ==> bail out because of redefine\n");
+                                        VIR_LOG_FLUSH(dumper);
+                                        VIR_Inst_Dump(dumper, redefInst);
+                                        VIR_LOG_FLUSH(dumper);
+                                    }
+                                    break;
                                 }
-                                break;
                             }
                         }
                     }
@@ -2454,7 +2477,7 @@ static VSC_ErrCode _VSC_CPP_CopyPropagationForBB(
             if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetOPTS(options),
                 VSC_OPTN_CPPOptions_BACKWARD_OPT))
             {
-                 _VSC_CPP_CopyToMOV(cpp, inst, inst_def_set, inst_usage_set);
+                 CHECK_ERROR0(_VSC_CPP_CopyToMOV(cpp, inst, inst_def_set, inst_usage_set));
             }
         }
 
@@ -2628,6 +2651,7 @@ VSC_ErrCode VSC_CPP_PerformOnShader(
             break;
         }
     }
+    ON_ERROR(errcode,"");
 
     if (VSC_CPP_GetInvalidCfg(&cpp))
     {
@@ -2648,6 +2672,7 @@ VSC_ErrCode VSC_CPP_PerformOnShader(
         }
     }
 
+OnError:
     VSC_CPP_Final(&cpp);
 
     return errcode;
