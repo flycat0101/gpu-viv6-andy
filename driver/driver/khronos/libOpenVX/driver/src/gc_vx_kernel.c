@@ -2892,7 +2892,7 @@ gcfVX_CreateShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], gctBOOL
     }
 
     gcmONERROR(gcLinkKernel(kernelBinary,
-                          flags | gcvSHADER_REMOVE_UNUSED_UNIFORMS,
+                          flags | gcvSHADER_REMOVE_UNUSED_UNIFORMS | gcSHADER_FLAG_FORCE_GEN_FLOAT_MAD,
                           &programState));
 
     kernel->states.programState = programState;
