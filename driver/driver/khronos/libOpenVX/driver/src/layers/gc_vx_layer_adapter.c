@@ -742,11 +742,6 @@ VX_PRIVATE_API vx_bool vxoNNadapterLayer_SH_Support(vx_node node, const vx_refer
 
     support = support && enable_dataFormat;
 
-    if (support)
-    {
-        SETBIT(reg_param->flag, ((enable_dataFormat == vx_true_e) ? 1 : 0), 0);
-    }
-
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
     return support;

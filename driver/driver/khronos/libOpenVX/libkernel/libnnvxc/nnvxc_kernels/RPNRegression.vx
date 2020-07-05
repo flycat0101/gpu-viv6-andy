@@ -347,10 +347,8 @@ __kernel void vxcRPN_Regression_FP16toFP32
     return;
 #endif
 }
-
+_viv_uniform VXC_512Bits UniformDP4x4_cvtInt8toFp16_low;
 _viv_uniform float bboxScale;
-_viv_uniform float bboxZP;
-_viv_uniform VXC_512Bits Uni4x4_Cvt2Float32_low;
 
 __kernel void vxcRPN_Regression_INT8
     (
@@ -419,15 +417,13 @@ __kernel void vxcRPN_Regression_INT8
     VXC_ReadImage2DArray(d_log_h , box_data, d_log_h_coord, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
 
     vxc_float4 dx_f, dy_f, d_log_w_f, d_log_h_f;
+    half scale_h;
+    _viv_asm(CONV, scale_h, bboxScale);
 
-    VXC_DP4x4(dx_f , dx , dx , VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), Uni4x4_Cvt2Float32_low);
-    VXC_DP4x4(dy_f , dy , dy , VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), Uni4x4_Cvt2Float32_low);
-    VXC_DP4x4(d_log_w_f , d_log_w , d_log_w , VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), Uni4x4_Cvt2Float32_low);
-    VXC_DP4x4(d_log_h_f , d_log_h , d_log_h , VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), Uni4x4_Cvt2Float32_low);
-    dx_f = (dx_f - bboxZP) * bboxScale;
-    dy_f = (dy_f - bboxZP) * bboxScale;
-    d_log_w_f = (d_log_w_f - bboxZP) * bboxScale;
-    d_log_h_f = (d_log_h_f - bboxZP) * bboxScale;
+    VXC_DP4x4(dx_f , dx , scale_h , VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), UniformDP4x4_cvtInt8toFp16_low);
+    VXC_DP4x4(dy_f , dy , scale_h , VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), UniformDP4x4_cvtInt8toFp16_low);
+    VXC_DP4x4(d_log_w_f , d_log_w , scale_h , VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), UniformDP4x4_cvtInt8toFp16_low);
+    VXC_DP4x4(d_log_h_f , d_log_h , scale_h , VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), UniformDP4x4_cvtInt8toFp16_low);
 
     d_log_w_f = exp(d_log_w_f);
     d_log_h_f = exp(d_log_h_f);
@@ -509,7 +505,7 @@ __kernel void vxcRPN_Regression_INT8
     VXC_WriteImage2DArray(output_data, output_coord, box3_st8, VXC_MODIFIER(0, 4, 0, VXC_RM_TowardZero, 0));
     return;
 }
-
+_viv_uniform VXC_512Bits Uni4x4_Cvt2Float32_low;
 __kernel void vxcRPN_Regression_INT8toFP32
     (
     image2d_array_t score_data,
@@ -577,15 +573,17 @@ __kernel void vxcRPN_Regression_INT8toFP32
     VXC_ReadImage2DArray(d_log_h , box_data, d_log_h_coord, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
 
     vxc_float4 dx_f, dy_f, d_log_w_f, d_log_h_f;
+    half scale_h;
+    _viv_asm(CONV, scale_h, bboxScale);
 
     VXC_DP4x4(dx_f , dx , dx , VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), Uni4x4_Cvt2Float32_low);
     VXC_DP4x4(dy_f , dy , dy , VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), Uni4x4_Cvt2Float32_low);
     VXC_DP4x4(d_log_w_f , d_log_w , d_log_w , VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), Uni4x4_Cvt2Float32_low);
     VXC_DP4x4(d_log_h_f , d_log_h , d_log_h , VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), Uni4x4_Cvt2Float32_low);
-    dx_f = (dx_f - bboxZP) * bboxScale;
-    dy_f = (dy_f - bboxZP) * bboxScale;
-    d_log_w_f = (d_log_w_f - bboxZP) * bboxScale;
-    d_log_h_f = (d_log_h_f - bboxZP) * bboxScale;
+    dx_f = dx_f * bboxScale;
+    dy_f = dy_f * bboxScale;
+    d_log_w_f = d_log_w_f * bboxScale;
+    d_log_h_f = d_log_h_f * bboxScale;
 
     d_log_w_f = exp(d_log_w_f);
     d_log_h_f = exp(d_log_h_f);
@@ -690,6 +688,7 @@ __kernel void vxcRPN_Regression_INT8toFP32
 #endif
 }
 _viv_uniform VXC_512Bits Uni4x4_Sub_ZP_low;
+_viv_uniform float bboxZP;
 __kernel void vxcRPN_Regression_UINT8
     (
     image2d_array_t score_data,

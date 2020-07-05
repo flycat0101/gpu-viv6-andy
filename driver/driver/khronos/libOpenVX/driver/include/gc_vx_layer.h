@@ -275,11 +275,9 @@ enum vxnne_kernel_e
     VXNNE_KERNEL_GPU_NORMALIZATION,
     VXNNE_KERNEL_FULLYCONNECTED,
     VXNNE_KERNEL_GPU_FULLYCONNECTED,
-    VXNNE_KERNEL_RELUN,
+    VXNNE_KERNEL_ACTIVATION,
     VXNNE_KERNEL_GPU_ACTIVATION,
-    VXNNE_KERNEL_SOFTMAX_AXIS0,
-    VXNNE_KERNEL_SOFTMAX_AXIS1,
-    VXNNE_KERNEL_SOFTMAX_AXIS2,
+    VXNNE_KERNEL_SOFTMAX,
     VXNNE_KERNEL_GPU_SOFTMAX,
     VXNNE_KERNEL_REORG,
     VXNNE_KERNEL_GPU_REORG,
@@ -306,17 +304,16 @@ enum vxnne_kernel_e
     VXNNE_KERNEL_GPU_TENSOR2ROW,
     VXNNE_KERNEL_GEMM,
     VXNNE_KERNEL_GPU_GEMM,
-    VXNNE_KERNEL_L2NORM_AXIS0,
-    VXNNE_KERNEL_GPU_L2NORM_AXIS0,
-    VXNNE_KERNEL_L2NORM_AXIS1,
-    VXNNE_KERNEL_GPU_L2NORM_AXIS1,
-    VXNNE_KERNEL_L2NORM_AXIS2,
-    VXNNE_KERNEL_GPU_L2NORM_AXIS2,
+    VXNNE_KERNEL_L2NORM_SUMSQRT,
+    VXNNE_KERNEL_GPU_L2NORM_SUMSQRT,
+    VXNNE_KERNEL_L2NORM_SUMSCALE,
+    VXNNE_KERNEL_GPU_L2NORM_SUMSCALE,
     VXNNE_KERNEL_TENSOR_LSTMLAYER,
     VXNNE_KERNEL_TENSOR_LSTMUNIT,
     VXNNE_KERNEL_GPU_TENSOR_LSTMUNIT,
     VXNNE_KERNEL_AVGPOOLING_INT16,
     VXNNE_KERNEL_AVGPOOLING_UINT8,
+    VXNNE_KERNEL_ACTIVATION_UINT8,
     VXNNE_KERNEL_TF_AVGPOOLING,
     VXNNE_KERNEL_ROIPOOL,
     VXNNE_KERNEL_GPU_ROIPOOL,
@@ -381,35 +378,11 @@ enum vxnne_kernel_e
     VXNNE_KERNEL_GPU_BATCH2SPACE,
     VXNNE_KERNEL_SHUFFLECHANNEL,
     VXNNE_KERNEL_GPU_SHUFFLECHANNEL,
-    VXNNE_KERNEL_TENSOR_LINEAR,
-    VXNNE_KERNEL_GPU_TENSOR_LINEAR,
     VXNNE_KERNEL_TENSOREXPAND,
     VXNNE_KERNEL_GPU_TENSOREXPAND,
     VXNNE_KERNEL_FC_TP_CHECK,
-    VXNNE_KERNEL_SWISH,
-    VXNNE_KERNEL_GPU_SWISH,
-    VXNNE_KERNEL_HSWISH,
-    VXNNE_KERNEL_GPU_HSWISH,
     VXNNE_KERNEL_FIXED_COUNT,
 };
-
-typedef enum
-{
-    INVALID = 0,
-    I8 = 1,
-    I16,
-    I32,
-    I64,
-    U8,
-    U16,
-    U32,
-    U64,
-    F16,
-    F32,
-    F64,
-    BF16,
-    BOOL8
-} vx_sh_kernel_type_e;
 
 #define VXNNE_KERNEL_DYNAMIC_COUNT 1024
 
@@ -2031,7 +2004,6 @@ typedef struct _vxnne_l2normalize_operation_s
     vxnne_operation_s                base;
     vx_tensor                        inputs;
     vx_tensor                        outputs;
-    vx_int32                         axis;
 }
 vxnne_l2normalize_operation_s, * vxnne_l2normalize_operation;
 
@@ -2040,7 +2012,8 @@ typedef struct _vxnne_l2normalize_layer_s
     vxnne_layer_s                                   base;
     vxnne_operation                                 operations[2];
     vxnne_l2normalize_operation_s                   l2normalize_sw_operation;
-    vxnne_shader_operation_s                        l2normalize_sh_operation;
+    vxnne_shader_operation_s                        l2normalize_SumSqrt_sh_operation;
+    vxnne_shader_operation_s                        l2normalize_sumScale_sh_operation;
 }
 vxnne_l2normalize_layer_s, *vxnne_l2normalize_layer;
 
@@ -2910,23 +2883,6 @@ vxnne_shader_executable vxnneGetLeakyReluShaderExecutable(
     vx_tensor               output
     );
 
-vxnne_shader_executable vxnneGetSwishShaderExecutable(
-    vx_context              context,
-    vx_enum                 kernelEnum,
-    vx_border_mode_t        *borderMode,
-    vx_tensor               input,
-    vx_scalar               beta,
-    vx_tensor               output
-    );
-
-vxnne_shader_executable vxnneGetHSwishShaderExecutable(
-    vx_context              context,
-    vx_enum                 kernelEnum,
-    vx_border_mode_t        *borderMode,
-    vx_tensor               input,
-    vx_tensor               output
-    );
-
 vxnne_shader_executable vxnneGetFC_TPCheckShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
@@ -3052,25 +3008,17 @@ vxnne_shader_executable vxnneGetActivationShaderExecutable(
     vx_float32              maxVal,
     vx_tensor               output);
 
-vxnne_shader_executable vxnneGetSoftmaxAxis0ShaderExecutable(
+vxnne_shader_executable vxnneGetActivation_UInt8ShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
-    vx_uint32               dims,
+    vx_enum                 funcType,
     vx_tensor               input,
-    vx_float32              beta,
+    vx_float32              minVal,
+    vx_float32              maxVal,
     vx_tensor               output);
 
-vxnne_shader_executable vxnneGetSoftmaxAxis1ShaderExecutable(
-    vx_context              context,
-    vx_enum                 kernelEnum,
-    vx_border_mode_t        *borderMode,
-    vx_uint32               dims,
-    vx_tensor               input,
-    vx_float32              beta,
-    vx_tensor               output);
-
-vxnne_shader_executable vxnneGetSoftmaxAxis2ShaderExecutable(
+vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
@@ -3441,28 +3389,19 @@ vxnne_shader_executable vxnneGemm_noBiasShaderExecutable(
     vx_uint32               overflow_policy,
     vx_tensor               output);
 
-vxnne_shader_executable vxnneGetL2NormAxis0ShaderExecutable(
+vxnne_shader_executable vxnneL2NormSumSqrtShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
-    vx_uint32               axis,
     vx_tensor               input,
     vx_tensor               output);
 
-vxnne_shader_executable vxnneGetL2NormAxis1ShaderExecutable(
+vxnne_shader_executable vxnneL2NormSumScaleShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
-    vx_uint32               axis,
     vx_tensor               input,
-    vx_tensor               output);
-
-vxnne_shader_executable vxnneGetL2NormAxis2ShaderExecutable(
-    vx_context              context,
-    vx_enum                 kernelEnum,
-    vx_border_mode_t        *borderMode,
-    vx_uint32               axis,
-    vx_tensor               input,
+    vx_tensor               sumTmp,
     vx_tensor               output);
 
 vxnne_shader_executable vxnneLSTMUnitShaderExecutable(
@@ -3674,22 +3613,6 @@ vxnne_shader_executable vxnneGetTensorPad2ShaderExecutable(
     vx_tensor               outputs,
     vx_int32                *pad_dims);
 
-vxnne_shader_executable vxnneGetTensorPadSymShaderExecutable(
-    vx_context              context,
-    vx_enum                 kernelEnum,
-    vx_border_mode_t        *borderMode,
-    vx_tensor               inputs,
-    vx_tensor               outputs,
-    vx_int32                *pad_dims);
-
-vxnne_shader_executable vxnneGetTensorPadRefShaderExecutable(
-    vx_context              context,
-    vx_enum                 kernelEnum,
-    vx_border_mode_t        *borderMode,
-    vx_tensor               inputs,
-    vx_tensor               outputs,
-    vx_int32                *pad_dims);
-
 vxnne_shader_executable vxnneGetTFAvgPoolingShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
@@ -3789,15 +3712,6 @@ vxnne_shader_executable vxnneGetTensor2DAddShaderExecutable(
     vx_tensor               input1,
     vx_int32                activation,
     vx_enum                 operation,
-    vx_tensor               output);
-
-vxnne_shader_executable vxnneGetTensorLinearShaderExecutable(
-    vx_context              context,
-    vx_enum                 kernelEnum,
-    vx_border_mode_t        *borderMode,
-    vx_tensor               input,
-    vx_scalar               a_s,
-    vx_scalar               b_s,
     vx_tensor               output);
 
 vxnne_shader_executable vxnneGetTensorAbsShaderExecutable(
@@ -4016,32 +3930,20 @@ vxnne_shader_executable vxnneGetGPUHashLUTShaderExecutable(
     vx_tensor               output
     );
 
-vxnne_shader_executable vxnneGetGPUL2NormAxis0ShaderExecutable(
+vxnne_shader_executable vxnneGPUL2NormSumSqrtShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
-    vx_int32                axis,
     vx_tensor               input,
-    vx_tensor               output
-    );
+    vx_tensor               output);
 
-vxnne_shader_executable vxnneGetGPUL2NormAxis1ShaderExecutable(
+vxnne_shader_executable vxnneGPUL2NormSumScaleShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
-    vx_int32                axis,
     vx_tensor               input,
-    vx_tensor               output
-    );
-
-vxnne_shader_executable vxnneGetGPUL2NormAxis2ShaderExecutable(
-    vx_context              context,
-    vx_enum                 kernelEnum,
-    vx_border_mode_t        *borderMode,
-    vx_int32                axis,
-    vx_tensor               input,
-    vx_tensor               output
-    );
+    vx_tensor               sumTmp,
+    vx_tensor               output);
 
 vxnne_shader_executable vxnneGetGPUReorgShaderExecutable(
     vx_context              context,
@@ -4350,24 +4252,6 @@ vxnne_shader_executable vxnneGetGPULeakyReluShaderExecutable(
     vx_scalar               alpha,
     vx_tensor               output);
 
-vxnne_shader_executable vxnneGetGPUSwishShaderExecutable(
-    vx_context              context,
-    vx_enum                 kernelEnum,
-    vx_border_mode_t        *borderMode,
-    vx_tensor               input,
-    vx_scalar               beta,
-    vx_tensor               output
-    );
-
-vxnne_shader_executable vxnneGetGPUHSwishShaderExecutable(
-    vx_context              context,
-    vx_enum                 kernelEnum,
-    vx_border_mode_t        *borderMode,
-    vx_tensor               input,
-    vx_tensor               output
-    );
-
-
 vxnne_shader_executable vxnneGetGPUBatchNormShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
@@ -4377,15 +4261,6 @@ vxnne_shader_executable vxnneGetGPUBatchNormShaderExecutable(
     vx_tensor               weights,
     vx_tensor               biases,
     vx_tensor               output);
-
-vxnne_shader_executable vxnneGetGPUTensorLinearShaderExecutable(
-    vx_context              context,
-    vx_enum                 kernelEnum,
-    vx_border_mode_t        *borderMode,
-    vx_tensor               inputs,
-    vx_scalar               a_s,
-    vx_scalar               b_s,
-    vx_tensor               outputs);
 
 vxnne_shader_executable vxnneGetGPUTensorTRShaderExecutable(
     vx_context              context,
