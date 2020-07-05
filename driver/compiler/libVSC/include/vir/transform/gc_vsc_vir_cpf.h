@@ -73,7 +73,6 @@ typedef struct _VSC_CPF
     VSC_HASH_TABLE              constTable;    /* hash table to save the const information
                                                   key: (tempIdx*4 + channel) and bbIdx
                                                   value: VSC_CPF_Const */
-    VSC_HASH_TABLE              visitedBBSet;     /* hash table to tag current BB is visited */
     /* We need a loop to check that in/out flow. */
     VIR_LoopOpts                loopOpts;
     gctBOOL                     codeChanged;
@@ -102,7 +101,6 @@ typedef struct _VSC_CPF
 #define VSC_CPF_GetConstTable(cpf)              (&(cpf)->constTable)
 #define VSC_CPF_GetLoopOpts(cpf)                ((cpf)->loopOpts)
 #define VSC_CPF_SetLoopOpts(cpf, l)             ((cpf)->loopOpts = (l))
-#define VSC_CPF_GetVisitBBSet(cpf)              (&(cpf)->visitedBBSet)
 
 #define VSC_CPF_CodeChanged(cpf)                ((cpf)->codeChanged)
 #define VSC_CPF_SetCodeChange(cpf, cc)          ((cpf)->codeChanged = cc)
