@@ -803,6 +803,8 @@ gbm_viv_bo_create(
     uint32_t handle = 0;
     uint32_t alignedWidth;
     uint32_t alignedHeight;
+    gceCHIPMODEL chipModel;
+    gctUINT32 chipRevision;
     struct gbm_viv_device *dev = gbm_viv_device(gbm);
     gceSTATUS status = gcvSTATUS_OK;
 
@@ -850,7 +852,10 @@ gbm_viv_bo_create(
     gcmONERROR(gcoSURF_Construct(NULL, width, height, 1, surfType, gc_format, gcvPOOL_DEFAULT, &rtSurf));
     bo->surface = rtSurf;
 
-    if ((surfType & 0xFF) != gcvSURF_BITMAP || gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_LINEAR_RENDER_TARGET))
+    gcoHAL_QueryChipIdentity(gcvNULL, &chipModel, &chipRevision, gcvNULL, gcvNULL);
+
+    if ((surfType & 0xFF) != gcvSURF_BITMAP ||
+        (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_LINEAR_RENDER_TARGET) && (chipModel == gcv7000 && chipRevision == 0x6202)))
     {
         gcmONERROR(gcoSURF_SetFlags(rtSurf,
                                     gcvSURF_FLAG_CONTENT_YINVERTED,
@@ -978,7 +983,11 @@ gbm_viv_create_buffers(
     )
 {
     int i;
+    gceCHIPMODEL chipModel;
+    gctUINT32 chipRevision;
     gceSTATUS status = gcvSTATUS_OK;
+
+    gcoHAL_QueryChipIdentity(gcvNULL, &chipModel, &chipRevision, gcvNULL, gcvNULL);
 
     for (i = 0; i < surf->buffer_count; i++)
     {
@@ -1002,7 +1011,8 @@ gbm_viv_create_buffers(
             ** we found some DC using modifier == 0xFFFFFFFF,
             ** which is also suitable use direct linear output.
             */
-            surf->extResolve = gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_LINEAR_RENDER_TARGET) ?
+            surf->extResolve = (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_LINEAR_RENDER_TARGET) &&
+                              (chipModel == gcv7000 && chipRevision == 0x6202)) ?
                                 gcvSTATUS_TRUE :
                                 gcvSTATUS_FALSE;
             break;
