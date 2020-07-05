@@ -2055,6 +2055,10 @@ gckGALDEVICE_Construct(
     device->baseAddress = device->physBase = Args->baseAddress;
     device->physSize = Args->physSize;
 
+    /* Set the external base address */
+    device->externalBase = Args->externalBase;
+    device->externalSize = Args->externalSize;
+
     for (i = 0; i < gcvSRAM_EXT_COUNT; i++)
     {
         device->extSRAMBases[i] = Args->extSRAMBases[i];
@@ -2063,6 +2067,39 @@ gckGALDEVICE_Construct(
 
     /* Construct the gckOS object. */
     gcmkONERROR(gckOS_Construct(device, &device->os));
+
+
+    if (device->externalSize > 0)
+    {
+        /* create the external memory heap */
+        status = gckVIDMEM_Construct(
+            device->os,
+            device->externalBase,
+            device->externalSize,
+            64,
+            0,
+            &device->externalVidMem
+            );
+
+        if (gcmIS_ERROR(status))
+        {
+            /* Error, disable external heap. */
+            device->externalSize = 0;
+        }
+        else
+        {
+            /* Map external memory. */
+            gcmkONERROR(gckOS_RequestReservedMemory(
+                    device->os,
+                    device->externalBase, device->externalSize,
+                    "galcore external memory",
+                    gcvTRUE,
+                    &device->externalPhysical
+                    ));
+
+            device->externalVidMem->physical = device->externalPhysical;
+        }
+    }
 
     /* Construct the gckDEVICE object for os independent core management. */
     gcmkONERROR(gckDEVICE_Construct(device->os, &device->device));
@@ -2078,10 +2115,6 @@ gckGALDEVICE_Construct(
 
     /* Setup contiguous video memory pool. */
     gcmkONERROR(_SetupContiguousVidMem(device, Args));
-
-    /* Set external base and size */
-    device->externalBase = Args->externalBase;
-    device->externalSize = Args->externalSize;
 
 #if gcdEXTERNAL_SRAM_DEFAULT_POOL
     /* Setup external SRAM video memory pool. */
@@ -2235,39 +2268,6 @@ gckGALDEVICE_Construct(
     if (!kernel)
     {
         gcmkONERROR(gcvSTATUS_INVALID_ARGUMENT);
-    }
-
-
-    if (device->externalSize > 0)
-    {
-        /* create the external memory heap */
-        status = gckVIDMEM_Construct(
-            device->os,
-            device->externalBase,
-            device->externalSize,
-            64,
-            0,
-            &device->externalVidMem
-            );
-
-        if (gcmIS_ERROR(status))
-        {
-            /* Error, disable external heap. */
-            device->externalSize = 0;
-        }
-        else
-        {
-            /* Map external memory. */
-            gcmkONERROR(gckOS_RequestReservedMemory(
-                    device->os,
-                    device->externalBase, device->externalSize,
-                    "galcore external memory",
-                    gcvTRUE,
-                    &device->externalPhysical
-                    ));
-
-            device->externalVidMem->physical = device->externalPhysical;
-        }
     }
 
     if (device->internalPhysical)
