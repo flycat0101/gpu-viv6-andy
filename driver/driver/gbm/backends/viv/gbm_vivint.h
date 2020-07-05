@@ -19,7 +19,7 @@
 #include "gbmint.h"
 #include "common_drm.h"
 
-#define GBM_MAX_BUFFER  4
+#define GBM_MAX_BUFFER  3
 #define GBM_QUEUE_SIZE (GBM_MAX_BUFFER + 1)
 
 struct gbm_viv_surface;

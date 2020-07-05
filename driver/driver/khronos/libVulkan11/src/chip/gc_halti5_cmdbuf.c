@@ -10998,7 +10998,7 @@ static VkResult halti5_helper_setDescSetStorage(
                         uint32_t offset = (uint32_t)resInfo->u.bufferInfo.offset + dynamicOffsets[(*dynamicOffsetIndex) + arrayIdx];
                         __vkBuffer *buf = resInfo->u.bufferInfo.buffer;
                         physical = buf->memory->devAddr;
-                        offset += buf->memOffset;
+                        offset += (uint32_t)buf->memOffset;
                         physical += offset;
                         data[dataCount++] = physical;
                         if (devCtx->enabledFeatures.robustBufferAccess)
