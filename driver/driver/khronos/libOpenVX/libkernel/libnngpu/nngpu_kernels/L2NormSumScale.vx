@@ -1,0 +1,40 @@
+__kernel void gpuL2NormScale_MulScaleFP32
+    (
+    image2d_array_t input0,
+    image2d_t input1,
+    image2d_array_t output
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    float4 src0, src1, dst = {0.0};
+
+    src0 = read_imagef(input0, coord);
+    src1 = read_imagef(input1, coord.xy);
+    dst.x = src0.x * src1.x;
+
+    write_imagef(output, coord, dst);
+}
+
+__kernel void gpuL2NormScale_MulScaleQuant8
+    (
+    image2d_array_t input0,
+    image2d_t input1,
+    float scaleIn,
+    float scaleOut,
+    float zpIn,
+    float zpOut,
+    image2d_array_t output
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    uint4 tmp, dst = {0.0};
+    float4 src1;
+    float src0;
+
+    tmp = read_imageui(input0, coord);
+    src0 = (convert_float(tmp.x) - zpIn)*scaleIn;
+    src1 = read_imagef(input1, coord.xy);
+    dst.x = floor(src0 * src1.x * scaleOut + zpOut);
+
+    write_imageui(output, coord, dst);
+}

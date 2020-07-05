@@ -366,7 +366,6 @@ LSTM_UNIT_FP16_P5_PROJECTION(F16,  convert_F16addF16toF32,   F16, convert_F32toF
 LSTM_UNIT_FP16_P5_PROJECTION(BF16, convert_BF16addBF16toF32, BF16, convert_F32toBF16)
 
 _viv_uniform float outputScale;
-_viv_uniform float outputZP;
 _viv_uniform VXC_512Bits uniExtractInteger_2x8;
 __kernel void vxcLSTMUnitHiddenOutExt_F16toI8_P3(
     __read_only  image2d_array_t  input_conv,
@@ -398,7 +397,7 @@ __kernel void vxcLSTMUnitHiddenOutExt_F16toI8_P3(
     write_imagef(cell_state, coord_in.zy, data_i_t);
     data_o_t = sigmoid(data_o_t);
     data_f_t = tangentH(data_i_t);
-    data_o_t = data_o_t * data_f_t * outputScale + outputZP;
+    data_o_t = data_o_t * data_f_t * outputScale;
     _viv_asm(CONV_RTE, dst0, data_o_t);
     vxc_char4 dst;
     VXC_DP2x8(dst, dst0, dst0, VXC_MODIFIER(0, 3, 0, VXC_RM_ToNearestEven, 1), uniExtractInteger_2x8);
@@ -452,7 +451,7 @@ __kernel void vxcLSTMUnitHiddenOutExt_F16toI8_P4(
     write_imagef(cell_state, coord_in.zy, data_c_t);
     data_o_t = sigmoid(data_o_t);
     data_f_t = tangentH(data_c_t);
-    data_o_t = data_o_t * data_f_t * outputScale + outputZP;
+    data_o_t = data_o_t * data_f_t * outputScale;
     _viv_asm(CONV_RTE, dst0, data_o_t);
     vxc_char4 dst;
     VXC_DP2x8(dst, dst0, dst0, VXC_MODIFIER(0, 3, 0, VXC_RM_ToNearestEven, 1), uniExtractInteger_2x8);
@@ -509,7 +508,7 @@ __kernel void vxcLSTMUnitHiddenOutExt_F16toI8_P6_NP(
     data_o_t = sigmoid(data_o_t);
     write_imagef(cell_state_out, coord_in.zyww, data_c_t);
     data_c_t = tangentH(data_c_t);
-    data_o_t = data_o_t * data_c_t * outputScale + outputZP;
+    data_o_t = data_o_t * data_c_t * outputScale;
     _viv_asm(CONV_RTE, dst, data_o_t);
 
     vxc_char4 data;
@@ -518,6 +517,7 @@ __kernel void vxcLSTMUnitHiddenOutExt_F16toI8_P6_NP(
     VXC_WriteImage(hidden_state_out, coord_in.zy, data, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
 }
 
+_viv_uniform float outputZP;
 __kernel void vxcLSTMUnitHiddenOutExt_F16toU8_P3(
     __read_only  image2d_array_t  input_conv,
       image2d_t  cell_state,
@@ -698,7 +698,7 @@ __kernel void vxcLSTMUnitHiddenOutExt_F16toI16_P3(
     write_imagef(cell_state, coord_in.zy, data_i_t);
     data_o_t = sigmoid(data_o_t);
     data_f_t = tangentH(data_i_t);
-    data_o_t = data_o_t * data_f_t * outputScale + outputZP;
+    data_o_t = data_o_t * data_f_t * outputScale;
     _viv_asm(CONV_RTE, dst0, data_o_t);
     vxc_short4 dst;
     VXC_DP2x8(dst, dst0, dst0, VXC_MODIFIER(0, 3, 0, VXC_RM_ToNearestEven, 1), uniExtractInteger_2x8);
@@ -752,7 +752,7 @@ __kernel void vxcLSTMUnitHiddenOutExt_F16toI16_P4(
     write_imagef(cell_state, coord_in.zy, data_c_t);
     data_o_t = sigmoid(data_o_t);
     data_f_t = tangentH(data_c_t);
-    data_o_t = data_o_t * data_f_t * outputScale + outputZP;
+    data_o_t = data_o_t * data_f_t * outputScale;
     _viv_asm(CONV_RTE, dst0, data_o_t);
     vxc_short4 dst;
     VXC_DP2x8(dst, dst0, dst0, VXC_MODIFIER(0, 3, 0, VXC_RM_ToNearestEven, 1), uniExtractInteger_2x8);
@@ -809,7 +809,7 @@ __kernel void vxcLSTMUnitHiddenOutExt_F16toI16_P6_NP(
     data_o_t = sigmoid(data_o_t);
     write_imagef(cell_state_out, coord_in.zyww, data_c_t);
     data_c_t = tangentH(data_c_t);
-    data_o_t = data_o_t * data_c_t * outputScale + outputZP;
+    data_o_t = data_o_t * data_c_t * outputScale;
     _viv_asm(CONV_RTE, dst, data_o_t);
 
     vxc_short4 data;

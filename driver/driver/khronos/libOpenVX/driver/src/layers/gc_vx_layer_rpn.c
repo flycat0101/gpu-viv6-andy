@@ -522,7 +522,7 @@ vx_status vxnneExecuteSWRPN_Regression(struct _vxnne_operation_s *operation)
     vx_uint32 proposal_area     = proposal_width * proposal_height;
 
     vx_uint8_ptr bbox_data = VX_NULL, img_data = VX_NULL, anchor_data = VX_NULL, score_data = VX_NULL,out_data = VX_NULL;
-    /*vx_float32_ptr foreground_score, proposals, p_proposals;*/
+    vx_float32_ptr /*foreground_score,*/ proposals, p_proposals;
 
     vx_float32 img_W,img_H,img_scale_H,img_scale_W,min_box_H,min_box_W;
     vx_uint32 w, h, k;
@@ -534,7 +534,7 @@ vx_status vxnneExecuteSWRPN_Regression(struct _vxnne_operation_s *operation)
     vxmONERROR(vxnneGetTensorMemeory(anchor, (vx_ptr_ptr)&anchor_data, input_stage, vx_false_e));
     vxmONERROR(vxnneGetTensorMemeory(output, (vx_ptr_ptr)&out_data, output_stage, vx_true_e));
 
-    /*proposals        = (vx_float32_ptr)out_data;*/
+    proposals        = (vx_float32_ptr)out_data;
 
     img_W       = (vx_float32)vxnneGetDataExt(in_img_format, in_img_quant_format, 0, (vx_uint8_ptr)img_data, in_img_fp, in_img_zp, in_img_scale);
     img_H       = (vx_float32)vxnneGetDataExt(in_img_format, in_img_quant_format, 1, (vx_uint8_ptr)img_data, in_img_fp, in_img_zp, in_img_scale);
@@ -543,7 +543,7 @@ vx_status vxnneExecuteSWRPN_Regression(struct _vxnne_operation_s *operation)
     min_box_W   = min_size * img_scale_W;
     min_box_H   = min_size * img_scale_H;
 
-    /*p_proposals = proposals;*/
+    p_proposals = proposals;
     for(h=0; h<proposal_height; h++)
     {
         for(w=0; w<proposal_width; w++)
@@ -638,6 +638,7 @@ vx_status vxnneExecuteSWRPN_Sort(struct _vxnne_operation_s *operation)
         vx_int16_ptr proposals_ptr = (vx_int16_ptr)proposals_data;
 
         // xzq test
+
         vx_nn_rpn_qsort_box_fp16(proposals_ptr, 0, proposal_count-1, pre_nms_topn);
     }
     else
@@ -658,6 +659,7 @@ vx_status vxnneExecuteSWRPN_Sort(struct _vxnne_operation_s *operation)
 
         vxFree(proposals_data);
     }
+
     return status;
 }
 
@@ -793,11 +795,12 @@ vx_status vxnneExecuteSWRPN_Retrieve(struct _vxnne_operation_s *operation)
         out_score_scale = TENSOR_TF_SCALE(score_output);
     }
 
+
     real_roi = real_roi_t->value->u32;
 
     for(i = 0; i < real_roi; i++)
     {
-        vx_float32 output[5] = {0};
+        vx_float32 output[5];
         vx_float32 item_index = 0.0f; /* item_index = input score batch, but we only supported single batch */
         vx_float32 findex = roi_indices_ptr[i];
         vx_uint32 index = (vx_uint32)findex;
@@ -909,6 +912,7 @@ vx_status vxnneExecuteSWRPN_SortNMS(struct _vxnne_operation_s *operation)
     vxnneGetTensorMemeory(proposal, (vx_ptr_ptr)&proposals_data, output_stage, vx_false_e);
     vxnneGetTensorMemeory(roi_output, (vx_ptr_ptr)&roi_output_data, output_stage, vx_false_e);
     vxnneGetTensorMemeory(score_output,(vx_ptr_ptr)&score_output_data, output_stage, vx_false_e);
+
 
     if(pre_nms_topn>proposal_count)
         pre_nms_topn = proposal_count;
@@ -1076,7 +1080,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd_cpu(vx_node n
         tensor_create_params.num_of_dims = dims;
         tensor_create_params.sizes = sizes;
         tensor_create_params.data_format = tmpBuf_format;
-        tensor_create_params.quant_format = VX_QUANT_NONE;
+        tensor_create_params.quant_format = VX_QUANT_DYNAMIC_FIXED_POINT;
 
         socreBufferTensor = vxoTensor_CreateTensor(node->base.context, node->graph, &tensor_create_params, vx_true_e);
         if (socreBufferTensor == VX_NULL)
@@ -1168,7 +1172,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd_cpu(vx_node n
         tensor_create_params.num_of_dims = dims;
         tensor_create_params.sizes = sizes;
         tensor_create_params.data_format = tmpBuf_format;
-        tensor_create_params.quant_format = VX_QUANT_NONE;
+        tensor_create_params.quant_format = VX_QUANT_DYNAMIC_FIXED_POINT;
 
         proposalTensor = vxoTensor_CreateTensor(node->base.context, node->graph, &tensor_create_params, vx_true_e);
         if (proposalTensor == VX_NULL)
@@ -1468,7 +1472,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd(vx_node node,
         tensor_create_params.num_of_dims = dims;
         tensor_create_params.sizes = sizes;
         tensor_create_params.data_format = tmpBuf_format;
-        tensor_create_params.quant_format = VX_QUANT_NONE;
+        tensor_create_params.quant_format = VX_QUANT_DYNAMIC_FIXED_POINT;
 
         socreBufferTensor = vxoTensor_CreateTensor(node->base.context, node->graph, &tensor_create_params, vx_true_e);
         if (socreBufferTensor == VX_NULL)
@@ -1559,7 +1563,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd(vx_node node,
         tensor_create_params.num_of_dims = dims;
         tensor_create_params.sizes = sizes;
         tensor_create_params.data_format = tmpBuf_format;
-        tensor_create_params.quant_format = VX_QUANT_NONE;
+        tensor_create_params.quant_format = VX_QUANT_DYNAMIC_FIXED_POINT;
 
         proposalTensor = vxoTensor_CreateTensor(node->base.context, node->graph, &tensor_create_params, vx_true_e);
         if (proposalTensor == VX_NULL)
@@ -1769,7 +1773,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd(vx_node node,
         tensor_create_params.num_of_dims = dims;
         tensor_create_params.sizes = sizes;
         tensor_create_params.data_format = temp_format;
-        tensor_create_params.quant_format = VX_QUANT_NONE;
+        tensor_create_params.quant_format = VX_QUANT_DYNAMIC_FIXED_POINT;
 
         roiIndicesTensor = vxoTensor_CreateTensor(node->base.context, node->graph, &tensor_create_params, vx_true_e);
         if (roiIndicesTensor == VX_NULL)

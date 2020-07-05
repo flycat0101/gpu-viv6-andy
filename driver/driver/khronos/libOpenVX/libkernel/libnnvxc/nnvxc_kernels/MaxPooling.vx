@@ -785,8 +785,7 @@ __kernel void vxcPooling_genMaxFp16toFp16(
     gidy = gidy * stride.y - pad.y;
     int4 posin = (int4)(gidx, gidy, gidz, 0);
     vxc_short8 valMin = {0xfbff,0xfbff,0xfbff,0xfbff,0xfbff,0xfbff,0xfbff,0xfbff};
-    int4 bitExtractCoeff0 = (int4)(0x30201000, 0x70605040, 0x10101010, 0x10101010);
-    int4 bitExtractCoeff1 = (int4)(0x40302010, 0x00706050, 0x10101010, 0x10101010);
+    int4 bitExtractCoeff = (int4)(0x30201000, 0x70605040, 0x10101010, 0x10101010);
     vxc_short8 src;
     vxc_half8 hfVal, hfMaxVal;
     _viv_asm(COPY, hfVal, valMin, 16);
@@ -798,6 +797,8 @@ __kernel void vxcPooling_genMaxFp16toFp16(
             for (int y = 0; y < kernelSize.y; y++)
             {
                 posin.y = gidy + y;
+                if (posin.y < 0 || posin.y >= in_height)
+                    continue;
                 VXC_ReadImage2DArray(src, input, posin, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
                 VXC_VertMax3_Half(hfVal, src, src, hfVal, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
             }
@@ -805,8 +806,8 @@ __kernel void vxcPooling_genMaxFp16toFp16(
             VXC_HorzMax3_Half(hfVal, hfVal, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0));
             VXC_HorzMax3_Half(hfVal, hfVal, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
             VXC_HorzMax3_Half(hfVal, hfVal, VXC_MODIFIER(0, 1, 0, VXC_RM_TowardZero, 0));
-            VXC_BitExtract(valTmp1, hfVal, hfVal, bitExtractCoeff0, VXC_MODIFIER_BIN(0, 0, 0));
-            VXC_BitExtract(valTmp2, hfVal, hfVal, bitExtractCoeff1, VXC_MODIFIER_BIN(0, 0, 0));
+            VXC_BitExtract(valTmp1, hfVal, hfVal, bitExtractCoeff, VXC_MODIFIER_BIN(0, 0, 0));
+            VXC_BitExtract(valTmp2, hfVal, hfVal, bitExtractCoeff, VXC_MODIFIER_BIN(0, 0, 1));
             VXC_VertMax3_Half(hfMaxVal, valTmp1, valTmp2, hfMaxVal, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
             posin.x += 8;
         }
@@ -816,6 +817,8 @@ __kernel void vxcPooling_genMaxFp16toFp16(
         for (int y = 0; y < kernelSize.y; y++)
         {
             posin.y = gidy + y;
+            if (posin.y < 0 || posin.y >= in_height)
+                continue;
             VXC_ReadImage2DArray(src, input, posin, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
             vxc_half8 hfSrc, hfSrcTmp;
             _viv_asm(COPY, hfSrc, src, 16);
@@ -827,8 +830,8 @@ __kernel void vxcPooling_genMaxFp16toFp16(
         VXC_HorzMax3_Half(hfVal, hfVal, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0));
         VXC_HorzMax3_Half(hfVal, hfVal, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
         VXC_HorzMax3_Half(hfVal, hfVal, VXC_MODIFIER(0, 1, 0, VXC_RM_TowardZero, 0));
-        VXC_BitExtract(valTmp1, hfVal, hfVal, bitExtractCoeff0, VXC_MODIFIER_BIN(0, 0, 0));
-        VXC_BitExtract(valTmp2, hfVal, hfVal, bitExtractCoeff1, VXC_MODIFIER_BIN(0, 0, 0));
+        VXC_BitExtract(valTmp1, hfVal, hfVal, bitExtractCoeff, VXC_MODIFIER_BIN(0, 0, 0));
+        VXC_BitExtract(valTmp2, hfVal, hfVal, bitExtractCoeff, VXC_MODIFIER_BIN(0, 0, 1));
         VXC_VertMax3_Half(hfMaxVal, valTmp1, valTmp2, hfMaxVal, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
     }
     vxc_half8 minData, maxData;
@@ -948,19 +951,18 @@ __kernel void vxcPooling_genMaxUint8toUint8(
     gidy = gidy * stride.y - pad.y;
     int4 posin = (int4)(gidx, gidy, gidz, 0);
     vxc_uchar8 src;
-    vxc_uchar8 val;
-    vxc_uchar8 maxVal = (vxc_uchar8)(0, 0, 0, 0, 0, 0, 0, 0);
-    int4 bitExtractCoeff0 = (int4)(0x18100800, 0x38302820, 0x08080808, 0x08080808);
-    int4 bitExtractCoeff1 = (int4)(0x20181008, 0x00383028, 0x08080808, 0x08080808);
+    vxc_uchar8 val = {0};
+    vxc_uchar8 maxVal = {0};
+    int4 bitExtractCoeff = (int4)(0x18100800, 0x38302820, 0x08080808, 0x08080808);
     if (kernelXis8x)
     {
         for (int x = 0; x < kernelSize.x; x += 8)
         {
-            posin.y = gidy;
-            VXC_ReadImage2DArray(val, input, posin, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-            for (int y = 1; y < kernelSize.y; y++)
+            for (int y = 0; y < kernelSize.y; y++)
             {
                 posin.y = gidy + y;
+                if (posin.y < 0 || posin.y >= in_height)
+                    continue;
                 VXC_ReadImage2DArray(src, input, posin, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
                 VXC_VertMax3_Integer(val, src, src, val, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
             }
@@ -968,18 +970,19 @@ __kernel void vxcPooling_genMaxUint8toUint8(
             VXC_HorzMax3_Integer(val, val, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0));
             VXC_HorzMax3_Integer(val, val, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
             VXC_HorzMax3_Integer(val, val, VXC_MODIFIER(0, 1, 0, VXC_RM_TowardZero, 0));
-            VXC_BitExtract(valTmp1, val, val, bitExtractCoeff0, VXC_MODIFIER_BIN(0, 0, 0));
-            VXC_BitExtract(valTmp2, val, val, bitExtractCoeff1, VXC_MODIFIER_BIN(0, 0, 0));
+            VXC_BitExtract(valTmp1, val, val, bitExtractCoeff, VXC_MODIFIER_BIN(0, 0, 0));
+            VXC_BitExtract(valTmp2, val, val, bitExtractCoeff, VXC_MODIFIER_BIN(0, 0, 1));
             VXC_VertMax3_Integer(maxVal, valTmp1, valTmp2, maxVal, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
             posin.x += 8;
         }
     }
     if (kernelXremain)
     {
-        val    = (vxc_uchar8)(0, 0, 0, 0, 0, 0, 0, 0);
         for (int y = 0; y < kernelSize.y; y++)
         {
             posin.y = gidy + y;
+            if (posin.y < 0 || posin.y >= in_height)
+                continue;
             VXC_ReadImage2DArray(src, input, posin, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
             VXC_DP2x8(src, src, maxVal, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniUint8ExtractN_dp2x8);
             VXC_VertMax3_Integer(val, src, src, val, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
@@ -988,8 +991,8 @@ __kernel void vxcPooling_genMaxUint8toUint8(
         VXC_HorzMax3_Integer(val, val, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0));
         VXC_HorzMax3_Integer(val, val, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
         VXC_HorzMax3_Integer(val, val, VXC_MODIFIER(0, 1, 0, VXC_RM_TowardZero, 0));
-        VXC_BitExtract(valTmp1, val, val, bitExtractCoeff0, VXC_MODIFIER_BIN(0, 0, 0));
-        VXC_BitExtract(valTmp2, val, val, bitExtractCoeff1, VXC_MODIFIER_BIN(0, 0, 0));
+        VXC_BitExtract(valTmp1, val, val, bitExtractCoeff, VXC_MODIFIER_BIN(0, 0, 0));
+        VXC_BitExtract(valTmp2, val, val, bitExtractCoeff, VXC_MODIFIER_BIN(0, 0, 1));
         VXC_VertMax3_Integer(maxVal, valTmp1, valTmp2, maxVal, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
     }
     float fValTmp;
@@ -1024,29 +1027,27 @@ __kernel void vxcPooling_genMaxInt8toInt8(
     gidy = gidy * stride.y - pad.y;
     int4 posin = (int4)(gidx, gidy, gidz, 0);
     vxc_char8 src;
-    vxc_char8 val;
-    vxc_char8 maxVal = {0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80};
-    int4 bitExtractCoeff0 = (int4)(0x18100800, 0x38302820, 0x08080808, 0x08080808);
-    int4 bitExtractCoeff1 = (int4)(0x20181008, 0x00383028, 0x08080808, 0x08080808);
-
+    vxc_char8 val = {0};
+    vxc_char8 maxVal = {0};
+    int4 bitExtractCoeff = (int4)(0x18100800, 0x38302820, 0x08080808, 0x08080808);
     if (kernelXis8x)
     {
         for (int x = 0; x < kernelSize.x; x += 8)
         {
-            posin.y = gidy;
-            VXC_ReadImage2DArray(val, input, posin, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-            for (int y = 1; y < kernelSize.y; y++)
+            for (int y = 0; y < kernelSize.y; y++)
             {
                 posin.y = gidy + y;
-                VXC_ReadImage2DArray(src, input, posin, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+                if (posin.y < 0 || posin.y >= in_height)
+                    continue;
+                VXC_ReadImage2DArray(src, input, posin, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
                 VXC_VertMax3_Integer(val, src, src, val, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
             }
             vxc_uchar8 valTmp1, valTmp2;
             VXC_HorzMax3_Integer(val, val, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0));
             VXC_HorzMax3_Integer(val, val, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
             VXC_HorzMax3_Integer(val, val, VXC_MODIFIER(0, 1, 0, VXC_RM_TowardZero, 0));
-            VXC_BitExtract(valTmp1, val, val, bitExtractCoeff0, VXC_MODIFIER_BIN(0, 0, 0));
-            VXC_BitExtract(valTmp2, val, val, bitExtractCoeff1, VXC_MODIFIER_BIN(0, 0, 0));
+            VXC_BitExtract(valTmp1, val, val, bitExtractCoeff, VXC_MODIFIER_BIN(0, 0, 0));
+            VXC_BitExtract(valTmp2, val, val, bitExtractCoeff, VXC_MODIFIER_BIN(0, 0, 1));
             vxc_char8 valTmp3, valTmp4;
             _viv_asm(COPY, valTmp3, valTmp1, 16);
             _viv_asm(COPY, valTmp4, valTmp2, 16);
@@ -1056,10 +1057,11 @@ __kernel void vxcPooling_genMaxInt8toInt8(
     }
     if (kernelXremain)
     {
-        val    = (vxc_char8)(0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80);
         for (int y = 0; y < kernelSize.y; y++)
         {
             posin.y = gidy + y;
+            if (posin.y < 0 || posin.y >= in_height)
+                continue;
             VXC_ReadImage2DArray(src, input, posin, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
             VXC_DP2x8(src, src, maxVal, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniUint8ExtractN_dp2x8);
             VXC_VertMax3_Integer(val, src, src, val, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
@@ -1068,8 +1070,8 @@ __kernel void vxcPooling_genMaxInt8toInt8(
         VXC_HorzMax3_Integer(val, val, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0));
         VXC_HorzMax3_Integer(val, val, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
         VXC_HorzMax3_Integer(val, val, VXC_MODIFIER(0, 1, 0, VXC_RM_TowardZero, 0));
-        VXC_BitExtract(valTmp1, val, val, bitExtractCoeff0, VXC_MODIFIER_BIN(0, 0, 0));
-        VXC_BitExtract(valTmp2, val, val, bitExtractCoeff1, VXC_MODIFIER_BIN(0, 0, 0));
+        VXC_BitExtract(valTmp1, val, val, bitExtractCoeff, VXC_MODIFIER_BIN(0, 0, 0));
+        VXC_BitExtract(valTmp2, val, val, bitExtractCoeff, VXC_MODIFIER_BIN(0, 0, 1));
         vxc_char8 valTmp3, valTmp4;
         _viv_asm(COPY, valTmp3, valTmp1, 16);
         _viv_asm(COPY, valTmp4, valTmp2, 16);

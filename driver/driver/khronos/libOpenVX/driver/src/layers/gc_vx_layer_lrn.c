@@ -390,33 +390,40 @@ VX_PRIVATE_API vx_status vxoLRNOperationSH_Initialize(
     vx_scalar               bias_s       = VX_NULL;
     vx_enum    inputFormat               = TENSOR_DATA_TYPE(inputs);
     vx_enum    outputFormat              = TENSOR_DATA_TYPE(outputs);
-    /*vx_bool    sammap_flag               = vx_false_e;*/
+    vx_bool    sammap_flag               = vx_false_e;
     vx_bool    acrossmap_flag            = vx_false_e;
     vx_bool    dataformat_flag[6]        = {vx_false_e};
-    /*vx_bool    norm_config[3]            = {vx_false_e};*/
-    /*vx_bool    generic_flag              = vx_false_e;*/
+    vx_bool    norm_config[3]            = {vx_false_e};
+    vx_bool    generic_flag              = vx_false_e;
     vx_bool    isuint8_flag              = vx_false_e;
-    /*vx_bool    norm_shader_flag          = vx_false_e;*/
-    vx_enum    inputQuantType            = TENSOR_QUANT_TYPE(inputs);
+    vx_bool    norm_shader_flag          = vx_false_e;
 
     if (!op_index)
     {
         vxmONERROR(VX_ERROR_INVALID_PARAMETERS);
     }
 
-    //sammap_flag        = (vx_bool)(norm_type == VX_NN_NORMALIZATION_SAME_MAP);
+    sammap_flag        = (vx_bool)(norm_type == VX_NN_NORMALIZATION_SAME_MAP);
     acrossmap_flag     = (vx_bool)(norm_type == VX_NN_NORMALIZATION_ACROSS_MAPS);
-    dataformat_flag[0] = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT8)
-                                && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_INT8) && (VX_QUANT_AFFINE_SCALE != inputQuantType));
+    norm_config[0]     = (vx_bool)(norm_size == 3 && beta == 0.75);
+    norm_config[1]     = (vx_bool)(norm_size == 5 && beta == 0.75);
+    norm_config[2]     = (vx_bool)(norm_size == 11 && beta == 0.5);
+    dataformat_flag[0] = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT8) && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_INT8));
     dataformat_flag[1] = (vx_bool)(inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16);
     dataformat_flag[2] = (vx_bool)(inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8);
     dataformat_flag[3] = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16);
     dataformat_flag[4] = (vx_bool)(inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32 &&!evis);
     dataformat_flag[5] = (vx_bool)(inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16);
-
     isuint8_flag       = (vx_bool)((acrossmap_flag && dataformat_flag[5])
-                                    || dataformat_flag[2]
-                                    || ((inputFormat == VX_TYPE_INT8) && (outputFormat == VX_TYPE_INT8) && evis && (VX_QUANT_AFFINE_SCALE == inputQuantType)));
+                                    || dataformat_flag[2]);
+    generic_flag       = (vx_bool)((acrossmap_flag && dataformat_flag[0]) || (sammap_flag && dataformat_flag[3])
+                                    ||(acrossmap_flag && dataformat_flag[5]));
+    norm_shader_flag   = (vx_bool)((sammap_flag && norm_config[0] && dataformat_flag[0])
+                                || (acrossmap_flag && norm_config[0] && dataformat_flag[0])
+                                || (acrossmap_flag && norm_config[1] && dataformat_flag[0])
+                                || (acrossmap_flag && norm_config[2] && (dataformat_flag[0] || dataformat_flag[1]))
+                                || generic_flag || isuint8_flag || dataformat_flag[4]);
+
     if (div == 1)
     {
         if (acrossmap_flag)
@@ -558,7 +565,7 @@ VX_PRIVATE_API vx_status vxoNormalization_SW_Initialize(vxnne_layer ops_layer, c
     vx_scalar  alpha_s                    = (vx_scalar)parameters[4];
     vx_scalar  beta_s                     = (vx_scalar)parameters[5];
     vx_scalar  bias_s                     = (vx_scalar)parameters[6];
-    vx_tensor  outputs                    = (vx_tensor)parameters[num - 1];
+    vx_tensor  outputs                    = (vx_tensor)parameters[7];
 
     vx_enum    norm_type                  = type_s->value->e;
     vx_uint32  norm_size                  = norm_size_s->value->u32;
@@ -598,7 +605,7 @@ VX_PRIVATE_API vx_bool vxoNormalization_SH_EVIS_Support_Ext(vx_node node, const 
     vx_scalar  norm_size_s                = (vx_scalar)parameters[2];
 
     vx_scalar  beta_s                     = (vx_scalar)parameters[5];
-    vx_tensor  outputs                    = (vx_tensor)parameters[num - 1];
+    vx_tensor  outputs                    = (vx_tensor)parameters[7];
 
     vx_enum    norm_type                  = type_s->value->e;
     vx_uint32  norm_size                  = norm_size_s->value->u32;
@@ -690,7 +697,7 @@ VX_PRIVATE_API vx_status vxoNormalization_SH_EVIS_Initialize_Ext(vxnne_layer ops
     vx_scalar  alpha_s                    = (vx_scalar)parameters[4];
     vx_scalar  beta_s                     = (vx_scalar)parameters[5];
     vx_scalar  bias_s                     = (vx_scalar)parameters[6];
-    vx_tensor  outputs                    = (vx_tensor)parameters[num - 1];
+    vx_tensor  outputs                    = (vx_tensor)parameters[7];
 
     vx_enum    norm_type                  = type_s->value->e;
     vx_uint32  norm_size                  = norm_size_s->value->u32;
@@ -769,7 +776,7 @@ VX_PRIVATE_API vx_bool vxoNormalization_TP_Support(vx_node node, const vx_refere
     vx_tensor  inputs                     = (vx_tensor)parameters[0];
     vx_scalar  type_s                     = (vx_scalar)parameters[1];
     vx_scalar  norm_size_s                = (vx_scalar)parameters[2];
-    vx_tensor  outputs                    = (vx_tensor)parameters[num - 1];
+    vx_tensor  outputs                    = (vx_tensor)parameters[6];
 
     vx_enum    norm_type                  = type_s->value->e;
     vx_uint32  norm_size                  = norm_size_s->value->u32;
@@ -804,7 +811,7 @@ VX_PRIVATE_API vx_status vxoNormalization_TP_Initialize(vxnne_layer ops_layer, c
     vx_scalar  alpha_s                    = (vx_scalar)parameters[4];
     vx_scalar  beta_s                     = (vx_scalar)parameters[5];
     vx_scalar  bias_s                     = (vx_scalar)parameters[6];
-    vx_tensor  outputs                    = (vx_tensor)parameters[num - 1];
+    vx_tensor  outputs                    = (vx_tensor)parameters[7];
 
     vx_enum    norm_type                  = type_s->value->e;
     vx_uint32  norm_size                  = norm_size_s->value->u32;
@@ -1131,7 +1138,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalizationLayer2_Initializer(vx_node 
     vx_uint32 div = 1;
     vx_scalar  div_s = vxCreateScalar(node->base.context, VX_TYPE_UINT32, &div);
     vx_reference params[] = {
-        parameters[0], parameters[1], parameters[2], (vx_reference)div_s, parameters[3], parameters[4], parameters[5], parameters[6], parameters[7],
+        parameters[0], parameters[1], parameters[2], (vx_reference)div_s, parameters[3], parameters[4], parameters[5], parameters[6],
     };
     vxmONERROR(vxoNormalization_Initializer_Ext(node, "NormalizationLayer2", params, gcmCOUNTOF(params)));
 

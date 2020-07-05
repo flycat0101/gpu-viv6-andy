@@ -85,7 +85,7 @@ __kernel void vxcTFPooling_generic_fp16
     sum.x = sum.x * filter.x;
     if (enable_int8_format == 1)
     {
-        sum.x = sum.x * genericAvgScale + output_ZP;
+        sum.x *= genericAvgScale;
         char dst = convert_char_rte(sum.x);
         VXC_WriteImage2DArray(output, coord_out, dst, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
     }

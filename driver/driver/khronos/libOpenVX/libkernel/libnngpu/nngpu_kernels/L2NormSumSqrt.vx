@@ -1,0 +1,53 @@
+__kernel void gpuL2NormScale_SumRsqrtFP32
+    (
+    image2d_array_t input,
+    image2d_t output
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), 0, 0);
+    int  depth = get_image_array_size(input);
+    float4 sum = {0.0}, tmp = {0.0};
+
+    do
+    {
+        tmp = read_imagef(input, coord);
+        sum.x += (tmp.x * tmp.x);
+        coord.z++;
+    } while (coord.z < depth);
+
+    float epsilon = (float)1e-12;
+    sum.x = sum.x == 0.0 ? epsilon : sum.x;
+    sum.x = rsqrt(sum.x);
+    write_imagef(output, coord.xy, sum);
+}
+
+__kernel void gpuL2NormScale_SumRsqrtQuant8
+    (
+    image2d_array_t input,
+    float r_scaleIn,
+    float zp,
+    image2d_t output
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), 0, 0);
+    int  depth = get_image_array_size(input);
+    uint4 tmp = {0.0};
+    float4 dst = {0.0};
+    float inPixel, sum = 0.0;
+
+    do
+    {
+        tmp = read_imageui(input, coord);
+        coord.z++;
+
+        inPixel = convert_float(tmp.x) - zp;
+        sum = inPixel * inPixel + sum;
+    } while (coord.z < depth);
+
+    float epsilon = (float)1e-12;
+    sum = sum == 0.0 ? epsilon : sum;
+
+    sum = rsqrt(sum) * r_scaleIn;
+    dst.x = sum;
+    write_imagef(output, coord.xy, dst);
+}

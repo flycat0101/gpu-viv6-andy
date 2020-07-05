@@ -749,35 +749,6 @@ VX_PRIVATE_API vx_bool vxoNNConcatIndefiniteLayer_SH_EVIS_Support_Ext(vx_node no
                                 || (axis < 3 && batchCount == 1));
     }
 
-    if (_Is_concat_on_highest_dimension(output_s, axis) == vx_false_e)
-    {
-#define _PACK_CONCAT_SH_KEY(IN_TYPE, OUT_TYPE) \
-    (IN_TYPE | (OUT_TYPE << 8))
-        for (i = 0; i < itemCount; i++)
-        {
-            vx_tensor input = (vx_tensor)input_s->itemsTable[i];
-            vx_sh_kernel_type_e input_type  = getSHKernelType(TENSOR_DATA_TYPE(input));
-            vx_sh_kernel_type_e output_type = getSHKernelType(TENSOR_DATA_TYPE(output_s));
-            vx_uint32 key = _PACK_CONCAT_SH_KEY(input_type, output_type);
-
-            switch (key)
-            {
-            case _PACK_CONCAT_SH_KEY(F32, BF16):
-            case _PACK_CONCAT_SH_KEY(F16, BF16):
-            case _PACK_CONCAT_SH_KEY(BF16, F32):
-            case _PACK_CONCAT_SH_KEY(BF16, F16):
-                support = 0;
-                break;
-            default:
-                break;
-            }
-
-            if (support == 0)
-                break;
-        }
-#undef _PACK_CONCAT_SH_KEY
-    }
-
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
     return support;
@@ -1066,7 +1037,7 @@ VX_PRIVATE_API vx_status vxoNNConcatIndefiniteLayer_SH_Initialize(vxnne_layer op
 OnError:
     vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
 
-    return status;
+    return VX_SUCCESS;
 }
 
 VX_PRIVATE_API vx_bool vxoNNConcatIndefiniteLayer_SH_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)

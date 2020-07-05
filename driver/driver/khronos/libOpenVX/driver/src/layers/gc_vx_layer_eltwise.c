@@ -127,7 +127,7 @@ vx_status vxnneExecuteSWTensorAdd(vxnne_operation operation)
         {
             vx_uint32 in1offset, in2offset, outoffset;
             vx_int8_ptr in1, in2, out;
-            /*vx_status status = VX_SUCCESS;*/
+            vx_status status = VX_SUCCESS;
             vx_float32 in1Data_fl32, in2Data_fl32;
 
             in1offset = getExpandTensorOffset(i, input1, output->dims);
@@ -142,7 +142,7 @@ vx_status vxnneExecuteSWTensorAdd(vxnne_operation operation)
                 TENSOR_POS(input1), TENSOR_TF_ZEROPOINT(input1), TENSOR_TF_SCALE(input1));
             in2Data_fl32 = vxnneGetDataExt((vx_type_e)TENSOR_DATA_TYPE(input2), TENSOR_QUANT_TYPE(input2), 0, (vx_uint8_ptr)in2,
                 TENSOR_POS(input2), TENSOR_TF_ZEROPOINT(input2), TENSOR_TF_SCALE(input2));
-            vxnneSaveDataExt((vx_type_e)TENSOR_DATA_TYPE(output), TENSOR_QUANT_TYPE(output), 0, in1Data_fl32 + in2Data_fl32, (vx_uint8_ptr)out,
+            status = vxnneSaveDataExt((vx_type_e)TENSOR_DATA_TYPE(output), TENSOR_QUANT_TYPE(output), 0, in1Data_fl32 + in2Data_fl32, (vx_uint8_ptr)out,
                 TENSOR_POS(output), TENSOR_TF_ZEROPOINT(output), TENSOR_TF_SCALE(output), TENSOR_ROUNDING_MODE(output));
         }
     }
@@ -220,14 +220,12 @@ VX_PRIVATE_API vx_bool vxoNNTensorAdd_SH_EVIS_Support_Ext(vx_node node, const vx
     reg_param->flag = 0;
     if(evis)
     {
-        format_flag = (vx_bool)((input0Format != VX_TYPE_FLOAT32) && (input1Format != VX_TYPE_FLOAT32) && (outputFormat != VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_INT32));
-        format_flag = format_flag || (vx_bool)((input0Format == VX_TYPE_FLOAT32) && (input1Format == VX_TYPE_FLOAT32) && (outputFormat == VX_TYPE_BFLOAT16));
+        format_flag = (vx_bool)((input0Format != VX_TYPE_FLOAT32) && (input1Format != VX_TYPE_FLOAT32) && (outputFormat != VX_TYPE_FLOAT32));
         enable_2d_tensor = (vx_bool)(depth == 1 && ((input0Format == VX_TYPE_FLOAT16 && (input1Format == VX_TYPE_FLOAT16 || input1Format == VX_TYPE_FLOAT32) && outputFormat == VX_TYPE_FLOAT16) || format_flag) && policyEnum == VX_CONVERT_POLICY_SATURATE);
     }
     else
     {
-        format_flag = (vx_bool)(((input0Format == VX_TYPE_FLOAT16 || input0Format == VX_TYPE_FLOAT32) && (input1Format == VX_TYPE_FLOAT16 || input1Format == VX_TYPE_FLOAT32) && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_FLOAT32))
-                               || (input0Format == VX_TYPE_UINT8 && input1Format == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8));
+        format_flag = vx_true_e;
     }
     shExe_flag = format_flag || enable_2d_tensor;
 
@@ -545,7 +543,6 @@ OnError:
     if(context->evisNoInst.supportEVIS)
     {
         format_flag = (vx_bool)((input0Format != VX_TYPE_FLOAT32) && (input1Format != VX_TYPE_FLOAT32) && (outputFormat != VX_TYPE_FLOAT32));
-        format_flag = format_flag || (vx_bool)((input0Format == VX_TYPE_FLOAT32) && (input1Format == VX_TYPE_FLOAT32) && (outputFormat == VX_TYPE_BFLOAT16));
         enable_2d_tensor = (vx_bool)(depth == 1 && ((input0Format == VX_TYPE_FLOAT16 && (input1Format == VX_TYPE_FLOAT16 || input1Format == VX_TYPE_FLOAT32) && outputFormat == VX_TYPE_FLOAT16) || format_flag) && policyEnum == VX_CONVERT_POLICY_SATURATE);
     }
     else
@@ -774,12 +771,12 @@ vx_status vxnneExecuteSWTensorSub(vxnne_operation operation)
             out = (vx_int8_ptr)outputbase + outoffset;
 
             {
-                /*vx_status status = VX_SUCCESS;*/
+                vx_status status = VX_SUCCESS;
                 vx_float32 in1Data_fl32 = vxnneGetDataExt((vx_type_e)TENSOR_DATA_TYPE(input1), TENSOR_QUANT_TYPE(input1), 0, (vx_uint8_ptr)in1,
                     TENSOR_POS(input1), TENSOR_TF_ZEROPOINT(input1), TENSOR_TF_SCALE(input1));
                 vx_float32 in2Data_fl32 = vxnneGetDataExt((vx_type_e)TENSOR_DATA_TYPE(input2), TENSOR_QUANT_TYPE(input2), 0, (vx_uint8_ptr)in2,
                     TENSOR_POS(input2), TENSOR_TF_ZEROPOINT(input2), TENSOR_TF_SCALE(input2));
-                vxnneSaveDataExt((vx_type_e)TENSOR_DATA_TYPE(output), TENSOR_QUANT_TYPE(output), 0, in1Data_fl32 - in2Data_fl32, (vx_uint8_ptr)out,
+                status = vxnneSaveDataExt((vx_type_e)TENSOR_DATA_TYPE(output), TENSOR_QUANT_TYPE(output), 0, in1Data_fl32 - in2Data_fl32, (vx_uint8_ptr)out,
                     TENSOR_POS(output), TENSOR_TF_ZEROPOINT(output), TENSOR_TF_SCALE(output), TENSOR_ROUNDING_MODE(output));
             }
         }
@@ -1229,7 +1226,7 @@ vx_status vxnneExecuteSWTensorMul(vxnne_operation operation)
         {
             vx_uint32 in1offset, in2offset, outoffset;
             vx_int8_ptr in1, in2, out;
-            /*vx_status status = VX_SUCCESS;*/
+            vx_status status = VX_SUCCESS;
             vx_float32 in1Data_fl32, in2Data_fl32;
 
             in1offset = getExpandTensorOffset(i, input1, output->dims);
@@ -1244,7 +1241,7 @@ vx_status vxnneExecuteSWTensorMul(vxnne_operation operation)
                 TENSOR_POS(input1), TENSOR_TF_ZEROPOINT(input1), TENSOR_TF_SCALE(input1));
             in2Data_fl32 = vxnneGetDataExt((vx_type_e)TENSOR_DATA_TYPE(input2), TENSOR_QUANT_TYPE(input2), 0, (vx_uint8_ptr)in2,
                 TENSOR_POS(input2), TENSOR_TF_ZEROPOINT(input2), TENSOR_TF_SCALE(input2));
-            vxnneSaveDataExt((vx_type_e)TENSOR_DATA_TYPE(output), TENSOR_QUANT_TYPE(output), 0, in1Data_fl32 * in2Data_fl32, (vx_uint8_ptr)out,
+            status = vxnneSaveDataExt((vx_type_e)TENSOR_DATA_TYPE(output), TENSOR_QUANT_TYPE(output), 0, in1Data_fl32 * in2Data_fl32, (vx_uint8_ptr)out,
                 TENSOR_POS(output), TENSOR_TF_ZEROPOINT(output), TENSOR_TF_SCALE(output), TENSOR_ROUNDING_MODE(output));
         }
     }

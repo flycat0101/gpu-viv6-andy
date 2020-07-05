@@ -392,6 +392,9 @@ VX_PRIVATE_API vx_status vxoNNTensorReduceSum_SW_Initialize(vxnne_layer ops_laye
 
     vxmONERROR(vxnneOperation_AddReference(&reduceNode->tensor_reduce_sum_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT));
     vxmONERROR(vxnneOperation_AddReference(&reduceNode->tensor_reduce_sum_operation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    if (reduceDim)
+        vxmONERROR(vxnneOperation_AddReference(&reduceNode->tensor_reduce_sum_operation.base, (vx_reference)reduceDim, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&reduceNode->tensor_reduce_sum_operation.base, (vx_reference)keepDim, VXNNE_OPERATION_REFENRENCE_INPUT));
 OnError:
     vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
 

@@ -41,22 +41,6 @@ vx_kernel_description_s internalkernel_NNL2NormalizeLayer = {
     vxoNNL2NormalizeLayer_Deinitializer
 };
 
-static vx_param_description_s nn_L2NormalizeLayer2_params[] = {
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_true_e},
-    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e}
-};
 
-vx_kernel_description_s internalkernel_NNL2NormalizeLayer2 = {
-    VX_KERNEL_NN_L2NORMALIZE_LAYER2,
-    "vivante.nn.L2Normalize2.layer",
-    vxoBaseKernel_NNL2NormalizeLayer,
-    nn_L2NormalizeLayer2_params, vxmLENGTH_OF(nn_L2NormalizeLayer2_params),
-    VX_NULL,
-    vxoNNL2NormalizeLayer_ValidateInput,
-    vxoNNL2NormalizeLayer_ValidateOutput,
-    vxoNNL2NormalizeLayer_Initializer,
-    vxoNNL2NormalizeLayer_Deinitializer
-};
 #endif
 

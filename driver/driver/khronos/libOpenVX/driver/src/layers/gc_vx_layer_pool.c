@@ -353,12 +353,11 @@ VX_PRIVATE_API vx_bool vxoNNPooling_SH_EVIS_Support_Ext(vx_node node, const vx_r
     vx_bool avgPool_BF_flag                  = vx_false_e;
     vx_bool enable_tf_quantize               = vx_false_e;
     vx_bool enable_int16_sh                  = vx_false_e;
-    vx_enum inputQuantType                   = TENSOR_QUANT_TYPE(inputs);
-    vx_enum outputQuantType                  = TENSOR_QUANT_TYPE(outputs);
+
     vx_uint32 inputsWidth, inputsHeight, outputsWidth, outputsHeight;
-    /*vx_int32  inputsDepth, outputsDepth;*/
+    vx_int32  inputsDepth, outputsDepth;
     vx_uint32  stride_x = 1, stride_y = 1;
-    vx_bool   is_int8_asym = (vx_bool)(inputQuantType == VX_QUANT_AFFINE_SCALE || outputQuantType == VX_QUANT_AFFINE_SCALE);
+
     vx_uint32 pool_pad_x_left   = poolPadXLeftScalar->value->u32;
     vx_uint32 pool_pad_x_right  = poolPadXRightScalar->value->u32;
     vx_uint32 pool_pad_y_top    = poolPadYTopScalar->value->u32;
@@ -366,10 +365,10 @@ VX_PRIVATE_API vx_bool vxoNNPooling_SH_EVIS_Support_Ext(vx_node node, const vx_r
 
     inputsWidth   = TENSOR_SIZE_INDEX(inputs, 0);
     inputsHeight  = TENSOR_SIZE_INDEX(inputs, 1);
-    /*inputsDepth   = TENSOR_SIZE_INDEX(inputs, 2);*/
+    inputsDepth   = TENSOR_SIZE_INDEX(inputs, 2);
     outputsWidth  = TENSOR_VIEW_SIZE_INDEX(outputs, 0);
     outputsHeight = TENSOR_VIEW_SIZE_INDEX(outputs, 1);
-    /*outputsDepth  = TENSOR_VIEW_SIZE_INDEX(outputs, 2);*/
+    outputsDepth  = TENSOR_VIEW_SIZE_INDEX(outputs, 2);
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
@@ -408,8 +407,7 @@ VX_PRIVATE_API vx_bool vxoNNPooling_SH_EVIS_Support_Ext(vx_node node, const vx_r
     if(evis)
     {
         dataFormat_AvgPool_flag[0] = (vx_bool)(inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16);
-        dataFormat_AvgPool_flag[1] = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 &&
-            (outputFormat == VX_TYPE_INT16 || outputFormat == VX_TYPE_INT8 || outputFormat == VX_TYPE_UINT8));
+        dataFormat_AvgPool_flag[1] = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 && (outputFormat == VX_TYPE_INT8 || outputFormat == VX_TYPE_UINT8));
         dataFormat_AvgPool_flag[2] = (vx_bool)(inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8);
         dataFormat_AvgPool_flag[3] = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16);
         dataFormat_AvgPool_flag[4] = (vx_bool)(inputFormat == VX_TYPE_INT16);
@@ -427,9 +425,7 @@ VX_PRIVATE_API vx_bool vxoNNPooling_SH_EVIS_Support_Ext(vx_node node, const vx_r
         dataFormat_AvgPool_flag[5] = (vx_bool)(inputFormat == VX_TYPE_UINT8 );
     }
 
-   enable_tf_quantize           =  (vx_bool)(dataFormat_AvgPool_flag[5] ||
-                                             (dataFormat_AvgPool_flag[2] && is_int8_asym) ||
-                                             (dataFormat_AvgPool_flag[0] && is_int8_asym) );
+   enable_tf_quantize           =  (vx_bool)(dataFormat_AvgPool_flag[5] );
 
    enable_int16_sh              = (vx_bool)(dataFormat_AvgPool_flag[4]);
 
@@ -592,15 +588,15 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
     vx_uint32  numTmpTensor            = 0;
 
     vx_uint32 inputsWidth, inputsHeight, outputsWidth, outputsHeight;
-    /*vx_int32  inputsDepth, outputsDepth;*/
+    vx_int32  inputsDepth, outputsDepth;
 
     inputsWidth   = TENSOR_SIZE_INDEX(inputs, 0);
     inputsHeight  = TENSOR_SIZE_INDEX(inputs, 1);
-    /*inputsDepth   = TENSOR_SIZE_INDEX(inputs, 2);*/
+    inputsDepth   = TENSOR_SIZE_INDEX(inputs, 2);
     batchCount    = TENSOR_SIZE_INDEX(inputs, 3);
     outputsWidth  = TENSOR_VIEW_SIZE_INDEX(outputs, 0);
     outputsHeight = TENSOR_VIEW_SIZE_INDEX(outputs, 1);
-    /*outputsDepth  = TENSOR_VIEW_SIZE_INDEX(outputs, 2);*/
+    outputsDepth  = TENSOR_VIEW_SIZE_INDEX(outputs, 2);
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
     if (strideXScalar != NULL)
@@ -723,15 +719,15 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
             {
                 vx_tensor_create_params_t tensor_create_params;
                 vx_uint32 sizes[]       = {1, 1, 1, 1};
-                /*vx_uint32 inputWidth   = 0;*/
+                vx_uint32 inputWidth   = 0;
                 vx_uint32 copy_dims     = TENSOR_DIM_NUM(inputs);
                 gctPOINTER inputLogical = VX_NULL;
                 vx_uint8   inputZP      = (vx_uint8)TENSOR_TF_ZEROPOINT(inputs);
                 vx_uint32  copy_size     = 0;
                 vx_int32      padLeftv                       = 0;
-                /*vx_int32      padRightv                      = 0;*/
+                vx_int32      padRightv                      = 0;
                 vx_int32      padTopv                        = 0;
-                /*vx_int32      padBottomv                     = 0;*/
+                vx_int32      padBottomv                     = 0;
                 vx_scalar     padLeft                        = VX_NULL;
                 vx_scalar     padTop                         = VX_NULL;
                 vx_scalar     padXLeft                       = VX_NULL;
@@ -743,7 +739,7 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
                 sizes[2] = copy_dims > 2 ? TENSOR_VIEW_SIZE_INDEX(inputs, 2) : 1;
                 sizes[3] = copy_dims > 3 ? TENSOR_VIEW_SIZE_INDEX(inputs, 3) : 1;
                 sizes[0] = sizes[0] + pool_pad_x_left + pool_pad_x_right;
-                /*inputWidth = sizes[0];*/
+                inputWidth = sizes[0];
                 sizes[1] = sizes[1] + pool_pad_y_top + pool_pad_y_bottom;
                 if (sizes[0] % 4 != 0)
                 {
@@ -774,9 +770,9 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
                 copy_size = sizes[0] * sizes[1] * sizes[2] * sizes[3];
                 gcoOS_MemFill(inputLogical, inputZP, copy_size);
                 padLeftv   = 0;
-                /*padRightv  = 0;*/
+                padRightv  = 0;
                 padTopv    = 0;
-                /*padBottomv = 0;*/
+                padBottomv = 0;
                 padLeft   = vxCreateScalar(ops_layer->node->base.context, VX_TYPE_INT32, &padLeftv);
                 padTop  = vxCreateScalar(ops_layer->node->base.context, VX_TYPE_INT32, &padTopv);
                 padXLeft    = vxCreateScalar(ops_layer->node->base.context, VX_TYPE_INT32, &pool_pad_x_left);

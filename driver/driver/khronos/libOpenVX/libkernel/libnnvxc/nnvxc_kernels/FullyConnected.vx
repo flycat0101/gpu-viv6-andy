@@ -5,6 +5,7 @@ _viv_uniform int Cycles;
 _viv_uniform float in_scale;
 _viv_uniform VXC_512Bits uniMulAcc;
 _viv_uniform VXC_512Bits uniMulAcc_Int8;
+_viv_uniform float bias_scale;
 _viv_uniform int   is_bias_uint8;
 _viv_uniform int   overflow_mode;
 
@@ -234,7 +235,7 @@ _viv_uniform int inputSize_aln64;
     { \
         temp = read_imagei(bias, coord_in.yw).x; \
     } \
-    dst = convert_float(temp) + nZ1Z2; \
+    dst = convert_float(temp) * bias_scale + nZ1Z2; \
     do \
     { \
         VXC_ReadImage(v0, input,  coord_in.xz, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0)); \
@@ -403,7 +404,7 @@ __kernel void vxcFullyConnected_NoReluI16(
     int temp = 0;
     float dst;
     temp = read_imagei(bias, coord_in.ywww).x;
-    dst = convert_float(temp);
+    dst = convert_float(temp) * bias_scale;
     do
     {
         VXC_ReadImage(v0, input,  coord_in.xz, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
