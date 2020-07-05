@@ -1145,7 +1145,6 @@ fbdev_GetDisplayByIndex(
             {
                 display->multiBuffer = 8;
             }
-
         }
 
         getFBFunctions(display);
@@ -1776,14 +1775,14 @@ fbdev_SetDisplayVirtual(
         return status;
     }
 
-    if (display->varInfo.nonstd != 0)
+    if (display->varInfo.nonstd != 0 || display->multiBuffer > 1)
     {
         struct fb_var_screeninfo varInfo;
 
         /* Restore the tile format after suspend/resume test */
         if (ioctl(display->file, FBIOGET_VSCREENINFO, &varInfo) >= 0)
         {
-            if (varInfo.nonstd != display->varInfo.nonstd)
+            if (varInfo.nonstd != display->varInfo.nonstd || varInfo.yres_virtual != display->varInfo.yres_virtual)
             {
                 ioctl(display->file, FBIOPUT_VSCREENINFO, &display->varInfo);
             }
@@ -1829,6 +1828,7 @@ fbdev_SetDisplayVirtual(
             }
 
             display->functions.PanDisplay(display->file, &display->varInfo);
+
             {
                 /* FSL: buffer PAN'ed. */
                 gctINT index;

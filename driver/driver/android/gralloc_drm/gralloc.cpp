@@ -219,7 +219,6 @@ static int gralloc_validate_buffer_size(struct gralloc_module_t const* module,
                 int usage,uint32_t stride)
 {
     int err;
-    struct vivante_module_t *mod = (struct vivante_module_t *)module;
 
     gralloc_trace_init();
     gralloc_trace(0, "module=%p handle=%p w=%d h=%d format=%d usage=0x%x",

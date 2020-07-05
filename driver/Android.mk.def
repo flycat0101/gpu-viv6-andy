@@ -59,13 +59,13 @@ else
     CROSS_COMPILE            ?= $(ANDROID_BUILD_TOP)/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-
   endif
 endif
-
+ 
 # CPU arch for kernel module build.
 ARCH_TYPE                    ?= $(TARGET_ARCH)
 
 # HAL module variant, for gralloc.<variant>.so, etc.
 HAL_MODULE_VARIANT           ?= $(TARGET_BOARD_PLATFORM)
-
+ 
 # Enable debug.
 DEBUG                        ?= 0
 
@@ -186,7 +186,7 @@ endif
 
 # For clang.
 ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
-CFLAGS        += -Wno-parentheses-equality -Wno-self-assign
+ CFLAGS        += -Wno-parentheses-equality -Wno-self-assign
 else
 ifeq ($(USE_CLANG_PLATFORM_BUILD),true)
 CFLAGS        += -Wno-parentheses-equality -Wno-self-assign -Wno-strncat-size

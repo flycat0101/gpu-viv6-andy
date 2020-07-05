@@ -2359,16 +2359,18 @@ _BindWindow(
                     renderMode = VEGL_DIRECT_RENDERING_FCFILL;
                 }
 
-                if(gbm_query_enable_overlay_view())
-                {
-                    renderMode = VEGL_INDIRECT_RENDERING;
-                }
-
                 if (_CanSupport2DTilestatus())
                 {
                     renderMode = VEGL_DIRECT_RENDERING_FC_NOCC;
                     egl_surface->enable_tile_status = 1;
                 }
+            }
+
+            if(gbm_query_enable_overlay_view() &&
+               gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TILE_FILLER) &&
+               renderMode > VEGL_DIRECT_RENDERING_NOFC)
+            {
+                renderMode = VEGL_DIRECT_RENDERING_FCFILL;
             }
         }
 

@@ -341,7 +341,6 @@ int hwc_get_tileStatus(buffer_handle_t hnd, struct g2d_surfaceEx *surfaceX)
 {
     gcoSURF surface;
     static const int sMagic = 0x3141592;
-    gceSURF_TYPE type = gcvSURF_TYPE_UNKNOWN;
     const struct private_handle_t* handle = (struct private_handle_t*)hnd;
 
     if (!hnd || hnd->version != sizeof(native_handle_t)

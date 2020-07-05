@@ -147,10 +147,8 @@ int gralloc_vivante_validate_buffer_size(buffer_handle_t handle,uint32_t *v_size
 {
     uint32_t size;
     int align_w, align_h, bpp, stride;
-    uint32_t flags = 0;
     uint32_t tiling = 0;
     int create_ts = 0;
-    int err;
 
     gralloc_trace(0, "handle=%p usage=0x%x", handle, gralloc_handle_usage(handle));
 

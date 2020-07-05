@@ -106,7 +106,7 @@ ifeq ($(HAVE_G2D),1)
 endif
 
 ifeq ($(X11_DRI3),1)
-CFLAGS += -I./imx_drm -I$(LIBDRM_DIR)/include/drm -I$(LIBDRM_DIR)/vivante
+CFLAGS += -I./imx_drm -I$(ROOTFS_DIR)/usr/include/libdrm
 LDFLAGS += -ldrm -ldrm_vivante
 else
 CFLAGS += -I$(ROOTFS)/usr/include/libdrm
