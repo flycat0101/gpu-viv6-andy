@@ -526,14 +526,6 @@ _VSC_CPF_InitFunction(
                                  1024);
     ON_ERROR0(errCode);
 
-    /* initialize visted BB hash table */
-    /* initialize the const hash table */
-    errCode = vscHTBL_Initialize(VSC_CPF_GetVisitBBSet(pCPF),
-                                 VSC_CPF_GetMM(pCPF),
-                                 (PFN_VSC_HASH_FUNC) _HFUNC_CPF_CONSTKEY,
-                                 (PFN_VSC_KEY_CMP) _HKCMP_CPF_CONSTKEY,
-                                 256);
-
     /* Initialize the loopOpts. */
     errCode = VIR_LoopOpts_Init(&VSC_CPF_GetLoopOpts(pCPF),
                                 gcvNULL,
@@ -566,8 +558,6 @@ _VSC_CPF_FinalizeFunction(
     QUEUE_FINALIZE(VSC_CPF_GetWorkList(pCPF));
 
     vscHTBL_Finalize(VSC_CPF_GetConstTable(pCPF));
-
-    vscHTBL_Finalize(VSC_CPF_GetVisitBBSet(pCPF));
 
     /* Finalize the loopOpts. */
     VIR_LoopOpts_Final(&VSC_CPF_GetLoopOpts(pCPF));
@@ -3037,30 +3027,6 @@ OnError:
     return errCode;
 }
 
-static gctBOOL
-_VSC_CPF_CheckPredsAreVisited(
-    VSC_CPF         *pCPF,
-    VIR_BASIC_BLOCK *pBB)
-{
-    if (!VIR_LoopOpts_IsBBHeadBlockOfOneLoop(&VSC_CPF_GetLoopOpts(pCPF), pBB, gcvNULL))
-    {
-        VIR_BASIC_BLOCK             *pPredBasicBlk;
-        VSC_ADJACENT_LIST_ITERATOR  predEdgeIter;
-        VIR_CFG_EDGE                *pPredEdge;
-        VSC_ADJACENT_LIST_ITERATOR_INIT(&predEdgeIter, &pBB->dgNode.predList);
-        pPredEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&predEdgeIter);
-        for (; pPredEdge != gcvNULL; pPredEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&predEdgeIter))
-        {
-            pPredBasicBlk = CFG_EDGE_GET_TO_BB(pPredEdge);
-            if (!vscHTBL_TestAndGet(VSC_CPF_GetVisitBBSet(pCPF), (void *)pPredBasicBlk, gcvNULL))
-            {
-                return gcvFALSE;
-            }
-        }
-    }
-    return gcvTRUE;
-}
-
 static VSC_ErrCode
 _VSC_CPF_AnalysisOnBlock(
     VSC_CPF         *pCPF,
@@ -3394,9 +3360,7 @@ _VSC_CPF_AnalysisOnBlock(
                         (!checkingResult && pSuccEdge->type == VIR_CFG_EDGE_TYPE_TRUE)
                        )
                     {
-                        if (!_VSC_CPF_InWorkList(pCPF, psuccBasicBlk) &&
-                            /* add SuccBB if bb is in a loop or the predBB are all visited */
-                            (pCurrentLoopInfo != NULL || _VSC_CPF_CheckPredsAreVisited(pCPF, psuccBasicBlk)))
+                        if (!_VSC_CPF_InWorkList(pCPF, psuccBasicBlk))
                         {
                             errCode = _VSC_CPF_WorkListQueue(pCPF, psuccBasicBlk);
                             ON_ERROR(errCode, "Fail to add the worklist.");
@@ -3535,9 +3499,6 @@ _VSC_CPF_PerformOnFunction(
             VIR_LOG(pDumper, "Analyze BB[%d]", pBB->dgNode.id);
             VIR_LOG_FLUSH(pDumper);
         }
-        /* mark current BB is visited when dealing with a general BB (without loopinfo) */
-        errCode = vscHTBL_DirectSet(VSC_CPF_GetVisitBBSet(pCPF), pBB, gcvNULL);
-        ON_ERROR0(errCode);
 
         errCode = _VSC_CPF_AnalysisOnBlock(pCPF, pBB, gcvNULL, gcvNULL);
         ON_ERROR0(errCode);
