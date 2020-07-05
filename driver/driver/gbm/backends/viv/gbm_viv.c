@@ -850,7 +850,7 @@ gbm_viv_bo_create(
     gcmONERROR(gcoSURF_Construct(NULL, width, height, 1, surfType, gc_format, gcvPOOL_DEFAULT, &rtSurf));
     bo->surface = rtSurf;
 
-    if ((surfType & 0xFF) != gcvSURF_BITMAP)
+    if ((surfType & 0xFF) != gcvSURF_BITMAP || gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_LINEAR_RENDER_TARGET))
     {
         gcmONERROR(gcoSURF_SetFlags(rtSurf,
                                     gcvSURF_FLAG_CONTENT_YINVERTED,
@@ -998,7 +998,13 @@ gbm_viv_create_buffers(
             surf->extResolve = gcvSTATUS_TRUE;
             break;
         default:
-            surf->extResolve = gcvSTATUS_FALSE;
+            /* besides DRM_FORMAT_MOD_LINEAR,
+            ** we found some DC using modifier == 0xFFFFFFFF,
+            ** which is also suitable use direct linear output.
+            */
+            surf->extResolve = gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_LINEAR_RENDER_TARGET) ?
+                                gcvSTATUS_TRUE :
+                                gcvSTATUS_FALSE;
             break;
         }
     }
