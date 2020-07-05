@@ -376,36 +376,6 @@ gbm_viv_bo_unmap_fd(struct gbm_viv_bo *bo)
 }
 
 static uint32_t
-gbm_query_g2d_render(void)
-{
-    char *path = gcvNULL;
-    char *dir = getenv("XDG_RUNTIME_DIR");
-    int ret = -1;
-
-    if (dir)
-    {
-        path = (char*)malloc(strlen(dir) + 32);
-    }
-
-    if (path)
-    {
-        strcpy(path, dir);
-        strcat(path, "/use-g2d-renderer");
-        ret = access(path, F_OK);
-        free(path);
-    }
-
-    if (ret == 0)
-    {
-        return 1;
-    }
-    else
-    {
-        return 0;
-    }
-}
-
-static uint32_t
 gbm_query_enable_overlay_view(void)
 {
     char *path = gcvNULL;
@@ -438,7 +408,7 @@ gbm_query_enable_overlay_view(void)
 static uint32_t
 gbm_viv_enable_import_wl_buffer(void)
 {
-     if(gbm_query_g2d_render() && gbm_query_enable_overlay_view())
+     if(gbm_query_enable_overlay_view())
         return 1;
      else
         return 0;
@@ -549,9 +519,7 @@ gbm_viv_bo_import(
     switch (tiling)
     {
     case gcvSUPERTILED:
-        bo->base.width  = gcmALIGN(bo->base.width , 64);
-        bo->base.height = gcmALIGN(bo->base.height, 64);
-        bo->modifier = DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_FC;
+        bo->modifier = DRM_FORMAT_MOD_VIVANTE_SUPER_TILED;
         break;
     default:
         bo->modifier = DRM_FORMAT_MOD_LINEAR;
