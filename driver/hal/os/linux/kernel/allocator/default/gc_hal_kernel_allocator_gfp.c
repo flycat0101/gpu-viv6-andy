@@ -738,7 +738,7 @@ _GFPGetSGT(
 
     gcmkASSERT(Offset + Bytes <= Mdl->numPages << PAGE_SHIFT);
 
-    if (Mdl->contiguous)
+    if (mdlPriv->contiguous)
     {
         pages = tmpPages = kmalloc(sizeof(struct page*) * numPages, GFP_KERNEL | gcdNOWARN);
         if (!pages)
@@ -799,7 +799,7 @@ _GFPFree(
     int low  = 0;
     int high = 0;
 
-    if (Mdl->contiguous)
+    if (mdlPriv->contiguous)
     {
         dma_unmap_page(galcore_device, mdlPriv->dma_addr,
                 Mdl->numPages << PAGE_SHIFT, DMA_FROM_DEVICE);
@@ -819,7 +819,7 @@ _GFPFree(
 
     for (i = 0; i < Mdl->numPages; i++)
     {
-        if (Mdl->contiguous)
+        if (mdlPriv->contiguous)
         {
             page = nth_page(mdlPriv->contiguousPages, i);
         }
@@ -843,7 +843,7 @@ _GFPFree(
     atomic_sub(low, &priv->low);
     atomic_sub(high, &priv->high);
 
-    if (Mdl->contiguous)
+    if (mdlPriv->contiguous)
     {
 #if defined(CONFIG_X86)
         if (!PageHighMem(mdlPriv->contiguousPages))
@@ -1123,7 +1123,7 @@ _GFPMapKernel(
 
     numPages = ((Offset & ~PAGE_MASK) + Bytes + (PAGE_SIZE - 1)) >> PAGE_SHIFT;
 
-    if (Mdl->contiguous)
+    if (mdlPriv->contiguous)
     {
         gctSIZE_T i;
 
@@ -1286,7 +1286,7 @@ _GFPPhysical(
     gctUINT32 offsetInPage = Offset & ~PAGE_MASK;
     gctUINT32 index = Offset / PAGE_SIZE;
 
-    if (Mdl->contiguous)
+    if (mdlPriv->contiguous)
     {
         *Physical = page_to_phys(nth_page(mdlPriv->contiguousPages, index));
     }
