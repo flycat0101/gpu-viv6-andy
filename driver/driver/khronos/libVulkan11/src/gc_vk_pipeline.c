@@ -424,6 +424,7 @@ static VkResult __vki_CreateGraphicsPipeline(
     /* MSAA state */
     pip->msaaEnabled = info->pMultisampleState ?
         (info->pMultisampleState->rasterizationSamples != VK_SAMPLE_COUNT_1_BIT) : VK_FALSE;
+    pip->alphaToCoverageEnable = info->pMultisampleState ? info->pMultisampleState->alphaToCoverageEnable : VK_FALSE;
 
     /* dynamic states */
     pip->dynamicStates = 0;

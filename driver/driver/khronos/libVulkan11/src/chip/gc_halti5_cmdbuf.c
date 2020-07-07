@@ -8377,6 +8377,127 @@ VkResult halti5_setRenderTargets(
             }
         }
 
+        if (devCtx->database->chipID == 0x7000 && devCtx->database->chipVersion == 0x6009
+            && devCtx->pPhyDevice->pInst->patchID == gcvPATCH_DEQP
+            && rtImage->createInfo.format == VK_FORMAT_R5G6B5_UNORM_PACK16
+            && pip->alphaToCoverageEnable
+            && subPass->color_attachment_index[0] == VK_ATTACHMENT_UNUSED
+            && subPass->color_attachment_index[1] != VK_ATTACHMENT_UNUSED
+            && subPass->color_attachment_index[2] == VK_ATTACHMENT_UNUSED
+            && subPass->color_attachment_index[3] == VK_ATTACHMENT_UNUSED
+            )
+        {
+            halti5_pipeline *chipPipeline = (halti5_pipeline *)chipGfxPipeline;
+            struct _gcsHINT *hints = &chipPipeline->curInstance->hwStates.hints;
+            __vkBuffer *vertBuffer = (__vkBuffer*)cmdBuf->bindInfo.vertexBuffers.buffers[0];
+            uint32_t *p = (uint32_t*)vertBuffer->memory->hostAddr;
+
+            if (p && p[7] == 0x3f800000)
+            {
+                chipGfxPipeline->hwCacheMode = CHIP_CACHEMODE_64;
+
+                halti5_gfxpipeline_switch(cmdBuf);
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E06, VK_FALSE,
+                      ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 1:0) - (0 ?
+ 1:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 1:0) - (0 ?
+ 1:0) + 1))))))) << (0 ?
+ 1:0))) | (((gctUINT32) ((gctUINT32) (0x0) & ((gctUINT32) ((((1 ?
+ 1:0) - (0 ?
+ 1:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ? 1:0)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 14:12) - (0 ?
+ 14:12) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 14:12) - (0 ?
+ 14:12) + 1))))))) << (0 ?
+ 14:12))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 14:12) - (0 ?
+ 14:12) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 14:12) - (0 ? 14:12) + 1))))))) << (0 ? 14:12)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 17:16) - (0 ?
+ 17:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 17:16) - (0 ?
+ 17:16) + 1))))))) << (0 ?
+ 17:16))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 17:16) - (0 ?
+ 17:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 17:16) - (0 ? 17:16) + 1))))))) << (0 ? 17:16)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:4) - (0 ?
+ 7:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:4) - (0 ?
+ 7:4) + 1))))))) << (0 ?
+ 7:4))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 7:4) - (0 ?
+ 7:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ? 7:4))));
+
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0402, VK_FALSE,
+                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1))))))) << (0 ?
+ 5:0))) | (((gctUINT32) ((gctUINT32) (hints->fsInputCount) & ((gctUINT32) ((((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ? 5:0)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 12:8) - (0 ?
+ 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 12:8) - (0 ?
+ 12:8) + 1))))))) << (0 ?
+ 12:8))) | (((gctUINT32) ((gctUINT32) (~0) & ((gctUINT32) ((((1 ?
+ 12:8) - (0 ?
+ 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 20:16) - (0 ?
+ 20:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 20:16) - (0 ?
+ 20:16) + 1))))))) << (0 ?
+ 20:16))) | (((gctUINT32) ((gctUINT32) (hints->psHighPVaryingCount) & ((gctUINT32) ((((1 ?
+ 20:16) - (0 ?
+ 20:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 20:16) - (0 ? 20:16) + 1))))))) << (0 ? 20:16)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 24:24) - (0 ?
+ 24:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 24:24) - (0 ?
+ 24:24) + 1))))))) << (0 ?
+ 24:24))) | (((gctUINT32) ((gctUINT32) ((hints->psInputControlHighpPosition | chipGfxPipeline->sampleMaskInPos | (hints->rtArrayComponent != -1))) & ((gctUINT32) ((((1 ?
+ 24:24) - (0 ?
+ 24:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 24:24) - (0 ? 24:24) + 1))))))) << (0 ? 24:24))));
+
+                rtImage->sampleInfo.x       = 1;
+                rtImage->sampleInfo.y       = 1;
+                rtImage->sampleInfo.product = 1;
+
+
+                pLevel->allocedW /= 2;
+                pLevel->allocedH /= 2;
+                pLevel->alignedW /= 2;
+                pLevel->alignedH /= 2;
+
+                pLevel->stride    /= 2;
+                pLevel->sliceSize /= 4;
+                pLevel->partSize  /= 4;
+                pLevel->size      /= 4;
+            }
+        }
+
         while (partIndex < chipGfxPipeline->patchOutput.outputs[i].partCount)
         {
             hwRtIndex = halti5_convertLocationToRenderIndex(hints, chipGfxPipeline->patchOutput.outputs[i].locations[partIndex]);
