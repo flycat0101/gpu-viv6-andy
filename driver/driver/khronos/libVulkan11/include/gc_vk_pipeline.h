@@ -216,6 +216,7 @@ typedef struct __vkPipelineRec
     VkBool32 primitiveRestartEnable;
 
     VkBool32 msaaEnabled;
+    VkBool32 alphaToCoverageEnable;
 
     VkFlags dynamicStates;
     __vkDynamicScissorState scissorState;
