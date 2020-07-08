@@ -32,25 +32,11 @@ arm-yocto)
     export ARCH_TYPE=$ARCH
     export CPU_TYPE=cortex-a9
     export CPU_ARCH=armv7-a
-    #export FIXED_ARCH_TYPE=arm-yocto
-
-    #export KERNEL_DIR=/home/software/Linux/YOCTO/L3.10.9_1.0.0_alpha_20131009
-    #export TOOLCHAIN=/home/software/Linux/YOCTO/poky/sysroots/x86_64-pokysdk-linux/usr
-    #export PATH=$TOOLCHAIN/bin:$TOOLCHAIN/bin/cortexa9hf-vfp-neon-poky-linux-gnueabi:$PATH
-    #export CROSS_COMPILE=arm-poky-linux-gnueabi-
-    #export ROOTFS=/home/software/Linux/YOCTO/x11-20130912221643
-    #export ROOTFS_USR=$ROOTFS/usr
-    #export X11_ARM_DIR=$ROOTFS/usr
-    #export CFLAGS="-D__ARM_PCS_VFP --sysroot=$ROOTFS"
-    #export LDFLAGS="--sysroot=$ROOTFS"
-    #export PFLAGS="--sysroot=$ROOTFS"
-    #export FPU=vfp
-    #export FLOAT_ABI=hard
+    BUILD_YOCTO_DRI_BUILD=1
     BUILD_OPTION_USE_OPENCL=1
     BUILD_OPTION_VIVANTE_ENABLE_2D=1
     BUILD_OPTION_MXC_FBDEV=1
 ;;
-
 
 arm64-yocto)
     export ARCH=arm64
@@ -66,14 +52,12 @@ arm64-yocto)
     BUILD_OPTION_VIVANTE_ENABLE_2D=0
     BUILD_OPTION_VIVANTE_ENABLE_VG=0
 ;;
-
 IMX8_Alpha)
     ARCH=arm64
     export BOARD=IMX8_Alpha
     export ARCH_TYPE=$ARCH
     export CPU_TYPE=cortex-a53
     export CPU_ARCH=armv8-a
-    #export FIXED_ARCH_TYPE=arm64-yocto
 
     export KERNEL_DIR=/home/software/Linux/freescale/L4.9.11_imx8_alpha_kernel_code/linux-imx
     export TOOLCHAIN=/home/software/Linux/freescale/fsl-imx-internal-xwayland/4.9.11-8mq_alpha/sysroots/x86_64-pokysdk-linux/usr/bin/aarch64-poky-linux
@@ -83,16 +67,14 @@ IMX8_Alpha)
     export ROOTFS_USR=$ROOTFS/usr
     export CFLAGS="--sysroot=$ROOTFS  -D__arm64"
     export PFLAGS="--sysroot=$ROOTFS"
-    export LFLAGS="--sysroot=$ROOTFS"
+    export LDFLAGS="--sysroot=$ROOTFS"
     export X11_ARM_DIR=$ROOTFS/usr
     export HAVE_G2D=1
-    BUILD_YOCTO_DRI_BUILD=1
     BUILD_OPTION_EGL_API_DRI=0
     BUILD_OPTION_EGL_API_FB=0
     BUILD_OPTION_X11_DRI3=1
     BUILD_OPTION_VIVANTE_ENABLE_DRM=1
 ;;
-
 
 X86_PCIE)
     #export FIXED_ARCH_TYPE=x86_64
@@ -179,7 +161,6 @@ esac;
 ########################################################
 # Driver Build Options
 #
-
 BUILD_OPTION_DEBUG=0
 BUILD_OPTION_ABI=0
 BUILD_OPTION_LINUX_OABI=0
@@ -190,6 +171,17 @@ BUILD_OPTION_CUSTOM_PIXMAP=0
 BUILD_OPTION_USE_3D_VG=1
 BUILD_OPTION_USE_FB_DOUBLE_BUFFER=0
 BUILD_OPTION_USE_PLATFORM_DRIVER=1
+if [ -z $BUILD_OPTION_MAXCPUS ]; then
+    BUILD_OPTION_MAXCPUS=4
+fi
+
+if [ -z $BUILD_OPTION_VIVANTE_ENABLE_VG ]; then
+    BUILD_OPTION_VIVANTE_ENABLE_VG=1
+fi
+
+if [ -z $USE_KMS ]; then
+    USE_KMS=0
+fi
 BUILD_OPTION_FPGA_BUILD=0
 if [ -z $BUILD_OPTION_MXC_FBDEV ]; then
     BUILD_OPTION_MXC_FBDEV=0
@@ -232,7 +224,6 @@ fi
 if [ -z $BUILD_OPTION_X11_DRI3 ];then
     BUILD_OPTION_X11_DRI3=0
 fi
-
 if [ -z $BUILD_OPTION_USE_OPENCL ]; then
     BUILD_OPTION_USE_OPENCL=0
 fi
@@ -257,25 +248,11 @@ fi
 if [ -z $BUILD_OPTION_VIVANTE_ENABLE_DRM ]; then
     BUILD_OPTION_VIVANTE_ENABLE_DRM=0
 fi
-if [ -z $BUILD_OPTION_VIVANTE_ENABLE_VG ]; then
-    BUILD_OPTION_VIVANTE_ENABLE_VG=0
-fi
 if [ -z $BUILD_OPTION_VIVANTE_ENABLE_3D ]; then
     BUILD_OPTION_VIVANTE_ENABLE_3D=1
 fi
 if [ -z $BUILD_OPTION_VIVANTE_ENABLE_2D ]; then
     BUILD_OPTION_VIVANTE_ENABLE_2D=0
-fi
-if [ -z $BUILD_OPTION_MAXCPUS ]; then
-    BUILD_OPTION_MAXCPUS=4
-fi
-
-if [ -z $BUILD_OPTION_VIVANTE_ENABLE_VG ]; then
-    BUILD_OPTION_VIVANTE_ENABLE_VG=1
-fi
-
-if [ -z $USE_KMS ]; then
-    USE_KMS=0
 fi
 
 BUILD_OPTIONS="NO_DMA_COHERENT=$BUILD_OPTION_NO_DMA_COHERENT"

@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2019 Vivante Corporation
+*    Copyright (C) 2014 - 2020 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -60,11 +60,11 @@
 
 #define gcvVERSION_MINOR        4
 
-#define gcvVERSION_PATCH        0
+#define gcvVERSION_PATCH        3
 
-#define gcvVERSION_BUILD     234062
+#define gcvVERSION_BUILD     281125
 
-#define gcvVERSION_STRING    "6.4.0.p2.234062"
+#define gcvVERSION_STRING    "6.4.3.p0.281125"
 
 #endif /* __gc_hal_version_h_ */
 

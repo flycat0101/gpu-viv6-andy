@@ -165,9 +165,6 @@ VkBool32 halti5_isMismatch(VSC_IMAGE_FORMAT vscFormat, VkFormat descFormat)
     VkFormat cmpFormat = mapTable[vscFormat].cmpFormat;
     VkBool32 result = VK_FALSE;
 
-    /*VIV: the vkcts1.1.3 cases: dEQP-VK.memory.pipeline_barrier.host_write_uniform_texel_buffer.*
-    ** on 8qm_wld shouldn't trigger recompile
-    */
     if (vscFormat == VSC_IMAGE_FORMAT_RGBA16UI &&
         descFormat == VK_FORMAT_R16_UINT)
     {
@@ -7747,9 +7744,6 @@ VkResult halti5_patch_pipeline(
                 i++;
             }
 
-            /*VIV: if totalEntries is zero, needn't do recompile,
-            **but need free related resource to avoid memory leak.
-            */
             if (totalEntries == 0)
             {
                 preHighPatch = VK_FALSE;
@@ -8009,10 +8003,6 @@ VkResult halti5_patch_pipeline(
 
             totalEntries += chipPipeline->linkEntryCount;
 
-            /*VIV: the follow two situations no need do reLink:
-            **1.totalEntries is zero and didn't do recompile;
-            **2.totalEntries is none zero, but didn't do recompile and needn't do other patch.
-            */
             if ((!totalEntries && !recompiled) ||
                 (totalEntries && !recompiled &&
                 (totalEntries == chipPipeline->linkEntryCount)))

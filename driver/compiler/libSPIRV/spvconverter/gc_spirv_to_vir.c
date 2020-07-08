@@ -4753,10 +4753,6 @@ VSC_ErrCode __SpvEmitType(gcSPV spv, VIR_Shader * virShader)
                     ON_ERROR(virErrCode, "Invalid OpTypeImage operand");
                 }
 
-                /*
-                ** VIV:TODO: why we need this ????
-                ** set a default format for subpass data.
-                */
                 SPV_ID_TYPE_IMAGE_FORMAT(spv->resultId) = SpvImageFormatRgba8;
             }
 

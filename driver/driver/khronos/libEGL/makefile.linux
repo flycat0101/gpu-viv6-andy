@@ -100,10 +100,14 @@ ifeq ($(USE_KMS),1)
 else
   CFLAGS += $(INCLUDE) -DgcdUSE_KMS=0
 endif
+
 ################################################################################
 # Add extra flags for object files.
+
+ifneq ($(EGL_API_WL), 1)
 ifneq ($(filter 1,$(EGL_API_X) $(EGL_API_DRI) $(X11_DRI3)),)
   CFLAGS += -DX11
+endif
 endif
 
 ifeq ($(EGL_API_DRI), 1)

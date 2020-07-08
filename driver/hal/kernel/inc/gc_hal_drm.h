@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2019 Vivante Corporation
+*    Copyright (C) 2014 - 2020 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -55,6 +55,8 @@
 
 #ifndef __VIVNATE_DRM_H__
 #define __VIVNATE_DRM_H__
+
+#include <drm.h>
 
 #if defined(__cplusplus)
 extern "C" {
