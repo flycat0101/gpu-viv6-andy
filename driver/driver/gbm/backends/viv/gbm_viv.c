@@ -620,7 +620,7 @@ Is_8DXBoard()
 
     fp = fopen(path, "r");
 
-    if(fp < 0)
+    if(fp == NULL)
     {
         return ret;
     }
