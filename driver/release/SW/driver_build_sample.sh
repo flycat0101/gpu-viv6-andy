@@ -32,20 +32,6 @@ arm-yocto)
     export ARCH_TYPE=$ARCH
     export CPU_TYPE=cortex-a9
     export CPU_ARCH=armv7-a
-    #export FIXED_ARCH_TYPE=arm-yocto
-
-    #export KERNEL_DIR=/home/software/Linux/YOCTO/L3.10.9_1.0.0_alpha_20131009
-    #export TOOLCHAIN=/home/software/Linux/YOCTO/poky/sysroots/x86_64-pokysdk-linux/usr
-    #export PATH=$TOOLCHAIN/bin:$TOOLCHAIN/bin/cortexa9hf-vfp-neon-poky-linux-gnueabi:$PATH
-    #export CROSS_COMPILE=arm-poky-linux-gnueabi-
-    #export ROOTFS=/home/software/Linux/YOCTO/x11-20130912221643
-    #export ROOTFS_USR=$ROOTFS/usr
-    #export X11_ARM_DIR=$ROOTFS/usr
-    #export CFLAGS="-D__ARM_PCS_VFP --sysroot=$ROOTFS"
-    #export LDFLAGS="--sysroot=$ROOTFS"
-    #export PFLAGS="--sysroot=$ROOTFS"
-    #export FPU=vfp
-    #export FLOAT_ABI=hard
     BUILD_OPTION_USE_OPENCL=1
     BUILD_OPTION_VIVANTE_ENABLE_2D=1
 ;;
@@ -60,7 +46,6 @@ arm64-yocto)
     BUILD_OPTION_USE_VULKAN=1
     BUILD_OPTION_USE_OPENVX=1
     BUILD_OPTION_VIVANTE_ENABLE_2D=0
-
 ;;
 
 X86_PCIE)
@@ -208,7 +193,7 @@ if [ -z $BUILD_OPTION_VIVANTE_ENABLE_DRM ]; then
     BUILD_OPTION_VIVANTE_ENABLE_DRM=0
 fi
 if [ -z $BUILD_OPTION_VIVANTE_ENABLE_VG ]; then
-    BUILD_OPTION_VIVANTE_ENABLE_VG=0
+    BUILD_OPTION_VIVANTE_ENABLE_VG=1
 fi
 if [ -z $BUILD_OPTION_VIVANTE_ENABLE_3D ]; then
     BUILD_OPTION_VIVANTE_ENABLE_3D=1

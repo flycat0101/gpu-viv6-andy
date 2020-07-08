@@ -302,7 +302,7 @@ typedef struct
 {
     VSC_IMAGE_FORMAT vscFormat;
     VkFormat drvFormat;
-    VkFormat cmpFormat; /*VIV:compatible packed format*/
+    VkFormat cmpFormat;
 }halti5_formatMapInfo;
 
 enum

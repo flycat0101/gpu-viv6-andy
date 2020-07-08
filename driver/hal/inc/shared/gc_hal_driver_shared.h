@@ -41,6 +41,7 @@ extern "C" {
 #define IOCTL_GCHAL_PROFILER_INTERFACE  30001
 #define IOCTL_GCHAL_TERMINATE           30002
 
+#undef CONFIG_ANDROID_RESERVED_MEMORY_ACCOUNT
 /******************************************************************************\
 ****************************** Interface Structure *****************************
 \******************************************************************************/

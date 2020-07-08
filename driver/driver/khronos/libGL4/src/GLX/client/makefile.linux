@@ -68,8 +68,8 @@ INCLUDE += \
 	-I$(LIBDRM_DIR)/include/drm
 
 ifeq ($(X11_DRI3),1)
-INCLUDE += -I$(LIBDRM_DIR)/vivante
 LDLIBS += -lX11-xcb -ldrm_vivante -lxcb -lxcb-dri3 -lxcb-present -lxshmfence -lxcb-sync
+INCLUDE += -I$(ROOTFS_USR)/include/libdrm
 endif
 
 CFLAGS += $(INCLUDE)

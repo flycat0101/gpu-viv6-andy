@@ -392,10 +392,6 @@ glfCreateContext(
         /* Set 3D object */
         context->hw = Engine;
 
-        /* Save shared context pointer. */
-        /*
-            VIV: We don't support shared context between ES11 and ES20 above.
-        */
         if (ClientVersion == SharedContextClient)
         {
             context->shared = (struct _glsCONTEXT*)SharedContext;
