@@ -21482,6 +21482,7 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
     vx_tensor               input,
+    vx_tensor               mask,
     vx_scalar               poolType,
     vx_scalar               stride_x_s,
     vx_scalar               stride_y_s,
@@ -21504,7 +21505,7 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
     vxnne_kernel_shaders        kernel;
     vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
 
-    vx_reference parameters[3]      = {(vx_reference)input, VX_NULL, (vx_reference)output};
+    vx_reference parameters[4]      = {(vx_reference)input, (vx_reference)mask, VX_NULL, (vx_reference)output};
     vx_enum      inputFormat        = TENSOR_DATA_TYPE(input);
     vx_enum      outputFormat       = TENSOR_DATA_TYPE(output);
     vx_uint32    in_width           = TENSOR_VIEW_SIZE_INDEX(input, 0);
@@ -21553,7 +21554,7 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
             in_heights = vxCreateScalar(context, VX_TYPE_INT32, &out_height);
     }
 
-    parameters[1] = (vx_reference)in_heights;
+    parameters[2] = (vx_reference)in_heights;
 
     if (inputFormat == VX_TYPE_INT8)
     {
@@ -21663,7 +21664,7 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
         status = vxBuildProgram(program, "-cl-viv-vx-extension");
         if (status != VX_SUCCESS) goto OnError;
 
-        kernel = vxnneAddKernelShadersInProgram(context, "vxcL2Pooling", program, 3, kernelEnum);
+        kernel = vxnneAddKernelShadersInProgram(context, "vxcL2Pooling", program, 4, kernelEnum);
         if (!kernel) goto OnError;
 
         vxReleaseProgram(&program);
@@ -21675,7 +21676,7 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
         vx_int32     maxData                = 0;
         vx_int32     enable_uint8_format    = outputFormat == VX_TYPE_UINT8 ? 1 : 0;
         vx_uint32    input_2ZP              = input_ZP * 2;
-        vx_float32   uint8Scale             = scaleIn * scaleIn/ (float)(kernel_size_x * kernel_size_y * scaleOut * scaleOut);
+        vx_float32   uint8Scale             = scaleIn * scaleIn/ (float)(scaleOut * scaleOut);
         vx_float32   uint8ZP_out            = (vx_float32)output_ZP;
         vx_int32     pool_size              = gcmALIGN_SAFE(kernel_size_x * kernel_size_y, 32);
         vx_float32   NInputZPSquare         = (vx_float32)input_ZP * input_ZP * pool_size;
@@ -21730,7 +21731,7 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
         vx_int32     enable_uint8_format    = outputFormat == VX_TYPE_UINT8 ? 1 : 0;
         vx_float32   uint8ZP_out            = (vx_float32)output_ZP;
         vx_int32     pool_size              = gcmALIGN_SAFE(kernel_size_x * kernel_size_y, 32);
-        vx_float32   genericL2Scale         = (vx_float32)1.0 / (vx_float32)(kernel_size_x * kernel_size_y * scaleOut * scaleOut);
+        vx_float32   genericL2Scale         = (vx_float32)1.0 / (vx_float32)(scaleOut * scaleOut);
         vx_uint32 uniAcc8BinSquareFp16_16x1[16] = {
             0x00005555, // TCfg
             0x00000000, // ASelt
@@ -21776,7 +21777,7 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
     else if (globalPooling_flag && inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16)
     {
         vx_int32     pool_size              = gcmALIGN_SAFE(kernel_size_x * kernel_size_y, 32);
-        vx_float32   genericL2Scale         = (vx_float32)1.0 / (vx_float32)(kernel_size_x * kernel_size_y * scaleOut * scaleOut);
+        vx_float32   genericL2Scale         = (vx_float32)1.0 / (vx_float32)(scaleOut * scaleOut);
         vx_uint32 uniConvBF16toF32_Part0_2x8[16] = {
             0x11111111, // TCfg
             0x01010101, // ASelt
@@ -21809,7 +21810,7 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
     {
         vx_int32     minData              = 0;
         vx_int32     maxData              = 0;
-        vx_float32   uint8Scale           = scaleIn * scaleIn/ (float)(kernel_size_x * kernel_size_y * scaleOut * scaleOut);
+        vx_float32   uint8Scale           = scaleIn * scaleIn/ (float)(scaleOut * scaleOut);
         vx_float32   output_zeroPoint     = (vx_float32)output_ZP;
         vx_int32     kernelsize[2]        = {kernel_size_x, kernel_size_y};
         vx_int32     padding[2]           = {pad_left, pad_top};
@@ -21888,7 +21889,7 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
     {
         vx_int32     minData              = 0;
         vx_int32     maxData              = 0;
-        vx_float32   genericL2Scale       = 1.0f / (float)(kernel_size_x * kernel_size_y * scaleOut * scaleOut);
+        vx_float32   genericL2Scale       = 1.0f / (float)(scaleOut * scaleOut);
         vx_float32   output_zeroPoint     = (vx_float32)output_ZP;
         vx_int32     kernelsize[2]        = {kernel_size_x, kernel_size_y};
         vx_int32     padding[2]           = {pad_left, pad_top};
@@ -21962,7 +21963,6 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
     }
     else if (inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16)
     {
-        vx_float32   genericL2Scale       = 1.0f / (float)(kernel_size_x * kernel_size_y * scaleOut * scaleOut);
         vx_int32     kernelsize[2]        = {kernel_size_x, kernel_size_y};
         vx_int32     padding[2]           = {pad_left, pad_top};
         vx_int32     stride[2]            = {stride_v, stride_y};
@@ -22039,7 +22039,6 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
 
         status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "x_len_8x", 1, &x_len_8x);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "x_len_remain", 1, &x_len_remain);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "genericL2Scale", 1, &genericL2Scale);
         if (status != VX_SUCCESS) goto OnError;
     }
     else
@@ -22068,7 +22067,7 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
         execution_parameters.globalWorkSize[2]   = depth;
     }
 
-    status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 3);
+    status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
     if (status != VX_SUCCESS) goto OnError;
 
     status = vxnneShaderExecutable_SetExecutionParameters(shaderExecutable, &execution_parameters);

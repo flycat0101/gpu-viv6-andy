@@ -3581,6 +3581,7 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
     vx_tensor               input,
+    vx_tensor               mask,
     vx_scalar               poolType,
     vx_scalar               stride_x_s,
     vx_scalar               stride_y_s,
