@@ -19,7 +19,7 @@
     coord.x++; \
     write_fun(output, coord, tmpOut.wwww);
 
-__kernel void gpuTensorCopy_Fp32_4X (
+__kernel void gpuTensorCopy_F32toF32_4X (
     __read_only image2d_array_t  input,
     __write_only image2d_array_t output)
 {
@@ -27,7 +27,7 @@ __kernel void gpuTensorCopy_Fp32_4X (
     TENSOR_COPY_SAME_4X_PROCESS(float4, read_imagef, write_imagef);
 }
 
-__kernel void gpuTensorCopy_Fp32_4X_2D (
+__kernel void gpuTensorCopy_F32toF32_4X_2D (
     __read_only image2d_t  input,
     __write_only image2d_t output)
 {
@@ -35,7 +35,7 @@ __kernel void gpuTensorCopy_Fp32_4X_2D (
     TENSOR_COPY_SAME_4X_PROCESS(float4, read_imagef, write_imagef);
 }
 
-__kernel void gpuTensorCopy_Fp32_4S (
+__kernel void gpuTensorCopy_F32toF32_4S (
     __read_only image2d_array_t  input,
     __write_only image2d_array_t output)
 {
@@ -43,7 +43,7 @@ __kernel void gpuTensorCopy_Fp32_4S (
     TENSOR_COPY_SAME_4S_PROCESS(float4, read_imagef, write_imagef);
 }
 
-__kernel void gpuTensorCopy_Fp32_4S_2D (
+__kernel void gpuTensorCopy_F32toF32_4S_2D (
     __read_only image2d_t  input,
     __write_only image2d_t output)
 {
@@ -52,7 +52,7 @@ __kernel void gpuTensorCopy_Fp32_4S_2D (
 }
 
 
-__kernel void gpuTensorCopy_INT32_4X (
+__kernel void gpuTensorCopy_I32toI32_4X (
     __read_only image2d_array_t  input,
     __write_only image2d_array_t output)
 {
@@ -60,7 +60,7 @@ __kernel void gpuTensorCopy_INT32_4X (
     TENSOR_COPY_SAME_4X_PROCESS(int4, read_imagei, write_imagei);
 }
 
-__kernel void gpuTensorCopy_INT32_4X_2D (
+__kernel void gpuTensorCopy_I32toI32_4X_2D (
     __read_only image2d_t  input,
     __write_only image2d_t output)
 {
@@ -68,7 +68,7 @@ __kernel void gpuTensorCopy_INT32_4X_2D (
     TENSOR_COPY_SAME_4X_PROCESS(int4, read_imagei, write_imagei);
 }
 
-__kernel void gpuTensorCopy_INT32_4S (
+__kernel void gpuTensorCopy_I32toI32_4S (
     __read_only image2d_array_t  input,
     __write_only image2d_array_t output)
 {
@@ -76,7 +76,7 @@ __kernel void gpuTensorCopy_INT32_4S (
     TENSOR_COPY_SAME_4S_PROCESS(int4, read_imagei, write_imagei);
 }
 
-__kernel void gpuTensorCopy_INT32_4S_2D (
+__kernel void gpuTensorCopy_I32toI32_4S_2D (
     __read_only image2d_t  input,
     __write_only image2d_t output)
 {
@@ -417,4 +417,170 @@ __kernel void gpuTensorCopy_FP32toFP16_4S_2D (
     ((ushort*)output_data_ptr)[1] = result.y;
     ((ushort*)output_data_ptr)[2] = result.z;
     ((ushort*)output_data_ptr)[3] = result.w;
+}
+
+#define DATA_CONVERT_TO_INT32_2D_4X(name, image_load_inst, input_type) \
+__kernel void gpuTensorCopy_##name##toI32_2D_4X ( \
+    __read_only  image2d_t input, \
+    __write_only image2d_t output, \
+                  float    scale, \
+                  float    tail) \
+{ \
+    int2 coord = (int2)(get_global_id(0), get_global_id(1)); \
+    input_type src = image_load_inst(input, coord); \
+ \
+    float4 data = convert_float4(src) * scale + tail; \
+    int4 dst = convert_int4(data); \
+ \
+    write_imagei(output, coord, dst); \
+}
+DATA_CONVERT_TO_INT32_2D_4X(U8, read_imageui, uint4)
+DATA_CONVERT_TO_INT32_2D_4X(F32, read_imagef, float4)
+
+#define DATA_CONVERT_TO_INT32_2D_4S(name, image_load_inst, input_type) \
+__kernel void gpuTensorCopy_##name##toI32_2D_4S ( \
+    __read_only  image2d_t input, \
+    __write_only image2d_t output, \
+                  float    scale, \
+                  float    tail) \
+{ \
+    int2 coord = (int2)(get_global_id(0), get_global_id(1)); \
+    input_type src = image_load_inst(input, coord); \
+ \
+    float4 data = convert_float4(src) * scale + tail; \
+    int4 dst = convert_int4(data); \
+ \
+    write_imagei(output, coord, dst.xxxx); \
+    coord.x++; \
+    write_imagei(output, coord, dst.yyyy); \
+    coord.x++; \
+    write_imagei(output, coord, dst.zzzz); \
+    coord.x++; \
+    write_imagei(output, coord, dst.wwww); \
+}
+DATA_CONVERT_TO_INT32_2D_4S(U8, read_imageui, uint4)
+DATA_CONVERT_TO_INT32_2D_4S(F32, read_imagef, float4)
+
+#define DATA_CONVERT_TO_INT32(name, image_load_inst, input_type) \
+__kernel void gpuTensorCopy_##name##toI32 ( \
+    __read_only  image2d_array_t input, \
+    __write_only image2d_array_t output, \
+                  float    scale, \
+                  float    tail) \
+{ \
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), get_global_id(2)); \
+    input_type src = image_load_inst(input, coord); \
+ \
+    float4 data = convert_float4(src) * scale + tail; \
+    int4 dst = convert_int4(data); \
+ \
+    write_imagei(output, coord, dst); \
+}
+DATA_CONVERT_TO_INT32(U8, read_imageui, uint4)
+DATA_CONVERT_TO_INT32(F32, read_imagef, float4)
+
+#define TENSOR_COPY_F32TOBF16_4X_PROCESS() \
+    float4 tmp = read_imagef(input, coord); \
+    uint4 src, dst; \
+    _viv_asm(COPY, src, tmp, 16); \
+    dst = src >> 16; \
+    write_imageui(output, coord, dst);
+
+
+#define TENSOR_COPY_F32TOBF16_4S_PROCESS() \
+    float4 tmp = read_imagef(input, coord); \
+    uint4 src, dst; \
+    _viv_asm(COPY, src, tmp, 16); \
+    dst = src >> 16; \
+    write_imageui(output, coord, dst.xxxx); \
+    coord.x++; \
+    write_imageui(output, coord, dst.yyyy); \
+    coord.x++; \
+    write_imageui(output, coord, dst.zzzz); \
+    coord.x++; \
+    write_imageui(output, coord, dst.wwww);
+
+__kernel void gpuTensorCopy_F32toBF16_4X (
+    __read_only image2d_array_t  input,
+    __write_only image2d_array_t output)
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    TENSOR_COPY_F32TOBF16_4X_PROCESS();
+}
+
+__kernel void gpuTensorCopy_F32toBF16_4X_2D (
+    __read_only image2d_t  input,
+    __write_only image2d_t output)
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    TENSOR_COPY_F32TOBF16_4X_PROCESS();
+}
+
+__kernel void gpuTensorCopy_F32toBF16_4S (
+    __read_only image2d_array_t  input,
+    __write_only image2d_array_t output)
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    TENSOR_COPY_F32TOBF16_4S_PROCESS();
+}
+
+__kernel void gpuTensorCopy_F32toBF16_4S_2D (
+    __read_only image2d_t  input,
+    __write_only image2d_t output)
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    TENSOR_COPY_F32TOBF16_4S_PROCESS();
+}
+
+#define TENSOR_COPY_BF16TOF32_4X_PROCESS() \
+    uint4 src = read_imageui(input, coord); \
+    float4 dst; \
+    src = src << 16; \
+    _viv_asm(COPY, dst, src, 16); \
+    write_imagef(output, coord, dst);
+
+
+#define TENSOR_COPY_BF16TOF32_4S_PROCESS() \
+    uint4 src = read_imageui(input, coord); \
+    float4 dst; \
+    src = src << 16; \
+    _viv_asm(COPY, dst, src, 16); \
+    write_imagef(output, coord, dst.xxxx); \
+    coord.x++; \
+    write_imagef(output, coord, dst.yyyy); \
+    coord.x++; \
+    write_imagef(output, coord, dst.zzzz); \
+    coord.x++; \
+    write_imagef(output, coord, dst.wwww);
+
+__kernel void gpuTensorCopy_BF16toF32_4X (
+    __read_only image2d_array_t  input,
+    __write_only image2d_array_t output)
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    TENSOR_COPY_BF16TOF32_4X_PROCESS();
+}
+
+__kernel void gpuTensorCopy_BF16toF32_4X_2D (
+    __read_only image2d_t  input,
+    __write_only image2d_t output)
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    TENSOR_COPY_BF16TOF32_4X_PROCESS();
+}
+
+__kernel void gpuTensorCopy_BF16toF32_4S (
+    __read_only image2d_array_t  input,
+    __write_only image2d_array_t output)
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    TENSOR_COPY_BF16TOF32_4S_PROCESS();
+}
+
+__kernel void gpuTensorCopy_BF16toF32_4S_2D (
+    __read_only image2d_t  input,
+    __write_only image2d_t output)
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    TENSOR_COPY_BF16TOF32_4S_PROCESS();
 }

@@ -3742,6 +3742,41 @@ VX_API_ENTRY vx_node VX_API_CALL vxL2NormalizeLayer(
     return node;
 }
 
+VX_API_ENTRY vx_node VX_API_CALL vxL2NormalizeLayer2(
+    vx_graph                    graph,
+    vx_tensor                   inputs,
+    const vx_nn_l2norm_params_t *l2norm_params,
+    vx_size size_of_l2norm_params,
+    vx_tensor                   outputs
+    )
+{
+    vx_reference parameters[] = {
+        (vx_reference)inputs,
+        NULL,
+        (vx_reference)outputs
+    };
+
+    vx_node node = VX_NULL;
+    vx_scalar axis_s = VX_NULL;
+    vx_int32 axis;
+
+    gcmHEADER_ARG("graph=%p, inputs=%p, l2norm_params=%p, size_of_l2norm_params=0x%lx, outputs=%p",
+        graph, inputs, l2norm_params, size_of_l2norm_params, outputs);
+    gcmDUMP_API("$VX vxL2NormalizeLayer2: graph=%p, inputs=%p, l2norm_params=%p, size_of_l2norm_params=0x%lx, outputs=%p",
+        graph, inputs, l2norm_params, size_of_l2norm_params, outputs);
+
+    axis = l2norm_params->axis;
+    axis_s = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, &axis);
+
+    parameters[1] = (vx_reference)axis_s;
+
+    node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_L2NORMALIZE_LAYER2, parameters, vxmLENGTH_OF(parameters));
+
+    vxReleaseScalar(&axis_s);
+    gcmFOOTER_NO();
+    return node;
+}
+
 VX_API_ENTRY vx_node VX_API_CALL vxDeconvolutionLayer(
     vx_graph graph,
     vx_tensor inputs,
@@ -4410,28 +4445,39 @@ VX_API_ENTRY vx_node VX_API_CALL vxSoftmaxLayer2(
     vx_reference parameters[] = {
         (vx_reference)input,
         NULL,
+        NULL,
         (vx_reference)output
     };
 
     vx_node node = VX_NULL;
+    vx_scalar axis_s = VX_NULL, beta_s = VX_NULL;
+    vx_float32 beta;
+    vx_int32 axis;
 
-    vx_scalar beta = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_FLOAT32, &softmax_params->beta);
     gcmHEADER_ARG("graph=%p, input=%p, softmax_params=%p, size_of_softmax_params=0x%lx, output=%p",
         graph, input, softmax_params, size_of_softmax_params, output);
     gcmDUMP_API("$VX vxSoftmaxLayer2: graph=%p, input=%p, softmax_params=%p, size_of_softmax_params=0x%lx, output=%p",
         graph, input, softmax_params, size_of_softmax_params, output);
 
-
-    if (vxoReference_GetStatus((vx_reference)beta) != VX_SUCCESS)
+    if (sizeof(vx_nn_softmax_params_ext_t) == size_of_softmax_params)
     {
-        gcmFOOTER_NO();
-        return (vx_node)beta;
+        vx_nn_softmax_params_ext_t * params = (vx_nn_softmax_params_ext_t *)softmax_params;
+        beta = params->base.beta;
+        axis = params->axis;
     }
-    parameters[1]  = (vx_reference)beta;
-
+    else if (sizeof(vx_nn_softmax_params_t) == size_of_softmax_params)
+    {
+        beta = softmax_params->beta;
+        axis = -1;
+    }
+    beta_s = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_FLOAT32, &beta);
+    axis_s = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, &axis);
+    parameters[1] = (vx_reference)beta_s;
+    parameters[2] = (vx_reference)axis_s;
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_SOFTMAX2_LAYER, parameters, vxmLENGTH_OF(parameters));
 
-    vxReleaseScalar(&beta);
+    vxReleaseScalar(&beta_s);
+    vxReleaseScalar(&axis_s);
     gcmFOOTER_NO();
     return node;
 }
@@ -4511,65 +4557,94 @@ VX_API_ENTRY vx_node VX_API_CALL vxNormalizationLayer2(
         NULL,
         NULL,
         NULL,
+        NULL,
         (vx_reference)outputs
     };
 
     vx_node node = VX_NULL;
-    vx_scalar norm_size = VX_NULL, alpha = VX_NULL, beta = VX_NULL, bias = VX_NULL;
-
-    vx_scalar type = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &normalization_params->type);
+    vx_scalar type_s = VX_NULL, norm_size_s = VX_NULL, alpha_s = VX_NULL, beta_s = VX_NULL, bias_s = VX_NULL, axis_s = VX_NULL;
+    vx_uint32 norm_size;
+    vx_float32 alpha, beta, bias;
+    vx_int32 axis;
+    vx_enum type;
 
     gcmHEADER_ARG("graph=%p, inputs=%p, normalization_params=%p, size_of_normalization_param=0x%lx, outputs=%p",
         graph, inputs, normalization_params, size_of_normalization_param, outputs);
     gcmDUMP_API("$VX vxNormalizationLayer2: graph=%p, inputs=%p, normalization_params=%p, size_of_normalization_param=0x%lx, outputs=%p",
         graph, inputs, normalization_params, size_of_normalization_param, outputs);
 
-    if (vxoReference_GetStatus((vx_reference)type) != VX_SUCCESS)
+    if (size_of_normalization_param == sizeof(vx_nn_normalization_params_ext_t))
+    {
+        vx_nn_normalization_params_ext_t *normalization_params_ext = (vx_nn_normalization_params_ext_t *)normalization_params;
+        type = normalization_params_ext->base.type;
+        norm_size = normalization_params_ext->base.norm_size;
+        alpha = normalization_params_ext->base.alpha;
+        beta = normalization_params_ext->base.beta;
+        bias = normalization_params_ext->base.bias;
+        axis = normalization_params_ext->axis;
+    }
+    else if (size_of_normalization_param == sizeof(vx_nn_normalization_params_t))
+    {
+        type = normalization_params->type;
+        norm_size = normalization_params->norm_size;
+        alpha = normalization_params->alpha;
+        beta = normalization_params->beta;
+        bias = normalization_params->bias;
+        axis = -1;
+    }
+
+    type_s = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &type);
+    if (vxoReference_GetStatus((vx_reference)type_s) != VX_SUCCESS)
     {
         gcmFOOTER_NO();
-        return (vx_node)type;
+        return (vx_node)type_s;
     }
-    norm_size = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_UINT32, &normalization_params->norm_size);
-    if (vxoReference_GetStatus((vx_reference)norm_size) != VX_SUCCESS)
+    norm_size_s = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_UINT32, &norm_size);
+    if (vxoReference_GetStatus((vx_reference)norm_size_s) != VX_SUCCESS)
     {
         gcmFOOTER_NO();
-        return (vx_node)norm_size;
+        return (vx_node)norm_size_s;
     }
-    alpha = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_FLOAT32, &normalization_params->alpha);
-    if (vxoReference_GetStatus((vx_reference)alpha) != VX_SUCCESS)
+    alpha_s = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_FLOAT32, &alpha);
+    if (vxoReference_GetStatus((vx_reference)alpha_s) != VX_SUCCESS)
     {
         gcmFOOTER_NO();
-        return (vx_node)alpha;
+        return (vx_node)alpha_s;
     }
-    beta = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_FLOAT32, &normalization_params->beta);
-    if (vxoReference_GetStatus((vx_reference)beta) != VX_SUCCESS)
+    beta_s = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_FLOAT32, &beta);
+    if (vxoReference_GetStatus((vx_reference)beta_s) != VX_SUCCESS)
     {
         gcmFOOTER_NO();
-        return (vx_node)beta;
+        return (vx_node)beta_s;
     }
-    bias = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_FLOAT32, &normalization_params->bias);
-    if (vxoReference_GetStatus((vx_reference)bias) != VX_SUCCESS)
+    bias_s = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_FLOAT32, &bias);
+    if (vxoReference_GetStatus((vx_reference)bias_s) != VX_SUCCESS)
     {
         gcmFOOTER_NO();
-        return (vx_node)bias;
+        return (vx_node)bias_s;
     }
-    parameters[1]  = (vx_reference)type;
-    parameters[2]  = (vx_reference)norm_size;
-    parameters[3]  = (vx_reference)alpha;
-    parameters[4]  = (vx_reference)beta;
-    parameters[5]  = (vx_reference)bias;
+    axis_s = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, &axis);
+
+    parameters[1]  = (vx_reference)type_s;
+    parameters[2]  = (vx_reference)norm_size_s;
+    parameters[3]  = (vx_reference)alpha_s;
+    parameters[4]  = (vx_reference)beta_s;
+    parameters[5]  = (vx_reference)bias_s;
+    parameters[6]  = (vx_reference)axis_s;
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_NORMALIZATION_LAYER2, parameters, vxmLENGTH_OF(parameters));
 
-    vxReleaseScalar(&type);
+    vxReleaseScalar(&type_s);
 
-    vxReleaseScalar(&norm_size);
+    vxReleaseScalar(&norm_size_s);
 
-    vxReleaseScalar(&alpha);
+    vxReleaseScalar(&alpha_s);
 
-    vxReleaseScalar(&beta);
+    vxReleaseScalar(&beta_s);
 
-    vxReleaseScalar(&bias);
+    vxReleaseScalar(&bias_s);
+
+    vxReleaseScalar(&axis_s);
 
     gcmFOOTER_NO();
     return node;

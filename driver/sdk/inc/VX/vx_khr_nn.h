@@ -196,6 +196,8 @@ enum vx_nn_activation_function_e
     VX_NN_ACTIVATION_RSQRT = VX_ENUM_BASE(VX_ID_VIVANTE, VX_ENUM_NN_ACTIVATION_FUNCTION_TYPE) + 0x3,
     VX_NN_ACTIVATION_LEAKYRELU_MAX_POOLING = VX_ENUM_BASE(VX_ID_VIVANTE, VX_ENUM_NN_ACTIVATION_FUNCTION_TYPE) + 0x4,
     VX_NN_ACTIVATION_NONE = VX_ENUM_BASE(VX_ID_VIVANTE, VX_ENUM_NN_ACTIVATION_FUNCTION_TYPE) + 0x5,
+    VX_NN_ACTIVATION_SWISH = VX_ENUM_BASE(VX_ID_VIVANTE, VX_ENUM_NN_ACTIVATION_FUNCTION_TYPE) + 0x6,
+    VX_NN_ACTIVATION_HSWISH = VX_ENUM_BASE(VX_ID_VIVANTE, VX_ENUM_NN_ACTIVATION_FUNCTION_TYPE) + 0x7,
 };
 
 /*! \brief  The Convolutional network type
@@ -786,6 +788,32 @@ VX_API_ENTRY vx_node VX_API_CALL vxNormalizationLayer(vx_graph graph, vx_tensor 
         vx_float32 beta,
         vx_tensor outputs);
 
+/*! \brief [Graph] Creates a Convolutional Network Local Response Normalization Layer Node. This function is optional for 8-bit extension with the extension string 'KHR_NN_8'.
+ * \details Normalizing over local input regions. Each input value is divided by \f$ (\bias+\frac{\alpha}{n}\sum_i x^2_i)^\beta \f$ , where n is the number of elements to normalize across.
+ * and the sum is taken over a rectangle region centred at that value (zero padding is added where necessary).
+ * \param [in] graph The handle to the graph.
+ * \param [in] inputs The input tensor data. 3 lower dimensions represent a single input, 4th dimension for batch of inputs is optional. Dimension layout is [width, height, IFM, #batches].
+ * See <tt>\ref vxCreateTensor</tt> and <tt>\ref vxCreateVirtualTensor</tt>.
+ * Implementations must support input tensor data types indicated by the extension strings 'KHR_NN_8 KHR_NN_16'.
+ * Since this function is optional for 'KHR_NN_8', so implementations only must support <tt>VX_TYPE_INT16</tt> with fixed_point_position 8.
+ * \param [in] type [static] Either same map or across maps (see <tt>\ref vx_nn_norm_type_e</tt>).
+ * \param [in] normalization_size [static] Number of elements to normalize across. Must be a positive odd number with maximum size of 7 and minimum of 3.
+ * \param [in] alpha [static] Alpha parameter in the local response normalization equation. must be positive.
+ * \param [in] beta  [static] Beta parameter in the local response normalization equation. must be positive.
+ * \param [in] bias  [static] Bias parameter in the local response normalization equation. must be positive.
+ * \param [out] outputs The output tensor data. Output will have the same number of dimensions as input.
+ * \ingroup group_cnn
+ * \return <tt> vx_node</tt>.
+ * \returns A node reference <tt>\ref vx_node</tt>. Any possible errors preventing a
+ * successful creation should be checked using <tt>\ref vxGetStatus</tt>.
+ */
+VX_API_ENTRY vx_node VX_API_CALL vxLocalResponseNormalizationLayer(vx_graph graph, vx_tensor inputs, vx_enum type,
+        vx_size normalization_size,
+        vx_float32 alpha,
+        vx_float32 beta,
+        vx_float32 bias,
+        vx_tensor outputs);
+
 /*! \brief Input parameter for normalization layer2
 * \ingroup group_cnn
 *\version 0.4
@@ -798,6 +826,16 @@ typedef struct _vx_nn_normalization_params_t
     vx_float32 beta; /*!< \brief Beta parameter in the normalization equation */
     vx_float32 bias;  /*!< \brief Bias parameter, must not be zero */
 } vx_nn_normalization_params_t;
+
+/*! \brief extenstion parameters for normalization layer2.
+ * \ingroup group_cnn
+ *\version 0.5
+ */
+typedef struct _vx_nn_normalization_params_ext_t
+{
+    vx_nn_normalization_params_t base;        /*!< \brief Khronos standard structure head <tt> \ref vx_nn_normalization_params_t <tt> */
+     vx_int32 axis;
+} vx_nn_normalization_params_ext_t;
 
 /*! \brief Input parameter for tensor transpose layer2
 * \ingroup group_cnn
@@ -1416,6 +1454,16 @@ typedef struct _vx_nn_softmax_params_t
     vx_float32 beta;             /*!< \brief  A FLOAT32 value, specifying the positive scaling factor for the exponent, beta.  */
 } vx_nn_softmax_params_t, * vx_nn_softmax_params;
 
+/*! \brief extenstion parameters for softmax layer2.
+ * \ingroup group_cnn
+ *\version 0.5
+ */
+typedef struct _vx_nn_softmax_params_ext_t
+{
+    vx_nn_softmax_params_t base;        /*!< \brief Khronos standard structure head <tt> \ref vx_nn_softmax_params_t <tt> */
+    vx_int32 axis;
+} vx_nn_softmax_params_ext_t;
+
 /*! \brief [Graph] Creates a softmax Layer Node.
  * \param [in] graph The reference to the parent graph.
  * \param [in] input The input tensor data, with number of dimensions equals dim(input batch) + 1. Softmax will be calculated per IFM..
@@ -1691,6 +1739,15 @@ vx_nn_tensor_reverse_params_t;
 */
 VX_API_ENTRY vx_node VX_API_CALL vxTensorReverse(vx_graph graph, vx_tensor inputs, const vx_nn_tensor_reverse_params_t * tensor_reverse_params, vx_size size_of_tensor_reverse_params, vx_tensor outputs);
 
+/*! \brief Input parameter for L2Normalize layer2
+ *\ingroup group_cnn
+ *\version 0.4
+ */
+typedef struct _vx_nn_l2norm_params_t
+{
+    vx_int32       axis;
+} vx_nn_l2norm_params_t;
+
 /*! \brief [Graph] Creates a Convolutional Network L2Normalize Layer Node.
 * \param [in] graph The handle to the graph.
 * \param [in] inputs The input tensor. 3 lower dimensions represent a single input, and an optional 4th dimension for batch of inputs. Dimension layout is [width, height, #IFM, #batches].
@@ -1702,6 +1759,25 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorReverse(vx_graph graph, vx_tensor input
 * \retval * Node handle.
 */
 VX_API_ENTRY vx_node VX_API_CALL vxL2NormalizeLayer(vx_graph graph, vx_tensor inputs, vx_tensor outputs);
+
+/*! \brief [Graph] Creates a Convolutional Network L2Normalize Layer2 Node.
+ * \param [in] graph The handle to the graph.
+* \param [in] inputs The input tensor. 3 lower dimensions represent a single input, and an optional 4th dimension for batch of inputs. Dimension layout is [width, height, #IFM, #batches].
+ * See <tt>\ref vxCreateTensor</tt> and <tt>\ref vxCreateVirtualTensor</tt>.
+* \param [in] l2norm_params [static] Pointer to parameters of type <tt>\ref vx_nn_l2norm_params</tt>
+* \param [in] size_of_l2norm_params [static] Size in bytes of vx_nn_l2norm_params.
+* \param [out] outputs The output tensor data. Output will have the same number of dimensions as input.
+* \ingroup group_cnn
+* \return <tt> vx_node</tt>.
+* \retval 0 Node could not be created.
+* \retval * Node handle.
+*/
+VX_API_ENTRY vx_node VX_API_CALL vxL2NormalizeLayer2(
+    vx_graph                      graph,
+    vx_tensor                     inputs,
+    const vx_nn_l2norm_params_t * l2norm_params,
+    vx_size                       size_of_l2norm_params,
+    vx_tensor                     outputs);
 
 /*! \brief Input parameter structure for RPNLayer
  *\ingroup group_cnn

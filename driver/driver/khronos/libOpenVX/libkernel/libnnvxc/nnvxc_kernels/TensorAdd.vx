@@ -289,3 +289,27 @@ __kernel void vxcTensorEltwise_BF16AddBF16ToBF16(
     VXC_WriteImage2DArray(output, coord, src, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 }
 
+__kernel void vxcTensorEltwise_F32AddF32ToBF16(
+    __read_only image2d_array_t   input0,
+    __read_only image2d_array_t   input1,
+    __write_only image2d_array_t  output)
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    float4 vecA0, vecA1;
+    float4 vecB0, vecB1;
+    vxc_ushort8 src, srcA, srcB;
+
+    vecA0 = read_imagef(input0, coord);
+    vecB0 = read_imagef(input1, coord);
+    coord.x += 4;
+    vecA1 = read_imagef(input0, coord);
+    vecB1 = read_imagef(input1, coord);
+    vecA0 = vecA0 + vecB0 * input_scale1;
+    vecA1 = vecA1 + vecB1 * input_scale1;
+    coord.x -= 4;
+    _viv_asm(COPY, srcA, vecA0, 16);
+    _viv_asm(COPY, srcB, vecA1, 16);
+    VXC_DP2x8(src, srcA, srcB, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniPackedBF16_2x8);
+
+    VXC_WriteImage2DArray(output, coord, src, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+}

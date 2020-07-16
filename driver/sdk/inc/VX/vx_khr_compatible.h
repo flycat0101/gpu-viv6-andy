@@ -15,4 +15,33 @@
 */
 #define VX_CONVERT_POLICY_WRAP_ENABLE 1
 
+/*
+ VX_L2NORM_AXIS_PARAMETER_SUPPORT is used to declare that L2NORMALIZE can support axis parameter
+ [value]
+ 0: not support
+ 1: support
+*/
+#define VX_L2NORM_AXIS_PARAMETER_SUPPORT 1
+/*
+ VX_SOFTMAX_AXIS_PARAMETER_SUPPORT is used to declare that SOFTAMX can support axis parameter
+ [value]
+ 0: not support
+ 1: support
+*/
+#define VX_SOFTMAX_AXIS_PARAMETER_SUPPORT 1
+/*
+ VX_NORMALIZATION_AXIS_PARAMETER_SUPPORT is used to declare that NORMALIZATION can support axis parameter
+ [value]
+ 0: not support
+ 1: support
+*/
+#define VX_NORMALIZATION_AXIS_PARAMETER_SUPPORT 1
+/*
+ VX_ACTIVATION_EXT_SUPPORT is used to declare that ACTIVATION can support swish and hswish
+ [value]
+ 0: not support
+ 1: support
+*/
+#define VX_ACTIVATION_EXT_SUPPORT 1
+
 #endif /* __VX_KHR_COMPATIBLE_H__ */
