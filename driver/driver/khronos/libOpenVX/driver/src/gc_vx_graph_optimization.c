@@ -5748,9 +5748,6 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_pcq(vx_graph graph)
         if(vxoGraphOptimization_isDepthWiseConv(node))
             threshold = DEPTHWISE_CONV_ENTROPY;
 
-        vxoGraphOptimization_pcq_resetDeadChannel(node);
-        weightData = vxoGraphOptimization_pcq_getFpWeightData(weight);
-        vxoTensor_GetTensorElementCount(weight, &weightSize);
 #ifdef __ANDROID__
         if(!vxoGraphOptimization_isV8((vx_reference)node))
             goto exit;
