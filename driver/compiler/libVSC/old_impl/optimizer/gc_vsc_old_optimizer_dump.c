@@ -1462,7 +1462,7 @@ _DumpIR(
                           buffer + offset, gcmSIZEOF(buffer) - offset);
     }
 
-    if (gcmOPT_EnableDebug())
+    if (gcmOPT_EnableDebug() || gcmOPT_DUMP_SRCLOC())
     {
         /* Append source loc */
         gcmVERIFY_OK(
