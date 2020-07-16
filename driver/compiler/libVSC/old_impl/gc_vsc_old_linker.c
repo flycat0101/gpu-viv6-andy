@@ -16963,6 +16963,16 @@ gcLinkShaders(
     hasHalti2 = gcHWCaps.hwFeatureFlags.hasHalti2;
     useFullNewLinker = gcUseFullNewLinker(hasHalti2);
 
+    /* When run webgl1.0.3 glsl case on imx6dl android P9.0. Shader has over 10000 instructions as well as CPU memory is limited,
+       So we need to skip LTC optimization and vir path to avoid random out of memory. */
+    if (gcdPROC_IS_WEBGL(gcPatchId) && (gcHWCaps.chipModel == gcv880) && (gcHWCaps.chipRevision == 0x5106) &&
+        (FragmentShader->codeCount > 14000) && (FragmentShader->type == gcSHADER_TYPE_FRAGMENT) && (FragmentShader->clientApiVersion == gcvAPI_OPENGL_ES30))
+    {
+        gcSetOptimizerOption(gcvSHADER_VIRCG_NONE);
+        FragmentShader->optimizationOption &= ~gcvOPTIMIZATION_LOADTIME_CONSTANT;
+    }
+
+
     /* Verify the arguments. */
     if (VertexShader)
     {
