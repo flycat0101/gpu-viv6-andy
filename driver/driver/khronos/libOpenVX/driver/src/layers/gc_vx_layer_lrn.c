@@ -808,12 +808,14 @@ VX_PRIVATE_API vx_bool vxoNormalization_TP_Support(vx_node node, const vx_refere
     vx_tensor  inputs                     = (vx_tensor)parameters[0];
     vx_scalar  type_s                     = (vx_scalar)parameters[1];
     vx_scalar  norm_size_s                = (vx_scalar)parameters[2];
+    vx_scalar  axis_s                     = num == 9 ? (vx_scalar)parameters[7] : VX_NULL;
     vx_tensor  outputs                    = (vx_tensor)parameters[num - 1];
 
     vx_enum    norm_type                  = type_s->value->e;
     vx_uint32  norm_size                  = norm_size_s->value->u32;
 
     vx_uint32  size_x = TENSOR_SIZE_INDEX(inputs, 0), size_y = TENSOR_SIZE_INDEX(inputs, 1);
+    vx_int32   axis = axis_s ? axis_s->value->n32 : 2;
 
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_TP, VX_TYPE_INVALID, VX_NULL);
 
@@ -823,8 +825,8 @@ VX_PRIVATE_API vx_bool vxoNormalization_TP_Support(vx_node node, const vx_refere
 
     support = support && (vxnneIsTPSupportFormat(node->graph, inputs, VX_NULL, outputs) &&
                             vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP_LRN) &&
-                            norm_size <= 5 &&
-                            (norm_type == VX_NN_NORMALIZATION_SAME_MAP || size_x * size_y < 65536));
+                            norm_size <= 5 && axis == 2 &&
+                            (norm_type == VX_NN_NORMALIZATION_SAME_MAP || (size_x * size_y > 1 && size_x * size_y < 65536)));
 
     support = support && IsTPSupport_CheckOutPixel(node->base.context, inputs, outputs);
 
