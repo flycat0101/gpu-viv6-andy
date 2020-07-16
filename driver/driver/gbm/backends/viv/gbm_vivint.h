@@ -80,7 +80,6 @@ struct gbm_viv_surface
     gctPOINTER lock;
 
     gctINT lastIndex;
-    gctINT lastBuffer;
 
     gctBOOL extResolve;
     int fence_fd;
