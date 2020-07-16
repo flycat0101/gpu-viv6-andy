@@ -5743,7 +5743,8 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_pcq(vx_graph graph)
         if(weight->quantFormat != VX_QUANT_AFFINE_SCALE_PER_CHANNEL ||
             gcvSTATUS_TRUE == gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT))
             continue;
-
+        if(TENSOR_DATA_LIFETIME(weight) != VX_TENSOR_LIFE_TIME_STATIC)
+            continue;
         if(vxoGraphOptimization_isDepthWiseConv(node))
             threshold = DEPTHWISE_CONV_ENTROPY;
 
