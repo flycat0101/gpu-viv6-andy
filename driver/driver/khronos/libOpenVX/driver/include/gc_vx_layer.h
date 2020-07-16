@@ -3002,6 +3002,7 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
     vx_tensor               bias,
     vx_int32                activation,
     vx_uint32               overflow_policy,
+    vx_tensor               scales,
     vx_tensor               output);
 vxnne_shader_executable vxnneGetTensorDivShaderExecutable(
     vx_context              context,
@@ -4090,6 +4091,7 @@ vxnne_shader_executable vxnneGetGPUFullyConnectedShaderExecutable(
     vx_tensor               weights,
     vx_tensor               bias,
     vx_int32                activation,
+    vx_tensor               scales,
     vx_tensor               output);
 
 vxnne_shader_executable vxnneGetGPUHashLUTShaderExecutable(
