@@ -5595,11 +5595,11 @@ VX_PRIVATE_API vx_status vxoNN_LSTMUnit_SH_EVIS_Initialize_Ext(vxnne_layer ops_l
     /*op1 : fc*/
     if (evis)
     {
-        shaderExecutable = vxnneGetFullyConnectedShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_FULLYCONNECTED, &ops_layer->node->kernelAttributes.borderMode, input, w_x, bias, VX_NN_ACTIVATION_NONE, overflow_policy, fc_output);
+        shaderExecutable = vxnneGetFullyConnectedShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_FULLYCONNECTED, &ops_layer->node->kernelAttributes.borderMode, input, w_x, bias, VX_NN_ACTIVATION_NONE, overflow_policy, VX_NULL, fc_output);
     }
     else
     {
-        shaderExecutable = vxnneGetGPUFullyConnectedShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_FULLYCONNECTED, &ops_layer->node->kernelAttributes.borderMode, vx_false_e, input, w_x, bias, VX_NN_ACTIVATION_NONE, fc_output);
+        shaderExecutable = vxnneGetGPUFullyConnectedShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_FULLYCONNECTED, &ops_layer->node->kernelAttributes.borderMode, vx_false_e, input, w_x, bias, VX_NN_ACTIVATION_NONE, VX_NULL, fc_output);
     }
 
     if (!shaderExecutable)

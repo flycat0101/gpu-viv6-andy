@@ -5195,6 +5195,7 @@ vxnne_shader_executable vxnneGetGPUFullyConnectedShaderExecutable(
     vx_tensor               weights,
     vx_tensor               bias,
     vx_int32                activation,
+    vx_tensor               scales,
     vx_tensor               output)
 {
 #if !gcdUSE_VXC_BINARY
@@ -5241,6 +5242,12 @@ vxnne_shader_executable vxnneGetGPUFullyConnectedShaderExecutable(
     vx_scalar     weightZP         = NULL;
     vx_scalar     outZP            = NULL;
     vx_scalar     cycle            = NULL;
+    vx_scalar     inputsize_s      = NULL;
+    vx_enum       weight_quant_type          = TENSOR_QUANT_TYPE(weights);
+    vx_enum       bias_quant_type            = bias ? TENSOR_QUANT_TYPE(bias) : VX_QUANT_NONE;
+    vx_bool       is_per_channel_quant       = (vx_bool)(weight_quant_type == VX_QUANT_AFFINE_SCALE_PER_CHANNEL && bias_quant_type == VX_QUANT_AFFINE_SCALE_PER_CHANNEL);
+    vx_uint32     weight_channelDim          = 1;
+    vx_uint32    *weight_nChannelDim         = is_per_channel_quant ? &weight_channelDim : NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input=%p, output=%p", context, kernelEnum, input, output);
 
@@ -5303,7 +5310,7 @@ vxnne_shader_executable vxnneGetGPUFullyConnectedShaderExecutable(
     sizes[2]      = 1;
     sizes[3]      = 1;
     weight_dims   = 2;
-    weight_rs     = vxoTensor_ReshapeTensor(weights, (vx_int32*)sizes, weight_dims, VX_NULL);
+    weight_rs     = vxoTensor_ReshapeTensor(weights, (vx_int32*)sizes, weight_dims, weight_nChannelDim);
 
     if (enable_bias)
     {
@@ -5406,6 +5413,45 @@ vxnne_shader_executable vxnneGetGPUFullyConnectedShaderExecutable(
         if (status != VX_SUCCESS) goto OnError;
 
         status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 9);
+        if (status != VX_SUCCESS)
+        {
+            goto OnError;
+        }
+    }
+    else if (is_per_channel_quant && input_format == VX_TYPE_UINT8 &&
+              weights_format ==  VX_TYPE_INT8 && output_format == VX_TYPE_UINT8 )
+    {
+
+        vx_reference  parameters[8] = {(vx_reference)input_rs, (vx_reference)weight_rs, (vx_reference)bias_rs,
+                                        (vx_reference)VX_NULL, (vx_reference)VX_NULL, (vx_reference)VX_NULL, (vx_reference)scales,
+                                        (vx_reference)output_rs};
+        inZP = vxCreateScalar(context, VX_TYPE_INT32, &inputZPValue);
+        outZP = vxCreateScalar(context, VX_TYPE_INT32, &outputZPValue);
+        inputsize_s = vxCreateScalar(context, VX_TYPE_INT32, &inputSize);
+        parameters[3] = (vx_reference)inZP;
+        parameters[4] = (vx_reference)outZP;
+        parameters[5] = (vx_reference)inputsize_s;
+        if(inputSize % 4 == 0)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_VecQuant8_Perchanel", borderMode);
+        }
+        else
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Perchanel", borderMode);
+        }
+
+        if (!shaderExecutable)
+        {
+            goto OnError;
+        }
+
+        if(inputSize % 4 == 0)
+        {
+            status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            if (status != VX_SUCCESS) goto OnError;
+        }
+        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 8);
         if (status != VX_SUCCESS)
         {
             goto OnError;
@@ -5575,7 +5621,7 @@ vxnne_shader_executable vxnneGetGPUFullyConnectedShaderExecutable(
 
     execution_parameters.globalWorkScale[0] = 1;
     execution_parameters.globalWorkScale[1] = 1;
-    execution_parameters.localWorkSize[0]  = 8;
+    execution_parameters.localWorkSize[0]  = 1;
     execution_parameters.localWorkSize[1]  = 1;
     execution_parameters.globalWorkSize[0] = gcmALIGN((num_units + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], execution_parameters.localWorkSize[0]);
     execution_parameters.globalWorkSize[1] = gcmALIGN((batch + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1], execution_parameters.localWorkSize[1]);
@@ -5595,6 +5641,7 @@ vxnne_shader_executable vxnneGetGPUFullyConnectedShaderExecutable(
     if(weightZP) vxReleaseScalar(&weightZP);
     if(outZP) vxReleaseScalar(&outZP);
     if(cycle) vxReleaseScalar(&cycle);
+    if(inputsize_s) vxReleaseScalar(&inputsize_s);
 
     gcmFOOTER_ARG("%p", shaderExecutable);
     return shaderExecutable;
@@ -5612,6 +5659,7 @@ OnError:
     if (weight_rs) vxoTensor_ReleaseTensor(&weight_rs);
     if (bias_rs) vxoTensor_ReleaseTensor(&bias_rs);
     if (output_rs) vxoTensor_ReleaseTensor(&output_rs);
+    if(inputsize_s) vxReleaseScalar(&inputsize_s);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
 #if !gcdUSE_VXC_BINARY
