@@ -254,6 +254,7 @@ typedef struct _arch_swtiling_info_s
     arch_uint32     origOutZ;
 
     arch_int32      kernelCacheMode;
+    arch_int32      kernelDirectStreamFromVipSram;                  /* for the kernel Direct Stream Mode. Should be only valid in run mode */
     arch_int32      imageCacheMode;
     arch_float64    kernelCachePercentage;
     arch_float64    kernelSizeInPixel;
