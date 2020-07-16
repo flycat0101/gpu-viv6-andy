@@ -2893,6 +2893,7 @@ gcfVX_CreateShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], gctBOOL
         flags |= gcvSHADER_ENABLE_MULTI_GPU;
     }
 
+    /* We need to make sure that the value of the link flag is the same as vcCompiler uses to generate the VXC binary. */
     gcmONERROR(gcLinkKernel(kernelBinary,
                           flags | gcvSHADER_REMOVE_UNUSED_UNIFORMS | gcSHADER_FLAG_FORCE_GEN_FLOAT_MAD,
                           &programState));
