@@ -114,8 +114,8 @@ __kernel void gpuFullyConnected_Quant8(
         tmp0 = read_imageui(input, coord.zy);
         tmp1 = read_imageui(weights, coord.zx);
         coord.z++;
-        src0 = (convert_float(tmp0.x - zpIn));
-        src1 = (convert_float(tmp1.x - zpWeight));
+        src0 = (convert_int(tmp0.x - zpIn));
+        src1 = (convert_int(tmp1.x - zpWeight));
         sum += src0 * src1;
     } while (coord.z < inputSize);
 
