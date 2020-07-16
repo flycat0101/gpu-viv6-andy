@@ -443,12 +443,21 @@ typedef enum _gce2D_TILE_STATUS_CONFIG
 }
 gce2D_TILE_STATUS_CONFIG;
 
+typedef enum _gce2D_DEC400_MINOR_VERSION
+{
+    gcv2D_DEC400_MINOR_V1 = 1,
+    gcv2D_DEC400_MINOR_V2 = 2,
+    gcv2D_DEC400_MINOR_V3 = 3,
+}
+gce2D_DEC400_MINOR_VERSION;
+
 typedef enum _gce2D_QUERY
 {
     gcv2D_QUERY_RGB_ADDRESS_MIN_ALIGN       = 0,
     gcv2D_QUERY_RGB_STRIDE_MIN_ALIGN,
     gcv2D_QUERY_YUV_ADDRESS_MIN_ALIGN,
     gcv2D_QUERY_YUV_STRIDE_MIN_ALIGN,
+    gcv2D_QUERY_DEC400_MINOR_VERSION,
 }
 gce2D_QUERY;
 
@@ -903,6 +912,30 @@ typedef enum _gceHAL_ARG_VERSION
 }
 gceHAL_ARG_VERSION;
 
+
+/** endian mode  for each 2Bytes
+* endian mode                          endian
+*endian mode0: 0  1  2  3  4  5  6  7  8  9  10  11  12  13  14  15
+*endian mode1: 1  0  3  2  5  4  7  6  9  8  11  10  13  12  15  14
+*endian mode2: 2  3  0  1  6  7  4  5  10  11  8  9  14  15  12  13
+*endain mode3: 3  2  1  0  7  6  5  4  11  10  9  8  15  14  13  12
+*endain mode4: 12  13  14  15  8  9  10  11  4  5  6  7  0  1  2  3
+*endain mode5: 13  12  15  14  9  8  11  10  5  4  7  6  1  0  3  2
+*endain mode6: 14  15  12  13  10  11  8  9  6  7  4  5  2  3  0  1
+*endain mode7: 15  14  13  12  11  10  9  8  7  6  5  4  3  2  1  0
+**/
+typedef enum _gceENDIAN_MODE
+{
+    gcvENDIAN_MODE0          = 0x0, /* endian mode0 */
+    gcvENDIAN_MODE1          = 0x1, /* endian mode1 */
+    gcvENDIAN_MODE2          = 0x2, /* endian mode2 */
+    gcvENDIAN_MODE3          = 0x3, /* endian mode3 */
+    gcvENDIAN_MODE4          = 0x4, /* endian mode4 */
+    gcvENDIAN_MODE5          = 0x5, /* endian mode5 */
+    gcvENDIAN_MODE6          = 0x6, /* endian mode6 */
+    gcvENDIAN_MODE7          = 0x7, /* endian mode7 */
+}
+gceENDIAN_MODE;
 
 typedef enum _gceHW_FE_TYPE
 {

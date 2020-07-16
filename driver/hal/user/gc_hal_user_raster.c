@@ -8885,3 +8885,59 @@ OnError:
     return gcvSTATUS_NOT_SUPPORTED;
 #endif  /* gcdENABLE_2D */
 }
+
+/*******************************************************************************
+**
+**  gco2D_SetSourceEndianMode
+**
+**  Set source endian mode.
+**
+**  INPUT:
+**
+**      gco2D Engine
+**          Pointer to the gco2D object.
+**
+**      gctUINT32 eEndianMode
+**          endian mode.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gco2D_SetSourceEndianMode(
+    IN gco2D Engine,
+    IN gceENDIAN_MODE eEndianMode
+    )
+{
+    return gcvSTATUS_NOT_SUPPORTED;
+}
+
+/*******************************************************************************
+**
+**  gco2D_SetTargetEndianMode
+**
+**  Set target endian mode.
+**
+**  INPUT:
+**
+**      gco2D Engine
+**          Pointer to the gco2D object.
+**
+**      gctUINT32 eEndianMode
+**          endian mode.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+
+gceSTATUS
+gco2D_SetTargetEndianMode(
+    IN gco2D Engine,
+    IN gceENDIAN_MODE eEndianMode
+    )
+{
+    return gcvSTATUS_NOT_SUPPORTED;
+}
+
