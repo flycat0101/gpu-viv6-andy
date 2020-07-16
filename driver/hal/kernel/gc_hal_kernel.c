@@ -3988,6 +3988,26 @@ gckKERNEL_Recovery(
     {
         gcmkPRINT("[galcore]: GPU[%d] hang, automatic recovery.", Kernel->core);
     }
+    else if (Kernel->stuckDump == gcvSTUCK_DUMP_ALL_CORE)
+    {
+        gckDEVICE device = Kernel->device;
+        gckKERNEL kernel = gcvNULL;
+
+        gcmkASSERT(device != gcvNULL);
+
+        gcmkVERIFY_OK(gckOS_AcquireMutex(Kernel->os, Kernel->device->stuckDumpMutex, gcvINFINITE));
+
+        for (i = 0; i < device->coreNum; i++)
+        {
+            kernel = device->coreInfoArray[i].kernel;
+            gcmkASSERT(kernel != gcvNULL);
+
+            _DumpDriverConfigure(kernel);
+            _DumpState(kernel);
+        }
+
+        gcmkVERIFY_OK(gckOS_ReleaseMutex(Kernel->os, Kernel->device->stuckDumpMutex));
+    }
     else
     {
         gcmkVERIFY_OK(gckOS_AcquireMutex(Kernel->os, Kernel->device->stuckDumpMutex, gcvINFINITE));

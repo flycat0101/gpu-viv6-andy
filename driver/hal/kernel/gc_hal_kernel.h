@@ -219,6 +219,9 @@ extern "C" {
 /* Beside gcvSTUCK_DUMP_USER_COMMAND, dump kernel command buffer. */
 #define gcvSTUCK_DUMP_ALL_COMMAND   4
 
+/* Dump all the cores with level 4 dump. */
+#define gcvSTUCK_DUMP_ALL_CORE      5
+
 /*******************************************************************************
 ***** Page table **************************************************************/
 
