@@ -6308,10 +6308,6 @@ gctINT  VIR_Symbol_GetRegSize(
     IN VIR_Symbol       *Sym);
 
 VIR_SymIndexingInfo VIR_Symbol_GetIndexingInfo(VIR_Shader * Shader, VIR_Symbol *Sym);
-gctBOOL
-VIR_Symbol_IsInArray(
-    IN  VIR_Symbol              *Symbol
-    );
 
 gctBOOL
 VIR_Symbol_NeedReplaceSymWithReg(
@@ -6872,6 +6868,12 @@ VIR_Symbol_GetRealPrecision(
 
 gctBOOL
 VIR_Symbol_IsSymbolUnsupport(
+    IN VIR_Shader*          pShader,
+    IN VIR_Symbol*          pSym
+    );
+
+gctBOOL
+VIR_Symbol_NeedConsecutiveTemp(
     IN VIR_Shader*          pShader,
     IN VIR_Symbol*          pSym
     );

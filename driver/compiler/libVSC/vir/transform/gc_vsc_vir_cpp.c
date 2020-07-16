@@ -2986,6 +2986,125 @@ _VIR_SCPP_AbleToDoNeighborPropagation(
     return result;
 }
 
+static VSC_ErrCode
+_VIR_SCPP_ReplaceSource(
+    IN VIR_SCPP*        scpp,
+    IN VSC_HASH_TABLE*  pDefsTable,
+    IN VIR_Instruction* pInst,
+    IN VIR_Operand*     pSrcOpnd,
+    IN gctBOOL          bHandleModifier,
+    IN gctBOOL          bReplace,
+    OUT VIR_SymId*      pReplaceSymId,
+    OUT gctBOOL*        pChanged
+    )
+{
+    VSC_ErrCode         errCode  = VSC_ERR_NONE;
+    gctBOOL             bChanged = gcvFALSE;
+    VIR_DEF_USAGE_INFO* pDuInfo = VIR_SCPP_GetDUInfo(scpp);
+    VIR_Function*       pFunc = VIR_Inst_GetFunction(pInst);
+    VIR_Symbol*         pSrcSym = gcvNULL;
+    VIR_Swizzle         srcSwizzle = VIR_Operand_GetSwizzle(pSrcOpnd);
+    VIR_OperandInfo     srcOpndInfo;
+    VIR_SCPP_Copy*      copy;
+    VIR_SymId           defSymId = VIR_INVALID_ID;
+    VIR_Symbol*         pDefSym;
+
+    if (!VIR_Operand_isSymbol(pSrcOpnd))
+    {
+        return errCode;
+    }
+
+    pSrcSym = VIR_Operand_GetSymbol(pSrcOpnd);
+    if (!vscHTBL_DirectTestAndGet(pDefsTable, (void*)pSrcSym, (void**)&copy))
+    {
+        return errCode;
+    }
+
+    defSymId = _VIR_SCPP_Copy_GetRhs(copy, srcSwizzle);
+    if (defSymId == VIR_INVALID_ID)
+    {
+        return errCode;
+    }
+
+    pDefSym = VIR_Function_GetSymFromId(pFunc, defSymId);
+    srcSwizzle = VIR_Swizzle_ApplyMappingSwizzle(srcSwizzle, VIR_SCPP_Copy_GetMappingSwizzle(copy));
+
+    if (VIR_OPCODE_isVX(VIR_Inst_GetOpcode(pInst)) &&
+        srcSwizzle != VIR_SWIZZLE_XXXX &&
+        srcSwizzle != VIR_SWIZZLE_XYYY &&
+        srcSwizzle != VIR_SWIZZLE_XYZZ &&
+        srcSwizzle != VIR_SWIZZLE_XYZW)
+    {
+        /* The EVIS inst src0's swizzle bits are used for EVIS info like startBin, make sure the src0 operand does NOT use them. */
+        return errCode;
+    }
+
+    if (VIR_SCPP_Copy_GetSrc0Modifier(copy) != VIR_MOD_NONE)
+    {
+        if (!bHandleModifier)
+        {
+            return errCode;
+        }
+    }
+
+    if (bReplace)
+    {
+        VIR_Operand_GetOperandInfo(pInst, pSrcOpnd, &srcOpndInfo);
+
+        /* Delete the old usage. */
+        if (srcOpndInfo.isVreg)
+        {
+            vscVIR_DeleteUsage(pDuInfo,
+                               VIR_SCPP_Copy_GetMovInst(copy),
+                               pInst,
+                               pSrcOpnd,
+                               gcvFALSE,
+                               srcOpndInfo.u1.virRegInfo.virReg,
+                               1,
+                               VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pSrcOpnd)),
+                               VIR_HALF_CHANNEL_MASK_FULL,
+                               gcvNULL);
+        }
+
+        VIR_Operand_SetOpKind(pSrcOpnd, VIR_OPND_SYMBOL);
+        VIR_Operand_SetSym(pSrcOpnd, pDefSym);
+        VIR_Operand_SetPrecision(pSrcOpnd, VIR_Symbol_GetPrecision(pDefSym));
+        VIR_Operand_SetSwizzle(pSrcOpnd, srcSwizzle);
+
+        /* Add the new usage. */
+        VIR_Operand_GetOperandInfo(pInst, pSrcOpnd, &srcOpndInfo);
+        if (srcOpndInfo.isVreg)
+        {
+            errCode = vscVIR_AddNewUsageToDef(pDuInfo,
+                                              VIR_ANY_DEF_INST,
+                                              pInst,
+                                              pSrcOpnd,
+                                              gcvFALSE,
+                                              srcOpndInfo.u1.virRegInfo.virReg,
+                                              1,
+                                              VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pSrcOpnd)),
+                                              VIR_HALF_CHANNEL_MASK_FULL,
+                                              gcvNULL);
+            ON_ERROR(errCode, "Failed to add new usage to def.");
+        }
+
+        bChanged = gcvTRUE;
+    }
+
+    if (pChanged)
+    {
+        *pChanged = bChanged;
+    }
+
+    if (pReplaceSymId)
+    {
+        *pReplaceSymId = defSymId;
+    }
+
+OnError:
+    return errCode;
+}
+
 VSC_ErrCode VIR_SCPP_PerformOnBB(
     VIR_SCPP* scpp,
     VIR_Function* func,
@@ -3016,114 +3135,113 @@ VSC_ErrCode VIR_SCPP_PerformOnBB(
     /* walk over bb instructions forwardly */
     while(gcvTRUE)
     {
-        VIR_OpCode opcode = VIR_Inst_GetOpcode(instIter);
-        gctUINT i;
+        VIR_OpCode          opcode = VIR_Inst_GetOpcode(instIter);
+        VIR_SymId           temp256SymIds[2] = { VIR_INVALID_ID, VIR_INVALID_ID };
+        gctUINT             i, temp256SymIndex;
 
         /* propagate over source operands if possiable */
-        if(opcode != VIR_OP_LDARR)  /* if we propagate a uniform to LDARR's src1, it might be wrong */
+        if (opcode != VIR_OP_LDARR)  /* if we propagate a uniform to LDARR's src1, it might be wrong */
         {
-            for(i = 0; i < VIR_Inst_GetSrcNum(instIter); i++)
+            for (i = 0; i < VIR_Inst_GetSrcNum(instIter); i++)
             {
-                VIR_Operand* src = VIR_Inst_GetSource(instIter, i);
-                VIR_Symbol* srcSym = gcvNULL;
-                VIR_Swizzle srcSwizzle = VIR_Operand_GetSwizzle(src);
-                VIR_OperandInfo srcOpndInfo;
+                VIR_Operand*    pSrcOpnd = VIR_Inst_GetSource(instIter, i);
+                gctBOOL         bReplaceSrc = gcvTRUE;
 
-                /* Do not copy the temp256 pair in SCPP, otherwise it will break the assumption that the register pair wiil be contiguous. */
-                if (VIR_Operand_isTemp256High(src) || VIR_Operand_isTemp256Low(src))
+                if ((VIR_OPCODE_Src0Src1Temp256(opcode) && i == 0)
+                    ||
+                    (VIR_OPCODE_Src1Src2Temp256(opcode) && i == 1))
                 {
-                     continue;
+                    temp256SymIndex = 0;
+                    bReplaceSrc = gcvFALSE;
+                }
+                else if ((VIR_OPCODE_Src0Src1Temp256(opcode) && i == 1)
+                         ||
+                         (VIR_OPCODE_Src1Src2Temp256(opcode) && i == 2))
+                {
+                    temp256SymIndex = 1;
+                    bReplaceSrc = gcvFALSE;
+                }
+                else
+                {
+                    temp256SymIndex = 0;
                 }
 
-                if(VIR_Operand_isSymbol(src))
+                /*
+                ** Try to replace the source, for a temp256 operand,
+                ** we need to make sure that this temp256 operand is replaced by another temp256 operand.
+                */
+                errCode = _VIR_SCPP_ReplaceSource(scpp,
+                                                  defsTable,
+                                                  instIter,
+                                                  pSrcOpnd,
+                                                  bHandleModifier,
+                                                  bReplaceSrc,
+                                                  bReplaceSrc ? gcvNULL : &temp256SymIds[temp256SymIndex],
+                                                  &bChanged);
+                ON_ERROR(errCode, "Fail to replace the source.");
+            }
+
+            /* We need to make sure that both higher and lower part can be replaced. */
+            if (temp256SymIds[0] != VIR_INVALID_ID && temp256SymIds[1] != VIR_INVALID_ID)
+            {
+                gctUINT     i, vregIndex[2] = { 0xFFFFFFFF, 0xFFFFFFFF }, indexRange[2] = { 0xFFFFFFFF, 0xFFFFFFFF };
+                VIR_Symbol* pSym = gcvNULL;
+                gctBOOL     bReplaceTemp256 = gcvFALSE;
+
+                for (i = 0; i < 2; i++)
                 {
-                    srcSym = VIR_Operand_GetSymbol(src);
+                    pSym = VIR_Shader_GetSymFromId(shader, temp256SymIds[i]);
 
-                    if(vscHTBL_DirectTestAndGet(defsTable, (void*)srcSym, (void**)&copy))
+                    vregIndex[i] = VIR_Symbol_GetVregIndex(pSym);
+
+                    if (VIR_Symbol_isVreg(pSym))
                     {
-                        VIR_SymId defSymId = _VIR_SCPP_Copy_GetRhs(copy, srcSwizzle);
-                        VIR_Symbol* defSym;
-
-                        if(defSymId != VIR_INVALID_ID)
-                        {
-                            defSym = VIR_Function_GetSymFromId(func, defSymId);
-                            srcSwizzle = VIR_Swizzle_ApplyMappingSwizzle(srcSwizzle, VIR_SCPP_Copy_GetMappingSwizzle(copy));
-
-                            if (VIR_OPCODE_isVX(VIR_Inst_GetOpcode(instIter)) &&
-                                srcSwizzle!= VIR_SWIZZLE_XXXX &&
-                                srcSwizzle != VIR_SWIZZLE_XYYY &&
-                                srcSwizzle != VIR_SWIZZLE_XYZZ &&
-                                srcSwizzle != VIR_SWIZZLE_XYZW    )
-                            {
-                                /* the EVIS inst src0's swizzle bits are used for EVIS info like startBin,
-                                 * make sure the src0 operand does NOT use them
-                                 */
-                                continue;
-                            }
-
-                            if (VIR_SCPP_Copy_GetSrc0Modifier(copy) != VIR_MOD_NONE)
-                            {
-                                if (!bHandleModifier)
-                                {
-                                    continue;
-                                }
-                            }
-
-                            if(VSC_UTILS_MASK(VSC_OPTN_SCPPOptions_GetTrace(option), VSC_OPTN_SCPPOptions_TRACE_DETAIL))
-                            {
-                                VIR_LOG(VIR_SCPP_GetDumper(scpp), "transform instruction:\n");
-                                VIR_Inst_Dump(VIR_SCPP_GetDumper(scpp), instIter);
-                            }
-
-                            VIR_Operand_GetOperandInfo(instIter, src, &srcOpndInfo);
-
-                            /* Delete the old usage. */
-                            if (srcOpndInfo.isVreg)
-                            {
-                                vscVIR_DeleteUsage(pDuInfo,
-                                                   VIR_SCPP_Copy_GetMovInst(copy),
-                                                   instIter,
-                                                   src,
-                                                   gcvFALSE,
-                                                   srcOpndInfo.u1.virRegInfo.virReg,
-                                                   1,
-                                                   VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(src)),
-                                                   VIR_HALF_CHANNEL_MASK_FULL,
-                                                   gcvNULL);
-                            }
-
-                            VIR_Operand_SetOpKind(src, VIR_OPND_SYMBOL);
-                            VIR_Operand_SetSym(src, defSym);
-                            VIR_Operand_SetPrecision(src, VIR_Symbol_GetPrecision(defSym));
-                            VIR_Operand_SetSwizzle(src, srcSwizzle);
-
-                            /* Add the new usage. */
-                            VIR_Operand_GetOperandInfo(instIter, src, &srcOpndInfo);
-                            if (srcOpndInfo.isVreg)
-                            {
-                                errCode = vscVIR_AddNewUsageToDef(pDuInfo,
-                                                                  VIR_ANY_DEF_INST,
-                                                                  instIter,
-                                                                  src,
-                                                                  gcvFALSE,
-                                                                  srcOpndInfo.u1.virRegInfo.virReg,
-                                                                  1,
-                                                                  VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(src)),
-                                                                  VIR_HALF_CHANNEL_MASK_FULL,
-                                                                  gcvNULL);
-                                ON_ERROR(errCode, "Failed to add new usage to def.");
-                            }
-
-                            bChanged = gcvTRUE;
-
-                            if(VSC_UTILS_MASK(VSC_OPTN_SCPPOptions_GetTrace(option), VSC_OPTN_SCPPOptions_TRACE_DETAIL))
-                            {
-                                VIR_LOG(VIR_SCPP_GetDumper(scpp), "to:\n");
-                                VIR_Inst_Dump(VIR_SCPP_GetDumper(scpp), instIter);
-                                VIR_LOG_FLUSH(VIR_SCPP_GetDumper(scpp));
-                            }
-                        }
+                        pSym = VIR_Symbol_GetVregVariable(pSym);
                     }
+
+                    while (pSym && VIR_Symbol_isField(pSym))
+                    {
+                        pSym = VIR_Shader_GetSymFromId(shader, VIR_Symbol_GetParentId(pSym));
+                    };
+
+                    if (pSym && VIR_Symbol_isVariable(pSym))
+                    {
+                        indexRange[i] = VIR_Symbol_GetIndexRange(pSym);
+                    }
+                }
+
+                if ((vregIndex[0] + 1 == vregIndex[1])
+                    &&
+                    (indexRange[0] == indexRange[1])
+                    &&
+                    (indexRange[0] != 0xFFFFFFFF))
+                {
+                    bReplaceTemp256 = gcvTRUE;
+                }
+
+                if (bReplaceTemp256)
+                {
+                    /* Replace the high part. */
+                    errCode = _VIR_SCPP_ReplaceSource(scpp,
+                                                      defsTable,
+                                                      instIter,
+                                                      VIR_OPCODE_Src0Src1Temp256(opcode) ? VIR_Inst_GetSource(instIter, 0) : VIR_Inst_GetSource(instIter, 1),
+                                                      bHandleModifier,
+                                                      gcvTRUE,
+                                                      gcvNULL,
+                                                      &bChanged);
+                    ON_ERROR(errCode, "Fail to replace the source.");
+
+                    /* Replace the low part. */
+                    errCode = _VIR_SCPP_ReplaceSource(scpp,
+                                                      defsTable,
+                                                      instIter,
+                                                      VIR_OPCODE_Src0Src1Temp256(opcode) ? VIR_Inst_GetSource(instIter, 1) : VIR_Inst_GetSource(instIter, 2),
+                                                      bHandleModifier,
+                                                      gcvTRUE,
+                                                      gcvNULL,
+                                                      &bChanged);
+                    ON_ERROR(errCode, "Fail to replace the source.");
                 }
             }
         }
@@ -3138,7 +3256,7 @@ VSC_ErrCode VIR_SCPP_PerformOnBB(
             VSC_HASH_ITERATOR iter;
             VSC_DIRECT_HNODE_PAIR pair;
 
-            if (!VIR_Symbol_IsInArray(destSym))
+            if (!VIR_Symbol_NeedConsecutiveTemp(shader, destSym))
             {
                 vscHTBLIterator_Init(&iter, defsTable);
                 for(pair = vscHTBLIterator_DirectFirst(&iter);
@@ -3210,9 +3328,9 @@ VSC_ErrCode VIR_SCPP_PerformOnBB(
             {
                 srcIndexing = gcvTRUE;
             }
-            if(!VIR_Symbol_IsInArray(destSym) &&
+            if(!VIR_Symbol_NeedConsecutiveTemp(shader, destSym) &&
                VIR_Operand_isSymbol(src) &&
-               !VIR_Symbol_IsInArray(VIR_Operand_GetSymbol(src)) &&
+               !VIR_Symbol_NeedConsecutiveTemp(shader, VIR_Operand_GetSymbol(src)) &&
                (VIR_Operand_GetRelIndexing(src) == 0) &&
                _VIR_SCPP_NeedToUpdateCopy(pDuInfo, shader, instIter))
             {

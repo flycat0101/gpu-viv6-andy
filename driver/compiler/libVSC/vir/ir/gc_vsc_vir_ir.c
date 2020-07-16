@@ -6952,66 +6952,6 @@ VIR_Symbol_GetIndexingInfo(
 }
 
 gctBOOL
-VIR_Symbol_IsInArray(
-    IN  VIR_Symbol              *Symbol
-    )
-{
-    switch(VIR_Symbol_GetKind(Symbol))
-    {
-        case VIR_SYM_VIRREG:
-        {
-            gcmASSERT(VIR_Symbol_GetIndexRange(Symbol) >= 0);
-
-            if((gctUINT) VIR_Symbol_GetIndexRange(Symbol) > VIR_Symbol_GetVregIndex(Symbol) + 1)
-            {
-                return gcvTRUE;
-            }
-            else
-            {
-                VIR_Symbol* underlyingSym = VIR_Symbol_GetVregVariable(Symbol);
-
-                if(underlyingSym)
-                {
-                    return VIR_Symbol_IsInArray(underlyingSym);
-                }
-                else
-                {
-                    return gcvFALSE;
-                }
-            }
-        }
-        case VIR_SYM_VARIABLE:
-        case VIR_SYM_UNIFORM:
-        case VIR_SYM_IMAGE:
-        case VIR_SYM_IMAGE_T:
-        case VIR_SYM_FIELD:
-        {
-            VIR_Type* symType = VIR_Symbol_GetType(Symbol);
-
-            if (VIR_Type_GetKind(symType) == VIR_TY_ARRAY ||
-                VIR_Type_GetKind(symType) == VIR_TY_MATRIX)
-            {
-                return gcvTRUE;
-            }
-            else if(VIR_Symbol_GetKind(Symbol) == VIR_SYM_FIELD)
-            {
-                return VIR_Symbol_IsInArray(VIR_Id_isFunctionScope(VIR_Symbol_GetParentId(Symbol)) ?
-                                            VIR_Function_GetSymFromId(VIR_Symbol_GetParamOrHostFunction(Symbol), VIR_Symbol_GetParentId(Symbol)) :
-                                            VIR_Shader_GetSymFromId(VIR_Symbol_GetShader(Symbol), VIR_Symbol_GetParentId(Symbol)));
-            }
-            else
-            {
-                gcmASSERT(VIR_Symbol_GetIndexRange(Symbol) >= 0);
-
-                return (gctUINT) VIR_Symbol_GetIndexRange(Symbol)  > (VIR_Symbol_GetVariableVregIndex(Symbol) + 1);
-            }
-        }
-        default:
-            return gcvFALSE;
-    }
-}
-
-gctBOOL
 VIR_Symbol_NeedReplaceSymWithReg(
     IN  VIR_Symbol              *Symbol
     )
@@ -11808,6 +11748,36 @@ VIR_Symbol_IsSymbolUnsupport(
         {
             return gcvTRUE;
         }
+    }
+
+    return gcvFALSE;
+}
+
+gctBOOL
+VIR_Symbol_NeedConsecutiveTemp(
+    IN VIR_Shader*          pShader,
+    IN VIR_Symbol*          pSym
+    )
+{
+    gctINT                  regCount = VIR_Type_GetRegCount(pShader, VIR_Symbol_GetType(pSym), gcvFALSE);
+
+    if (regCount <= 1)
+    {
+        /* Check the variable to see if it need the consecutive temp. */
+        if (VIR_Symbol_isVreg(pSym))
+        {
+            VIR_Symbol*     pVarSym = VIR_Symbol_GetVregVariable(pSym);
+
+            if (pVarSym)
+            {
+                regCount = VIR_Type_GetRegCount(pShader, VIR_Symbol_GetType(pVarSym), gcvFALSE);
+            }
+        }
+    }
+
+    if (regCount > 1)
+    {
+        return gcvTRUE;
     }
 
     return gcvFALSE;
