@@ -428,6 +428,12 @@ if ((database->SMALLBATCH && phyDev->phyDevConfig.options.smallBatch)){    vsCon
     pVscHwCfg->hwFeatureFlags.supportVectorB0        = gcvFALSE;
     pVscHwCfg->hwFeatureFlags.FEDrawDirect           = database->FE_DRAW_DIRECT;
 
+    if (pVscHwCfg->chipModel == 0x7000 && pVscHwCfg->chipRevision == 0x6009
+        && phyDev->pInst->patchID == gcvPATCH_DEQP)
+    {
+        pVscHwCfg->hwFeatureFlags.hasAtomTimingFix = gcvFALSE;
+    }
+
     /* Only those chips with VX2 really have this issue, other chips don't have this issue. */
     if (database->EVIS_VX2)
     {
