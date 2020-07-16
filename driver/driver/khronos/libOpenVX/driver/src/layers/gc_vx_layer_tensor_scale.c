@@ -267,7 +267,7 @@ VX_PRIVATE_API vx_bool vxoTensorScale_SH_EVIS_Support_Ext(vx_node node, const vx
                                          ||(srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_INT16)
                                          ||(srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
                                          ||(srcFormat == VX_TYPE_BFLOAT16 && dstFormat == VX_TYPE_BFLOAT16));
-        enable_nearest_format   = (vx_bool)(!checkOutputTensorDoAlu(inputs, outputs)
+        enable_nearest_format   = (vx_bool)(!checkOutputTensorDoAlu(inputs, outputs, evis)
                                         || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
                                         || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_UINT8)
                                         || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_INT8));
@@ -287,7 +287,7 @@ VX_PRIVATE_API vx_bool vxoTensorScale_SH_EVIS_Support_Ext(vx_node node, const vx
                                          ||(srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_UINT8)
                                          ||(srcFormat == VX_TYPE_FLOAT32 && dstFormat == VX_TYPE_UINT8)
                                          ||(srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8));
-        enable_nearest_format   = (vx_bool)(!checkOutputTensorDoAlu(inputs, outputs)
+        enable_nearest_format   = (vx_bool)(!checkOutputTensorDoAlu(inputs, outputs, evis)
                                         || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
                                         || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_UINT8)
                                         || (srcFormat == VX_TYPE_FLOAT32 && dstFormat == VX_TYPE_UINT8));
@@ -515,7 +515,7 @@ OnError:
                                          ||(srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_INT16)
                                          ||(srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
                                          ||(srcFormat == VX_TYPE_BFLOAT16 && dstFormat == VX_TYPE_BFLOAT16));
-        enable_nearest_format   = (vx_bool)(!checkOutputTensorDoAlu(inputs, outputs)
+        enable_nearest_format   = (vx_bool)(!checkOutputTensorDoAlu(inputs, outputs, vx_true_e)
                                         || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
                                         || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_UINT8)
                                         || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_INT8));
@@ -535,7 +535,7 @@ OnError:
                                          ||(srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_UINT8)
                                          ||(srcFormat == VX_TYPE_FLOAT32 && dstFormat == VX_TYPE_UINT8)
                                          ||(srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8));
-        enable_nearest_format   = (vx_bool)(!checkOutputTensorDoAlu(inputs, outputs)
+        enable_nearest_format   = (vx_bool)(!checkOutputTensorDoAlu(inputs, outputs, vx_false_e)
                                         || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
                                         || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_UINT8)
                                         || (srcFormat == VX_TYPE_FLOAT32 && dstFormat == VX_TYPE_UINT8));
