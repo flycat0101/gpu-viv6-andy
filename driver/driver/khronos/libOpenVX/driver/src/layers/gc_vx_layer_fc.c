@@ -212,20 +212,19 @@ vx_status vxoNNFullyConnectedLayerInitializer(
     vx_uint32    overflow_policy,
     vx_tensor outputs)
 {
+#define _PACK_FC_SH_KEY(IN_TYPE, WEIGHT_TYPE, BIAS_TYPE, OUT_TYPE) \
+    (IN_TYPE | (WEIGHT_TYPE << 8) | (BIAS_TYPE << 16) | (OUT_TYPE << 24) )
     vx_status status = VX_SUCCESS;
     vx_context context = vxGetContext((vx_reference)node);
     vx_uint32 i = 0, batchCount = 1;
     vx_uint32 phys;
     vx_bool aligned64 = vx_true_e;
     vx_bool   enable_shader               = vx_false_e;
-    vx_bool   supportDataFormat0          = vx_false_e;
-    vx_bool   supportDataFormat1          = vx_false_e;
-    vx_bool   supportDataFormat2          = vx_false_e;
-    vx_bool   supportDataFormat3          = vx_false_e;
-    vx_enum   input_dataformat            = TENSOR_DATA_TYPE(inputs0);
-    vx_enum   weight_dataformat           = TENSOR_DATA_TYPE(WB_WEIGHT_TENSOR(weights_biases));
-    vx_enum   bias_dataformat             = WB_BIAS_TENSOR(weights_biases) ? TENSOR_DATA_TYPE(WB_BIAS_TENSOR(weights_biases)) : VX_TYPE_INVALID;
-    vx_enum   output_dataformat           = TENSOR_DATA_TYPE(outputs);
+    vx_sh_kernel_type_e input_type        = getSHKernelType(TENSOR_DATA_TYPE(inputs0));
+    vx_sh_kernel_type_e weight_type       = getSHKernelType(TENSOR_DATA_TYPE(WB_WEIGHT_TENSOR(weights_biases)));
+    vx_sh_kernel_type_e bias_type         = getSHKernelType(WB_BIAS_TENSOR(weights_biases) ? TENSOR_DATA_TYPE(WB_BIAS_TENSOR(weights_biases)) : VX_TYPE_INVALID);
+    vx_sh_kernel_type_e output_type       = getSHKernelType(TENSOR_DATA_TYPE(outputs));
+    vx_uint32 key                         = _PACK_FC_SH_KEY(input_type, weight_type, bias_type, output_type);
     vx_uint32 dims                        = TENSOR_VIEW_DIM_NUM(inputs0);
     vx_uint32 width                       = TENSOR_VIEW_SIZE_INDEX(inputs0, 0);
     vx_uint32 height                      = (dims > 1) ? TENSOR_VIEW_SIZE_INDEX(inputs0, 1) : 1;
@@ -236,11 +235,33 @@ vx_status vxoNNFullyConnectedLayerInitializer(
     vx_uint32 tempTensorCount = 0;
     vx_tensor inputs = inputs0;
 
-    supportDataFormat0 = (vx_bool)(input_dataformat == VX_TYPE_FLOAT16 && weight_dataformat == VX_TYPE_FLOAT16 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_FLOAT32) && output_dataformat == VX_TYPE_FLOAT16);
-    supportDataFormat1 = (vx_bool)(input_dataformat == VX_TYPE_INT8 && weight_dataformat == VX_TYPE_INT8 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_INT32) && output_dataformat == VX_TYPE_INT8);
-    supportDataFormat2 = (vx_bool)(input_dataformat == VX_TYPE_INT16 && weight_dataformat == VX_TYPE_INT16 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_INT32) && output_dataformat == VX_TYPE_INT16);
-    supportDataFormat3 = (vx_bool)(input_dataformat == VX_TYPE_UINT8 && weight_dataformat == VX_TYPE_UINT8 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_INT32) && output_dataformat == VX_TYPE_UINT8);
-    enable_shader      = (supportDataFormat0 || supportDataFormat1 || supportDataFormat2 || supportDataFormat3) && (inputDim < IMG_MAX_WIDTH);
+    switch (key)
+    {
+    case _PACK_FC_SH_KEY(F16, F16, INVALID, F16):
+    case _PACK_FC_SH_KEY(F16, F16, F32, F16):
+    case _PACK_FC_SH_KEY(I8, I8, INVALID, I8):
+    case _PACK_FC_SH_KEY(I8, I8, I32, I8):
+    case _PACK_FC_SH_KEY(I16, I16, INVALID, I16):
+    case _PACK_FC_SH_KEY(I16, I16, I32, I16):
+    case _PACK_FC_SH_KEY(I16, I16, I64, I16):
+    case _PACK_FC_SH_KEY(I16, I16, I64, F16):
+    case _PACK_FC_SH_KEY(U8, U8, INVALID, U8):
+    case _PACK_FC_SH_KEY(U8, U8, INVALID, I16):
+    case _PACK_FC_SH_KEY(U8, U8, INVALID, F16):
+    case _PACK_FC_SH_KEY(U8, U8, I32, U8):
+    case _PACK_FC_SH_KEY(U8, U8, I32, I16):
+    case _PACK_FC_SH_KEY(U8, U8, I32, F16):
+    case _PACK_FC_SH_KEY(U8, U8, U8, U8):
+    case _PACK_FC_SH_KEY(U8, U8, U8, I16):
+    case _PACK_FC_SH_KEY(U8, U8, U8, F16):
+        enable_shader = (vx_bool)(inputDim < IMG_MAX_WIDTH);
+        break;
+    default:
+        enable_shader = vx_false_e;
+        break;
+    }
+
+#undef _PACK_FC_SH_KEY
 
     if (TENSOR_DIM_NUM(inputs) == 2)
     {
@@ -900,9 +921,10 @@ VX_PRIVATE_API vx_bool vxoNNFullyConnectedLayer_SH_EVIS_Support_Ext(vx_node node
         case _PACK_FC_SH_KEY(F16, F16, F32, F16):
         case _PACK_FC_SH_KEY(I8, I8, INVALID, I8):
         case _PACK_FC_SH_KEY(I8, I8, I32, I8):
-        case _PACK_FC_SH_KEY(I16, I16, INVALID, I8):
+        case _PACK_FC_SH_KEY(I16, I16, INVALID, I16):
         case _PACK_FC_SH_KEY(I16, I16, I32, I16):
         case _PACK_FC_SH_KEY(I16, I16, I64, I16):
+        case _PACK_FC_SH_KEY(I16, I16, I64, F16):
         case _PACK_FC_SH_KEY(U8, U8, INVALID, U8):
         case _PACK_FC_SH_KEY(U8, U8, INVALID, I16):
         case _PACK_FC_SH_KEY(U8, U8, INVALID, F16):
@@ -945,6 +967,7 @@ VX_PRIVATE_API vx_bool vxoNNFullyConnectedLayer_SH_EVIS_Support_Ext(vx_node node
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
+#undef _PACK_FC_SH_KEY
     return support;
 }
 
