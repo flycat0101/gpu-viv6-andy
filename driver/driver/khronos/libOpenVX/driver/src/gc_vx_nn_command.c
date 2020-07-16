@@ -20,10 +20,21 @@
 
 #include <gc_vx_common.h>
 #include <gc_vx_nn_util.h>
+#include <gc_vx_nn_wb.h>
+#ifdef ORI_NNARCHPERF
 #include "gc_nn_arch_model.h"
+#else
+#include "archModelInterface.h"
+#endif
 
 #define TP_SPLIT_Z_MAJOR 0
 #define SHOW_TP_SPLITING_INFO 1
+#define MAX_IMAGE_SIZE 65535
+#define TP_SPLIT_COUNT     18000
+#define NN_IMAGE_2D_TILE_LIMITATION 32
+
+/* define for 2023, the TP_REORDER_INTILE_X_SIZE shoudl be not equal to 512 */
+#define TP_REORDER_INTILE_X_SIZE_512    512
 
 VX_PRIVATE_API vx_float32 Fp21toFp32(const vx_uint32 in)
 {
@@ -49,6 +60,7 @@ VX_PRIVATE_API vx_float32 Fp21toFp32(const vx_uint32 in)
 
     return out;
 }
+
 
 VX_PRIVATE_API vx_int32 Fp32toFp21(vx_float32 val)
 {
@@ -110,6 +122,981 @@ VX_PRIVATE_API vx_int32 Fp32toFp21(vx_float32 val)
     return f21;
 }
 
+
+
+VX_PRIVATE_API vx_int32 Fp32toSE8M12(vx_float32 val)
+{
+    vx_uint32 f32 = (*(vx_uint32 *) &val);
+    vx_int32 f21 = 0; //SE8M12
+    /* Decode IEEE 754 little-endian 32-bit floating-point value */
+    int sign = (f32 >> 11) & 0x100000;
+    /* Map exponent to the range [-127,128] */
+    int exponent = ((f32 >> 23) & 0xff);
+    int mantissa = f32 & 0x007fffff;
+    if (exponent == 0xFF)
+    { /* Infinity or NaN */
+        f21 = sign | 0xFEFFF;
+    }
+    else if (exponent > 0)
+    { /* Representable value */
+        /* RTNE */
+        int roundingBit = (mantissa >> (SE8M12_MANTISSA_SHIFT - 1)) & 0x1;
+        int stickyBits = mantissa & 0x3FF;
+
+        mantissa >>= SE8M12_MANTISSA_SHIFT;
+
+        if (roundingBit && stickyBits)
+        {
+            mantissa++;
+            if (mantissa > SE8M12_MANTISSA_BITS)
+            {
+                exponent++;
+                if (exponent > 0xFE)
+                {
+                    /* Clamp to HALF_MAX/HALF_MIN. */
+                    exponent--;
+                    mantissa--;
+                }
+                else
+                {
+                    mantissa &= SE8M12_MANTISSA_BITS;
+                }
+            }
+        }
+        f21 = sign | (exponent << SE8M12_EXPONENT_SHIFT) | mantissa;
+    }
+    else
+        f21 = sign;
+
+    return f21;
+}
+
+VX_PRIVATE_API vx_float32 SE8M12toFp32(vx_uint32 val)
+{
+    vx_float32 f32;
+    *(vx_uint32 *)&f32 = (val << 11);
+    return f32;
+}
+
+VX_PRIVATE_API vx_float32 SE8M15toFp32(vx_uint32 val)
+{
+    vx_float32 f32;
+    if(((val >> 15 ) & 0xFF) == 0xFF)
+        *(vx_uint32 *)&f32 = 0x7F7FFFFF | ((val >> 23) & 0x1) << 31;
+    else
+        *(vx_uint32 *)&f32 = (val << 8);
+    return f32;
+}
+
+vx_uint32 getbaseF24(vx_uint32 base, vx_uint32 expBits, vx_bool aluPwlSignSupport)
+{
+    vx_uint32 baseF24 = 0;
+    vx_uint32 baseU17 = 0;
+    vx_uint32 signBits = (aluPwlSignSupport ? 1 : 0);
+    vx_uint32 baseU9;
+
+    if(aluPwlSignSupport)
+    {
+        baseU9 = base & 0x1FF;
+        if(expBits == 8)
+            baseF24 = base << 14;
+        else if(baseU9 >= (0x1 << 8))
+        {
+            baseU17 = ((0xFF << 10 | ((base & 0x1FF) << signBits)) << expBits) & 0x1FFFF;
+            baseF24 = (base & 0x200) << 14 | baseU17 << 5;
+        }
+        else
+        {
+            baseU17 = (((base & 0x1FF) << signBits ) << expBits) & 0x1FFFF;;
+            baseF24 = (base & 0x200) << 14 | 0x1 << 22 | (baseU17  << 5);
+        }
+    }
+    else
+    {
+        baseU9 = base & 0x1FF;
+
+        if(expBits == 8)
+        {
+            baseF24 = base << 13;
+        }
+        else if(base >= (0x1 << 9))
+        {
+            baseU17 = ((0x7F << 10 | base )<< expBits) & 0x1FFFF;
+            baseF24 = baseU17 << 5;
+        }
+        else
+        {
+
+            baseU17 = (base << expBits) & 0x1FFFF;
+            baseF24 = (baseU17 << 5) | 0x1 << 22;
+        }
+    }
+    return baseF24;
+}
+VX_PRIVATE_API vx_status fillBF16ActivateReluLUT(vx_uint32 *pwlLUTBaseEx, vx_uint32 expBits, vx_bool aluPwlSignSupport, vx_enum format)
+{
+    vx_uint16   base;
+    vx_uint32   baseF24;
+    vx_float32  baseF32;
+    vx_float32  pwlValue;
+    vx_float32 m_out_of_max_range_slope;
+    vx_float32 m_out_of_min_range_slope;
+    vx_float32 scale = 0.0;
+    vx_uint32 baseBF16 = 0x400;
+
+
+    for(base = 0; base < 0x400; base++)
+    {
+
+        baseF24 = getbaseF24(base, expBits, aluPwlSignSupport);
+
+        if(((baseF24 >> 15) & 0xFF) == 0xFF)
+            baseF24 = (baseF24 & 0x800000) | 0x7F7FFF;
+
+        if(((baseF24 >> 15) & 0xFF) == 0x0)
+            baseF24 = (baseF24 & 0x800000);
+
+        baseF32 = SE8M15toFp32(baseF24);
+
+        if((base >> 9) == 1)
+        {
+            pwlValue = baseF32 * scale;
+             if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(pwlValue);
+             else
+                pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+        }
+        else
+        {
+            if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+                pwlLUTBaseEx[base] = (baseF24 >> 3);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(baseF32);
+        }
+    }
+
+    m_out_of_max_range_slope = 1;
+    m_out_of_min_range_slope = scale;
+
+    pwlLUTBaseEx[baseBF16 + 0] = ((*(vx_uint32 *)&m_out_of_max_range_slope) >> 8 | expBits << 24) & (0xFFFFFFF);
+    pwlLUTBaseEx[baseBF16 + 1] = ((*(vx_uint32 *)&m_out_of_min_range_slope) >> 8) & 0xFFFFFF;
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status fillBF16ActivateHswishLUT(vx_uint32 *pwlLUTBaseEx, vx_uint32 expBits, vx_float32 scale, vx_bool aluPwlSignSupport, vx_enum format)
+{
+    vx_uint16   base;
+    vx_uint32   baseF24;
+    vx_float32  baseF32;
+    vx_float32  pwlValue;
+    vx_float32 m_out_of_max_range_slope;
+    vx_float32 m_out_of_min_range_slope;
+    vx_uint32 baseBF16 = 0x400;
+
+
+    for(base = 0; base < 0x400; base++)
+    {
+
+        baseF24 = getbaseF24(base, expBits, aluPwlSignSupport);
+
+        if(((baseF24 >> 15) & 0xFF) == 0xFF)
+            baseF24 = (baseF24 & 0x800000) | 0x7F7FFF;
+
+        if(((baseF24 >> 15) & 0xFF) == 0x0)
+            baseF24 = (baseF24 & 0x800000);
+
+        baseF32 = SE8M15toFp32(baseF24);
+
+        if((base >> 9) == 1)
+        {
+            baseF32 = SE8M15toFp32(baseF24) * scale;
+            pwlValue = 1.0f * baseF32 * gcoMATH_MIN(gcoMATH_MAX(baseF32 + 3, 0), 6) / 6;
+            if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(pwlValue);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+        }
+        else
+        {
+            baseF32 = SE8M15toFp32(baseF24) * scale;
+            pwlValue = 1.0f * baseF32 * gcoMATH_MIN(gcoMATH_MAX(baseF32 + 3, 0), 6) / 6;
+            if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(pwlValue);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+        }
+    }
+
+    m_out_of_max_range_slope = 1;
+    m_out_of_min_range_slope = 0;
+
+    pwlLUTBaseEx[baseBF16 + 0] = ((*(vx_uint32 *)&m_out_of_max_range_slope) >> 8 | expBits << 24) & (0xFFFFFFF);
+    pwlLUTBaseEx[baseBF16 + 1] = ((*(vx_uint32 *)&m_out_of_min_range_slope) >> 8) & 0xFFFFFF;
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status fillBF16LeakyReluLUT(vx_uint32 *pwlLUTBaseEx, vx_uint32 expBits, vx_float32 scale, vx_bool aluPwlSignSupport, vx_enum format)
+{
+    vx_uint16   base;
+    vx_uint32   baseF24;
+    vx_float32  baseF32;
+    vx_float32  pwlValue;
+    vx_uint32 baseBF16 = 0x400;
+    vx_float32 m_out_of_max_range_slope;
+    vx_float32 m_out_of_min_range_slope;
+
+    for(base = 0; base < 0x400; base++)
+    {
+        baseF24 = getbaseF24(base, expBits, aluPwlSignSupport);
+
+        if(((baseF24 >> 15) & 0xFF) == 0xFF)
+            baseF24 = (baseF24 & 0x800000) | 0x7F7FFF;
+
+        if(((baseF24 >> 15) & 0xFF) == 0x0)
+            baseF24 = (baseF24 & 0x800000);
+
+        baseF32 = SE8M15toFp32(baseF24);
+
+        if((base >> 9) == 1)
+        {
+            pwlValue = baseF32 * scale;
+
+            if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(pwlValue);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+        }
+        else
+        {
+            if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+                pwlLUTBaseEx[base] = (baseF24 >> 3);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(baseF32);
+        }
+
+    }
+
+    m_out_of_max_range_slope = 1;
+    m_out_of_min_range_slope = scale;
+
+    pwlLUTBaseEx[baseBF16 + 0] = ((*(vx_uint32 *)&m_out_of_max_range_slope) >> 8 | expBits << 24) & (0xFFFFFFF);
+    pwlLUTBaseEx[baseBF16 + 1] = ((*(vx_uint32 *)&m_out_of_min_range_slope) >> 8) & 0xFFFFFF;
+
+    return VX_SUCCESS;
+}
+VX_PRIVATE_API vx_status  fillBF16ActivateRelu1LUT(vx_uint32 *pwlLUTBaseEx, vx_uint32 expBits, vx_float32 scale, vx_bool aluPwlSignSupport, vx_enum format)
+{
+    vx_uint16   base;
+    vx_uint32   baseF24;
+    vx_float32  baseF32;
+    vx_float32  pwlValue;
+    vx_uint32 baseBF16 = 0x400;
+    vx_float32 m_out_of_max_range_slope;
+    vx_float32 m_out_of_min_range_slope;
+
+    for(base = 0; base < 0x400; base++)
+    {
+        baseF24 = getbaseF24(base, expBits, aluPwlSignSupport);
+
+        if(((baseF24 >> 15) & 0xFF) == 0xFF)
+            baseF24 = (baseF24 & 0x800000) | 0x7F7FFF;
+
+        if(((baseF24 >> 15) & 0xFF) == 0x0)
+            baseF24 = (baseF24 & 0x800000);
+
+        baseF32 = SE8M15toFp32(baseF24);
+
+        pwlValue = baseF32 * scale;
+
+        if(pwlValue  > 1.0f)
+        {
+            if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(1.0f);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(1.0f);
+        }
+        else if(pwlValue  < -1.0f)
+        {
+            if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(-1.0f);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(-1.0f);
+        }
+        else
+        {
+            if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(pwlValue);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+        }
+
+    }
+
+    m_out_of_max_range_slope = 0.0f;
+    m_out_of_min_range_slope = 0.0f;
+
+    pwlLUTBaseEx[baseBF16 + 0] = ((*(vx_uint32 *)&m_out_of_max_range_slope) >> 8 | expBits << 24) & (0xFFFFFFF);
+    pwlLUTBaseEx[baseBF16 + 1] = ((*(vx_uint32 *)&m_out_of_min_range_slope) >> 8) & 0xFFFFFF;
+
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status  fillBF16ActivateRelu6LUT(vx_uint32 *pwlLUTBaseEx, vx_uint32 expBits, vx_float32 scale, vx_bool aluPwlSignSupport, vx_enum format)
+{
+    vx_uint16   base;
+    vx_uint32   baseF24;
+    vx_float32  baseF32;
+    vx_float32  pwlValue;
+    vx_float32 m_out_of_max_range_slope;
+    vx_float32 m_out_of_min_range_slope;
+    vx_uint32 baseBF16 = 0x400;
+
+    for(base = 0; base < 0x400; base++)
+    {
+        baseF24 = getbaseF24(base, expBits, aluPwlSignSupport);
+
+        if(((baseF24 >> 15) & 0xFF) == 0xFF)
+            baseF24 = (baseF24 & 0x800000) | 0x7F7FFF;
+
+        if(((baseF24 >> 15) & 0xFF) == 0x0)
+            baseF24 = (baseF24 & 0x800000);
+
+        if((base >> 9) == 1)
+        {
+            baseF32 = SE8M15toFp32(baseF24);
+            pwlValue = baseF32 * 0.0f;
+            if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(pwlValue);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+        }
+        else
+        {
+            baseF32 = SE8M15toFp32(baseF24);
+            pwlValue = baseF32 * scale;
+            if(pwlValue > 6.0f)
+            {
+                if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+                    pwlLUTBaseEx[base] = Fp32toSE8M12(6.0f);
+                else
+                    pwlLUTBaseEx[base] = Fp32toFp21(6.0f);
+            }
+            else
+            {
+                if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+                    pwlLUTBaseEx[base] = Fp32toSE8M12(pwlValue);
+                else
+                    pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+            }
+        }
+    }
+
+    m_out_of_max_range_slope = 0;
+    m_out_of_min_range_slope = 0;
+
+    pwlLUTBaseEx[baseBF16 + 0] = ((*(vx_uint32 *)&m_out_of_max_range_slope) >> 8 | expBits << 24) & (0xFFFFFFF);
+    pwlLUTBaseEx[baseBF16 + 1] = ((*(vx_uint32 *)&m_out_of_min_range_slope) >> 8) & 0xFFFFFF;
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status  fillBF16ActivateLogisticLUT(vx_uint32 *pwlLUTBaseEx, vx_uint32 expBits, vx_float32 scale, vx_bool aluPwlSignSupport, vx_enum format)
+{
+    vx_uint16   base;
+    /*vx_uint16   baseU9;*/
+    vx_uint32   baseF24;
+    /*vx_uint32   baseU18;*/
+    vx_float32  baseF32 = 0;
+    vx_float32  pwlValue;
+    vx_uint32 baseBF16 = 0x400;
+    vx_uint32 signBits = (aluPwlSignSupport ? 1 : 0);
+    vx_uint16 maxLUTinput = expBits == 8 ? 0x3FF >> signBits : 0x1FF >>signBits;
+    vx_uint16 minLUTinput = (vx_uint16)(aluPwlSignSupport ? (expBits == 8 ? (0x3FF >> signBits) | aluPwlSignSupport << 9 : 0x1FF >>signBits | aluPwlSignSupport << 9) :  (expBits == 8 ? 0  : 0x200 >>signBits));
+    vx_float32 m_out_of_max_range_slope = 0;
+    vx_float32 m_out_of_min_range_slope = 0;
+
+
+    for(base = 0; base < 0x400; base++)
+    {
+        baseF24 = 0;
+        /*baseU18 = 0;*/
+        baseF32 = 0;
+        /*baseU9 = base & 0x1FF;*/
+
+        baseF24 = getbaseF24(base, expBits, aluPwlSignSupport);
+
+        baseF32 = SE8M15toFp32(baseF24);
+        if(((baseF24 >> 15) & 0xFF) == 0xFF)
+        {
+            if((baseF24 >> 23) == 0x1)
+            {
+                if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+                    pwlLUTBaseEx[base] = Fp32toSE8M12(0.0f);
+                else
+                    pwlLUTBaseEx[base] = Fp32toFp21(0.0f);
+            }
+            else
+            {
+                if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+                    pwlLUTBaseEx[base] = Fp32toSE8M12(1.0f);
+                else
+                    pwlLUTBaseEx[base] = Fp32toFp21(1.0f);
+            }
+        }
+        else if(((baseF24 >> 15) & 0xFF) == 0x0)
+        {
+            if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(0.5f);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(0.5f);
+        }
+        else
+        {
+
+            pwlValue = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * scale));
+
+            if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(pwlValue);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+
+        }
+
+        if(base == maxLUTinput)
+        {
+            vx_float32 temp = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * scale));
+            m_out_of_max_range_slope = (vx_float32)temp * (1.0f - temp);
+        }
+        if(base == minLUTinput)
+        {
+            vx_float32 temp = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * scale));
+            m_out_of_min_range_slope = (vx_float32)temp * (1.0f - temp);
+        }
+
+    }
+
+    pwlLUTBaseEx[baseBF16 + 0] = ((*(vx_uint32 *)&m_out_of_max_range_slope) >> 8 | expBits << 24) & (0xFFFFFFF);
+    pwlLUTBaseEx[baseBF16 + 1] = ((*(vx_uint32 *)&m_out_of_min_range_slope) >> 8) & 0xFFFFFF;
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status  fillBF16ActivateSwishLUT(vx_uint32 *pwlLUTBaseEx, vx_uint32 expBits, vx_float32 scale, vx_bool aluPwlSignSupport, vx_enum format)
+{
+    vx_uint16   base;
+    vx_uint32   baseF24;
+    vx_float32  baseF32 = 0;
+    vx_float32  pwlValue;
+    vx_uint32 baseBF16 = 0x400;
+    vx_uint32 signBits = (aluPwlSignSupport ? 1 : 0);
+    vx_uint16 maxLUTinput = expBits == 8 ? 0x3FF >> signBits : 0x1FF >>signBits;
+    vx_uint16 minLUTinput = (vx_uint16)(aluPwlSignSupport ? (expBits == 8 ? (0x3FF >> signBits) | aluPwlSignSupport << 9 : 0x1FF >>signBits | aluPwlSignSupport << 9) :  (expBits == 8 ? 0  : 0x200 >>signBits));
+    vx_float32 m_out_of_max_range_slope = 0;
+    vx_float32 m_out_of_min_range_slope = 0;
+
+
+    for(base = 0; base < 0x400; base++)
+    {
+        baseF24 = 0;
+        baseF32 = 0;
+
+        baseF24 = getbaseF24(base, expBits, aluPwlSignSupport);
+
+        baseF32 = SE8M15toFp32(baseF24) * scale;
+        if(((baseF24 >> 15) & 0xFF) == 0xFF)
+        {
+            if((baseF24 >> 23) == 0x1)
+            {
+                if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+                    pwlLUTBaseEx[base] = Fp32toSE8M12(0.0f);
+                else
+                    pwlLUTBaseEx[base] = Fp32toFp21(0.0f);
+            }
+            else
+            {
+                baseF24 = 0x7F7FFF;
+                baseF32 = SE8M15toFp32(baseF24) * scale;
+                if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+                    pwlLUTBaseEx[base] = Fp32toSE8M12(baseF32);
+                else
+                    pwlLUTBaseEx[base] = Fp32toFp21(baseF32);
+            }
+        }
+        else if(((baseF24 >> 15) & 0xFF) == 0x0)
+        {
+            if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(0.0f);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(0.0f);
+        }
+        else
+        {
+            pwlValue = 1.0f * baseF32 / (1.0f + gcoMATH_Exp(0.0f - baseF32));
+
+            if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(pwlValue);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+
+        }
+
+        if(base == maxLUTinput)
+        {
+            m_out_of_max_range_slope = 1;
+        }
+        if(base == minLUTinput)
+        {
+            m_out_of_min_range_slope = 0;
+        }
+
+    }
+
+    pwlLUTBaseEx[baseBF16 + 0] = ((*(vx_uint32 *)&m_out_of_max_range_slope) >> 8 | expBits << 24) & (0xFFFFFFF);
+    pwlLUTBaseEx[baseBF16 + 1] = ((*(vx_uint32 *)&m_out_of_min_range_slope) >> 8) & 0xFFFFFF;
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status  fillBF16ActivateHyperbolicTanLUT(vx_uint32 *pwlLUTBaseEx, vx_uint32 expBits, vx_float32 scaleIn,vx_float32 scaleOut, vx_bool aluPwlSignSupport, vx_enum format)
+{
+
+    vx_uint16   base;
+    vx_uint32   baseF24;
+    vx_float32  baseF32;
+    vx_float32  pwlValue;
+    vx_uint32 baseBF16 = 0x400;
+    vx_uint32 signBits = (aluPwlSignSupport ? 1 : 0);
+    //vx_uint32 mantissaBits = 10 - signBits - expBits;
+    vx_uint16 maxAbsLUTinput = expBits == 8 ? 0x3FF >> signBits : 0x1FF >>signBits;
+    vx_uint16 minAbsLUTinput = expBits == 8 ? 0  : 0x200 >>signBits;
+    vx_float32 m_out_of_max_range_slope = 0;
+    vx_float32 m_out_of_min_range_slope = 0;
+
+    for(base = 0; base < 0x400; base++)
+    {
+        baseF24 = 0;
+        baseF32 = 0;
+
+        baseF24 = getbaseF24(base, expBits, aluPwlSignSupport);
+
+        baseF32 = SE8M15toFp32(baseF24);
+
+        if(((baseF24 >> 15) & 0xFF) == 0xFF)
+        {
+            if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(1.0f);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(1.0f);
+        }
+        else if(((baseF24 >> 15) & 0xFF) == 0x0)
+        {
+            if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(0.0f);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(0.0f);
+        }
+        else
+        {
+            pwlValue = scaleOut * gcoMATH_TangentH(baseF32 * scaleIn);
+
+            if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(pwlValue);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+        }
+
+        if(base == maxAbsLUTinput)
+            m_out_of_max_range_slope = (vx_float32)(scaleOut * (1.0f - pow(gcoMATH_TangentH(baseF32 * scaleIn), 2)));
+        if(base == minAbsLUTinput)
+            m_out_of_min_range_slope = (vx_float32)(scaleOut * (1.0f - pow(gcoMATH_TangentH(baseF32 * scaleIn), 2)));
+    }
+
+    pwlLUTBaseEx[baseBF16 + 0] = ((*(vx_uint32 *)&m_out_of_max_range_slope) >> 8 | expBits << 24) & (0xFFFFFFF);
+    pwlLUTBaseEx[baseBF16 + 1] = ((*(vx_uint32 *)&m_out_of_min_range_slope) >> 8) & 0xFFFFFF;
+
+   return VX_SUCCESS;
+}
+VX_PRIVATE_API vx_status  fillBF16LRNLUT(vx_uint32 *pwlLUTBaseEx, vx_uint32 expBits, vx_float32 u8Scale, vx_tp_value_cmd value_cmd_ptr, vx_uint32 preShiftValue,vx_bool aluPwlSignSupport, vx_enum format)
+{
+    vx_uint16   base;
+    vx_uint32   baseF24;
+    vx_float32  baseF32;
+    vx_float32  pwlValue;
+    vx_uint32 baseBF16 = 0x400;
+    vx_uint32 signBits = (aluPwlSignSupport ? 1 : 0);
+    //vx_uint32 mantissaBits = 10 - signBits - expBits;
+    vx_uint16 maxAbsLUTinput = expBits == 8 ? 0x3FF >> signBits : 0x1FF >>signBits;
+    vx_uint16 minAbsLUTinput = expBits == 8 ? 0  : 0x200 >>signBits;
+    vx_float32 m_out_of_max_range_slope = 0;
+    vx_float32 m_out_of_min_range_slope = 0;
+    vx_float32  alpha, beta, bias, ks;
+    /*vx_uint32 kernel;*/
+    vx_float32 tempValue= 0;
+
+    alpha  = value_cmd_ptr->f32[0];
+    beta   = value_cmd_ptr->f32[1];
+    bias   = value_cmd_ptr->f32[2];
+    /*kernel = value_cmd_ptr->u32[0];*/
+    ks     = (vx_float32)value_cmd_ptr->u32[1];
+
+
+    for(base = 0; base < 0x400; base++)
+    {
+        baseF24 = 0;
+        baseF32 = 0;
+
+        baseF24 = getbaseF24(base, expBits, aluPwlSignSupport);
+
+        baseF32 = SE8M15toFp32(baseF24);
+
+        if(((baseF24 >> 15) & 0xFF) == 0xFF)
+            baseF24 = (baseF24 & 0x800000) | 0x7F7FFF;
+
+        if(((baseF24 >> 15) & 0xFF) == 0x0)
+            baseF24 = (baseF24 & 0x800000);
+
+        baseF32 = SE8M15toFp32(baseF24);
+        tempValue = bias + alpha * (baseF32 * u8Scale *u8Scale * (vx_float32)preShiftValue / ks);
+        pwlValue = 1.0f / (vx_float32)pow(tempValue, beta);
+        if(format == VX_TYPE_BFLOAT16 || format == VX_TYPE_FLOAT32)
+            pwlLUTBaseEx[base] = Fp32toSE8M12(pwlValue);
+        else
+            pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+
+        if(base == maxAbsLUTinput)
+            m_out_of_max_range_slope = -1.0f * (beta *alpha* u8Scale * u8Scale * (vx_float32)preShiftValue / ks) / (vx_float32)pow(tempValue, beta + 1);
+        if(base == minAbsLUTinput)
+            m_out_of_min_range_slope = -1.0f * (beta * alpha* u8Scale * u8Scale * (vx_float32)preShiftValue / ks) / (vx_float32)pow(tempValue, beta + 1);
+    }
+
+    pwlLUTBaseEx[baseBF16 + 0] = ((*(vx_uint32 *)&m_out_of_max_range_slope) >> 8 | expBits << 24) & (0xFFFFFFF);
+    pwlLUTBaseEx[baseBF16 + 1] = ((*(vx_uint32 *)&m_out_of_min_range_slope) >> 8) & 0xFFFFFF;
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_float64 maxErrorLUT(vx_uint32 * pwlLUTBaseEx, vx_uint32 expBits, vx_uint32 type, vx_float32 u8Scale, vx_bool aluPwlSignSupport, vx_tp_value_cmd value_cmd_ptr, vx_uint32 preShiftValue)
+{
+    vx_uint32 u11 = 0;
+    vx_float64 maxError = 0;
+    vx_float64 error = 0;
+    vx_uint32 signBits = (aluPwlSignSupport ? 1 : 0);
+    vx_uint32 mantissaBits = 10 - signBits - expBits;
+    vx_uint16 maxAbsLUTinput = expBits == 8 ? 0x3FF >> signBits : 0x1FF >>signBits;
+    vx_uint16 minAbsLUTinput = expBits == 8 ? 0  : 0x200 >>signBits;
+
+
+    for(u11 = 1; u11 < ((0x1 << 11) -1); u11 += 2)
+    {
+        vx_float64 slope = 0;
+        vx_float64 predictValue = 0;
+        vx_float64 expectValue = 0;
+        vx_uint32 base = 0;
+
+        vx_uint32 u19 = 0;
+        vx_uint32 f24 = 0;
+
+        if(aluPwlSignSupport)
+        {
+            if(expBits == 8)
+                f24 = u11 << 13;
+            else
+            {
+                vx_uint32 baseU10 = (u11 >> 1) & 0x1FF;
+                if(baseU10 >= (0x1 << 8))
+                {
+                    u19 = ((0xFF << 11 | ((u11 & 0x3FF)) << signBits) << expBits) & 0x7FFFF;
+                    f24 = (u11 & 0x400) << 13 | (0x3FFFF & u19) << 4;
+
+                }
+                else
+                {
+                    u19 = (((u11 & 0x3FF) << signBits) << expBits) & 0x7FFFF;
+                    f24 = (u11 & 0x400) << 13 | (0x40000 | u19) << 4;
+                }
+            }
+        }
+        else
+        {
+
+            if(expBits == 8)
+            {
+                f24 = u11 << 12;
+            }
+            else
+            {
+                if(u11 >= (0x1 << 10))
+                {
+                    u19 = ((0x7F << 11 | u11) << expBits) & 0x3FFFF;
+                    f24 = u19 << 4;
+                }
+                else
+                {
+                    u19 = (u11 << expBits)& 0x3FFFF;
+                    f24 = 0x1 << 22 | u19 << 4;
+                }
+            }
+        }
+        if((((f24 >> 15) & 0xFF) == 0) || (((f24 >> 15) & 0xFF) == 0xFF))
+            continue;
+
+        if(aluPwlSignSupport)
+            base = (f24 & 0x800000) >> 14 | ((((f24 & 0x7FFFFF) >> 5) >> (expBits + signBits)) & 0x1FF);
+        else
+            base = ((f24 >> 5) >> (expBits + signBits)) & 0x3FF;
+
+        if(base == maxAbsLUTinput || base == minAbsLUTinput)
+        {
+            vx_uint32 baseF24 = 0;
+            vx_uint32 minMaxBaseF24 = 0;
+            baseF24 = getbaseF24(base,expBits, aluPwlSignSupport);
+
+            if (type == VX_NN_ACTIVATION_HYPERBOLIC_TAN || type == TP_LRN)
+                vxmASSERT(!aluPwlSignSupport);
+            else
+                vxmASSERT(aluPwlSignSupport);
+
+            if(base == maxAbsLUTinput)
+            {
+                if(((baseF24 >> 15 ) & 0xFF) == 0xFF)
+                    minMaxBaseF24 = baseF24;
+                else
+                    minMaxBaseF24 = (((baseF24 >> 15 ) & 0xFF) + 1) << 15 | (baseF24 & 0x807FFF);
+                predictValue = SE8M12toFp32(pwlLUTBaseEx[maxAbsLUTinput]) + SE8M15toFp32(pwlLUTBaseEx[0x400] & 0xFFFFFF) * (SE8M15toFp32(minMaxBaseF24) - SE8M15toFp32(baseF24));
+            }
+            if(base == minAbsLUTinput)
+            {
+                if(((baseF24 >> 15 ) & 0xFF) == 0)
+                    minMaxBaseF24 = baseF24;
+                else
+                    minMaxBaseF24 = (((baseF24 >> 15 ) & 0xFF) - 1) << 15 | (baseF24 & 0x807FFF);
+                predictValue = SE8M12toFp32(pwlLUTBaseEx[minAbsLUTinput]) + SE8M15toFp32(pwlLUTBaseEx[0x401]) * (SE8M15toFp32(minMaxBaseF24) - SE8M15toFp32(baseF24));
+            }
+            f24 = minMaxBaseF24;
+        }
+        else
+        {
+
+            vx_uint32 baseDelta = 0;
+            vx_uint32 expU8 = (f24 >> 15) & 0xFF;
+
+            vx_float64 mantStepDelta = 1.0/(1.0/(0x1 << mantissaBits));
+            vx_uint32 expCount = 0;
+            vx_uint32 mantStepDeltaInt = 0;
+            vx_uint32 absInput = 0;
+            vx_float64 inputDelta = 0;
+            vx_uint32 absF24LUTInput = 0;
+
+            vx_uint32 nextBase = ((base + 1) & ((!aluPwlSignSupport) << 9 | 0x1FF)) | ((aluPwlSignSupport & (base >> 9)) << 9);
+
+            while(mantStepDelta >= 2)
+            {
+                expCount++;
+                mantStepDelta /=2;
+            }
+
+            mantStepDeltaInt = (vx_uint32)((0x1 << 15) * (mantStepDelta -1.0));
+
+            baseDelta =  (((0xFE - expU8) + expCount)& 0xFF) << 15 | (mantStepDeltaInt & 0x7FFF); //se8m15
+
+            if(aluPwlSignSupport)
+            {
+                vx_uint32 baseU18 = 0;
+                vx_uint32 baseU9 = base & 0x1FF;
+                vx_uint32  mask0 = 0x1FFFF;
+                vx_uint32  mask1 = 0x20000;
+
+                if(expBits == 8)
+                    absF24LUTInput = base << 14;
+                else if(baseU9 >= (0x1 << 8))
+                {
+                    baseU18 = ((0xFF << 10 | ((base & 0x1FF) << signBits)) << expBits) & 0x3FFFF;
+                    absF24LUTInput = (base & 0x200) << 14 | (baseU18 & mask0)<< 5;
+                }
+                else
+                {
+                    baseU18 = (((base & 0x1FF) << signBits ) << expBits) & 0x3FFFF;;
+                    absF24LUTInput = (base & 0x200) << 14 | ((baseU18 | mask1) << 5);
+                }
+            }
+            else
+            {
+                vx_uint32 baseU17 = 0;
+
+                if(expBits == 8)
+                {
+                    absF24LUTInput = base << 13;
+                }
+                else if(base >= (0x1 << 9))
+                {
+                    baseU17 = ((0x7F << 10 | base )<< expBits) & 0x1FFFF;
+                    absF24LUTInput = baseU17 << 5;
+                }
+                else
+                {
+
+                    baseU17 = (base << expBits) & 0x1FFFF;
+                    absF24LUTInput = (baseU17 << 5) | 0x1 << 22;
+                }
+            }
+
+            slope = 1.0 * ((SE8M12toFp32(pwlLUTBaseEx[nextBase]) - SE8M12toFp32(pwlLUTBaseEx[base]))) * SE8M15toFp32((f24 & 0x800000) |baseDelta);
+
+            absInput = f24 & 0x7FFFFF;
+            inputDelta = (SE8M15toFp32((f24 & 0x800000) |absInput ) - SE8M15toFp32(absF24LUTInput));
+
+            if(aluPwlSignSupport)
+                predictValue = slope* inputDelta + SE8M12toFp32(pwlLUTBaseEx[base]);
+            else
+                predictValue = slope* inputDelta + SE8M12toFp32(((f24 & 0x800000) >> 3) | pwlLUTBaseEx[base]);
+
+        }
+
+        switch(type)
+        {
+            case VX_NN_ACTIVATION_LEAKYRELU:
+            case VX_NN_ACTIVATION_RELU:
+            {
+                if(base >= 0x200)
+                    expectValue = (vx_float64)SE8M15toFp32(f24) * u8Scale;
+                else
+                    expectValue = (vx_float64)SE8M15toFp32(f24)/* * scale*/;
+                break;
+            }
+            case VX_NN_ACTIVATION_RELU1:
+            {
+                vx_float64 tempValue;
+                tempValue = (vx_float64)SE8M15toFp32(f24) * u8Scale;
+                if(tempValue > 1.0f)
+                    expectValue = 1.0f;
+                else if(tempValue < -1.0f)
+                    expectValue = -1.0f;
+                else
+                    expectValue = tempValue;
+                 break;
+            }
+            case VX_NN_ACTIVATION_RELU6:
+            {
+                vx_float64 tempValue;
+                tempValue = (vx_float64)SE8M15toFp32(f24) * u8Scale;
+                if(tempValue > 6.0f)
+                    expectValue = 6.0f;
+                else if(base >= 0x200)
+                    expectValue = 0.0f;
+                else
+                    expectValue = tempValue;
+                break;
+            }
+            case VX_NN_ACTIVATION_HSWISH:
+            {
+                vx_float32 tempValue;
+
+                if(((f24 >> 15) & 0xFF) == 0xFF)
+                {
+                    expectValue = SE8M15toFp32((f24 & 0x800000) | 0x7F7FFF);
+                }
+                else if(((f24 >> 15) & 0xFF) == 0x0)
+                {
+                    expectValue = 0.0f;
+                }
+                else
+                {
+                    tempValue = SE8M15toFp32(f24) * u8Scale;
+                    expectValue = (vx_float64)(1.0f * tempValue * gcoMATH_MIN(gcoMATH_MAX(tempValue + 3, 0), 6) / 6.0f);
+                }
+                break;
+            }
+            case VX_NN_ACTIVATION_LOGISTIC :
+            {
+                vx_float32 tempValue;
+
+                if(((f24 >> 15) & 0xFF) == 0xFF)
+                {
+                    expectValue = SE8M15toFp32((f24 & 0x800000) | 0x7F7FFF);
+                }
+                else if(((f24 >> 15) & 0xFF) == 0x0)
+                {
+                    expectValue = 0.5f;
+                }
+                else
+                {
+                    tempValue = SE8M15toFp32(f24);
+                    expectValue = (vx_float64)(1.0f / (1.0f + gcoMATH_Exp(0.0f - tempValue * u8Scale)));
+                }
+                break;
+            }
+            case VX_NN_ACTIVATION_SWISH:
+            {
+                vx_float32 tempValue;
+
+                if(((f24 >> 15) & 0xFF) == 0xFF)
+                {
+                    expectValue = SE8M15toFp32((f24 & 0x800000) | 0x7F7FFF);
+                }
+                else if(((f24 >> 15) & 0xFF) == 0x0)
+                {
+                    expectValue = 0.0f;
+                }
+                else
+                {
+                    tempValue = SE8M15toFp32(f24) * u8Scale;
+                    expectValue = (vx_float64)(1.0f * tempValue / (1.0f + gcoMATH_Exp(0.0f - tempValue * u8Scale)));
+                }
+                break;
+            }
+            case VX_NN_ACTIVATION_HYPERBOLIC_TAN :
+            {
+                vx_float32 tempValue;
+                vx_float32 scaleOut = value_cmd_ptr->f32[0];
+                vx_float32 scaleIn = value_cmd_ptr->f32[1];
+
+                if(((f24 >> 15) & 0xFF) == 0xFF)
+                {
+                    expectValue = 1.0;
+                }
+                else if(((f24 >> 15) & 0xFF) == 0x0)
+                {
+                    expectValue = 0.0f;
+                }
+                else
+                {
+                    tempValue = SE8M15toFp32(f24);
+                    expectValue = (vx_float64)scaleOut * gcoMATH_TangentH(tempValue * scaleIn * u8Scale);
+                }
+                break;
+            }
+            case TP_LRN:
+            {
+                vx_float64 tempValue, baseF32;
+                vx_float32  alpha, beta, bias, ks;
+                /*vx_uint32 kernel;*/
+                alpha  = value_cmd_ptr->f32[0];
+                beta   = value_cmd_ptr->f32[1];
+                bias   = value_cmd_ptr->f32[2];
+                /*kernel = value_cmd_ptr->u32[0];*/
+                ks     = (vx_float32)value_cmd_ptr->u32[1];
+                baseF32 = SE8M15toFp32(f24);
+                tempValue = bias + alpha * (baseF32 * u8Scale * u8Scale * (vx_float32)preShiftValue / ks);
+                expectValue = 1.0f / (vx_float32)pow(tempValue, beta);
+                break;
+            }
+
+        }
+        if(expectValue != 0)
+            error = (vx_float64)fabs((vx_float64)(expectValue -predictValue)/expectValue);
+
+        if(u11 == 1)
+            maxError = error;
+        else
+            maxError = gcmMAX(maxError, error);
+    }
+    return maxError;
+}
+
+
 VX_PRIVATE_API vx_int32 getHwPoolingSze(vx_uint32 poolingSize)
 {
     switch (poolingSize)
@@ -125,7 +1112,7 @@ VX_PRIVATE_API vx_int32 getHwPoolingSze(vx_uint32 poolingSize)
     return -1;
 }
 
-VX_PRIVATE_API vx_int8 getHWDataFormat(vx_enum dataFormat)
+VX_PRIVATE_API vx_int8 getNNDataFormat(vx_enum dataFormat)
 {
     switch (dataFormat)
     {
@@ -139,6 +1126,35 @@ VX_PRIVATE_API vx_int8 getHWDataFormat(vx_enum dataFormat)
         return 0x4;
     case VX_TYPE_BFLOAT16:
         return 0x7;
+    case VX_TYPE_FLOAT32:
+        return 0x8;
+    default:
+        break;
+    }
+
+    vxError("hw not support this data format. function %s line %d", __FUNCTION__, __LINE__);
+    return -1;
+}
+
+
+VX_PRIVATE_API vx_int8 getTPDataFormat(vx_enum dataFormat)
+{
+    switch (dataFormat)
+    {
+    case VX_TYPE_UINT8:
+        return 0x0;
+    case VX_TYPE_INT8:
+        return 0x2;
+    case VX_TYPE_FLOAT16:
+        return 0x1;
+    case VX_TYPE_INT16:
+        return 0x4;
+    case VX_TYPE_UINT16:
+        return 0x3;
+    case VX_TYPE_BFLOAT16:
+        return 0x6;
+    case VX_TYPE_FLOAT32:
+        return 0x5;
     default:
         break;
     }
@@ -181,11 +1197,14 @@ VX_PRIVATE_API void _checkSramOverflow(
     case VX_TYPE_FLOAT16:
         coreCountUsed = context->nnConfig.fixedFeature.nnCoreCountFloat16;
         break;
+    case VX_TYPE_BFLOAT16:
+        coreCountUsed = context->nnConfig.fixedFeature.nnCoreCountBFloat16;
+        break;
     default:
         break;
     }
 
-    maxSizeOfCore = (vx_uint32)wb->slice_array[0].kernel_max_stream_size_percore;
+    maxSizeOfCore = (vx_uint32)WB_STREAM_MAX_SIZE_PERCORE_INDEX(wb, 0);
 
     for (i = 0; i != (info->vx_nn_general_cmd_info.kernelPatternMsb+1); i++)
     {
@@ -205,6 +1224,7 @@ VX_PRIVATE_API void _checkSramOverflow(
     dataUnitNum         = maxSizeOfCore / dataUnitByte;
 
     patternLoopCount    = dataUnitNum / (info->vx_nn_general_cmd_info.kernelPatternMsb + 1); /* full loop count */
+
     sramDataUnitNum1Core = patternLoopCount * oneNumOfPattern;
     dataUnitLastLoop    = dataUnitNum - patternLoopCount * (info->vx_nn_general_cmd_info.kernelPatternMsb + 1);
 
@@ -257,19 +1277,19 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNSplitCommandInfo(
     if(wb)
     {
 
-        zcount = wb->slice_z_num != 0 ? wb->slice_z_num : 1;
+        zcount = WB_OUTPUT_Z_SLICE_NUM(wb) != 0 ? WB_OUTPUT_Z_SLICE_NUM(wb) : 1;
         z_offsets[0]=0;
-        for(k = 0; k < wb->slice_z_num; ++k)
+        for(k = 0; k < WB_OUTPUT_Z_SLICE_NUM(wb); ++k)
         {
-            z_size[k] = wb->slice_array[k].z_count;
-            z_offsets[k+1] = z_offsets[k] + wb->slice_array[k].z_count;
+            z_size[k] = WB_OUTPUT_Z_INDEX(wb, k);
+            z_offsets[k+1] = z_offsets[k] + WB_OUTPUT_Z_INDEX(wb, k);
         }
     }
     else
         z_size[0] = output->depth;
 
 
-    vxmASSERT(z_offsets[wb->slice_z_num] == output->depth);
+    vxmASSERT(z_offsets[WB_OUTPUT_Z_SLICE_NUM(wb)] == output->depth);
 
     count = xcount * ycount * zcount;
     sinfoArray = vxAllocateAndZeroMemory(sizeof(vx_nn_cmd_split_info_u) * count);
@@ -401,7 +1421,17 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNSplitCommandInfo(
                     sinfoArray[index].vx_nn_general_cmd_split_info.outImageAddress = sinfoArray[index - 1].vx_nn_general_cmd_split_info.outImageAddress + x_sizes[i - 1] * vxnneGetTypeSize(outDataFormat);
                     sinfoArray[index].vx_nn_general_cmd_split_info.kernelAddress   = sinfoArray[index - 1].vx_nn_general_cmd_split_info.kernelAddress;
                 }
-
+                /*
+                if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_BIT_INIMG_NOT_64BYTE_ALIGN_CACHELINE_MODE_FIX))
+                {
+                    if ((sinfoArray[index].vx_nn_general_cmd_split_info.inImageAddress & 0x3F) &&
+                        (conv_cmd_ptr->out_image_tile_x == sinfoArray[index].vx_nn_general_cmd_split_info.outImageXSize))
+                    {
+                        //HW cannot handle inImageAddress is not 64Byte Aligned when outImageTileX >= outImageXSize and outImageTileY >= outImageYSize.
+                        vxmASSERT(0);
+                    }
+                }
+                */
                 vxmASSERT(sinfoArray[index].vx_nn_general_cmd_split_info.outImageXSize <= NN_IMAGE_XSIZE_MAX);
             }
             vxmASSERT(sinfoArray[index].vx_nn_general_cmd_split_info.outImageYSize <= NN_IMAGE_YSIZE_MAX);
@@ -431,6 +1461,18 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
     vx_float32 inScale, outScale;
     vx_weights_biases_parameter weights_biases = (vx_weights_biases_parameter) conv_cmd_ptr->other_ref;
     vx_bool isV8 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP0);
+    vx_weights_biases_parameter wb = (vx_weights_biases_parameter)(conv_cmd_ptr->other_ref);
+
+    vx_bool hasNNPerFilterPostMultiply = 0;
+    vx_bool hasTensorAdd = vx_false_e;
+    vx_bool coefCompressBypass = (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_NN_COEF_DECOMPRESS_BYPASS) && (WB_WEIGHT_QUANT_FORMAT(wb) != VX_QUANT_AFFINE_SCALE_PER_CHANNEL));
+
+    if(wb != VX_NULL)
+    {
+        hasNNPerFilterPostMultiply = (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT) &&
+            WB_WEIGHT_QUANT_FORMAT(wb) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL &&
+            (input->dataFormat == VX_TYPE_UINT8) && (WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_UINT8 || WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_INT8));
+    }
 
     outZSize = output->depth;
     inDataFormat   = input->dataFormat;
@@ -464,10 +1506,10 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
     info->vx_nn_general_cmd_info.relu              = conv_cmd_ptr->enable_relu;
     info->vx_nn_general_cmd_info.outImageZSize     = outZSize;
 
-    info->vx_nn_general_cmd_info.hwDepthWise       = weights_biases->wb_base->hw_depth_wise ? 1 : 0;
+    info->vx_nn_general_cmd_info.hwDepthWise       = WB_IS_DEPTH_WISE(weights_biases) ? 1 : 0;
     info->vx_nn_general_cmd_info.noZOffset         = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_NO_Z_LOCATION_OFFSET);
     info->vx_nn_general_cmd_info.pRelu             = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU);
-    info->vx_nn_general_cmd_info.perChannelPostMul = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT);
+    info->vx_nn_general_cmd_info.perChannelPostMul = (vx_uint8)hasNNPerFilterPostMultiply;
 
     /* add assert for hw limitation */
     vxmASSERT(info->vx_nn_general_cmd_info.outImageZSize <= NN_IMAGE_ZSIZE_MAX);
@@ -480,7 +1522,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
 
     vxmASSERT(info->vx_nn_general_cmd_info.kernelXSize < 16 && info->vx_nn_general_cmd_info.kernelYSize < 16);
 
-    if (!gcoHAL_IsFeatureAvailable(gcvNULL, gcFEATURE_BIT_NN_HW_LIMITATION_NATIVE_KER_1x2_2x1))
+    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcFEATURE_BIT_NN_HW_LIMITATION_NATIVE_KER_1x2_2x1))
     {
         /* Not support 1x2 or 2x1 kernel. */
         vxmASSERT(info->vx_nn_general_cmd_info.kernelXSize * info->vx_nn_general_cmd_info.kernelYSize != 2);
@@ -518,53 +1560,100 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
     info->vx_nn_general_cmd_info.outImageTileYSize = outImageTileSizeY;
 
     /* Fixed same type in this stage. */
-    info->vx_nn_general_cmd_info.kernelDataType    = getHWDataFormat(WB_WEIGHT_DATA_FORMAT(weights_biases));
-    info->vx_nn_general_cmd_info.inImageDataType   = getHWDataFormat(inDataFormat);
-    info->vx_nn_general_cmd_info.outImageDataType  = getHWDataFormat(outDataFormat);
+    if (WB_WEIGHT_QUANT_FORMAT(weights_biases) == VX_QUANT_AFFINE_SCALE
+       && WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_INT8
+       && (!coefCompressBypass)
+       && vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ASYMMETRIC_INT8))
+    {
+        info->vx_nn_general_cmd_info.kernelDataType = getNNDataFormat(VX_TYPE_UINT8);
+    }
+    else
+    {
+        info->vx_nn_general_cmd_info.kernelDataType    = getNNDataFormat(WB_WEIGHT_DATA_FORMAT(weights_biases));
+    }
+
+    info->vx_nn_general_cmd_info.inImageDataType   = getNNDataFormat(inDataFormat);
+    info->vx_nn_general_cmd_info.outImageDataType  = getNNDataFormat(outDataFormat);
 
     /* Since V7 HW WORD1 only has 2 bits for kerenl data type, input data type & output data type,
      * int16 value 0x4 will overflow, need add MSB value to WORD15 to cover
      */
-    if (WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_INT16 || WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_BFLOAT16)
-        info->vx_nn_general_cmd_info.kernelDataTypeMsb = 1;
+    /*Since v8.1 support FP32, which value is 8, need bit3 now*/
+    info->vx_nn_general_cmd_info.kernelDataTypeMsb = info->vx_nn_general_cmd_info.kernelDataType >> 2;
+    info->vx_nn_general_cmd_info.kernelDataTypeBit3 = info->vx_nn_general_cmd_info.kernelDataType >> 3;
 
-    if (inDataFormat == VX_TYPE_INT16 || inDataFormat == VX_TYPE_BFLOAT16)
-        info->vx_nn_general_cmd_info.inImageDataTypeMsb = 1;
+    info->vx_nn_general_cmd_info.inImageDataTypeMsb = info->vx_nn_general_cmd_info.inImageDataType >> 2;
+    info->vx_nn_general_cmd_info.inImageDataTypeBit3 = info->vx_nn_general_cmd_info.inImageDataType >> 3;
 
-    if (outDataFormat == VX_TYPE_INT16 || outDataFormat == VX_TYPE_BFLOAT16)
-        info->vx_nn_general_cmd_info.outImageDataTypeMsb = 1;
+    info->vx_nn_general_cmd_info.outImageDataTypeMsb = info->vx_nn_general_cmd_info.outImageDataType >> 2;
+    info->vx_nn_general_cmd_info.outImageDataTypeBit3 = info->vx_nn_general_cmd_info.outImageDataType >> 3;
+    if (weights_biases->alpha_ref != VX_NULL &&
+        WB_OPERATION_TYPE(wb) == VX_NN_CONV_PRELU &&
+        gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU) &&
+        gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT))
+    {
+        info->vx_nn_general_cmd_info.nnAluFunction = 0x2;
+        info->vx_nn_general_cmd_info.perChannelPostMul = 1; /*Prelu need enable per channel multiply*/
+        gcmPRINT("Yun add print here, merge pRelu\n");
+    }
 
-    vxmASSERT(info->vx_nn_general_cmd_info.inImageDataType == info->vx_nn_general_cmd_info.kernelDataType);
+    if (hasTensorAdd)
+    {
+        vx_uint16 nnTensorAddConst = 0;
+        vx_uint32 secPostMul = 0;
+        vx_uint32 secPostShift = 0;
+
+        info->vx_nn_general_cmd_info.nnAluFunction = 0x1;
+        info->vx_nn_general_cmd_info.negPostMultiplier = secPostMul;
+        info->vx_nn_general_cmd_info.negPostShift = secPostShift;
+        info->vx_nn_general_cmd_info.dwOutputZPBit1To0 = (nnTensorAddConst & 0x300) >> 8; /*dwOutZP[1:0] = nnTensorAddConst[9:8]*/
+        info->vx_nn_general_cmd_info.dwCoefZPBit5To0 = (nnTensorAddConst & 0x3F); /*dwOutZP[5:0] = nnTensorAddConst[5:0]*/
+        info->vx_nn_general_cmd_info.dwCoefZPBit7To6 = (nnTensorAddConst & 0xC0) >> 6; /*dwOutZP[7:6] = nnTensorAddConst[7:6]*/
+    }
+    info->vx_nn_general_cmd_info.convolutionStride = (conv_cmd_ptr->nn_strideX == 2 && conv_cmd_ptr->nn_strideY == 2) ? 1 : 0;
+
+    //vxmASSERT(info->vx_nn_general_cmd_info.inImageDataType == info->vx_nn_general_cmd_info.kernelDataType);
 
     info->vx_nn_general_cmd_info.postMultiplier = 0;
     info->vx_nn_general_cmd_info.roundingMode   = getHWRoundingMode((vx_nn_round_mode_e)outRMode, outDataFormat, vx_false_e);
 
-
     info->vx_nn_general_cmd_info.bFloat16Mode = (WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_BFLOAT16) ? 1 : 0 ;
+    /*For v8, BF16 && FP16 should set noBias to bypass post add bias/*/
+    if (isV8 &&
+        (WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_BFLOAT16 || WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_FLOAT16))
+        info->vx_nn_general_cmd_info.noBias = 1;
 
-    if(info->vx_nn_general_cmd_info.bFloat16Mode)
+    if (weights_biases->alpha_ref != VX_NULL &&
+        WB_OPERATION_TYPE(wb) == VX_NN_CONV_PRELU &&
+        gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU) &&
+        gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT))
     {
-        vxmASSERT(info->vx_nn_general_cmd_info.kernelDataType == 0x7 &&
-                  info->vx_nn_general_cmd_info.inImageDataType == 0x7 &&
-                  info->vx_nn_general_cmd_info.outImageDataType == 0x7 &&
-                  WB_BIAS_DATA_FORMAT(weights_biases) == VX_TYPE_FLOAT32);
+        info->vx_nn_general_cmd_info.nnAluFunction = 0x2;
+        info->vx_nn_general_cmd_info.perChannelPostMul = 1; /*Prelu need enable per channel multiply*/
+
+        if (WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_BFLOAT16 || WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_FLOAT16)
+        {
+            info->vx_nn_general_cmd_info.nnClampMin = 0xff800000;
+            info->vx_nn_general_cmd_info.nnClampMax = 0x7f800000;
+        }
     }
 
-    if (((inDataFormat == VX_TYPE_UINT8) && (inQuantFormat == VX_QUANT_AFFINE_SCALE)) ||
-        ((WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_UINT8) && (WB_WEIGHT_QUANT_FORMAT(weights_biases) == VX_QUANT_AFFINE_SCALE)) ||
-        ((outDataFormat == VX_TYPE_UINT8) && (outQuantFormat == VX_QUANT_AFFINE_SCALE)))
+    info->vx_nn_general_cmd_info.nnCoefDecompressBypass = (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_NN_COEF_DECOMPRESS_BYPASS) & !info->vx_nn_general_cmd_info.perChannelPostMul);
+
+    if (((inDataFormat == VX_TYPE_UINT8 || inDataFormat == VX_TYPE_INT8) && (inQuantFormat == VX_QUANT_AFFINE_SCALE)) ||
+        ((WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_UINT8 || WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_INT8) && (WB_WEIGHT_QUANT_FORMAT(weights_biases) == VX_QUANT_AFFINE_SCALE)) ||
+        ((outDataFormat == VX_TYPE_UINT8 || outDataFormat == VX_TYPE_INT8) && (outQuantFormat == VX_QUANT_AFFINE_SCALE)))
     {
         vx_float32 scale;
         vx_uint32 uintScale;
         vx_uint32 tmpMultiply;
         vx_int32 exp;
         vx_int8 tmpPostShift;
-        vx_float32 wScale = WB_WEIGHT_SCALE(weights_biases);
-        vx_float32 bScale = WB_BIAS_SCALE(weights_biases);
-
+        vx_float32 wScale = WB_WEIGHT_SCALE(weights_biases, 0);
+        vx_float32 bScale = WB_BIAS_SCALE(weights_biases, 0);
         if (inQuantFormat  == VX_QUANT_DYNAMIC_FIXED_POINT)
         {
-            inScale = vxnneConvertDynamicFixPointValueToFloat32(1.0, inFPP);
+             inScale = vxnneConvertDynamicFixPointValueToFloat32(1.0, inFPP);
         }
 
         if (WB_WEIGHT_QUANT_FORMAT(weights_biases) == VX_QUANT_DYNAMIC_FIXED_POINT)
@@ -583,7 +1672,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
         exp = (uintScale & 0x7F800000) >> 23; /* postShift is Scale's exp*/
 
         /* HW design follow the paper, biasScale = inputScale * coefScale*/
-        if (!weights_biases->wb_base->no_bias)
+        if (WB_BIAS_TENSOR(weights_biases) != VX_NULL)
         {
             if (!(gcmABS(bScale - inScale * wScale) < 0.000001))
             {
@@ -611,7 +1700,11 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
         {
             /*V8 use 23bit to save post-multiply*/
             tmpMultiply = uintScale & 0x7FFFFF; /* postMultiply is 23-bit of Scale's mantissa*/
-
+            if (context->options.use15bitsPostMultiply)
+            {
+                /*use 15bits to save post-multiply*/
+                tmpMultiply &= 0x7FFF00;
+            }
             info->vx_nn_general_cmd_info.postMultiplier = tmpMultiply & 1;
             tmpMultiply = tmpMultiply >> 1;
             info->vx_nn_general_cmd_info.postMultiplierBit6to1 = tmpMultiply & 0x3F;
@@ -620,20 +1713,110 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
             tmpMultiply = tmpMultiply >> 8;
             info->vx_nn_general_cmd_info.postMultiplierBit22to15 = tmpMultiply;
 
-            /*V8 post shift no need add 15*/
-            tmpPostShift = 127 - (vx_int8)exp;
-            info->vx_nn_general_cmd_info.postShift = tmpPostShift & 0x1F;
-            tmpPostShift = tmpPostShift >> 5;
-            info->vx_nn_general_cmd_info.postShiftBit6to5 = tmpPostShift & 3;
+            if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FLOAT_POST_MULT))
+            {
+                info->vx_nn_general_cmd_info.postShift =  exp & 0x1F;
+                info->vx_nn_general_cmd_info.postShiftBit6to5 = (exp >> 5) & 0x3;
+                info->vx_nn_general_cmd_info.postShiftBits7 = (exp >> 7) & 0x1;
+                info->vx_nn_general_cmd_info.postMultiplierSign = (uintScale >> 31) & 0x1;
+            }
+            else
+            {
+                /*V8 post shift no need add 15*/
+                tmpPostShift = 127 - (vx_int8)exp;
+                info->vx_nn_general_cmd_info.postShift = tmpPostShift & 0x1F;
+                tmpPostShift = tmpPostShift >> 5;
+                info->vx_nn_general_cmd_info.postShiftBit6to5 = tmpPostShift & 3;
+                info->vx_nn_general_cmd_info.postShiftBits7 = 0;
+                info->vx_nn_general_cmd_info.postMultiplierSign = 0;
+            }
+
+            if (weights_biases->alpha_ref != VX_NULL &&
+                WB_OPERATION_TYPE(wb) == VX_NN_CONV_PRELU &&
+                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU) &&
+                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT))
+            {
+                vx_uint32 uintClampMin, uintClampMax;
+                getClampMaxAndMin(VX_NN_CONV_PRELU, conv_cmd_ptr->mergedParam, scale, outScale, &uintClampMin, &uintClampMax);
+                info->vx_nn_general_cmd_info.nnClampMin = uintClampMin;
+                info->vx_nn_general_cmd_info.nnClampMax = uintClampMax;
+                vxmASSERT(conv_cmd_ptr->mergedParam.mergedCount != 0);
+            }
+            else if ((WB_OPERATION_TYPE(weights_biases) == VX_NN_CONV_LEAKYRELU) &&
+                (vxoReference_GetType(wb->alpha_ref) == VX_TYPE_SCALAR) &&
+                (!hasNNPerFilterPostMultiply) &&
+                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_LEAKY_RELU))
+            {
+                vx_scalar  negative_slopes   = (vx_scalar)wb->alpha_ref;
+                vx_float32 leakyReluAlpha = negative_slopes->value->f32;
+                vx_uint32 uintClampMin, uintClampMax;
+                getClampMaxAndMin(VX_NN_CONV_LEAKYRELU, conv_cmd_ptr->mergedParam, leakyReluAlpha, outScale, &uintClampMin, &uintClampMax);
+                info->vx_nn_general_cmd_info.nnClampMin = uintClampMin;
+                info->vx_nn_general_cmd_info.nnClampMax = uintClampMax;
+                vxmASSERT(conv_cmd_ptr->mergedParam.mergedCount != 0);
+
+                scale = scale * leakyReluAlpha;
+                uintScale = *((vx_uint32*)(&scale));
+                exp = (uintScale & 0x7F800000) >> 23; /* negPostShift is Scale's exp*/
+
+                if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FLOAT_POST_MULT))
+                {
+                    info->vx_nn_general_cmd_info.negPostShift = exp & 0x7F;
+                    info->vx_nn_general_cmd_info.negPostShiftBits7 = (exp >> 7) & 0x1;
+                    info->vx_nn_general_cmd_info.negPostMultiplierSign = (uintScale >> 31) & 0x1;
+                }
+                else
+                {
+                    info->vx_nn_general_cmd_info.negPostShift = (127 - (vx_int8)exp) & 0x7F;
+                    info->vx_nn_general_cmd_info.negPostShiftBits7 = 0;
+                    info->vx_nn_general_cmd_info.negPostMultiplierSign = (uintScale >> 31) & 0x1;
+                }
+
+                info->vx_nn_general_cmd_info.negPostMultiplier = uintScale & 0x7FFFFF; /* negPostMultiply is 23-bit of Scale's mantissa*/
+                /*leaky relu can't enable per channel*/
+                info->vx_nn_general_cmd_info.nnAluFunction = 0x2;
+                info->vx_nn_general_cmd_info.perChannelPostMul = 0;
+            }
+
+
         }
-        info->vx_nn_general_cmd_info.coefZP = WB_WEIGHT_ZP(weights_biases);
-        info->vx_nn_general_cmd_info.outputZP = outZP;
+
+        if (WB_WEIGHT_QUANT_FORMAT(weights_biases) == VX_QUANT_AFFINE_SCALE && WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_INT8)
+        {
+            info->vx_nn_general_cmd_info.coefZP = WB_WEIGHT_ZP(weights_biases, 0) + 128;
+        }
+        else
+        {
+            info->vx_nn_general_cmd_info.coefZP = WB_WEIGHT_ZP(weights_biases, 0);
+        }
+
+        if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ASYMMETRIC_INT8) && outDataFormat == VX_TYPE_INT8)
+        {
+            info->vx_nn_general_cmd_info.outputZP = outZP + 128;
+        }
+        else
+        {
+            info->vx_nn_general_cmd_info.outputZP = outZP;
+        }
     }
     else if ((inQuantFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ||
              (WB_WEIGHT_QUANT_FORMAT(weights_biases) == VX_QUANT_DYNAMIC_FIXED_POINT) ||
              (outQuantFormat == VX_QUANT_DYNAMIC_FIXED_POINT))
     {
         vx_int8 tmpPostShift = 0;
+
+        /*coefCompressBypass mode, coef zero point reset to 128*/
+        if (coefCompressBypass && WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_INT8)
+        {
+            info->vx_nn_general_cmd_info.coefZP = 128;
+        }
+
+        if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ASYMMETRIC_INT8)
+            && outDataFormat == VX_TYPE_INT8)
+        {
+            info->vx_nn_general_cmd_info.outputZP = 128;
+        }
+
         if (WB_BIAS_TENSOR(weights_biases) != VX_NULL)
         {
             /* fl(in) + fl(weights) == fl(bias) */
@@ -647,20 +1830,39 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
             tmpPostShift += 15;
         }
 
-        if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT) || (context->nnConfig.fixedFeature.nnCoreCountInt16 > 0) || isV8)
+        tmpPostShift = tmpPostShift + inFPP - outFPP + WB_WEIGHT_FPP(weights_biases);
+
+        if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FLOAT_POST_MULT))
         {
-            tmpPostShift = tmpPostShift + inFPP - outFPP + WB_WEIGHT_FPP(weights_biases);
+            tmpPostShift = 127 - tmpPostShift;
+            info->vx_nn_general_cmd_info.postShift = tmpPostShift & 0x1F;
+            info->vx_nn_general_cmd_info.postShiftBit6to5 = (tmpPostShift >> 5) & 0x3;
+            info->vx_nn_general_cmd_info.postShiftBits7 = (tmpPostShift >> 7) & 0x1;
+            info->vx_nn_general_cmd_info.postMultiplierSign = 0;
+        }
+        else if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT) || (context->nnConfig.fixedFeature.nnCoreCountInt16 > 0) || isV8)
+        {
+
             info->vx_nn_general_cmd_info.postShift = tmpPostShift & 0x1F;
             tmpPostShift = tmpPostShift >> 5;
             info->vx_nn_general_cmd_info.postShiftBit6to5 = tmpPostShift & 3;
-        } else
+            info->vx_nn_general_cmd_info.postShiftBits7 = 0;
+            info->vx_nn_general_cmd_info.postMultiplierSign = 0;
+        }
+        else
         {
-            info->vx_nn_general_cmd_info.postShift = tmpPostShift + inFPP - outFPP + WB_WEIGHT_FPP(weights_biases);
+            info->vx_nn_general_cmd_info.postShift = tmpPostShift;
+            info->vx_nn_general_cmd_info.postShiftBit6to5 = 0;
+            info->vx_nn_general_cmd_info.postShiftBits7 = 0;
+            info->vx_nn_general_cmd_info.postMultiplierSign = 0;
         }
     }
     else
     {
         info->vx_nn_general_cmd_info.postShift = 0;
+        info->vx_nn_general_cmd_info.postShiftBit6to5 = 0;
+        info->vx_nn_general_cmd_info.postShiftBits7 = 0;
+        info->vx_nn_general_cmd_info.postMultiplierSign = 0;
     }
 
     if (isV8)
@@ -707,7 +1909,13 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
         }
         else
         {
-            if (conv_cmd_ptr->imageCacheMode == VXNNE_SRAM_CACHE_MODE_FULL_CACHE &&
+            if(!gcoHAL_IsFeatureAvailable(gcvNULL, gcFEATURE_BIT_INIMAGE_2DTILE_NOT_LESS_160PIXEL_FIX) && inImageTileSizeX * inImageTileSizeY <= NN_IMAGE_2D_TILE_LIMITATION)
+            {
+                info->vx_nn_general_cmd_info.imageCachingMode = 0;
+                info->vx_nn_general_cmd_info.imageStartAddress = 0;
+                info->vx_nn_general_cmd_info.imageEndAddress = info->vx_nn_general_cmd_info.imageStartAddress + VX_VIP_SRAM_IMAGE_STREAM_SIZE;
+            }
+            else if (conv_cmd_ptr->imageCacheMode == VXNNE_SRAM_CACHE_MODE_FULL_CACHE &&
                 checkImageCacheMode(info->vx_nn_general_cmd_info.outImageZSize, info->vx_nn_general_cmd_info.kernelsPerCore, nnCoreCount))
             {
                 info->vx_nn_general_cmd_info.imageCachingMode    = 1;
@@ -768,7 +1976,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
                     break;
             }
 
-            vxmASSERT(kernelStreamAlignSize - conv_cmd_ptr->kernelCacheSize > 0);
+            vxmASSERT(kernelStreamAlignSize - conv_cmd_ptr->kernelCacheSize > 0 && vipSramNeed <= conv_cmd_ptr->kernelCacheSize);
 
             vxnneGetPatternBitAndVipSramSizeNeed(ratio,
                 conv_cmd_ptr->kernelCacheSize,
@@ -806,7 +2014,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
                 info->vx_nn_general_cmd_info.partialCacheDataUnit    = partialCacheDataUnit;
 
                 info->vx_nn_general_cmd_info.kernelCacheStartAddress = conv_cmd_ptr->kernelCacheStart;
-                info->vx_nn_general_cmd_info.kernelCacheEndAddress = info->vx_nn_general_cmd_info.kernelCacheStartAddress + vipSramNeed;
+                info->vx_nn_general_cmd_info.kernelCacheEndAddress = info->vx_nn_general_cmd_info.kernelCacheStartAddress + conv_cmd_ptr->kernelCacheSize;;
 
                 vxmASSERT(info->vx_nn_general_cmd_info.kernelCacheEndAddress > info->vx_nn_general_cmd_info.kernelCacheStartAddress);
                 vxmASSERT((info->vx_nn_general_cmd_info.kernelCacheEndAddress - info->vx_nn_general_cmd_info.kernelCacheStartAddress) <= conv_cmd_ptr->kernelCacheSize);
@@ -833,6 +2041,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
             info->vx_nn_general_cmd_info.imageStartAddress = 0;
             info->vx_nn_general_cmd_info.imageEndAddress = 2048;
 
+            info->vx_nn_general_cmd_info.kernelDirectStreamFromVipSram = 0;
             info->vx_nn_general_cmd_info.kernelCachingMode = 0;
             info->vx_nn_general_cmd_info.partialCacheDataUnit = 0;
             info->vx_nn_general_cmd_info.kernelPatternMsb = 0;
@@ -851,12 +2060,11 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
     if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_BORDER_MODE))
     {
         info->vx_nn_general_cmd_info.inImageBorderMode = getHWBorderMode(conv_cmd_ptr->pad_mode, gcvVX_ACCELERATOR_NN);
-        info->vx_nn_general_cmd_info.inImageBorderConst = (inDataFormat == VX_TYPE_INT8) ?
-                                                            (vx_int8)conv_cmd_ptr->pad_const : (vx_int16)conv_cmd_ptr->pad_const;
+        info->vx_nn_general_cmd_info.inImageBorderConst = (inDataFormat == VX_TYPE_INT8) ? (vx_int8)conv_cmd_ptr->pad_const : (vx_int16)conv_cmd_ptr->pad_const;
     }
 
     info->vx_nn_general_cmd_info.inImageBorderMode = 0x0;
-    if ((inQuantFormat == VX_QUANT_AFFINE_SCALE) && (inDataFormat == VX_TYPE_UINT8))
+    if ((inQuantFormat == VX_QUANT_AFFINE_SCALE) && (inDataFormat == VX_TYPE_UINT8 || inDataFormat == VX_TYPE_INT8))
     {
         info->vx_nn_general_cmd_info.inImageBorderConst = inZP;
     }
@@ -914,8 +2122,9 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
     vx_bool again = vx_false_e;
     vx_enum split = split_type;
     vx_uint32 slice, size;
-    vx_uint32 core = tpType != TP_SINGLE_FC ? context->nnConfig.fixedFeature.tpCoreCount :
-                                              context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
+    vx_uint32 slice2 = 1;
+
+    vx_uint32 core = getTPCoreCount(context, tpType);
     vx_bool mult = context->options.enableMultiTP && core > 1;
 
     vx_uint32 inputXSize = input->width;
@@ -956,7 +2165,7 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
         case TP_MAX_POOLING:
         case TP_TENSOR_PAD:
         {
-            slice = !mult || size < core ? 1 : core;
+            slice = !mult ? 1 : gcmMIN(size, core);
             break;
         }
 
@@ -996,13 +2205,15 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
                 {
                     size = inputXSize * inputYSize;
                     outputYSize = inputZSize;
+                    split = TP_SPLIT_X_DIRECTION;
                 }
                 else
                 {
                     size = inputXSize;
                     outputXSize = outputZSize;
+                    split = TP_SPLIT_X_DIRECTION;
                 }
-                slice = !mult ? 1 : gcmMIN(size, core);
+                slice = (!mult || (size == core)) ? 1 : gcmMIN(size, core);
             }
             break;
         }
@@ -1024,24 +2235,66 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
             {
                 size = outputYSize;
             }
-            slice = !mult || size < core ? 1 : core;
+            slice = !mult ? 1 : gcmMIN(size, core);
+            break;
+        }
+
+        case TP_REORG_DEPTH2SPACE:
+        {
+            vxmASSERT(value != VX_NULL);
+            size = inputXSize;
+            slice = !mult ? 1 : gcmMIN(size, core);
+            split = TP_SPLIT_X_DIRECTION;
+            break;
+        }
+
+        case TP_REORG_SPACE2DEPTH:
+        {
+            vxmASSERT(value != VX_NULL);
+            size = inputZSize;
+            slice = !mult ? 1 : gcmMIN(size, core);
+            split = TP_SPLIT_Z_DIRECTION;
             break;
         }
 
         case TP_REORG_SPACE2BATCH:
-        case TP_REORG_BATCH2SPACE:
         {
             vxmASSERT(value != VX_NULL);
             size = inputZSize * value->u32[2];
-            slice = 1;
+            slice = !mult ? 1 : gcmMIN(size, core);
+            split = TP_SPLIT_Z_DIRECTION;
+            break;
+        }
+
+        case TP_REORG_BATCH2SPACE:
+        {
+            vxmASSERT(value != VX_NULL);
+            size = inputXSize;
+            slice = !mult ? 1 : gcmMIN(size, core);
+            split = TP_SPLIT_X_DIRECTION;
             break;
         }
 
         case TP_REORG_SHUFFLECHANNEL:
         {
             vxmASSERT(value != VX_NULL);
-            size = inputZSize * value->u32[2];
-            slice = 1;
+            if (value->u32[4] == 2 || value->u32[4] == 3)
+            {
+                size = inputXSize;
+                slice = !mult ? 1 : gcmMIN(size, core);
+                split = TP_SPLIT_X_DIRECTION;
+            }
+            else if (value->u32[4] == 0 || value->u32[4] == 1)
+            {
+                size = inputZSize * value->u32[2];
+                slice = !mult ? 1 : gcmMIN(size, core);
+                split = TP_SPLIT_Z_DIRECTION;
+            }
+            else
+            {
+                size = inputZSize * value->u32[2];
+                slice = 1;
+            }
             break;
         }
 
@@ -1059,7 +2312,7 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
             else
             {
                 slice = !mult ? 1 : gcmMIN(value->u32[6], core);
-                size = value->u32[6];
+                size = ((parameter)->data_buff)->dims[0]/4;
             }
             break;
         }
@@ -1068,20 +2321,23 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
         case TP_UPSAMPLE_CLIP:
         {
             size = outputZSize;
-            slice = !mult || size < core ? 1 : core;
+            slice = !mult ? 1 : gcmMIN(size, core);
             break;
         }
 
         case TP_TRANSPOSE:
         {
-            vx_uint32 i, x, y, dnum = value->u32[0], dsize;
+            vx_uint32 i, x, y, dnum = value->u32[0], tsize = 1;
             vx_uint32 dims[VX_CONTEXT_TENSOR_MAX_DIMENSION], strides[VX_CONTEXT_TENSOR_MAX_DIMENSION];
             vxmASSERT(otherRef != VX_NULL);
-            vxoTensor_GetTensorDimStride((vx_tensor)otherRef, &dnum, dims, strides);
+            vxoTensor_GetTensorDimStride(otherRef, &dnum, dims, strides);
             vxmASSERT(dims[0] < TP_MAX_XYSIZE && dims[1] < TP_MAX_XYSIZE);
-            dsize = TENSOR_DATA_SIZE((vx_tensor)otherRef);
+            for (i = 0; i < dnum; i++)
+            {
+                tsize *= dims[i];
+            }
             x = dims[0];
-            y = strides[dnum-1] * dims[dnum-1] / dsize / dims[0];
+            y = tsize / dims[0];
             for (i = 1; i < dnum; i++)
             {
                 if (x >= TP_MAX_XYSIZE || y < TP_MAX_XYSIZE)
@@ -1106,43 +2362,83 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
                 }
                 size = dims[i];
                 /* TP X/Y size has max size limitation, must split */
-                y = strides[dnum-1] * dims[dnum-1] / dsize / dims[0];
+                y = tsize / dims[0];
                 slice = gcmALIGN_NP2(y, TP_MAX_XYSIZE-1) / (TP_MAX_XYSIZE-1);
             }
             if (slice == 1 && (dnum == 3 || (dnum == 4 && dims[3] == 1)))
             {
                 vx_uint32_ptr perm = (vx_uint32*)value->p8[0];
-                if (perm[0] == 1 && perm[1] == 0) /* y, x, z */
+
+                if (parameter->tpTransposeSize > 0 && ((!output->sRAM) && (!input->sRAM)) && input->dataFormat == output->dataFormat && (32 * dims[1] * dims[2] <= parameter->tpTransposeSize))
                 {
-                    slice = x * y > 128 && mult ? gcmMIN(dims[2], core) : 1;
-                    size = dims[2];
-                    value->e32[0] = 1;
+                    vx_uint32 splitXCount = 1;
+                    vx_uint32 tempXCount = 0;
+                    size = dims[1];
+                    slice = mult ? gcmMIN(dims[1], core) : 1;
+                    tempXCount = 32 / vxnneGetTypeSize(input->dataFormat);
+                    splitXCount = gcmMAX(dims[0] / tempXCount, 1);
+                    splitXCount = dims[0] % tempXCount == 0 ? dims[0] / tempXCount : dims[0] / tempXCount + 1;
+                    slice2 = splitXCount * slice * 2;
+                    value->u32[1] = slice;
+                    value->u32[2] = splitXCount;
+                    value->u32[3] = splitXCount > 1 ? tempXCount : dims[0];
+                    value->e32[0] = 6;
+                    vxmASSERT(dims[0] / splitXCount * dims[1] * dims[2] * vxnneGetTypeSize(input->dataFormat) < parameter->tpTransposeSize);
+                    /*if outPixel is 1, avert split in X direction or Y direction*/
+                    calculateSplitSize(size, slice, split_size_array, split_offset_array);
+                    if (slice != 1)
+                    {
+                        if (split_size_array[slice-1] * (dims[0] - value->u32[3] * (splitXCount - 1)) * outputZSize == 1)
+                        {
+                            slice = 1;
+                            value->u32[1] = slice;
+                            slice2 = splitXCount * slice * 2;
+                        }
+                    }
+                    else
+                    {
+                        if (dims[1] * (dims[0] - value->u32[3] * (splitXCount - 1)) * outputZSize == 1)
+                        {
+                            value->u32[2] = 1;
+                            value->u32[3] = dims[0];
+                            slice2 = slice * 2;
+                        }
+                    }
                 }
-                else if (perm[0] == 1 && perm[1] == 2) /* y, z, x */ /* use single TP to reduce bandwidth */
+                else
                 {
-                    slice = 1;
-                    size = dims[2];
-                    value->e32[0] = 2;
-                }
+                    if (perm[0] == 1 && perm[1] == 0) /* y, x, z */
+                    {
+                        slice = x * y > 128 && mult ? gcmMIN(dims[2], core) : 1;
+                        size = dims[2];
+                        value->e32[0] = 1;
+                    }
+                    else if (perm[0] == 1 && perm[1] == 2) /* y, z, x */ /* use single TP to reduce bandwidth */
+                    {
+                    slice = context->hwChipInfo.customerID == 0xAE && x * y > 128 && mult ? gcmMIN(dims[2], core) : 1;
+                        size = dims[2];
+                        value->e32[0] = 2;
+                    }
                 else if (context->hwChipInfo.customerID == 0xAE)
-                {
-                    if (perm[0] == 2 && perm[1] == 0) /* z, x, y */
                     {
-                        slice = mult ? gcmMIN(dims[1], core) : 1;
-                        size = dims[1];
-                        value->e32[0] = 3;
-                    }
-                    else if (perm[0] == 2 && perm[1] == 1) /* z, y, x */
-                    {
-                        slice = mult ? gcmMIN(dims[1], core) : 1;
-                        size = dims[1];
-                        value->e32[0] = 4;
-                    }
-                    else if (perm[0] == 0 && perm[1] == 2) /* x, z, y */
-                    {
-                        slice = mult ? gcmMIN(dims[1], core) : 1;
-                        size = dims[1];
-                        value->e32[0] = 5;
+                        if (perm[0] == 2 && perm[1] == 0) /* z, x, y */
+                        {
+                            slice = mult ? gcmMIN(dims[1], core) : 1;
+                            size = dims[1];
+                            value->e32[0] = 3;
+                        }
+                        else if (perm[0] == 2 && perm[1] == 1) /* z, y, x */
+                        {
+                            slice = mult ? gcmMIN(dims[1], core) : 1;
+                            size = dims[1];
+                            value->e32[0] = 4;
+                        }
+                        else if (perm[0] == 0 && perm[1] == 2) /* x, z, y */
+                        {
+                            slice = mult ? gcmMIN(dims[1], core) : 1;
+                            size = dims[1];
+                            value->e32[0] = 5;
+                        }
                     }
                 }
             }
@@ -1155,7 +2451,7 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
             {
                 vxmASSERT(otherRef != VX_NULL);
                 size = input->width * input->height * input->depth;
-                slice = ((vx_weights_biases_parameter)otherRef)->slice_num;
+                slice = WB_TOTAL_SLICE_NUM((vx_weights_biases_parameter)otherRef);
             }
             else
             {
@@ -1208,7 +2504,11 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
         calculateSplitSize(size, slice, split_size_array, split_offset_array);
     }
 
-    *split_count = slice;
+    if (tpType == TP_TRANSPOSE && parameter->tpTransposeSize > 0 && value->e32[0] == 6)
+        *split_count = slice2;
+    else
+
+       *split_count = slice;
 }
 
 #define FILL_TP_COMMAND(context, input, output, param, stype, scount, ssizes, soffsets, sinfoarray, info, NAME) \
@@ -1327,7 +2627,9 @@ void _fill_TP_RESHUFFLE_Command(
         info_array[i].vx_tp_general_cmd_split_info.needReorder = vx_false_e;
 
         if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_REORDER) &&
-            inXSizeTmp <= context->nnConfig.fixedFeature.tpReorderInImageSize)
+            inXSizeTmp <= context->nnConfig.fixedFeature.tpReorderInImageSize &&
+            (gcoHAL_IsFeatureAvailable(gcvNULL, gcFEATURE_TP_REORDER_INTILE_X_SIZE_512_FIX)     /* fix == 1 */
+                || (!gcoHAL_IsFeatureAvailable(gcvNULL, gcFEATURE_TP_REORDER_INTILE_X_SIZE_512_FIX) && inXSizeTmp != TP_REORDER_INTILE_X_SIZE_512)))  /* fix == 0 and inTileX != 512 */
         {
             vx_bool disableTPReorder = vx_false_e;
 
@@ -1419,7 +2721,6 @@ void _fill_TP_RESHUFFLE_Command(
     }
 }
 
-
 void _fill_TP_SINGLE_FC_Command(
     vx_context                  context,
     vxnne_tensor_info           input,
@@ -1447,7 +2748,7 @@ void _fill_TP_SINGLE_FC_Command(
         kzGroup = value_cmd_ptr[i].u32[0];
         if (kzGroup == 1)
         {
-            vxmASSERT(WB_IS_USE_TP_FC(weights_biases));
+            vxmASSERT(WB_IS_TP_COMPRESS(weights_biases));
 
             zOffset = value_cmd_ptr[i].u32[1];
             outZSize = WB_OUTPUT_Z_INDEX(weights_biases, i);
@@ -1492,7 +2793,7 @@ void _fill_TP_SINGLE_FC_Command(
         {
             if (value_cmd_ptr[i].e32[0] == 0)
             {
-                vxmASSERT(WB_IS_USE_TP_FC(weights_biases));
+                vxmASSERT(WB_IS_TP_COMPRESS(weights_biases));
 
                 zOffset = value_cmd_ptr[i].u32[1];
                 kzOffset = value_cmd_ptr[i].u32[2];
@@ -1606,6 +2907,8 @@ void _fill_TP_TRANSPOSE_Command(
     vx_uint32 i, j, dims[VX_CONTEXT_TENSOR_MAX_DIMENSION], distances[VX_CONTEXT_TENSOR_MAX_DIMENSION], strides[VX_CONTEXT_TENSOR_MAX_DIMENSION];
     vx_uint32_ptr perm;
     vx_uint32 pnum;
+    vx_uint32 xSplitSizes[TP_SPLIT_COUNT] = {0};
+    vx_uint32 xSplitOffsets[TP_SPLIT_COUNT] = {0};
     DEFINE_TP_GENERAL_PARAMETER();
 
     vxmASSERT(value_cmd_ptr != VX_NULL);
@@ -1613,17 +2916,13 @@ void _fill_TP_TRANSPOSE_Command(
     perm = (vx_uint32_ptr) value_cmd_ptr->p8[0];
     pnum = value_cmd_ptr->u32[0];
 
-    vxoTensor_GetTensorDimStride((vx_tensor)other_tensor, &pnum, dims, strides);
+    vxoTensor_GetTensorDimStride(other_tensor, &pnum, dims, strides);
     for (i = 0; i < pnum; i++)
     {
         vx_uint32 dim = 1;
         for (j = 0; j < i; j++)
             dim *= dims[perm[j]];
         distances[perm[i]] = dim;
-    }
-
-    for (i = 0; i < TENSOR_DIM_NUM((vx_tensor)other_tensor); i++)
-    {
         totalSize *= dims[i];
     }
 
@@ -1651,16 +2950,252 @@ void _fill_TP_TRANSPOSE_Command(
         {
             if (dims[i] > 1) break;
         }
+        vxmASSERT((vx_int32)i >=0);
         pnum = i + 1;
+        totalSize = 1;
+        for (i = 0; i < pnum - 1; i++)
+        {
+            totalSize *= dims[i];
+        }
+    }
+
+    if (parameter->tpTransposeSize > 0 && ((!output->sRAM) && (!input->sRAM)) && value_cmd_ptr->e32[0] == 6)
+    {
+        vx_uint32 i = 0;
+        for(i = 0; i < value_cmd_ptr->u32[2]; ++i)
+        {
+            if(i == value_cmd_ptr->u32[2] - 1)
+            {
+                xSplitOffsets[i] = i == 0 ? 0 : xSplitOffsets[i-1] + xSplitSizes[i-1];
+                xSplitSizes[i] = dims[0] - xSplitOffsets[i];
+            }
+            else
+            {
+                xSplitOffsets[i] = (i == 0 ? 0 : xSplitOffsets[i-1] + xSplitSizes[i-1]);
+                xSplitSizes[i] = value_cmd_ptr->u32[3];
+            }
+        }
     }
 
     for (i = 0; i < split_count; i++)
     {
-        if (split_count > 1 && value_cmd_ptr->e32[0] == 0)
+        if (parameter->tpTransposeSize > 0 && ((!output->sRAM) && (!input->sRAM)) && value_cmd_ptr->e32[0] == 6)
         {
-            inYSizeNew = totalSize / dims[0] * split_sizes[i];
+            vx_uint32 multiTPCount = value_cmd_ptr->u32[1];
+
+            vx_uint32 xSize = xSplitSizes[i / (multiTPCount * 2)];
+            vx_uint32 xOffset = xSplitOffsets[i / (multiTPCount * 2)] ;
+            vx_uint32 ii = i % multiTPCount;
+            vx_uint32 bufferSize = parameter->tpTransposeSize;/*xSize * inYSize * inZSize;*/
+
+            if (i % (multiTPCount * 2) < multiTPCount) /* transpose from ddr to sram */
+            {
+                vx_uint32 inXSizeT = xSize, inYSizeT = split_sizes[ii], inZSizeT = inZSize;
+                vx_uint32 outTileX = 0, outTileY = 0/*, outTileZ = 0*/;
+                vx_uint32 outYStrideT = perm[0] == 2 && perm[1] == 0 ? xSize * inZSize : perm[0] == 2 && perm[1] == 1 ? inZSize * outputElemSize : outputElemSize;
+                vx_uint32 outZStrideT = 0;
+                vx_uint32 inputOffset = 0, outputOffset = 0;
+                vx_uint32 inc[3] = {0}, loopCount[3] = {0};
+                /*vx_uint32 outZDistance = perm[0] == 1 && perm[1] == 0 ? distances[2] / xSplit : distances[2];*/
+
+                inputBase = input->physical.start + xOffset * inputElemSize;
+                outputBase = parameter->tpTransposeStart;
+                inputOffset = inYStride * split_offsets[ii];
+
+                if(perm[0] == 2 && perm[1] == 0)
+                {
+                    outTileX = inZSizeT;
+                    outTileY = inXSizeT;
+                    /*outTileZ = inYSizeT;*/
+                    outYStrideT = outTileX * outputElemSize;
+                    outZStrideT = outYStrideT * outTileY;
+                    outputOffset = outZStrideT * split_offsets[ii];
+                    inc[0] = outTileX;
+                    inc[1] = outZStrideT/outputElemSize;
+                    inc[2] = 1;
+                    loopCount[0] = inXSizeT;
+                    loopCount[1] = inYSizeT;
+                    loopCount[2] = inZSizeT;
+                }
+                else if(perm[0] == 1 && perm[1] == 0)
+                {
+                    outTileX = inYSizeT;
+                    outTileY = inXSizeT;
+                    /*outTileZ = inZSizeT;*/
+                    outYStrideT = dims[1] * outputElemSize;
+                    outZStrideT = outYStrideT * outTileY ;
+                    outputOffset = split_offsets[ii] * outputElemSize;
+                    inc[0] = outYStrideT/outputElemSize;
+                    inc[1] = 1;
+                    inc[2] = outZStrideT/outputElemSize;
+                    loopCount[0] = inXSizeT;
+                    loopCount[1] = inYSizeT;
+                    loopCount[2] = inZSizeT;
+                }
+                else if(perm[0] == 2 && perm[1] == 1)
+                {
+                    outTileX = inZSizeT;
+                    outTileY = inYSizeT;
+                    /*outTileZ = inXSizeT;*/
+                    outYStrideT = dims[2] * outputElemSize;
+                    outZStrideT = outYStrideT * dims[1];
+                    outputOffset = outYStrideT * split_offsets[ii];
+                    inc[0] = outZStrideT/outputElemSize;
+                    inc[1] = outTileX;
+                    inc[2] = 1;
+                    loopCount[0] = inXSizeT;
+                    loopCount[1] = inYSizeT;
+                    loopCount[2] = inZSizeT;
+                }
+                else if(perm[0] == 1 && perm[1] == 2)
+                {
+                    outTileX = inYSizeT;
+                    outTileY = inZSizeT;
+                    /*outTileZ = inXSizeT;*/
+                    outYStrideT = dims[1] * outputElemSize;
+                    outZStrideT = outTileY * outYStrideT;
+                    outputOffset = split_offsets[ii] * outputElemSize;
+                    inc[0] = outZStrideT/outputElemSize;
+                    inc[1] = 1;
+                    inc[2] = outYStrideT/outputElemSize;
+                    loopCount[0] = inXSizeT;
+                    loopCount[1] = inYSizeT;
+                    loopCount[2] = inZSizeT;
+                }
+
+                info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inputOffset;
+                info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + outputOffset;
+                info_array[i].vx_tp_general_cmd_split_info.inImageXSize   = inXSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inImageYSize   = inYSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inImageZSize   = inZSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inImageStride  = inYStride / inputElemSize;
+                info_array[i].vx_tp_general_cmd_split_info.inImageSlice   = inZStride / inputElemSize;
+                info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = 0;
+                info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = 0;
+                info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd   = inXSizeT - 1;
+                info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd   = inYSizeT - 1;
+                info_array[i].vx_tp_general_cmd_split_info.inTileXSize    = inXSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inTileYSize    = inYSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inTileXInc     = inXSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inTileYInc     = inYSizeT;
+
+                info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = inc[0];
+                info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = loopCount[0];
+                info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = 1;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = inc[1];
+                info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = loopCount[1];
+                info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = inc[2];
+                info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = loopCount[2];
+                info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = 1;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = 1;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = 0;
+
+                info_array[i].vx_tp_general_cmd_split_info.inImageCircularBufSize = 0;
+                info_array[i].vx_tp_general_cmd_split_info.inImageCircularBufEndAddrPlus1 = 0xFFFFFFFF;
+                info_array[i].vx_tp_general_cmd_split_info.outImageCircularBufSize = bufferSize;
+                info_array[i].vx_tp_general_cmd_split_info.outImageCircularBufEndAddrPlus1 = outputBase + info_array[i].vx_tp_general_cmd_split_info.outImageCircularBufSize;
+            }
+            else /* copy from sram to ddr */
+            {
+                vx_uint32 inXSizeT = 0, inYSizeT = 0, inZSizeT = 0, inYStrideT = 0, inZStrideT = 0, outYStrideT = 0, outZStrideT = 0, multiInOffset = 0, multiOutOffset = 0;
+                inputBase = parameter->tpTransposeStart;
+                outputBase = output->physical.start + xOffset * distances[0] * outputElemSize;
+
+                if (perm[0] == 1 && perm[1] == 0) /* x y z -> y x z */
+                {
+                    inXSizeT = split_sizes[ii];
+                    inYSizeT = xSize;
+                    inZSizeT = dims[2];
+                    inYStrideT = dims[1] * outputElemSize;
+                    inZStrideT = dims[1] * xSize * outputElemSize;
+                    multiInOffset = outputElemSize * split_offsets[ii];
+                    outYStrideT = dims[1] * outputElemSize;
+                    outZStrideT = dims[1] * dims[0] * outputElemSize;
+                    multiOutOffset = outputElemSize * split_offsets[ii];
+                }
+                else if (perm[0] == 1 && perm[1] == 2) /* x y z -> y z x */
+                {
+                    inXSizeT = split_sizes[ii];
+                    inYSizeT = dims[2];
+                    inZSizeT = xSize;
+                    inYStrideT = dims[1] * outputElemSize;
+                    inZStrideT = dims[1] * dims[2] * outputElemSize;
+                    multiInOffset = outputElemSize * split_offsets[ii];
+                    outYStrideT = dims[1] * outputElemSize;
+                    outZStrideT = dims[1] * dims[2] * outputElemSize;
+                    multiOutOffset = outputElemSize * split_offsets[ii];
+                }
+                else if (perm[0] == 2 && perm[1] == 1) /* x y z -> z y x */
+                {
+                    inXSizeT = dims[2];
+                    inYSizeT = split_sizes[ii];
+                    inZSizeT = xSize;
+                    inYStrideT = dims[2] * outputElemSize;
+                    inZStrideT = dims[2] * dims[1] * outputElemSize;
+                    multiInOffset = inYStrideT * split_offsets[ii];
+                    outYStrideT = dims[2] * outputElemSize;
+                    outZStrideT = dims[2] * dims[1] * outputElemSize;
+                    multiOutOffset = outYStrideT * split_offsets[ii];
+                }
+                else if(perm[0] == 2 && perm[1] == 0 && perm[2] == 1) /* x y z -> z x y */
+                {
+                    inXSizeT = dims[2];
+                    inYSizeT = xSize;
+                    inZSizeT = split_sizes[ii];
+                    inYStrideT = dims[2] * outputElemSize;
+                    inZStrideT = dims[2] * xSize * outputElemSize;
+                    multiInOffset = inZStrideT * split_offsets[ii];
+                    outYStrideT = dims[2] * outputElemSize;
+                    outZStrideT = dims[2] * dims[0] * outputElemSize;
+                    multiOutOffset = outZStrideT * split_offsets[ii];
+                }
+
+                info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + multiInOffset;
+                info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + multiOutOffset;
+                info_array[i].vx_tp_general_cmd_split_info.inImageXSize   = inXSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inImageYSize   = inYSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inImageZSize   = inZSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inImageStride  = inYStrideT / outputElemSize;
+                info_array[i].vx_tp_general_cmd_split_info.inImageSlice   = inZStrideT / outputElemSize;
+                info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = 0;
+                info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = 0;
+                info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd   = inXSizeT - 1;
+                info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd   = inYSizeT - 1;
+                info_array[i].vx_tp_general_cmd_split_info.inTileXSize    = inXSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inTileYSize    = inYSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inTileXInc     = inXSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inTileYInc     = inYSizeT;
+
+                info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = 1;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = inXSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = 1;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = outYStrideT / outputElemSize;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = inYSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = outZStrideT / outputElemSize;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = inZSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = 1;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = 1;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = 0;
+
+                info_array[i].vx_tp_general_cmd_split_info.inImageCircularBufSize = bufferSize;
+                info_array[i].vx_tp_general_cmd_split_info.inImageCircularBufEndAddrPlus1 = inputBase + info_array[i].vx_tp_general_cmd_split_info.inImageCircularBufSize;
+                info_array[i].vx_tp_general_cmd_split_info.outImageCircularBufSize = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outImageCircularBufEndAddrPlus1 = 0xFFFFFFFF;
+            }
         }
-        vxmASSERT(inXSizeNew < TP_MAX_XYSIZE && inYSizeNew < TP_MAX_XYSIZE);
+        else
 
         if (value_cmd_ptr->e32[0] == 1)
         {
@@ -1841,6 +3376,12 @@ void _fill_TP_TRANSPOSE_Command(
         }
         else
         {
+            if (split_count > 1)
+            {
+                inYSizeNew = totalSize / dims[0] * split_sizes[i];
+            }
+            vxmASSERT(inXSizeNew < TP_MAX_XYSIZE && inYSizeNew < TP_MAX_XYSIZE);
+
             info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + strides[pnum-1] * split_offsets[i];
             info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + distances[pnum-1] * split_offsets[i] * outputElemSize;
             info_array[i].vx_tp_general_cmd_split_info.inImageXSize   = inXSizeNew;
@@ -1873,8 +3414,14 @@ void _fill_TP_TRANSPOSE_Command(
             info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = split_count > 1 && pnum == 5 ? split_sizes[i] : pnum > 4 ? dims[4] : 1;
             info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = pnum > 5 ? distances[5] : 0;
         }
-
-        info_array[i].vx_tp_general_cmd_split_info.noFlush = (i == split_count - 1 ? 0 : 1);
+        if (value_cmd_ptr->e32[0] == 6)
+        {
+            info_array[i].vx_tp_general_cmd_split_info.noFlush = (i % parameter->tp_value->u32[1] == parameter->tp_value->u32[1] - 1 ? 0 : 1);
+        }
+        else
+        {
+            info_array[i].vx_tp_general_cmd_split_info.noFlush = (i == split_count - 1 ? 0 : 1);
+        }
         info_array[i].vx_tp_general_cmd_split_info.last = 1;
     }
 }
@@ -2301,13 +3848,13 @@ void _fill_TP_ROI_POOLING_Command(
         {
             vx_uint32 proposalsInterleaved, zTogether;
             vx_tensor inputTensor = (vx_tensor)other_tensor;
-
+            vx_uint32 physical = 0;
             vxmASSERT(data_buff != VX_NULL);
 
             inXSize = TENSOR_VIEW_SIZE_INDEX(inputTensor, 0);
             inYSize = TENSOR_VIEW_SIZE_INDEX(inputTensor, 1);
             inZSize = TENSOR_VIEW_SIZE_INDEX(inputTensor, 2);
-
+            vxoTensor_GetTensorViewMemory(data_buff, VX_NULL, &physical);
             proposalsInterleaved = 1;
             zTogether = 1;
 
@@ -2322,7 +3869,7 @@ void _fill_TP_ROI_POOLING_Command(
             info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = inXSize - 1;
             info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x2;
             info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase;
-            info_array[i].vx_tp_general_cmd_split_info.inTileListAddress = data_buff->tensorBuffer->memory.physicals[0] + split_offsets[i] * sizeof(vx_tp_roi_pool);
+            info_array[i].vx_tp_general_cmd_split_info.inTileListAddress = physical + split_offsets[i] * sizeof(vx_tp_roi_pool);
             info_array[i].vx_tp_general_cmd_split_info.inTileXSize = poolHeight;
             info_array[i].vx_tp_general_cmd_split_info.inTileYSize = poolWidth;
             info_array[i].vx_tp_general_cmd_split_info.inTileXInc = zTogether;
@@ -2442,24 +3989,24 @@ void _fill_TP_REORG_DEPTH2SPACE_Command(
 
     for (i = 0; i < split_count; i++)
     {
-        info_array[i].vx_tp_general_cmd_split_info.inImageXSize = inXSize;
+        info_array[i].vx_tp_general_cmd_split_info.inImageXSize = split_sizes[i];
         info_array[i].vx_tp_general_cmd_split_info.inImageYSize = inYSize;
-        info_array[i].vx_tp_general_cmd_split_info.inImageZSize = split_sizes[i];
+        info_array[i].vx_tp_general_cmd_split_info.inImageZSize = inZSize;
         info_array[i].vx_tp_general_cmd_split_info.inImageStride = inXSize;
         info_array[i].vx_tp_general_cmd_split_info.inImageSlice = inXSize * inYSize;
         info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = 0;
         info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = 0;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = inXSize - 1;
+        info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = split_sizes[i] - 1;
         info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = inYSize - 1;
         info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
-        info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inXSize * inYSize * split_offsets[i] * inputElemSize;
+        info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + split_offsets[i] * inputElemSize;
         info_array[i].vx_tp_general_cmd_split_info.inTileXSize = inXSize;
         info_array[i].vx_tp_general_cmd_split_info.inTileYSize = inYSize;
         info_array[i].vx_tp_general_cmd_split_info.inTileXInc = inXSize;
         info_array[i].vx_tp_general_cmd_split_info.inTileYInc = inYSize;
-        info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + outXSize * outYSize * split_offsets[i] * outputElemSize;
+        info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + blockSize * split_offsets[i] * outputElemSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = blockSize;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = inXSize;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = split_sizes[i];
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = outXSize * blockSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = inYSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 0;
@@ -2649,24 +4196,24 @@ void _fill_TP_REORG_BATCH2SPACE_Command(
 
     for (i = 0; i < split_count; i++)
     {
-        info_array[i].vx_tp_general_cmd_split_info.inImageXSize = inXSize;
+        info_array[i].vx_tp_general_cmd_split_info.inImageXSize = split_sizes[i];
         info_array[i].vx_tp_general_cmd_split_info.inImageYSize = inYSize;
-        info_array[i].vx_tp_general_cmd_split_info.inImageZSize = split_sizes[i];
+        info_array[i].vx_tp_general_cmd_split_info.inImageZSize = inZSize * inNSize;
         info_array[i].vx_tp_general_cmd_split_info.inImageStride = inXSize;
         info_array[i].vx_tp_general_cmd_split_info.inImageSlice = inXSize * inYSize;
         info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = 0;
         info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = 0;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = inXSize - 1;
+        info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = split_sizes[i] - 1;
         info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = inYSize - 1;
         info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
-        info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inXSize * inYSize * split_offsets[i] * inputElemSize;
+        info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + split_offsets[i] * inputElemSize;
         info_array[i].vx_tp_general_cmd_split_info.inTileXSize = inXSize;
         info_array[i].vx_tp_general_cmd_split_info.inTileYSize = inYSize;
         info_array[i].vx_tp_general_cmd_split_info.inTileXInc = inXSize;
         info_array[i].vx_tp_general_cmd_split_info.inTileYInc = inYSize;
-        info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + outXSize * outYSize * split_offsets[i] * outputElemSize;
+        info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + blockWidth * split_offsets[i] * outputElemSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = blockWidth;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = inXSize;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = split_sizes[i];
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = outXSize * blockHeight;
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = inYSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 0;
@@ -2704,7 +4251,6 @@ void _fill_TP_REORG_SHUFFLECHANNEL_Command(
     vx_uint32 i;
     vx_uint32 num_group, group_size, axis;
     vx_uint32 inNSize, outNSize;
-    vx_uint32 z_offset, n_offset, col, line;
     DEFINE_TP_GENERAL_PARAMETER();
 
     vxmASSERT(value_cmd_ptr != VX_NULL);
@@ -2804,28 +4350,24 @@ void _fill_TP_REORG_SHUFFLECHANNEL_Command(
         else if (axis == 2)
         {
             group_size = inZSize / num_group;
-            z_offset = split_offsets[i] % outZSize;
-            n_offset = split_offsets[i] / outZSize;
-            col = z_offset % group_size;
-            line = z_offset / group_size;
-            info_array[i].vx_tp_general_cmd_split_info.inImageXSize = inXSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageXSize = split_sizes[i];
             info_array[i].vx_tp_general_cmd_split_info.inImageYSize = inYSize;
-            info_array[i].vx_tp_general_cmd_split_info.inImageZSize = split_sizes[i];
+            info_array[i].vx_tp_general_cmd_split_info.inImageZSize = inZSize * inNSize;
             info_array[i].vx_tp_general_cmd_split_info.inImageStride = inXSize;
             info_array[i].vx_tp_general_cmd_split_info.inImageSlice = inXSize * inYSize;
             info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = 0;
             info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = 0;
-            info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = inXSize - 1;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = split_sizes[i] - 1;
             info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = inYSize - 1;
             info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
-            info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inXSize * inYSize * split_offsets[i] * inputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + split_offsets[i] * inputElemSize;
             info_array[i].vx_tp_general_cmd_split_info.inTileXSize = inXSize;
             info_array[i].vx_tp_general_cmd_split_info.inTileYSize = inYSize;
             info_array[i].vx_tp_general_cmd_split_info.inTileXInc = inXSize;
             info_array[i].vx_tp_general_cmd_split_info.inTileYInc = inYSize;
-            info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + ((n_offset * outZSize + col * num_group + line) * outXSize * outYSize) * outputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + split_offsets[i] * outputElemSize;
             info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = 1;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = outXSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = split_sizes[i];
             info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = outXSize;
             info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = outYSize;
             info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 0;
@@ -2847,27 +4389,24 @@ void _fill_TP_REORG_SHUFFLECHANNEL_Command(
         else if (axis ==3)
         {
             group_size = inNSize / num_group;
-            n_offset = split_offsets[i] / outZSize;
-            col = n_offset % group_size;
-            line = n_offset / group_size;
-            info_array[i].vx_tp_general_cmd_split_info.inImageXSize = inXSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageXSize = split_sizes[i];
             info_array[i].vx_tp_general_cmd_split_info.inImageYSize = inYSize;
-            info_array[i].vx_tp_general_cmd_split_info.inImageZSize = split_sizes[i];
+            info_array[i].vx_tp_general_cmd_split_info.inImageZSize = inZSize * inNSize;
             info_array[i].vx_tp_general_cmd_split_info.inImageStride = inXSize;
             info_array[i].vx_tp_general_cmd_split_info.inImageSlice = inXSize * inYSize;
             info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = 0;
             info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = 0;
-            info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = inXSize - 1;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = split_sizes[i] - 1;
             info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = inYSize - 1;
             info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
-            info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inXSize * inYSize * split_offsets[i] * inputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + split_offsets[i] * inputElemSize;
             info_array[i].vx_tp_general_cmd_split_info.inTileXSize = inXSize;
             info_array[i].vx_tp_general_cmd_split_info.inTileYSize = inYSize;
             info_array[i].vx_tp_general_cmd_split_info.inTileXInc = inXSize;
             info_array[i].vx_tp_general_cmd_split_info.inTileYInc = inYSize;
-            info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + (col * num_group + line) * outXSize * outYSize * outZSize * outputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + split_offsets[i] * outputElemSize;
             info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = 1;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = outXSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = split_sizes[i];
             info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = outXSize;
             info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = outYSize;
             info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 0;
@@ -3042,18 +4581,18 @@ void _fill_TP_REVERSE_Command(
         info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + outOffset;
         info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = reverseArray[0] ? -1 : 1;
         info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = dims[0];
-        info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = dim < 2 ? 0 : strides[1] / inputElemSize * (reverseArray[1] ? -1 : 1);
+        info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = dim < 2 ? 0 : strides[1] / outputElemSize * (reverseArray[1] ? -1 : 1);
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = dim < 2 ? 1 : dims[1];
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = dim < 3 ? 0 : strides[2] / inputElemSize * (reverseArray[2] ? -1 : 1);
+        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = dim < 3 ? 0 : strides[2] / outputElemSize * (reverseArray[2] ? -1 : 1);
         info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = dim < 3 ? 1 : dims[2];
         info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = dim < 4 ? 0 : strides[3] / inputElemSize * (reverseArray[3] ? -1 : 1);
+        info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = dim < 4 ? 0 : strides[3] / outputElemSize * (reverseArray[3] ? -1 : 1);
         info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = dim < 4 ? 1 : dims[3];
         info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = dim < 5 ? 0 : strides[4] / inputElemSize * (reverseArray[4] ? -1 : 1);
+        info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = dim < 5 ? 0 : strides[4] / outputElemSize * (reverseArray[4] ? -1 : 1);
         info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = dim < 5 ? 1 : dims[4];
-        info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = dim < 6 ? 0 : strides[5] / inputElemSize * (reverseArray[5] ? -1 : 1);
+        info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = dim < 6 ? 0 : strides[5] / outputElemSize * (reverseArray[5] ? -1 : 1);
         info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = dim < 6 ? 1 : dims[5];
         info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = 0;
 
@@ -3089,8 +4628,8 @@ void _fill_TP_UPSAMPLE_Command(
         info_array[i].vx_tp_general_cmd_split_info.inImageXSize        = inXSize;
         info_array[i].vx_tp_general_cmd_split_info.inImageYSize        = inYSize;
         info_array[i].vx_tp_general_cmd_split_info.inImageZSize        = split_sizes[i] * strideX * strideY;
-        info_array[i].vx_tp_general_cmd_split_info.inImageStride       = inXSize;
-        info_array[i].vx_tp_general_cmd_split_info.inImageSlice        = inXSize * inYSize;
+        info_array[i].vx_tp_general_cmd_split_info.inImageStride       = inYStride/inputElemSize;
+        info_array[i].vx_tp_general_cmd_split_info.inImageSlice        = inZStride/inputElemSize;
         info_array[i].vx_tp_general_cmd_split_info.inWindowXStart      = 0;
         info_array[i].vx_tp_general_cmd_split_info.inWindowYStart      = 0;
         info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd        = inXSize - 1;
@@ -3110,7 +4649,7 @@ void _fill_TP_UPSAMPLE_Command(
         info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc         = inXSize * strideX;
         info_array[i].vx_tp_general_cmd_split_info.outLoop3Count       = strideY;
         info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset       = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc         = outXSize * outYSize;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc         = outZStride/outputElemSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop4Count       = outZSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc         = 0;
         info_array[i].vx_tp_general_cmd_split_info.outLoop5Count       = 1;
@@ -3191,12 +4730,15 @@ void _fill_TP_DILATE_UPSAMPLE_Command(
     )
 {
     vx_uint32 i;
-    vx_int32 dilationX, dilationY, stride = 1;
+    vx_uint32 dilationX, dilationY, stride = 1;
     vx_uint32 batch;
+    vx_uint32 strideY = 0;
+
     DEFINE_TP_GENERAL_PARAMETER();
 
-    dilationX = outXSize/inXSize;
-    dilationY = outYSize/inYSize;
+    dilationX = parameter->tp_value->u32[1];
+    strideY = parameter->tp_value->u32[2];
+    dilationY = (vx_uint32)parameter->dilationY;
     batch = dilationX * dilationY;
 
     for (i = 0; i < split_count; i++)
@@ -3218,10 +4760,10 @@ void _fill_TP_DILATE_UPSAMPLE_Command(
         info_array[i].vx_tp_general_cmd_split_info.inTileYInc          = 1;
         info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc         = dilationX;
         info_array[i].vx_tp_general_cmd_split_info.outLoop0Count       = inXSize;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc         = inXSize * dilationX * dilationY;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc         = inXSize * dilationX * strideY;
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Count       = inYSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset       = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc         = (batch > 1)?(inXSize * dilationX * inYSize * dilationY):stride;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc         = (batch > 1)?(inXSize * dilationX * inYSize * strideY):stride;
         info_array[i].vx_tp_general_cmd_split_info.outLoop2Count       = (batch > 1)?inZSize:dilationX;
         info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset       = 0;
         info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc         = (batch > 1)?1:(inXSize * dilationX);
@@ -3307,12 +4849,14 @@ void _fill_TP_DILATE_RESHUFFLE_Command(
     )
 {
     vx_uint32 i;
-    vx_scalar dilationX;
-    vx_int32 dilate;
+    vx_uint32 dilationX, dilationY;
+    vx_uint32 orgoutZSize = 0;
+
     DEFINE_TP_GENERAL_PARAMETER();
 
-    dilationX = (vx_scalar)other_tensor;
-    dilate = dilationX->value->n32 + 1;
+    dilationX = (vx_uint32)parameter->dilationX;
+    dilationY = (vx_uint32)parameter->dilationY;
+    orgoutZSize = parameter->tp_value->u32[0];
 
     for (i = 0; i < split_count; i++)
     {
@@ -3325,19 +4869,19 @@ void _fill_TP_DILATE_RESHUFFLE_Command(
         info_array[i].vx_tp_general_cmd_split_info.inImageSlice        = inXSize * inYSize;
         info_array[i].vx_tp_general_cmd_split_info.inWindowXStart      = 0;
         info_array[i].vx_tp_general_cmd_split_info.inWindowYStart      = 0;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd        = outXSize * dilate - 1;//inXSize - 1;/**/
-        info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd        = outYSize * dilate - 1;//inYSize - 1;/**/
+        info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd        = outXSize * dilationX - 1;/*inXSize - 1;*/
+        info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd        = outYSize * dilationY - 1;/*inYSize - 1;*/
         info_array[i].vx_tp_general_cmd_split_info.inTileXSize         = 1;
         info_array[i].vx_tp_general_cmd_split_info.inTileYSize         = 1;
         info_array[i].vx_tp_general_cmd_split_info.inTileXInc          = 1;
         info_array[i].vx_tp_general_cmd_split_info.inTileYInc          = 1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc         = outXSize * outYSize * inZSize;/* 4*4*21=336 */
-        info_array[i].vx_tp_general_cmd_split_info.outLoop0Count       = dilate;/* 6 */
+        info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc         = outXSize * outYSize * orgoutZSize;/* 4*4*21=336 */
+        info_array[i].vx_tp_general_cmd_split_info.outLoop0Count       = dilationX;/* 6 */
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc         = 1;
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Count       = outXSize;/* 4 * 4 */
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset       = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc         = outXSize * outYSize * inZSize * dilate;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Count       = dilate;/* 6 */
+        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc         = outXSize * outYSize * orgoutZSize * dilationX;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop2Count       = dilationY;/* 6 */
         info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset       = 0;
         info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc         = outXSize;/* 4 */
         info_array[i].vx_tp_general_cmd_split_info.outLoop3Count       = outYSize * inZSize;/* 21 */
@@ -3487,9 +5031,6 @@ void _fill_TP_TENSOR_COPY_Command(
         info_array[i].vx_tp_general_cmd_split_info.last = 1;
     }
 }
-
-
-
 void _fill_TP_TENSOR_PAD_Command(
     vx_context                  context,
     vxnne_tensor_info           input,
@@ -3508,6 +5049,10 @@ void _fill_TP_TENSOR_PAD_Command(
 
     for (i = 0; i < split_count; i++)
     {
+        vx_int32 z_front_offset = (i == 0 && parameter->pad_z_front != 0)?(parameter->pad_z_front):0;
+        vx_int32 z_back_offset = (i == (split_count - 1) && parameter->pad_z_back != 0)?(parameter->pad_z_back):0;
+        vx_int32 z_out_offset = (i != 0 && parameter->pad_z_front != 0)?(parameter->pad_z_front * outZStride):0;
+
         info_array[i].vx_tp_general_cmd_split_info.inImageXSize = inXSize;
         info_array[i].vx_tp_general_cmd_split_info.inImageYSize = inYSize;
         info_array[i].vx_tp_general_cmd_split_info.inImageZSize = split_sizes[i];
@@ -3519,11 +5064,13 @@ void _fill_TP_TENSOR_PAD_Command(
         info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = info_array[i].vx_tp_general_cmd_split_info.inWindowYStart + outYSize - 1;
         info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
         info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inZStride * split_offsets[i];
+        info_array[i].vx_tp_general_cmd_split_info.inWindowZStartOverfetch2 = z_front_offset;
+        info_array[i].vx_tp_general_cmd_split_info.inWindowZEndOverfetch2 = z_back_offset;
         info_array[i].vx_tp_general_cmd_split_info.inTileXSize = outXSize;
         info_array[i].vx_tp_general_cmd_split_info.inTileYSize = outYSize;
         info_array[i].vx_tp_general_cmd_split_info.inTileXInc = outXSize;
         info_array[i].vx_tp_general_cmd_split_info.inTileYInc = outYSize;
-        info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + outZStride * split_offsets[i];
+        info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + outZStride * split_offsets[i] + z_out_offset;
         info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = 0;
         info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = 1;
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = 1;
@@ -3964,8 +5511,8 @@ _CalculateSplitSizes(vxnne_tensor_info input,
     vx_uint32 input_pitch_y = input->zStride / input->yStride;
     vx_uint32 output_pitch_x;
     vx_uint32 output_pitch_y = output->zStride / output->yStride;
-    vx_uint32 inferred_input_size_x, inferred_input_size_y;
-    vx_uint32 pad_left/*, pad_right*/, pad_top/*, pad_bottom*/;
+    /*vx_uint32 inferred_input_size_x, inferred_input_size_y;*/
+    vx_uint32 pad_left,/* pad_right,*/ pad_top/*, pad_bottom*/;
     vx_uint32 index, last_x_index, last_y_index, last_z_index;
     vx_uint32 x_sizes[MAX_TP_SPLIT_XY_NUM], x_offsets[MAX_TP_SPLIT_XY_NUM], y_sizes[MAX_TP_SPLIT_XY_NUM], y_offsets[MAX_TP_SPLIT_XY_NUM], z_sizes[MAX_TP_SPLIT_XY_NUM], z_offsets[MAX_TP_SPLIT_XY_NUM];
 
@@ -3987,16 +5534,11 @@ _CalculateSplitSizes(vxnne_tensor_info input,
                                     WB_ORG_KERNEL_Y(weights_biases) == 1;
     }
 
-    inferred_input_size_x = output->width * stride_x;
-    inferred_input_size_y = output->height * stride_y;
+    /*inferred_input_size_x = output->width * stride_x;*/
+    /*inferred_input_size_y = output->height * stride_y;*/
 
     pad_left = parameter->pad_x_left;
     pad_top = parameter->pad_y_top;
-    /*pad_right = (inferred_input_size_x > parameter->pad_x_left + input->width) ?
-                inferred_input_size_x - (parameter->pad_x_left + input->width) : 0;
-    pad_bottom = (inferred_input_size_y > parameter->pad_y_top + input->height) ?
-                 inferred_input_size_y - (parameter->pad_y_top + input->height) : 0;*/
-
     calculateSplitSize(output->width, div_x, x_sizes, x_offsets);
     calculateSplitSize(output->height, div_y, y_sizes, y_offsets);
     calculateSplitSize(output->depth / stride_x / stride_y, div_z, z_sizes, z_offsets);
@@ -4165,6 +5707,9 @@ _CalculateSplitSizes(vxnne_tensor_info input,
     return VX_SUCCESS;
 }
 
+#define MIN_TP_UNIT_INIMAGE_X  16
+#define MIN_TP_UNIT_OUTIMAGE_X 16
+
 VX_PRIVATE_API vx_status _SplitInputAndOutputForMultiTPCores(vx_context context,
                                     vxnne_tensor_info input,
                                     vxnne_tensor_info output,
@@ -4185,8 +5730,8 @@ VX_PRIVATE_API vx_status _SplitInputAndOutputForMultiTPCores(vx_context context,
     vx_uint32 output_size_z = output->depth;
 
     vx_uint32 num_slice;
-    vx_uint32 core = tp_type != TP_SINGLE_FC ? context->nnConfig.fixedFeature.tpCoreCount :
-                                               context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
+    vx_uint32 core = getTPCoreCount(context, tp_type);
+
     vx_bool mult = context->options.enableMultiTP && core > 1;
     vx_uint32 pad_left = parameter->pad_x_left;
     vx_uint32 pad_top = parameter->pad_y_top;
@@ -4214,6 +5759,9 @@ VX_PRIVATE_API vx_status _SplitInputAndOutputForMultiTPCores(vx_context context,
         case TP_TENSOR_COPY:
         case TP_TENSOR_COPY4CONCAT:
         {
+            vx_uint32 unit_input_size_x, unit_output_size_x;
+            vx_bool check_x;
+
             /* Don't split if the size is too small. */
             if (mult && (output_size_x * output_size_y * output_size_z) > MULTI_TP_RESHUFFLE_SIZE)
             {
@@ -4223,6 +5771,16 @@ VX_PRIVATE_API vx_status _SplitInputAndOutputForMultiTPCores(vx_context context,
             {
                 num_slice = 1;
             }
+
+            /*
+             * To use cache more efficiently, we need to make sure
+             * unit_input_size_x >= 16 and unit_output_size_x >= 16.
+             */
+            unit_output_size_x = output_size_x / num_slice;
+            unit_input_size_x = unit_output_size_x * stride_x;
+
+            check_x = (unit_input_size_x >= MIN_TP_UNIT_INIMAGE_X) &&
+                      (unit_output_size_x >= MIN_TP_UNIT_OUTIMAGE_X);
 
 #if TP_SPLIT_Z_MAJOR
             if ((output_size_z / stride_x / stride_y) % num_slice == 0)
@@ -4259,23 +5817,9 @@ VX_PRIVATE_API vx_status _SplitInputAndOutputForMultiTPCores(vx_context context,
                 }
             }
 #else
-            if (output_size_x % num_slice == 0 &&
-                output_size_x / num_slice > pad_left &&
-                output_size_x / num_slice > pad_right)
-            {
-                div_x = num_slice;
-            }
-            else if (output_size_y % num_slice == 0 &&
-                     output_size_y / num_slice > pad_top &&
-                     output_size_y / num_slice > pad_bottom)
-            {
-                div_y = num_slice;
-            }
-            else if ((output_size_z / stride_x / stride_y) % num_slice == 0)
-            {
-                div_z = num_slice;
-            }
-            else
+            if (output_size_x > MAX_IMAGE_SIZE ||
+                output_size_y > MAX_IMAGE_SIZE ||
+                output_size_z / stride_x / stride_y > MAX_IMAGE_SIZE)
             {
                 vx_uint32 max = gcmMAX(gcmMAX(output_size_x, output_size_y), output_size_z / stride_x / stride_y);
 
@@ -4290,6 +5834,43 @@ VX_PRIVATE_API vx_status _SplitInputAndOutputForMultiTPCores(vx_context context,
                 else
                 {
                     div_z = gcmMIN(core, num_slice);
+                }
+            }
+            else
+            {
+                if (check_x &&
+                    output_size_x % num_slice == 0 &&
+                    output_size_x / num_slice > pad_left &&
+                    output_size_x / num_slice > pad_right)
+                {
+                    div_x = num_slice;
+                }
+                else if (output_size_y % num_slice == 0 &&
+                         output_size_y / num_slice > pad_top &&
+                         output_size_y / num_slice > pad_bottom)
+                {
+                    div_y = num_slice;
+                }
+                else if ((output_size_z / stride_x / stride_y) % num_slice == 0)
+                {
+                    div_z = num_slice;
+                }
+                else
+                {
+                    vx_uint32 max = gcmMAX(gcmMAX(output_size_x, output_size_y), output_size_z / stride_x / stride_y);
+
+                    if (check_x && (output_size_x == max))
+                    {
+                        div_x = gcmMIN(core, num_slice);
+                    }
+                    else if (output_size_y == max)
+                    {
+                        div_y = gcmMIN(core, num_slice);
+                    }
+                    else
+                    {
+                        div_z = gcmMIN(gcmMIN(core, num_slice), (output_size_z / stride_x / stride_y));
+                    }
                 }
             }
 #endif
@@ -4370,7 +5951,6 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPSplitCommandInfo(
     vx_uint32 *                  sinfo_num_ptr
     )
 {
-#define TP_SPLIT_COUNT     64
     vx_nn_cmd_split_info_u * sinfoArray;
     vx_enum tpType, splitTypes[TP_TENSOR_COUNT] = {TP_SPLIT_Z_DIRECTION};
 
@@ -4664,43 +6244,45 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPSplitCommandInfo(
                 tmpPtr->aluReorderBitsUsed = (vx_uint32)gcoMATH_Ceiling(gcoMATH_Log2((vx_float32)(tmpPtr->inTileXSize * tmpPtr->inTileYSize)));
             }
         }
-
-        if (output->sRAM)
+        if (tpType != TP_TRANSPOSE || parameter->tp_value->e32[0] != 6)
         {
-            tmpPtr->outImageCircularBufSize = output->circleBufferSize;
-            tmpPtr->outImageCircularBufEndAddrPlus1 = output->physical.circularBufEndAddrPlus1;
-
-            if (tmpPtr->outBaseAddress >= output->physical.circularBufEndAddrPlus1)
+            if (output->sRAM)
             {
-                vx_uint32 offset = tmpPtr->outBaseAddress - output->physical.circularBufEndAddrPlus1;
-                offset = offset % output->circleBufferSize;
-                tmpPtr->outBaseAddress = output->physical.circularBufEndAddrPlus1 - output->circleBufferSize + offset;
+                tmpPtr->outImageCircularBufSize = output->circleBufferSize;
+                tmpPtr->outImageCircularBufEndAddrPlus1 = output->physical.circularBufEndAddrPlus1;
+
+                if (tmpPtr->outBaseAddress >= output->physical.circularBufEndAddrPlus1)
+                {
+                    vx_uint32 offset = tmpPtr->outBaseAddress - output->physical.circularBufEndAddrPlus1;
+                    offset = offset % output->circleBufferSize;
+                    tmpPtr->outBaseAddress = output->physical.circularBufEndAddrPlus1 - output->circleBufferSize + offset;
+                }
+                vxmASSERT(tmpPtr->outBaseAddress < output->physical.circularBufEndAddrPlus1);
             }
-            vxmASSERT(tmpPtr->outBaseAddress < output->physical.circularBufEndAddrPlus1);
-        }
-        else
-        {
-            tmpPtr->outImageCircularBufSize         = 0;
-            tmpPtr->outImageCircularBufEndAddrPlus1 = 0xFFFFFFFF;
-        }
-
-        if (input->sRAM)
-        {
-            tmpPtr->inImageCircularBufSize = input->circleBufferSize;
-            tmpPtr->inImageCircularBufEndAddrPlus1  = input->physical.circularBufEndAddrPlus1;
-
-            if (tmpPtr->inImageBaseAddress >= input->physical.circularBufEndAddrPlus1)
+            else
             {
-                vx_uint32 offset = tmpPtr->inImageBaseAddress - input->physical.circularBufEndAddrPlus1;
-                offset = offset % input->circleBufferSize;
-                tmpPtr->inImageBaseAddress = input->physical.circularBufEndAddrPlus1 - input->circleBufferSize + offset;
+                tmpPtr->outImageCircularBufSize         = 0;
+                tmpPtr->outImageCircularBufEndAddrPlus1 = 0xFFFFFFFF;
             }
-            vxmASSERT(tmpPtr->inImageBaseAddress < input->physical.circularBufEndAddrPlus1);
-        }
-        else
-        {
-            tmpPtr->inImageCircularBufSize   = 0;
-            tmpPtr->inImageCircularBufEndAddrPlus1     = 0xFFFFFFFF;
+
+            if (input->sRAM)
+            {
+                tmpPtr->inImageCircularBufSize = input->circleBufferSize;
+                tmpPtr->inImageCircularBufEndAddrPlus1  = input->physical.circularBufEndAddrPlus1;
+
+                if (tmpPtr->inImageBaseAddress >= input->physical.circularBufEndAddrPlus1)
+                {
+                    vx_uint32 offset = tmpPtr->inImageBaseAddress - input->physical.circularBufEndAddrPlus1;
+                    offset = offset % input->circleBufferSize;
+                    tmpPtr->inImageBaseAddress = input->physical.circularBufEndAddrPlus1 - input->circleBufferSize + offset;
+                }
+                vxmASSERT(tmpPtr->inImageBaseAddress < input->physical.circularBufEndAddrPlus1);
+            }
+            else
+            {
+                tmpPtr->inImageCircularBufSize   = 0;
+                tmpPtr->inImageCircularBufEndAddrPlus1     = 0xFFFFFFFF;
+            }
         }
     }
 
@@ -4708,6 +6290,42 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPSplitCommandInfo(
     *sinfo_num_ptr = splitCount;
 
     return VX_SUCCESS;
+}
+
+vx_bool convertWBFormatFromI8ToU8(vx_context context, vx_weights_biases_parameter weights_biases)
+{
+    if ((WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_INT8) &&
+        WB_WEIGHT_QUANT_FORMAT(weights_biases) == VX_QUANT_AFFINE_SCALE &&
+        vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ASYMMETRIC_INT8))
+    {
+        return vx_true_e;
+    }
+
+    return vx_false_e;
+}
+
+vx_bool updateZPForOutData(vx_context context, vx_enum tpType, vx_enum outFormat)
+{
+    vx_bool update = vx_false_e;
+    if ((outFormat == VX_TYPE_INT8) &&
+        vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ASYMMETRIC_INT8))
+    {
+        update = vx_true_e;
+    }
+
+    return update;
+}
+
+vx_bool updateZPForInputData(vx_context context, vx_enum tpType, vx_enum inFormat)
+{
+    vx_bool update = vx_false_e;
+    if ((inFormat == VX_TYPE_INT8) &&
+        vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ASYMMETRIC_INT8))
+    {
+        update = vx_true_e;
+    }
+
+    return update;
 }
 
 VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
@@ -4728,9 +6346,10 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
     vx_bool hasInputQuant = vx_false_e;
     vx_bool hasOutputQuant = vx_false_e;
     vx_bool hasWQuant = vx_false_e;
-    vx_bool tpRealInt16 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16);
-    vx_bool tpSimpleInt16 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_SIMPLE_INT16);
+    /*vx_bool tpRealInt16 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16);*/
+    /*vx_bool tpSimpleInt16 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_SIMPLE_INT16);*/
     vx_bool tfQuant = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT);
+    vx_bool tpBF16 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16);
     vx_tensor other_tensor, data_buff;
     vx_tp_value_cmd value_cmd_ptr;
 
@@ -4755,11 +6374,11 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
     data_buff = (vx_tensor)conv_cmd_ptr->data_buff;
     value_cmd_ptr = conv_cmd_ptr->tp_value;
 
-    hasInputQuant  = (vx_bool)((inFormat == VX_TYPE_UINT8) && (inQFormat == VX_QUANT_AFFINE_SCALE));
-    hasOutputQuant = (vx_bool)((outFormat == VX_TYPE_UINT8) && (outQFormat == VX_QUANT_AFFINE_SCALE));
+    hasInputQuant  = (vx_bool)((inFormat == VX_TYPE_UINT8 || inFormat == VX_TYPE_INT8) && (inQFormat == VX_QUANT_AFFINE_SCALE));
+    hasOutputQuant = (vx_bool)((outFormat == VX_TYPE_UINT8 || outFormat == VX_TYPE_INT8) && (outQFormat == VX_QUANT_AFFINE_SCALE));
 
     if ((tp_type == TP_SINGLE_FC) && other_tensor != VX_NULL &&
-        (WB_WEIGHT_DATA_FORMAT((vx_weights_biases_parameter)other_tensor) == VX_TYPE_UINT8) &&
+        (WB_WEIGHT_DATA_FORMAT((vx_weights_biases_parameter)other_tensor) == VX_TYPE_UINT8 || WB_WEIGHT_DATA_FORMAT((vx_weights_biases_parameter)other_tensor) == VX_TYPE_INT8) &&
         (WB_WEIGHT_QUANT_FORMAT((vx_weights_biases_parameter)other_tensor) == VX_QUANT_AFFINE_SCALE))
     {
         hasWQuant = vx_true_e;
@@ -4777,7 +6396,9 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
 
         if (info->vx_nn_tp_cmd_info.inImageBorderMode == 0x0)
         {
-            info->vx_nn_tp_cmd_info.inImageBorderConst = (inFormat == VX_TYPE_INT8) ? (vx_int8)conv_cmd_ptr->pad_const : (vx_int16)conv_cmd_ptr->pad_const;
+            info->vx_nn_tp_cmd_info.inImageBorderConst = (inFormat == VX_TYPE_INT8)
+                                                        ? (vx_int8)conv_cmd_ptr->pad_const
+                                                        : (vx_int16)conv_cmd_ptr->pad_const;
         }
     }
 
@@ -4787,7 +6408,6 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
         {
             vx_weights_biases_parameter weights_biases = (vx_weights_biases_parameter) other_tensor;
             vx_uint32 kzGroup;
-
             vxmASSERT(value_cmd_ptr != VX_NULL);
 
             kzGroup = value_cmd_ptr->u32[0];
@@ -4796,7 +6416,9 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                 info->vx_nn_tp_cmd_info.inImageGlobalMem = 1;
                 info->vx_nn_tp_cmd_info.aluSquarePreshift = 0;
                 info->vx_nn_tp_cmd_info.aluSquareEnable = 0;
-                info->vx_nn_tp_cmd_info.aluHorzProcessing = getHWDataFormat(WB_WEIGHT_DATA_FORMAT(weights_biases));
+                info->vx_nn_tp_cmd_info.aluHorzProcessing = convertWBFormatFromI8ToU8(context, weights_biases)
+                                                            ? getTPDataFormat(VX_TYPE_UINT8)
+                                                            : getTPDataFormat(WB_WEIGHT_DATA_FORMAT(weights_biases));
                 info->vx_nn_tp_cmd_info.aluHorzProcStride = 0;
                 info->vx_nn_tp_cmd_info.aluVertProcessing = 0;
                 info->vx_nn_tp_cmd_info.aluVertProcStride = 0;
@@ -4815,8 +6437,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                      ((inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0)
                    - (outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT ? outFPP : 0)
                    + (WB_WEIGHT_QUANT_FORMAT(weights_biases) == VX_QUANT_DYNAMIC_FIXED_POINT ? WB_WEIGHT_FPP(weights_biases) : 0);
-                info->vx_nn_tp_cmd_info.aluI2FEnable = (inFormat == VX_TYPE_FLOAT16) ? 0 : 1;
-                info->vx_nn_tp_cmd_info.aluF2IEnable = (outFormat == VX_TYPE_FLOAT16) ? 0 : 1;
+                info->vx_nn_tp_cmd_info.aluI2FEnable = tpBF16 ? 1 : ((inFormat == VX_TYPE_FLOAT16) ? 0 : 1);
+                info->vx_nn_tp_cmd_info.aluF2IEnable = tpBF16 ? 1 : ((outFormat == VX_TYPE_FLOAT16) ? 0 : 1);
             }
             else
             {
@@ -4824,7 +6446,9 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                 {
                     info->vx_nn_tp_cmd_info.inTileSequence = 0x3;
                     info->vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-                    info->vx_nn_tp_cmd_info.aluHorzProcessing = getHWDataFormat(WB_WEIGHT_DATA_FORMAT(weights_biases));
+                    info->vx_nn_tp_cmd_info.aluHorzProcessing = convertWBFormatFromI8ToU8(context, weights_biases)
+                                                                ? getTPDataFormat(VX_TYPE_UINT8)
+                                                                : getTPDataFormat(WB_WEIGHT_DATA_FORMAT(weights_biases));
                     info->vx_nn_tp_cmd_info.aluHorzProcStride = 0;
                     info->vx_nn_tp_cmd_info.aluVertProcessing = 0;
                     info->vx_nn_tp_cmd_info.aluVertProcStride = 0;
@@ -4862,8 +6486,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                 info->vx_nn_tp_cmd_info.aluMultEnable = 0;
                 info->vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
                 info->vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
-                info->vx_nn_tp_cmd_info.aluI2FEnable = inFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-                info->vx_nn_tp_cmd_info.aluF2IEnable = outFormat == VX_TYPE_FLOAT16 ? 0 : 1;
+                info->vx_nn_tp_cmd_info.aluI2FEnable = tpBF16 ? 1 : ((inFormat == VX_TYPE_FLOAT16) ? 0 : 1);
+                info->vx_nn_tp_cmd_info.aluF2IEnable = tpBF16 ? 1 : ((outFormat == VX_TYPE_FLOAT16) ? 0 : 1);
 
             }
             break;
@@ -4910,8 +6534,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             info->vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
             info->vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
             info->vx_nn_tp_cmd_info.aluReluEnable = 0;
-            info->vx_nn_tp_cmd_info.aluI2FEnable = inFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-            info->vx_nn_tp_cmd_info.aluF2IEnable = outFormat == VX_TYPE_FLOAT16 ? 0 : 1;
+            info->vx_nn_tp_cmd_info.aluI2FEnable = tpBF16 ? 1 : ((inFormat == VX_TYPE_FLOAT16) ? 0 : 1);
+            info->vx_nn_tp_cmd_info.aluF2IEnable = tpBF16 ? 1 : ((outFormat == VX_TYPE_FLOAT16) ? 0 : 1);
             info->vx_nn_tp_cmd_info.aluInputPreshift   = 0;
             info->vx_nn_tp_cmd_info.aluOutputPostshift = ((inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0) - ((outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? outFPP : 0);
             break;
@@ -4926,7 +6550,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             vx_uint32   fixed21, baseF21;
             vx_float32  baseF32;
             vx_float32  pwlValue;
-            vx_float32  value = inQFormat == VX_QUANT_AFFINE_SCALE ? inScale : 1.0f;
+            vx_float32  u8Scale= inQFormat == VX_QUANT_AFFINE_SCALE ? inScale : 1.0f;
 
             vxmASSERT(value_cmd_ptr != VX_NULL);
             vxmASSERT(pwlLUTBase != VX_NULL);
@@ -4955,6 +6579,18 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             pwlLUTBase[base] = 0x8000;      /* Half float negative zero. */
                         }
+                    }
+                    else if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16))
+                    {
+                        vx_uint32 expBits = 0;
+                        if(inFormat == VX_TYPE_INT8 || inFormat == VX_TYPE_UINT8 || inFormat == VX_TYPE_INT16 || inFormat == VX_TYPE_FLOAT16)
+                            expBits = 5;
+                        else if(inFormat == VX_TYPE_BFLOAT16 ||inFormat == VX_TYPE_FLOAT32)
+                            expBits = 8;
+                        else
+                            vxmASSERT(0);
+
+                        fillBF16ActivateReluLUT(pwlLUTBaseEx, expBits, vx_true_e, inFormat);
                     }
                     else
                     {
@@ -5011,6 +6647,18 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                             pwlLUTBase[base] = 0xfbff;      /* Half float negative infinity clamp to max. */
                         }
                     }
+                    else if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16))
+                    {
+                        vx_uint32 expBits = 0;
+                        if(inFormat == VX_TYPE_INT8 || inFormat == VX_TYPE_UINT8 || inFormat == VX_TYPE_INT16 || inFormat == VX_TYPE_FLOAT16)
+                            expBits = 5;
+                        else if(inFormat == VX_TYPE_BFLOAT16 ||inFormat == VX_TYPE_FLOAT32)
+                            expBits = 8;
+                        else
+                            vxmASSERT(0);
+
+                        fillBF16LeakyReluLUT(pwlLUTBaseEx, expBits, scale, vx_true_e, inFormat);
+                    }
                     else
                     {
                         /* Flush denorms to 0.0f. */
@@ -5056,7 +6704,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             baseF16 = base << 6;
                             baseF32 = Fp16toFp32(baseF16);
-                            pwlValue = baseF32 * value;
+                            pwlValue = baseF32 * u8Scale;
                             if (pwlValue >= 1.0f) break;
                             pwlLUTBase[base] = Fp32toFp16(pwlValue);
                         }
@@ -5073,7 +6721,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             baseF16 = base << 6;
                             baseF32 = Fp16toFp32(baseF16);
-                            pwlValue = baseF32 * value;
+                            pwlValue = baseF32 * u8Scale;
                             if (pwlValue <= -1.0f) break;
                             pwlLUTBase[base] = Fp32toFp16(pwlValue);
                         }
@@ -5082,6 +6730,18 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             pwlLUTBase[base] = fixed16;         /* smaller than negative one to -1.0f. */
                         }
+                    }
+                    else if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16))
+                    {
+                        vx_uint32 expBits = 0;
+                        if(inFormat == VX_TYPE_INT8 || inFormat == VX_TYPE_UINT8 || inFormat == VX_TYPE_INT16 || inFormat == VX_TYPE_FLOAT16)
+                            expBits = 5;
+                        else if(inFormat == VX_TYPE_BFLOAT16 ||inFormat == VX_TYPE_FLOAT32)
+                            expBits = 8;
+                        else
+                            vxmASSERT(0);
+
+                        fillBF16ActivateRelu1LUT(pwlLUTBaseEx, expBits, u8Scale, vx_true_e, inFormat);
                     }
                     else
                     {
@@ -5093,7 +6753,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             baseF21 = base << 11;
                             baseF32 = Fp21toFp32(baseF21);
-                            pwlValue = baseF32 * value;
+                            pwlValue = baseF32 * u8Scale;
                             if (pwlValue >= 1.0f) break;
                             pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
                         }
@@ -5110,7 +6770,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             baseF21 = base << 11;
                             baseF32 = Fp21toFp32(baseF21);
-                            pwlValue = baseF32 * value;
+                            pwlValue = baseF32 * u8Scale;
                             if (pwlValue <= -1.0f) break;
                             pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
                         }
@@ -5133,7 +6793,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             baseF16 = base << 6;
                             baseF32 = Fp16toFp32(baseF16);
-                            pwlValue = baseF32 * value;
+                            pwlValue = baseF32 * u8Scale;
                             if (pwlValue >= 6.0f) break;
                             pwlLUTBase[base] = Fp32toFp16(pwlValue);
                         }
@@ -5147,6 +6807,18 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                             pwlLUTBase[base] = 0x0;             /* smaller than zero to 0.0f. */
                         }
                     }
+                    else if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16))
+                    {
+                        vx_uint32 expBits = 0;
+                        if(inFormat == VX_TYPE_INT8 || inFormat == VX_TYPE_UINT8 || inFormat == VX_TYPE_INT16 || inFormat == VX_TYPE_FLOAT16)
+                            expBits = 5;
+                        else if(inFormat == VX_TYPE_BFLOAT16 ||inFormat == VX_TYPE_FLOAT32)
+                            expBits = 8;
+                        else
+                            vxmASSERT(0);
+
+                        fillBF16ActivateRelu6LUT(pwlLUTBaseEx, expBits, u8Scale,vx_true_e, inFormat);
+                    }
                     else
                     {
                         for (base = 0; base < 0x10; base++)
@@ -5157,7 +6829,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             baseF21 = base << 11;
                             baseF32 = Fp21toFp32(baseF21);
-                            pwlValue = baseF32 * value;
+                            pwlValue = baseF32 * u8Scale;
                             if (pwlValue >= 6.0f) break;
                             pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
                         }
@@ -5169,6 +6841,130 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         for (base = 0x200; base < 0x400; base++)
                         {
                             pwlLUTBaseEx[base] = 0x0;             /* smaller than zero to 0.0f. */
+                        }
+                    }
+                    break;
+
+                case VX_NN_ACTIVATION_HSWISH:
+                    if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16))
+                    {
+                        for (base = 0; base < 0x10; base++)
+                        {
+                            pwlLUTBase[base] = 0x0;         /* Half float positive zero. */
+                        }
+                        for (base = 0x10; base < 0x1F0; base++)
+                        {
+                            baseF16 = base << 6;
+                            baseF32 = Fp16toFp32(baseF16) * u8Scale;
+                            pwlValue = 1.0f * baseF32 * gcoMATH_MIN(gcoMATH_MAX(baseF32 + 3, 0), 6) / 6;
+                            pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+                        }
+                        for (base = 0x1F0; base < 0x200; base++)
+                        {
+                            pwlLUTBase[base] = 0x7dff;
+                        }
+                        fixed16 = Fp32toFp16(0.0f);
+                        for (base = 0x200; base < 0x210; base++)
+                        {
+                            pwlLUTBase[base] = fixed16;
+                        }
+                        for (base = 0x210; base < 0x3F0; base++)
+                        {
+                            baseF16 = base << 6;
+                            baseF32 = Fp16toFp32(baseF16) * u8Scale;
+                            pwlValue = 1.0f * baseF32 * gcoMATH_MIN(gcoMATH_MAX(baseF32 + 3, 0), 6) / 6;
+                            pwlLUTBase[base] = Fp32toFp16(pwlValue);
+                        }
+                        fixed16 = Fp32toFp16(0.0f);
+                        for (base = 0x3F0; base < 0x400; base++)
+                        {
+                            pwlLUTBase[base] = fixed16;
+                        }
+                    }
+                    else if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16))
+                    {
+                        if(inFormat == VX_TYPE_BFLOAT16 ||inFormat == VX_TYPE_FLOAT32)
+                        {
+                            vx_uint32 expBits = 0;
+                            vx_float64 maxError0 = 0, maxError1 = 1024*1024*1024;
+                            vx_uint32 *pwlLUTBase0 = (vx_uint32 *)vxAllocate((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32));
+                            vx_uint32 *pwlLUTBase1 = (vx_uint32 *)vxAllocate((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32));
+                            vx_uint16 selBase = 0;
+                            for(expBits = 4; expBits <= 8; expBits++) /*SE8M12 fromat*/
+                            {
+                                if(selBase)
+                                {
+                                    memset(pwlLUTBase1, 0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
+                                    fillBF16ActivateHswishLUT(pwlLUTBase1, expBits, u8Scale, vx_true_e, inFormat);
+                                    maxError1 = maxErrorLUT(pwlLUTBase1, expBits, VX_NN_ACTIVATION_HSWISH, u8Scale, vx_true_e, VX_NULL, 0);
+                                }
+                                else
+                                {
+                                    memset(pwlLUTBase0, 0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
+                                    fillBF16ActivateHswishLUT(pwlLUTBase0, expBits, u8Scale, vx_true_e, inFormat);
+                                    maxError0 = maxErrorLUT(pwlLUTBase0, expBits, VX_NN_ACTIVATION_HSWISH, u8Scale, vx_true_e, VX_NULL, 0);
+                                }
+                                if(maxError0 == maxError1)
+                                {
+                                    if(((pwlLUTBase0[0x400]>>24) & 0xF) >= ((pwlLUTBase1[0x400]>>24) & 0xF))
+                                        selBase = 0;
+                                    else
+                                        selBase = 1;
+                                }
+                                else if(maxError0 > maxError1)
+                                    selBase = 0;
+                                else
+                                    selBase = 1;
+                            }
+                            if(selBase)
+                                memcpy(pwlLUTBaseEx, pwlLUTBase0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
+                            else
+                                memcpy(pwlLUTBaseEx, pwlLUTBase1, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
+
+                            vxFree(pwlLUTBase0);
+                            vxFree(pwlLUTBase1);
+                        }
+                        else
+                        {
+                            vx_uint32 expBits = 0;
+                            if(inFormat == VX_TYPE_INT8 || inFormat == VX_TYPE_UINT8 || inFormat == VX_TYPE_INT16 || inFormat == VX_TYPE_FLOAT16)
+                                expBits = 5;
+                            else
+                                vxmASSERT(0);
+                            fillBF16ActivateHswishLUT(pwlLUTBaseEx, expBits, u8Scale, vx_true_e, inFormat);
+                        }
+                    }
+                    else
+                    {
+                        for (base = 0; base < 0x10; base++)
+                        {
+                            pwlLUTBaseEx[base] = 0x0;
+                        }
+                        for (base = 0x10; base < 0x1F0; base++)
+                        {
+                            baseF21 = base << 11;
+                            baseF32 = Fp21toFp32(baseF21) * u8Scale;
+                            pwlValue = 1.0f * baseF32 * gcoMATH_MIN(gcoMATH_MAX(baseF32 + 3, 0), 6) / 6;
+                            pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+                        }
+                        for (base = 0x1F0; base < 0x200; base++)
+                        {
+                            pwlLUTBaseEx[base] = 0xfdfff;
+                        }
+                        for (base = 0x200; base < 0x210; base++)
+                        {
+                            pwlLUTBaseEx[base] = 0x0;             /* smaller than zero to 0.0f. */
+                        }
+                        for (base = 0x210; base < 0x3F0; base++)
+                        {
+                            baseF21 = base << 11;
+                            baseF32 = Fp21toFp32(baseF21) * u8Scale;
+                            pwlValue = 1.0f * baseF32 * gcoMATH_MIN(gcoMATH_MAX(baseF32 + 3, 0), 6) / 6;
+                            pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+                        }
+                        for (base = 0x3F0; base < 0x400; base++)
+                        {
+                            pwlLUTBaseEx[base] = 0x0;
                         }
                     }
                     break;
@@ -5185,7 +6981,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             baseF16 = base << 6;
                             baseF32 = Fp16toFp32(baseF16);
-                            pwlValue = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * value));
+                            pwlValue = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * u8Scale));
                             pwlLUTBase[base] = Fp32toFp16(pwlValue);
                         }
                         fixed16 = Fp32toFp16(1.0f);
@@ -5203,13 +6999,66 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             baseF16 = base << 6;
                             baseF32 = Fp16toFp32(baseF16);
-                            pwlValue = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * value));
+                            pwlValue = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * u8Scale));
                             pwlLUTBase[base] = Fp32toFp16(pwlValue);
                         }
                         fixed16 = Fp32toFp16(0.0f);
                         for (base = 0x3F0; base < 0x400; base++)
                         {
                             pwlLUTBase[base] = fixed16;
+                        }
+                    }
+                    else if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16))
+                    {
+                        if(inFormat == VX_TYPE_BFLOAT16 ||inFormat == VX_TYPE_FLOAT32)
+                        {
+                            vx_uint32 expBits = 0;
+                            vx_float64 maxError0 = 0, maxError1 = 1024 * 1024 * 1024;
+                            vx_uint32 *pwlLUTBase0 = (vx_uint32 *)vxAllocate((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32));
+                            vx_uint32 *pwlLUTBase1 = (vx_uint32 *)vxAllocate((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32));
+                            vx_uint16 selBase = 0;
+                            for(expBits = 4; expBits <= 8; expBits++) /*SE8M12 fromat*/
+                            {
+                                if(selBase)
+                                {
+                                    memset(pwlLUTBase1, 0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
+                                    fillBF16ActivateLogisticLUT(pwlLUTBase1, expBits, u8Scale, vx_true_e, inFormat);
+                                    maxError1 = maxErrorLUT(pwlLUTBase1, expBits, VX_NN_ACTIVATION_LOGISTIC, u8Scale, vx_true_e, VX_NULL, 0);
+                                }
+                                else
+                                {
+                                    memset(pwlLUTBase0, 0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
+                                    fillBF16ActivateLogisticLUT(pwlLUTBase0, expBits, u8Scale, vx_true_e, inFormat);
+                                    maxError0 = maxErrorLUT(pwlLUTBase0, expBits, VX_NN_ACTIVATION_LOGISTIC, u8Scale, vx_true_e, VX_NULL, 0);
+                                }
+                                if(maxError0 == maxError1)
+                                {
+                                    if(((pwlLUTBase0[0x400]>>24) & 0xF) >= ((pwlLUTBase1[0x400]>>24) & 0xF))
+                                        selBase = 0;
+                                    else
+                                        selBase = 1;
+                                }
+                                else if(maxError0 > maxError1)
+                                    selBase = 0;
+                                else
+                                    selBase = 1;
+                            }
+                            if(selBase)
+                                memcpy(pwlLUTBaseEx, pwlLUTBase0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
+                            else
+                                memcpy(pwlLUTBaseEx, pwlLUTBase1, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
+
+                            vxFree(pwlLUTBase0);
+                            vxFree(pwlLUTBase1);
+                        }
+                        else
+                        {
+                            vx_uint32 expBits = 0;
+                            if(inFormat == VX_TYPE_INT8 || inFormat == VX_TYPE_UINT8 || inFormat == VX_TYPE_INT16 || inFormat == VX_TYPE_FLOAT16)
+                                expBits = 5;
+                            else
+                                vxmASSERT(0);
+                            fillBF16ActivateLogisticLUT(pwlLUTBaseEx, expBits, u8Scale,vx_true_e, inFormat);
                         }
                     }
                     else
@@ -5223,7 +7072,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             baseF21 = base << 11;
                             baseF32 = Fp21toFp32(baseF21);
-                            pwlValue = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * value));
+                            pwlValue = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * u8Scale));
                             pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
                         }
                         fixed21 = Fp32toFp21(1.0f);
@@ -5241,7 +7090,135 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             baseF21 = base << 11;
                             baseF32 = Fp21toFp32(baseF21);
-                            pwlValue = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * value));
+                            pwlValue = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * u8Scale));
+                            pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+                        }
+                        fixed21 = Fp32toFp21(0.0f);
+                        for (base = 0x3F0; base < 0x400; base++)
+                        {
+                            pwlLUTBaseEx[base] = fixed21;
+                        }
+                    }
+                    break;
+
+                case VX_NN_ACTIVATION_SWISH:
+                    if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16))
+                    {
+                        fixed16 = Fp32toFp16(0.0f);
+                        for (base = 0; base < 0x10; base++)
+                        {
+                            pwlLUTBase[base] = fixed16;
+                        }
+                        for (base = 0x10; base < 0x1F0; base++)
+                        {
+                            baseF16 = base << 6;
+                            baseF32 = Fp16toFp32(baseF16) * u8Scale;
+                            pwlValue = 1.0f * baseF32 / (1.0f + gcoMATH_Exp(0.0f - baseF32));
+                            pwlLUTBase[base] = Fp32toFp16(pwlValue);
+                        }
+                        for (base = 0x1F0; base < 0x200; base++)
+                        {
+                            pwlLUTBase[base] = 0x7bff;
+                        }
+                        fixed16 = Fp32toFp16(0.0f);
+                        for (base = 0x200; base < 0x210; base++)
+                        {
+                            pwlLUTBase[base] = fixed16;
+                        }
+                        for (base = 0x210; base < 0x3F0; base++)
+                        {
+                            baseF16 = base << 6;
+                            baseF32 = Fp16toFp32(baseF16) * u8Scale;
+                            pwlValue = 1.0f * baseF32 / (1.0f + gcoMATH_Exp(0.0f - baseF32));
+                            pwlLUTBase[base] = Fp32toFp16(pwlValue);
+                        }
+                        fixed16 = Fp32toFp16(0.0f);
+                        for (base = 0x3F0; base < 0x400; base++)
+                        {
+                            pwlLUTBase[base] = fixed16;
+                        }
+                    }
+                    else if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16))
+                    {
+                        if(inFormat == VX_TYPE_BFLOAT16 ||inFormat == VX_TYPE_FLOAT32)
+                        {
+                            vx_uint32 expBits = 0;
+                            vx_float64 maxError0 = 0, maxError1 = 1024*1024*1024;
+                            vx_uint32 *pwlLUTBase0 = (vx_uint32 *)vxAllocate((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32));
+                            vx_uint32 *pwlLUTBase1 = (vx_uint32 *)vxAllocate((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32));
+                            vx_uint16 selBase = 0;
+                            for(expBits = 4; expBits <= 8; expBits++) /*SE8M12 fromat*/
+                            {
+                                if(selBase)
+                                {
+                                    memset(pwlLUTBase1, 0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
+                                    fillBF16ActivateSwishLUT(pwlLUTBase1, expBits, u8Scale, vx_true_e, inFormat);
+                                    maxError1 = maxErrorLUT(pwlLUTBase1, expBits, VX_NN_ACTIVATION_SWISH, u8Scale, vx_true_e, VX_NULL, 0);
+                                }
+                                else
+                                {
+                                    memset(pwlLUTBase0, 0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
+                                    fillBF16ActivateSwishLUT(pwlLUTBase0, expBits, u8Scale, vx_true_e, inFormat);
+                                    maxError0 = maxErrorLUT(pwlLUTBase0, expBits, VX_NN_ACTIVATION_SWISH, u8Scale, vx_true_e, VX_NULL, 0);
+                                }
+                                if(maxError0 == maxError1)
+                                {
+                                    if(((pwlLUTBase0[0x400]>>24) & 0xF) >= ((pwlLUTBase1[0x400]>>24) & 0xF))
+                                        selBase = 0;
+                                    else
+                                        selBase = 1;
+                                }
+                                else if(maxError0 > maxError1)
+                                    selBase = 0;
+                                else
+                                    selBase = 1;
+                            }
+                            if(selBase)
+                                memcpy(pwlLUTBaseEx, pwlLUTBase0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
+                            else
+                                memcpy(pwlLUTBaseEx, pwlLUTBase1, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
+
+                            vxFree(pwlLUTBase0);
+                            vxFree(pwlLUTBase1);
+                        }
+                        else
+                        {
+                            vx_uint32 expBits = 0;
+                            if(inFormat == VX_TYPE_INT8 || inFormat == VX_TYPE_UINT8 || inFormat == VX_TYPE_INT16 || inFormat == VX_TYPE_FLOAT16)
+                                expBits = 5;
+                            else
+                                vxmASSERT(0);
+                            fillBF16ActivateSwishLUT(pwlLUTBaseEx, expBits, u8Scale,vx_true_e, inFormat);
+                        }
+                    }
+                    else
+                    {
+                        fixed21 = Fp32toFp21(0.0f);
+                        for (base = 0; base < 0x10; base++)
+                        {
+                            pwlLUTBaseEx[base] = fixed21;
+                        }
+                        for (base = 0x10; base < 0x1F0; base++)
+                        {
+                            baseF21 = base << 11;
+                            baseF32 = Fp21toFp32(baseF21) * u8Scale;
+                            pwlValue = 1.0f * baseF32 / (1.0f + gcoMATH_Exp(0.0f - baseF32));
+                            pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+                        }
+                        for (base = 0x1F0; base < 0x200; base++)
+                        {
+                            pwlLUTBaseEx[base] = 0xf7fff;
+                        }
+                        fixed21 = Fp32toFp21(0.0f);
+                        for (base = 0x200; base < 0x210; base++)
+                        {
+                            pwlLUTBaseEx[base] = fixed21;
+                        }
+                        for (base = 0x210; base < 0x3F0; base++)
+                        {
+                            baseF21 = base << 11;
+                            baseF32 = Fp21toFp32(baseF21) * u8Scale;
+                            pwlValue = 1.0f * baseF32 / (1.0f + gcoMATH_Exp(0.0f - baseF32));
                             pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
                         }
                         fixed21 = Fp32toFp21(0.0f);
@@ -5253,44 +7230,104 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                     break;
 
                 case VX_NN_ACTIVATION_HYPERBOLIC_TAN:
-                    if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16))
                     {
-                        fixed16 = Fp32toFp16(0.0f);
-                        for (base = 0; base < 0x20; base++)
+                        vx_float32 scaleOut = value_cmd_ptr->f32[0];
+                        vx_float32 scaleIn = value_cmd_ptr->f32[1];
+                        if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16))
                         {
-                            pwlLUTBase[base] = fixed16;
+                            fixed16 = Fp32toFp16(0.0f);
+                            for (base = 0; base < 0x20; base++)
+                            {
+                                pwlLUTBase[base] = fixed16;
+                            }
+                            for (base = 0x20; base < 0x3E0; base++)
+                            {
+                                baseF16 = base << 5;
+                                baseF32 = Fp16toFp32(baseF16);
+                                pwlValue = scaleOut * gcoMATH_TangentH(baseF32 * u8Scale * scaleIn);
+                                pwlLUTBase[base] = Fp32toFp16(pwlValue);
+                            }
+                            fixed16 = Fp32toFp16(1.0f);
+                            for (base = 0x3E0; base < 0x400; base++)
+                            {
+                                pwlLUTBase[base] = fixed16;
+                            }
                         }
-                        for (base = 0x20; base < 0x3E0; base++)
+                        else if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16))
                         {
-                            baseF16 = base << 5;
-                            baseF32 = Fp16toFp32(baseF16);
-                            pwlValue = gcoMATH_TangentH(baseF32 * value);
-                            pwlLUTBase[base] = Fp32toFp16(pwlValue);
+                            if(inFormat == VX_TYPE_BFLOAT16 ||inFormat == VX_TYPE_FLOAT32)
+                            {
+                                vx_uint32 expBits;
+                                vx_float64 maxError0 = 1024, maxError1 = 1024;
+                                vx_uint32 *pwlLUTBase0 = (vx_uint32 *)vxAllocate((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32));
+                                vx_uint32 *pwlLUTBase1 = (vx_uint32 *)vxAllocate((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32));
+                                vx_uint16 selBase = 0;
+                                for(expBits = 5; expBits <= 8; expBits++) /*SE8M12 fromat*/
+                                {
+                                    if(selBase)
+                                    {
+                                        memset(pwlLUTBase1, 0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
+                                        fillBF16ActivateHyperbolicTanLUT(pwlLUTBase1, expBits, scaleIn, scaleOut, vx_false_e, inFormat);
+                                        maxError1 = maxErrorLUT(pwlLUTBase1, expBits, VX_NN_ACTIVATION_HYPERBOLIC_TAN, u8Scale, vx_false_e, value_cmd_ptr, 0);
+                                    }
+                                    else
+                                    {
+                                        memset(pwlLUTBase0, 0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
+                                        fillBF16ActivateHyperbolicTanLUT(pwlLUTBase0, expBits, scaleIn, scaleOut, vx_false_e, inFormat);
+                                        maxError0 = maxErrorLUT(pwlLUTBase0, expBits, VX_NN_ACTIVATION_HYPERBOLIC_TAN, u8Scale, vx_false_e, value_cmd_ptr, 0);
+                                    }
+
+                                    if(maxError0 == maxError1)
+                                    {
+                                        if(((pwlLUTBase0[0x400]>>24) & 0xF) >= ((pwlLUTBase1[0x400]>>24) & 0xF))
+                                            selBase = 0;
+                                        else
+                                            selBase = 1;
+                                    }
+                                    else if(maxError0 > maxError1)
+                                        selBase = 0;
+                                    else
+                                        selBase = 1;
+                                }
+                                if(selBase)
+                                    memcpy(pwlLUTBaseEx, pwlLUTBase0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
+                                else
+                                    memcpy(pwlLUTBaseEx, pwlLUTBase1, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
+
+                                vxFree(pwlLUTBase0);
+                                vxFree(pwlLUTBase1);
+                            }
+                            else
+                            {
+
+                                vx_uint32 expBits = 0;
+                                if(inFormat == VX_TYPE_INT8 || inFormat == VX_TYPE_UINT8 || inFormat == VX_TYPE_INT16 || inFormat == VX_TYPE_FLOAT16)
+                                    expBits = 5;
+                                else
+                                    vxmASSERT(0);
+                                fillBF16ActivateHyperbolicTanLUT(pwlLUTBaseEx, expBits, scaleIn * u8Scale, scaleOut, vx_false_e, inFormat);
+
+                            }
                         }
-                        fixed16 = Fp32toFp16(1.0f);
-                        for (base = 0x3E0; base < 0x400; base++)
+                        else
                         {
-                            pwlLUTBase[base] = fixed16;
-                        }
-                    }
-                    else
-                    {
-                        fixed21 = Fp32toFp21(0.0f);
-                        for (base = 0; base < 0x20; base++)
-                        {
-                            pwlLUTBaseEx[base] = fixed21;
-                        }
-                        for (base = 0x20; base < 0x3E0; base++)
-                        {
-                            baseF21 = base << 10;
-                            baseF32 = Fp21toFp32(baseF21);
-                            pwlValue = gcoMATH_TangentH(baseF32 * value);
-                            pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
-                        }
-                        fixed21 = Fp32toFp21(1.0f);
-                        for (base = 0x3E0; base < 0x400; base++)
-                        {
-                            pwlLUTBaseEx[base] = fixed21;
+                            fixed21 = Fp32toFp21(0.0f);
+                            for (base = 0; base < 0x20; base++)
+                            {
+                                pwlLUTBaseEx[base] = fixed21;
+                            }
+                            for (base = 0x20; base < 0x3E0; base++)
+                            {
+                                baseF21 = base << 10;
+                                baseF32 = Fp21toFp32(baseF21);
+                                pwlValue = scaleOut * gcoMATH_TangentH(baseF32 * u8Scale * scaleIn);
+                                pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+                            }
+                            fixed21 = Fp32toFp21(1.0f);
+                            for (base = 0x3E0; base < 0x400; base++)
+                            {
+                                pwlLUTBaseEx[base] = fixed21;
+                            }
                         }
                     }
                     break;
@@ -5315,8 +7352,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             info->vx_nn_tp_cmd_info.outBrickMode  = 0;
             info->vx_nn_tp_cmd_info.aluPwlSignSupport = (value_cmd_ptr->e32[0] == VX_NN_ACTIVATION_HYPERBOLIC_TAN) ? 0 : 1;
             info->vx_nn_tp_cmd_info.aluReluEnable = 0;
-            info->vx_nn_tp_cmd_info.aluI2FEnable = inFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-            info->vx_nn_tp_cmd_info.aluF2IEnable = outFormat == VX_TYPE_FLOAT16 ? 0 : 1;
+            info->vx_nn_tp_cmd_info.aluI2FEnable = tpBF16 ? 1 : ((inFormat == VX_TYPE_FLOAT16) ? 0 : 1);
+            info->vx_nn_tp_cmd_info.aluF2IEnable = tpBF16 ? 1 : ((outFormat == VX_TYPE_FLOAT16) ? 0 : 1);
             info->vx_nn_tp_cmd_info.aluInputPreshift = (inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0;
             info->vx_nn_tp_cmd_info.aluOutputPostshift = (outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? (0 - outFPP) : 0;
             break;
@@ -5333,7 +7370,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             vx_uint32   baseU32, fixed21, baseF21;
             vx_float32  pwlValue;
             vx_uint32   halfK, preShift = 4, preShiftValue = 1 << (preShift*2);
-            vx_float32  value = inQFormat == VX_QUANT_AFFINE_SCALE ? inScale * inScale : 1.0f;
+            vx_float32  u8Scale = inQFormat == VX_QUANT_AFFINE_SCALE ? inScale : 1.0f;
 
             vxmASSERT(value_cmd_ptr != VX_NULL);
             vxmASSERT(pwlLUTBase != VX_NULL);
@@ -5360,7 +7397,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                 {
                     baseF16 = base << 5;
                     baseF32 = Fp16toFp32(baseF16);
-                    pwlValue = bias + alpha * (baseF32 * value * (vx_float32)preShiftValue / ks);
+                    pwlValue = bias + alpha * (baseF32 * u8Scale * u8Scale * (vx_float32)preShiftValue / ks);
                     pwlValue = 1.0f / (vx_float32)pow(pwlValue, beta);
                     pwlLUTBase[base] = Fp32toFp16(pwlValue);
                 }
@@ -5374,6 +7411,59 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                     pwlLUTBase[base] = fixed16;
                 }
             }
+            else if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16))
+            {
+                if(inFormat == VX_TYPE_BFLOAT16 ||inFormat == VX_TYPE_FLOAT32)
+                {
+                    vx_uint32 expBits;
+                    vx_float64 maxError0 = 1024, maxError1 = 1024;
+                    vx_uint32 *pwlLUTBase0 = (vx_uint32 *)vxAllocate((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32));
+                    vx_uint32 *pwlLUTBase1 = (vx_uint32 *)vxAllocate((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32));
+                    vx_uint16 selBase = 0;
+                    for(expBits = 5; expBits <= 8; expBits++) /*SE8M12 fromat*/
+                    {
+                        if(selBase)
+                        {
+                            memset(pwlLUTBase1, 0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
+                            fillBF16LRNLUT(pwlLUTBase1, expBits, u8Scale, value_cmd_ptr, preShiftValue, vx_false_e, inFormat);
+                            maxError1 = maxErrorLUT(pwlLUTBase1, expBits, TP_LRN, u8Scale, vx_false_e, value_cmd_ptr, preShiftValue);
+                        }
+                        else
+                        {
+                            memset(pwlLUTBase0, 0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
+                            fillBF16LRNLUT(pwlLUTBase0, expBits, u8Scale, value_cmd_ptr, preShiftValue, vx_false_e, inFormat);
+                            maxError0 = maxErrorLUT(pwlLUTBase0, expBits, TP_LRN, u8Scale, vx_false_e, value_cmd_ptr, preShiftValue);
+                        }
+                        if(maxError0 == maxError1)
+                        {
+                            if(((pwlLUTBase0[0x400] >> 24) & 0xF) >= ((pwlLUTBase1[0x400] >> 24) & 0xF))
+                                selBase = 0;
+                            else
+                                selBase = 1;
+                        }
+                        else if(maxError0 > maxError1)
+                            selBase = 0;
+                        else
+                            selBase = 1;
+                    }
+                    if(selBase)
+                        memcpy(pwlLUTBaseEx, pwlLUTBase0, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
+                    else
+                        memcpy(pwlLUTBaseEx, pwlLUTBase1, ((TP_LUT_BUFF_SIZE) * sizeof(vx_uint32)));
+
+                    vxFree(pwlLUTBase0);
+                    vxFree(pwlLUTBase1);
+                }
+                else
+                {
+                    vx_uint32 expBits = 0;
+                    if(inFormat == VX_TYPE_INT8 || inFormat == VX_TYPE_UINT8 || inFormat == VX_TYPE_INT16 || inFormat == VX_TYPE_FLOAT16)
+                        expBits = 5;
+                    else
+                        vxmASSERT(0);
+                    fillBF16LRNLUT(pwlLUTBaseEx, expBits, u8Scale, value_cmd_ptr, preShiftValue, vx_false_e, inFormat);
+                }
+            }
             else
             {
                 fixed21 = Fp32toFp21(1.0f);
@@ -5385,7 +7475,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                 {
                     baseF21 = base << 10;
                     baseF32 = Fp21toFp32(baseF21);
-                    pwlValue = bias + alpha * (baseF32 * value * (vx_float32)preShiftValue / ks);
+                    pwlValue = bias + alpha * (baseF32 * u8Scale* u8Scale * (vx_float32)preShiftValue / ks);
                     pwlValue = 1.0f / (vx_float32)pow(pwlValue, beta);
                     pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
                 }
@@ -5412,8 +7502,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             info->vx_nn_tp_cmd_info.aluMultEnable = 1;
             info->vx_nn_tp_cmd_info.aluLoadPwlLUT = 1;
             info->vx_nn_tp_cmd_info.aluLoadPwlLUTGlobalMem = 1;
-            info->vx_nn_tp_cmd_info.aluI2FEnable = inFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-            info->vx_nn_tp_cmd_info.aluF2IEnable = outFormat == VX_TYPE_FLOAT16 ? 0 : 1;
+            info->vx_nn_tp_cmd_info.aluI2FEnable = tpBF16 ? 1 : ((inFormat == VX_TYPE_FLOAT16) ? 0 : 1);
+            info->vx_nn_tp_cmd_info.aluF2IEnable = tpBF16 ? 1 : ((outFormat == VX_TYPE_FLOAT16) ? 0 : 1);
             info->vx_nn_tp_cmd_info.aluInputPreshift = (inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0;
             info->vx_nn_tp_cmd_info.aluOutputPostshift = (outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? (0 - outFPP) : 0;
 
@@ -5486,8 +7576,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             info->vx_nn_tp_cmd_info.aluLoadPwlLUTGlobalMem = 1;
             info->vx_nn_tp_cmd_info.outGlobalMem  = 1;
             info->vx_nn_tp_cmd_info.outBrickMode  = 0;
-            info->vx_nn_tp_cmd_info.aluI2FEnable = inFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-            info->vx_nn_tp_cmd_info.aluF2IEnable = outFormat == VX_TYPE_FLOAT16 ? 0 : 1;
+            info->vx_nn_tp_cmd_info.aluI2FEnable = tpBF16 ? 1 : ((inFormat == VX_TYPE_FLOAT16) ? 0 : 1);
+            info->vx_nn_tp_cmd_info.aluF2IEnable = tpBF16 ? 1 : ((outFormat == VX_TYPE_FLOAT16) ? 0 : 1);
             info->vx_nn_tp_cmd_info.aluInputPreshift   = 0;
             info->vx_nn_tp_cmd_info.aluOutputPostshift = ((inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0) - ((outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? outFPP : 0);
 
@@ -5544,8 +7634,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             info->vx_nn_tp_cmd_info.aluLoadPwlLUT = 0;
             info->vx_nn_tp_cmd_info.aluLoadPwlLUTAddress = 0;
             info->vx_nn_tp_cmd_info.aluLoadPwlLUTGlobalMem = 1;
-            info->vx_nn_tp_cmd_info.aluI2FEnable = inFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-            info->vx_nn_tp_cmd_info.aluF2IEnable = outFormat == VX_TYPE_FLOAT16 ? 0 : 1;
+            info->vx_nn_tp_cmd_info.aluI2FEnable = tpBF16 ? 1 : ((inFormat == VX_TYPE_FLOAT16) ? 0 : 1);
+            info->vx_nn_tp_cmd_info.aluF2IEnable = tpBF16 ? 1 : ((outFormat == VX_TYPE_FLOAT16) ? 0 : 1);
             info->vx_nn_tp_cmd_info.aluInputPreshift = (inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0;
             info->vx_nn_tp_cmd_info.aluOutputPostshift = (outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? (0 - outFPP) : 0;
             break;
@@ -5579,8 +7669,13 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             info->vx_nn_tp_cmd_info.aluFilterPwlSwap    = 0;
             info->vx_nn_tp_cmd_info.aluPwlSignSupport   = 0;
             info->vx_nn_tp_cmd_info.aluReluEnable       = 0;
-            info->vx_nn_tp_cmd_info.aluI2FEnable        = (tfQuant && hasInputQuant) ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-            info->vx_nn_tp_cmd_info.aluF2IEnable        = (tfQuant && hasOutputQuant) ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
+            info->vx_nn_tp_cmd_info.aluI2FEnable        = (tfQuant && hasInputQuant) ? 1 : (tpBF16 ? 1 : (inFormat == outFormat ? 0 : (inFormat == VX_TYPE_FLOAT16 ? 0 : 1)));
+            info->vx_nn_tp_cmd_info.aluF2IEnable        = (tfQuant && hasOutputQuant) ? 1 : (tpBF16 ? 1 : (inFormat == outFormat ? 0 : (outFormat == VX_TYPE_FLOAT16 ? 0 : 1)));
+            if (tp_type == TP_TENSOR_STRIDED_SLICE)
+            {
+                info->vx_nn_tp_cmd_info.aluInputPreshift    = 0;
+                info->vx_nn_tp_cmd_info.aluOutputPostshift  = ((inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0) - ((outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? outFPP : 0);
+            }
             break;
         }
 
@@ -5593,8 +7688,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             info->vx_nn_tp_cmd_info.aluFilterPwlSwap    = 0;
             info->vx_nn_tp_cmd_info.aluPwlSignSupport   = 0;
             info->vx_nn_tp_cmd_info.aluReluEnable       = 0;
-            info->vx_nn_tp_cmd_info.aluI2FEnable        = (tfQuant && hasInputQuant) ? 1 : (inFormat == VX_TYPE_FLOAT16 ? 0 : (tpSimpleInt16 ? 0 : 1));
-            info->vx_nn_tp_cmd_info.aluF2IEnable        = (tfQuant && hasOutputQuant) ? 1 : (outFormat == VX_TYPE_FLOAT16 ? 0 : (tpSimpleInt16 ? 0 : 1));
+            info->vx_nn_tp_cmd_info.aluI2FEnable        = (tfQuant && hasInputQuant) ? 1 : (tpBF16 ? 1 : (inFormat == outFormat ? 0 : (inFormat == VX_TYPE_FLOAT16 ? 0 : 1)));
+            info->vx_nn_tp_cmd_info.aluF2IEnable        = (tfQuant && hasOutputQuant) ? 1 : (tpBF16 ? 1 : (inFormat == outFormat ? 0 : (outFormat == VX_TYPE_FLOAT16 ? 0 : 1)));
             info->vx_nn_tp_cmd_info.aluInputPreshift    = 0;
             info->vx_nn_tp_cmd_info.aluOutputPostshift  = ((inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0) - ((outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? outFPP : 0);
             break;
@@ -5603,8 +7698,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
         default:
             break;
     }
-
-    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16))
+    if (!tpBF16 && gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16))
     {
         info->vx_nn_tp_cmd_info.aluI2FEnable = inFormat == VX_TYPE_FLOAT16 ? 0 : 1;
         info->vx_nn_tp_cmd_info.aluF2IEnable = outFormat == VX_TYPE_FLOAT16 ? 0 : 1;
@@ -5642,7 +7736,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
 
             if (hasWQuant)
             {
-                wScale = WB_WEIGHT_SCALE(weights_biases);
+                wScale = WB_WEIGHT_SCALE(weights_biases, 0);
             }
             else
             {
@@ -5683,7 +7777,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
         tmpPostShift = tmpPostShift >> 5;
         info->vx_nn_tp_cmd_info.aluOutputPostshiftBit6to5 = tmpPostShift & 3;
 
-        if (0)
+        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_23BITS_POST_MULTIPLIER))
         {
             /* 23-bit post multiplier */
             info->vx_nn_tp_cmd_info.aluOutputPostMultiplier = tmpMultiply & 0x7FFF;
@@ -5696,7 +7790,14 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             info->vx_nn_tp_cmd_info.aluOutputPostMultiplierBit22to15 = 0;
         }
 
-        info->vx_nn_tp_cmd_info.coefZP = weights_biases == VX_NULL ? 0 : WB_WEIGHT_ZP(weights_biases);
+        info->vx_nn_tp_cmd_info.coefZP = weights_biases == VX_NULL ? 0 : WB_WEIGHT_ZP(weights_biases, 0);
+        if ((weights_biases != VX_NULL) &&
+            (WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_INT8) &&
+            (WB_WEIGHT_QUANT_FORMAT(weights_biases) == VX_QUANT_AFFINE_SCALE) &&
+            vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ASYMMETRIC_INT8))
+        {
+            info->vx_nn_tp_cmd_info.coefZP += 128;
+        }
         if (tp_type == TP_ROI_POOLING_STEP_1)
         {
             /* Zero point is handled in VPooling, so no zero point in HPooling. */
@@ -5707,6 +7808,15 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
         {
             info->vx_nn_tp_cmd_info.inputZP  = hasInputQuant ? inZP : 0;
             info->vx_nn_tp_cmd_info.outputZP = hasOutputQuant ? outZP : 0;
+
+            if (updateZPForOutData(context, conv_cmd_ptr->tpType, outFormat))
+            {
+                info->vx_nn_tp_cmd_info.outputZP += 128;
+            }
+            if (updateZPForInputData(context, conv_cmd_ptr->tpType, inFormat))
+            {
+                info->vx_nn_tp_cmd_info.inputZP += 128;
+            }
         }
     }
     else
@@ -5716,10 +7826,22 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
         tmpPostShift = tmpPostShift >> 5;
         info->vx_nn_tp_cmd_info.aluOutputPostshiftBit6to5 = tmpPostShift & 3;
         info->vx_nn_tp_cmd_info.aluOutputPostMultiplier = 0;
+        info->vx_nn_tp_cmd_info.inputZP  = hasInputQuant ? inZP : 0;
+        info->vx_nn_tp_cmd_info.outputZP = hasOutputQuant ? outZP : 0;
+
+        if (updateZPForOutData(context, conv_cmd_ptr->tpType, outFormat))
+        {
+            info->vx_nn_tp_cmd_info.outputZP += 128;
+        }
+
+        if (updateZPForInputData(context, conv_cmd_ptr->tpType, inFormat))
+        {
+            info->vx_nn_tp_cmd_info.inputZP += 128;
+        }
     }
 
-    info->vx_nn_tp_cmd_info.inImageDataType = getHWDataFormat(inFormat);
-    info->vx_nn_tp_cmd_info.outImageDataType = getHWDataFormat(outFormat);
+    info->vx_nn_tp_cmd_info.inImageDataType = getTPDataFormat(inFormat);
+    info->vx_nn_tp_cmd_info.outImageDataType = getTPDataFormat(outFormat);
     info->vx_nn_tp_cmd_info.floatRoundingMode = getHWRoundingMode((vx_nn_round_mode_e)outRMode, outFormat, vx_true_e);
     info->vx_nn_tp_cmd_info.integeroundingMode = 0x1;
 
@@ -5810,6 +7932,7 @@ VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
             cmdBufPhys = command_buffer->physical + NNE_COMMAND_SIZE * i;
             cmdBufTPtr = cmdBufPtr = (vx_uint8_ptr)command_buffer->logical + NNE_COMMAND_SIZE * i;
 
+
             vxMemCopy(&info.vx_nn_tp_cmd_info, &sinfo[i].vx_nn_general_cmd_split_info, sizeof(struct _vx_nn_general_cmd_split_info));
             memset(cmdBufTPtr, 0, NNE_COMMAND_SIZE);
             gcoVX_ProgrammCrossEngine((void*)&info, gcvVX_ACCELERATOR_NN, (void*)&context->options, (vx_uint32_ptr*)&cmdBufTPtr);
@@ -5822,7 +7945,7 @@ VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
                            (gctPOINTER)cmdBufPtr,
                            0,
                            NNE_COMMAND_SIZE);
-            dumpNNCommandInfo(i, weights_biases->slice_num, &info, NULL);
+            dumpNNCommandInfo(i, WB_TOTAL_SLICE_NUM(weights_biases), &info, NULL);
 #endif
 
             if (node->graph->binarySave)
@@ -5831,7 +7954,7 @@ VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
                 vx_uint32 ksDataPhysical    = (vx_uint32)WB_MEM_PHYSICAL_ADDR_INDEX(weights_biases, 0);
                 vx_uint32 ksDataSize        = (vx_uint32)WB_MEM_SIZE_INDEX(weights_biases, 0);
 
-                vxoBinaryGraph_SaveTPNNOperation(node,
+                vxmONERROR(vxoBinaryGraph_SaveTPNNOperation(node,
                                                  cmdBufPtr,
                                                  cmdBufPhys,
                                                  NNE_COMMAND_SIZE,
@@ -5842,7 +7965,10 @@ VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
                                                  input,
                                                  output,
                                                  info.vx_nn_general_cmd_info.inImageAddress,
-                                                 info.vx_nn_general_cmd_info.outImageAddress);
+                                                 info.vx_nn_general_cmd_info.outImageAddress,
+                                                 parameter,
+                                                 operation_command->operation,
+                                                 i));
             }
 
             if (!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_SMALLBATCH_PHASE1))
@@ -5870,6 +7996,8 @@ VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
             else
             {
                 vxMemCopy(&info.vx_nn_tp_cmd_info, &sinfo[i].vx_tp_general_cmd_split_info, sizeof(struct _vx_tp_general_cmd_split_info));
+                info.vx_nn_tp_cmd_info.inWindowZStartOverfetch = info.vx_nn_tp_cmd_info.inWindowZStartOverfetch2;
+                info.vx_nn_tp_cmd_info.inWindowZEndOverfetch = info.vx_nn_tp_cmd_info.inWindowZEndOverfetch2;
             }
 
             gcoVX_ProgrammCrossEngine((void*)&info, gcvVX_ACCELERATOR_TP, VX_NULL, (vx_uint32_ptr*)&cmdBufTPtr);
@@ -5912,7 +8040,7 @@ VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
 
             if (node->graph->binarySave)
             {
-                vxoBinaryGraph_SaveTPNNOperation(node,
+                vxmONERROR(vxoBinaryGraph_SaveTPNNOperation(node,
                                                  cmdBufPtr,
                                                  cmdBufPhys,
                                                  TP_COMMAND_SIZE,
@@ -5923,14 +8051,28 @@ VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
                                                  input,
                                                  output,
                                                  info.vx_nn_tp_cmd_info.inImageBaseAddress,
-                                                 info.vx_nn_tp_cmd_info.outBaseAddress);
+                                                 info.vx_nn_tp_cmd_info.outBaseAddress,
+                                                 parameter,
+                                                 operation_command->operation,
+                                                 i));
             }
 
-            command_buffer->eventID[i] = i != command_buffer->commandCount - 1 ? 1 : 0;
-
-            if (operation_command->operation->operatorType == VXNNE_OPERATOR_FULLYCONNECTED)
+            if (operation_command->operation->operatorType == VXNNE_OPERATOR_TENSOR_TRANS && parameter->tp_value->e32[0] == 6)
             {
-                command_buffer->eventID[i] |= 0x80000000;
+                command_buffer->eventID[i] = i % parameter->tp_value->u32[1] != parameter->tp_value->u32[1] - 1 ? 1 : 0;
+            }
+            else
+            {
+                command_buffer->eventID[i] = i != command_buffer->commandCount - 1 ? 1 : 0;
+            }
+
+            /*parameter->tp_value->u32[0] == 1 :  kz not split*/
+            /*parameter->tp_value->u32[0] != 1 && parameter->tp_value->e32[0] == 0 : kz split and not the last vertical process operation*/
+            if (operation_command->operation->operatorType == VXNNE_OPERATOR_FULLYCONNECTED && (parameter->tp_value->u32[0] == 1 || (parameter->tp_value->u32[0] != 1 && parameter->tp_value->e32[0] == 0)))
+            {
+                if((gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16) &&  gcoHAL_IsFeatureAvailable(gcvNULL, gcFEATURE_BIT_TPLITE_BFLOAT16)) ||
+                    (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16) && !gcoHAL_IsFeatureAvailable(gcvNULL, gcFEATURE_BIT_TPLITE_BFLOAT16)))
+                    command_buffer->eventID[i] |= 0x80000000;
             }
         }
     }

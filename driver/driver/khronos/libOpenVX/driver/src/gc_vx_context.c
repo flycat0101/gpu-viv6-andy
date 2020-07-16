@@ -13,6 +13,8 @@
 
 #include <gc_vx_common.h>
 #include <gc_vx_nn_util.h>
+#include <gc_vx_nn_wb.h>
+#include "archModelInterface.h"
 /*
 ** Misc
 */
@@ -149,7 +151,6 @@ static vx_datatype_size_record_s vxDataTypeSizeRecords[] = {
     {VX_TYPE_TENSOR_ADDRESS, sizeof(vx_tensor_addressing_s)},
 
     {VX_TYPE_WEIGHTS_BIASES_PARAMETER, sizeof(vx_weights_biases_parameter_s)},
-    {VX_TYPE_WEIGHTS_BIASES_PARAMETER_BASE, sizeof(vx_weights_biases_parameter_base_s)}
 };
 
 VX_INTERNAL_API vx_uint32 vxDataType_GetSize(vx_type_e type)
@@ -217,8 +218,7 @@ static vx_object_destructor_record_s vxDestructorRecords[] = {
     {VX_TYPE_TENSOR_VIEW, VX_NULL},
     {VX_TYPE_TENSOR_ADDRESS,VX_NULL},
 
-    {VX_TYPE_WEIGHTS_BIASES_PARAMETER, &vxoWeightsBiases_Destructor},
-    {VX_TYPE_WEIGHTS_BIASES_PARAMETER_BASE, &vxoWeightsBiasesBase_Destructor},
+    {VX_TYPE_WEIGHTS_BIASES_PARAMETER, &vxoWeightBias_Destructor},
 
     {VX_TYPE_PROGRAM, &vxoProgram_Destructor}
 };
@@ -338,6 +338,26 @@ VX_PRIVATE_API vx_bool vxoContext_CreateAllPredefinedErrorObjects(vx_context con
     return vx_true_e;
 }
 
+
+vx_status vxoContext_initializeSRAM(vx_context context)
+{
+    if(context->options.kernelVIPSize > context->vipSRAM.size)
+    {
+        vxInfo("\nvipSRAM is not enough for kernel\n");
+        context->vipSRAMForKernel.size = 0;
+        return VX_FAILURE;
+    }
+    if(context->options.kernelVIPSize)
+    {
+        context->vipSRAMForKernel.physical = context->vipSRAM.physical;
+        context->vipSRAMForKernel.physBase = context->vipSRAM.physBase;
+        context->vipSRAMForKernel.size = (vx_uint32)gcmALIGN_NP2(context->options.kernelVIPSize, CACHE_ALIGNMENT_SIZE);
+        context->vipSRAMForKernel.used = 0;
+        context->vipSRAM.physical += (vx_uint32)gcmALIGN_NP2(context->options.kernelVIPSize, CACHE_ALIGNMENT_SIZE);
+        context->vipSRAM.size -= (vx_uint32)gcmALIGN_NP2(context->options.kernelVIPSize, CACHE_ALIGNMENT_SIZE);
+    }
+    return VX_SUCCESS;
+}
 
 VX_PRIVATE_API void vxoGlobalData_FetchOptionsForTransferGraph(vx_global_data globalData, gctSTRING envctrl)
 {
@@ -635,6 +655,37 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
     {
         globalData->options.enableCNNPerf = atoi(envctrl);
     }
+    else
+    {
+        if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_PROFILE", &envctrl)) && envctrl)
+        {
+            if (atoi(envctrl) == 1) {
+                /*enable profiling per operation by default if user didn't set CNN_PERF*/
+                globalData->options.enableCNNPerf = 1;
+            }
+        }
+    }
+
+    envctrl = gcvNULL;
+    globalData->options.enableBlockDump = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_BLOCK_DUMP", &envctrl)) && envctrl)
+    {
+        globalData->options.enableBlockDump = atoi(envctrl);
+    }
+
+    envctrl = gcvNULL;
+    globalData->options.enableWBDump = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_WB_DUMP", &envctrl)) && envctrl)
+    {
+        globalData->options.enableWBDump = atoi(envctrl);
+    }
+
+    envctrl = gcvNULL;
+    globalData->options.commandBufferDump = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_COMMAND_DUMP", &envctrl)) && envctrl)
+    {
+        globalData->options.commandBufferDump = atoi(envctrl);
+    }
 
     globalData->options.graphPerfLogFile = gcvNULL;
     gcoOS_GetEnv(gcvNULL, "VIV_VX_GRAPH_PERF", &globalData->options.graphPerfLogFile);
@@ -695,24 +746,6 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
         globalData->options.axiSramTotalBWLimit = (gctFLOAT) atof(envctrl);
     }
     envctrl = gcvNULL;
-    globalData->options.axiBusReadBWLimit = 0;
-    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_AXI_BUS_READ_BW_LIMIT", &envctrl)) && envctrl)
-    {
-        globalData->options.axiBusReadBWLimit = (gctFLOAT) atof(envctrl);
-    }
-    envctrl = gcvNULL;
-    globalData->options.axiBusWriteBWLimit = 0;
-    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_AXI_BUS_WRITE_BW_LIMIT", &envctrl)) && envctrl)
-    {
-        globalData->options.axiBusWriteBWLimit = (gctFLOAT) atof(envctrl);
-    }
-    envctrl = gcvNULL;
-    globalData->options.axiBusTotalBWLimit = 0;
-    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_AXI_BUS_TOTAL_BW_LIMIT", &envctrl)) && envctrl)
-    {
-        globalData->options.axiBusTotalBWLimit = (gctFLOAT) atof(envctrl);
-    }
-    envctrl = gcvNULL;
     globalData->options.vipSRAMSize = VX_INVALID_VALUE;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_VIP_SRAM_SIZE", &envctrl)) && envctrl)
     {
@@ -737,6 +770,13 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_LAYER_DUMP", &envctrl)) && envctrl)
     {
         globalData->options.enableNNLayerDump = atoi(envctrl);
+    }
+
+    envctrl = gcvNULL;
+    globalData->options.enableNNLayerDump_Int = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_LAYER_DUMP_QTENSOR", &envctrl)) && envctrl)
+    {
+        globalData->options.enableNNLayerDump_Int = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
@@ -808,6 +848,13 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_COLLECT_PERF_TYPE", &envctrl)) && envctrl)
     {
         globalData->options.collectPerfType = atoi(envctrl);
+    }
+
+    envctrl = gcvNULL;
+    globalData->options.disableVIPFinalRelease = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DISABLE_VIP_FINAL_RELEASE", &envctrl)) && envctrl)
+    {
+        globalData->options.disableVIPFinalRelease = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
@@ -965,6 +1012,13 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
     }
 
     envctrl = gcvNULL;
+    globalData->options.enableWBShare = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_WB_SHARE", &envctrl)) && envctrl)
+    {
+        globalData->options.enableWBShare = atoi(envctrl);
+    }
+
+    envctrl = gcvNULL;
     globalData->options.enableGraphTranform = 1;
     globalData->options.enableGraphMerge = 1;
     globalData->options.enableGraphDump = 0;
@@ -982,7 +1036,7 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
     globalData->options.enableTransformNMConv = 1;
     globalData->options.enableGraphMergeTranspose = 1;
     globalData->options.enableGraphPadConv = 1;
-    globalData->options.enableGraphDeleteRelu = 0;
+    globalData->options.enableGraphDeleteRelu = 1;
     globalData->options.enableGraphDeleteSqueeze = 1;
     globalData->options.enableGraphWar1x1x1weight = 1;
     globalData->options.enableGraphAvgPoolandPWConv = 1;
@@ -1063,10 +1117,10 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
     }
 
     envctrl = gcvNULL;
-    globalData->options.enableForce64BitsBiasNN = 0;
-    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_64BITS_BIAS_NN", &envctrl)) && envctrl)
+    globalData->options.kernelVIPSize = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_VIPSRAM_MAX_SIZE_KERNEL_AND_CONST_TENSOR", &envctrl)) && envctrl)
     {
-        globalData->options.enableForce64BitsBiasNN = atoi(envctrl);
+        globalData->options.kernelVIPSize = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
@@ -1074,6 +1128,13 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_CONTIGOUS_MEM_FOR_KERNEL", &envctrl)) && envctrl)
     {
         globalData->options.enableAllocateContigousMemForKernel = atoi(envctrl);
+    }
+
+    envctrl = gcvNULL;
+    globalData->options.enableNNCoefByPass = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_COEF_BYPASS", &envctrl)) && envctrl)
+    {
+        globalData->options.enableNNCoefByPass = atoi(envctrl);
     }
 
     globalData->options.disableTPNNEvis = 0;
@@ -1107,6 +1168,107 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
             globalData->nnConfig.fixedFeature.tpPwlLUTCount      = 0;
             globalData->nnConfig.fixedFeature.vipCoreCount       = 0;
         }
+    }
+    /* get the graph_batchCount from env */
+    envctrl = gcvNULL;
+    globalData->options.graphBatchCount = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_GRAPH_BATCH_COUNT", &envctrl)) && envctrl)
+    {
+        globalData->options.graphBatchCount = atoi(envctrl);
+    }
+
+    /*Solely for BRCM 2019July */
+    #define  DEFAULT_DDR_READ_BW_IN_BYTE_PER_CYCLE_64B              2
+    #define  DEFAULT_DDR_READ_BW_IN_BYTE_PER_CYCLE_128B             14.2
+    #define  DEFAULT_DDR_READ_BW_IN_BYTE_PER_CYCLE_256B             14.7
+    #define  DEFAULT_DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_64B         0.32
+    #define  DEFAULT_DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_128B        1.8
+    #define  DEFAULT_DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_256B        3.04
+    #define  DEFAULT_DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_64B      1.28
+    #define  DEFAULT_DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_128B     7.2
+    #define  DEFAULT_DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_256B     12.16
+    /* get the DDR Burst information from env */
+    envctrl = gcvNULL;
+    globalData->options.specificDDRLimitByBurst = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_SPECIFIC_DDR_LIMIT_BYBURST", &envctrl)) && envctrl)
+    {
+        globalData->options.specificDDRLimitByBurst = atoi(envctrl);
+    }
+    /* DDR Burst detail value */
+    envctrl = gcvNULL;
+    globalData->options.ddrReadSustainedBw64BBurst = (gctFLOAT)DEFAULT_DDR_READ_BW_IN_BYTE_PER_CYCLE_64B;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DDR_READ_BW64B_BURST", &envctrl)) && envctrl)
+    {
+        globalData->options.ddrReadSustainedBw64BBurst = (gctFLOAT) atof(envctrl);
+    }
+    envctrl = gcvNULL;
+    globalData->options.ddrReadSustainedBw128BBurst = (gctFLOAT)DEFAULT_DDR_READ_BW_IN_BYTE_PER_CYCLE_128B;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DDR_READ_BW128B_BURST", &envctrl)) && envctrl)
+    {
+        globalData->options.ddrReadSustainedBw128BBurst = (gctFLOAT) atof(envctrl);
+    }
+    envctrl = gcvNULL;
+    globalData->options.ddrReadSustainedBw256BBurst = (gctFLOAT)DEFAULT_DDR_READ_BW_IN_BYTE_PER_CYCLE_256B;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DDR_READ_BW256B_BURST", &envctrl)) && envctrl)
+    {
+        globalData->options.ddrReadSustainedBw256BBurst = (gctFLOAT) atof(envctrl);
+    }
+    envctrl = gcvNULL;
+    globalData->options.ddrMaskWriteSustainedBw64BBurst = (gctFLOAT)DEFAULT_DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_64B;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DDR_MASKWRITE_BW64B_BURST", &envctrl)) && envctrl)
+    {
+        globalData->options.ddrMaskWriteSustainedBw64BBurst = (gctFLOAT) atof(envctrl);
+    }
+    envctrl = gcvNULL;
+    globalData->options.ddrMaskWriteSustainedBw128BBurst = (gctFLOAT)DEFAULT_DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_128B;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DDR_MASKWRITE_BW128B_BURST", &envctrl)) && envctrl)
+    {
+        globalData->options.ddrMaskWriteSustainedBw128BBurst = (gctFLOAT) atof(envctrl);
+    }
+    envctrl = gcvNULL;
+    globalData->options.ddrMaskWriteSustainedBw256BBurst = (gctFLOAT)DEFAULT_DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_256B;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DDR_MASKWRITE_BW256B_BURST", &envctrl)) && envctrl)
+    {
+        globalData->options.ddrMaskWriteSustainedBw256BBurst = (gctFLOAT) atof(envctrl);
+    }
+    envctrl = gcvNULL;
+    globalData->options.ddrNonMaskWriteSustainedBw64BBurst = (gctFLOAT)DEFAULT_DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_64B;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DDR_NON_MASKWRITE_BW64B_BURST", &envctrl)) && envctrl)
+    {
+        globalData->options.ddrNonMaskWriteSustainedBw64BBurst = (gctFLOAT) atof(envctrl);
+    }
+    envctrl = gcvNULL;
+    globalData->options.ddrNonMaskWriteSustainedBw128BBurst = (gctFLOAT)DEFAULT_DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_128B;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DDR_NON_MASKWRITE_BW128B_BURST", &envctrl)) && envctrl)
+    {
+        globalData->options.ddrNonMaskWriteSustainedBw128BBurst = (gctFLOAT) atof(envctrl);
+    }
+    envctrl = gcvNULL;
+    globalData->options.ddrNonMaskWriteSustainedBw256BBurst = (gctFLOAT)DEFAULT_DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_256B;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DDR_NON_MASKWRITE_BW256B_BURST", &envctrl)) && envctrl)
+    {
+        globalData->options.ddrNonMaskWriteSustainedBw256BBurst = (gctFLOAT) atof(envctrl);
+    }
+
+    envctrl = gcvNULL;
+    globalData->options.setCoreCount = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_SET_CORE_COUNT", &envctrl)) && envctrl)
+    {
+        globalData->options.setCoreCount = atoi(envctrl);
+    }
+
+    envctrl = gcvNULL;
+    globalData->options.use15bitsPostMultiply = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_USE_15BITS_POST_MULTIPLY", &envctrl)) && envctrl)
+    {
+        globalData->options.use15bitsPostMultiply = atoi(envctrl);
+    }
+
+    envctrl = gcvNULL;
+    globalData->options.enableMPSplitZ = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_SPLIT_Z", &envctrl)) && envctrl)
+    {
+        globalData->options.enableMPSplitZ = atoi(envctrl);
     }
 
     gcmFOOTER_ARG("%d", VX_SUCCESS);
@@ -1181,9 +1343,12 @@ VX_PRIVATE_API vx_status QuerySRAM(
         {
             globalData->nnConfig.customizedFeature.axiSRAMSize = size;
 
+            /* after query sram, need to set the result to C-Arch if the size is not 0 */
+            setAxiSramToCArch(size);
+
             gcmONERROR(gcoHAL_QuerySRAM(gcvNULL,
                                         type,
-                                        &size,
+                                        gcvNULL,
                                         &gpuVirtual,
                                         &gpuPhysical,
                                         &gpuPhysicalName,
@@ -1215,7 +1380,7 @@ VX_PRIVATE_API vx_status QuerySRAM(
         {
             gcmONERROR(gcoHAL_QuerySRAM(gcvNULL,
                                         type,
-                                        &size,
+                                        gcvNULL,
                                         &gpuVirtual,
                                         VX_NULL,
                                         VX_NULL,
@@ -1320,17 +1485,17 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitSRAM(
             globalData->axiSRAM[i].captureLogical = vxAllocateAndZeroMemory(globalData->axiSRAM[i].size);
             globalData->axiSRAM[i].logical  = globalData->axiSRAM[i].captureLogical;
 #else
-            globalData->axiSRAM[i].logical  = (vx_uint8_ptr)axiSRAMLogical + globalData->axiSRAM[i-1].size;
+            globalData->axiSRAM[i].logical  = (vx_uint8_ptr)(globalData->axiSRAM[i-1].logical) + globalData->axiSRAM[i-1].size;
 #endif
 
-            globalData->axiSRAM[i].physical = axiSRAMPhysical + globalData->axiSRAM[i-1].size;
+            globalData->axiSRAM[i].physical = globalData->axiSRAM[i-1].physical + globalData->axiSRAM[i-1].size;
             globalData->axiSRAM[i].used     = 0;
         }
     }
 
     if (vipSRAMSize != 0)
     {
-        vx_uint32 vipSramImageStreamSize = globalData->nnConfig.fixedFeature.latencyHidingAtFullAxiBw * globalData->nnConfig.fixedFeature.axiBusWidth;
+        vx_uint32 vipSramImageStreamSize = (vipSRAMSize == 2048) ? 2048 : globalData->nnConfig.fixedFeature.latencyHidingAtFullAxiBw * globalData->nnConfig.fixedFeature.axiBusWidth;
         globalData->vipSRAM.size         = (vipSRAMSize <= vipSramImageStreamSize) ? vipSRAMSize : (vipSRAMSize - vipSramImageStreamSize);
         globalData->vipSRAM.logical      = gcvNULL;
         globalData->vipSRAM.physBase     = vipSRAMPhysical != gcvINVALID_ADDRESS ? vipSRAMPhysical : 0;
@@ -1339,81 +1504,6 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitSRAM(
         globalData->vipSRAM.used         = 0;
         globalData->vipSRAM.node         = vipSRAMNode;
     }
-
-OnError:
-    gcmFOOTER_ARG("%d", status);
-    return status;
-}
-
-VX_INTERNAL_API vx_status vxoContext_CaptureInitState(
-    vx_context context
-    )
-{
-    vx_status status = VX_SUCCESS;
-    vx_uint32 i = 0;
-    gctUINT32 axiSRAMPhysical = gcvINVALID_ADDRESS;
-    gctUINT32 axiSRAMSize = 0;
-    gctUINT32 axiSRAMGpuPhysical = gcvINVALID_ADDRESS;
-
-    gctUINT32 vipSRAMPhysical = gcvINVALID_ADDRESS;
-    gctUINT32 vipSRAMSize = 0;
-    gcmHEADER_ARG("context=%p", context);
-
-    context->binaryGraphInitBuffer = (vx_ptr_ptr)vxAllocateAndZeroMemory(sizeof(vx_ptr) * context->deviceCount);
-    vxmONERROR_NULLPTR(context->binaryGraphInitBuffer);
-
-    context->binaryGraphInitSize = (vx_uint32_ptr)vxAllocateAndZeroMemory(sizeof(vx_uint32) * context->deviceCount);
-    vxmONERROR_NULLPTR(context->binaryGraphInitSize);
-
-    /* program SRAM commands for NBG start */
-    vxmONERROR(QuerySRAM(context->globalData, gcvPOOL_EXTERNAL_SRAM, &axiSRAMPhysical, gcvNULL, &axiSRAMGpuPhysical, &axiSRAMSize, gcvNULL));
-    vxmONERROR(QuerySRAM(context->globalData, gcvPOOL_INTERNAL_SRAM, &vipSRAMPhysical, gcvNULL, gcvNULL, &vipSRAMSize, gcvNULL));
-
-    vxmASSERT(vipSRAMSize != 0);
-    vxmASSERT(axiSRAMSize == 0 || (axiSRAMPhysical != gcvINVALID_ADDRESS && axiSRAMGpuPhysical != gcvINVALID_PHYSICAL_ADDRESS));
-
-    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE3))
-    {
-        vxmASSERT(vipSRAMPhysical != gcvINVALID_ADDRESS);
-        gcmVERIFY_OK(gcoVX_SetRemapAddress(vipSRAMPhysical, 0, gcvVX_SRAM_REMAP));
-        vxInfo("generate NBG, map VIP-SRAM start address=0x%x\n", vipSRAMPhysical);
-    }
-
-    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1))
-    {
-        gctUINT32 axiSRAMEndAddr = 0;
-
-        if (axiSRAMSize != 0)
-        {
-            if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_XYDP0))
-            {
-                /* v8 */
-                axiSRAMEndAddr =  axiSRAMPhysical + axiSRAMSize;
-            }
-            else
-            {
-                axiSRAMEndAddr =  axiSRAMGpuPhysical + axiSRAMSize;
-            }
-        }
-        else
-        {
-            axiSRAMPhysical = 0;
-            axiSRAMEndAddr = 0;
-        }
-
-        gcmVERIFY_OK(gcoVX_SetRemapAddress(axiSRAMPhysical, axiSRAMEndAddr, gcvVX_OCB_REMAP));
-        vxInfo("generate NBG, map AXI-SRAM size=0x%x, start address=0x%x, end address=0x%x\n", axiSRAMSize, axiSRAMPhysical, axiSRAMEndAddr);
-    }
-    /* program SRAM commands for NBG end */
-
-    for (i = 0; i < context->deviceCount; i++)
-    {
-        context->binaryGraphInitBuffer[i] = (vx_ptr)vxAllocateAndZeroMemory(sizeof(vx_uint8) * VX_MAX_INITIALIZE_COMMAND_SIZE);
-        vxmONERROR_NULLPTR(context->binaryGraphInitBuffer[i]);
-    }
-
-    gcoVX_CaptureInitState(context->binaryGraphInitBuffer, VX_MAX_INITIALIZE_COMMAND_SIZE,
-                            context->binaryGraphInitSize, context->deviceCount);
 
 OnError:
     gcmFOOTER_ARG("%d", status);
@@ -1555,6 +1645,8 @@ VX_PRIVATE_API vx_context vxoContext_Create()
         memcpy(&context->axiSRAM, &vxGlobalData->axiSRAM, sizeof(vxnne_sram_s) * MAX_GPU_CORE_COUNT);
         memcpy(&context->vipSRAM, &vxGlobalData->vipSRAM, sizeof(vxnne_sram_s));
 
+        vxoContext_initializeSRAM(context);
+
         if (context->options.disableTPNNEvis)
         {
             context->evisNoInst.isVX2       = vx_false_e;
@@ -1610,13 +1702,17 @@ VX_PRIVATE_API vx_context vxoContext_Create()
     }
 #endif
 
+#if gcdUSE_BROKER
+    if(vxoBinaryGraph_BrokerInit(context) != VX_SUCCESS)
+    {
+        vxError("%s[%d]: failed to initialzie broker\n", __FUNCTION__, __LINE__);
+    }
+#endif
+
     vxReleaseMutex(pls->vxContextGlobalLock);
 
-    if ((context->options.enableSaveBinary) || (context->options.enableCacheBinaryGraph))
-    {
-        vxoContext_CaptureInitState(context);
-    }
     gcmFOOTER_ARG("%p", context);
+
     return (vx_context)context;
 
 ErrorExit:
@@ -1734,6 +1830,10 @@ VX_PRIVATE_API vx_uint32 vxoGlobalData_Release(vx_global_data globalData)
     refCount = globalData->refGlobalDataCount;
     if (refCount == 0)
     {
+        if (globalData->options.vipTimeOut != gcdGPU_TIMEOUT)
+        {
+            gcoHAL_SetTimeOut(gcvNULL, gcdGPU_TIMEOUT);
+        }
 
 #if gcdCAPTURE_ONLY_MODE
         vx_uint32 deviceCount = 0;
@@ -1748,11 +1848,6 @@ VX_PRIVATE_API vx_uint32 vxoGlobalData_Release(vx_global_data globalData)
             }
         }
 #endif
-
-        if (globalData->options.vipTimeOut != gcdGPU_TIMEOUT)
-        {
-            gcoHAL_SetTimeOut(gcvNULL, gcdGPU_TIMEOUT);
-        }
 
         if (globalData->options.flagTPFunc)
             vxFree(globalData->options.flagTPFunc);
@@ -1782,14 +1877,17 @@ VX_PRIVATE_API vx_uint32 vxoGlobalData_Release(vx_global_data globalData)
 
         /* Destroy vir intrinsic library. */
 #if (!VSC_LITE_BUILD)
+        gcFreeCLPatchLibrary();
         vscFreeVirIntrinsicLib();
+        gcSHADER_FreeRecompilerLibrary();
 #endif
         gcfVX_UnloadCompiler(globalData);
 
-#ifdef USE_LIB_NN_ARCH_PERF
         if (globalData->apm)
             DestroyAPModel(globalData->apm);
-#endif
+
+        if(globalData->archSwLibHandle)
+            archSwLibDeInitFromDriver(globalData->archSwLibHandle);
 
         vxFree(vxGlobalData);
         vxGlobalData = NULL;
@@ -1839,6 +1937,12 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
     }
     vxAcquireMutex(pls->vxContextGlobalLock);
 
+#if gcdUSE_BROKER
+    if(vxoBinaryGraph_BrokerDestroy(context) != VX_SUCCESS)
+    {
+        vxError("%s[%d]: failed to destroy broker\n", __FUNCTION__, __LINE__);
+    }
+#endif
 
     gcfVX_Flush(gcvTRUE);
 
@@ -1853,28 +1957,6 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
     /* Destroy the profiler. */
     vxoProfiler_Destroy(context);
 #endif
-
-    if ((context->options.enableSaveBinary) || (context->options.enableCacheBinaryGraph))
-    {
-        if (context->binaryGraphInitBuffer != VX_NULL)
-        {
-            for (i = 0; i < context->deviceCount; i++)
-            {
-                if (context->binaryGraphInitBuffer[i] != VX_NULL)
-                {
-                    vxFree(context->binaryGraphInitBuffer[i]);
-                    context->binaryGraphInitBuffer[i] = VX_NULL;
-                }
-            }
-            vxFree(context->binaryGraphInitBuffer);
-            context->binaryGraphInitBuffer = VX_NULL;
-        }
-        if (context->binaryGraphInitSize != VX_NULL)
-        {
-            vxFree(context->binaryGraphInitSize);
-            context->binaryGraphInitSize = VX_NULL;
-        }
-    }
 
     if (vxoReference_Decrement(&context->base, VX_REF_EXTERNAL) == 0)
     {
@@ -2213,8 +2295,8 @@ VX_INTERNAL_API vx_status vxContext_LoadKernels(vx_context context, const vx_str
                 vxError("Failed to publish kernels in module\n");
                 vxUnloadModule(context->moduleTable[i].handle);
                 context->moduleTable[i].handle = NULL;
-                gcmFOOTER_ARG("%d", VX_ERROR_NO_RESOURCES);
-                return VX_ERROR_NO_RESOURCES;
+                gcmFOOTER_ARG("%d", status);
+                return status;
             }
 
             vxStrCopySafe(context->moduleTable[i].name, VX_MAX_PATH, module);
@@ -2740,6 +2822,116 @@ VX_API_ENTRY vx_enum VX_API_CALL vxRegisterUserStruct(vx_context context, vx_siz
     return VX_TYPE_INVALID;
 }
 
+VX_API_ENTRY vx_enum VX_API_CALL vxGetUserStructByName(vx_context context, const vx_char *name)
+{
+    vx_enum type = VX_TYPE_INVALID;
+    vx_uint32 i = 0;
+    vx_size len = strlen(name);
+    if (VX_MAX_STRUCT_NAME < len)
+        len = VX_MAX_STRUCT_NAME;
+    if (vxoContext_IsValid(context) && (len != 0))
+    {
+        for (i = 0; i < VX_MAX_USER_STRUCT_COUNT; ++i)
+        {
+            if ((VX_TYPE_INVALID != context->userStructTable[i].type) &&
+                (0 == strncmp(context->userStructTable[i].name, name, len)))
+            {
+                type = context->userStructTable[i].type;
+                break;
+            }
+        }
+    }
+    return type;
+}
+
+VX_API_ENTRY vx_enum VX_API_CALL vxRegisterUserStructWithName(vx_context context, vx_size size, const vx_char* type_name)
+{
+    vx_enum type = VX_TYPE_INVALID;
+    vx_uint32 i = 0;
+
+    if (vxoContext_IsValid(context) && (size != 0) &&
+        VX_TYPE_INVALID == vxGetUserStructByName(context, type_name))
+    {
+        for (i = 0; i < VX_MAX_USER_STRUCT_COUNT; i++)
+        {
+            if (context->userStructTable[i].type == VX_TYPE_INVALID)
+            {
+                context->userStructTable[i].type = VX_TYPE_USER_STRUCT_START + i;
+                context->userStructTable[i].size = size;
+                strncpy(context->userStructTable[i].name, type_name, VX_MAX_REFERENCE_NAME - 1);
+                type = context->userStructTable[i].type;
+                break;
+            }
+        }
+    }
+    return type;
+}
+
+VX_API_ENTRY vx_status VX_API_CALL vxGetUserStructNameByEnum(vx_context context, vx_enum user_struct_type, vx_char* type_name, vx_size name_size)
+{
+    vx_uint32 i = 0;
+    vx_status status = VX_ERROR_INVALID_PARAMETERS;
+
+    if (vxoContext_IsValid(context) && (user_struct_type != VX_TYPE_INVALID))
+    {
+        for (i = 0; i < VX_MAX_USER_STRUCT_COUNT; ++i)
+        {
+            if (user_struct_type == context->userStructTable[i].type)
+            {
+                break;
+            }
+        }
+
+        if (i == VX_MAX_USER_STRUCT_COUNT)
+        {
+            status = VX_FAILURE;
+        }
+        else
+        {
+            if (name_size < (strlen(context->userStructTable[i].name) + 1))
+            {
+                status = VX_ERROR_NO_MEMORY;
+            }
+            else
+            {
+                memcpy(type_name, context->userStructTable[i].name,
+                       strlen(context->userStructTable[i].name) + 1);
+                status = VX_SUCCESS;
+            }
+        }
+    }
+    return status;
+}
+
+VX_API_ENTRY vx_status VX_API_CALL vxGetUserStructEnumByName(vx_context context, const vx_char* type_name, vx_enum *user_struct_type)
+{
+    vx_status status = VX_FAILURE;
+    vx_uint32 i = 0;
+    vx_size len = 0;
+    if (NULL != type_name)
+    {
+        len = strlen(type_name);
+        if (VX_MAX_REFERENCE_NAME < len)
+        {
+            len = VX_MAX_REFERENCE_NAME;
+        }
+    }
+    if (vxoContext_IsValid(context) && (len != 0))
+    {
+        for (i = 0; i < VX_MAX_USER_STRUCT_COUNT; ++i)
+        {
+            if ((VX_TYPE_INVALID != context->userStructTable[i].type) &&
+                (0 == strncmp(context->userStructTable[i].name, type_name, len)))
+            {
+                *user_struct_type = context->userStructTable[i].type;
+                status = VX_SUCCESS;
+                break;
+            }
+        }
+    }
+    return status;
+}
+
 static vx_target_s* vxoContext_FindTargetByString(vx_context context, const char* targetString)
 {
     vx_uint32 index = 0;
@@ -2768,8 +2960,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetImmediateModeTarget(vx_context context, 
     gcmDUMP_API("$VX vxSetImmediateModeTarget: context=%p, target_enum=0x%x, target_string=%s", context, target_enum, target_string);
 
     if (!vxoContext_IsValid(context)) {
-        gcmFOOTER_ARG("%d", VX_TYPE_INVALID);
-        return VX_TYPE_INVALID;
+        gcmFOOTER_ARG("%d", status);
+        return status;
     }
 
     switch (target_enum)
@@ -2907,12 +3099,7 @@ VX_INTERNAL_API vx_bool vxoContext_MemoryMap(
                 //buf = (vx_uint8*)malloc(size);
                 if (size > 0)
                 {
-                    if (VX_TYPE_WEIGHTS_BIASES_PARAMETER == ref->type)
-                    {
-                        vx_weights_biases_parameter wb = (vx_weights_biases_parameter)ref;
-                        buf = (vx_uint8_ptr)wb->memory.logicals[0] - WB_MEM_HEAD_OFFSET(wb);
-                    }
-                    else if (VX_TYPE_ARRAY == ref->type || VX_TYPE_LUT == ref->type)
+                    if (VX_TYPE_ARRAY == ref->type || VX_TYPE_LUT == ref->type)
                     {
                         vx_memory_map_extra_s* extra = (vx_memory_map_extra_s*)extra_data;
                         vx_size offset = extra->array_data.start * ((vx_array)ref)->itemSize;
@@ -2929,6 +3116,17 @@ VX_INTERNAL_API vx_bool vxoContext_MemoryMap(
                     else if (VX_TYPE_DISTRIBUTION == ref->type)
                     {
                         buf = (vx_uint8_ptr)((vx_distribution)ref)->memory.logicals[0];
+                    }
+                    else if (VX_TYPE_TENSOR == ref->type)
+                    {
+                        vx_memory_map_extra_s* extra = (vx_memory_map_extra_s*)extra_data;
+                        vx_uint32 i;
+                        vx_size offset = 0;
+                        for (i = 0; i < TENSOR_DIM_NUM((vx_tensor)ref); i++)
+                        {
+                            offset += extra->tensor_data.start[i] * extra->tensor_data.stride[i];
+                        }
+                        buf = (vx_uint8_ptr)&((vx_tensor)ref)->tensorBuffer->memory.logicals[0][offset];
                     }
                     else {
                         buf = (vx_uint8_ptr)vxAllocate(size);
@@ -3057,6 +3255,7 @@ VX_INTERNAL_API void vxoContext_MemoryUnmap(vx_context context, vx_map_id m_id)
                 && (VX_TYPE_DISTRIBUTION != context->memoryMaps[map_id].ref->type)
                 && (VX_TYPE_IMAGE != context->memoryMaps[map_id].ref->type)
                 && (VX_TYPE_LUT != context->memoryMaps[map_id].ref->type)
+                && (VX_TYPE_TENSOR != context->memoryMaps[map_id].ref->type)
                 )
             {
                 vxFree(context->memoryMaps[map_id].logical);
@@ -3189,8 +3388,14 @@ VX_INTERNAL_API vx_bool vxoGlobalData_IsFeatureAvailable(vx_global_data globalDa
     case VX_NN_FEATURE_TF_QUANT:
         return gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TF_QUANTIZATION) ? vx_true_e : vx_false_e;
 
+    case VX_NN_FEATURE_ASYMMETRIC_INT8:
+        return gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_ASYMMETRIC_INT8) ? vx_true_e : vx_false_e;
+
     case VX_NN_FEATURE_FIRST_PIXEL_POOLING:
         return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FIRST_PIXEL_POOLING) && globalData->options.enableNNFirstPixelPooling) ? vx_true_e : vx_false_e;
+
+     case VX_NN_FEATURE_FAST_FIRST_PIXEL_POOLING:
+        return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FAST_FIRST_PIXEL_POOLING)) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_NN_STRIDE_SUPPORT:
         return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_STRIDE_SUPPORT)
@@ -3214,6 +3419,9 @@ VX_INTERNAL_API vx_bool vxoGlobalData_IsFeatureAvailable(vx_global_data globalDa
     case VX_NN_FEATURE_SCALER:
         return gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_VIP_SCALER) && globalData->options.enableYUV2RGBScaler ? vx_true_e : vx_false_e;
 
+    case VX_NN_FEATURE_SCALER_4K:
+        return gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_VIP_SCALER_4K) ? vx_true_e : vx_false_e;
+
     case VX_NN_FEATURE_VIP_DEC400:
         return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_VIP_DEC400) && globalData->options.enableVIPDEC400) ? vx_true_e : vx_false_e;
 
@@ -3229,6 +3437,16 @@ VX_INTERNAL_API vx_bool vxoGlobalData_IsFeatureAvailable(vx_global_data globalDa
         return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_TRANSPOSE)
              && globalData->options.enableNNTranspose ) ? vx_true_e : vx_false_e;
 
+    case VX_NN_FEATURE_OUTPUT_CONVERT_UINT8_INT8_TO_UINT16_INT16_FIX:
+            return gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_OUTPUT_CONVERT_UINT8_INT8_TO_UINT16_INT16_FIX) ? vx_true_e : vx_false_e;
+
+    case VX_NN_FEATURE_VIP_FINAL_RELEASE:
+            return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_VIP_HW_FINAL_RELEASE)
+                && !globalData->options.disableVIPFinalRelease) ? vx_true_e : vx_false_e;
+
+    case VX_NN_FEATURE_NN_COEF_DECOMPRESS_BYPASS:
+        return (gcoHAL_IsFeatureAvailable(gcvNULL, gcFEATURE_BIT_NN_COMPRESSION_BYPASSS)
+             && globalData->options.enableNNCoefByPass ) ? vx_true_e : vx_false_e;
     default:
         return vx_false_e;
     }

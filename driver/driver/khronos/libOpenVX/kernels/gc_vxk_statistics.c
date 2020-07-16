@@ -359,7 +359,7 @@ vx_status vxMinMaxGetLocation(vx_node node, vx_image img, vx_scalar minVal, vx_s
 
     gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, constantData, sizeof(constantData));
     kernelContext->uniforms[1].index       = 8;
-    kernelContext->uniforms[1].num         = sizeof(constantData) / sizeof(vx_uint32);
+    kernelContext->uniforms[1].num         = vxmLENGTH_OF(constantData);
     kernelContext->uniform_num             = 2;
 
 
@@ -458,7 +458,7 @@ vx_status vxMinMaxLocFilter(vx_node node, vx_image input, vx_scalar filter_min, 
                 {    4, 4 * 4, {FV4(6*8,(16+6)*8,0,0), FV4(0,0,0, 0), FV4(4*8,4*8,0,0), FV4(0,0,0,0)}  }, /*  */
             };
 
-            kernelContext->uniform_num             = sizeof(indexs)/sizeof(indexs[0]);
+            kernelContext->uniform_num             = vxmLENGTH_OF(indexs);
 
             for(i = 0; i < kernelContext->uniform_num; i++)
             {
@@ -476,7 +476,7 @@ vx_status vxMinMaxLocFilter(vx_node node, vx_image input, vx_scalar filter_min, 
                 {    4, 4 * 4, {FV4(6*8,(16+6)*8,0,0), FV4(0,0,0, 0), FV4(4*8,4*8,0,0), FV4(0,0,0,0)}  }, /*  */
             };
 
-            kernelContext->uniform_num             = sizeof(indexs)/sizeof(indexs[0]);
+            kernelContext->uniform_num             = vxmLENGTH_OF(indexs);
 
             for(i = 0; i < kernelContext->uniform_num; i++)
             {

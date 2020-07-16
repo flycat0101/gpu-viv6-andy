@@ -92,6 +92,12 @@ VX_INTERNAL_API vx_status vxoGraphParallel_AnalyzeOperationsAfter(vx_graph graph
 
 VX_INTERNAL_API void vxoGraph_VerifyOperationSync(vx_graph graph);
 
+VX_INTERNAL_API vx_status vxoGraph_AllocateContiguousMemory(vx_graph graph);
+
+VX_INTERNAL_API vx_status vxoGraph_VerifyNNTranspose(vx_graph graph);
+
+VX_INTERNAL_API vx_status vxoGraph_Process(vx_graph graph);
+
 EXTERN_C_END
 
 #endif /* __GC_VX_GRAPH_H__ */

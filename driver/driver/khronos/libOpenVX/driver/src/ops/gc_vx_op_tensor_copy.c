@@ -40,7 +40,7 @@ vx_status vxoTensorCopyOperation_Initialize(
 
     /* Choose the accelerator. */
     if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP) &&
-        vxnneIsTPSupportFormat(context, inputs, VX_NULL, outputs))
+        vxnneIsTPSupportFormat(node->graph, inputs, VX_NULL, outputs))
     {
         target = VXNNE_OPERATION_TARGET_TP;
     }
@@ -192,14 +192,12 @@ vx_status vxoTensorCopyOperationSH_Initialize(
     depth1       = (dimCount1 > 2) ? TENSOR_VIEW_SIZE_INDEX(dst, 2) : 1;
     batch1       = (dimCount1 > 3) ? TENSOR_VIEW_SIZE_INDEX(dst, 3) : 1;
     /*dst_elementCount = width1 * height1 * depth1 * batch1;*/
-
-
     sizes[0]   = gcmMAX(gcmMAX(width0, height0), depth0);
     sizes[1]   = gcmMAX(gcmMIN(width0, height0), gcmMIN(gcmMAX(width0, height0), depth0));
     sizes[2]   = gcmMIN(gcmMIN(width0, height0), depth0) * batch0;
     sizes[3]   = 1;
 
-    input     = vxoTensor_ReshapeTensor(src, sizes, dimCount0);
+    input     = vxoTensor_ReshapeTensor(src, sizes, dimCount0, VX_NULL);
     if (input == NULL)
     {
         vxError("%s: out-of-memory\n", __FUNCTION__);
@@ -211,7 +209,7 @@ vx_status vxoTensorCopyOperationSH_Initialize(
     sizes[2]   = gcmMIN(gcmMIN(width1, height1), depth1) * batch1;
     sizes[3]   = 1;
 
-    output     = vxoTensor_ReshapeTensor(dst, sizes, dimCount1);
+    output     = vxoTensor_ReshapeTensor(dst, sizes, dimCount1, VX_NULL);
     if (output == NULL)
     {
         vxError("%s: out-of-memory\n", __FUNCTION__);

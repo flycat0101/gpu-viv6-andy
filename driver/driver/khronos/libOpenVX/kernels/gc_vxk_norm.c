@@ -71,7 +71,7 @@ vx_status vxNorm(vx_node node, vx_image input_x, vx_image input_y, vx_scalar nor
             vx_uint8 bin[16] = {0, 32, 64, 96, 0, 0, 0, 0, 16, 16, 16, 16, 0, 0, 0, 0};
             gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, bin, sizeof(bin));
             kernelContext->uniforms[0].index = 3;
-            kernelContext->uniforms[0].num = sizeof(bin) / sizeof(vx_uint8);
+            kernelContext->uniforms[0].num = vxmLENGTH_OF(bin);
             kernelContext->uniform_num = 1;
             kernelContext->params.evisNoInst = node->base.context->evisNoInst;
         }
@@ -171,7 +171,7 @@ vx_status vxNorm_F16(vx_node node, vx_image input_x, vx_image input_y, vx_scalar
             }; /* srcA*srcA + srcB * srcB(4-7) */
             gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, bin, sizeof(bin));
             kernelContext->uniforms[0].index = 3;
-            kernelContext->uniforms[0].num = sizeof(bin) / sizeof(vx_uint8);
+            kernelContext->uniforms[0].num = vxmLENGTH_OF(bin);
 
             gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, dp4x4_sqaure, sizeof(dp4x4_sqaure));
             kernelContext->uniforms[1].index       = 4;
@@ -329,7 +329,7 @@ vx_status vxEdgeTraceHysteresis(vx_node node, vx_image input, vx_scalar flag)
         kernelContext->uniforms[0].index           = 2;
         kernelContext->uniforms[0].num             = 4 * 4;
         gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, data, sizeof(data));
-        kernelContext->uniforms[1].num             = sizeof(data) / sizeof(vx_uint8);
+        kernelContext->uniforms[1].num             = vxmLENGTH_OF(data);
         kernelContext->uniforms[1].index           = 3;
         kernelContext->uniform_num                 = 2;
 

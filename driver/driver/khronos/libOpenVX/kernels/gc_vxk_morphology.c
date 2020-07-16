@@ -111,7 +111,7 @@ vx_status _gcfVX_Morphology(vx_node node, gceVX_KERNEL kernel, vx_image src, vx_
     {
         vx_uint8 bin[16] = {0, 32, 64, 96, 0, 0, 0, 0, 8, 8, 8, 8, 0, 0, 0, 0};
         gcoOS_MemCopy(&kernelContext->uniforms[2].uniform, bin, sizeof(bin));
-        kernelContext->uniforms[2].num = sizeof(bin) / sizeof(vx_uint8);
+        kernelContext->uniforms[2].num = vxmLENGTH_OF(bin);
         kernelContext->uniforms[2].index = 4;
         kernelContext->uniform_num = 3;
 

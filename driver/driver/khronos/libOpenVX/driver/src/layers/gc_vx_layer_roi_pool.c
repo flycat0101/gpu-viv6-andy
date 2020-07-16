@@ -118,6 +118,7 @@ vx_status vxnneExecuteSWROIPooling(struct _vxnne_operation_s *operation)
                     vx_int32 wstart = (vx_int32)(floor((vx_float32)(pw) * roi_size_scale_w));
                     vx_int32 hend = (vx_int32)(ceil((vx_float32)(ph + 1) * roi_size_scale_h));
                     vx_int32 wend = (vx_int32)(ceil((vx_float32)(pw + 1) * roi_size_scale_w));
+
                     hstart = gcmMIN(gcmMAX(hstart + roi_start_h, 0), height);
                     hend = gcmMIN(gcmMAX(hend + roi_start_h, 0), height);
                     wstart = gcmMIN(gcmMAX(wstart + roi_start_w, 0), width);
@@ -467,7 +468,7 @@ VX_PRIVATE_API vx_status vxoROIPoolLayer_SH_EVIS_Initialize_Ext(vxnne_layer ops_
         {
             vx_int32 new_size[3] = {pool_width * pool_height, depth, rois_num};
             outputs_dims = 3;
-            outputs_reshp = vxoTensor_ReshapeTensor(outputs, new_size, outputs_dims);
+            outputs_reshp = vxoTensor_ReshapeTensor(outputs, new_size, outputs_dims, VX_NULL);
             TENSOR_POS(outputs_reshp) = TENSOR_POS(outputs);
         }
 
@@ -475,7 +476,7 @@ VX_PRIVATE_API vx_status vxoROIPoolLayer_SH_EVIS_Initialize_Ext(vxnne_layer ops_
         if(outputs_reshp)
         {
             shaderExecutable = vxnneHorzMaxPoolShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_HORZMAXPOOL, &ops_layer->node->kernelAttributes.borderMode, vertMaxPoolTensor, preTreatedRectTensor, outputs_reshp);
-            vxmONERROR(vxoTensor_ReleaseTensor(&outputs_reshp));
+            vxoTensor_ReleaseTensor(&outputs_reshp);
         }
         else
         {
@@ -608,8 +609,9 @@ VX_PRIVATE_API vx_bool vxoROIPoolLayer_TP_Support(vx_node node, const vx_referen
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
     support = support && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP_ROI_POOLING) &&
-                            vxnneIsTPSupportFormat(node->base.context, input_data, VX_NULL, outputs) &&
-                            (roisFormat == VX_TYPE_FLOAT16 || roisFormat == VX_TYPE_BFLOAT16));
+                          vxnneIsTPSupportFormat(node->graph, input_data, VX_NULL, outputs) &&
+                          (roisFormat == VX_TYPE_FLOAT16 || roisFormat == VX_TYPE_BFLOAT16) &&
+                          (TENSOR_VIEW_SIZE_INDEX(outputs, 3) >= (node->base.context->options.enableMultiTP ? node->base.context->nnConfig.fixedFeature.tpCoreCount : 1) * 4));
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
@@ -650,19 +652,34 @@ VX_PRIVATE_API vx_status vxoROIPoolLayer_TP_Initialize(vxnne_layer ops_layer, co
     vx_bool mult = context->options.enableMultiTP && core > 1;
     vx_uint32 slice = !mult ? 1 : gcmMIN(TENSOR_VIEW_SIZE_INDEX(outputs, 3), core);
     vx_uint32 roi_size = TENSOR_VIEW_SIZE_INDEX(outputs, 3);
-    vx_uint32 split_size_array[TP_TENSOR_COUNT] = {0};
-    vx_uint32 split_offset_array[TP_TENSOR_COUNT] = {0};
     vx_uint32 splitEnds[TP_TENSOR_COUNT] = {0};
+    vx_uint32 multiGpu_split_size[TP_TENSOR_COUNT];
+    vx_uint32 multiGpu_split_offset[TP_TENSOR_COUNT];
+    vx_uint32 split_size[TP_TENSOR_COUNT][TP_TENSOR_COUNT];
+    vx_uint32 split_offset[TP_TENSOR_COUNT][TP_TENSOR_COUNT];
     vx_uint32 i = 0;
+    vx_uint32 gpuCount = 0;
+    vx_uint32 all_split_count = 0;
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
-    calculateSplitSize(roi_size, slice, split_size_array, split_offset_array);
+    gcoOS_ZeroMemory(split_size, TP_TENSOR_COUNT * TP_TENSOR_COUNT * sizeof(vx_uint32));
+    gcoOS_ZeroMemory(split_offset, TP_TENSOR_COUNT * TP_TENSOR_COUNT * sizeof(vx_uint32));
 
-    splitEnds[0] = split_size_array[0] - 1;
-    for (i = 1; i < slice; i++)
+    gpuCount = (((roipoolLayer)->base).node)->graph->gpuCount;
+    gpuCount = context->options.enableMultiVIPCombined ? gpuCount :1;
+    calculateSplitSize(roi_size, gpuCount, multiGpu_split_size, multiGpu_split_offset);
+
+    for(i = 0; i < gpuCount; ++i)
+        calculateSplitSize(multiGpu_split_size[i], slice, split_size[i], split_offset[i]);
+
+    all_split_count = slice * gpuCount;
+
+    splitEnds[0] = split_size[0][0] -1;
+
+    for(i = 1; i < all_split_count; ++i)
     {
-        splitEnds[i] = splitEnds[i - 1] + split_size_array[i];
+        splitEnds[i] = split_size[i/slice][i%slice] + splitEnds[ i - 1];
     }
 
     vxmONERROR(vxnneOperation_Initialize(&roipoolLayer->roipool_tp_operation[0].base,
@@ -685,9 +702,9 @@ VX_PRIVATE_API vx_status vxoROIPoolLayer_TP_Initialize(vxnne_layer ops_layer, co
 
     /* Prepare ROI intermediate output buffer. */
     maxpool = (TENSOR_VIEW_SIZE_INDEX(input_data, 0) + pool_width - 1) / pool_width;
-    poolx = 1 << (vx_uint32) ceil(log(TENSOR_VIEW_SIZE_INDEX(input_data, 0)) / log(2));
-    pooly = 1 << (vx_uint32) ceil(log(TENSOR_VIEW_SIZE_INDEX(input_data, 1)) / log(2));
-    poolz = 1 << (vx_uint32) ceil(log(TENSOR_VIEW_SIZE_INDEX(input_data, 2)) / log(2));
+    poolx = (vx_uint32)ceil((vx_float32)TENSOR_VIEW_SIZE_INDEX(input_data, 0) / maxpool) * maxpool;
+    pooly = TENSOR_VIEW_SIZE_INDEX(input_data, 1);
+    poolz = TENSOR_VIEW_SIZE_INDEX(input_data, 2);
     size = poolx * pooly * poolz * maxpool * TENSOR_DATA_SIZE(input_data);
 
     gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
@@ -757,16 +774,16 @@ VX_PRIVATE_API vx_status vxoROIPoolLayer_TP_Initialize(vxnne_layer ops_layer, co
         goto OnError;
     }
     /* Prepare Split end list. */
-    split_end = vxnneAllocateTPROIListBuffer(context, ops_layer->node, slice, VX_TYPE_UINT32);
+    split_end = vxnneAllocateTPROIListBuffer(context, ops_layer->node, all_split_count, VX_TYPE_UINT32);
     if (split_end == VX_NULL)
     {
         status = VX_ERROR_NO_MEMORY;
         goto OnError;
     }
 
-    vxnneInitROITensorFromBuffer(split_end, splitEnds, slice * sizeof(vx_uint32));
+    vxnneInitROITensorFromBuffer(split_end, splitEnds, all_split_count * sizeof(vx_uint32));
 
-    shaderExecutable = vxnneROIRect2ROIListShaderExecutable(context, VXNNE_KERNEL_ROIRECT2ROILIST, &ops_layer->node->kernelAttributes.borderMode, input_rois, roi_stride, rois_num, pool_width, pool_height, spatial_scale, slice, split_end, list);
+    shaderExecutable = vxnneROIRect2ROIListShaderExecutable(context, VXNNE_KERNEL_ROIRECT2ROILIST, &ops_layer->node->kernelAttributes.borderMode, input_rois, roi_stride, rois_num, pool_width, pool_height, spatial_scale, all_split_count, split_end, list);
     if (!shaderExecutable)
     {
         status = VX_FAILURE;
@@ -918,7 +935,7 @@ VX_PRIVATE_API vx_status vxnneROIPoolLayer_Initializer(
             VX_NULL);
 
         if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_ROI_POOLING) &&
-            vxnneIsTPSupportFormat(context, input_data, VX_NULL, outputs) &&
+            vxnneIsTPSupportFormat(node->graph, input_data, VX_NULL, outputs) &&
             (roisFormat == VX_TYPE_FLOAT16 || roisFormat == VX_TYPE_BFLOAT16))
         {
             vxnne_shader_executable shaderExecutable = VX_NULL;
@@ -1238,7 +1255,7 @@ VX_PRIVATE_API vx_status vxnneROIPoolLayer_Initializer(
                     {
                         vx_int32 new_size[3] = {pool_width * pool_height, depth, rois_num};
                         outputs_dims = 3;
-                        outputs_reshp = vxoTensor_ReshapeTensor(outputs, new_size, outputs_dims);
+                        outputs_reshp = vxoTensor_ReshapeTensor(outputs, new_size, outputs_dims, VX_NULL);
                         TENSOR_POS(outputs_reshp) = TENSOR_POS(outputs);
                     }
 

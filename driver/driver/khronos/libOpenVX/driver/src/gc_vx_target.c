@@ -242,10 +242,17 @@ VX_PRIVATE_API vx_action vxoTarget_ProcessNodes(
                 vx_size num_replicas = 0;
                 vx_uint32 param;
                 vx_uint32 num_parameters = node->kernel->signature.paramCount;
-                vx_reference parameters[VX_MAX_PARAMETERS] = { NULL };
+                vx_reference *parameters = vxAllocateAndZeroMemory(num_parameters * gcmSIZEOF(vx_reference));
+                if (parameters == VX_NULL)
+                {
+                    vxError("Error: out of memory at %s:%d\n", __FUNCTION__, __LINE__);
+                    gcmASSERT(0);
+                    break;
+                }
 
                 for (param = 0; param < num_parameters; ++param)
                 {
+                    vxmASSERT(node->replicated_flags != VX_NULL);
                     if (node->replicated_flags[param] == vx_true_e)
                     {
                         vx_size numItems = 0;
@@ -305,6 +312,10 @@ VX_PRIVATE_API vx_action vxoTarget_ProcessNodes(
                             parameters,
                             num_parameters);
                     }
+                }
+                if (parameters != VX_NULL)
+                {
+                    vxFree(parameters);
                 }
             }
             else
@@ -562,12 +573,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxTilingKernelFunction(vx_node node, const 
 {
     vx_uint32           paramIndex;
     vx_status           status;
-    vx_enum             dirTable[VX_MAX_PARAMETERS];
-    vx_enum             typeTable[VX_MAX_PARAMETERS];
-    vx_tile_t           tileTable[VX_MAX_PARAMETERS];
-    vx_image            imageTable[VX_MAX_PARAMETERS];
-    size_t              scalarTable[VX_MAX_PARAMETERS];
-    vx_ptr              tileKernelParams[VX_MAX_PARAMETERS];
+    vx_enum             *dirTable;
+    vx_enum             *typeTable;
+    vx_tile_t           *tileTable;
+    vx_image            *imageTable;
+    size_t              *scalarTable;
+    vx_ptr              *tileKernelParams;
     vx_uint32           firstOutputImageIndex = VX_INVALID_INDEX;
     vx_uint32           imageWidth, imageHeight;
     vx_border_t         borderMode;
@@ -577,28 +588,44 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxTilingKernelFunction(vx_node node, const 
 
     gcmHEADER_ARG("node=%p, paramTable=%p, paramCount=0x%x", node, paramTable, paramCount);
 
+
+    dirTable = vxAllocateAndZeroMemory(paramCount * gcmSIZEOF(vx_enum));
+    typeTable = vxAllocateAndZeroMemory(paramCount * gcmSIZEOF(vx_enum));
+    tileTable = vxAllocateAndZeroMemory(paramCount * gcmSIZEOF(vx_tile_t));
+    imageTable = vxAllocateAndZeroMemory(paramCount * gcmSIZEOF(vx_image));
+    scalarTable = vxAllocateAndZeroMemory(paramCount * gcmSIZEOF(size_t));
+    tileKernelParams = vxAllocateAndZeroMemory(paramCount * gcmSIZEOF(vx_ptr));
+
+    if ((dirTable == NULL) || (typeTable == NULL) || (tileTable == NULL) ||
+        (imageTable == NULL) || (scalarTable == NULL) || (tileKernelParams == NULL))
+    {
+        vxError("Error: out of memory at %s:%d\n", __FUNCTION__, __LINE__);
+        vxmASSERT(0);
+        gcmFOOTER_NO();
+        status = VX_ERROR_NO_MEMORY;
+        goto onError;
+    }
+
     for (paramIndex = 0; paramIndex < paramCount; paramIndex++)
     {
         vx_parameter param = vxGetParameterByIndex(node, paramIndex);
 
         if (vxoReference_GetStatus((vx_reference)param) != VX_SUCCESS)
         {
-            gcmFOOTER_NO();
-            return VX_ERROR_INVALID_PARAMETERS;
+            status = VX_ERROR_INVALID_PARAMETERS;
+            goto onError;
         }
         status = vxQueryParameter(param, VX_PARAMETER_DIRECTION,
                                     &dirTable[paramIndex], sizeof(dirTable[paramIndex]));
         if (status != VX_SUCCESS)
         {
-            gcmFOOTER_ARG("%d", status);
-            return status;
+            goto onError;
         }
         status = vxQueryParameter(param, VX_PARAMETER_TYPE,
                                     &typeTable[paramIndex], sizeof(typeTable[paramIndex]));
         if (status != VX_SUCCESS)
         {
-            gcmFOOTER_ARG("%d", status);
-            return status;
+            goto onError;
         }
         vxReleaseParameter(&param);
 
@@ -609,15 +636,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxTilingKernelFunction(vx_node node, const 
                             &tileTable[paramIndex].tile_block, sizeof(vx_tile_block_size_t));
                 if (status != VX_SUCCESS)
                 {
-                    gcmFOOTER_ARG("%d", status);
-                    return status;
+                    goto onError;
                 }
                 status = vxQueryNode(node, VX_NODE_INPUT_NEIGHBORHOOD,
                             &tileTable[paramIndex].neighborhood, sizeof(vx_neighborhood_size_t));
                 if (status != VX_SUCCESS)
                 {
-                    gcmFOOTER_ARG("%d", status);
-                    return status;
+                    goto onError;
                 }
                 imageTable[paramIndex] = (vx_image)paramTable[paramIndex];
 
@@ -625,36 +650,31 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxTilingKernelFunction(vx_node node, const 
                                         &tileTable[paramIndex].image.width, sizeof(vx_uint32));
                 if (status != VX_SUCCESS)
                 {
-                    gcmFOOTER_ARG("%d", status);
-                    return status;
+                    goto onError;
                 }
                 status = vxQueryImage(imageTable[paramIndex], VX_IMAGE_HEIGHT,
                                         &tileTable[paramIndex].image.height, sizeof(vx_uint32));
                 if (status != VX_SUCCESS)
                 {
-                    gcmFOOTER_ARG("%d", status);
-                    return status;
+                    goto onError;
                 }
                 status = vxQueryImage(imageTable[paramIndex], VX_IMAGE_FORMAT,
                                         &tileTable[paramIndex].image.format, sizeof(vx_df_image));
                 if (status != VX_SUCCESS)
                 {
-                    gcmFOOTER_ARG("%d", status);
-                    return status;
+                    goto onError;
                 }
                 status = vxQueryImage(imageTable[paramIndex], VX_IMAGE_SPACE,
                                         &tileTable[paramIndex].image.space, sizeof(vx_enum));
                 if (status != VX_SUCCESS)
                 {
-                    gcmFOOTER_ARG("%d", status);
-                    return status;
+                    goto onError;
                 }
                 status = vxQueryImage(imageTable[paramIndex], VX_IMAGE_RANGE,
                                         &tileTable[paramIndex].image.range, sizeof(vx_enum));
                 if (status != VX_SUCCESS)
                 {
-                    gcmFOOTER_ARG("%d", status);
-                    return status;
+                    goto onError;
                 }
                 tileKernelParams[paramIndex] = &tileTable[paramIndex];
 
@@ -668,8 +688,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxTilingKernelFunction(vx_node node, const 
                 status = vxReadScalarValue((vx_scalar)paramTable[paramIndex], (void *)&scalarTable[paramIndex]);
                 if (status != VX_SUCCESS)
                 {
-                    gcmFOOTER_ARG("%d", status);
-                    return status;
+                    goto onError;
                 }
                 tileKernelParams[paramIndex] = &scalarTable[paramIndex];
                 break;
@@ -678,40 +697,36 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxTilingKernelFunction(vx_node node, const 
 
     if (firstOutputImageIndex == VX_INVALID_INDEX)
     {
-        gcmFOOTER_ARG("%d", status);
-        return VX_ERROR_INVALID_PARAMETERS;
+        status = VX_ERROR_INVALID_PARAMETERS;
+        goto onError;
     }
     status = vxQueryImage(imageTable[firstOutputImageIndex], VX_IMAGE_WIDTH,
                             &imageWidth, sizeof(imageWidth));
     if (status != VX_SUCCESS)
     {
-        gcmFOOTER_ARG("%d", status);
-        return status;
+        goto onError;
     }
     status = vxQueryImage(imageTable[firstOutputImageIndex], VX_IMAGE_HEIGHT,
                             &imageHeight, sizeof(imageHeight));
     if (status != VX_SUCCESS)
     {
-        gcmFOOTER_ARG("%d", status);
-        return status;
+        goto onError;
     }
     status = vxQueryNode(node, VX_NODE_BORDER, &borderMode, sizeof(borderMode));
     if (status != VX_SUCCESS)
     {
-        gcmFOOTER_ARG("%d", status);
-        return status;
+        goto onError;
     }
     if (borderMode.mode != VX_BORDER_UNDEFINED && borderMode.mode != VX_BORDER_MODE_SELF)
     {
-        gcmFOOTER_ARG("%d", status);
-        return VX_ERROR_NOT_SUPPORTED;
+        status = VX_ERROR_NOT_SUPPORTED;
+        goto onError;
     }
 
     status = vxQueryNode(node, VX_NODE_TILE_MEMORY_SIZE, &tileMemorySize, sizeof(tileMemorySize));
     if (status != VX_SUCCESS)
     {
-        gcmFOOTER_ARG("%d", status);
-        return status;
+        goto onError;
     }
     tileHeight  = imageHeight / VX_TILE_BLOCK_MULTIPLER;
     tileWidth   = imageWidth;
@@ -738,8 +753,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxTilingKernelFunction(vx_node node, const 
                     status = vxGetImagePatchToTile(imageTable[paramIndex], &rect, &tileTable[paramIndex]);
                     if (status != VX_SUCCESS)
                     {
-                        gcmFOOTER_ARG("%d", status);
-                        return status;
+                        goto onError;
                     }
                 }
             }
@@ -747,8 +761,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxTilingKernelFunction(vx_node node, const 
             status = vxQueryNode(node, VX_NODE_TILE_MEMORY_PTR, &tileMemoryPtr, sizeof(vx_ptr));
             if (status != VX_SUCCESS)
             {
-                gcmFOOTER_ARG("%d", status);
-                return status;
+                goto onError;
             }
             node->kernel->tilingFunction(tileKernelParams, tileMemoryPtr, tileMemorySize);
 
@@ -767,15 +780,23 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxTilingKernelFunction(vx_node node, const 
 
                     if (status != VX_SUCCESS)
                     {
-                        gcmFOOTER_ARG("%d", status);
-                        return status;
+                        goto onError;
                     }
                 }
             }
         }
     }
+
+onError:
+    if (dirTable) vxFree(dirTable);
+    if (typeTable) vxFree(typeTable);
+    if (tileTable) vxFree(tileTable);
+    if (imageTable) vxFree(imageTable);
+    if (scalarTable) vxFree(scalarTable);
+    if (tileKernelParams) vxFree(tileKernelParams);
+
     gcmFOOTER_ARG("%d", status);
-    return VX_SUCCESS;
+    return status;
 }
 
 VX_INTERNAL_API void vxoTarget_Dump(vx_target target, vx_uint32 index)

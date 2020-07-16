@@ -345,7 +345,6 @@ OnError:
     node->layer = &lshprojectionLayer->base;
 #endif
 
-
     return status;
 }
 

@@ -367,12 +367,10 @@ VX_API_ENTRY vx_status VX_API_CALL vxBuildProgram(vx_program program, vx_const_s
 
     if (program->binary == gcvNULL)
     {
-
         gcmONERROR(_UpdateCompileOption(&program->buildOptions));
 #if (!VSC_LITE_BUILD)
          /* change to VIR shader as default path for hw hasHalti2 */
         vscSetDriverVIRPath(gcGetHWCaps()->hwFeatureFlags.hasHalti2);
-#endif
         status = (*program->base.context->globalData->compileKernel) (
                                         gcvNULL,
                                         0,
@@ -388,6 +386,11 @@ VX_API_ENTRY vx_status VX_API_CALL vxBuildProgram(vx_program program, vx_const_s
         program->binary = (unsigned char *) binary;
         gcmONERROR(gcSHADER_SaveEx(binary, gcvNULL, &binarySize));
         program->binarySize = binarySize;
+#else
+        vxError("ERROR: cannot compile shader with VSCLite driver\n");
+        vStatus = VX_ERROR_NOT_SUPPORTED;
+        goto OnError;
+#endif
     }
 
     vStatus = VX_SUCCESS;

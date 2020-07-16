@@ -51,12 +51,6 @@ enum vx_graph_attribute_internal_type_e
     VX_GRAPH_DEVICE_INDEX_VIV                     =  VX_ATTRIBUTE_BASE(VX_ID_VIVANTE, VX_TYPE_GRAPH) + 0x0,
 };
 
-/*! \brief Size Alignment of User Memory
- * \0x40   64Byte Align
- * \0x1000 4k Align
- */
-#define VX_WRAP_USER_MEMORY_SIZE_ALIGNMENT (0x40)
-
 /*! \brief OpenVX Version Compatibility set*/
 #define VX_KHR_COMPATIBILITY (0x1)
 
@@ -104,6 +98,10 @@ enum vx_kernel_nn_ext_e {
     * \see group_cnn
     */
     VX_KERNEL_DECONVOLUTION_LAYER = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_NN_EXTENSION) + 0x7,
+    /*! \brief The Neural Network Extension local response normalization Kernel (with bias).
+    * \see group_cnn
+    */
+    VX_KERNEL_LOCAL_RESPONSE_NORMALIZATION_LAYER = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_NN_EXTENSION) + 0x8,
 };
 
 /*! \brief NN extension type enums.
@@ -253,6 +251,9 @@ enum vx_quantized_format_e
     VX_QUANT_DYNAMIC_FIXED_POINT    = 0x1,
     /*! \brief A quantization data type which has scale value and zero point to match with TF and Android NN API */
     VX_QUANT_AFFINE_SCALE           = 0x2,
+
+    VX_QUANT_AFFINE_SCALE_PER_CHANNEL = 0x3,
+
 };
 
 /*! \brief The rank mode of tensor memory.
@@ -393,6 +394,28 @@ vxCreateTensorForNN11(
  */
 VX_API_ENTRY vx_object_array VX_API_CALL vxCreateTensorObjectArray(vx_context context, vx_uint32 count, vx_tensor* tensor);
 
+typedef union _vx_tensor_quant_param
+{
+    struct
+    {
+        vx_int8 fixed_point_pos; /*!< \brief Specifies the fixed point position when the input element type is int16/int8, if 0 calculations are performed in integer math */
+    } dfp;
+
+    struct
+    {
+        vx_float32      scale;       /*!< \brief Scale vaule for the quantized value */
+        vx_int32        zeroPoint;  /*!< \brief  A 32 bit integer, in range [0, 255] */
+    } affine;
+
+    struct
+    {
+        vx_uint32       channelDim; /*!< \brief a 32 bit unsigned integer indicating channel dimension */
+        vx_uint32       scaleCount; /*!< \brief the size of the scale array, must be equal to size[channelDim] */
+        vx_float32 *    scales; /*!< \brief an array of positive 32 bit floating point value. The size of the scales array must be equal to size[channelDim] */
+        vx_uint32       zeroPointCount; /*!< \brief the size of the zero point array, must be equal to 0 or size[channelDim] */
+        vx_int32 *      zeroPoint;  /*!< \brief  A 32 bit integer, in range [0, 255] */
+    } affinePerChannel;
+}vx_tensor_quant_param;
 
 /*! \brief Input parameter for createTensor2
  * \ingroup group_tensor
@@ -404,25 +427,7 @@ typedef struct _vx_tensor_create_params_t
     vx_uint32 *     sizes;       /*!< \brief The pointer to an array of dimension */
     vx_enum         data_format; /*!< \brief Data format for the tensor */
     vx_enum         quant_format; /*!< \brief Quantized format <tt>\ref vx_quantized_format_e </tt>. */
-    union {
-        struct {
-            vx_int8 fixed_point_pos; /*!< \brief Specifies the fixed point position when the input element type is int16/int8, if 0 calculations are performed in integer math */
-        } dfp;
-
-        struct {
-            vx_float32      scale;       /*!< \brief Scale vaule for the quantized value */
-            vx_int32        zeroPoint;  /*!< \brief  A 32 bit integer, in range [0, 255] */
-        } affine;
-
-        struct {
-            vx_uint32       channelDim; /*!< \brief a 32 bit unsigned integer indicating channel dimension */
-            vx_uint32       scaleCount; /*!< \brief the size of the scale array, must be equal to size[channelDim] */
-            vx_float32 *    scales; /*!< \brief an array of positive 32 bit floating point value. The size of the scales array must be equal to size[channelDim] */
-            vx_uint32       zeroPointCount; /*!< \brief the size of the zero point array, must be equal to 0 or size[channelDim] */
-            vx_int32 *      zeroPoint;  /*!< \brief  A 32 bit integer, in range [0, 255] */
-        } affinePerChannel;
-     }
-     quant_data;
+    vx_tensor_quant_param quant_data;
 } vx_tensor_create_params_t;
 
 
@@ -457,6 +462,14 @@ VX_API_ENTRY vx_tensor VX_API_CALL vxCreateTensor2(vx_context context, const vx_
  */
 VX_API_ENTRY vx_tensor VX_API_CALL vxCreateVirtualTensor2(vx_graph graph, const vx_tensor_create_params_t* tensor_create_params, vx_size size_of_create_params);
 
+/*! \brief Swaps the tensor created from handle.
+ *\details This function swap tensors logical and physical address.
+ *\these tensors must have the same proterties expect memory related content.
+ *\Attention: APP should make sure the cache and memory cohensive for the first call vxSwapTensor
+ *\version 0.4
+ */
+VX_API_ENTRY vx_status VX_API_CALL vxSwapTensor(vx_tensor tensor0, vx_tensor tensor1);
+
 /*! \brief Creates a reference to a tensor object that was externally allocated.
  * \param [in] context The reference to the implementation context.
  * \param [in] tensor_create_params The <tt>\ref vx_tensor_create_params_t</tt> that points to a parameter structure.
@@ -473,31 +486,9 @@ VX_API_ENTRY vx_tensor VX_API_CALL vxCreateVirtualTensor2(vx_graph graph, const 
  * \ingroup group_tensor
  *\version 0.4
  */
-VX_API_ENTRY vx_tensor VX_API_CALL vxCreateTensorFromHandle(
+VX_API_ENTRY vx_tensor VX_API_CALL vxCreateTensorFromHandle2(
         vx_context context, const vx_tensor_create_params_t* tensor_create_params, vx_size size_of_create_params, const vx_tensor_addressing addrs,
         void * const ptr, vx_enum import_type);
-
-/*! \brief Swaps the image handle of an image previously created from handle.
- *\details This function sets the new tensor handle and returns the previous one.
- * Once this function call has completed, the application gets back the ownership of the memory referenced by the
- * previous handle. This memory contains up-to-date tensor data, and the application can safely reuse or release it.
- * The memory referenced by the new handle must have been allocated consistently with the tensor properties
- * since the import type, memory layout and dimensions are unchanged (see addrs, tensor_create_params and import_type in vxCreateTensorFromHandle).
- * \param[in] tensor The reference to an tensor create from handle.
- * \param[in] new_ptr The pointer to new tensor storage. If it's null, the previous tensor storage image is reclaimed by the caller, while no new handle is provided.
- * \param[out] prev_ptr The pointer to a caller owned memory where driver would write the old handle into, if it's null, the old handle is not returned.
- * \ingroup group_tensor
- * \version 0.4
- */
-VX_API_ENTRY vx_status VX_API_CALL vxSwapTensorHandle(vx_tensor tensor, void* const new_ptr, void** prev_ptr);
-
-/*! \brief Swaps the tensor created from handle.
- *\details This function swap tensors logical and physical address.
- *\these tensors must have the same proterties expect memory related content.
- *\Attention: APP should make sure the cache and memory cohensive for the first call vxSwapTensor
- *\version 0.4
- */
-VX_API_ENTRY vx_status VX_API_CALL vxSwapTensor(vx_tensor tensor0, vx_tensor tensor1);
 
 /*
 *\ vxo_flushHandle used to support vxo_createTensorFromHandle/vxo_createImageFromHandle

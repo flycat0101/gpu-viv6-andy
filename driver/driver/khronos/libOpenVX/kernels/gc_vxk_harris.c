@@ -99,7 +99,7 @@ vx_status vxHarrisScore(vx_node node, vx_image grad_x, vx_image grad_y, vx_image
 
         kernelContext->params.xstep                = 4;
 
-        kernelContext->uniform_num                 = sizeof(indexs)/sizeof(indexs[0]);
+        kernelContext->uniform_num                 = vxmLENGTH_OF(indexs);
 
         for(i = 0; i < kernelContext->uniform_num; i++)
         {
@@ -286,7 +286,7 @@ vx_status vxCreateLister(vx_node node, vx_image src, vx_image countImg, vx_array
     kernelContext->uniforms[0].num         = 16;
     gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, constantData, sizeof(constantData));
     kernelContext->uniforms[1].index       = 4;
-    kernelContext->uniforms[1].num         = sizeof(constantData) / sizeof(vx_uint32);
+    kernelContext->uniforms[1].num         = vxmLENGTH_OF(constantData);
     kernelContext->uniform_num             = 2;
 
     kernelContext->params.kernel           = gcvVX_KERNEL_IMAGE_LISTER;

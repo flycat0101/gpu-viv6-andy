@@ -19,7 +19,7 @@
 #include"gpu_binaries.h"
 #endif
 
-void * GetBinaryPtr(nngpu_kernel_enum type, unsigned int* len)
+void * GetGPUNNVXCBinaryPtr(nngpu_kernel_enum type, unsigned int* len)
 {
     switch(type)
     {
@@ -30,7 +30,7 @@ void * GetBinaryPtr(nngpu_kernel_enum type, unsigned int* len)
     return NULL;
 }
 
-#if defined(_WINDOWS)
+#if defined(_WINDOWS) && !gcdSTATIC_LINK
 #include <windows.h>
 
 int WINAPI DllMain(HINSTANCE hInst, DWORD reason, LPVOID reserved)

@@ -12,7 +12,9 @@
 
 
 #include <gc_vx_common.h>
+#include <gc_vx_nn_wb.h>
 #include <layers/gc_vx_layer_pool.h>
+
 
 vx_status vxnneExecuteSWPooling(struct _vxnne_operation_s *operation)
 {
@@ -346,7 +348,7 @@ VX_PRIVATE_API vx_bool vxoNNPooling_SH_EVIS_Support_Ext(vx_node node, const vx_r
     vx_uint32 poolSizeXValue                 = pool_size_x_s->value->u32;
     vx_uint32 poolSizeYValue                 = pool_size_y_s->value->u32;
     vx_enum roundingValue                    = rounding_s->value->e;
-    vx_enum inputFormat                 = TENSOR_DATA_TYPE(inputs);
+    vx_enum inputFormat                      = TENSOR_DATA_TYPE(inputs);
     vx_enum outputFormat                     = TENSOR_DATA_TYPE(outputs);
     vx_bool dataFormat_AvgPool_flag[6]       = {vx_false_e};
     vx_bool avgPool_flag                     = vx_false_e;
@@ -585,6 +587,7 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
     vx_uint32 pool_pad_y_bottom = poolPadYBottomScalar->value->u32;
 
     vxnne_shader_executable shaderExecutable = NULL;
+
     vx_scalar stride_x_s = NULL;
     vx_scalar stride_y_s = NULL;
 
@@ -917,7 +920,7 @@ VX_PRIVATE_API vx_bool vxoNNPooling_NN_AVG_Support(vx_node node, const vx_refere
     vx_scalar  poolPadXLeftScalar         = (vx_scalar)parameters[4];
     vx_scalar  poolPadXRightScalar        = (vx_scalar)parameters[5];
     vx_scalar  poolPadYTopScalar        = (vx_scalar)parameters[6];
-    vx_scalar  poolPadYBottomScalar        = (vx_scalar)parameters[7];
+    vx_scalar  poolPadYBottomScalar     = (vx_scalar)parameters[7];
     vx_scalar  rounding_s             = (vx_scalar)parameters[8];
     vx_scalar  stride_x_s                = (vx_scalar)parameters[9];
     vx_scalar  stride_y_s                = (vx_scalar)parameters[10];
@@ -937,9 +940,10 @@ VX_PRIVATE_API vx_bool vxoNNPooling_NN_AVG_Support(vx_node node, const vx_refere
 
     vx_uint32 pool_pad_x_left = poolPadXLeftScalar->value->u32;
     vx_uint32 pool_pad_x_right = poolPadXRightScalar->value->u32;
-    vx_uint32 pool_pad_y_top = poolPadYTopScalar->value->u32;
+    vx_uint32 pool_pad_y_top    = poolPadYTopScalar->value->u32;
     vx_uint32 pool_pad_y_bottom = poolPadYBottomScalar->value->u32;
-    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_TP, VX_TYPE_INVALID, VX_NULL);
+
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_NN, TENSOR_DATA_TYPE(inputs), VX_NULL);
 
     inputsWidth   = TENSOR_SIZE_INDEX(inputs, 0);
     inputsHeight  = TENSOR_SIZE_INDEX(inputs, 1);
@@ -986,7 +990,7 @@ VX_PRIVATE_API vx_bool vxoNNPooling_NN_AVG_Support(vx_node node, const vx_refere
 
     totalSize = poolSizeXValue * poolSizeYValue * inputsDepth * outputsDepth * (vx_uint32)vxDataType_GetSize((vx_type_e)TENSOR_DATA_TYPE(inputs)) + outputsDepth * sizeof(vx_float32);
 
-    support = support && (vxnneIsNNSupportFormat(node->base.context, inputs, VX_NULL, outputs) &&
+    support = support && (vxnneIsNNSupportFormat(node->base.context, node->graph, inputs, VX_NULL, outputs) &&
             (poolTypeValue == VX_NN_POOLING_AVG) &&
             (stride_x == 1) && (stride_x == stride_y) &&
             (totalSize <= maxAllocateSize));
@@ -999,7 +1003,7 @@ VX_PRIVATE_API vx_bool vxoNNPooling_NN_AVG_Support(vx_node node, const vx_refere
 VX_PRIVATE_API vx_status vxoNNPooling_NN_AVG_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
 {
     vx_tensor  inputs                     = (vx_tensor)parameters[0];
-    vx_scalar  pool_type_s             = (vx_scalar)parameters[1];
+    /*vx_scalar  pool_type_s             = (vx_scalar)parameters[1];*/
     vx_scalar  pool_size_x_s            = (vx_scalar)parameters[2];
     vx_scalar  pool_size_y_s            = (vx_scalar)parameters[3];
     vx_scalar  poolPadXLeftScalar         = (vx_scalar)parameters[4];
@@ -1009,7 +1013,7 @@ VX_PRIVATE_API vx_status vxoNNPooling_NN_AVG_Initialize(vxnne_layer ops_layer, c
     vx_scalar  rounding_s             = (vx_scalar)parameters[8];
     vx_tensor  outputs                    = (vx_tensor)parameters[num-1];
 
-    vx_enum poolTypeValue                    = pool_type_s->value->e;
+    /*vx_enum poolTypeValue                    = pool_type_s->value->e;*/
     vx_uint32 poolSizeXValue                 = pool_size_x_s->value->u32;
     vx_uint32 poolSizeYValue                 = pool_size_y_s->value->u32;
     vx_enum roundingValue                    = rounding_s->value->e;
@@ -1028,6 +1032,15 @@ VX_PRIVATE_API vx_status vxoNNPooling_NN_AVG_Initialize(vxnne_layer ops_layer, c
     vx_status status = VX_SUCCESS;
     vxnne_pooling_layer  poolingLayer = (vxnne_pooling_layer)ops_layer;
 
+    vx_int8 *weightData = VX_NULL;
+    vx_float32 *biasData = VX_NULL;
+    vx_int8 *weightsValuePtr = VX_NULL;
+    vx_int8 *zerosValuePtr = VX_NULL;
+    vx_tensor weights = VX_NULL;
+    vx_tensor biases = VX_NULL;
+    vx_tensor_addressing weightUserAddr = VX_NULL;
+    vx_tensor_addressing biasUserAddr = VX_NULL;
+
     /*inputsWidth   = TENSOR_SIZE_INDEX(inputs, 0);*/
     /*inputsHeight  = TENSOR_SIZE_INDEX(inputs, 1);*/
     inputsDepth   = TENSOR_SIZE_INDEX(inputs, 2);
@@ -1040,7 +1053,7 @@ VX_PRIVATE_API vx_status vxoNNPooling_NN_AVG_Initialize(vxnne_layer ops_layer, c
     vxmONERROR(vxnneOperation_Initialize(&poolingLayer->pooling_nne_operation.base,
                                        &poolingLayer->base,
                                        VXNNE_OPERATION_TARGET_NN,
-                                       VXNNE_OPERATOR_POOLING,
+                                       VXNNE_OPERATOR_CONVOLUTION,
                                        VX_NULL,
                                        vxnnePoolingOperation_Deinitialize,
                                        batchCount,
@@ -1052,14 +1065,14 @@ VX_PRIVATE_API vx_status vxoNNPooling_NN_AVG_Initialize(vxnne_layer ops_layer, c
         0));
 
     poolingLayer->pooling_nne_operation.inputs            = inputs;
-    poolingLayer->pooling_nne_operation.pool_type         = poolTypeValue;
-    poolingLayer->pooling_nne_operation.pool_size_x       = poolSizeXValue;
-    poolingLayer->pooling_nne_operation.pool_size_y       = poolSizeYValue;
-    poolingLayer->pooling_nne_operation.pool_pad_x_left   = pool_pad_x_left;
-    poolingLayer->pooling_nne_operation.pool_pad_x_right  = pool_pad_x_right;
-    poolingLayer->pooling_nne_operation.pool_pad_y_top    = pool_pad_y_top;
-    poolingLayer->pooling_nne_operation.pool_pad_y_bottom = pool_pad_y_bottom;
-    poolingLayer->pooling_nne_operation.rounding          = roundingValue;
+    poolingLayer->pooling_nne_operation.pool_type         = 0;
+    poolingLayer->pooling_nne_operation.pool_size_x       = 1;
+    poolingLayer->pooling_nne_operation.pool_size_y       = 1;
+    poolingLayer->pooling_nne_operation.pad_x_left   = pool_pad_x_left;
+    poolingLayer->pooling_nne_operation.pad_x_right  = pool_pad_x_right;
+    poolingLayer->pooling_nne_operation.pad_y_top    = pool_pad_y_top;
+    poolingLayer->pooling_nne_operation.pad_y_bottom = pool_pad_y_bottom;
+    poolingLayer->pooling_nne_operation.conv_rounding_type          = roundingValue;
     poolingLayer->pooling_nne_operation.outputs           = outputs;
 
     vxmONERROR(vxnneOperation_AddReference(&poolingLayer->pooling_nne_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT));
@@ -1067,24 +1080,16 @@ VX_PRIVATE_API vx_status vxoNNPooling_NN_AVG_Initialize(vxnne_layer ops_layer, c
 
     /* prepare data for nne */
     {
-        vx_int8 *weightData = VX_NULL;
-        vx_float32 *biasData = VX_NULL;
         vx_uint32 i, j;
         vx_int32 w, z;
-        vx_int8 *weightsValuePtr;
-        vx_int8 *zerosValuePtr;
         vx_uint32 weightItemCount;
         vx_int8 *pWeightData;
         vx_float32 *pBiasData;
-        vx_tensor weights = VX_NULL;
-        vx_tensor biases = VX_NULL;
         vx_uint32 numWeightDims = 4, numBiasDims = 1;
         vx_uint32 weightSize[4] = {poolSizeXValue, poolSizeYValue, inputsDepth, outputsDepth};
         vx_uint32 weightStrideSize[4];
         vx_uint32 biasSize[4] = {outputsDepth};
         vx_uint32 biasStrideSize[1];
-        vx_tensor_addressing weightUserAddr = NULL;
-        vx_tensor_addressing biasUserAddr = NULL;
         vx_weights_biases_parameter weights_biases = VX_NULL;
         vx_type_e inputDataFormat = (vx_type_e)TENSOR_DATA_TYPE(inputs);
         vx_type_e weightDataFormat = inputDataFormat;
@@ -1186,7 +1191,15 @@ VX_PRIVATE_API vx_status vxoNNPooling_NN_AVG_Initialize(vxnne_layer ops_layer, c
 
             weightUserAddr = vxCreateTensorAddressing(context, weightSize, weightStrideSize, (vx_uint8)numWeightDims);
 
-           vxmONERROR(vxoCopyTensorPatch(weights, VX_NULL, weightUserAddr, weightData, VX_WRITE_ONLY,0));
+            status = vxoCopyTensorPatch(weights, VX_NULL, weightUserAddr, weightData, VX_WRITE_ONLY,0);
+            if (status != VX_SUCCESS)
+            {
+                if (weightsValuePtr != VX_NULL) vxFree(weightsValuePtr);
+                if (zerosValuePtr != VX_NULL) vxFree(zerosValuePtr);
+                if (weightData != VX_NULL) vxFree(weightData);
+                if (biasData != VX_NULL) vxFree(biasData);
+                goto OnError;
+            }
 
             biasStrideSize[0] = biasItemSize;
 
@@ -1204,7 +1217,7 @@ VX_PRIVATE_API vx_status vxoNNPooling_NN_AVG_Initialize(vxnne_layer ops_layer, c
 
             vxmONERROR(vxoCopyTensorPatch(biases, VX_NULL, biasUserAddr, biasData, VX_WRITE_ONLY,0));
 
-            weights_biases = _createWeightsBiasesParameterFromTensors(context,
+            weights_biases = vxoCreateWeightsBiasesParameterFromTensors(context,
                                                                    VX_NN_CONVOLUTION_LAYER,
                                                                    (vx_uint32*)(TENSOR_SIZES(inputs)),
                                                                    inputs->dimCount,
@@ -1221,13 +1234,14 @@ VX_PRIVATE_API vx_status vxoNNPooling_NN_AVG_Initialize(vxnne_layer ops_layer, c
                                                                    (vx_uint32*)(TENSOR_SIZES(outputs)),
                                                                    VX_NULL,
                                                                    &opt,
+                                                                   0,
                                                                    TENSOR_DATA_TYPE(weights),
                                                                    0,
                                                                    VX_TENSOR_RANK_WHCN,
                                                                    weights,
                                                                    biases,
                                                                    VX_NULL,
-                                                                   vx_false_e,
+                                                                   VX_NN_CONV_ONLY,
                                                                    vx_false_e);
         }
         else
@@ -1282,7 +1296,7 @@ VX_PRIVATE_API vx_status vxoNNPooling_NN_AVG_Initialize(vxnne_layer ops_layer, c
 
             weightUserAddr = vxCreateTensorAddressing(context, weightSize, weightStrideSize, (vx_uint8)numWeightDims);
 
-            vxoCopyTensorPatch(weights, VX_NULL, weightUserAddr, weightData, VX_WRITE_ONLY,0);
+            vxmONERROR(vxoCopyTensorPatch(weights, VX_NULL, weightUserAddr, weightData, VX_WRITE_ONLY,0));
 
             biasStrideSize[0] = biasItemSize;
 
@@ -1298,7 +1312,7 @@ VX_PRIVATE_API vx_status vxoNNPooling_NN_AVG_Initialize(vxnne_layer ops_layer, c
 
             vxmONERROR(vxoCopyTensorPatch(biases, VX_NULL, biasUserAddr, biasData, VX_WRITE_ONLY,0));
 
-            weights_biases = _createWeightsBiasesParameterFromTensors(context,
+            weights_biases = vxoCreateWeightsBiasesParameterFromTensors(context,
                                                                    VX_NN_CONVOLUTION_LAYER,
                                                                    (vx_uint32*)(TENSOR_SIZES(inputs)),
                                                                    inputs->dimCount,
@@ -1315,27 +1329,16 @@ VX_PRIVATE_API vx_status vxoNNPooling_NN_AVG_Initialize(vxnne_layer ops_layer, c
                                                                    (vx_uint32*)(TENSOR_SIZES(outputs)),
                                                                    VX_NULL,
                                                                    VX_NULL,
+                                                                   0,
                                                                    TENSOR_DATA_TYPE(weights),
                                                                    0,
                                                                    VX_TENSOR_RANK_WHCN,
                                                                    weights,
                                                                    biases,
                                                                    VX_NULL,
-                                                                   vx_false_e,
+                                                                   VX_NN_CONV_ONLY,
                                                                    vx_false_e);
         }
-
-        if (weightsValuePtr != VX_NULL)
-            vxFree(weightsValuePtr);
-
-        if (zerosValuePtr != VX_NULL)
-            vxFree(zerosValuePtr);
-
-        if (weightData != VX_NULL)
-            vxFree(weightData);
-
-        if (biasData != VX_NULL)
-            vxFree(biasData);
 
         {
             vx_op_param_s conv = {0};
@@ -1354,29 +1357,35 @@ VX_PRIVATE_API vx_status vxoNNPooling_NN_AVG_Initialize(vxnne_layer ops_layer, c
             memcpy(&poolingLayer->pooling_nne_operation.base.parameter, &conv, sizeof(vx_op_param_s));
         }
 
+        vxmONERROR(vxoCalculateNNCompressionFirstTime(context, weights_biases, outputs));
+
         poolingLayer->pooling_nne_operation.weights_biases = weights_biases;
-
-        if (weights != VX_NULL)
-        {
-            vxoTensor_ReleaseTensor(&weights);
-        }
-
-        if (biases != VX_NULL)
-        {
-            vxoTensor_ReleaseTensor(&biases);
-        }
-
-        if (weightUserAddr != VX_NULL)
-        {
-            vxReleaseTensorAddressing(&weightUserAddr);
-        }
-
-        if (biasUserAddr != VX_NULL)
-        {
-            vxReleaseTensorAddressing(&biasUserAddr);
-        }
     }
 OnError:
+    if (weightsValuePtr != VX_NULL)
+        vxFree(weightsValuePtr);
+
+    if (zerosValuePtr != VX_NULL)
+        vxFree(zerosValuePtr);
+
+    if (weightData != VX_NULL)
+        vxFree(weightData);
+
+    if (biasData != VX_NULL)
+        vxFree(biasData);
+
+    if (weights != VX_NULL)
+        vxoTensor_ReleaseTensor(&weights);
+
+    if (biases != VX_NULL)
+        vxoTensor_ReleaseTensor(&biases);
+
+    if (weightUserAddr != VX_NULL)
+        vxReleaseTensorAddressing(&weightUserAddr);
+
+    if (biasUserAddr != VX_NULL)
+        vxReleaseTensorAddressing(&biasUserAddr);
+
     vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
 
     return status;
@@ -1401,8 +1410,8 @@ VX_PRIVATE_API vx_bool vxoNNPooling_TP_MAX_Support(vx_node node, const vx_refere
     vx_uint32 poolSizeXValue                 = pool_size_x_s->value->u32;
     vx_uint32 poolSizeYValue                 = pool_size_y_s->value->u32;
     vx_enum roundingValue                    = rounding_s->value->e;
-    vx_enum inputdata_format                 = TENSOR_DATA_TYPE(inputs);
-    vx_enum outputdata_format                = TENSOR_DATA_TYPE(outputs);
+    vx_enum inputFormat                 = TENSOR_DATA_TYPE(inputs);
+    vx_enum outputFormat                = TENSOR_DATA_TYPE(outputs);
 
     vx_uint32 inputsWidth, outputsWidth, outputsHeight, inputsHeight;
     /*vx_int32  inputsDepth, outputsDepth;*/
@@ -1411,7 +1420,8 @@ VX_PRIVATE_API vx_bool vxoNNPooling_TP_MAX_Support(vx_node node, const vx_refere
     vx_uint32 pool_pad_x_left  = poolPadXLeftScalar->value->u32;
     vx_uint32 pool_pad_x_right = poolPadXRightScalar->value->u32;
     vx_uint32 pool_pad_y_top   = poolPadYTopScalar->value->u32;
-    vx_uint32 pool_pad_y_bottom  = poolPadYBottomScalar->value->u32;
+    vx_uint32 pool_pad_y_bottom = poolPadYBottomScalar->value->u32;
+
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_TP, VX_TYPE_INVALID, VX_NULL);
 
     vx_bool avgPool_BF_flag                  = vx_false_e;
@@ -1461,15 +1471,17 @@ VX_PRIVATE_API vx_bool vxoNNPooling_TP_MAX_Support(vx_node node, const vx_refere
 
     if(node->base.context->evisNoInst.supportEVIS)
     {
-        avgPool_BF_flag = (vx_bool)(inputdata_format == VX_TYPE_BFLOAT16 && outputdata_format == VX_TYPE_BFLOAT16);
+        avgPool_BF_flag = (vx_bool)(inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16);
     }
 
-    if (stride_x > 0)
+    if ((stride_x > 0) && (stride_x == stride_y))
     {
-        vx_bool isTpSupportFormat = vxnneIsTPSupportFormat(node->base.context, inputs, VX_NULL, outputs);
-        vx_bool isStride1Support = ((stride_x == 1) && (stride_x == stride_y) && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_MAX_POOLING_STRIDE1) && poolSizeXValue <= 3) ? vx_true_e : vx_false_e;
-        vx_bool isStride2Support = ((stride_x == 2) && (stride_x == stride_y) && (stride_x == poolSizeXValue || stride_x == poolSizeXValue-1)) ? vx_true_e : vx_false_e;
-        vx_bool isPoolSizeSupport = ((stride_x == stride_y) && poolSizeXValue == 1 && !pool_pad_x_left && !pool_pad_y_top && TENSOR_VIEW_SIZE_INDEX(inputs, 0) % stride_x == 0 && TENSOR_VIEW_SIZE_INDEX(inputs, 1) % stride_x == 0) ? vx_true_e : vx_false_e;
+        vx_bool isTpSupportFormat = vxnneIsTPSupportFormat(node->graph, inputs, VX_NULL, outputs);
+        vx_bool isStride1Support = ((stride_x == 1) && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_MAX_POOLING_STRIDE1) && poolSizeXValue <= 3) ? vx_true_e : vx_false_e;
+        vx_bool isStride2Support = ((stride_x == 2) && (stride_x == poolSizeXValue || stride_x == poolSizeXValue-1)) ? vx_true_e : vx_false_e;
+        vx_bool isPoolSizeSupport = (poolSizeXValue == 1 && !pool_pad_x_left && !pool_pad_y_top && TENSOR_VIEW_SIZE_INDEX(inputs, 0) % stride_x == 0 && TENSOR_VIEW_SIZE_INDEX(inputs, 1) % stride_x == 0) ? vx_true_e : vx_false_e;
+        /* max pooling is not support when (poolSizeXValue==2&& poolSizeXValue ==3) or (poolSizeXValue==3 && poolSizeXValue==2) */
+        vx_bool isKernelSizeSupport = (poolSizeXValue == poolSizeYValue);
 
         /* stride!=2 is not supported yet */
         support = support && ((poolTypeValue == VX_NN_POOLING_MAX) &&
@@ -1478,10 +1490,13 @@ VX_PRIVATE_API vx_bool vxoNNPooling_TP_MAX_Support(vx_node node, const vx_refere
                             (isStride1Support || isStride2Support || isPoolSizeSupport) &&
                             (poolSizeXValue <= 64) &&
                             (avgPool_BF_flag == vx_false_e) &&
-                            (poolSizeXValue < 4 &&  poolSizeYValue < 4));
+                            (poolSizeXValue < 4 &&  poolSizeYValue < 4) &&
+                            isKernelSizeSupport);
     }
     else
         support = vx_false_e;
+
+    support = support && IsTPSupport_CheckOutPixel(node->base.context, inputs, outputs);
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
@@ -1610,7 +1625,6 @@ OnError:
     return status;
 }
 #else
-
 VX_PRIVATE_API vx_status vxnnePoolingInitializer(
     vx_node node,
     char* name,
@@ -1754,7 +1768,7 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
                             &&  (poolTypeValue == VX_NN_POOLING_AVG || poolTypeValue == VX_NN_POOLING_AVG_ANDROID));
 
     /* if the needed total size is larger than maxAllocateSize, do pooling with CPU version. maybe need implement avg pooling with shader */
-    if (vxnneIsNNSupportFormat(context, inputs, VX_NULL, outputs) &&
+    if (vxnneIsNNSupportFormat(context, node->graph, inputs, VX_NULL, outputs) &&
         (poolTypeValue == VX_NN_POOLING_AVG) &&
         (stride_x == 1) && (stride_x == stride_y) &&
         (totalSize <= maxAllocateSize) &&
@@ -1931,7 +1945,7 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
 
                 vxoCopyTensorPatch(biases, VX_NULL, biasUserAddr, biasData, VX_WRITE_ONLY,0);
 
-                weights_biases = _createWeightsBiasesParameterFromTensors(context,
+                weights_biases = vxoCreateWeightsBiasesParameterFromTensors(context,
                                                                        VX_NN_CONVOLUTION_LAYER,
                                                                        (vx_uint32*)(TENSOR_SIZES(inputs)),
                                                                        inputs->dimCount,
@@ -2025,7 +2039,7 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
 
                 vxoCopyTensorPatch(biases, VX_NULL, biasUserAddr, biasData, VX_WRITE_ONLY,0);
 
-                weights_biases = _createWeightsBiasesParameterFromTensors(context,
+                weights_biases = vxoCreateWeightsBiasesParameterFromTensors(context,
                                                                        VX_NN_CONVOLUTION_LAYER,
                                                                        (vx_uint32*)(TENSOR_SIZES(inputs)),
                                                                        inputs->dimCount,
@@ -2081,6 +2095,8 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
                 memcpy(&poolingLayer->pooling_nne_operation.base.parameter, &conv, sizeof(vx_op_param_s));
             }
 
+            vxoCalculateNNCompressionFirstTime(context, weights_biases, outputs);
+
             poolingLayer->pooling_nne_operation.weights_biases = weights_biases;
 
             if (weights != VX_NULL)
@@ -2106,7 +2122,7 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
     }
     else
     {
-        vx_bool isTpSupportFormat = vxnneIsTPSupportFormat(context, inputs, VX_NULL, outputs);
+        vx_bool isTpSupportFormat = vxnneIsTPSupportFormat(node->graph, inputs, VX_NULL, outputs);
         vx_bool isStride1Support = ((stride_x == 1) && (stride_x == stride_y) && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_MAX_POOLING_STRIDE1) && poolSizeXValue <= 3) ? vx_true_e : vx_false_e;
         vx_bool isStride2Support = ((stride_x == 2) && (stride_x == stride_y) && (stride_x == poolSizeXValue || stride_x == poolSizeXValue-1)) ? vx_true_e : vx_false_e;
         vx_bool isPoolSizeSupport = ((stride_x == stride_y) && poolSizeXValue == 1 && !pool_pad_x_left && !pool_pad_y_top && TENSOR_VIEW_SIZE_INDEX(inputs, 0) % stride_x == 0 && TENSOR_VIEW_SIZE_INDEX(inputs, 1) % stride_x == 0) ? vx_true_e : vx_false_e;
@@ -2520,6 +2536,7 @@ exit:
 }
 #endif
 
+
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPoolingLayer_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
 #if REGISTER_FRAME
@@ -2606,6 +2623,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPoolingLayer_Initializer(vx_node node,
                                             outputs);
 #endif
 
+
 }
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPoolingLayer_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
@@ -2691,6 +2709,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPoolingLayer2_Initializer(vx_node node
                                             strideYScalar,
                                             outputs);
 #endif
+
 }
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPoolingLayer2_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)

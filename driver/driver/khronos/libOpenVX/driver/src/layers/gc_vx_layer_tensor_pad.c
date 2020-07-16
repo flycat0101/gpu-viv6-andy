@@ -296,6 +296,7 @@ vx_status vxnnePAD(vx_int32 pad, vx_int32 slice, vx_uint8_ptr* dst_ptr, vx_int32
             case VX_PAD_MIRROR_SYMMETRIC:
                 break;
             case VX_PAD_MIRROR_REFLECT:
+                memset(*dst_ptr, constant, item_size);
                 break;
             }
 
@@ -306,7 +307,8 @@ vx_status vxnnePAD(vx_int32 pad, vx_int32 slice, vx_uint8_ptr* dst_ptr, vx_int32
     return VX_SUCCESS;
 
 }
-
+vx_int16 Fp32toBF16(vx_float32 val);
+vx_float32 BF16toFp32(const vx_uint16 in);
 vx_status vxnneExecuteSWTensorPad2(struct _vxnne_operation_s *operation)
 {
     vxnne_tensor_pad_sw_operation           padOperation = (vxnne_tensor_pad_sw_operation)operation;
@@ -325,9 +327,12 @@ vx_status vxnneExecuteSWTensorPad2(struct _vxnne_operation_s *operation)
     vx_int32 inWidth = 0, inHeight = 0, inDepth = 0, inBatch = 0;
     vx_int32 outWidth = 0, outHeight = 0, outDepth = 0, outBatch = 0;
     vx_int32 item_size = vxnneGetTypeSize(TENSOR_DATA_TYPE(src));
+    vx_int32 dst_item_size = vxnneGetTypeSize(TENSOR_DATA_TYPE(dst));
+    vx_enum inputFormat = TENSOR_DATA_TYPE(src);
+    vx_enum outputFormat = TENSOR_DATA_TYPE(dst);
     vx_int32 b = 0, c = 0, w = 0, h = 0;
     vx_int32_ptr pad_base = VX_NULL;
-
+    printf("%d, %d\n", item_size, dst_item_size);
     vxoTensor_GetTensorViewMemory(pad_dims, (gctPOINTER*)&pad_base, VX_NULL);
     vxoTensor_GetTensorViewMemory(src, (gctPOINTER*)&src_base, VX_NULL);
     vxoTensor_GetTensorViewMemory(dst, (gctPOINTER*)&dst_base, VX_NULL);
@@ -380,42 +385,58 @@ vx_status vxnneExecuteSWTensorPad2(struct _vxnne_operation_s *operation)
     gcmASSERT(inHeight + left_h_padding + right_h_padding == outHeight);
     gcmASSERT(inWidth  + left_w_padding + right_w_padding == outWidth);
     gcmASSERT(inDepth  + left_c_padding + right_c_padding == outDepth);
-    gcmASSERT(inBatch  + left_n_padding + right_n_padding == outBatch);
+    if(inBatch  + left_n_padding + right_n_padding != outBatch)
+        gcmASSERT(0);
 
     dst_ptr = dst_base;
     src_ptr = src_base;
 
-    vxnnePAD(left_n_padding, outDepth * outWidth * outHeight, &dst_ptr, item_size, mode, constant, VX_NULL);
+    vxnnePAD(left_n_padding, outDepth * outWidth * outHeight, &dst_ptr, dst_item_size, mode, constant, VX_NULL);
 
     for (b = 0; b < inBatch; b ++)
     {
 
-        vxnnePAD(left_c_padding, outWidth * outHeight, &dst_ptr, item_size, mode, constant, VX_NULL);
+        vxnnePAD(left_c_padding, outWidth * outHeight, &dst_ptr, dst_item_size, mode, constant, VX_NULL);
 
         for (c = 0; c < inDepth; c++)
         {
-            vxnnePAD(left_h_padding, outWidth, &dst_ptr, item_size, mode, constant, VX_NULL);
+            vxnnePAD(left_h_padding, outWidth, &dst_ptr, dst_item_size, mode, constant, VX_NULL);
 
             for (h = 0; h < inHeight; h++)
             {
-                vxnnePAD(left_w_padding, 1, &dst_ptr, item_size, mode, constant, VX_NULL);
+                vxnnePAD(left_w_padding, 1, &dst_ptr, dst_item_size, mode, constant, VX_NULL);
 
                 for (w = 0; w < inWidth; w++)
                 {
-                    memcpy(dst_ptr, src_ptr, item_size);
+                    if ((inputFormat == VX_TYPE_FLOAT32) && (outputFormat == VX_TYPE_BFLOAT16))
+                    {
+                        *(vx_int16 *)dst_ptr = Fp32toBF16(*(float *)src_ptr);
+                    }
+                    else if ((inputFormat == VX_TYPE_BFLOAT16) && (outputFormat == VX_TYPE_FLOAT32))
+                    {
+                        *(float *)dst_ptr = BF16toFp32(*(vx_int16 *)src_ptr);
+                    }
+                    else if (item_size == dst_item_size)
+                    {
+                        memcpy(dst_ptr, src_ptr, item_size);
+                    }
+                    else
+                    {
+                        memcpy(dst_ptr, src_ptr, item_size);
+                    }
                     src_ptr += item_size;
 
-                    dst_ptr += item_size;
+                    dst_ptr += dst_item_size;
                 }
 
-                vxnnePAD(right_w_padding, 1, &dst_ptr, item_size, mode, constant, VX_NULL);
+                vxnnePAD(right_w_padding, 1, &dst_ptr, dst_item_size, mode, constant, VX_NULL);
             }
-            vxnnePAD(right_h_padding, outWidth, &dst_ptr, item_size, mode, constant, VX_NULL);
+            vxnnePAD(right_h_padding, outWidth, &dst_ptr, dst_item_size, mode, constant, VX_NULL);
         }
-        vxnnePAD(right_c_padding, outWidth * outHeight, &dst_ptr, item_size, mode, constant, VX_NULL);
+        vxnnePAD(right_c_padding, outWidth * outHeight, &dst_ptr, dst_item_size, mode, constant, VX_NULL);
     }
 
-    vxnnePAD(right_n_padding, outDepth * outWidth * outHeight, &dst_ptr, item_size, mode, constant, VX_NULL);
+    vxnnePAD(right_n_padding, outDepth * outWidth * outHeight, &dst_ptr, dst_item_size, mode, constant, VX_NULL);
 
     return VX_SUCCESS;
 }
@@ -434,6 +455,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorPad_ValidateOutput(vx_node node,
 {
     return VX_SUCCESS;
 }
+
 #if REGISTER_FRAME
 VX_PRIVATE_API vx_status vxoNNTensorPad_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
 {
@@ -662,12 +684,14 @@ VX_PRIVATE_API vx_bool vxoNNTensorPad_TP_Support(vx_node node, const vx_referenc
     vx_tensor  src                     = (vx_tensor)parameters[0];
     vx_tensor  dst                     = (vx_tensor)parameters[1];
     vx_context context                 = vxGetContext((vx_reference)node);
-    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_TP, VX_TYPE_INVALID, VX_NULL);
+    vx_bool support = vxoLayer_CheckSupport(context, VX_NN_QUERY_TP, VX_TYPE_INVALID, VX_NULL);
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
     support = support && vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP);
-    support = support && vxnneIsTPSupportFormat(context, src, VX_NULL, dst);
+    support = support && vxnneIsTPSupportFormat(node->graph, src, VX_NULL, dst);
+
+    support = support && IsTPSupport_CheckOutPixel(node->base.context, src, dst);
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
@@ -708,7 +732,7 @@ VX_PRIVATE_API vx_status vxoNNTensorPad_TP_Initialize(vxnne_layer ops_layer, con
     conv.pad_x_right = padRight->value->n32;
     conv.pad_y_bottom = padBottom->value->n32;
     conv.pad_mode = padModeVal;
-    conv.pad_const = TENSOR_PAD_ZERO_VALUE(src);
+    conv.pad_const = 0;
     conv.pool_size_x = conv.pool_size_y = 0;
     conv.pool_stride = 1;
     conv.enable_relu = vx_false_e;
@@ -747,7 +771,6 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint
 }
 
 #endif
-
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorPad_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status  status                     = VX_SUCCESS;
@@ -764,7 +787,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorPad_Initializer(vx_node node, co
 
 OnError:
 #else
-
     vx_tensor  src                     = (vx_tensor)parameters[0];
     vx_tensor  dst                     = (vx_tensor)parameters[1];
     vx_scalar  padLeft                 = (vx_scalar)parameters[2];
@@ -828,7 +850,7 @@ OnError:
     tensorPadSHFlag = (vx_bool)(dataFormatFlag && (padModeVal == VX_PAD_CONSTANT || padModeVal == VX_PAD_REPLICATE));
 
     if (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP) &&
-        vxnneIsTPSupportFormat(context, src, VX_NULL, dst))
+        vxnneIsTPSupportFormat(node->graph, src, VX_NULL, dst))
     {
         vx_op_param_s conv = {0};
 
@@ -1062,8 +1084,8 @@ VX_PRIVATE_API vx_bool vxoNNTensorPad2_SH_EVIS_Support(vx_node node, const vx_re
 
     if(outDepth == inDepth && outBatch == inBatch)
     {
-        /*pad_flag = vx_true_e;
-        shader_flag = vx_true_e;*/
+        /*pad_flag = vx_true_e;*/
+        /*shader_flag = vx_true_e;*/
     }
     else if(outWidth == inWidth && outHeight == inHeight && pad_mode == VX_PAD_CONSTANT
         && ((outDepth != inDepth && outBatch == inBatch) || (outDepth == inDepth && outBatch != inBatch)))
@@ -1263,12 +1285,12 @@ VX_PRIVATE_API vx_status vxoNNTensorPad2_SH_EVIS_Initialize(vxnne_layer ops_laye
         reshpTensor_Sizes[0] = outWidth * outHeight;
         reshpTensor_Sizes[1] = outDepth;
         reshpTensor_Sizes[2] = outBatch == 0 ? 1: outBatch;
-        output     = vxoTensor_ReshapeTensor(dst, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+        output     = vxoTensor_ReshapeTensor(dst, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims, VX_NULL);
 
         reshpTensor_Sizes[0] = inWidth * inHeight;
         reshpTensor_Sizes[1] = inDepth;
         reshpTensor_Sizes[2] = inBatch == 0 ? 1: inBatch;
-        input     = vxoTensor_ReshapeTensor(src, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+        input     = vxoTensor_ReshapeTensor(src, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims, VX_NULL);
 
         topPad = pad_base[4];
         bottomPad = pad_base[5];
@@ -1310,12 +1332,12 @@ VX_PRIVATE_API vx_status vxoNNTensorPad2_SH_EVIS_Initialize(vxnne_layer ops_laye
         reshpTensor_Sizes[0] = outWidth * outHeight * outDepth;
         reshpTensor_Sizes[1] = outBatch == 0 ? 1: outBatch;
         reshpTensor_Sizes[2] = 1;
-        output     = vxoTensor_ReshapeTensor(dst, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+        output     = vxoTensor_ReshapeTensor(dst, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims, VX_NULL);
 
         reshpTensor_Sizes[0] = inWidth * inHeight * inDepth;
         reshpTensor_Sizes[1] = inBatch == 0 ? 1: inBatch;
         reshpTensor_Sizes[2] = 1;
-        input     = vxoTensor_ReshapeTensor(src, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+        input     = vxoTensor_ReshapeTensor(src, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims, VX_NULL);
 
         topPad = pad_base[6];
         bottomPad = pad_base[7];
@@ -1479,12 +1501,26 @@ VX_PRIVATE_API vx_bool vxoNNTensorPad2_TP_Support(vx_node node, const vx_referen
 {
     vx_tensor  src = (vx_tensor)parameters[0];
     vx_tensor  dst = (vx_tensor)parameters[1];
+    vx_tensor  pad_dims = (vx_tensor)parameters[2];
+    vx_scalar  padMode = (vx_scalar)parameters[3];
+
+    vx_int32_ptr pad_base = VX_NULL;
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_TP, VX_TYPE_INVALID, VX_NULL);
+    vxoTensor_GetTensorViewMemory(pad_dims, (gctPOINTER *)&pad_base, VX_NULL);
+
+    if((padMode->value->e != VX_PAD_CONSTANT) && ((pad_base[4] != 0) || (pad_base[5] != 0)))
+    {
+        return vx_false_e;
+    }
+    else if ((padMode->value->e == VX_PAD_CONSTANT) && (pad_base[5] > 3))
+    {
+        return vx_false_e;
+    }
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
     support = support && vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP);
-    support = support && vxnneIsTPSupportFormat(node->base.context, src, VX_NULL, dst);
+    support = support && vxnneIsTPSupportFormat(node->graph, src, VX_NULL, dst);
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
@@ -1498,6 +1534,7 @@ VX_PRIVATE_API vx_status vxoNNTensorPad2_TP_Initialize(vxnne_layer ops_layer, co
     vx_tensor  dst = (vx_tensor)parameters[1];
     vx_tensor  pad_dims = (vx_tensor)parameters[2];
     vx_scalar  padMode = (vx_scalar)parameters[3];
+    vx_scalar  padConst = (vx_scalar)parameters[4];
     vx_uint32  batchCount = TENSOR_SIZE_INDEX(src, 3);
     vxnne_tensor_pad  padNode = (vxnne_tensor_pad)ops_layer;
 
@@ -1521,10 +1558,12 @@ VX_PRIVATE_API vx_status vxoNNTensorPad2_TP_Initialize(vxnne_layer ops_layer, co
 
     conv.pad_x_left = pad_base[0];
     conv.pad_y_top = pad_base[2];
+    conv.pad_z_front = pad_base[4];
     conv.pad_x_right = pad_base[1];
     conv.pad_y_bottom = pad_base[3];
+    conv.pad_z_back = pad_base[5];
     conv.pad_mode = padMode->value->e;
-    conv.pad_const = TENSOR_PAD_ZERO_VALUE(src);
+    conv.pad_const = padConst->value->e;
     conv.pool_size_x = conv.pool_size_y = 0;
     conv.pool_stride = 1;
     conv.enable_relu = vx_false_e;
@@ -1559,10 +1598,10 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations2(vxnne_layer ops_layer, vx_uin
     *max_num_operations = gcmCOUNTOF(padNode->operations);
 
     *operations = padNode->operations;
+
     return status;
 }
 #endif
-
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorPad2_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status  status = VX_SUCCESS;
@@ -1579,7 +1618,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorPad2_Initializer(vx_node node, c
 
 OnError:
 #else
-
     vx_tensor  src = (vx_tensor)parameters[0];
     vx_tensor  dst = (vx_tensor)parameters[1];
     vx_tensor  pad_dims = (vx_tensor)parameters[2];
@@ -1612,7 +1650,7 @@ OnError:
         padNode->operations,
         VX_NULL);
     if (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP) &&
-        vxnneIsTPSupportFormat(node->base.context, src, VX_NULL, dst))
+        vxnneIsTPSupportFormat(node->graph, src, VX_NULL, dst))
     {
         vx_int32 index = 0;
         vx_op_param_s conv = { 0 };
@@ -1788,12 +1826,12 @@ OnError:
                 reshpTensor_Sizes[0] = outWidth * outHeight;
                 reshpTensor_Sizes[1] = outDepth;
                 reshpTensor_Sizes[2] = outBatch == 0 ? 1: outBatch;
-                output     = vxoTensor_ReshapeTensor(dst, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+                output     = vxoTensor_ReshapeTensor(dst, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims, VX_NULL);
 
                 reshpTensor_Sizes[0] = inWidth * inHeight;
                 reshpTensor_Sizes[1] = inDepth;
                 reshpTensor_Sizes[2] = inBatch == 0 ? 1: inBatch;
-                input     = vxoTensor_ReshapeTensor(src, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+                input     = vxoTensor_ReshapeTensor(src, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims, VX_NULL);
 
                 topPad = pad_base[4];
                 bottomPad = pad_base[5];
@@ -1835,12 +1873,12 @@ OnError:
                 reshpTensor_Sizes[0] = outWidth * outHeight * outDepth;
                 reshpTensor_Sizes[1] = outBatch == 0 ? 1: outBatch;
                 reshpTensor_Sizes[2] = 1;
-                output     = vxoTensor_ReshapeTensor(dst, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+                output     = vxoTensor_ReshapeTensor(dst, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims, VX_NULL);
 
                 reshpTensor_Sizes[0] = inWidth * inHeight * inDepth;
                 reshpTensor_Sizes[1] = inBatch == 0 ? 1: inBatch;
                 reshpTensor_Sizes[2] = 1;
-                input     = vxoTensor_ReshapeTensor(src, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+                input     = vxoTensor_ReshapeTensor(src, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims, VX_NULL);
 
                 topPad = pad_base[6];
                 bottomPad = pad_base[7];

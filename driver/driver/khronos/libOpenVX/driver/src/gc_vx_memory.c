@@ -47,11 +47,29 @@ VX_PRIVATE_API vx_bool _AllocateMemory(vx_context context, vx_memory memory, vx_
             {
                 size = (vx_size)abs(memory->strides[planeIndex][VX_DIM_CHANNEL]);
             }
-
-            for (dimIndex = 0; (vx_uint32)dimIndex < memory->dimCount; dimIndex++)
+            else if (memory->stride_x_bits[planeIndex] != 0)
             {
-                memory->strides[planeIndex][dimIndex] = (vx_int32)size;
-                size *= (vx_size)abs(memory->dims[planeIndex][dimIndex]);
+                /* data type is not whole number of bytes */
+                size = 0;
+            }
+            if (size == 0)
+            {
+                memory->strides[planeIndex][VX_DIM_X] = 0;
+                /* the size of each row in the x-dimension, in integer number of bytes (rounded up from bits) */
+                size = (memory->stride_x_bits[planeIndex] * (vx_size)abs(memory->dims[planeIndex][VX_DIM_X]) + 7) / 8;
+                for (dimIndex = 2; (vx_uint32)dimIndex < memory->dimCount; dimIndex++)
+                {
+                    memory->strides[planeIndex][dimIndex] = (vx_int32)size;
+                    size *= (vx_size)abs(memory->dims[planeIndex][dimIndex]);
+                }
+            }
+            else
+            {
+                for (dimIndex = 0; (vx_uint32)dimIndex < memory->dimCount; dimIndex++)
+                {
+                    memory->strides[planeIndex][dimIndex] = (vx_int32)size;
+                    size *= (vx_size)abs(memory->dims[planeIndex][dimIndex]);
+                }
             }
 
             memory->sizes[planeIndex] = size;
@@ -253,10 +271,10 @@ VX_INTERNAL_API vx_bool vxoMemory_WrapUserMemory(vx_context context, vx_memory m
         desc.physical = gcvINVALID_PHYSICAL_ADDRESS;
 
         /*TODO: add more check to make sure memory size 4k alignment*/
-        desc.size     = gcmALIGN((gctUINT32)memory->sizes[planeIndex], VX_WRAP_USER_MEMORY_SIZE_ALIGNMENT);
+        desc.size     = gcmALIGN((gctUINT32)memory->sizes[planeIndex], 0x1000);
 
         /*page size alignment for CPU*/
-        if(desc.logical & 0x3f) goto ErrorExit;
+        if(desc.logical & 0x3f || desc.size & 0xfff ) goto ErrorExit;
 
         memory->wrappedSize[planeIndex] = desc.size;
 
@@ -1437,10 +1455,11 @@ vxoMemoryPool_RequestList(
     vx_uint32           list_count,
     vx_uint32           start,
     vx_uint32           count,
-    vx_uint32           *max_sizes
+    vx_uint32           *max_sizes,
+    vx_uint32           *fail_id
     )
 {
-    vx_uint32 i, j, ii, s, tcount = 0, mcounts[VXNNE_MEM_POOL_TYPE_END] = {0};
+    vx_uint32 i, j, ii, s, tcount = 0, mcounts[VXNNE_MEM_POOL_TYPE_END] = {0}, failId = 0xDEAD;
     vx_size size, msize[VXNNE_MEM_POOL_TYPE_END] = {0};
     vx_size maxs[VXNNE_MEM_POOL_TYPE_ALL] = {0};
     vx_memory * plists[VXNNE_MEM_POOL_TYPE_END] = {VX_NULL};
@@ -1475,7 +1494,21 @@ vxoMemoryPool_RequestList(
             {
                 list[i].outputMemory[j]->firstUseId = i;
             }
-            list[i].outputMemory[j]->lastUseId = i;
+            if (!list[i].outputMemory[j]->ignoreLastUseId)
+            {
+                list[i].outputMemory[j]->lastUseId = i;
+            }
+
+            if (i >= start + count &&
+                list[i].outputMemory[j]->firstUseId >= start &&
+                list[i].outputMemory[j]->firstUseId < start + count &&
+                list[i].outputMemory[j]->allocType != VXNNE_MEM_POOL_TYPE_ORIG_DDR &&
+                list[i].outputMemory[j]->allocated == vx_false_e)
+            {
+                failId = list[i].outputMemory[j]->firstUseId;
+                status = VX_ERROR_INVALID_SCOPE;
+                goto exit;
+            }
 
             if (i >= start && i < start + count)
             {
@@ -1520,7 +1553,20 @@ vxoMemoryPool_RequestList(
             {
                 list[i].inputMemory[j]->firstUseId = i;
             }
-            list[i].inputMemory[j]->lastUseId = i;
+            if (!list[i].inputMemory[j]->ignoreLastUseId)
+            {
+                list[i].inputMemory[j]->lastUseId = i;
+            }
+            if (i >= start + count &&
+                list[i].inputMemory[j]->firstUseId >= start &&
+                list[i].inputMemory[j]->firstUseId < start + count &&
+                list[i].inputMemory[j]->allocType != VXNNE_MEM_POOL_TYPE_ORIG_DDR &&
+                list[i].inputMemory[j]->allocated == vx_false_e)
+            {
+                failId = list[i].inputMemory[j]->firstUseId;
+                status = VX_ERROR_INVALID_SCOPE;
+                goto exit;
+            }
 
             if (i >= start && i < start + count)
             {
@@ -1602,8 +1648,15 @@ again:
                 gcmASSERT(ntype < VXNNE_MEM_POOL_TYPE_END);
                 gcmASSERT(mcounts[ntype] > 0);
 
-                if (mem->allocated == vx_false_e && i > mem->firstUseId && mustHave)
+                if (mem->allocated == vx_false_e && mem->firstUseId < start)
                 {
+                    failId = i;
+                    status = VX_ERROR_INVALID_SCOPE;
+                    goto exit;
+                }
+                else if (mem->allocated == vx_false_e && i > mem->firstUseId && mustHave)
+                {
+                    failId = i;
                     status = VX_FAILURE;
                     goto exit;
                 }
@@ -1663,7 +1716,7 @@ again:
 
                             if (sstate == VX_MEMPOOL_STACK_HAS_HEAD)
                             {
-                                if (sid > nid)
+                                if (sid >= nid)
                                 {
                                     pos = vxoMemoryPool_PushStack(&stacks[ntype], mem, vx_false_e);
                                 }
@@ -1674,7 +1727,7 @@ again:
                             }
                             else
                             {
-                                if (sid > nid)
+                                if (sid >= nid)
                                 {
                                     pos = vxoMemoryPool_PushStack(&stacks[ntype], mem, vx_true_e);
                                 }
@@ -1764,6 +1817,7 @@ again:
                                     {
                                         if (VXNNE_MEM_ALLOC_TYPE_IS_MUST_HAVE(plist[k]->allocPriority))
                                         {
+                                            failId = i;
                                             status = VX_FAILURE;
                                             goto exit;
                                         }
@@ -1795,6 +1849,7 @@ again:
                                     {
                                         if (VXNNE_MEM_ALLOC_TYPE_IS_MUST_HAVE(plist[k]->allocPriority))
                                         {
+                                            failId = i;
                                             status = VX_FAILURE;
                                             goto exit;
                                         }
@@ -1817,6 +1872,14 @@ again:
                             i = fid;
                             goto again;
                         }
+                        else if (VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(mem->allocType) == VXNNE_MEM_POOL_TYPE_SRAM &&
+                                 mem->allocTypeTmp == VXNNE_MEM_POOL_TYPE_VIP_SRAM &&
+                                 maxs[VXNNE_MEM_POOL_TYPE_AXI_SRAM] != 0)
+                        {
+                            mem->allocTypeTmp = VXNNE_MEM_POOL_TYPE_AXI_SRAM;
+                            vxoMemoryPool_ResetStackItemByPos(&stacks[ntype], pos);
+                            goto again;
+                        }
                         else if (mem->allocPartial && mem->sizes[1] > dsize)
                         {
                             vxoMemoryPool_SetStackItemSizeByPos(&stacks[ntype], mem->sizes[1]-dsize, pos);
@@ -1829,16 +1892,9 @@ again:
                             vxoMemoryPool_ResetStackItemByPos(&stacks[ntype], pos);
                             continue;
                         }
-                        else if (VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(mem->allocType) == VXNNE_MEM_POOL_TYPE_SRAM &&
-                                 mem->allocTypeTmp == VXNNE_MEM_POOL_TYPE_VIP_SRAM &&
-                                 maxs[VXNNE_MEM_POOL_TYPE_AXI_SRAM] != 0)
-                        {
-                            mem->allocTypeTmp = VXNNE_MEM_POOL_TYPE_AXI_SRAM;
-                            vxoMemoryPool_ResetStackItemByPos(&stacks[ntype], pos);
-                            goto again;
-                        }
                         else
                         {
+                            failId = i;
                             status = VX_FAILURE;
                             goto exit;
                         }
@@ -1870,7 +1926,8 @@ again:
         sstate = vxoMemoryPool_GetStackStatus(&stacks[i]);
         if (sstate != VX_MEMPOOL_STACK_EMPTY)
         {
-            status = VX_FAILURE;
+            vxmASSERT(0);
+            status = VX_ERROR_INVALID_SCOPE;
             goto exit;
         }
 
@@ -1885,7 +1942,7 @@ again:
     {
         if (!context->options.memPoolSize && !vxoMemoryPool_LockDown(graph, msize[atype]))
         {
-            vxError("Can't allocate memory for virtual memory pool");
+            vxError("Can't allocate memory for virtual memory pool, size: %zu\n", msize[atype]);
             status = VX_ERROR_NO_MEMORY;
             goto exit;
         }
@@ -1939,6 +1996,11 @@ exit:
             gcoOS_FreeMemory(gcvNULL, plists[i]);
             plists[i] = VX_NULL;
         }
+    }
+
+    if (status != VX_SUCCESS && fail_id != VX_NULL)
+    {
+        *fail_id = failId;
     }
 
     gcmFOOTER_ARG("%d", status);

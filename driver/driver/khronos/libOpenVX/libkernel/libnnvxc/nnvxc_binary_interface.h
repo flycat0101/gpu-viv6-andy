@@ -20,5 +20,9 @@ typedef enum _nnvxc_kernel_enum
 }
 nnvxc_kernel_enum;
 
-typedef void * (*GetBinaryPtr_FUNC)(nnvxc_kernel_enum, unsigned int *);
+#if gcdSTATIC_LINK
+void * GetVIPNNVXCBinaryPtr(nnvxc_kernel_enum, unsigned int *);
+#else
+typedef void * (*GetVIPNNVXCBinaryPtr_FUNC)(nnvxc_kernel_enum, unsigned int *);
+#endif
 #endif

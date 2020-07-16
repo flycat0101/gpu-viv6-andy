@@ -41,6 +41,185 @@ VX_INTERNAL_API void vxoMetaFormat_Release(vx_meta_format_ptr metaFormatPtr)
     vxoReference_Release((vx_reference_ptr)metaFormatPtr, VX_TYPE_META_FORMAT, VX_REF_EXTERNAL);
 }
 
+
+VX_API_ENTRY vx_status VX_API_CALL vxQueryMetaFormatAttribute(vx_meta_format meta_format, vx_enum attribute, void *ptr, vx_size size)
+{
+    vx_status status = VX_SUCCESS;
+
+    gcmHEADER_ARG("meta_format=%p, attribute=0x%x, ptr=%p, size=0x%lx", meta_format, attribute, ptr, size);
+    gcmDUMP_API("$VX vxQueryMetaFormatAttribute: meta_format=%p, attribute=0x%x, ptr=%p, size=0x%lx", meta_format, attribute, ptr, size);
+
+    if (vxoReference_IsValidAndSpecific(&meta_format->base, VX_TYPE_META_FORMAT) == vx_false_e)
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
+
+    if (VX_TYPE(attribute) != (vx_uint32)meta_format->type &&
+        attribute != VX_VALID_RECT_CALLBACK)
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_TYPE);
+        return VX_ERROR_INVALID_TYPE;
+    }
+
+    switch(attribute)
+    {
+        /**********************************************************************/
+        case VX_IMAGE_FORMAT:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_df_image, 0x3);
+            *(vx_df_image *)ptr = meta_format->u.imageInfo.format;
+            break;
+        case VX_IMAGE_HEIGHT:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
+            *(vx_uint32 *)ptr = meta_format->u.imageInfo.height;
+            break;
+        case VX_IMAGE_WIDTH:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
+            *(vx_uint32 *)ptr = meta_format->u.imageInfo.width;
+            break;
+        /**********************************************************************/
+        case VX_ARRAY_CAPACITY:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
+            *(vx_size *)ptr = meta_format->u.arrayInfo.capacity;
+            break;
+        case VX_ARRAY_ITEMTYPE:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_enum, 0x3);
+            *(vx_enum *)ptr = meta_format->u.arrayInfo.itemType;
+            break;
+        /**********************************************************************/
+        case VX_PYRAMID_FORMAT:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_df_image, 0x3);
+            *(vx_df_image *)ptr = meta_format->u.pyramidInfo.format;
+            break;
+        case VX_PYRAMID_HEIGHT:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
+            *(vx_uint32 *)ptr =meta_format->u.pyramidInfo.height;
+            break;
+        case VX_PYRAMID_WIDTH:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
+            *(vx_uint32 *)ptr = meta_format->u.pyramidInfo.width;
+            break;
+        case VX_PYRAMID_LEVELS:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
+            *(vx_size *)ptr = meta_format->u.pyramidInfo.levelCount;
+            break;
+        case VX_PYRAMID_SCALE:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_float32, 0x3);
+            *(vx_float32 *)ptr = meta_format->u.pyramidInfo.scale;
+            break;
+        /**********************************************************************/
+        case VX_SCALAR_TYPE:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_enum, 0x3);
+            *(vx_enum *)ptr = meta_format->u.scalarInfo.type;
+            break;
+        /**********************************************************************/
+        case VX_MATRIX_TYPE:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_enum, 0x3);
+            *(vx_enum *)ptr = meta_format->u.matrixInfo.type;
+            break;
+        case VX_MATRIX_ROWS:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
+            *(vx_size *)ptr = meta_format->u.matrixInfo.rows;
+            break;
+        case VX_MATRIX_COLUMNS:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
+            *(vx_size *)ptr = meta_format->u.matrixInfo.cols;
+            break;
+        /**********************************************************************/
+        case VX_DISTRIBUTION_BINS:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
+            *(vx_size *)ptr = meta_format->u.distributionInfo.bins;
+            break;
+        case VX_DISTRIBUTION_RANGE:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
+            *(vx_uint32 *)ptr = meta_format->u.distributionInfo.range;
+            break;
+        case VX_DISTRIBUTION_OFFSET:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_int32, 0x3);
+            *(vx_int32 *)ptr = meta_format->u.distributionInfo.offset;
+            break;
+        /**********************************************************************/
+        case VX_REMAP_SOURCE_WIDTH:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
+            *(vx_uint32 *)ptr = meta_format->u.remapInfo.src_width;
+            break;
+        case VX_REMAP_SOURCE_HEIGHT:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
+            *(vx_uint32 *)ptr = meta_format->u.remapInfo.src_height;
+            break;
+        case VX_REMAP_DESTINATION_WIDTH:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
+            *(vx_uint32 *)ptr = meta_format->u.remapInfo.dst_width;
+            break;
+        case VX_REMAP_DESTINATION_HEIGHT:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
+            *(vx_uint32 *)ptr = meta_format->u.remapInfo.dst_height;
+            break;
+        /**********************************************************************/
+        case VX_LUT_TYPE:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_enum, 0x3);
+            *(vx_enum *)ptr = meta_format->u.lutInfo.type;
+            break;
+        case VX_LUT_COUNT:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
+            *(vx_size *)ptr = meta_format->u.lutInfo.count;
+            break;
+        /**********************************************************************/
+        case VX_THRESHOLD_TYPE:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_enum, 0x3);
+            *(vx_enum *)ptr = meta_format->u.thresholdInfo.type;
+            break;
+        /**********************************************************************/
+        case VX_VALID_RECT_CALLBACK:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_kernel_image_valid_rectangle_f, 0x0);
+            *(vx_kernel_image_valid_rectangle_f*)ptr = meta_format->setValidRectangleCallback;
+            break;
+        /**********************************************************************/
+        case VX_OBJECT_ARRAY_ITEMTYPE:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_enum, 0x3);
+            *(vx_enum *)ptr = meta_format->u.objectArrayInfo.item_type;
+            break;
+        case VX_OBJECT_ARRAY_NUMITEMS:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
+            *(vx_size *)ptr = meta_format->u.objectArrayInfo.item_count;
+            break;
+        /**********************************************************************/
+        case VX_TENSOR_NUMBER_OF_DIMS:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
+            *(vx_size *)ptr = meta_format->u.tensorInfo.numOfDims;
+            break;
+        case VX_TENSOR_DIMS:
+            if (size <= (sizeof(vx_size)*VX_CONTEXT_TENSOR_MAX_DIMENSION) && ((vx_size)ptr & 0x3) == 0)
+            {
+                vx_uint32 i;
+                for (i = 0; i < size / sizeof(vx_size); i++)
+                    *((vx_size*)ptr + i) = meta_format->u.tensorInfo.dimensions[i];
+            }
+            else
+            {
+                gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+                return VX_ERROR_INVALID_PARAMETERS;
+            }
+            break;
+        case VX_TENSOR_DATA_TYPE:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_enum, 0x3);
+            *(vx_enum *)ptr = meta_format->u.tensorInfo.dataFormat;
+            break;
+        case VX_TENSOR_FIXED_POINT_POSITION:
+            vxmVALIDATE_PARAMETERS_EX(ptr, size, vx_uint8);
+            *(vx_int8 *)ptr = meta_format->u.tensorInfo.fixedPointPosition;
+            break;
+        default:
+            vxError("The attribute parameter, %d, is not supported", attribute);
+            gcmFOOTER_ARG("%d", VX_ERROR_NOT_SUPPORTED);
+            status = VX_ERROR_NOT_SUPPORTED;
+            break;
+    }
+
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
+    return status;
+}
+
 VX_API_ENTRY vx_status VX_API_CALL vxSetMetaFormatAttribute(vx_meta_format meta_format, vx_enum attribute, const void *ptr, vx_size size)
 {
     gcmHEADER_ARG("meta_format=%p, attribute=0x%x, ptr=%p, size=0x%lx", meta_format, attribute, ptr, size);
@@ -241,7 +420,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetMetaFormatAttribute(vx_meta_format meta_
             vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
 
             meta_format->u.tensorInfo.numOfDims = *(vx_uint32 *)ptr;
-           break;
+            break;
 
         case VX_TENSOR_DIMS:
             if (size <= (sizeof(vx_size)*VX_CONTEXT_TENSOR_MAX_DIMENSION) && ((vx_size)ptr & 0x3) == 0)
@@ -464,9 +643,19 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetMetaFormatFromReference(vx_meta_format m
 
             break;
         }
-    default:
-        status = VX_ERROR_INVALID_REFERENCE;
-        break;
+        case VX_TYPE_TENSOR:
+        {
+            vx_tensor tensor = (vx_tensor)examplar;
+            meta->type = VX_TYPE_TENSOR;
+            meta->u.tensorInfo.dataFormat = tensor->dataFormat;
+            meta->u.tensorInfo.fixedPointPosition = (tensor->quantFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? tensor->quantData.dfp.fixed_point_pos : 0;
+            meta->u.tensorInfo.numOfDims = tensor->dimCount;
+            memcpy(meta->u.tensorInfo.dimensions, tensor->dims, sizeof(tensor->dims));
+            break;
+        }
+        default:
+            status = VX_ERROR_INVALID_REFERENCE;
+            break;
     }
 
     gcmFOOTER_ARG("%d", status);

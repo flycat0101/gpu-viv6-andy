@@ -20,5 +20,9 @@ typedef enum _ovx12_vxc_kernel_enum
 }
 ovx12_vxc_kernel_enum;
 
+#if gcdSTATIC_LINK
+void * GetOvx12KernelBinaryPtr(ovx12_vxc_kernel_enum, unsigned int *);
+#else
 typedef void * (*GetOvx12KernelBinaryPtr_FUNC)(ovx12_vxc_kernel_enum, unsigned int *);
+#endif
 #endif

@@ -638,6 +638,7 @@ vx_status vxnneExecuteSWRPN_Sort(struct _vxnne_operation_s *operation)
         vx_int16_ptr proposals_ptr = (vx_int16_ptr)proposals_data;
 
         // xzq test
+
         vx_nn_rpn_qsort_box_fp16(proposals_ptr, 0, proposal_count-1, pre_nms_topn);
     }
     else
@@ -658,6 +659,7 @@ vx_status vxnneExecuteSWRPN_Sort(struct _vxnne_operation_s *operation)
 
         vxFree(proposals_data);
     }
+
     return status;
 }
 
@@ -793,6 +795,7 @@ vx_status vxnneExecuteSWRPN_Retrieve(struct _vxnne_operation_s *operation)
         out_score_scale = TENSOR_TF_SCALE(score_output);
     }
 
+
     real_roi = real_roi_t->value->u32;
 
     for(i = 0; i < real_roi; i++)
@@ -909,6 +912,7 @@ vx_status vxnneExecuteSWRPN_SortNMS(struct _vxnne_operation_s *operation)
     vxnneGetTensorMemeory(proposal, (vx_ptr_ptr)&proposals_data, output_stage, vx_false_e);
     vxnneGetTensorMemeory(roi_output, (vx_ptr_ptr)&roi_output_data, output_stage, vx_false_e);
     vxnneGetTensorMemeory(score_output,(vx_ptr_ptr)&score_output_data, output_stage, vx_false_e);
+
 
     if(pre_nms_topn>proposal_count)
         pre_nms_topn = proposal_count;
@@ -1097,12 +1101,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd_cpu(vx_node n
             if (rs_score_flag){
                 vx_int32 new_size[6] = {score->dims[0], score->dims[1],
                                         score->dims[2] * score->dims[3], 1, 1, 1};
-                rs_score              = vxoTensor_ReshapeTensor(score, new_size, 3);
+                rs_score              = vxoTensor_ReshapeTensor(score, new_size, 3, VX_NULL);
             }
             if (rs_socreBufferTensor_flag){
                 vx_int32 new_size[6] = {socreBufferTensor->dims[0], socreBufferTensor->dims[1],
                                         socreBufferTensor->dims[2] * socreBufferTensor->dims[3], 1, 1, 1};
-                rs_socreBufferTensor = vxoTensor_ReshapeTensor(socreBufferTensor, new_size, 3);
+                rs_socreBufferTensor = vxoTensor_ReshapeTensor(socreBufferTensor, new_size, 3, VX_NULL);
             }
             // --end reshape
             shaderExecutable =
@@ -1198,16 +1202,16 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd_cpu(vx_node n
             // reshap tensor objs from dim(4) to dim(3)
             if (rs_socreBufferTensor_flag){
                 vx_int32 new_size[6] = {socreBufferTensor->dims[0], socreBufferTensor->dims[1], socreBufferTensor->dims[2] * socreBufferTensor->dims[3], 1, 1, 1};
-                rs_socreBufferTensor = vxoTensor_ReshapeTensor(socreBufferTensor, new_size, 3);
+                rs_socreBufferTensor = vxoTensor_ReshapeTensor(socreBufferTensor, new_size, 3, VX_NULL);
             }
             if (rs_box_flag){
                 vx_int32 new_size[6] = {bbox->dims[0], bbox->dims[1], bbox->dims[2] * bbox->dims[3], 1, 1, 1};
-                rs_bbox = vxoTensor_ReshapeTensor(bbox, new_size, 3);
+                rs_bbox = vxoTensor_ReshapeTensor(bbox, new_size, 3, VX_NULL);
             }
             if (rs_anchors_flag){
 
                 vx_int32 new_size[6] = {anchors->dims[0]*anchors->dims[1]*anchors->dims[2] * anchors->dims[3], 1, 1, 1, 1, 1};
-                rs_anchors = vxoTensor_ReshapeTensor(anchors, new_size, 3);
+                rs_anchors = vxoTensor_ReshapeTensor(anchors, new_size, 3, VX_NULL);
             }
             // get img_info as input paramerters
             vxnneGetTensorMemeory(img_info, (vx_ptr_ptr)&img_data, vx_false_e, vx_false_e);
@@ -1218,7 +1222,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd_cpu(vx_node n
             min_box_W   = min_size_v * img_scale_W;
             min_box_H   = min_size_v * img_scale_H;
 
-            pScalarObj = (vx_scalar *)calloc(4, sizeof(vx_scalar));
+            pScalarObj = (vx_scalar *)vxAllocateAndZeroMemory(4 * sizeof(vx_scalar));
             pScalarObj[0] = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &img_W);
             pScalarObj[1] = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &img_H);
             pScalarObj[2] = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &min_box_W);
@@ -1489,12 +1493,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd(vx_node node,
             if (rs_score_flag){
                 vx_int32 new_size[6] = {score->dims[0], score->dims[1],
                                         score->dims[2] * score->dims[3], 1, 1, 1};
-                rs_score              = vxoTensor_ReshapeTensor(score, new_size, 3);
+                rs_score              = vxoTensor_ReshapeTensor(score, new_size, 3, VX_NULL);
             }
             if (rs_socreBufferTensor_flag){
                 vx_int32 new_size[6] = {socreBufferTensor->dims[0], socreBufferTensor->dims[1],
                                         socreBufferTensor->dims[2] * socreBufferTensor->dims[3], 1, 1, 1};
-                rs_socreBufferTensor = vxoTensor_ReshapeTensor(socreBufferTensor, new_size, 3);
+                rs_socreBufferTensor = vxoTensor_ReshapeTensor(socreBufferTensor, new_size, 3, VX_NULL);
             }
             // --end reshape
             shaderExecutable =
@@ -1589,16 +1593,16 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd(vx_node node,
             // reshap tensor objs from dim(4) to dim(3)
             if (rs_socreBufferTensor_flag){
                 vx_int32 new_size[6] = {socreBufferTensor->dims[0], socreBufferTensor->dims[1], socreBufferTensor->dims[2] * socreBufferTensor->dims[3], 1, 1, 1};
-                rs_socreBufferTensor = vxoTensor_ReshapeTensor(socreBufferTensor, new_size, 3);
+                rs_socreBufferTensor = vxoTensor_ReshapeTensor(socreBufferTensor, new_size, 3, VX_NULL);
             }
             if (rs_box_flag){
                 vx_int32 new_size[6] = {bbox->dims[0], bbox->dims[1], bbox->dims[2] * bbox->dims[3], 1, 1, 1};
-                rs_bbox = vxoTensor_ReshapeTensor(bbox, new_size, 3);
+                rs_bbox = vxoTensor_ReshapeTensor(bbox, new_size, 3, VX_NULL);
             }
             if (rs_anchors_flag){
 
                 vx_int32 new_size[6] = {anchors->dims[0]*anchors->dims[1]*anchors->dims[2] * anchors->dims[3], 1, 1, 1, 1, 1};
-                rs_anchors = vxoTensor_ReshapeTensor(anchors, new_size, 3);
+                rs_anchors = vxoTensor_ReshapeTensor(anchors, new_size, 3, VX_NULL);
 
             }
             // get img_info as input paramerters
@@ -1610,7 +1614,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd(vx_node node,
             min_box_W   = min_size_v * img_scale_W;
             min_box_H   = min_size_v * img_scale_H;
 
-            pScalarObj = (vx_scalar *)calloc(4, sizeof(vx_scalar));
+            pScalarObj = (vx_scalar *)vxAllocateAndZeroMemory(4 * sizeof(vx_scalar));
             pScalarObj[0] = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &img_W);
             pScalarObj[1] = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &img_H);
             pScalarObj[2] = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &min_box_W);
@@ -1709,7 +1713,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd(vx_node node,
             {
                 vx_int32 len = proposalTensor->dims[0] * proposalTensor->dims[1] * proposalTensor->dims[2] * proposalTensor->dims[3];
                 vx_int32 new_size[6] = {5, len/5, 1, 1, 1, 1};
-                rs_proposalTensor = vxoTensor_ReshapeTensor(proposalTensor, new_size, 3);
+                rs_proposalTensor = vxoTensor_ReshapeTensor(proposalTensor, new_size, 3, VX_NULL);
             }
             shaderExecutable =  vxnneRPNSortShaderExecutable(
                                 node->base.context,
@@ -1804,7 +1808,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd(vx_node node,
             {
                 vx_int32 len = proposalTensor->dims[0] * proposalTensor->dims[1] * proposalTensor->dims[2] * proposalTensor->dims[3];
                 vx_int32 new_size[6] = {5, len/5, 1, 1, 1, 1};
-                rs_proposalTensor = vxoTensor_ReshapeTensor(proposalTensor, new_size, 3);
+                rs_proposalTensor = vxoTensor_ReshapeTensor(proposalTensor, new_size, 3, VX_NULL);
             }
 
             shaderExecutable =  vxnneRPNNmsShaderExecutable(
@@ -1881,19 +1885,19 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd(vx_node node,
             {
                 vx_int32 len = proposalTensor->dims[0] * proposalTensor->dims[1] * proposalTensor->dims[2] * proposalTensor->dims[3];
                 vx_int32 new_size[6] = {5, len/5, 1, 1, 1, 1};
-                rs_proposalTensor = vxoTensor_ReshapeTensor(proposalTensor, new_size, 3);
+                rs_proposalTensor = vxoTensor_ReshapeTensor(proposalTensor, new_size, 3, VX_NULL);
             }
             if (roi_output != NULL)
             {
                 vx_int32 len = roi_output->dims[0] * roi_output->dims[1] * roi_output->dims[2] * roi_output->dims[3];
                 vx_int32 new_size[6] = {5, len/5, 1, 1, 1, 1};
-                rs_roi_output = vxoTensor_ReshapeTensor(roi_output, new_size, 3);
+                rs_roi_output = vxoTensor_ReshapeTensor(roi_output, new_size, 3, VX_NULL);
             }
             if (score_output != NULL)
             {
                 vx_int32 len = score_output->dims[0] * score_output->dims[1] * score_output->dims[2] * score_output->dims[3];
                 vx_int32 new_size[6] = {len, 1, 1, 1, 1, 1};
-                rs_score_output = vxoTensor_ReshapeTensor(score_output, new_size, 3);
+                rs_score_output = vxoTensor_ReshapeTensor(score_output, new_size, 3, VX_NULL);
             }
             shaderExecutable =  vxnneRPNRetrieveShaderExecutable(
                                 node->base.context,

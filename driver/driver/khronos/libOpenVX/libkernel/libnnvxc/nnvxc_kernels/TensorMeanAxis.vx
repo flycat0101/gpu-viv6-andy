@@ -53,6 +53,7 @@ TENSOR_MEAN_AXIS0_F16_2D(I16, short, short, CONV_SAT_RTE, 2)
 TENSOR_MEAN_AXIS0_F16_2D(I8,  char,  char,  CONV_SAT_RTE, 1)
 TENSOR_MEAN_AXIS0_F16_2D(U8,  unsigned char, unsigned char, CONV_SAT_RTE, 1)
 
+
 #define TENSOR_MEAN_AXIS0_F16(dst_name, dst_type, copy_type, conv_mode, copy_byte_num) \
 __kernel void vxcTensorMeanAxis0_F16to##dst_name \
     ( \

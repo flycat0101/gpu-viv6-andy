@@ -1420,9 +1420,16 @@ VX_API_ENTRY vx_status VX_API_CALL vxuBilateralFilter(vx_context context, vx_ten
     if(graph)
     {
         vx_node node = vxBilateralFilterNode(graph, src, diameter, sigmaSpace, sigmaValues, dst);
+
         if(node)
         {
-            status = vxVerifyGraph(graph);
+            status = vx_useImmediateBorderMode(context, node, vx_border_modes_3_e, gcmCOUNTOF(vx_border_modes_3_e));
+
+            if (status == VX_SUCCESS)
+            {
+                status = vxVerifyGraph(graph);
+            }
+
             if(status == VX_SUCCESS)
             {
                 status = vxProcessGraph(graph);
@@ -1616,5 +1623,29 @@ VX_API_ENTRY vx_status VX_API_CALL vxuCopy(vx_context context, vx_reference inpu
         }
         vxReleaseGraph(&graph);
     }
+    return status;
+}
+
+VX_API_ENTRY vx_status VX_API_CALL vxuWeightedAverage(vx_context context, vx_image input0, vx_scalar alpha, vx_image input1, vx_image output)
+{
+    vx_status status = VX_FAILURE;
+    vx_graph  graph  = NULL;
+    vx_node   node   = NULL;
+
+    graph = vxCreateGraph(context);
+    if (graph == NULL) return VX_FAILURE;
+
+    node = vxWeightedAverageNode(graph, input0, alpha, input1, output);
+    if (node == NULL) return VX_FAILURE;
+
+    status = vxVerifyGraph(graph);
+    if (status == VX_SUCCESS)
+    {
+        status = vxProcessGraph(graph);
+    }
+
+    vxReleaseNode(&node);
+    vxReleaseGraph(&graph);
+
     return status;
 }

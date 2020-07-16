@@ -20,12 +20,21 @@
 
 #include <gc_vx_common.h>
 #include <gc_vx_nn_util.h>
+#include <gc_vx_nn_wb.h>
+#ifdef ORI_NNARCHPERF
 #include "gc_nn_arch_model.h"
-#ifdef USE_LIB_NN_ARCH_PERF
 #include "nnArchPerfOri.h"
+#else
+#include "archModelInterface.h"
+#include "nnArchPerf.h"
 #endif
 
 #define AXI_BURST_SIZE 64
+
+#define NN_TRANSPOSE_KERNEL_CACHE_COEFFICIENT 1/2
+#define NN_TRANSPOSE_OUTPUT_CACHE_COEFFICIENT 5/3
+#define NN_TRANSPOSE_INPUT_CACHE_COEFFICIENT  5/3
+
 
 #define VX_GET_DATA_FROM_TENSOR64(tensor, index) \
     vxnneGetDataExt64((vx_type_e)TENSOR_DATA_TYPE(tensor), TENSOR_QUANT_TYPE(tensor), index, TENSOR_LOGICAL_ADDR(tensor), TENSOR_POS(tensor), TENSOR_TF_ZEROPOINT(tensor), TENSOR_TF_SCALE(tensor))
@@ -88,8 +97,49 @@ vx_float32 BF16toFp32(const vx_uint16 in)
 vx_int16 Fp32toBF16(vx_float32 val)
 {
     vx_uint32 f32 = (*(vx_uint32 *) &val);
-    vx_int16 bf16 = f32 >> 16;
+    vx_int16 bf16 = 0;
+    /* Decode IEEE 754 little-endian 32-bit floating-point value */
+    vx_int16 sign = (vx_int16)(f32 >> 16) & 0x8000;
+    /* Map exponent to the range [-127,128] */
+    int exponent = ((f32 >> 23) & 0xff);
+    int mantissa = f32 & 0x007fffff;
+    if (exponent == 0xFF)
+    { /* Infinity or NaN */
+        bf16 = sign | 0xFF7F;
+    }
+    else if (exponent > 0)
+    { /* Representable value */
+        /* RTNE */
+        int roundingBit = (mantissa >> (BF16_MANTISSA_SHIFT - 1)) & 0x1;
+        int stickyBits = mantissa & 0x7FFF;
+
+        mantissa >>= BF16_MANTISSA_SHIFT;
+        mantissa &= 0x7F;
+        if (roundingBit && stickyBits)
+        {
+            mantissa++;
+            if (mantissa > BF16_MANTISSA_BITS)
+            {
+                exponent++;
+                if (exponent > 0xFE)
+                {
+                    /* Clamp to HALF_MAX/HALF_MIN. */
+                    exponent--;
+                    mantissa--;
+                }
+                else
+                {
+                    mantissa &= BF16_MANTISSA_BITS;
+                }
+            }
+        }
+        bf16 =(vx_uint16) (sign | (exponent << BF16_EXPONENT_SHIFT) | mantissa);
+    }
+    else
+        bf16 = sign;
+
     return bf16;
+
 }
 
 vx_int16 Fp32toFp16(vx_float32 val)
@@ -448,7 +498,6 @@ vx_uint8 Fp32toAInt8(vx_float32 val, vx_int32 zeroPoint, vx_float32 scale, vx_in
     return result;
 }
 
-
 vx_int16 Fp32toInt16(vx_float32 val, vx_int8 fixedPointPos, vx_int32 roundMode)
 {
     vx_int16 result = 0;
@@ -463,6 +512,25 @@ vx_int16 Fp32toInt16(vx_float32 val, vx_int8 fixedPointPos, vx_int32 roundMode)
     {
         vx_int32 data = (vx_int32) vxnneRound(val * (1.0f / (vx_float32)(1 << -fixedPointPos)), roundMode);
         result = (vx_int16)((data > 32767) ? 32767 : (data < -32768) ? -32768 : data);
+    }
+
+    return result;
+}
+
+vx_int32 Fp32toInt32(vx_float32 val, vx_int8 fixedPointPos, vx_int32 roundMode)
+{
+    vx_int32 result = 0;
+
+    if (fixedPointPos > 0)
+    {
+        vx_int64 data = (vx_int32) vxnneRound(val * (vx_float32)(1 << fixedPointPos), roundMode);
+        result = (vx_int32)((data > 0x7FFFFFFF) ? 0x7FFFFFFF : (data < (vx_int32)0xFFFFFFFF) ? (vx_int32)0xFFFFFFFF : data);
+
+    }
+    else
+    {
+        vx_int64 data = (vx_int32) vxnneRound(val * (1.0f / (vx_float32)(1 << -fixedPointPos)), roundMode);
+        result = (vx_int32)((data > 0x7FFFFFFF) ? 0x7FFFFFFF : (data < (vx_int32)0xFFFFFFFF) ? (vx_int32)0xFFFFFFFF : data);
     }
 
     return result;
@@ -488,7 +556,10 @@ vx_float32 Int16toFp32(vx_int16 val, vx_int8 fixedPointPos)
 {
     return vxnneConvertDynamicFixPointValueToFloat32((vx_float32)val, fixedPointPos);
 }
-
+vx_float32 UInt16toFp32(vx_uint16 val, vx_int8 fixedPointPos)
+{
+    return vxnneConvertDynamicFixPointValueToFloat32((vx_float32)val, fixedPointPos);
+}
 vx_float32 Int32toFp32(vx_int32 val, vx_int8 fixedPointPos)
 {
     return vxnneConvertDynamicFixPointValueToFloat32((vx_float32)val, fixedPointPos);
@@ -679,27 +750,6 @@ void calculateActivationRangeUInt8(vx_int32 activation, vx_float32 scale, vx_int
     }
 }
 
-vx_bool getFC_1x1xN_to_NN_kxxkyxkz(vx_uint32 input_size, vx_uint32 *kx, vx_uint32 *ky, vx_uint32 *kz)
-{
-    vx_uint32 kernel_size[][2] = { {3, 3}, {2, 2}, {4, 4}, {5, 5}, {6, 6}};
-    vx_uint32 i = 0;
-
-    for (i = 0; i < sizeof(kernel_size)/sizeof(kernel_size[0]); i ++)
-    {
-        if (input_size % (kernel_size[i][0] * kernel_size[i][1]) == 0)
-        {
-            *kx = kernel_size[i][0];
-            *ky = kernel_size[i][1];
-            *kz = input_size / (kernel_size[i][0] * kernel_size[i][1]);
-
-            return vx_true_e;
-        }
-    }
-
-    return vx_false_e;
-}
-
-
 vx_status checkGetDataFactor(vx_uint32 data, vx_uint32 *factor, vx_uint32 minLimit, vx_uint32 maxLimit, vx_uint32 alignData)
 {
     vx_uint32 i         = 0;
@@ -753,7 +803,7 @@ vx_bool checkOutputTensorDoAlu(vx_tensor src, vx_tensor dst)
     {
         return vx_false_e;
     }
-    else if (srcQFormat == dstQFormat && srcQFormat == VX_QUANT_AFFINE_SCALE && srcFormat == dstFormat && srcFormat == VX_TYPE_UINT8)
+    else if (srcQFormat == dstQFormat && srcQFormat == VX_QUANT_AFFINE_SCALE && srcFormat == dstFormat && (srcFormat == VX_TYPE_UINT8 || srcFormat == VX_TYPE_INT8))
     {
         vx_float32 srcScale  = TENSOR_TF_SCALE(src);
         vx_float32 dstScale  = TENSOR_TF_SCALE(dst);
@@ -842,6 +892,12 @@ vx_float32 vxnneGetDataQuant(vx_type_e format, vx_int32 index, vx_uint8_ptr data
                 value = Uint8toFp32(data_ptr[index], zeroPoint, scale);
             }
             break;
+        case VX_TYPE_INT8:
+            {
+                vx_int8_ptr data_ptr = (vx_int8*)data;
+                value = int8toFp32(data_ptr[index], zeroPoint, scale);
+            }
+            break;
         case VX_TYPE_INT32:
             {
                 vx_int32_ptr data_ptr = (vx_int32*)data;
@@ -866,6 +922,12 @@ vx_status vxnneSaveDataQuant(vx_type_e format, vx_int32 index, vx_float64 data, 
         {
             vx_uint8* dst_data_p = (vx_uint8*)dst_data;
             dst_data_p[index] = Fp32toUint8((vx_float32)data, zeroPoint, scale, roundMode);
+        }
+        break;
+    case VX_TYPE_INT8:
+        {
+            vx_int8* dst_data_p = (vx_int8*)dst_data;
+            dst_data_p[index] = Fp32toInt8_asym((vx_float32)data, zeroPoint, scale, roundMode);
         }
         break;
     case VX_TYPE_INT32:
@@ -910,6 +972,12 @@ vx_float32 vxnneGetData(vx_type_e format, vx_int32 index, vx_uint8_ptr data, vx_
                 value = Int16toFp32(data_ptr[index], fpPos);
             }
             break;
+       case VX_TYPE_UINT16:
+            {
+                vx_uint16_ptr data_ptr = (vx_uint16*)data;
+                value = UInt16toFp32(data_ptr[index], fpPos);
+            }
+            break;
         case VX_TYPE_INT32:
             {
                 vx_int32_ptr data_ptr = (vx_int32*)data;
@@ -938,6 +1006,12 @@ vx_float32 vxnneGetData(vx_type_e format, vx_int32 index, vx_uint8_ptr data, vx_
             {
                 vx_float32_ptr data_ptr = (vx_float32_ptr)data;
                 value = data_ptr[index];
+            }
+            break;
+        case VX_TYPE_BFLOAT16:
+            {
+                vx_int16_ptr data_ptr = (vx_int16_ptr)data;
+                value = BF16toFp32(data_ptr[index]);
             }
             break;
         default:
@@ -1039,6 +1113,12 @@ vx_status vxnneSaveData(vx_type_e format, vx_int32 index, vx_float64 data, vx_pt
             dst_data_p[index] = (vx_float32)(data);
         }
         break;
+    case VX_TYPE_BFLOAT16:
+        {
+            vx_int16* dst_data_p = (vx_int16*)dst_data;
+            dst_data_p[index] = Fp32toBF16((vx_float32)data);
+        }
+        break;
     default:
         vxError("Not support format :%d\n", format);
         break;
@@ -1049,7 +1129,7 @@ vx_status vxnneSaveData(vx_type_e format, vx_int32 index, vx_float64 data, vx_pt
 
 vx_float32 vxnneGetDataExt(vx_type_e format, vx_enum quant_format, vx_int32 index, vx_uint8_ptr data, vx_int8 fixPointPos, vx_int32 zeroPoint, vx_float32 scale)
 {
-    if (quant_format == VX_QUANT_AFFINE_SCALE)
+    if (quant_format == VX_QUANT_AFFINE_SCALE || quant_format == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
         return vxnneGetDataQuant(format, index, data, zeroPoint, scale);
     else
         return vxnneGetData(format, index, data, fixPointPos);
@@ -1057,7 +1137,7 @@ vx_float32 vxnneGetDataExt(vx_type_e format, vx_enum quant_format, vx_int32 inde
 
 vx_status vxnneSaveDataExt(vx_type_e format, vx_enum quant_format, vx_int32 index, vx_float64 data, vx_ptr dst_data, vx_int8 fixedPointPos, vx_int32 zeroPoint, vx_float32 scale, vx_enum roundMode)
 {
-    if ((format == VX_TYPE_UINT8 || format == VX_TYPE_INT32)&& quant_format == VX_QUANT_AFFINE_SCALE)
+    if ((quant_format == VX_QUANT_AFFINE_SCALE  && (format == VX_TYPE_UINT8 || format == VX_TYPE_INT8 || format == VX_TYPE_INT32))|| quant_format == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
         return vxnneSaveDataQuant(format, index, data, dst_data, zeroPoint, scale, roundMode);
     else
         return vxnneSaveData(format, index, data, dst_data, fixedPointPos, roundMode);
@@ -1134,9 +1214,6 @@ void reshuffleData(vx_nn_reshuffle_s *src, vx_uint32 strideStepX, vx_uint32 stri
 
 void initUndefinedHardwareConfig(vx_global_data globalData)
 {
-#ifdef USE_LIB_NN_ARCH_PERF
-    char *useLibNNArchPerf = VX_NULL;
-#endif
 #define USC_CACHE_SIZE                         8
 #define CACHED_DATA_READ_FROM_SRAM             1
 #define DDR_READ_BANDWIDTH_LIMIT               3.8f
@@ -1225,7 +1302,7 @@ void initUndefinedHardwareConfig(vx_global_data globalData)
     globalData->nnConfig.unifiedFeature.xyOffsetLimitationFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_XY_OFFSET_LIMITATION_FIX) ? 1 : 0;
     globalData->nnConfig.unifiedFeature.accurateTileBW = ACCURATE_TILE_BW;
     globalData->nnConfig.unifiedFeature.lanesPerConv = LANES_PER_CORE;
-    globalData->nnConfig.unifiedFeature.maxTileSize = MAX_TILE_XSIZE;
+
     globalData->nnConfig.unifiedFeature.axiSramSlowedDownByAddr = AXI_SRAM_SLOWED_DOWN_BY_DDR;
     globalData->nnConfig.unifiedFeature.slowNNReqArbitrationFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_REQ_SLOWARBITRATION_FIX) ? 1 : 0;
     globalData->nnConfig.unifiedFeature.diffConditionForCachelineModePreFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DR_JD_DIFF_CONDITION_FOR_CACHELINE_MODE_PRE_FIX) ? 1 : 0;
@@ -1280,21 +1357,21 @@ void initUndefinedHardwareConfig(vx_global_data globalData)
         if (globalData->options.axiBusReadBWLimit != 0)
             globalData->nnConfig.customizedFeature.axiBusReadBWLimit = globalData->options.axiBusReadBWLimit;
         else
-            globalData->nnConfig.customizedFeature.axiBusReadBWLimit = AXI_BUS_READ_BANDWIDTH_LIMIT;
+            globalData->nnConfig.customizedFeature.axiBusReadBWLimit = (gctFLOAT)globalData->nnConfig.fixedFeature.axiBusWidth;
     }
     if (globalData->nnConfig.customizedFeature.axiBusWriteBWLimit == 0)
     {
         if (globalData->options.axiBusWriteBWLimit != 0)
             globalData->nnConfig.customizedFeature.axiBusWriteBWLimit = globalData->options.axiBusWriteBWLimit;
         else
-            globalData->nnConfig.customizedFeature.axiBusWriteBWLimit = AXI_BUS_WRITE_BANDWIDTH_LIMIT;
+            globalData->nnConfig.customizedFeature.axiBusWriteBWLimit = (gctFLOAT)globalData->nnConfig.fixedFeature.axiBusWidth;
     }
     if (globalData->nnConfig.customizedFeature.axiBusTotalBWLimit == 0)
     {
         if (globalData->options.axiBusTotalBWLimit != 0)
             globalData->nnConfig.customizedFeature.axiBusTotalBWLimit = globalData->options.axiBusTotalBWLimit;
         else
-            globalData->nnConfig.customizedFeature.axiBusTotalBWLimit = AXI_BUS_TOTAL_BANDWIDTH_LIMIT;
+            globalData->nnConfig.customizedFeature.axiBusTotalBWLimit = globalData->nnConfig.customizedFeature.axiBusReadBWLimit + globalData->nnConfig.customizedFeature.axiBusWriteBWLimit;
     }
 
     if (globalData->options.vipSRAMSize != VX_INVALID_VALUE)
@@ -1323,7 +1400,7 @@ void initUndefinedHardwareConfig(vx_global_data globalData)
         if (globalData->options.maxSocOTNumber != 0)
             globalData->nnConfig.customizedFeature.maxSocOTNumber = globalData->options.maxSocOTNumber;
         else
-            globalData->nnConfig.customizedFeature.maxSocOTNumber = MAX_SOC_OUT_STANDING_NUMBER;
+            globalData->nnConfig.customizedFeature.maxSocOTNumber = globalData->nnConfig.fixedFeature.maxOTNumber;
     }
 
 
@@ -1354,8 +1431,7 @@ void initUndefinedHardwareConfig(vx_global_data globalData)
         }
     }
 
-#ifdef USE_LIB_NN_ARCH_PERF
-    if ((gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "USE_LIB_NN_ARCH_PERF", &useLibNNArchPerf)) && useLibNNArchPerf && atoi(useLibNNArchPerf)))
+    /*if ((gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "USE_LIB_NN_ARCH_PERF", &useLibNNArchPerf)) && useLibNNArchPerf && atoi(useLibNNArchPerf)))*/
     {
         BWL_T bwl = {
             /*ddr bw limit*/globalData->nnConfig.customizedFeature.ddrReadBWLimit, globalData->nnConfig.customizedFeature.ddrWriteBWLimit, globalData->nnConfig.customizedFeature.ddrTotalBWLimit,
@@ -1363,10 +1439,13 @@ void initUndefinedHardwareConfig(vx_global_data globalData)
             /*axi-bus bw limit*/globalData->nnConfig.customizedFeature.axiBusReadBWLimit,globalData->nnConfig.customizedFeature.axiBusWriteBWLimit,globalData->nnConfig.customizedFeature.axiBusTotalBWLimit,
             /*internal write bw limite*/ (vx_float32)globalData->nnConfig.fixedFeature.nnLanesPerOutCycle,
             /*ddr latency*/globalData->nnConfig.customizedFeature.ddrLatency,
-            /*total latency*/globalData->nnConfig.derivedFeature.totalLatency
+            /*total latency*/globalData->nnConfig.derivedFeature.totalLatency,
+            /*max soc out standing */(float)globalData->nnConfig.customizedFeature.maxSocOTNumber
         };
+        archHAL_CHIPIDENTITY archChipDentity = {0};
         APM_IN_PARAM_T inParam;
-        gcsHAL_CHIPIDENTITY chipIdentity;
+        gcsHAL_CHIPIDENTITY chipIdentity = {0};
+        memset(&inParam,0,sizeof(APM_IN_PARAM_T));
         gcoHAL_QueryChipIdentityEx(VX_NULL, sizeof(gcsHAL_CHIPIDENTITY), &chipIdentity);
         inParam.chipDef.ChipID = (vx_uint32)chipIdentity.chipModel;
         inParam.chipDef.ChipVersion = chipIdentity.chipRevision;
@@ -1375,9 +1454,46 @@ void initUndefinedHardwareConfig(vx_global_data globalData)
         inParam.chipDef.CustomerID = chipIdentity.customerID;
 
         memcpy(&inParam.bwl, &bwl, sizeof(bwl));
-        globalData->apm = CreateAPModel(inParam);
-    }
+#ifndef ORI_NNARCHPERF
+        /* transfer global configration and optiions to arch model  */
+        initArchModelConfig(globalData, &inParam);
 #endif
+        globalData->apm = CreateAPModel(inParam);
+
+        /* Init arch SW lib */
+        archChipDentity.chipFlags = (archCHIP_FLAG)chipIdentity.chipFlags;
+        archChipDentity.chipModel = (archCHIPMODEL)chipIdentity.chipModel;
+        archChipDentity.chipRevision = chipIdentity.chipRevision;
+        archChipDentity.customerID = chipIdentity.customerID;
+        archChipDentity.ecoID = chipIdentity.ecoID;
+        archChipDentity.platformFlagBits = chipIdentity.platformFlagBits;
+        archChipDentity.productID = chipIdentity.productID;
+
+        /* init vsimulator env */
+
+        globalData->archSwLibHandle = archSwLibInitFromDriver(&archChipDentity,
+            globalData->apm);
+    }
+}
+
+
+
+void initArchModelConfig(vx_global_data globalData, APM_IN_PARAM_T *pInParam)
+{
+    pInParam->specified_ddr_bw_limit_by_burst = globalData->options.specificDDRLimitByBurst;
+
+    pInParam->bwl.DDR_READ_BW_IN_BYTE_PER_CYCLE_64B = globalData->options.ddrReadSustainedBw64BBurst;
+    pInParam->bwl.DDR_READ_BW_IN_BYTE_PER_CYCLE_128B = globalData->options.ddrReadSustainedBw128BBurst;
+    pInParam->bwl.DDR_READ_BW_IN_BYTE_PER_CYCLE_256B = globalData->options.ddrReadSustainedBw256BBurst;
+    pInParam->bwl.DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_64B = globalData->options.ddrMaskWriteSustainedBw64BBurst;
+    pInParam->bwl.DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_128B = globalData->options.ddrMaskWriteSustainedBw128BBurst;
+    pInParam->bwl.DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_256B = globalData->options.ddrMaskWriteSustainedBw256BBurst;
+    pInParam->bwl.DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_64B = globalData->options.ddrNonMaskWriteSustainedBw64BBurst;
+    pInParam->bwl.DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_128B = globalData->options.ddrNonMaskWriteSustainedBw128BBurst;
+    pInParam->bwl.DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_256B = globalData->options.ddrNonMaskWriteSustainedBw256BBurst;
+
+    pInParam->NN_DDR_BURST_SIZE = 64;     /* default set as 64, some of the config need to set as 256, will add into freature DB */
+
 }
 
 /* Write dataBits bits from data to buffer starting from bitOffset. */
@@ -1635,7 +1751,7 @@ vx_int32 getHwPoolingType(vx_enum poolingType)
         return VIV_NN_POOLING_MAX;
     case VX_NN_POOLING_AVG:
         return VIV_NN_POOLING_AVG;
-    case VX_NN_POOLING_FFP:
+    case VX_NN_POOLING_FPP:
         return VIV_NN_POOLING_FIRST_PIXEL;
     default:
         break;
@@ -1672,6 +1788,7 @@ vx_int32 getHWRoundingMode(vx_nn_round_mode_e roundingMode, vx_enum dataFormat, 
             break;
         case VX_TYPE_FLOAT16:
         case VX_TYPE_BFLOAT16:
+        case VX_TYPE_FLOAT32:
             switch (roundingMode)
             {
             case VX_NN_ROUNDING_MODE_SIMPLE_ROUNDING:
@@ -1718,6 +1835,7 @@ vx_int32 getHWRoundingMode(vx_nn_round_mode_e roundingMode, vx_enum dataFormat, 
             break;
         case VX_TYPE_FLOAT16:
         case VX_TYPE_BFLOAT16:
+        case VX_TYPE_FLOAT32:
             switch (roundingMode)
             {
             case VX_NN_ROUNDING_MODE_SIMPLE_ROUNDING:
@@ -1849,10 +1967,16 @@ vx_status vxnneCommandBuffer_ExecuteCommands(
                 vxmASSERT(0);
             }
 
-            vxoBinaryGraph_SaveNNTPStates(node,
-                                          cmdPhysical,
-                                          captureBuffer,
-                                          (vx_uint32)actualSize + binarySave->waitCommandsSize);
+            status = vxoBinaryGraph_SaveNNTPStates(node,
+                                                  cmdPhysical,
+                                                  captureBuffer,
+                                                  (vx_uint32)actualSize + binarySave->waitCommandsSize,
+                                                  gpuId,
+                                                  (gctBOOL)needMultiGpuSync);
+            if (status != VX_SUCCESS)
+            {
+                vxError("failed to save nn tp states\n");
+            }
             binarySave->waitCommandsSize = 0;
         }
     }
@@ -1885,6 +2009,7 @@ vx_status vxnneOperation_ExecuteCommands(vxnne_operation operation, vxnne_comman
 void ReplaceOperationCmmdZdpOpt(
     vxnne_tensor_info inputInfo,
     vxnne_tensor_info outputInfo,
+    vx_uint32 pooling_size,
     vx_weights_biases_parameter wb)
 {
     vx_uint32 fitN = 1;
@@ -1892,18 +2017,15 @@ void ReplaceOperationCmmdZdpOpt(
     vx_uint32 inputSize = vxDataType_GetSize((vx_type_e)inputInfo->dataFormat);
     vx_uint32 outputSize = vxDataType_GetSize((vx_type_e)outputInfo->dataFormat);
 
-    calcFitZdp3N(context, inputInfo->width, inputInfo->height, &fitN, 1, wb->wb_base->pooling_size_x);
+    calcFitZdp3N(context, inputInfo->width, inputInfo->height, &fitN, 1, pooling_size);
 
     /* Need reshape input[x, y, kz] --> [x*y/fitN, fitN, kz] */
     /* Need reshape output[x, y, vz] --> [x*y/fitN, fitN, vz] */
-    if(fitN != 0)
-    {
-        inputInfo->width = inputInfo->width * inputInfo->height / fitN;
-        inputInfo->height = fitN;
+    inputInfo->width = inputInfo->width * inputInfo->height / fitN;
+    inputInfo->height = fitN;
 
-        outputInfo->width = outputInfo->width * outputInfo->height / fitN;
-        outputInfo->height = fitN;
-    }
+    outputInfo->width = outputInfo->width * outputInfo->height / fitN;
+    outputInfo->height = fitN;
 
     inputInfo->yStride        = inputSize * inputInfo->width;
     outputInfo->yStride       = outputSize * outputInfo->width;
@@ -2055,20 +2177,20 @@ VX_PRIVATE_API vx_status vxnneOperationCommand_GenerateNNCommands(
     parameter->pool_size_x = convOperation->pool_size_x;
     parameter->pool_size_y = convOperation->pool_size_y;
     parameter->pool_stride = operationCommand->operation->parameter.pool_size_x ? operationCommand->operation->parameter.pool_stride : 1;
+    parameter->mergedParam = operationCommand->operation->parameter.mergedParam;
 
-
-    if (convOperation->weights_biases->wb_base->do_zdp_opt &&
+    if (convOperation->do_zdp_opt &&
         context->options.do1xnAfterSwtiling)
     {
-        ReplaceOperationCmmdZdpOpt(&inputInfo, &outputInfo, convOperation->weights_biases);
+        ReplaceOperationCmmdZdpOpt(&inputInfo, &outputInfo, convOperation->pool_size_x, convOperation->weights_biases);
     }
-    else if (convOperation->weights_biases->wb_base->do_1xN &&
-        context->options.do1xnAfterSwtiling)
+    else if (convOperation->do_1xN &&
+             context->options.do1xnAfterSwtiling)
     {
         ReplaceOperationCmmd1xN(&inputInfo, &outputInfo, convOperation->weights_biases);
     }
 
-    vxmASSERT(convOperation->weights_biases->wb_base->hw_depth_wise || (WB_KERNEL_Z(convOperation->weights_biases) == inputInfo.depth));
+    vxmASSERT(WB_IS_DEPTH_WISE(convOperation->weights_biases) || (WB_KERNEL_Z(convOperation->weights_biases) == inputInfo.depth));
 
     if (operationCommand->cmdInfo.tilingParam.kernelsPerCore == 0)
     {
@@ -2126,12 +2248,18 @@ VX_PRIVATE_API vx_status vxnneOperationCommand_GenerateNNCommands(
     vxmONERROR(vxnneCommandBuffer_GenerateCommands(context, node, operationCommand, &inputInfo, &outputInfo, VXNNE_OPERATION_TARGET_NN, parameter, commandBuffer));
 
 #if gcdDUMP
-    dumpNNCommandInfo(0, convOperation->weights_biases->slice_num, NULL, operationCommand);
+    dumpNNCommandInfo(0, WB_TOTAL_SLICE_NUM(convOperation->weights_biases), NULL, operationCommand);
 #endif
 
-    if (context->options.collectPerfType == COLLECT_PERF_RUN)
+    if ((context->options.collectPerfType == COLLECT_PERF_RUN) ||
+        (context->options.collectPerfType == COLLECT_PERF_ESTIMATE &&
+        vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_VIP_FINAL_RELEASE)))
     {
+#ifdef ORI_NNARCHPERF
         vx_arch_perf_s perf;
+#else
+        arch_perf_s perf;
+#endif
         vx_tensor input, output;
         vx_weights_biases_parameter wb;
 
@@ -2149,7 +2277,7 @@ VX_PRIVATE_API vx_status vxnneOperationCommand_GenerateNNCommands(
 
         perf.swTilingInfo.kernelCacheMode = operationCommand->parameter.kernelCacheMode;
         perf.swTilingInfo.imageCacheMode  = operationCommand->parameter.imageCacheMode;
-
+#ifdef ORI_NNARCHPERF
         calculateArchPerfFromTiling(context,
                                     convOperation->base.layer,
                                     &perf,
@@ -2162,7 +2290,20 @@ VX_PRIVATE_API vx_status vxnneOperationCommand_GenerateNNCommands(
 
          if (context->options.enableNNArchPerfPrint)
             showArchPerformance(context, convOperation->base.layer, &convOperation->base, &perf);
+#else
+        archCalculateArchPerfFromTiling(context,
+                                    convOperation->base.layer,
+                                    &perf,
+                                    &inputInfo,
+                                    &outputInfo,
+                                    input, output, wb,
+                                    operationCommand,
+                                    convOperation->base.target,
+                                    convOperation->base.operatorType);
 
+         if (context->options.enableNNArchPerfPrint)
+            showDriverPerformance(context, convOperation->base.layer, &convOperation->base, &perf);
+#endif
     }
 
     return VX_SUCCESS;
@@ -2272,28 +2413,24 @@ VX_PRIVATE_API vx_status vxnneOperationCommand_GenerateTPCommands(
     tpParams->pad_x_right        = 0;
     tpParams->pad_y_bottom       = 0;
 
-    if (operationCommand->operation->operatorType == VXNNE_OPERATOR_FULLYCONNECTED &&
-        tpOperation->weights_biases != VX_NULL)
-    {
-        vx_uint32 outputDims[2] = {output->width, output->height};
+    tpParams->tpTransposeSize = operationCommand->cmdInfo.tpTransposeSize;
+    tpParams->tpTransposeStart = operationCommand->cmdInfo.tpTransposeStart;
 
-        /* compress original wb */
-        vxmONERROR(vxoWeightsBiases_Compress(
-            context,
-            tpOperation->weights_biases,
-            0,
-            outputDims,
-            outputInfo.dataFormat,
-            -1));
-    }
+    vxmASSERT(tpOperation->weights_biases == VX_NULL || tpParams->tpType != TP_SINGLE_FC || WB_IS_TP_COMPRESS(tpOperation->weights_biases));
 
     vxmONERROR(vxnneCommandBuffer_GenerateCommands(context, tpOperation->base.layer->node, operationCommand, &inputInfo, &outputInfo, VXNNE_OPERATION_TARGET_TP, tpParams, commandBuffer));
 
     tpOperation->slice_num = commandBuffer->commandCount;
 
-    if (context->options.collectPerfType == COLLECT_PERF_RUN)
+    if ((context->options.collectPerfType == COLLECT_PERF_RUN) ||
+        (context->options.collectPerfType == COLLECT_PERF_ESTIMATE &&
+        vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_VIP_FINAL_RELEASE)))
     {
+#ifdef ORI_NNARCHPERF
         vx_arch_perf_s perf;
+#else
+        arch_perf_s perf;
+#endif
         vx_tensor input, output;
         vx_weights_biases_parameter wb;
 
@@ -2306,7 +2443,7 @@ VX_PRIVATE_API vx_status vxnneOperationCommand_GenerateTPCommands(
         {
             perf.imageNonZeroRatio = tpOperation->base.imgNonZeroRatio;
         }
-
+#ifdef ORI_NNARCHPERF
         calculateArchPerfFromTiling(context,
                                     tpOperation->base.layer,
                                     &perf,
@@ -2319,7 +2456,20 @@ VX_PRIVATE_API vx_status vxnneOperationCommand_GenerateTPCommands(
 
          if (context->options.enableNNArchPerfPrint)
             showArchPerformance(context, tpOperation->base.layer, &tpOperation->base, &perf);
+#else
+        archCalculateArchPerfFromTiling(context,
+                                    tpOperation->base.layer,
+                                    &perf,
+                                    &inputInfo,
+                                    &outputInfo,
+                                    input, output, wb,
+                                    operationCommand,
+                                    tpOperation->base.target,
+                                    tpOperation->base.operatorType);
 
+         if (context->options.enableNNArchPerfPrint)
+            showDriverPerformance(context, tpOperation->base.layer, &tpOperation->base, &perf);
+#endif
     }
 
     return VX_SUCCESS;
@@ -2362,18 +2512,20 @@ VX_INTERNAL_API vx_status vxnneOperationCommand_GenerateCommands(
     {
         if (node->graph->binarySave)
         {
-            vx_binary_save binarySave = node->graph->binarySave;
-            binarySave->operationCmdPhysical[binarySave->currOperationIndex] = gcmPTR_TO_UINT64(operation);
-            binarySave->operationOffset[binarySave->currOperationIndex] = binarySave->currOperationOffset;
-            binarySave->currOperationIndex++;
-            binarySave->currOperationOffset += sizeof(vx_binary_operation_info_s);
+            vxoBinaryGraph_StoreOperationPtr(operation);
         }
 
-        if (context->options.collectPerfType == COLLECT_PERF_RUN)
+        if ((context->options.collectPerfType == COLLECT_PERF_RUN) ||
+            (context->options.collectPerfType == COLLECT_PERF_ESTIMATE &&
+            vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_VIP_FINAL_RELEASE)))
         {
             if (context->options.enableNNArchPerfPrint)
             {
+#ifdef ORI_NNARCHPERF
                 showArchPerformance(context, operation->layer, operation, VX_NULL);
+#else
+                showDriverPerformance(context, operation->layer, operation, VX_NULL);
+#endif
             }
         }
     }
@@ -2404,9 +2556,9 @@ vx_status vxnneOperation_GetInfo(vxnne_operation operation, vxnne_operation_info
         info->input         = convolution->inputs;
         info->output        = convolution->outputs;
         info->weightsBiases = convolution->weights_biases;
-        info->kernelX       = convolution->weights_biases->weights_sizes[0];
-        info->kernelY       = convolution->weights_biases->weights_sizes[1];
-        info->kernelZ       = convolution->weights_biases->weights_sizes[2];
+        info->kernelX       = WB_KERNEL_X(convolution->weights_biases);
+        info->kernelY       = WB_KERNEL_Y(convolution->weights_biases);
+        info->kernelZ       = WB_KERNEL_Z(convolution->weights_biases);
         info->pad.left      = operation->parameter.pad_x_left;
         info->pad.right     = 0;
         info->pad.top       = operation->parameter.pad_y_top;
@@ -2423,10 +2575,16 @@ vx_status vxnneOperation_GetInfo(vxnne_operation operation, vxnne_operation_info
         info->reshuffStrideX = 1;
         info->reshuffStrideY = 1;
 
+        info->nnStrideX = operation->parameter.nn_strideX;
+        info->nnStrideY = operation->parameter.nn_strideY;
+
         info->normStrideX = 1;
         info->normStrideY = 1;
 
-        vxmASSERT(!info->enablePooling || (info->poolType == VX_NN_POOLING_MAX || info->poolType == VX_NN_POOLING_FFP));
+        info->dilationX = operation->parameter.dilationX ? operation->parameter.dilationX : 1;
+        info->dilationY = operation->parameter.dilationY ? operation->parameter.dilationY : 1;
+
+        vxmASSERT(!info->enablePooling || (info->poolType == VX_NN_POOLING_MAX || info->poolType == VX_NN_POOLING_FPP ));
         vxmASSERT(!info->enablePooling || (info->poolSizeY == 2 || info->poolSizeY == 3));
     }
     else if (operation->target == VXNNE_OPERATION_TARGET_TP)
@@ -2455,11 +2613,15 @@ vx_status vxnneOperation_GetInfo(vxnne_operation operation, vxnne_operation_info
 
         info->normStrideX = 1;
         info->normStrideY = 1;
+
+        info->dilationX = operation->parameter.dilationX ? operation->parameter.dilationX : 1;
+        info->dilationY = operation->parameter.dilationY ? operation->parameter.dilationY : 1;
+
     }
     else if (operation->target == VXNNE_OPERATION_TARGET_SH)
     {
-        info->input = operation->inputsNum > 0 ? (vx_tensor)operation->inputs[0] : (vx_tensor)VX_NULL;
-        info->output = operation->outputsNum > 0 ? (vx_tensor)operation->outputs[0] : (vx_tensor)VX_NULL;
+        info->input = operation->inputsNum > 0 ? ((operation->inputs[0]->type == VX_TYPE_TENSOR) ? (vx_tensor)operation->inputs[0] : (vx_tensor)VX_NULL) : (vx_tensor)VX_NULL;
+        info->output = operation->outputsNum > 0 ? ((operation->outputs[0]->type == VX_TYPE_TENSOR) ? (vx_tensor)operation->outputs[0] : (vx_tensor)VX_NULL) : (vx_tensor)VX_NULL;
 
         info->reshuffStrideX = 1;
         info->reshuffStrideY = 1;
@@ -2514,8 +2676,8 @@ vx_status vxnneOperation_CalculateDimSize(
             vx_int32   poolType = convReluPoolingOperation->pool_type;
             vx_uint32  poolSizeX = convReluPoolingOperation->pool_size_x;
             vx_uint32  poolSizeY = convReluPoolingOperation->pool_size_y;
-            vx_uint32  kernelXSize = convReluPoolingOperation->weights_biases->weights_sizes[0];
-            vx_uint32  kernelYSize = convReluPoolingOperation->weights_biases->weights_sizes[1];
+            vx_uint32  kernelXSize = WB_KERNEL_X(convReluPoolingOperation->weights_biases);
+            vx_uint32  kernelYSize = WB_KERNEL_Y(convReluPoolingOperation->weights_biases);
             vx_uint32  convDimSize;
             vx_uint32  poolDimSize = 0;
             vx_uint32  inConvDimSize = inDimSize;
@@ -2836,6 +2998,9 @@ vx_char* vxnneGetOperatorTypeName(vxnne_operator_e operationType)
 
     case VXNNE_OPERATOR_DEPTH_WISE_CONV:
         return "VXNNE_OPERATOR_DEPTH_WISE_CONV";
+
+    case VXNNE_OPERATOR_CONCATINDEFINITE:
+        return "VXNNE_OPERATOR_CONCAT_INDEFINITE";
     default:
         return "unkown operation type";
     }
@@ -3688,6 +3853,7 @@ vx_status vxnnePoolingMax(
 
 vx_status vxnnePoolingAvg(
     vx_uint8_ptr src,
+    vx_int32 type,
     vx_int8 srcFixPointPos,
     vx_type_e srcFormat,
     vx_int32 input_width,
@@ -3770,7 +3936,7 @@ vx_status vxnnePoolingAvg(
                         }
                     }
                     if(count != 0)
-                        vxnneSaveDataExt(dstFormat, dstQuantFormat, pool_index, sum/count, data_d, dstFixPointPos, outputZP, outputScale, dstRoundingMode);
+                        vxnneSaveDataExt(dstFormat, dstQuantFormat, pool_index, sum/((type == 2) ? (kernel_y_v * kernel_x_v) : count), data_d, dstFixPointPos, outputZP, outputScale, dstRoundingMode);
                 }
 
             }
@@ -3847,7 +4013,9 @@ vx_status vxnnePoolingCpu(
                             outputScale);
         break;
         case 2:
+        case 3:
             vxnnePoolingAvg(src,
+                            type,
                             srcFixPointPos,
                             srcFormat,
                             input_width,
@@ -3893,8 +4061,11 @@ vx_status vxnneCalculateConvTilingParam(
     )
 {
     vx_uint32 i, minKPK=0xFFFFFFFF, imode = 0;
+#ifdef ORI_NNARCHPERF
     vx_arch_perf_s perf;
-
+#else
+    arch_perf_s perf;
+#endif
     for (i = 0; i < count; i++)
     {
         vx_uint32 inputDims[3] = {info[i].input.width, info[i].input.height, TENSOR_SIZE_INDEX(conv_op->inputs, 2)};
@@ -3905,7 +4076,7 @@ vx_status vxnneCalculateConvTilingParam(
 
         if (context->options.do1xnAfterSwtiling)
         {
-            if (conv_op->weights_biases->wb_base->do_zdp_opt)
+            if (conv_op->do_zdp_opt)
             {
                 vx_uint32 fitN = 1;
                 vx_bool doZdpOpt = vx_false_e;
@@ -3917,7 +4088,7 @@ vx_status vxnneCalculateConvTilingParam(
                                             inputDims[1],
                                             &fitN,
                                             1,
-                                            conv_op->weights_biases->wb_base->pooling_size_x);
+                                            conv_op->pool_size_x);
 
                     if (doZdpOpt)
                     {
@@ -3931,10 +4102,10 @@ vx_status vxnneCalculateConvTilingParam(
                     }
                 }
 
-                conv_op->weights_biases->wb_base->do_zdp_opt = doZdpOpt;
+                conv_op->do_zdp_opt = doZdpOpt;
 
             }
-            else if (conv_op->weights_biases->wb_base->do_1xN)
+            else if (conv_op->do_1xN)
             {
                 vx_uint32 fitN = calcFit1xN(context, TENSOR_SIZE_INDEX(conv_op->inputs, 2), inputDims[0], inputDims[1]);
 
@@ -3950,8 +4121,11 @@ vx_status vxnneCalculateConvTilingParam(
                 outputDims[1] = 1;
             }
         }
-
+#ifdef ORI_NNARCHPERF
         memset(&perf, 0, sizeof(vx_arch_perf_s));
+#else
+        memset(&perf, 0, sizeof(arch_perf_s));
+#endif
 
         perf.calculated = vx_false_e;
         perf.swTilingInfo.origInX = TENSOR_SIZE_INDEX(conv_op->inputs, 0);
@@ -3964,19 +4138,46 @@ vx_status vxnneCalculateConvTilingParam(
         /* original output tensor might be reshaped, use reshaped sized to calc imageStride and imageSlice */
         perf.swTilingInfo.outImageStride = outputDims[0];
         perf.swTilingInfo.outImageSlice = outputDims[0] * outputDims[1];
+#ifdef ORI_NNARCHPERF
         calculateArchPerfFromWB(context,
                                 &perf,
                                 conv_op->weights_biases,
                                 inputDims,
                                 outputDims,
                                 TENSOR_DATA_TYPE(conv_op->outputs),
+                                conv_op->base.parameter.pad_x_left,
+                                conv_op->base.parameter.pad_x_right,
+                                conv_op->base.parameter.pad_y_top,
+                                conv_op->base.parameter.pad_y_bottom,
+                                conv_op->base.parameter.pool_size_x,
+                                conv_op->base.parameter.pool_stride,
                                 offsets,
                                 1,
                                 perf.swTilingInfo.srcBuf, perf.swTilingInfo.dstBuf, perf.swTilingInfo.kernelBuf,
                                 vipSize,
                                 VXNNE_OPERATION_TARGET_NN,
                                 conv_op->base.operatorType);
-
+#else
+        archCalculateArchPerfFromWB(context,
+                                (vxnne_operation)conv_op,
+                                &perf,
+                                conv_op->weights_biases,
+                                inputDims,
+                                outputDims,
+                                TENSOR_DATA_TYPE(conv_op->outputs),
+                                conv_op->base.parameter.pad_x_left,
+                                conv_op->base.parameter.pad_x_right,
+                                conv_op->base.parameter.pad_y_top,
+                                conv_op->base.parameter.pad_y_bottom,
+                                conv_op->base.parameter.pool_size_x,
+                                conv_op->base.parameter.pool_stride,
+                                offsets,
+                                1,
+                                perf.swTilingInfo.srcBuf, perf.swTilingInfo.dstBuf, perf.swTilingInfo.kernelBuf,
+                                vipSize,
+                                VXNNE_OPERATION_TARGET_NN,
+                                conv_op->base.operatorType);
+#endif
         info[i].tilingParam.outImageTileXSize = perf.resultInfo.outImageTileXSize;
         info[i].tilingParam.outImageTileYSize = perf.resultInfo.outImageTileYSize;
         info[i].tilingParam.interleaveMode    = perf.resultInfo.interleaveMode;
@@ -4007,7 +4208,7 @@ vx_weights_biases_parameter GetMinWeightBiases(
 
     for(i = 0; i < count; i++)
     {
-        if(wbTable[i] && wbTable[i]->memory.sizes[0] < (minWB ? minWB->memory.sizes[0] : ~0u))
+        if(wbTable[i] && WB_MEMORY_SIZE(wbTable[i]) < (minWB ? WB_MEMORY_SIZE(minWB) : ~0u))
         {
             minWB = wbTable[i];
             minID = i;
@@ -4030,7 +4231,7 @@ VX_INTERNAL_API vx_status vxnnePreLoadWeightsBiases(
     vx_uint32  i = 0, nnCount = 0;
     vxnne_convolution_relu_pooling_operation convOperation;
     vx_weights_biases_parameter weightBiases, *wbTable = VX_NULL;
-    gctUINT8   *logical, *endAddrPlusOne = VX_NULL;
+    gctUINT8   *logical, *endAddrPlusOne;
     vx_uint32  physical;
 
     vxmASSERT ((vx_int32)size >= 0 && !(size & (PRELOAD_WB_ALIGNMENT - 1)));
@@ -4062,23 +4263,23 @@ VX_INTERNAL_API vx_status vxnnePreLoadWeightsBiases(
     for(i = 0; i < nnCount; i++)
     {
         weightBiases = GetMinWeightBiases(wbTable, nnCount);
-        vxmASSERT(weightBiases && weightBiases->memory.sizes[0] > 0);
+        vxmASSERT(weightBiases && WB_MEMORY_SIZE(weightBiases) > 0);
         vxmASSERT(!((gctSIZE_T)logical & (PRELOAD_WB_ALIGNMENT - 1)));
         vxmASSERT(!(physical & (PRELOAD_WB_ALIGNMENT - 1)));
 
-        if (weightBiases->memory.sizes[0] > (vx_size)size) break;
+        if (WB_MEMORY_SIZE(weightBiases) > (vx_size)size) break;
+        if((logical + WB_MEMORY_SIZE(weightBiases) > endAddrPlusOne))
+            vxmASSERT(0);
 
-        vxmASSERT(logical + weightBiases->memory.sizes[0] <= endAddrPlusOne);
-
-        gcoOS_MemCopy(logical, WB_MEM_LOGICAL_ADDR_INDEX(weightBiases, 0), weightBiases->memory.sizes[0]);
+        gcoOS_MemCopy(logical, WB_MEM_LOGICAL_ADDR_INDEX(weightBiases, 0), WB_MEMORY_SIZE(weightBiases));
 
         /* change the DDR address to AXI address*/
-        weightBiases->memory.physicals[0] = physical;
+        WB_MEM_PHYSICAL_BASE_ADDR(weightBiases) = physical;
 
-        logical += gcmALIGN_NP2(weightBiases->memory.sizes[0], PRELOAD_WB_ALIGNMENT);
-        physical += (vx_uint32)gcmALIGN_NP2(weightBiases->memory.sizes[0], PRELOAD_WB_ALIGNMENT);
+        logical += gcmALIGN_NP2(WB_MEMORY_SIZE(weightBiases), PRELOAD_WB_ALIGNMENT);
+        physical += (vx_uint32)gcmALIGN_NP2(WB_MEMORY_SIZE(weightBiases), PRELOAD_WB_ALIGNMENT);
 
-        size -= (vx_uint32)gcmALIGN_NP2(weightBiases->memory.sizes[0], PRELOAD_WB_ALIGNMENT);
+        size -= (vx_uint32)gcmALIGN_NP2(WB_MEMORY_SIZE(weightBiases), PRELOAD_WB_ALIGNMENT);
     }
 
 OnError:
@@ -4130,6 +4331,70 @@ vx_status vxnneOperation_InitializeCommand(
         output->height  = TENSOR_VIEW_SIZE_INDEX(op->output, 1);
         output->yStride = TENSOR_STRIDE_INDEX(op->output, 1);
         output->zStride = TENSOR_STRIDE_INDEX(op->output, 2);
+
+        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE3) && operation->operatorType == VXNNE_OPERATOR_TENSOR_TRANS && operation->parameter.tpType == TP_TRANSPOSE && context->vipSRAM.size > 0 &&
+            op->input->tensorBuffer->memory.wrapFlag != gcvALLOC_FLAG_USERMEMORY && op->output->tensorBuffer->memory.wrapFlag != gcvALLOC_FLAG_USERMEMORY)
+        {
+            vx_uint32* perm = (vx_uint32 *)operation->parameter.tp_value->p8[0];
+
+            if ((perm[0] == 1 && perm[1] == 0 && perm[2] == 2) || /* y, x, z */
+                (perm[0] == 1 && perm[1] == 2 && perm[2] == 0) || /* y, z, x */
+                (perm[0] == 2 && perm[1] == 1 && perm[2] == 0) || /* z, y, x */
+                (perm[0] == 2 && perm[1] == 0 && perm[2] == 1)) /* z, x, y */
+            {
+                vxnne_mem_request requestList;
+                vxnne_operation_info_s opInfo;
+                vx_uint32 count = 0;
+                vx_uint32 tpTransposeBufferSize = context->vipSRAM.size;;
+
+                vxnneOperation_GetInfo(operation, &opInfo);
+                requestList = graph->layer->memRequestList + command->operationID;
+                gcoOS_ZeroMemory(&requestList->tpTransposeBuffer, sizeof(vx_memory_s));
+
+                vxmASSERT(context->vipSRAM.size > 0);
+
+                /*TODO: VIP/AXI both can be used as TP transpose buffer*/
+                requestList->tpTransposeBuffer.lastUseId = requestList->tpTransposeBuffer.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
+                requestList->tpTransposeBuffer.sizes[0] = tpTransposeBufferSize;
+                requestList->tpTransposeBuffer.allocType = VXNNE_MEM_POOL_TYPE_VIP_SRAM;
+                requestList->tpTransposeBuffer.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
+                requestList->tpTransposeBuffer.allocPartial = vx_false_e;
+                requestList->inputMemory[requestList->inputCount] = &requestList->tpTransposeBuffer;
+                requestList->inputCount++;
+                count++;
+                status = vxoMemoryPool_RequestList(graph, graph->layer->memRequestList, graph->layer->base.num_operations, command->operationID, 1, VX_NULL, VX_NULL);
+
+                if (requestList->tpTransposeBuffer.physicals[0] != 0)
+                {
+                    command->cmdInfo.tpTransposeSize  = (vx_uint32)requestList->tpTransposeBuffer.sizes[0];
+                    command->cmdInfo.tpTransposeStart = requestList->tpTransposeBuffer.physicals[0];
+                    vxmASSERT(requestList->tpTransposeBuffer.allocPartial == vx_false_e);
+                }
+                else
+                {
+                    command->cmdInfo.tpTransposeSize = 0;
+                }
+                if (context->vipSRAM.size > VX_VIP_SRAM_IMAGE_STREAM_SIZE)
+                {
+                    requestList->inputCount = requestList->inputCount - count;
+                }
+            }
+            else
+            {
+                command->cmdInfo.tpTransposeSize = 0;
+            }
+        }
+        else
+        {
+            command->cmdInfo.tpTransposeSize = 0;
+        }
+
+        if(operation->parameter.kernelPreLoad.size > 0)
+        {
+            command->cmdInfo.kernelCacheSize = operation->parameter.kernelPreLoad.size;
+            command->cmdInfo.kernelCacheStart = operation->parameter.kernelPreLoad.physical;
+            command->cmdInfo.kernelCacheMode = VXNNE_SRAM_CACHE_MODE_STREAM_CACHE;
+        }
     }
     else if (operation->target == VXNNE_OPERATION_TARGET_NN)
     {
@@ -4176,40 +4441,46 @@ vx_status vxnneOperation_InitializeCommand(
         {
             vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)operation;
             vxnne_mem_request requestList;
-            vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY/*, kernelZ*/, inImageZ, inputDataFormat, imageTileSize, kernelbufferSize;
+            vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, /*kernelZ,*/ inImageZ, inputDataFormat, imageTileSize, kernelbufferSize;
             vxnne_operation_info_s opInfo;
             vx_uint32 transposeSize = 0;
             vx_uint32 count = 0;
+            vx_uint32 nnStrideX = 1;
+            vx_uint32 nnStrideY = 1;
 
             vxnneOperation_GetInfo(operation, &opInfo);
 
+            nnStrideX = opInfo.nnStrideX;
+            nnStrideY = opInfo.nnStrideY;
             outImageTileX  = convOperation->resultInfo.outImageTileXSize;
             outImageTileY  = convOperation->resultInfo.outImageTileYSize;
             interleaveMode = convOperation->resultInfo.interleaveMode;
-            kernelX = opInfo.weightsBiases->weights_sizes[0];
-            kernelY = opInfo.weightsBiases->weights_sizes[1];
-            /*kernelZ = opInfo.weightsBiases->weights_sizes[2];*/
+            kernelX = WB_KERNEL_X(opInfo.weightsBiases);
+            kernelY = WB_KERNEL_Y(opInfo.weightsBiases);
+            /*kernelZ = WB_KERNEL_Z(opInfo.weightsBiases);*/
             inImageZ = TENSOR_SIZE_INDEX(opInfo.input, 2);
             inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
 
-            imageTileSize = caculate3DTileSize(context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode);
+            imageTileSize = caculate3DTileSize(context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode, nnStrideX, nnStrideY);
 
-            kernelbufferSize = (vx_uint32)gcmALIGN_NP2(opInfo.weightsBiases->slice_array[0].kernel_align_stream_size, CACHE_ALIGNMENT_SIZE);
+            kernelbufferSize = (vx_uint32)gcmALIGN_NP2(WB_STREAM_ALIGN_SIZE_INDEX(opInfo.weightsBiases, 0), CACHE_ALIGNMENT_SIZE);
 
             requestList = graph->layer->memRequestList + command->operationID;
 
             if (context->vipSRAM.size > VX_VIP_SRAM_IMAGE_STREAM_SIZE)
             {
                 gcoOS_ZeroMemory(&requestList->kernelCache, sizeof(vx_memory_s));
-                requestList->kernelCache.lastUseId = requestList->kernelCache.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
-                requestList->kernelCache.sizes[0] = kernelbufferSize;
-                requestList->kernelCache.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
-                requestList->kernelCache.allocPriority = VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_2;
-                requestList->kernelCache.allocPartial = vx_true_e;
-                requestList->inputMemory[requestList->inputCount] = &requestList->kernelCache;
-                requestList->inputCount++;
-                count++;
-
+                if(operation->parameter.kernelPreLoad.size == 0)
+                {
+                    requestList->kernelCache.lastUseId = requestList->kernelCache.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
+                    requestList->kernelCache.sizes[0] = kernelbufferSize;
+                    requestList->kernelCache.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
+                    requestList->kernelCache.allocPriority = VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_2;
+                    requestList->kernelCache.allocPartial = vx_true_e;
+                    requestList->inputMemory[requestList->inputCount] = &requestList->kernelCache;
+                    requestList->inputCount++;
+                    count++;
+                }
                 if (operation->bTransposeIn  /*&& requestList->inputMemory[0]->transposed*/)
                 {
                     vx_tensor input = (vx_tensor)(operation->inputs[0]);
@@ -4219,16 +4490,20 @@ vx_status vxnneOperation_InitializeCommand(
 
                     inputZ = TENSOR_STRIDE_INDEX(input, 3) / TENSOR_STRIDE_INDEX(input, 2);
 
-                    transposeSize = caculateInputTransposeBufferSize(VXNNE_SRAM_CACHE_MODE_FULL_CACHE,
-                                                                        outImageTileX,
-                                                                        outImageTileY,
-                                                                        kernelX,
-                                                                        kernelY,
-                                                                        inputZ,
-                                                                        interleaveMode,
-                                                                        context->nnConfig.customizedFeature.ddrLatency,
-                                                                        operation->transposeInChannel,
-                                                                        input->tensorBuffer->dataFormat);
+                    transposeSize = caculateInputTransposeBufferSize(context,
+                                                                    VXNNE_SRAM_CACHE_MODE_FULL_CACHE,
+                                                                    outImageTileX,
+                                                                    outImageTileY,
+                                                                    kernelX,
+                                                                    kernelY,
+                                                                    inputZ,
+                                                                    interleaveMode,
+                                                                    context->nnConfig.customizedFeature.ddrLatency,
+                                                                    operation->transposeInChannel,
+                                                                    input->tensorBuffer->dataFormat,
+                                                                    nnStrideX,
+                                                                    nnStrideY
+                                                                    );
 
                     gcoOS_ZeroMemory(&requestList->transposeIn, sizeof(vx_memory_s));
                     requestList->transposeIn.lastUseId = requestList->transposeIn.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
@@ -4259,7 +4534,7 @@ vx_status vxnneOperation_InitializeCommand(
 
                     alignTensorChannelToTransposeChannel(output, operation->transposeOutChannel);
 
-                    transposeSize = caculateOutTransposeBufferSize(outImageTileX, outImageTileY, output->tensorBuffer->dataFormat);
+                    transposeSize = caculateOutTransposeBufferSize(context, outImageTileX, outImageTileY, convOperation, output->tensorBuffer->dataFormat);
                     gcoOS_ZeroMemory(&requestList->transposeOut, sizeof(vx_memory_s));
                     requestList->transposeOut.lastUseId = requestList->transposeOut.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
                     requestList->transposeOut.sizes[0] = transposeSize;
@@ -4272,7 +4547,7 @@ vx_status vxnneOperation_InitializeCommand(
                 }
             }
 
-            status = vxoMemoryPool_RequestList(graph, graph->layer->memRequestList, graph->layer->base.num_operations, command->operationID, 1, VX_NULL);
+            status = vxoMemoryPool_RequestList(graph, graph->layer->memRequestList, graph->layer->base.num_operations, command->operationID, 1, VX_NULL, VX_NULL);
             if (status != VX_SUCCESS)
             {
                 vxmASSERT(0);
@@ -4291,7 +4566,14 @@ vx_status vxnneOperation_InitializeCommand(
                 command->cmdInfo.imageCacheMode = VXNNE_SRAM_CACHE_MODE_NONE;
                 command->cmdInfo.imageCacheSize = 0;
             }
-            if (requestList->kernelCache.physicals[0] != 0)
+
+            if(operation->parameter.kernelPreLoad.size > 0)
+            {
+                command->cmdInfo.kernelCacheSize = operation->parameter.kernelPreLoad.size;
+                command->cmdInfo.kernelCacheStart = operation->parameter.kernelPreLoad.physical;
+                command->cmdInfo.kernelCacheMode = VXNNE_SRAM_CACHE_MODE_STREAM_CACHE;
+            }
+            else if (requestList->kernelCache.physicals[0] != 0)
             {
                 command->cmdInfo.kernelCacheSize  = (vx_uint32)requestList->kernelCache.sizes[0];
                 command->cmdInfo.kernelCacheStart = requestList->kernelCache.physicals[0];
@@ -4363,12 +4645,20 @@ vx_uint32 caculate3DTileSize(
     vx_uint32 kernelY,
     vx_uint32 inImageZ,
     vx_uint32 dataFormat,
-    vx_uint32 interleaveMode
+    vx_uint32 interleaveMode,
+    vx_uint32 nnStrideX,
+    vx_uint32 nnStrideY
     )
 {
     vx_uint32 inImageTileSizeX = outputTileXSize + kernelX - 1;
     vx_uint32 inImageTileSizeY = outputTileYSize + kernelY - 1;
     vx_uint32 imageTileSize  = 0;
+
+    if (nnStrideX == 2 && nnStrideY == 2)
+    {
+        inImageTileSizeX = outputTileXSize * nnStrideY + kernelX - 1;
+        inImageTileSizeY = outputTileYSize *nnStrideY + kernelY - 1;
+    }
 
     if ((kernelX == 1 && kernelY == 1
         && (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3) || vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP6))
@@ -4511,101 +4801,6 @@ void dumpNNCommandInfo(vx_uint32 sliceIndex, vx_uint32 sliceNum, vx_nn_cmd_info_
 }
 #endif
 
-vx_status vxnneOperation_CaculateSRAMCache(
-    vx_context      context,
-    vxnne_operation operation,
-    vx_bool         enableImageCache,
-    vx_uint32*      kernelCacheSize,
-    vx_uint32*      kernelCacheStart,
-    vx_enum*        kernelCacheMode,
-    vx_uint32*      imageCacheSize,
-    vx_uint32*      imageCacheStart,
-    vx_enum*        imageCacheMode
-    )
-{
-    vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat;
-    vxnne_operation_info_s opInfo;
-    vx_status status = VX_SUCCESS;
-
-    vxmASSERT(kernelCacheSize && kernelCacheStart && kernelCacheMode && imageCacheSize && imageCacheStart && imageCacheMode);
-
-    vxnneOperation_GetInfo(operation, &opInfo);
-
-    if (opInfo.opType != VXNNE_OPERATOR_CONVOLUTION) return VX_SUCCESS;
-
-    outImageTileX  = opInfo.weightsBiases->archPerfHandle->resultInfo.outImageTileXSize;
-    outImageTileY  = opInfo.weightsBiases->archPerfHandle->resultInfo.outImageTileYSize;
-    interleaveMode = opInfo.weightsBiases->archPerfHandle->resultInfo.interleaveMode;
-    kernelX = opInfo.weightsBiases->weights_sizes[0];
-    kernelY = opInfo.weightsBiases->weights_sizes[1];
-    inImageZ = TENSOR_SIZE_INDEX(opInfo.input, 2);
-    inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
-
-    *imageCacheSize = caculate3DTileSize(context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode);
-
-    vxmASSERT(*imageCacheSize != 0);
-
-    vxnneSRAM_Reset(&context->vipSRAM);
-
-    if (enableImageCache)
-    {
-        status = vxnneSRAM_Allocate(
-                           &context->vipSRAM,
-                           *imageCacheSize,
-                           gcvNULL,
-                           imageCacheStart);
-    }
-    else
-    {
-        status = VX_ERROR_NOT_ALLOCATED;
-    }
-
-    if (status == VX_SUCCESS)
-    {
-        *imageCacheMode = VXNNE_SRAM_CACHE_MODE_FULL_CACHE;
-    }
-    else
-    {
-        *imageCacheMode = VXNNE_SRAM_CACHE_MODE_NONE;
-        *imageCacheSize = 0;
-    }
-
-
-    *kernelCacheSize = (vx_uint32)gcmALIGN_NP2(WB_STREAM_ALIGN_SIZE_INDEX(opInfo.weightsBiases, 0), CACHE_ALIGNMENT_SIZE);
-
-    status = vxnneSRAM_Allocate(
-                       &context->vipSRAM,
-                       *kernelCacheSize,
-                       gcvNULL,
-                       kernelCacheStart);
-
-    if (status == VX_SUCCESS)
-    {
-        *kernelCacheMode = VXNNE_SRAM_CACHE_MODE_FULL_CACHE;
-    }
-    else
-    {
-
-        status = vxnneSRAM_AllocateRest(
-                       &context->vipSRAM,
-                       kernelCacheSize,
-                       gcvNULL,
-                       kernelCacheStart);
-
-        if (status == VX_SUCCESS)
-        {
-            *kernelCacheMode = VXNNE_SRAM_CACHE_MODE_PARTIAL_CACHE;
-        }
-        else
-        {
-            *kernelCacheMode = VXNNE_SRAM_CACHE_MODE_NONE;
-            *kernelCacheSize = 0;
-        }
-    }
-
-    return VX_SUCCESS;
-}
-
 void* nnGetNCHWStreamFromTanspose(vx_tensor input, vx_uint8 interleave)
 {
     vx_uint32 inputWidth;
@@ -4691,6 +4886,168 @@ void* nnGetNCHWStreamFromTanspose(vx_tensor input, vx_uint8 interleave)
     }
 }
 
+vx_status vxnneOperation_WBDump(vxnne_execution_layer   executionLayer, vx_uint32 opIndex)
+{
+    vxnne_operation_command opCommand = &(executionLayer->opIndices[opIndex]);
+    if(opCommand->cmdInfo.wb != VX_NULL || opCommand->parameter.other_ref != VX_NULL )
+    {
+        vx_weights_biases_parameter wb = opCommand->cmdInfo.wb != VX_NULL ? (vx_weights_biases_parameter)opCommand->cmdInfo.wb : (vx_weights_biases_parameter)opCommand->parameter.other_ref;
+
+        if(wb != VX_NULL && (opCommand->operation->target == VXNNE_OPERATION_TARGET_NN || (opCommand->operation->target == VXNNE_OPERATION_TARGET_TP && WB_IS_TP_COMPRESS(wb))))
+        {
+            FILE *fpLayer = VX_NULL;
+            char wbFileName[256] = {'\0'};
+            vx_uint32 offset = 0;
+            vx_uint32 k = 0;
+            vx_uint8 *logicalWB = WB_MEM_LOGICAL_ADDR_INDEX(wb, 0);
+            gcoOS_PrintStrSafe(wbFileName, 256, &offset, "WB_%s_OpsID_%d_opIndices_%d_%x_%x.txt", opCommand->operation->layer->name, opCommand->operationID, opIndex, logicalWB, opCommand);
+            fpLayer = fopen(wbFileName,"w");
+            if(!fpLayer)
+            {
+                vxError("can't open the file %s\n",wbFileName);
+                vxmASSERT(0);
+            }
+            vxInfo("***Before operation execute: WBDump :opID:%d    opIndices : %d***\n",opCommand->operationID, opIndex);
+
+            for(k = 0 ; k < WB_MEMORY_SIZE(wb); ++k)
+            {
+                fprintf(fpLayer, "%02x", *(logicalWB + k));
+                if(k % 4 == 3)
+                    fprintf(fpLayer, "\n");
+            }
+            if (fpLayer)
+                fclose(fpLayer);
+        }
+    }
+
+
+    return vx_true_e;
+
+}
+
+
+vx_status  vxnneOperation_commandBufferDump(vxnne_execution_layer executionLayer, vx_uint32 opIndex)
+{
+    vxnne_operation_command opCommand = &(executionLayer->opIndices[opIndex]);
+
+    vxnne_command_buffer commandBuffer = &opCommand->commandBuffer;
+
+    if(commandBuffer && commandBuffer->logical)
+    {
+        FILE *fpLayer = VX_NULL;
+        char fileName[256] = {"CommandBuffer.txt\0"};
+        vx_uint32 k = 0;
+
+        fpLayer = fopen(fileName,"a+");
+        if(!fpLayer)
+        {
+            vxError("can't open the file %s\n",fileName);
+            vxmASSERT(0);
+        }
+
+        vxInfo("***Before operation execute, commandBuffer Dump :opID:%d    opIndices : %d***\n",opCommand->operationID, opIndex);
+
+        fprintf(fpLayer, "%s\n", opCommand->operation->layer->name);
+        fprintf(fpLayer, "operationID :%d opIndex:%d\n", opCommand->operationID, opIndex);
+
+        for(k = 0 ; k < 128/4; ++k) /*NN TP command always 128 bytes*/
+        {
+            fprintf(fpLayer, "%08x \n", *(((vx_uint32 *)commandBuffer->logical) + k));
+        }
+
+        if (fpLayer)
+            fclose(fpLayer);
+    }
+
+    return vx_true_e;
+
+}
+
+VX_PRIVATE_API vx_status vxnneOperation_NodeDumpForBinaryGraph(
+    vxnne_operation_command opCommand
+)
+{
+    vx_tensor output = VX_NULL;
+    vx_uint32 i = 0;
+    vx_uint8_ptr outputsBase = VX_NULL;
+    char layerFileName[256] = {'\0'};
+    FILE *fpLayer = VX_NULL;
+    vx_uint32 width = 0, height = 0, depth = 0, batch = 0;
+    vx_uint32 totalSize = 1;
+    vx_uint32 offset = 0;
+    static vx_uint32 layerNum = 0;
+    static vxnne_layer dumpedLayerPtr[VX_MAX_NODE_COUNT];
+    static vx_uint32 layerOperationNum[VX_MAX_NODE_COUNT];
+
+    /* the last operation of layer if mGpuSync is true */
+    if (opCommand->operation->mGpuSync == vx_true_e)
+    {
+        layerOperationNum[layerNum]++;
+        if (layerOperationNum[layerNum] < opCommand->operation->layer->num_operations)
+        {
+            /* only dump last operation in this layer */
+            return VX_SUCCESS;
+        }
+
+        for (i = 0; i < layerNum; i++)
+        {
+            /* ignore this layer if it has been dumped */
+            if (dumpedLayerPtr[i] == opCommand->operation->layer)
+            {
+                return VX_SUCCESS;
+            }
+        }
+
+        for (i = 0; i < opCommand->operation->outputsNum; i++)
+        {
+            if (opCommand->operation->outputs[i]->type == VX_TYPE_TENSOR)
+            {
+                /* dump last operation in layer.
+                   dump tensor total size for coverage multivip split operation */
+                vx_int32 *dims = VX_NULL;
+                vx_size tensorSize = 0;
+
+                output = (vx_tensor)(opCommand->operation->outputs[i]);
+                dims = TENSOR_ORIG_SIZES(output);
+                width = dims[0];
+                height = dims[1];
+                depth = dims[2];
+                batch = dims[3];
+                outputsBase = TENSOR_LOGICAL_ADDR(output);
+                vxoTensor_GetTensorWholeSize(output, &tensorSize);
+                totalSize = (vx_uint32)tensorSize;
+
+                memset(layerFileName, 0, sizeof(layerFileName));
+                gcoOS_PrintStrSafe(layerFileName, 256, &offset, "%d_%s_%d_%d_%d_%d_%d_tensorName_%s.bin", layerNum,
+                                    opCommand->operation->layer->name, width, height, depth, batch,
+                                    opCommand->batchID, ((vx_reference)output)->name);
+
+                gcmVERIFY_OK(gcoOS_Open(gcvNULL, layerFileName, gcvFILE_CREATE, (gctFILE*)(&fpLayer)));
+
+                if(fpLayer)
+                {
+                    gcoOS_Seek(gcvNULL, fpLayer, 0, gcvFILE_SEEK_SET);
+                    gcoOS_Write(gcvNULL, fpLayer, totalSize, outputsBase);
+
+                    gcoOS_Flush(gcvNULL, fpLayer);
+                    gcmVERIFY_OK(gcoOS_Close(gcvNULL, fpLayer));
+                }
+                else
+                    vxmASSERT(0);
+                dumpedLayerPtr[layerNum] = opCommand->operation->layer;
+
+                layerNum++;
+            }
+            else
+            {
+                vxError("%s[%d]: not support this data type dump\n", __FUNCTION__, __LINE__);
+            }
+        }
+    }
+
+    return VX_SUCCESS;
+}
+
 vx_status vxnneOperation_NodeDump(
     vxnne_operation_command opCommand
     )
@@ -4708,6 +5065,14 @@ vx_status vxnneOperation_NodeDump(
     vx_uint32 index;
     vx_bool isDumpOperation = vx_true_e;
     size_t len = 0;
+
+    if (1 == opCommand->operation->layer->node->base.context->options.enableSaveBinary)
+    {
+        /* dump output is binary file if enable saving NBG */
+        vxnneOperation_NodeDumpForBinaryGraph(opCommand);
+
+        return VX_SUCCESS;
+    }
 
     for (i = 0; i < opCommand->operation->outputsNum; i++)
     {
@@ -4776,28 +5141,43 @@ vx_status vxnneOperation_NodeDump(
                 elementCount = width * height * depth;
                 for(index = 0; index < elementCount; index++)
                 {
-                    if (TENSOR_DATA_TYPE(output) == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE)
+                    if (!opCommand->operation->layer->node->base.context->options.enableNNLayerDump_Int)
                     {
-                        if (fpLayer)
+                        if ((TENSOR_DATA_TYPE(output) == VX_TYPE_UINT8 || TENSOR_DATA_TYPE(output) == VX_TYPE_INT8) && TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE)
                         {
-                            fprintf(fpLayer, "%f\n", vxnneGetDataQuant((vx_type_e)TENSOR_DATA_TYPE(output), index, (vx_uint8_ptr)outputsBase, TENSOR_TF_ZEROPOINT(output), TENSOR_TF_SCALE(output)));
-                        }
+                            if (fpLayer)
+                            {
+                                fprintf(fpLayer, "%f\n", vxnneGetDataQuant((vx_type_e)TENSOR_DATA_TYPE(output), index, (vx_uint8_ptr)outputsBase, TENSOR_TF_ZEROPOINT(output), TENSOR_TF_SCALE(output)));
+                            }
 
-                        if (fpOperation)
+                            if (fpOperation)
+                            {
+                                fprintf(fpOperation, "%f\n", vxnneGetDataQuant((vx_type_e)TENSOR_DATA_TYPE(output), index, (vx_uint8_ptr)outputsBase, TENSOR_TF_ZEROPOINT(output), TENSOR_TF_SCALE(output)));
+                            }
+                        }
+                        else
                         {
-                            fprintf(fpOperation, "%f\n", vxnneGetDataQuant((vx_type_e)TENSOR_DATA_TYPE(output), index, (vx_uint8_ptr)outputsBase, TENSOR_TF_ZEROPOINT(output), TENSOR_TF_SCALE(output)));
+                            if (fpLayer)
+                            {
+                                fprintf(fpLayer, "%f\n", vxnneGetData((vx_type_e)TENSOR_DATA_TYPE(output), index, (vx_uint8_ptr)outputsBase, TENSOR_POS(output)));
+                            }
+
+                            if (fpOperation)
+                            {
+                                fprintf(fpOperation, "%f\n", vxnneGetData((vx_type_e)TENSOR_DATA_TYPE(output), index, (vx_uint8_ptr)outputsBase, TENSOR_POS(output)));
+                            }
                         }
                     }
                     else
                     {
                         if (fpLayer)
                         {
-                            fprintf(fpLayer, "%f\n", vxnneGetData((vx_type_e)TENSOR_DATA_TYPE(output), index, (vx_uint8_ptr)outputsBase, TENSOR_POS(output)));
+                            fprintf(fpLayer, "%d\n", vxnneGetDataInt((vx_type_e)TENSOR_DATA_TYPE(output), index, (vx_uint8_ptr)outputsBase, TENSOR_POS(output)));
                         }
 
                         if (fpOperation)
                         {
-                            fprintf(fpOperation, "%f\n", vxnneGetData((vx_type_e)TENSOR_DATA_TYPE(output), index, (vx_uint8_ptr)outputsBase, TENSOR_POS(output)));
+                            fprintf(fpOperation, "%d\n", vxnneGetDataInt((vx_type_e)TENSOR_DATA_TYPE(output), index, (vx_uint8_ptr)outputsBase, TENSOR_POS(output)));
                         }
                     }
                 }
@@ -4814,12 +5194,13 @@ vx_status vxnneOperation_NodeDump(
                     fpOperation = VX_NULL;
                 }
 
-                if (opCommand->operation->transposeOutChannel > 1)
-                {
-                    vxFree(outputsBase);
-                }
-
                 layerNum++;
+            }
+
+            if (opCommand->operation->transposeOutChannel > 1)
+            {
+                vxFree(outputsBase);
+                outputsBase = VX_NULL;
             }
         }
     }
@@ -4830,11 +5211,59 @@ vx_status vxnneOperation_NodeDump(
         fpLayer = VX_NULL;
     }
 
+    if (opCommand->operation->transposeOutChannel > 1)
+    {
+        if (outputsBase)
+        {
+            vxFree(outputsBase);
+            outputsBase = VX_NULL;
+        }
+    }
     return VX_SUCCESS;
+}
+
+vx_bool vxoLayer_IsInputTensorInHeadNode(vx_graph graph, vx_tensor tensor)
+{
+    if (graph->inputCount > 0 && (graph->inputs != VX_NULL))
+    {
+        vx_uint32 i = 0;
+        vx_reference ref;
+        while (i < graph->outputCount)
+        {
+            ref = graph->inputs[i];
+            if (ref->type == VX_TYPE_TENSOR && ref == (vx_reference)tensor)
+            {
+                return vx_true_e;
+            }
+            i++;
+        }
+    }
+    return vx_false_e;
+}
+
+vx_bool vxoLayer_IsOutputTensorInTailNode(vx_graph graph, vx_tensor tensor)
+{
+    if (graph->outputCount > 0 && (graph->outputs != VX_NULL))
+    {
+        vx_uint32 i = 0;
+        vx_reference ref;
+
+        while (i < graph->outputCount)
+        {
+            ref = graph->outputs[i];
+            if (ref->type == VX_TYPE_TENSOR && ref == (vx_reference)tensor)
+            {
+                return vx_true_e;
+            }
+            i++;
+        }
+    }
+    return vx_false_e;
 }
 
 vx_bool vxnneIsNNSupportFormat(
     vx_context context,
+    vx_graph graph,
     vx_tensor inputTensor,
     vx_weights_biases_parameter wb,
     vx_tensor outputTensor)
@@ -4860,8 +5289,7 @@ vx_bool vxnneIsNNSupportFormat(
     switch (inputFormat)
     {
     case VX_TYPE_FLOAT16:
-        if ((context->nnConfig.fixedFeature.nnCoreCountFloat16 > 0) &&
-            gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FP16_ALU))
+        if (context->nnConfig.fixedFeature.nnCoreCountFloat16 > 0)
         {
             isNNSupportFormat = vx_true_e;
         }
@@ -4881,9 +5309,19 @@ vx_bool vxnneIsNNSupportFormat(
             isNNSupportFormat = vx_true_e;
         }
         break;
+    case VX_TYPE_FLOAT32:
+        if (context->nnConfig.fixedFeature.nnCoreCountBFloat16 > 0 &&
+            gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FLOAT32_IO) &&
+            vxoLayer_IsInputTensorInHeadNode(graph, inputTensor))
+        {
+            isNNSupportFormat = vx_true_e;
+        }
+        break;
     case VX_TYPE_INT8:
-        if ((inputQuantFormat == VX_QUANT_DYNAMIC_FIXED_POINT) &&
-            (context->nnConfig.fixedFeature.nnCoreCountInt8 > 0))
+        if ((context->nnConfig.fixedFeature.nnCoreCountInt8 > 0) &&
+        ((inputQuantFormat == VX_QUANT_AFFINE_SCALE_PER_CHANNEL && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT)) ||
+        (inputQuantFormat == VX_QUANT_AFFINE_SCALE && vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ASYMMETRIC_INT8)) ||
+        (inputQuantFormat == VX_QUANT_DYNAMIC_FIXED_POINT)))
         {
             isNNSupportFormat = vx_true_e;
         }
@@ -4891,8 +5329,8 @@ vx_bool vxnneIsNNSupportFormat(
 
     case VX_TYPE_UINT8:
         if ((context->nnConfig.fixedFeature.nnCoreCountInt8 > 0) &&
-            (((inputQuantFormat == VX_QUANT_AFFINE_SCALE) &&
-            vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT)) ||
+            ((inputQuantFormat == VX_QUANT_AFFINE_SCALE_PER_CHANNEL && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT)) ||
+            ((inputQuantFormat == VX_QUANT_AFFINE_SCALE) && vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT)) ||
             (inputQuantFormat == VX_QUANT_DYNAMIC_FIXED_POINT)))
         {
             isNNSupportFormat = vx_true_e;
@@ -4901,6 +5339,13 @@ vx_bool vxnneIsNNSupportFormat(
 
     default:
         break;
+    }
+
+    if (!vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_OUTPUT_CONVERT_UINT8_INT8_TO_UINT16_INT16_FIX) &&
+        ((inputFormat == VX_TYPE_UINT8 || inputFormat == VX_TYPE_INT8) &&
+         (outputFormat == VX_TYPE_UINT16 || outputFormat == VX_TYPE_INT16)))
+    {
+        isNNSupportFormat = vx_false_e;
     }
 
     if (isNNSupportFormat && (wb != VX_NULL) && (outputTensor != VX_NULL))
@@ -4930,7 +5375,11 @@ vx_bool vxnneIsNNSupportFormat(
                 return vx_true_e;
             }
          case VX_TYPE_BFLOAT16:
-             if ((inputFormat == VX_TYPE_BFLOAT16) && (outputFormat == VX_TYPE_BFLOAT16))
+             if ((inputFormat == VX_TYPE_BFLOAT16 || inputFormat == VX_TYPE_FLOAT32)
+                 && (outputFormat == VX_TYPE_BFLOAT16 ||
+                        (outputFormat == VX_TYPE_FLOAT32 &&
+                            gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FLOAT32_IO) &&
+                            vxoLayer_IsOutputTensorInTailNode(graph, outputTensor))))
             {
                 return vx_true_e;
             }
@@ -4945,7 +5394,7 @@ vx_bool vxnneIsNNSupportFormat(
 }
 
 vx_bool vxnneIsTPSupportFormat(
-    vx_context context,
+    vx_graph graph,
     vx_tensor inputTensor,
     vx_weights_biases_parameter wb,
     vx_tensor outputTensor)
@@ -4954,6 +5403,7 @@ vx_bool vxnneIsTPSupportFormat(
     vx_enum dataFormat[3] = {0, 0, 0};
     vx_enum quantFormat[3] = {0, 0, 0};
     vx_uint32 i = 0;
+    vx_context context = graph->base.context;
 
     if ((inputTensor == VX_NULL) && (outputTensor == VX_NULL) && (wb == VX_NULL))
     {
@@ -4979,13 +5429,26 @@ vx_bool vxnneIsTPSupportFormat(
                     isTpSupportFormat[i] = vx_true_e;
                 }
                 break;
-             case VX_TYPE_BFLOAT16:
-                if (context->nnConfig.fixedFeature.tpCoreCount > 0)
+            case VX_TYPE_BFLOAT16:
+                if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16) && context->nnConfig.fixedFeature.tpCoreCount > 0)
                 {
                     isTpSupportFormat[i] = vx_true_e;
                 }
                 break;
-
+            case VX_TYPE_FLOAT32:
+                if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16) &&
+                    context->nnConfig.fixedFeature.tpCoreCount > 0 &&
+                    gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FLOAT32_IO)
+                    )
+                {
+                    if (((i == 0) && vxoLayer_IsInputTensorInHeadNode(graph, inputTensor)) ||
+                        ((i == 2) && vxoLayer_IsOutputTensorInTailNode(graph, outputTensor))
+                        )
+                    {
+                        isTpSupportFormat[i] = vx_true_e;
+                    }
+                }
+                break;
             case VX_TYPE_INT16:
                 if ((quantFormat[i] == VX_QUANT_DYNAMIC_FIXED_POINT) &&
                     (context->nnConfig.fixedFeature.tpCoreCount > 0) &&
@@ -4996,9 +5459,8 @@ vx_bool vxnneIsTPSupportFormat(
                 break;
 
             case VX_TYPE_INT8:
-                if ((quantFormat[i] == VX_QUANT_DYNAMIC_FIXED_POINT) &&
+                if (((quantFormat[i] == VX_QUANT_DYNAMIC_FIXED_POINT) || (quantFormat[i] == VX_QUANT_AFFINE_SCALE && vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ASYMMETRIC_INT8))) &&
                     (context->nnConfig.fixedFeature.tpCoreCount > 0))
-
                 {
                     isTpSupportFormat[i] = vx_true_e;
                 }
@@ -5154,7 +5616,8 @@ void vxnneGetPatternBitAndVipSramSizeNeed(
                 );
 
             if ((kernelPatternBits != 0) &&
-                (vipSramNeed <= kernelCacheSize))
+                (vipSramNeed <= kernelCacheSize) &&
+                (ratio - tempRatio) < (ratio - bestRatio))
             {
                 bestRatio = tempRatio;
                 *oneNumPtr = x;
@@ -5163,6 +5626,7 @@ void vxnneGetPatternBitAndVipSramSizeNeed(
                 *vipSramNeedPtr = vipSramNeed;
             }
         }
+
     }
 
 }
@@ -5210,111 +5674,6 @@ void vxnneGetKernelPatternBits(vx_uint32 oneNum, vx_uint32 zeroNum, vx_uint64 *k
 
     *kernelPatternBitPtr = result;
 }
-
-void vxoWeightsBiases_Reshuffle(
-    vx_weights_biases_parameter_base      wb_base
-    )
-{
-    vx_nn_reshuffle_s src = {
-        NULL,
-        vxnneAlignWithStride(wb_base->org_weights_sizes[0], wb_base->strideX),
-        vxnneAlignWithStride(wb_base->org_weights_sizes[1], wb_base->strideY),
-        wb_base->org_weights_sizes[2],
-        wb_base->org_weights_sizes[3],
-        (vx_type_e)wb_base->weights_data_format
-    };
-    vx_nn_reshuffle_s dst = {
-        NULL,
-        wb_base->weights_sizes[0],
-        wb_base->weights_sizes[1],
-        wb_base->weights_sizes[2],
-        wb_base->weights_sizes[3],
-        (vx_type_e)wb_base->weights_data_format
-    };
-    vx_uint32 x, y, z, w;
-    vx_uint32 orgXSize = wb_base->org_weights_sizes[0];
-    vx_uint32 orgYSize = wb_base->org_weights_sizes[1];
-    vx_uint32 orgZSize = wb_base->org_weights_sizes[2];
-    vx_uint32 weightItemCount = wb_base->weights_sizes[0] * wb_base->weights_sizes[1] * wb_base->weights_sizes[2] *wb_base->weights_sizes[3];
-    vx_uint32 weightSize = (vx_uint32)vxDataType_GetSize((vx_type_e)wb_base->weights_data_format);
-    vx_uint8_ptr startWeightDataPtr = VX_NULL;
-    gctPOINTER convertedWeightData  = VX_NULL;
-
-    if (((wb_base->strideX > 1) || (wb_base->strideY > 1)) &&
-        (wb_base->org_weights_sizes[0] != 1 || wb_base->org_weights_sizes[1] != 1) &&
-        wb_base->reshuffleWeightPtr == VX_NULL)
-    {
-        wb_base->reshuffleWeightPtr = (vx_uint8_ptr)vxAllocateAndZeroMemory(weightItemCount * weightSize);
-        if (wb_base->reshuffleWeightPtr == VX_NULL)
-        {
-            goto exit;
-        }
-
-        {
-            convertedWeightData = vxAllocateAndZeroMemory(weightItemCount * weightSize);
-        }
-
-        if (convertedWeightData == VX_NULL)
-        {
-            goto exit;
-        }
-
-        vxoTensor_GetTensorViewMemory(wb_base->origWeight, (gctPOINTER*)(&startWeightDataPtr), VX_NULL);
-
-        for (w = 0; w < src.wSize; w++)
-        {
-            for (z = 0; z < src.zSize; z++)
-            {
-                /* convert float32 to float16 and fill edge with 0 */
-                for (y = 0; y < src.ySize; y++)
-                {
-                    for (x = 0; x < src.xSize; x++)
-                    {
-                        vx_uint32 orgOffsetSize = (w * orgZSize * orgYSize * orgXSize + z * orgYSize * orgXSize + y * orgXSize + x) * weightSize;
-                        vx_uint32 fpOffsetSize = (w * src.zSize * src.ySize * src.xSize + z * src.ySize * src.xSize + y * src.xSize + x) * weightSize;
-                        vx_uint32 zero = (TENSOR_DATA_TYPE(wb_base->origWeight) == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(wb_base->origWeight) == VX_QUANT_AFFINE_SCALE) ?
-                            TENSOR_TF_ZEROPOINT(wb_base->origWeight) : 0;
-                        vx_uint8 *converted, *orig;
-
-                        converted = (vx_uint8*)convertedWeightData + fpOffsetSize;
-
-                        if ((x > orgXSize - 1) || (y > orgYSize - 1))
-                        {
-                            _DataGeneralConvert((void*)&zero, (void*)converted, weightSize, weightSize);
-                        }
-                        else
-                        {
-                            orig = startWeightDataPtr + orgOffsetSize;
-                            _DataGeneralConvert((void*)orig, (void*)converted, weightSize, weightSize);
-                        }
-                    }
-                }
-            }
-        }
-
-        /*reshuffle kernel data*/
-        src.data   = convertedWeightData;
-        dst.data   = wb_base->reshuffleWeightPtr;
-        reshuffleData(&src, wb_base->strideX, wb_base->strideY, &dst);
-
-        if (convertedWeightData)
-        {
-                vxFree(convertedWeightData);
-
-            convertedWeightData = VX_NULL;
-        }
-
-        return;
-
-exit:
-        if (wb_base->reshuffleWeightPtr)
-        {
-            vxFree(wb_base->reshuffleWeightPtr);
-            wb_base->reshuffleWeightPtr = VX_NULL;
-        }
-    }
-}
-
 
 vx_status vxo_insertHandle(vxnne_execution_layer   executionLayer)
 {
@@ -5658,6 +6017,28 @@ vx_bool _IsSameQuantType(
             }
             break;
 
+        case VX_QUANT_AFFINE_SCALE_PER_CHANNEL:
+            {
+                vx_uint32 i = 0;
+                vx_uint32 scale_cnt0 = TENSOR_TF_SCALE_COUNT(src);
+                vx_uint32 scale_cnt1 = TENSOR_TF_SCALE_COUNT(dst);
+
+                if (scale_cnt0 == scale_cnt1)
+                {
+                    vx_float32_ptr src_scale_ptr = TENSOR_TF_SCALE_POINTER(src);
+                    vx_float32_ptr dst_scale_ptr = TENSOR_TF_SCALE_POINTER(dst);
+                    for (i = 0; i < scale_cnt0; i++)
+                    {
+                        if (src_scale_ptr[i] != dst_scale_ptr[i])
+                            break;
+                    }
+
+                    if (i == scale_cnt0)
+                        result = vx_true_e;
+                }
+            }
+            break;
+
         default:
             break;
         }
@@ -5675,6 +6056,7 @@ vx_bool _IsSameType(
 }
 
 vx_uint32 caculateInputTransposeBufferSize(
+    vx_context context,
     vx_enum imageCacheMode,
     vx_uint32 outputTileXSize,
     vx_uint32 outputTileYSize,
@@ -5684,12 +6066,20 @@ vx_uint32 caculateInputTransposeBufferSize(
     vx_uint32 interleaveMode,
     vx_float32 ddrLatency,
     vx_uint32 transposeInChannel,
-    vx_enum dataFormat
+    vx_enum dataFormat,
+    vx_uint32 nnStrideX,
+    vx_uint32 nnStrideY
     )
 {
     vx_uint32 inImageTileSizeX = outputTileXSize + kernelX - 1;
     vx_uint32 inImageTileSizeY = outputTileYSize + kernelY - 1;
     vx_uint32 result = 0;
+
+    if (nnStrideX == 2 && nnStrideY == 2)
+    {
+        inImageTileSizeX = outputTileXSize * nnStrideX + kernelX - 1;
+        inImageTileSizeY = outputTileYSize * nnStrideY + kernelY - 1;
+    }
 
     if ((kernelX == 1) && (kernelY == 1))
     {
@@ -5722,14 +6112,29 @@ vx_uint32 caculateInputTransposeBufferSize(
 }
 
 vx_uint32 caculateOutTransposeBufferSize(
+    vx_context context,
     vx_uint32 outputTileXSize,
     vx_uint32 outputTileYSize,
+    vxnne_convolution_relu_pooling_operation convOperation,
     vx_enum format
     )
 {
+#define NN_CONV_POOLED_STRIDE_HW 2
+
+    vx_uint32 poolStride = 1;
+    vx_uint32 vipSramWidthInByte = context->nnConfig.fixedFeature.physicalVipSramWidthInByte;
     vx_uint32 dataSize        = (vx_uint32)vxDataType_GetSize((vx_type_e)format);
-    /*formular in PRD: N*ceil(PooledOutTX*PooledOutTY/64?)*64?*/
-    return 2 * VX_TRANSPOSE_MAX_INTERLEAVE_CH * gcmALIGN_NP2_SAFE(outputTileXSize * outputTileYSize, 64) * dataSize;
+
+    if(convOperation->enable_pooling && (convOperation->pool_type != VIV_NN_POOLING_NON) && ((convOperation->pool_size_x == 2 && convOperation->pool_size_y == 2) || (convOperation->pool_size_x == 3 && convOperation->pool_size_y == 3)))
+    {
+        poolStride = NN_CONV_POOLED_STRIDE_HW;
+    }
+
+    vxmASSERT(vipSramWidthInByte !=0);
+
+    /*formular in PRD: Max(2*N*ceil(PooledOutTX*PooledOutTY/PHYSICAL_VIPSRAM_WIDTH_IN_BYTE),3*N) *PHYSICAL_VIPSRAM_WIDTH_IN_BYTE*/
+    return gcmMAX((2 * VX_TRANSPOSE_MAX_INTERLEAVE_CH * gcmALIGN_NP2_SAFE((outputTileXSize/poolStride) * (outputTileYSize/poolStride), vipSramWidthInByte)), 3 * VX_TRANSPOSE_MAX_INTERLEAVE_CH * vipSramWidthInByte) * dataSize;
+
 }
 
 void alignTensorChannelToTransposeChannel(
@@ -5759,6 +6164,10 @@ void alignTensorChannelToTransposeChannel(
             TENSOR_STRIDE_INDEX(tensor, dimIndex) = TENSOR_SIZE_INDEX(tensor, dimIndex - 1) * TENSOR_STRIDE_INDEX(tensor, dimIndex - 1);
 
             tensor->tensorBuffer->memory.strides[0][dimIndex] = TENSOR_STRIDE_INDEX(tensor, dimIndex);
+        }
+        {
+            vx_uint32 dims = tensor->tensorBuffer->memory.dimCount - 1;
+            tensor->tensorBuffer->memory.sizes[0] = gcmALIGN_NP2(tensor->tensorBuffer->memory.strides[0][dims] * tensor->tensorBuffer->memory.dims[0][dims], CACHE_ALIGNMENT_SIZE);
         }
     }
 }
@@ -5840,6 +6249,219 @@ vx_status patchNodeParamLocation(vx_node node)
         }
     }
     return VX_SUCCESS;
+}
+
+vx_uint32  GetEsitimateWBSize(
+    vx_weights_biases_parameter weightsBiases
+    )
+{
+    vx_enum weightFormat = WB_WEIGHT_DATA_FORMAT(weightsBiases);
+    vx_enum biasFormat = WB_BIAS_DATA_FORMAT(weightsBiases);
+    vx_float64 EstimateRatio = WB_COMPRESS_RATIO(weightsBiases) > 1.0f ? 1.05f : (1.25f-1.05f) * (1.0f - WB_COMPRESS_RATIO(weightsBiases)) / (1.0f - 0.02f) + 1.05f;
+
+    vx_uint32 weightSize = WB_KERNEL_X(weightsBiases) * WB_KERNEL_Y(weightsBiases) * WB_KERNEL_Z(weightsBiases) *
+                           WB_OUTPUT_Z(weightsBiases) * vxnneGetTypeSize((vx_type_e)weightFormat);
+
+    vx_uint32 biasSize   = WB_OUTPUT_Z(weightsBiases) * vxnneGetTypeSize((vx_type_e)biasFormat);
+
+    return gcmALIGN_NP2((vx_uint32)((weightSize + biasSize) * EstimateRatio + 0.5f), CACHE_ALIGNMENT_SIZE);
+}
+vx_bool estimateNNTransposeSize(vx_context context, vx_graph graph)
+{
+#define ESTIMATE_KERNEL_CACHE_COEFFICIENT 0.5
+    vx_uint32 index = 0 ;
+    vx_tensor input, output;
+    vx_status status = VX_SUCCESS;
+    vxnne_operation_info_s opInfo;
+
+    for (index = 0; index < graph->layer->base.num_operations; index++)
+    {
+        vxnne_operation operation = graph->layer->operations[index];
+        input = (vx_tensor)(operation->inputs[0]);
+        output = (vx_tensor)(operation->outputs[0]);
+
+        vxnneOperation_GetInfo(operation, &opInfo);
+        if (opInfo.target == VXNNE_OPERATION_TARGET_NN)
+        {
+            vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)operation;
+            vx_uint32 outputDims[3] = {TENSOR_SIZE_INDEX(opInfo.output, 0), TENSOR_SIZE_INDEX(opInfo.output, 1), TENSOR_SIZE_INDEX(opInfo.output, 2)};
+            vx_uint32 inputDims[3]  = {TENSOR_SIZE_INDEX(opInfo.input, 0), TENSOR_SIZE_INDEX(opInfo.input, 1), TENSOR_SIZE_INDEX(opInfo.input, 2)};
+            vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat;
+            vx_uint32 nnStrideX = opInfo.nnStrideX;
+            vx_uint32 nnStrideY = opInfo.nnStrideY;
+
+#ifdef ORI_NNARCHPERF
+            vx_arch_perf_s archPerfHandle;
+#else
+            arch_perf_s archPerfHandle;
+#endif
+            INITIALIZE_STRUCT(archPerfHandle);
+#ifdef ORI_NNARCHPERF
+            calculateArchPerfFromWB(context,
+                                &archPerfHandle,
+                                opInfo.weightsBiases,
+                                inputDims,
+                                outputDims,
+                                TENSOR_DATA_TYPE(output),
+                                opInfo.pad.left,
+                                opInfo.pad.right,
+                                opInfo.pad.top,
+                                opInfo.pad.bottom,
+                                opInfo.poolSizeX,
+                                opInfo.poolStrideX,
+                                VX_NULL,
+                                vx_true_e,
+                                SW_TILING_FROM_DDR, SW_TILING_FROM_DDR, SW_TILING_FROM_DDR,
+                                context->vipSRAM.size,
+                                (vxnne_operation_target_e)opInfo.target,
+                                (vxnne_operator_e)opInfo.opType);
+#else
+            archCalculateArchPerfFromWB(context,
+                                operation,
+                                &archPerfHandle,
+                                opInfo.weightsBiases,
+                                inputDims,
+                                outputDims,
+                                TENSOR_DATA_TYPE(output),
+                                opInfo.pad.left,
+                                opInfo.pad.right,
+                                opInfo.pad.top,
+                                opInfo.pad.bottom,
+                                opInfo.poolSizeX,
+                                opInfo.poolStrideX,
+                                VX_NULL,
+                                vx_true_e,
+                                SW_TILING_FROM_DDR, SW_TILING_FROM_DDR, SW_TILING_FROM_DDR,
+                                context->vipSRAM.size,
+                                (vxnne_operation_target_e)opInfo.target,
+                                (vxnne_operator_e)opInfo.opType);
+#endif
+            outImageTileX   = archPerfHandle.resultInfo.outImageTileXSize;
+            outImageTileY   = archPerfHandle.resultInfo.outImageTileYSize;
+            interleaveMode  = archPerfHandle.resultInfo.interleaveMode;
+            kernelX         = WB_KERNEL_X(opInfo.weightsBiases);
+            kernelY         = WB_KERNEL_Y(opInfo.weightsBiases);
+            inImageZ        = TENSOR_SIZE_INDEX(opInfo.input, 2);
+            inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
+
+            operation->transposeInSize = caculateInputTransposeBufferSize(context,
+                                            VXNNE_SRAM_CACHE_MODE_FULL_CACHE,
+                                            outImageTileX,
+                                            outImageTileY,
+                                            kernelX,
+                                            kernelY,
+                                            inputDims[2],
+                                            interleaveMode,
+                                            context->nnConfig.customizedFeature.ddrLatency,
+                                            operation->transposeInChannel,
+                                            input->tensorBuffer->dataFormat,
+                                            nnStrideX,
+                                            nnStrideY
+                                            );
+
+            operation->transposeOutSize = caculateOutTransposeBufferSize(context, outImageTileX, outImageTileY, convOperation, output->tensorBuffer->dataFormat);
+            operation->transposeKernelSize = GetEsitimateWBSize(opInfo.weightsBiases);
+            operation->esitimateImageCacheSize = caculate3DTileSize(context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode, nnStrideX, nnStrideY);
+        }
+    }
+    return status;
+}
+
+vx_status nnTransposeChannel(vx_context context, vx_graph graph)
+{
+    vx_uint32 index = 0, j = 0;
+    vx_tensor input, output;
+    vx_uint8 transposeOutChannel = 0;
+    vx_uint32 outputZ = 0;
+    vx_status status = VX_SUCCESS;
+    for (index = 0; index < graph->layer->base.num_operations; index++)
+    {
+        vxnne_operation operation = graph->layer->operations[index];
+
+        input = (vx_tensor)(operation->inputs[0]);
+        output = (vx_tensor)(operation->outputs[0]);
+
+        /* skip TP, shader operation */
+        if (operation->target != VXNNE_OPERATION_TARGET_NN)
+        {
+            operation->bTransposeIn = vx_false_e;
+            operation->bTransposeOut = vx_false_e;
+
+            vxmASSERT((operation->parentOpNum == 0 )|| operation->bTransposeIn  == operation->parentOps[0]->bTransposeOut);
+            continue;
+        }
+
+        if (operation->parentOpNum == 1)
+        {
+            operation->bTransposeIn = operation->parentOps[0]->bTransposeOut;
+            operation->transposeInChannel = input->tensorBuffer->memory.transposeChannel;
+        }
+        else
+        {
+            operation->bTransposeIn = vx_false_e;
+            operation->transposeInChannel = 0;
+        }
+
+        vxmASSERT((operation->parentOpNum == 0 )|| operation->bTransposeIn  == operation->parentOps[0]->bTransposeOut);
+
+        /* skip last layer's output */
+        if (vxoTensor_IsVirtualTensor(output) == 0 ||
+            output->isViewed ||
+            (operation->childOpNum == 0))
+        {
+            operation->bTransposeOut = vx_false_e;
+            continue;
+        }
+
+        outputZ = TENSOR_VIEW_SIZE_INDEX(output, 2);
+        transposeOutChannel = (vx_uint8)gcmMIN(outputZ, VX_TRANSPOSE_MAX_INTERLEAVE_CH);
+
+        for (j = 0; j < operation->childOpNum; j++)
+        {
+            vxnne_operation childOp = operation->childOps[j];
+
+            if ((childOp->target != VXNNE_OPERATION_TARGET_NN) ||
+                (((vx_tensor)childOp->inputs[0])->isViewed) ||
+                (childOp->inputs[0] != operation->outputs[0]))
+            {
+                transposeOutChannel = 0;
+                break;
+            }
+
+            if(((childOp->bTransposeIn ? childOp->transposeInSize * NN_TRANSPOSE_INPUT_CACHE_COEFFICIENT : 0) + childOp->transposeKernelSize * NN_TRANSPOSE_KERNEL_CACHE_COEFFICIENT) >= context->vipSRAM.size)
+            {
+                transposeOutChannel = 0;
+                break;
+            }
+
+            if ((childOp->target == VXNNE_OPERATION_TARGET_NN) &&
+                (WB_KERNEL_X(((vxnne_convolution_relu_pooling_operation)childOp)->weights_biases) == 1) &&
+                (WB_KERNEL_Y(((vxnne_convolution_relu_pooling_operation)childOp)->weights_biases) == 1))
+            {
+                transposeOutChannel = VX_TRANSPOSE_MAX_INTERLEAVE_1MULTI1_CH;
+            }
+        }
+
+        if((operation->bTransposeIn ?
+ operation->transposeInSize * NN_TRANSPOSE_INPUT_CACHE_COEFFICIENT :
+ operation->esitimateImageCacheSize) + operation->transposeOutSize * NN_TRANSPOSE_OUTPUT_CACHE_COEFFICIENT + operation->transposeKernelSize * NN_TRANSPOSE_KERNEL_CACHE_COEFFICIENT >= context->vipSRAM.size)
+            transposeOutChannel=0;
+
+        if ((transposeOutChannel > 0) &&
+        (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_OUTIMAGE_X_BITWIDTH_LIMIT_FOR_NN_TRANSPOSE_FIX) || (transposeOutChannel * TENSOR_SIZE_INDEX(output, 0) < NN_IMAGE_XSIZE_MAX)))
+        {
+            operation->bTransposeOut = vx_true_e;
+        }
+        else
+        {
+            operation->bTransposeOut = vx_false_e;
+        }
+
+        operation->transposeOutChannel = transposeOutChannel;
+        output->tensorBuffer->memory.transposeChannel = operation->transposeOutChannel;
+    }
+
+    return status;
 }
 
 static vx_bool compute_gpu_divisor
@@ -6008,6 +6630,676 @@ vx_bool vx_nn_kernel_optimize_element_shape
 } /* vx_nn_kernel_optimize_element_shape() */
 
 
+vx_int32 getUserIDFromOutputTensor(
+    vx_reference tensor)
+{
+    vx_int32 uid = -1;
+    char uidName[64] = {'\0'};
+
+    if ((tensor != VX_NULL) && !strncmp(tensor->name, "uid_", 4))
+    {
+        char *p;
+        gcoOS_StrCopySafe(uidName, 64, &tensor->name[4]);
+        p = uidName;
+        while (p)
+        {
+            if (*p == '_')
+            {
+                *p = '\0';
+                uid = atoi(uidName);
+                break;
+            }
+            p++;
+        }
+    }
+
+    return uid;
+}
+
+VX_INTERNAL_API vx_status vxoGraph_caculateKernelSize(
+    vx_graph                      graph,
+    vx_weights_biases_parameter   wb,
+    vxnne_operation               operation,
+    vx_bool                       isWBReleased
+    )
+{
+    vx_context context = graph->base.context;
+    vx_uint32 kernelCopySize = 0;
+
+    if(context->vipSRAMForKernel.size == 0 || graph->shaderCopyLayer == VX_NULL || wb == VX_NULL || WB_MEMORY_SIZE(wb) == 0)
+    {
+        operation->parameter.kernelPreLoad.size = 0;
+        return VX_FAILURE;
+    }
+
+    /*allocate size*/
+    if(!isWBReleased)
+    {
+        if(operation->target == VXNNE_OPERATION_TARGET_NN)
+        {
+            kernelCopySize = (vx_uint32)(WB_MEMORY_SIZE(wb) - 64);
+            operation->parameter.kernelPreLoad.size = (vx_uint32)gcmALIGN_NP2(WB_STREAM_ALIGN_SIZE_INDEX(wb, 0), CACHE_ALIGNMENT_SIZE);
+
+            if(operation->parameter.kernelPreLoad.size > (context->vipSRAMForKernel.size - context->vipSRAMForKernel.used))
+            {
+                operation->parameter.kernelPreLoad.size = 0;
+                return VX_FAILURE;
+            }
+
+        }
+        else if(operation->target == VXNNE_OPERATION_TARGET_TP && operation->operatorType == VXNNE_OPERATOR_FULLYCONNECTED)
+        {
+            kernelCopySize = (vx_uint32)(WB_MEMORY_SIZE(wb));
+            operation->parameter.kernelPreLoad.size = (vx_uint32)gcmALIGN_NP2(kernelCopySize, CACHE_ALIGNMENT_SIZE);;
+
+            if(operation->parameter.kernelPreLoad.size > (context->vipSRAMForKernel.size - context->vipSRAMForKernel.used))
+            {
+                operation->parameter.kernelPreLoad.size = 0;
+                return VX_FAILURE;
+            }
+
+        }
+        else
+        {
+            operation->parameter.kernelPreLoad.size = 0;
+        }
+        context->vipSRAMForKernel.used += operation->parameter.kernelPreLoad.size;
+         }
+    else
+    {
+        context->vipSRAMForKernel.used -= operation->parameter.kernelPreLoad.size;
+        operation->parameter.kernelPreLoad.size = 0;
+    }
+
+
+
+    return VX_SUCCESS;
+
+}
+VX_INTERNAL_API vx_status vxoGraph_addShaderCopyKernelOperation(
+    vx_graph                      graph,
+    vx_node                       node,
+    vxnne_execution_layer         optLayer,
+    vx_weights_biases_parameter   wb,
+    vxnne_operation               operation
+    )
+{
+#define SHADER_COPY_DIMS_SIZE_MAX (0x1 <<16)
+
+    vx_context context = node->base.context;
+    vx_tensor wbTensor = VX_NULL;
+    vx_tensor cacheTensor = VX_NULL;
+    vx_tensor inputsReshape =VX_NULL, outputsReshape = VX_NULL;
+    vx_uint32 startAddress = 0;
+    vxnne_tensor_copy copylayer = gcvNULL;
+    vxnne_operation copyOperation = gcvNULL;
+    vx_uint32 reshpTensor_Sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION] = { 1 };
+    vx_uint32 reshpTensor_Dims = 2;
+    vx_uint32 kernelCopySize = 0;
+
+
+    if(context->vipSRAMForKernel.size == 0 || !node->kernelAttributes.isSetKernelVIP || graph->shaderCopyLayer == VX_NULL || wb == VX_NULL || WB_MEMORY_SIZE(wb) == 0)
+    {
+        operation->parameter.kernelPreLoad.size = 0;
+        operation->parameter.kernelPreLoad.logical = VX_NULL;
+        operation->parameter.kernelPreLoad.physical = 0;
+        return VX_FAILURE;
+    }
+
+    if(operation->target == VXNNE_OPERATION_TARGET_NN)
+    {
+        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FULLCACHE_KERNEL_INTERLEAVE_FIX))
+            kernelCopySize = (vx_uint32)(WB_MEMORY_SIZE(wb) - 64);/*WB_STREAM_FULL_CACHE_SIZE_INDEX(wb, 0)*/
+        else
+            kernelCopySize = (vx_uint32)(WB_STREAM_ALIGN_SIZE_INDEX(wb, 0));
+        operation->parameter.kernelPreLoad.size = (vx_uint32)gcmALIGN_NP2(WB_STREAM_ALIGN_SIZE_INDEX(wb, 0), CACHE_ALIGNMENT_SIZE);/*WB_STREAM_FULL_CACHE_SIZE_INDEX(wb, 0)*/
+
+        if(operation->parameter.kernelPreLoad.size > (context->vipSRAMForKernel.size - context->vipSRAMForKernel.used))
+        {
+            vxInfo("[CCT][FAILED] id:%d, name: %s, type: wb, size:%d, unused:%d\n",operation->absoluteOperationID, operation->layer->name, operation->parameter.kernelPreLoad.size, context->vipSRAMForKernel.size - context->vipSRAMForKernel.used);
+            operation->parameter.kernelPreLoad.size = 0;
+            return VX_FAILURE;
+        }
+
+        startAddress = context->vipSRAMForKernel.physical + context->vipSRAMForKernel.used;
+        context->vipSRAMForKernel.used += operation->parameter.kernelPreLoad.size;
+
+        wbTensor = vxoTensor_CreateTensorFromWB(graph, wb, kernelCopySize);
+        cacheTensor = vxoTensor_CreateTensorFromCache(graph, &kernelCopySize, 1, startAddress, VX_TYPE_UINT8);
+
+        operation->parameter.kernelPreLoad.physical = TENSOR_PHYSICAL_ADDR(cacheTensor) - context->vipSRAMForKernel.physBase;
+        operation->parameter.kernelPreLoad.logical = VX_NULL;
+
+    }
+    else if(operation->target == VXNNE_OPERATION_TARGET_TP && operation->operatorType == VXNNE_OPERATOR_FULLYCONNECTED)
+    {
+        kernelCopySize = (vx_uint32)(WB_MEMORY_SIZE(wb));
+        operation->parameter.kernelPreLoad.size = (vx_uint32)gcmALIGN_NP2(kernelCopySize, CACHE_ALIGNMENT_SIZE);;
+
+        if(operation->parameter.kernelPreLoad.size > (context->vipSRAMForKernel.size - context->vipSRAMForKernel.used))
+        {
+            vxInfo("[CCT][FAILED] id:%d, name: %s, type: wb, size:%d, unused:%d\n",operation->absoluteOperationID, operation->layer->name, operation->parameter.kernelPreLoad.size, context->vipSRAMForKernel.size - context->vipSRAMForKernel.used);
+            operation->parameter.kernelPreLoad.size = 0;
+            return VX_FAILURE;
+        }
+
+        startAddress = context->vipSRAMForKernel.physical + context->vipSRAMForKernel.used;
+        context->vipSRAMForKernel.used += operation->parameter.kernelPreLoad.size;
+
+        wbTensor = vxoTensor_CreateTensorFromWB(graph, wb, kernelCopySize);
+        cacheTensor = vxoTensor_CreateTensorFromCache(graph, &kernelCopySize, 1, startAddress, VX_TYPE_UINT8);
+        WB_MEM_PHYSICAL_BASE_ADDR(wb) = TENSOR_PHYSICAL_ADDR(cacheTensor);
+
+        operation->parameter.kernelPreLoad.physical = TENSOR_PHYSICAL_ADDR(cacheTensor);
+        operation->parameter.kernelPreLoad.logical = VX_NULL;
+    }
+    else
+    {
+        operation->parameter.kernelPreLoad.size = 0;
+        operation->parameter.kernelPreLoad.logical = VX_NULL;
+        operation->parameter.kernelPreLoad.physical = 0;
+        return VX_FAILURE;
+    }
+    vxInfo("[CCT][SUCCEED] id:%d, name: %s, type: wb, size:%d, unused:%d\n",operation->absoluteOperationID, operation->layer->name, operation->parameter.kernelPreLoad.size, context->vipSRAMForKernel.size - context->vipSRAMForKernel.used);
+
+    TENSOR_MEMORY_SHARED(wbTensor) = vx_true_e;
+    TENSOR_MEMORY_SHARED(cacheTensor) = vx_true_e;
+
+    gcoOS_Allocate(gcvNULL, sizeof(vxnne_tensor_copy_s), (gctPOINTER*)&copylayer);
+    if (!copylayer)
+    {
+        vxError("\nallocate memory fail at function %s line %d\n", __FUNCTION__, __LINE__);
+        return VX_FAILURE;
+    }
+
+    gcoOS_ZeroMemory(copylayer, sizeof(vxnne_tensor_copy_s));
+
+    vxnneLayer_Initialize(&copylayer->base,
+                        "shader_copy_kernel",
+                        node,
+                        vxmOPERATION_COUNT(copylayer),
+                        copylayer->operations,
+                        VX_NULL);
+
+    if(kernelCopySize < SHADER_COPY_DIMS_SIZE_MAX)
+    {
+        reshpTensor_Sizes[0] = kernelCopySize;
+        reshpTensor_Sizes[1] = 1;
+        inputsReshape = wbTensor;
+        outputsReshape = cacheTensor;
+    }
+    else
+    {
+        reshpTensor_Sizes[1] = 64;
+        reshpTensor_Sizes[0] = kernelCopySize / 64;
+        vxmASSERT(kernelCopySize % 64 == 0);
+
+        inputsReshape = vxoTensor_ReshapeTensor(wbTensor, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims, VX_NULL);
+        outputsReshape = vxoTensor_ReshapeTensor(cacheTensor, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims, VX_NULL);
+        vxoTensor_ReleaseTensor(&wbTensor);
+        vxoTensor_ReleaseTensor(&cacheTensor);
+    }
+
+    TENSOR_MEMORY_SHARED(inputsReshape) = vx_true_e;
+    TENSOR_MEMORY_SHARED(outputsReshape) = vx_true_e;
+
+    shaderCopyLayer(node, inputsReshape, outputsReshape, copylayer);
+
+    copyOperation = copylayer->operations[0];
+
+    optLayer->operations[optLayer->base.num_operations] = copyOperation;
+    optLayer->operations[optLayer->base.num_operations]->gpuId = 0;
+    optLayer->operations[optLayer->base.num_operations]->mGpuSync = vx_true_e;
+    optLayer->operations[optLayer->base.num_operations]->absoluteOperationID = optLayer->base.num_operations;
+    optLayer->operations[optLayer->base.num_operations]->mGpuNext = VX_NULL;
+    optLayer->base.num_operations++;
+
+    return VX_SUCCESS;
+}
+
+
+VX_INTERNAL_API vx_status vxoGraph_addShaderCopyTensorOperation(
+    vx_graph                      graph,
+    vx_node                       node,
+    vxnne_execution_layer         optLayer,
+    vxnne_operation               operation
+    )
+{
+    vx_uint32 i = 0, k;
+    vx_context context = node->base.context;
+
+    if(context->vipSRAMForKernel.size > 0 && node->kernelAttributes.isSetKernelVIP && operation->target == VXNNE_OPERATION_TARGET_SH)
+    {
+        vxnne_shader_operation shOpertion = (vxnne_shader_operation)operation;
+        for(i = 0; i < operation->inputsNum; ++i)
+        {
+            if(vxoReference_GetType(operation->inputs[i]) == VX_TYPE_TENSOR && TENSOR_DATA_LIFETIME((vx_tensor)operation->inputs[i]) == VX_TENSOR_LIFE_TIME_STATIC)
+            {
+                vx_size totalSize = 0;
+                vx_uint32 alignedSize = 0;
+                vx_uint32 size[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+                vx_uint32 dimCount = 0;
+                vx_uint32 startAddress = 0;
+                vx_tensor input = (vx_tensor)operation->inputs[i];
+                vx_tensor tensor = VX_NULL;
+                vxnne_tensor_copy copylayer = gcvNULL;
+                vxnne_operation copyOperation = gcvNULL;
+
+                vxoTensor_GetTensorWholeSize(input, &totalSize);
+                dimCount = TENSOR_DIM_NUM(input);
+
+                vxQueryTensor(input, VX_TENSOR_DIMS, size, sizeof(vx_uint32) * dimCount);
+
+                alignedSize = (vx_uint32)gcmALIGN_NP2(totalSize, CACHE_ALIGNMENT_SIZE);
+
+                if(alignedSize > (context->vipSRAMForKernel.size - context->vipSRAMForKernel.used))
+                {
+                    vxInfo("[CCT][FAILED] id:%d, name: %s, type: tensor, size:%d, unused:%d\n",operation->absoluteOperationID, operation->layer->name, alignedSize, context->vipSRAMForKernel.size - context->vipSRAMForKernel.used);
+                    return VX_FAILURE;
+                }
+
+                startAddress = context->vipSRAMForKernel.physical + context->vipSRAMForKernel.used;
+                context->vipSRAMForKernel.used += alignedSize;
+                tensor = vxoTensor_CreateTensorFromCache(graph, size, dimCount, startAddress, TENSOR_DATA_TYPE(input));
+                TENSOR_MEMORY_SHARED(tensor) = vx_true_e;
+
+                vxInfo("[CCT][SUCCEED] id:%d, name: %s, type: tensor, size:%d, unused:%d\n",operation->absoluteOperationID, operation->layer->name, alignedSize, context->vipSRAMForKernel.size - context->vipSRAMForKernel.used);
+
+                gcoOS_Allocate(gcvNULL, sizeof(vxnne_tensor_copy_s), (gctPOINTER*)&copylayer);
+                if (!copylayer)
+                {
+                    vxError("\nallocate memory fail at function %s line %d\n", __FUNCTION__, __LINE__);
+                    return VX_FAILURE;
+                }
+
+                gcoOS_ZeroMemory(copylayer, sizeof(vxnne_tensor_copy_s));
+
+                vxnneLayer_Initialize(&copylayer->base,
+                                    "shader_copy_kernel",
+                                    node,
+                                    vxmOPERATION_COUNT(copylayer),
+                                    copylayer->operations,
+                                    VX_NULL);
+
+
+                shaderCopyLayer(node, input, tensor, copylayer);
+
+                copyOperation = copylayer->operations[0];
+
+                for(k = 0; k < (shOpertion->shaderExecutable)->paramNum; ++k)
+                {
+                    if(shOpertion->shaderExecutable->param[k] != VX_NULL &&
+                        vxoReference_GetType(shOpertion->shaderExecutable->param[k]) == VX_TYPE_TENSOR &&
+                        TENSOR_DATA_LIFETIME((vx_tensor)shOpertion->shaderExecutable->param[k]) == VX_TENSOR_LIFE_TIME_STATIC)
+                    {
+                        if(((vx_tensor)shOpertion->shaderExecutable->param[k])->tensorBuffer == input->tensorBuffer)
+                        {
+                            vxoReference_Increment((vx_reference)tensor, VX_REF_INTERNAL);
+                            vxoTensor_ReleaseTensor((vx_tensor *)&((shOpertion->shaderExecutable->param[k])));
+                            shOpertion->shaderExecutable->param[k] = (vx_reference)tensor;
+                            break;
+                        }
+
+                    }
+                }
+
+                optLayer->operations[optLayer->base.num_operations] = copyOperation;
+                optLayer->operations[optLayer->base.num_operations]->gpuId = 0;
+                optLayer->operations[optLayer->base.num_operations]->mGpuSync = vx_true_e;
+                optLayer->operations[optLayer->base.num_operations]->absoluteOperationID = optLayer->base.num_operations;
+                optLayer->operations[optLayer->base.num_operations]->mGpuNext = VX_NULL;
+                optLayer->base.num_operations++;
+            }
+        }
+    }
+    return VX_SUCCESS;
+}
+
+
+VX_INTERNAL_API vx_status vxoGraph_releaseShaderCopyOperation(
+    vxnne_execution_layer         shaderCopyLayer
+    )
+{
+    vx_uint32 k = 0;
+    for (k = 0; k < shaderCopyLayer->base.num_operations; k++)
+    {
+        vxnne_operation operation = shaderCopyLayer->operations[k];
+        operation->layer->deinitialize(operation->layer);
+        gcoOS_Free(gcvNULL, operation->layer);
+    }
+    return VX_SUCCESS;
+}
+
+
+VX_INTERNAL_API vx_tensor vxoTensor_CreateTensorFromWB(vx_graph graph, vx_weights_biases_parameter wb, vx_uint32 kernelCacheSize)
+{
+#define FULLCACHE_KERNEL_INTERLEAVE_SIZE_BYTE 64
+    vx_tensor tensor = VX_NULL;
+    vx_context context = wb->base.context;
+    vx_uint32 sizes = kernelCacheSize;
+    vx_tensor_create_params_t tensor_create_params;
+
+    gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+    tensor_create_params.num_of_dims = 1;
+    tensor_create_params.sizes = &sizes;
+    tensor_create_params.data_format = VX_TYPE_UINT8;
+    tensor_create_params.quant_format = VX_QUANT_NONE;
+
+    tensor = vxoTensor_CreateTensor(context, graph, &tensor_create_params, vx_false_e);
+    if (tensor == VX_NULL)
+    {
+        vxError("vxoTensor_CreateTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
+        vxmASSERT(0);
+    }
+
+    if(WB_IS_TP_COMPRESS(wb))
+    {
+        TENSOR_LOGICAL_ADDR(tensor) = WB_MEM_LOGICAL_BASE_ADDR(wb);
+        TENSOR_PHYSICAL_ADDR(tensor) = WB_MEM_PHYSICAL_BASE_ADDR(wb);
+    }
+    else
+    {
+        if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FULLCACHE_KERNEL_INTERLEAVE_FIX))
+        {
+            TENSOR_LOGICAL_ADDR(tensor) = (WB_MEM_LOGICAL_BASE_ADDR(wb) + 64);
+            TENSOR_PHYSICAL_ADDR(tensor) = (WB_MEM_PHYSICAL_BASE_ADDR(wb) + 64);
+        }
+        else
+        {
+            vx_uint32 coreIndex = 0;
+            vx_uint8* kernelStreamPtr = WB_MEM_LOGICAL_BASE_ADDR(wb);
+            vx_uint32 nnCoreCount = (WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_INT16) ?
+                      context->nnConfig.fixedFeature.nnCoreCountInt16 : (WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_FLOAT16) ?
+                      context->nnConfig.fixedFeature.nnCoreCountFloat16 : (WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_BFLOAT16) ?
+                      context->nnConfig.fixedFeature.nnCoreCountBFloat16 :context->nnConfig.fixedFeature.nnCoreCount;
+
+            vx_uint32 usedCoreCount      = TENSOR_VIEW_SIZE_INDEX(wb->weight_tensor, 3) > nnCoreCount ? nnCoreCount : TENSOR_VIEW_SIZE_INDEX(wb->weight_tensor, 3);
+            vx_uint32* bitstreamSize     = VX_NULL;
+            vx_uint32  totalSize     = 0, maxSize = 0;
+            vx_uint32  interleaveCount   = 0, interleaveIndex = 0;
+            vx_uint32  cacheOffestBytes  = 0;
+            vx_uint8*  interleaveKernel  = VX_NULL;
+            vx_memory_s memory;
+
+            gcoOS_MemCopy(&memory, &(tensor->tensorBuffer->memory), sizeof(vx_memory_s));
+
+            bitstreamSize = (vx_uint32*)vxAllocateAndZeroMemory(sizeof(vx_uint32) * nnCoreCount);
+
+            for (coreIndex = 0; coreIndex < nnCoreCount; coreIndex++)
+            {
+                bitstreamSize[coreIndex] = gcmALIGN_NP2((*(vx_uint32 *)(kernelStreamPtr + 28 + coreIndex * sizeof(vx_uint32))) / 8, 64);
+                if(coreIndex >= usedCoreCount)
+                    vxmASSERT(bitstreamSize[coreIndex] == 0);
+                totalSize += bitstreamSize[coreIndex];
+                maxSize = gcmMAX(maxSize, bitstreamSize[coreIndex]);
+            }
+            vxmASSERT(maxSize % 64 == 0 && maxSize * usedCoreCount == sizes);
+            interleaveCount = gcmALIGN_NP2(maxSize, 64) / 64;
+
+            gcoVX_AllocateMemory(sizes, (gctPOINTER*)&memory.logicals[0],
+                            &memory.physicals[0],
+                            &memory.nodePtrs[0]);
+            gcoOS_ZeroMemory(memory.logicals[0], sizes);
+            interleaveKernel = (vx_uint8*)memory.logicals[0];
+
+            kernelStreamPtr += 64;
+
+            for(interleaveIndex = 0; interleaveIndex < interleaveCount; ++interleaveIndex)
+            {
+                vx_uint32 coreOffsetBytes = 0;
+                for (coreIndex = 0; coreIndex < usedCoreCount; coreIndex++)
+                {
+                    coreOffsetBytes += coreIndex == 0 ? 0 : bitstreamSize[coreIndex - 1];
+
+                    if(interleaveIndex * FULLCACHE_KERNEL_INTERLEAVE_SIZE_BYTE < bitstreamSize[coreIndex] && bitstreamSize[coreIndex] > 0)
+                    {
+
+                        gcoOS_MemCopy(interleaveKernel + cacheOffestBytes, kernelStreamPtr + coreOffsetBytes + interleaveIndex * FULLCACHE_KERNEL_INTERLEAVE_SIZE_BYTE, FULLCACHE_KERNEL_INTERLEAVE_SIZE_BYTE);
+                    }
+                    cacheOffestBytes += FULLCACHE_KERNEL_INTERLEAVE_SIZE_BYTE;
+                }
+            }
+
+            /*gcoOS_CacheFlush(gcvNULL, memory.nodePtrs[0], memory.logicals[0], sizes);*/
+
+            vxoMemory_Free(wb->base.context, &tensor->tensorBuffer->memory);
+            tensor->tensorBuffer->memory = memory;
+            tensor->tensorBuffer->memory.allocated = vx_true_e;
+            gcoOS_Free(gcvNULL, bitstreamSize);
+
+        }
+    }
+
+    tensor->tensorBuffer->memory.allocated = vx_true_e;
+
+    return tensor;
+
+}
+VX_INTERNAL_API vx_tensor vxoTensor_CreateTensorFromCache(vx_graph graph, vx_uint32* sizes, vx_uint32 dimCount, vx_uint32 startAddress, vx_enum dataFormat)
+{
+    vx_tensor tensor = VX_NULL;
+    vx_context context = graph->base.context;
+    vx_tensor_create_params_t tensor_create_params;
+
+    gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+    tensor_create_params.num_of_dims = dimCount;
+    tensor_create_params.sizes = sizes;
+    tensor_create_params.data_format = dataFormat;
+    tensor_create_params.quant_format = VX_QUANT_NONE;
+
+    tensor = vxoTensor_CreateTensor(context, graph, &tensor_create_params, vx_false_e);
+    if (tensor == VX_NULL)
+    {
+        vxError("vxoTensor_CreateTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
+        vxmASSERT(0);
+    }
+
+    TENSOR_PHYSICAL_ADDR(tensor) = startAddress;
+    tensor->tensorBuffer->memory.allocated = vx_true_e;
+
+    return tensor;
+}
+
+VX_INTERNAL_API vx_status shaderCopyLayer(vx_node node, vx_tensor input, vx_tensor output, vxnne_tensor_copy copyKernelLayer)
+{
+    vx_status status = VX_SUCCESS;
+    vx_uint32  batchCount =  1;
+    /* vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);*/
+    vxnne_tensor_copy  copyNode = (vxnne_tensor_copy)copyKernelLayer;
+    vx_context context = vxGetContext((vx_reference)&node->base);
+    vxnne_shader_executable shaderExecutable = VX_NULL;
+
+
+    copyNode->base.temp_tensors[0] = TENSOR_MEMORY_SHARED(input) == vx_true_e ? input : VX_NULL;
+    copyNode->base.temp_tensors[1] = TENSOR_MEMORY_SHARED(output) == vx_true_e ? output : VX_NULL;
+    copyNode->base.num_temp_tensors = 2;
+
+    if (input && output)
+        shaderExecutable = vxnneTensorCopyShaderExecutable(context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input, output);
+
+    if (!shaderExecutable)
+    {
+        status = VX_FAILURE;
+        goto OnError;
+    }
+
+    vxmONERROR(vxnneShaderOperation_Initialize(&copyNode->tensor_copy_sh_operation,
+        &copyNode->base,
+        VXNNE_OPERATOR_CONVERT_FORMAT,
+        batchCount, /*batchCount is 1 after reshape tensor object*/
+        shaderExecutable));
+
+    vxmONERROR(vxnneOperation_AddReference(&copyNode->tensor_copy_sh_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&copyNode->tensor_copy_sh_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    vxmONERROR(vxnneLayer_SetOperation(&copyNode->base, &copyNode->tensor_copy_sh_operation.base, 0));
+
+
+    return VX_SUCCESS;
+
+OnError:
+    vxmASSERT(0);
+    return VX_SUCCESS;
+}
+
+vx_status InitshaderCopyOperation(
+    vx_graph                graph,
+    vxnne_block             block)
+{
+    vx_uint32 i = 0, j = 0;
+    for (j = 0; j < block->segmentNum; j++)
+    {
+
+        for(i = block->segments[j]->start; i < block->segments[j]->start + block->segments[j]->count; i++)
+        {
+            vxnne_operation operation = graph->layer->operations[i];
+
+            if(operation->layer->node->kernelAttributes.isSetKernelVIP)
+            {
+                if(operation->target == VXNNE_OPERATION_TARGET_NN)
+                {
+                    vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)operation;
+                    vx_weights_biases_parameter weights_biases = VX_NULL;
+
+                    if(block->segments[j]->type == VXNNE_SEGMENT_TYPE_TILING)
+                        weights_biases = convOperation->swtWeightBiases;
+                    else if(block->segments[j]->type == VXNNE_SEGMENT_TYPE_AB)
+                        weights_biases = convOperation->weights_biases;
+
+                    vxoGraph_addShaderCopyKernelOperation(graph, operation->layer->node, graph->shaderCopyLayer, weights_biases, operation);
+
+                    if(operation->parameter.kernelPreLoad.size)
+                    {
+                        operation->kernelCacheSize = operation->parameter.kernelPreLoad.size;
+                        operation->kernelCacheStart = operation->parameter.kernelPreLoad.physical;
+                        operation->kernelCacheMode = VXNNE_SRAM_CACHE_MODE_STREAM_CACHE;
+                    }
+                }
+                else if(operation->target == VXNNE_OPERATION_TARGET_TP && operation->operatorType == VXNNE_OPERATOR_FULLYCONNECTED)
+                {
+                    vx_weights_biases_parameter weights_biases = VX_NULL;
+                    if(operation->parameter.other_ref)
+                    {
+                        weights_biases = (vx_weights_biases_parameter)(operation->parameter.other_ref);
+                        vxoGraph_addShaderCopyKernelOperation(graph, operation->layer->node, graph->shaderCopyLayer, weights_biases, operation);
+                        if(operation->parameter.kernelPreLoad.size)
+                        {
+                            operation->kernelCacheSize = operation->parameter.kernelPreLoad.size;
+                            operation->kernelCacheStart = operation->parameter.kernelPreLoad.physical;
+                            operation->kernelCacheMode = VXNNE_SRAM_CACHE_MODE_STREAM_CACHE;
+                        }
+                    }
+
+                }
+            }
+        }
+    }
+
+    return VX_SUCCESS;
+}
+
+vx_uint32 vxo_getMaxShaderCopyTensorCount(vx_graph graph)
+{
+    vx_uint32 i = 0, j = 0;
+    vx_uint32 maxCount = 0;
+
+    for (i = 0; i < graph->nodeCount; i++)
+    {
+        vx_node node = graph->nodeTable[i];
+
+        if(node->kernelAttributes.isSetKernelVIP)
+        {
+            for(j = 0; j < node->kernel->signature.paramCount; ++j)
+            {
+                if(node->paramTable[j] !=VX_NULL && vxoReference_GetType(node->paramTable[j]) == VX_TYPE_TENSOR && TENSOR_DATA_LIFETIME((vx_tensor)node->paramTable[j]) == VX_TENSOR_LIFE_TIME_STATIC)
+                {
+                    maxCount++;
+                }
+            }
+        }
+    }
+    return maxCount;
+}
+
+vx_uint32 getTPCoreCount(vx_context context, vx_enum tpType)
+{
+    vx_uint32 core = 0;
+
+    /*BF16 FC cannot support tpLite core*/
+    if(tpType == TP_SINGLE_FC)
+    {
+        if((gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16) &&  gcoHAL_IsFeatureAvailable(gcvNULL, gcFEATURE_BIT_TPLITE_BFLOAT16)) ||
+            (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16) && !gcoHAL_IsFeatureAvailable(gcvNULL, gcFEATURE_BIT_TPLITE_BFLOAT16)))
+        {
+            core = context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
+        }
+        else
+        {
+            core = context->nnConfig.fixedFeature.tpCoreCount;
+        }
+    }
+    else
+    {
+        core = context->nnConfig.fixedFeature.tpCoreCount;
+    }
+
+    return core;
+}
+vx_status getClampMaxAndMin(vx_enum operationType, vx_merge_param_s mergedParam, vx_float32 alphaScale, vx_float32 outScale, vx_uint32 *clampMin, vx_uint32 *clampMax)
+{
+    vx_status status = VX_SUCCESS;
+    vx_int32 QMinInt = 0;
+    vx_int32 QMaxInt = 0;
+    vx_float32 minFloat = 0;
+    vx_float32 maxFloat = 0;
+
+    if (clampMin == NULL && clampMax == VX_NULL) return status;
+
+
+    if (mergedParam.internalDataType[0] == VX_TYPE_UINT8)
+    {
+        QMinInt = (0 - mergedParam.internalZp[0]);
+        QMaxInt = (255 - mergedParam.internalZp[0]);
+    }
+    else if (mergedParam.internalDataType[0] == VX_TYPE_INT8)
+    {
+        QMinInt = (-128 - mergedParam.internalZp[0]);
+        QMaxInt = (127 - mergedParam.internalZp[0]);
+    }
+    else
+    {
+        vxError("ERROR: unsupported dataType in %s\n", __FUNCTION__);
+        vxmASSERT(0);
+    }
+
+    switch (operationType)
+    {
+        case VX_NN_CONV_PRELU:
+        {
+            minFloat = (QMinInt * mergedParam.internalScale[0] / outScale / alphaScale);
+            *clampMin = *(vx_uint32 *)&(minFloat);
+
+            maxFloat = (QMaxInt * mergedParam.internalScale[0] / outScale);
+            *clampMax = *(vx_uint32 *)&(maxFloat);
+
+                break;
+        }
+        case VX_NN_CONV_LEAKYRELU:
+        {
+            minFloat = (QMinInt * mergedParam.internalScale[0] *alphaScale / outScale);
+            *clampMin = *(vx_uint32 *)&(minFloat);
+
+            maxFloat = (QMaxInt * mergedParam.internalScale[0] / outScale);
+            *clampMax = *(vx_uint32 *)&(maxFloat);
+
+            break;
+        }
+        default:
+            vxmASSERT(0);
+            break;
+    }
+    return status;
+}
+
 /** Map data type to gpu internal dtype. */
 vx_sh_kernel_type_e getSHKernelType
     (
@@ -6058,5 +7350,35 @@ vx_bool IsTPSupport_CheckOutPixel(vx_context context, vx_tensor inputs, vx_tenso
     support = support && ((outputsWidth * outputsHeight * outputsDepth * outputsBatch) > 1);
 
     return support;
+}
+
+
+vx_uint32 gcd(vx_uint32 a, vx_uint32 b)
+{
+    /*greatest common diviser*/
+    return b == 0 ? a : gcd(b, a%b);
+}
+
+vx_status DoAlignForM(
+        vxnne_execution_layer   layer,
+        vx_uint32               start,
+        vx_uint32               count,
+        vx_uint32*              M
+        )
+{
+    vx_uint32 i = start;
+    vxnne_operation_info_s opInfo;
+    vx_uint32 alignM = 1;
+    for(i = 0; i < count; ++i)
+    {
+        vxnneOperation_GetInfo(layer->operations[start + i], &opInfo);
+
+        if(layer->operations[start + i]->operatorType == VXNNE_OPERATOR_UPSAMPLE)
+            alignM = alignM * opInfo.dilationY / gcd(opInfo.dilationY, alignM);
+    }
+
+    *M = *M / alignM * alignM;
+
+    return VX_SUCCESS;
 }
 

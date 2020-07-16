@@ -263,7 +263,6 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint
     return status;
 }
 #endif
-
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorDiv_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
@@ -413,7 +412,6 @@ exit:
     if (tensor_div_layer)
         gcoOS_Free(NULL, (gctPOINTER)tensor_div_layer);
 #endif
-
     return status;
 }
 

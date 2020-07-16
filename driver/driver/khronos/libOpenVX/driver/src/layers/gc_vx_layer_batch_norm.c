@@ -162,6 +162,7 @@ vx_status vxnneExecuteSWBatchNormalization(struct _vxnne_operation_s *operation)
     return status;
 }
 
+
 #if REGISTER_FRAME
 VX_PRIVATE_API vx_status vxoNNBatchNormalizationLayer_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
 {

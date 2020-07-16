@@ -447,7 +447,7 @@ VX_PRIVATE_API vx_status vxoNNTensorMean_SH_EVIS_Initialize_Ext(vxnne_layer ops_
                     break;
             }
 
-            input = vxoTensor_ReshapeTensor((vx_tensor)parameters[0], (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+            input = vxoTensor_ReshapeTensor((vx_tensor)parameters[0], (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims, VX_NULL);
 
             for (i = 0; i < reshpTensor_Dims; i++)
             {
@@ -724,7 +724,7 @@ VX_PRIVATE_API vx_status vxoNNTensorMean_SH_EVIS_Initialize_Ext(vxnne_layer ops_
         sizes[1] = 1;
         sizes[2] = new_sizes[2];
         sizes[3] = new_sizes[3];
-        dst = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, output_dims);
+        dst = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, output_dims, VX_NULL);
 
         tensor_mean_layer->base.temp_tensors[tmpTensorIndex++] = dst;
     }
@@ -737,7 +737,7 @@ VX_PRIVATE_API vx_status vxoNNTensorMean_SH_EVIS_Initialize_Ext(vxnne_layer ops_
         sizes[2] = new_sizes[2];
         sizes[3] = new_sizes[3];
         sizes[input_axis] = 1;
-        dst = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, output_dims);
+        dst = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, output_dims, VX_NULL);
 
         tensor_mean_layer->base.temp_tensors[tmpTensorIndex++] = dst;
     }
@@ -907,7 +907,7 @@ VX_PRIVATE_API vx_bool vxoNNTensorMean_SH_TP_Support(vx_node node, const vx_refe
     if (!support)return support;
 
     support = support && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP_TRANSPOSE) &&
-                            vxnneIsTPSupportFormat(node->base.context, input, VX_NULL, VX_NULL));
+                            vxnneIsTPSupportFormat(node->graph, input, VX_NULL, VX_NULL));
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
@@ -1053,7 +1053,7 @@ OnError:
                     break;
             }
 
-            input = vxoTensor_ReshapeTensor((vx_tensor)parameters[0], (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+            input = vxoTensor_ReshapeTensor((vx_tensor)parameters[0], (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims, VX_NULL);
 
             tensor_mean_layer->base.temp_tensors[tmpTensorIndex++] = input;
             tensor_mean_layer->base.num_temp_tensors = tmpTensorIndex;
@@ -1203,7 +1203,7 @@ OnError:
             tensor_mean_layer->base.temp_tensors[tmpTensorIndex++] = transTensor;
 
             if (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP_TRANSPOSE) &&
-                vxnneIsTPSupportFormat(context, input, VX_NULL, transTensor))
+                vxnneIsTPSupportFormat(node->graph, input, VX_NULL, transTensor))
             {
                 vx_op_param_s conv = {0};
                 vx_uint32 dnum = 4;
@@ -1302,16 +1302,16 @@ OnError:
                         batchCount,
                         shaderExecutable);
 
-                if (status != VX_SUCCESS)
-                    goto exit;
+                    if (status != VX_SUCCESS)
+                        goto exit;
 
-                vxnneOperation_AddReference(&tensor_mean_layer->tensor_mean_trans_sh_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT);
-                vxnneOperation_AddReference(&tensor_mean_layer->tensor_mean_trans_sh_operation.base, (vx_reference)transTensor, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+                    vxnneOperation_AddReference(&tensor_mean_layer->tensor_mean_trans_sh_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT);
+                    vxnneOperation_AddReference(&tensor_mean_layer->tensor_mean_trans_sh_operation.base, (vx_reference)transTensor, VXNNE_OPERATION_REFENRENCE_OUTPUT);
 
-                vxnneLayer_SetOperation(
-                        &tensor_mean_layer->base,
-                        &tensor_mean_layer->tensor_mean_trans_sh_operation.base,
-                        operationIdx++);
+                    vxnneLayer_SetOperation(
+                            &tensor_mean_layer->base,
+                            &tensor_mean_layer->tensor_mean_trans_sh_operation.base,
+                            operationIdx++);
                 }
                 else
                 {
@@ -1331,7 +1331,6 @@ OnError:
                     }
 
                     pnum_s = vxCreateScalar(context, VX_TYPE_UINT32, &pnum);
-
                     batchCount = new_sizes[3];
                     vxnneOperation_Initialize(&tensor_mean_layer->tensor_trans_sw_operation.base,
                                               &tensor_mean_layer->base,
@@ -1366,7 +1365,7 @@ OnError:
             sizes[1] = 1;
             sizes[2] = new_sizes[2];
             sizes[3] = new_sizes[3];
-            dst = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, output_dims);
+            dst = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, output_dims, VX_NULL);
 
             tensor_mean_layer->base.temp_tensors[tmpTensorIndex++] = dst;
         }
@@ -1379,7 +1378,7 @@ OnError:
             sizes[2] = new_sizes[2];
             sizes[3] = new_sizes[3];
             sizes[input_axis] = 1;
-            dst = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, output_dims);
+            dst = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, output_dims, VX_NULL);
 
             tensor_mean_layer->base.temp_tensors[tmpTensorIndex++] = dst;
         }

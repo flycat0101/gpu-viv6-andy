@@ -12,6 +12,7 @@
 
 
 #include <gc_vx_common.h>
+#include <gc_vx_nn_wb.h>
 #include <layers/gc_vx_layer_depthwise_conv.h>
 
 extern vx_status vxnneExecuteSWConvolution(vxnne_operation operation);
@@ -35,6 +36,9 @@ extern vx_status vxnneConvolutionReluPoolingInitializer(
     vx_uint32 pool_size_y,
     vx_enum padMode,
     vx_scalar padConst,
+    vx_array  internalScale,
+    vx_array  internalZp,
+    vx_array  internal_data_type,
     vx_tensor outputs
     );
 
@@ -259,6 +263,174 @@ VX_PRIVATE_API vx_status vxoNNSWDepthwiseConv_DilationWeight(vx_tensor weights, 
 
     return status;
 }
+
+VX_PRIVATE_API vx_tensor _mergeInputZeroPoint2Bias(vx_graph graph, vx_tensor input, vx_tensor weight, vx_tensor bias)
+{
+    vx_tensor new_bias = VX_NULL;
+    vx_tensor_create_params_t params;
+    vx_int32_ptr bias_base_ptr = VX_NULL;
+    vx_int32_ptr bias_base_prev_ptr = VX_NULL;
+    vx_uint8_ptr kernelDataPtr = VX_NULL;
+    vx_uint32 channelCount = TENSOR_VIEW_SIZE_INDEX(weight, 2);
+    vx_uint32 sizes[2] = {channelCount, 1};
+    vx_enum  weight_quant_format = TENSOR_QUANT_TYPE(weight);
+
+    gcoOS_MemFill(&params, 0, sizeof(vx_tensor_create_params_t));
+
+    params.num_of_dims = 2;
+    params.sizes = sizes;
+    params.data_format = TENSOR_DATA_TYPE(weight);
+    params.quant_format = weight_quant_format;
+    if (params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        params.quant_data.dfp.fixed_point_pos = TENSOR_POS(input) * TENSOR_POS(weight);
+        params.data_format = VX_TYPE_INT32;
+    }
+    else if (params.quant_format == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
+    {
+        params.quant_data.affinePerChannel.channelDim = 0;
+        params.quant_data.affinePerChannel.scaleCount = channelCount;
+        params.quant_data.affinePerChannel.zeroPointCount = channelCount;
+        params.quant_data.affinePerChannel.scales = (vx_float32 *)vxAllocateAndZeroMemory(channelCount * sizeof(vx_float32));
+        if (params.quant_data.affinePerChannel.scales == VX_NULL)
+        {
+            vxError("vxoTensor_Create: Out of memory");
+            goto OnError;
+        }
+
+        gcoOS_MemFill(params.quant_data.affinePerChannel.scales, 0, channelCount * sizeof(vx_float32));
+
+        params.quant_data.affinePerChannel.zeroPoint = (vx_int32 *)vxAllocateAndZeroMemory(channelCount * sizeof(vx_int32));
+        if (params.quant_data.affinePerChannel.zeroPoint == VX_NULL)
+        {
+            vxError("vxoTensor_Create: Out of memory");
+            goto OnError;
+        }
+
+        gcoOS_MemFill(params.quant_data.affinePerChannel.zeroPoint, 0, channelCount * sizeof(vx_int32));
+
+        params.data_format = VX_TYPE_INT32;
+    }
+    else
+    {
+        params.quant_data.affine.scale = TENSOR_TF_SCALE(input) * TENSOR_TF_SCALE(weight);
+        params.quant_data.affine.zeroPoint = 0;
+        params.data_format = VX_TYPE_INT32;
+    }
+
+    if (bias && params.quant_format == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
+    {
+        gcoOS_MemCopy(params.quant_data.affinePerChannel.scales, TENSOR_TF_SCALE_POINTER(bias), channelCount * sizeof(vx_float32));
+    }
+    else  if (params.quant_format == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
+    {
+        vx_uint32 i = 0;
+        vx_float32_ptr bias_scales = params.quant_data.affinePerChannel.scales;
+        vx_float32 input_scales = TENSOR_TF_SCALE(input);
+        vx_float32_ptr weight_scales = TENSOR_TF_SCALE_POINTER(weight);
+
+        for (i = 0; i < channelCount; i++)
+        {
+            bias_scales[i] = input_scales * weight_scales[i];
+        }
+    }
+
+    new_bias = vxoTensor_CreateTensor2(vxGetContext((vx_reference)graph), &params, sizeof(vx_tensor_create_params_t));
+    if (vxoTensor_AllocateMemory(new_bias) != VX_SUCCESS)
+    {
+        vxError("vxoTensor_AllocateMemory fail at function %s, line %d", __FUNCTION__, __LINE__);
+        goto OnError;
+    }
+
+    vxoTensor_GetTensorViewMemory(new_bias, (gctPOINTER*)&bias_base_ptr, VX_NULL);
+    vxoTensor_GetTensorViewMemory(weight, (gctPOINTER*)&kernelDataPtr, VX_NULL);
+
+    if (bias)
+    {
+        vxoTensor_GetTensorViewMemory(bias, (gctPOINTER*)&bias_base_prev_ptr, VX_NULL);
+        gcoOS_MemCopy(bias_base_ptr, bias_base_prev_ptr, channelCount * sizeof(vx_int32));
+    }
+
+    if (TENSOR_TF_ZEROPOINT(input) != 0)
+    {
+        vx_uint32 filterIndex   = 0;
+        vx_uint32 x             = 0;
+        vx_uint32 y             = 0;
+        vx_int32  weightZp      = 0;
+        vx_int32  input_zp      = TENSOR_TF_ZEROPOINT(input);
+        vx_uint32 weight_x      = TENSOR_VIEW_SIZE_INDEX(weight, 0);
+        vx_uint32 weight_y      = TENSOR_VIEW_SIZE_INDEX(weight, 1);
+        vx_enum   weight_format = TENSOR_DATA_TYPE(weight);
+        vx_uint32 weightSize    = (vx_uint32)vxDataType_GetSize((vx_type_e)weight_format);
+
+        for (filterIndex = 0; filterIndex < channelCount; filterIndex++)
+        {
+            if (weight_quant_format == VX_QUANT_AFFINE_SCALE)
+            {
+                weightZp = TENSOR_TF_ZEROPOINT(weight);
+            }
+
+            for (y = 0; y < weight_y; y++)
+            {
+                for (x = 0; x < weight_x; x++)
+                {
+                    vx_int32 weight = 0;
+
+                    if(weight_format == VX_TYPE_UINT8)
+                    {
+                        weight = *((vx_uint8 *)kernelDataPtr);
+                    }
+                    else if(weight_format == VX_TYPE_INT8)
+                    {
+                        weight = *((vx_int8 *)kernelDataPtr);
+                    }
+
+                    kernelDataPtr = kernelDataPtr + weightSize;
+
+                    /*Calc sum((coef[i] - coefZP) * InZP) */
+                    bias_base_ptr[filterIndex] -= (weight - weightZp) * input_zp;
+                }
+            }
+        }
+    }
+
+    if (params.quant_data.affinePerChannel.scales)
+    {
+        vxFree(params.quant_data.affinePerChannel.scales);
+        params.quant_data.affinePerChannel.scales = VX_NULL;
+    }
+
+    if (params.quant_data.affinePerChannel.zeroPoint != VX_NULL)
+    {
+        vxFree(params.quant_data.affinePerChannel.zeroPoint);
+        params.quant_data.affinePerChannel.zeroPoint = VX_NULL;
+    }
+
+    TENSOR_DATA_LIFETIME(new_bias) = VX_TENSOR_LIFE_TIME_STATIC;
+
+    return new_bias;
+
+OnError:
+    if (params.quant_data.affinePerChannel.scales)
+    {
+        vxFree(params.quant_data.affinePerChannel.scales);
+        params.quant_data.affinePerChannel.scales = VX_NULL;
+    }
+
+    if (params.quant_data.affinePerChannel.zeroPoint != VX_NULL)
+    {
+        vxFree(params.quant_data.affinePerChannel.zeroPoint);
+        params.quant_data.affinePerChannel.zeroPoint = VX_NULL;
+    }
+
+    if (new_bias)
+    {
+        vxoTensor_ReleaseTensor(&new_bias);
+    }
+
+    return VX_NULL;
+}
+
 #if REGISTER_FRAME
 
 VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
@@ -337,10 +509,12 @@ VX_PRIVATE_API vx_bool vxoNNDepthwiseConvLayer_SH_EVIS_Support_Ext(vx_node node,
 
     vx_enum  inputFormat = TENSOR_DATA_TYPE(inputs);
     vx_enum  weightFormat = TENSOR_DATA_TYPE(weights);
-    vx_enum  biasFormat = VX_TYPE_INT32;
+    vx_enum  biasFormat = VX_TYPE_INVALID;
     vx_enum  outputFormat = TENSOR_DATA_TYPE(outputs);
-    vx_bool  dataformat_flag[4] = { vx_false_e };
-
+    vx_bool  dataformat_flag[5] = { vx_false_e };
+    vx_bool  is_w_sym_per_channel_quant = (vx_bool)(TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL);
+    vx_bool  is_b_sym_per_channel_quant = biases == NULL? vx_false_e : (vx_bool)(TENSOR_QUANT_TYPE(biases) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL);
+    vx_bool  is_sym_per_channel_quant   = is_w_sym_per_channel_quant && is_b_sym_per_channel_quant;
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
     vx_scalar dilationX  = (vx_scalar)parameters[9];
     vx_scalar dilationY  = (vx_scalar)parameters[10];
@@ -355,10 +529,11 @@ VX_PRIVATE_API vx_bool vxoNNDepthwiseConvLayer_SH_EVIS_Support_Ext(vx_node node,
 
     if (evis)
     {
-        dataformat_flag[0] = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16);
+        dataformat_flag[0] = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && (biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_FLOAT32) && outputFormat == VX_TYPE_FLOAT16);
         dataformat_flag[3] = (vx_bool)(inputFormat == VX_TYPE_INT16 && weightFormat == VX_TYPE_INT16
-            && (biasFormat == VX_TYPE_INT32 || biasFormat == VX_TYPE_INT64)
+            && (biasFormat == VX_TYPE_INT32 || biasFormat == VX_TYPE_INT64 || biasFormat == VX_TYPE_INVALID)
             && outputFormat == VX_TYPE_INT16);
+        dataformat_flag[2] = (vx_bool)(inputFormat == VX_TYPE_INT8 && weightFormat == VX_TYPE_INT8 && (biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_INT32) && outputFormat == VX_TYPE_INT8);
         if ((biases == VX_NULL) && ((1 != dilation_x) || (1 != dilation_y)))
         {
             is_support_dilation = vx_false_e;
@@ -366,15 +541,14 @@ VX_PRIVATE_API vx_bool vxoNNDepthwiseConvLayer_SH_EVIS_Support_Ext(vx_node node,
     }
     else
     {
-        dataformat_flag[0] = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16) ||
-            (inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && biasFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16) ||
-            (inputFormat == VX_TYPE_FLOAT32 && weightFormat == VX_TYPE_FLOAT32 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32));
-        dataformat_flag[3] = (vx_bool)(inputFormat == VX_TYPE_INT16 && weightFormat == VX_TYPE_INT16 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT16);
+        dataformat_flag[0] = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && (biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_FLOAT32) && outputFormat == VX_TYPE_FLOAT16) ||
+            (inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && (biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_FLOAT16) && outputFormat == VX_TYPE_FLOAT16) ||
+            (inputFormat == VX_TYPE_FLOAT32 && weightFormat == VX_TYPE_FLOAT32 && (biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_FLOAT32) && outputFormat == VX_TYPE_FLOAT32));
     }
-    dataformat_flag[1] = (vx_bool)(inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_UINT8);
-    dataformat_flag[2] = (vx_bool)(inputFormat == VX_TYPE_INT8 && weightFormat == VX_TYPE_INT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT8);
+    dataformat_flag[4] = (vx_bool)(inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_INT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_UINT8 && is_sym_per_channel_quant);
+    dataformat_flag[1] = (vx_bool)(inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && (biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_INT32) && outputFormat == VX_TYPE_UINT8);
 
-    support = support && (vx_bool)((dataformat_flag[0] || dataformat_flag[1] || dataformat_flag[2] || dataformat_flag[3]) && biases);
+    support = support && (vx_bool)(dataformat_flag[0] || dataformat_flag[1] || dataformat_flag[2] || dataformat_flag[3] || dataformat_flag[4]);
     support = support && is_support_dilation;
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
@@ -400,6 +574,27 @@ VX_PRIVATE_API vx_bool vxoNNDepthwiseConvLayer_SH_EVIS_Support(vx_node node, con
     return support;
 }
 
+VX_PRIVATE_API vx_tensor _createTensorFromData(vx_graph graph, vx_tensor_create_params_t params, vx_uint8_ptr data)
+{
+    vx_tensor tensor = VX_NULL;
+    vx_uint8_ptr input_base_ptr = VX_NULL;
+    vx_uint32 tensor_size = 0;
+
+    tensor = vxoTensor_CreateTensor2(vxGetContext((vx_reference)graph), &params, sizeof(vx_tensor_create_params_t));
+    if (vxoTensor_AllocateMemory(tensor) != VX_SUCCESS)
+    {
+        vxError("vxoTensor_AllocateMemory fail at function %s, line %d", __FUNCTION__, __LINE__);
+        return VX_NULL;
+    }
+
+    vxoTensor_GetTensorSize(tensor, &tensor_size);
+
+    input_base_ptr = TENSOR_LOGICAL_ADDR(tensor);
+    memcpy(input_base_ptr, data, tensor_size);
+
+    return tensor;
+}
+
 VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_EVIS_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
 {
     vx_status status = VX_SUCCESS;
@@ -423,24 +618,25 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_EVIS_Initialize(vxnne_layer 
 
     vx_uint32  batchCount = TENSOR_SIZE_INDEX(inputs, 3);
 
-    /*vx_enum  biasFormat = VX_TYPE_INT32;*/
+    /*vx_enum  biasFormat = VX_TYPE_INVALID;*/
     vx_uint32  operation_idx = 0;
     vx_int32   strideXvalue  = 0;
     vx_int32   strideYvalue  = 0;
     vxnne_shader_executable shaderExecutable = NULL;
     vx_tensor               newBiases = NULL;
     vx_tensor               tensorCopy = NULL;
-    vx_uint32     input_width = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
-    vx_uint32     input_height = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
-    vx_uint32     output_width = TENSOR_VIEW_SIZE_INDEX(outputs, 0);
+    vx_uint32     input_width   = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
+    vx_uint32     input_height  = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
+    vx_uint32     output_width  = TENSOR_VIEW_SIZE_INDEX(outputs, 0);
     vx_uint32     output_height = TENSOR_VIEW_SIZE_INDEX(outputs, 1);
-    vx_int32      kernel_width = TENSOR_VIEW_SIZE_INDEX(weights, 0);
+    vx_int32      kernel_width  = TENSOR_VIEW_SIZE_INDEX(weights, 0);
     vx_int32      kernel_height = TENSOR_VIEW_SIZE_INDEX(weights, 1);
-    vx_int32      padLeftv = padXLeft->value->n32;
-    vx_int32      padRightv = padXRight->value->n32;
-    vx_int32      padTopv = padYTop->value->n32;
-    vx_int32      padBottomv = padYBottom->value->n32;
-
+    vx_int32      padLeftv      = padXLeft->value->n32;
+    vx_int32      padRightv     = padXRight->value->n32;
+    vx_int32      padTopv       = padYTop->value->n32;
+    vx_int32      padBottomv    = padYBottom->value->n32;
+    vx_tensor     scales        = NULL;
+    vx_uint32     numTmpTensor  = 0;
 
     if (strideX)
     {
@@ -474,33 +670,107 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_EVIS_Initialize(vxnne_layer 
         }
     }
 
+    if (TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
+    {
+        vx_tensor_create_params_t params;
+        vx_enum        input_quant      = TENSOR_QUANT_TYPE(inputs);
+        vx_uint32      channelCount     = TENSOR_TF_SCALE_COUNT(weights);
+        vx_uint32      sizes[2]         = {channelCount, 1};
+        vx_float32_ptr scales_data_ptr  = VX_NULL;
+        vx_enum        ouput_quant_type = TENSOR_QUANT_TYPE(outputs);
+        vx_float32     input_scales     = 1;
+        vx_uint32      idx              = 0;
+
+        if (input_quant == VX_QUANT_AFFINE_SCALE)
+            input_scales = TENSOR_TF_SCALE(inputs);
+
+        scales_data_ptr = (vx_float32 *)vxAllocateAndZeroMemory(channelCount * sizeof(vx_float32));
+        if (scales_data_ptr == VX_NULL)
+        {
+            status = VX_ERROR_NO_MEMORY;
+            vxError("allocate memory fail at function %s line %d", __FUNCTION__, __LINE__);
+            goto OnError;
+        }
+        gcoOS_MemCopy(scales_data_ptr, TENSOR_TF_SCALE_POINTER(weights), channelCount * sizeof(vx_float32));
+
+        for (idx = 0; idx < channelCount; idx++)
+        {
+            scales_data_ptr[idx] *= input_scales;
+            if (ouput_quant_type == VX_QUANT_AFFINE_SCALE)
+                scales_data_ptr[idx] /= TENSOR_TF_SCALE(outputs);
+        }
+
+        gcoOS_MemFill(&params, 0, sizeof(vx_tensor_create_params_t));
+
+        params.num_of_dims = 2;
+        params.sizes = sizes;
+        params.data_format = VX_TYPE_FLOAT32;
+
+        scales = _createTensorFromData(ops_layer->node->graph, params, (vx_uint8_ptr)scales_data_ptr);
+        depthwiseConvolutionLayer->base.temp_tensors[numTmpTensor++] = scales;
+        if (scales_data_ptr)
+        {
+            vxFree(scales_data_ptr);
+            scales_data_ptr = VX_NULL;
+        }
+    }
+
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
     newBiases = biases;
     tensorCopy = inputs;
-    shaderExecutable = vxnneGetDepthwiseConvShaderExecutable(ops_layer->node->base.context,
-        VXNNE_KERNEL_DEPTHWISE_CONV,
-        &ops_layer->node->kernelAttributes.borderMode,
-        tensorCopy,
-        weights,
-        newBiases,
-        padXLeft,
-        padXRight,
-        padYTop,
-        padYBottom,
-        VX_PAD_CONSTANT,
-        VX_NULL,
-        dilationX,
-        dilationY,
-        depth_multiplier,
-        VX_NULL,
-        VX_NULL,
-        VX_NULL,
-        VX_NULL,
-        downScaleSizeRounding,
-        strideXvalue,
-        strideYvalue,
-        outputs);
+    if (newBiases)
+    {
+        shaderExecutable = vxnneGetDepthwiseConvShaderExecutable(ops_layer->node->base.context,
+            VXNNE_KERNEL_DEPTHWISE_CONV,
+            &ops_layer->node->kernelAttributes.borderMode,
+            tensorCopy,
+            weights,
+            newBiases,
+            padXLeft,
+            padXRight,
+            padYTop,
+            padYBottom,
+            VX_PAD_CONSTANT,
+            VX_NULL,
+            dilationX,
+            dilationY,
+            depth_multiplier,
+            VX_NULL,
+            VX_NULL,
+            VX_NULL,
+            VX_NULL,
+            downScaleSizeRounding,
+            strideXvalue,
+            strideYvalue,
+            scales,
+            outputs);
+     }
+     else
+     {
+         shaderExecutable = vxnneGetDepthwiseConvNoBiasShaderExecutable(ops_layer->node->base.context,
+            VXNNE_KERNEL_DEPTHWISE_CONV,
+            &ops_layer->node->kernelAttributes.borderMode,
+            tensorCopy,
+            weights,
+            padXLeft,
+            padXRight,
+            padYTop,
+            padYBottom,
+            VX_PAD_CONSTANT,
+            VX_NULL,
+            dilationX,
+            dilationY,
+            depth_multiplier,
+            VX_NULL,
+            VX_NULL,
+            VX_NULL,
+            VX_NULL,
+            downScaleSizeRounding,
+            strideXvalue,
+            strideYvalue,
+            outputs);
+     }
 
     if (!shaderExecutable)
     {
@@ -522,7 +792,10 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_EVIS_Initialize(vxnne_layer 
 
     vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->depthwise_convolution_sh_operation.base, (vx_reference)tensorCopy, VXNNE_OPERATION_REFENRENCE_INPUT));
     vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->depthwise_convolution_sh_operation.base, (vx_reference)weights, VXNNE_OPERATION_REFENRENCE_INPUT));
-    vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->depthwise_convolution_sh_operation.base, (vx_reference)newBiases, VXNNE_OPERATION_REFENRENCE_INPUT));
+    if (newBiases)
+    {
+        vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->depthwise_convolution_sh_operation.base, (vx_reference)newBiases, VXNNE_OPERATION_REFENRENCE_INPUT));
+    }
     vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->depthwise_convolution_sh_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
 
     vxmONERROR(vxnneLayer_SetOperation(
@@ -568,7 +841,7 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_Initialize(vxnne_layer ops_l
     vx_scalar depth_multiplier = (vx_scalar)parameters[13];
     vx_scalar downScaleSizeRounding = (vx_scalar)parameters[18];
     vx_tensor outputs = (vx_tensor)parameters[19];
-
+    vx_tensor scales  = NULL;
     vx_enum  inputFormat = TENSOR_DATA_TYPE(inputs);
     /*vx_enum  biasFormat = VX_TYPE_INT32;*/
     vx_context context = vxGetContext((vx_reference)inputs);
@@ -581,7 +854,6 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_Initialize(vxnne_layer ops_l
     vxnne_shader_executable shaderExecutable = NULL;
     vx_tensor               newBiases = NULL;
     vx_tensor               tensorCopy = NULL;
-
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
@@ -636,6 +908,51 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_Initialize(vxnne_layer ops_l
             else
             {
                 strideYvalue = vxoNNExternsionConvlutionRound((vx_float32)(input_height + padTopv + padBottomv - kernel_height) / (output_height - 1), downScaleSizeRounding->value->e);
+            }
+        }
+
+        if (TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
+        {
+            vx_tensor_create_params_t params;
+            vx_enum        input_quant      = TENSOR_QUANT_TYPE(inputs);
+            vx_uint32      channelCount     = TENSOR_TF_SCALE_COUNT(weights);
+            vx_uint32      sizes[2]         = {channelCount, 1};
+            vx_float32_ptr scales_data_ptr  = VX_NULL;
+            vx_enum        ouput_quant_type = TENSOR_QUANT_TYPE(outputs);
+            vx_float32     input_scales     = 1;
+            vx_uint32      idx              = 0;
+
+            if (input_quant == VX_QUANT_AFFINE_SCALE)
+                input_scales = TENSOR_TF_SCALE(inputs);
+
+            scales_data_ptr = (vx_float32 *)vxAllocateAndZeroMemory(channelCount * sizeof(vx_float32));
+            if (scales_data_ptr == VX_NULL)
+            {
+                status = VX_ERROR_NO_MEMORY;
+                vxError("allocate memory fail at function %s line %d", __FUNCTION__, __LINE__);
+                goto OnError;
+            }
+            gcoOS_MemCopy(scales_data_ptr, TENSOR_TF_SCALE_POINTER(weights), channelCount * sizeof(vx_float32));
+
+            for (idx = 0; idx < channelCount; idx++)
+            {
+                scales_data_ptr[idx] *= input_scales;
+                if (ouput_quant_type == VX_QUANT_AFFINE_SCALE)
+                    scales_data_ptr[idx] /= TENSOR_TF_SCALE(outputs);
+            }
+
+            gcoOS_MemFill(&params, 0, sizeof(vx_tensor_create_params_t));
+
+            params.num_of_dims = 2;
+            params.sizes = sizes;
+            params.data_format = VX_TYPE_FLOAT32;
+
+            scales = _createTensorFromData(ops_layer->node->graph, params, (vx_uint8_ptr)scales_data_ptr);
+            depthwiseConvolutionLayer->base.temp_tensors[numTmpTensor++] = scales;
+            if (scales_data_ptr)
+            {
+                vxFree(scales_data_ptr);
+                scales_data_ptr = VX_NULL;
             }
         }
 
@@ -744,93 +1061,9 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_Initialize(vxnne_layer ops_l
 
         if (enable_adjust_biases)
         {
-            vx_tensor_create_params_t params;
-            gctPOINTER weightsLogical = VX_NULL;
-            gctPOINTER biasesLogical = VX_NULL;
-            gctPOINTER newBiasesLogical = VX_NULL;
-            vx_uint32  i = 0;
-            vx_uint32  j = 0;
-            vx_uint32  sizes[4] = { 1, 1, 1, 1 };
-            vx_uint32  ifm = kernel_width * kernel_height;
-            if (biases != VX_NULL)
-            {
-                vx_uint32  ofm = TENSOR_VIEW_SIZE_INDEX(biases, 0);
-                sizes[0] = TENSOR_VIEW_SIZE_INDEX(biases, 0);
-                sizes[1] = 1;
-                gcoOS_MemFill(&params, 0, sizeof(vx_tensor_create_params_t));
-                params.num_of_dims = TENSOR_DIM_NUM(biases);
-                params.sizes = sizes;
-                params.data_format = TENSOR_DATA_TYPE(biases);
-                params.quant_format = TENSOR_QUANT_TYPE(biases);
-                if (params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
-                {
-                    params.quant_data.dfp.fixed_point_pos = TENSOR_POS(biases);
-                }
-                else
-                {
-                    params.quant_data.affine.scale = TENSOR_TF_SCALE(biases);
-                }
-                newBiases = vxoTensor_CreateTensor(context, NULL, &params, vx_false_e);
-                if (newBiases == VX_NULL || vxoTensor_AllocateMemory(newBiases) != VX_SUCCESS)
-                {
-                    vxError("vxoTensor_CreateTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
-                    status = VX_ERROR_NO_MEMORY;
-                    goto OnError;
-                }
-                TENSOR_DATA_LIFETIME(newBiases) = VX_TENSOR_LIFE_TIME_STATIC;
-                vxmONERROR(vxoTensor_GetTensorViewMemory(weights, &weightsLogical, VX_NULL));
-                vxmONERROR(vxoTensor_GetTensorViewMemory(biases, &biasesLogical, VX_NULL));
-                vxmONERROR(vxoTensor_GetTensorViewMemory(newBiases, &newBiasesLogical, VX_NULL));
-                for (j = 0; j < ofm; j++)
-                {
-                    vx_int32 offset = 0;
-                    vx_int32 dstVal = 0;
-                    for (i = 0; i < ifm; i++)
-                    {
-                        vx_uint32 idx = j * ifm + i;
-                        offset = offset - (((vx_uint8*)weightsLogical)[idx] - TENSOR_TF_ZEROPOINT(weights)) * TENSOR_TF_ZEROPOINT(inputs);
-                    }
-                    dstVal = ((vx_int32*)biasesLogical)[j] + offset;
-                    ((vx_int32*)newBiasesLogical)[j] = dstVal;
-                }
-                depthwiseConvolutionLayer->base.temp_tensors[numTmpTensor++] = newBiases;
-                depthwiseConvolutionLayer->base.num_temp_tensors = numTmpTensor;
-            }
-            else
-            {
-                vx_uint32  ofm = TENSOR_VIEW_SIZE_INDEX(weights, 2);
-                sizes[0] = TENSOR_VIEW_SIZE_INDEX(weights, 2);
-                sizes[1] = 1;
-                gcoOS_MemFill(&params, 0, sizeof(vx_tensor_create_params_t));
-                params.num_of_dims = 2;
-                params.sizes = sizes;
-                params.data_format = VX_TYPE_INT32;
-                params.quant_format = VX_QUANT_AFFINE_SCALE;
-                params.quant_data.affine.scale = TENSOR_TF_SCALE(weights) * TENSOR_TF_SCALE(inputs);
-                params.quant_data.affine.zeroPoint = 0;
-                newBiases = vxoTensor_CreateTensor(context, NULL, &params, vx_false_e);
-                if (newBiases == VX_NULL || vxoTensor_AllocateMemory(newBiases) != VX_SUCCESS)
-                {
-                    vxError("vxoTensor_CreateTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
-                    status = VX_ERROR_NO_MEMORY;
-                    goto OnError;
-                }
-                TENSOR_DATA_LIFETIME(newBiases) = VX_TENSOR_LIFE_TIME_STATIC;
-                vxmONERROR(vxoTensor_GetTensorViewMemory(weights, &weightsLogical, VX_NULL));
-                vxmONERROR(vxoTensor_GetTensorViewMemory(newBiases, &newBiasesLogical, VX_NULL));
-                for (j = 0; j < ofm; j++)
-                {
-                    vx_int32 offset = 0;
-                    for (i = 0; i < ifm; i++)
-                    {
-                        vx_uint32 idx = j * ifm + i;
-                        offset = offset - (((vx_uint8*)weightsLogical)[idx] - TENSOR_TF_ZEROPOINT(weights)) * TENSOR_TF_ZEROPOINT(inputs);
-                    }
-                    ((vx_int32*)newBiasesLogical)[j] = offset;
-                }
-                depthwiseConvolutionLayer->base.temp_tensors[numTmpTensor++] = newBiases;
-                depthwiseConvolutionLayer->base.num_temp_tensors = numTmpTensor;
-            }
+            newBiases = _mergeInputZeroPoint2Bias(ops_layer->node->graph, inputs, weights, biases);
+            depthwiseConvolutionLayer->base.temp_tensors[numTmpTensor++] = newBiases;
+            depthwiseConvolutionLayer->base.num_temp_tensors = numTmpTensor;
         }
         else
         {
@@ -852,6 +1085,7 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_Initialize(vxnne_layer ops_l
             downScaleSizeRounding,
             strideXvalue,
             strideYvalue,
+            scales,
             outputs);
 
         if (padLeft)    vxReleaseScalar(&padLeft);
@@ -881,7 +1115,10 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_Initialize(vxnne_layer ops_l
 
     vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->depthwise_convolution_sh_operation.base, (vx_reference)tensorCopy, VXNNE_OPERATION_REFENRENCE_INPUT));
     vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->depthwise_convolution_sh_operation.base, (vx_reference)weights, VXNNE_OPERATION_REFENRENCE_INPUT));
-    vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->depthwise_convolution_sh_operation.base, (vx_reference)newBiases, VXNNE_OPERATION_REFENRENCE_INPUT));
+    if (newBiases)
+    {
+        vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->depthwise_convolution_sh_operation.base, (vx_reference)newBiases, VXNNE_OPERATION_REFENRENCE_INPUT));
+    }
     vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->depthwise_convolution_sh_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
 
     vxmONERROR(vxnneLayer_SetOperation(
@@ -903,7 +1140,12 @@ VX_PRIVATE_API vx_bool vxoNNDepthwiseConvLayer_NN_Support(vx_node node, const vx
     vx_scalar dilationY = (vx_scalar)parameters[10];
     vx_scalar depth_multiplier = (vx_scalar)parameters[13];
     vx_tensor outputs = (vx_tensor)parameters[19];
-
+    vx_uint32 origWeightX = TENSOR_SIZE_INDEX(weights, 0);
+    vx_uint32 origWeightY = TENSOR_SIZE_INDEX(weights, 1);
+    vx_scalar strideX = (vx_scalar)parameters[11];
+    vx_scalar strideY = (vx_scalar)parameters[12];
+    vx_uint32 weightX = (((origWeightX % strideX->value->u32 == 0) ? origWeightX : (origWeightX + (strideX->value->u32 - origWeightX % strideX->value->u32))) / strideX->value->u32);
+    vx_uint32 weightY = (((origWeightY % strideY->value->u32 == 0) ? origWeightY : (origWeightY + (strideY->value->u32 - origWeightY % strideY->value->u32))) / strideY->value->u32);
     vx_context context = vxGetContext((vx_reference)inputs);
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_NN, VX_TYPE_INVALID, VX_NULL);
     vx_int32   dilation_x  = dilationX->value->n32 + 1;
@@ -912,17 +1154,19 @@ VX_PRIVATE_API vx_bool vxoNNDepthwiseConvLayer_NN_Support(vx_node node, const vx
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
     support = support && ((depth_multiplier != NULL) && (depth_multiplier->value->n32 > 0));
+    support = support && (!(vx_bool)(TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL));
     support = support && (1 == dilation_x) && (1 == dilation_y);
 
     if ((TENSOR_DATA_LIFETIME(weights) == VX_TENSOR_LIFE_TIME_STATIC) &&
         (biases == VX_NULL) &&
-        vxnneIsNNSupportFormat(context, inputs, VX_NULL, outputs))
+        vxnneIsNNSupportFormat(context, node->graph, inputs, VX_NULL, outputs))
     {
         support = support && vx_true_e;
     }
     else if ((TENSOR_DATA_LIFETIME(weights) == VX_TENSOR_LIFE_TIME_STATIC) &&
-        (TENSOR_DATA_LIFETIME(biases) == VX_TENSOR_LIFE_TIME_STATIC) &&
-        vxnneIsNNSupportFormat(context, inputs, VX_NULL, outputs))
+        vxnneIsNNSupportFormat(context, node->graph, inputs, VX_NULL, outputs) &&
+        (TENSOR_DATA_LIFETIME(biases) == VX_TENSOR_LIFE_TIME_STATIC)
+        )
     {
         support = support && vx_true_e;
     }
@@ -933,8 +1177,11 @@ VX_PRIVATE_API vx_bool vxoNNDepthwiseConvLayer_NN_Support(vx_node node, const vx
     if (node->base.context->nnConfig.fixedFeature.nnCoreCountFloat16 == 0 &&
         (TENSOR_DATA_TYPE(inputs) == VX_TYPE_FLOAT16 || TENSOR_DATA_TYPE(weights) == VX_TYPE_FLOAT16 || TENSOR_DATA_TYPE(outputs) == VX_TYPE_FLOAT16))
         support = vx_false_e;
-
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+    if (weightX > context->nnConfig.fixedFeature.nnMaxKXSize || weightY > context->nnConfig.fixedFeature.nnMaxKYSize)
+    {
+        support = vx_false_e;
+    }
 
     return support;
 }
@@ -1026,7 +1273,7 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_NN_Initialize(vxnne_layer ops_l
     else
     {
         vx_weights_biases_parameter_optimizations_t opt = { -1, TENSOR_DATA_TYPE(outputs), TENSOR_TF_ZEROPOINT(inputs) };
-        vx_weights_biases_parameter weights_biases = _createWeightsBiasesParameterFromTensors(
+        vx_weights_biases_parameter weights_biases = vxoCreateWeightsBiasesParameterFromTensors(
             vxGetContext((vx_reference)ops_layer->node),
             VX_NN_CONVOLUTION_LAYER,
             inputs->dims,/*inputs_dims,*/
@@ -1044,13 +1291,14 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_NN_Initialize(vxnne_layer ops_l
             outputs->dims,/*convolution_outputs_dims,*/
             outputs->dims,/*pool_outputs_dims,*/
             &opt, /*optimizations,*/
+            0,
             TENSOR_DATA_TYPE(weight_dilation),
             0,
             VX_TENSOR_RANK_WHCN,
             weight_dilation,
             biases,
             VX_NULL,
-            vx_false_e,
+            VX_NN_CONV_ONLY,
             vx_false_e
         );
 
@@ -1071,6 +1319,9 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_NN_Initialize(vxnne_layer ops_l
             0,
             0,
             VX_PAD_CONSTANT,
+            VX_NULL,
+            VX_NULL,
+            VX_NULL,
             VX_NULL,
             outputs));
     }
@@ -1209,13 +1460,13 @@ vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(vx_node node,
 
     if ((TENSOR_DATA_LIFETIME(weights) == VX_TENSOR_LIFE_TIME_STATIC) &&
         (biases == VX_NULL) &&
-        vxnneIsNNSupportFormat(context, inputs, VX_NULL, outputs))
+        vxnneIsNNSupportFormat(context, node->graph, inputs, VX_NULL, outputs))
     {
         enable_nne = vx_true_e;
     }
     else if ((TENSOR_DATA_LIFETIME(weights) == VX_TENSOR_LIFE_TIME_STATIC) &&
         (TENSOR_DATA_LIFETIME(biases) == VX_TENSOR_LIFE_TIME_STATIC) &&
-        vxnneIsNNSupportFormat(context, inputs, VX_NULL, outputs))
+        vxnneIsNNSupportFormat(context, node->graph, inputs, VX_NULL, outputs))
     {
         enable_nne = vx_true_e;
     }
@@ -1294,7 +1545,7 @@ vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(vx_node node,
             else
             {
                 vx_weights_biases_parameter_optimizations_t opt = { -1, TENSOR_DATA_TYPE(outputs), TENSOR_TF_ZEROPOINT(inputs)};
-                vx_weights_biases_parameter weights_biases = _createWeightsBiasesParameterFromTensors(
+                vx_weights_biases_parameter weights_biases = vxoCreateWeightsBiasesParameterFromTensors(
                                     vxGetContext((vx_reference)node),
                                     VX_NN_CONVOLUTION_LAYER,
                                     inputs->dims,/*inputs_dims,*/
@@ -1352,34 +1603,84 @@ vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(vx_node node,
         vx_enum  weightFormat                      = TENSOR_DATA_TYPE(weights);
         vx_enum  biasFormat                        = VX_TYPE_INT32;
         vx_enum  outputFormat                      = TENSOR_DATA_TYPE(outputs);
-        vx_bool  dataformat_flag[4]                = {vx_false_e};
+        vx_bool  dataformat_flag[5]                = {vx_false_e};
         vx_bool  depthwiseConv_shader_flag         = vx_false_e;
+        vx_bool  is_w_sym_per_channel_quant        = (vx_bool)(TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL);
+        vx_bool  is_b_sym_per_channel_quant        = biases == NULL? vx_false_e : (vx_bool)(TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL);
+        vx_bool  is_sym_per_channel_quant          = is_w_sym_per_channel_quant && is_b_sym_per_channel_quant;
 
         if (biases != VX_NULL)
             biasFormat = TENSOR_DATA_TYPE(biases);
 
         if(context->evisNoInst.supportEVIS)
         {
-            dataformat_flag[0]        = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16);
+            dataformat_flag[0]        = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && ((biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_FLOAT32) && outputFormat == VX_TYPE_FLOAT16);
             dataformat_flag[3]        = (vx_bool)(inputFormat == VX_TYPE_INT16 && weightFormat == VX_TYPE_INT16
-                                                && (biasFormat == VX_TYPE_INT32 || biasFormat == VX_TYPE_INT64)
+                                                && ((biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_INT32 || biasFormat == VX_TYPE_INT64)
                                                 && outputFormat == VX_TYPE_INT16);
+            dataformat_flag[2]        = (vx_bool)(inputFormat == VX_TYPE_INT8 && weightFormat == VX_TYPE_INT8 && ((biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_INT32) && outputFormat == VX_TYPE_INT8);
         }
         else
         {
-            dataformat_flag[0]        = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16) ||
-                                                  (inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && biasFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16) ||
-                                                  (inputFormat == VX_TYPE_FLOAT32 && weightFormat == VX_TYPE_FLOAT32 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32));
-            dataformat_flag[3]        = (vx_bool)(inputFormat == VX_TYPE_INT16 && weightFormat == VX_TYPE_INT16 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT16);
+            dataformat_flag[0]        = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && (biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_FLOAT32) && outputFormat == VX_TYPE_FLOAT16) ||
+                                                  (inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && (biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_FLOAT16) && outputFormat == VX_TYPE_FLOAT16) ||
+                                                  (inputFormat == VX_TYPE_FLOAT32 && weightFormat == VX_TYPE_FLOAT32 && (biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_FLOAT32) && outputFormat == VX_TYPE_FLOAT32));
+            dataformat_flag[3]        = (vx_bool)(inputFormat == VX_TYPE_INT16 && weightFormat == VX_TYPE_INT16 && (biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_INT32) && outputFormat == VX_TYPE_INT16);
         }
-        dataformat_flag[1]        = (vx_bool)(inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_UINT8);
-        dataformat_flag[2]        = (vx_bool)(inputFormat == VX_TYPE_INT8 && weightFormat == VX_TYPE_INT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT8);
-        depthwiseConv_shader_flag = (vx_bool) ((dataformat_flag[0] || dataformat_flag[1] || dataformat_flag[2] || dataformat_flag[3]) && biases);
+        dataformat_flag[1]        = (vx_bool)(inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && (biasFormat == VX_TYPE_INVALID || biasFormat == VX_TYPE_INT32) && outputFormat == VX_TYPE_UINT8);
+        dataformat_flag[4]        = (vx_bool)(inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_INT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_UINT8 && is_sym_per_channel_quant);
+        depthwiseConv_shader_flag = (vx_bool) (dataformat_flag[0] || dataformat_flag[1] || dataformat_flag[2] || dataformat_flag[3] || dataformat_flag[4]);
         if (depthwiseConv_shader_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
         {
             vxnne_shader_executable shaderExecutable = NULL;
             vx_tensor               newBiases        = NULL;
             vx_tensor               tensorCopy       = NULL;
+            vx_tensor               scales        = NULL;
+
+            if (TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
+            {
+                vx_tensor_create_params_t params;
+                vx_enum        input_quant      = TENSOR_QUANT_TYPE(inputs);
+                vx_uint32      channelCount     = TENSOR_TF_SCALE_COUNT(weights);
+                vx_uint32      sizes[2]         = {channelCount, 1};
+                vx_float32_ptr scales_data_ptr  = VX_NULL;
+                vx_enum        ouput_quant_type = TENSOR_QUANT_TYPE(outputs);
+                vx_float32     input_scales     = 1;
+                vx_uint32      idx              = 0;
+
+                if (input_quant == VX_QUANT_AFFINE_SCALE)
+                    input_scales = TENSOR_TF_SCALE(inputs);
+
+                scales_data_ptr = (vx_float32 *)vxAllocateAndZeroMemory(channelCount * sizeof(vx_float32));
+                if (scales_data_ptr == VX_NULL)
+                {
+                    status = VX_ERROR_NO_MEMORY;
+                    vxError("allocate memory fail at function %s line %d", __FUNCTION__, __LINE__);
+                    goto OnError;
+                }
+                gcoOS_MemCopy(scales_data_ptr, TENSOR_TF_SCALE_POINTER(weights), channelCount * sizeof(vx_float32));
+
+                for (idx = 0; idx < channelCount; idx++)
+                {
+                    scales_data_ptr[idx] *= input_scales;
+                    if (ouput_quant_type == VX_QUANT_AFFINE_SCALE)
+                        scales_data_ptr[idx] /= TENSOR_TF_SCALE(outputs);
+                }
+
+                gcoOS_MemFill(&params, 0, sizeof(vx_tensor_create_params_t));
+
+                params.num_of_dims = 2;
+                params.sizes = sizes;
+                params.data_format = VX_TYPE_FLOAT32;
+
+                scales = _createTensorFromData(ops_layer->node->graph, params, (vx_uint8_ptr)scales_data_ptr);
+                depthwiseConvolutionLayer->base.temp_tensors[numTmpTensor++] = scales;
+                if (scales_data_ptr)
+                {
+                    vxFree(scales_data_ptr);
+                    scales_data_ptr = VX_NULL;
+                }
+            }
 
             if(node->base.context->evisNoInst.supportEVIS)
             {
@@ -1427,6 +1728,7 @@ vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(vx_node node,
                         strideYvalue = vxoNNExternsionConvlutionRound((vx_float32)(input_height + padTopv + padBottomv - kernel_height) / (output_height - 1), downScaleSizeRounding->value->e);
                     }
                 }
+
                 newBiases  = biases;
                 tensorCopy = inputs;
                 shaderExecutable = vxnneGetDepthwiseConvShaderExecutable(node->base.context,
@@ -1451,6 +1753,7 @@ vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(vx_node node,
                                                                          downScaleSizeRounding,
                                                                          strideXvalue,
                                                                          strideYvalue,
+                                                                         scales,
                                                                          outputs);
             }
             else
@@ -1610,95 +1913,12 @@ vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(vx_node node,
                     is_static_weights_biases = (vx_bool)(CHECK_LIFETIME_IS_STATIC(weights));
                 }
                 enable_adjust_biases = (is_static_weights_biases && (inputFormat == VX_TYPE_UINT8) && (3 == kernel_width) && (3 == kernel_height));
+
                 if (enable_adjust_biases)
                 {
-                    vx_tensor_create_params_t params;
-                    gctPOINTER weightsLogical   = VX_NULL;
-                    gctPOINTER biasesLogical    = VX_NULL;
-                    gctPOINTER newBiasesLogical = VX_NULL;
-                    vx_uint32  i                = 0;
-                    vx_uint32  j                = 0;
-                    vx_uint32  sizes[4]         = {1, 1, 1, 1};
-                    vx_uint32  ifm              = kernel_width * kernel_height;
-                    if (biases != VX_NULL)
-                    {
-                        vx_uint32  ofm              = TENSOR_VIEW_SIZE_INDEX(biases, 0);
-                        sizes[0] = TENSOR_VIEW_SIZE_INDEX(biases, 0);
-                        sizes[1] = 1;
-                        gcoOS_MemFill(&params, 0, sizeof(vx_tensor_create_params_t));
-                        params.num_of_dims = TENSOR_DIM_NUM(biases);
-                        params.sizes = sizes;
-                        params.data_format = TENSOR_DATA_TYPE(biases);
-                        params.quant_format = TENSOR_QUANT_TYPE(biases);
-                        if (params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
-                        {
-                            params.quant_data.dfp.fixed_point_pos = TENSOR_POS(biases);
-                        }
-                        else
-                        {
-                            params.quant_data.affine.scale = TENSOR_TF_SCALE(biases);
-                        }
-                        newBiases = vxoTensor_CreateTensor(context, NULL, &params, vx_false_e);
-                        if (newBiases == VX_NULL|| vxoTensor_AllocateMemory(newBiases) != VX_SUCCESS)
-                        {
-                            vxError("vxoTensor_CreateTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
-                            status = VX_ERROR_NO_MEMORY;
-                            goto exit;
-                        }
-                        TENSOR_DATA_LIFETIME(newBiases) = VX_TENSOR_LIFE_TIME_STATIC;
-                        vxoTensor_GetTensorViewMemory(weights, &weightsLogical, VX_NULL);
-                        vxoTensor_GetTensorViewMemory(biases, &biasesLogical, VX_NULL);
-                        vxoTensor_GetTensorViewMemory(newBiases, &newBiasesLogical, VX_NULL);
-                        for (j = 0; j < ofm; j++)
-                        {
-                            vx_int32 offset = 0;
-                            vx_int32 dstVal = 0;
-                            for (i = 0; i < ifm; i++)
-                            {
-                                vx_uint32 idx = j * ifm + i;
-                                offset = offset - (((vx_uint8*)weightsLogical)[idx] - TENSOR_TF_ZEROPOINT(weights)) * TENSOR_TF_ZEROPOINT(inputs);
-                            }
-                            dstVal = ((vx_int32*)biasesLogical)[j] + offset;
-                            ((vx_int32*)newBiasesLogical)[j] = dstVal;
-                        }
-                        depthwiseConvolutionLayer->base.temp_tensors[numTmpTensor++] = newBiases;
-                        depthwiseConvolutionLayer->base.num_temp_tensors = numTmpTensor;
-                    }
-                    else
-                    {
-                        vx_uint32  ofm              = TENSOR_VIEW_SIZE_INDEX(weights, 2);
-                        sizes[0] = TENSOR_VIEW_SIZE_INDEX(weights, 2);
-                        sizes[1] = 1;
-                        gcoOS_MemFill(&params, 0, sizeof(vx_tensor_create_params_t));
-                        params.num_of_dims = 2;
-                        params.sizes = sizes;
-                        params.data_format = VX_TYPE_INT32;
-                        params.quant_format = VX_QUANT_AFFINE_SCALE;
-                        params.quant_data.affine.scale = TENSOR_TF_SCALE(weights) * TENSOR_TF_SCALE(inputs);
-                        params.quant_data.affine.zeroPoint = 0;
-                        newBiases = vxoTensor_CreateTensor(context, NULL, &params, vx_false_e);
-                        if (newBiases == VX_NULL|| vxoTensor_AllocateMemory(newBiases) != VX_SUCCESS)
-                        {
-                            vxError("vxoTensor_CreateTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
-                            status = VX_ERROR_NO_MEMORY;
-                            goto exit;
-                        }
-                        TENSOR_DATA_LIFETIME(newBiases) = VX_TENSOR_LIFE_TIME_STATIC;
-                        vxoTensor_GetTensorViewMemory(weights, &weightsLogical, VX_NULL);
-                        vxoTensor_GetTensorViewMemory(newBiases, &newBiasesLogical, VX_NULL);
-                        for (j = 0; j < ofm; j++)
-                        {
-                            vx_int32 offset = 0;
-                            for (i = 0; i < ifm; i++)
-                            {
-                                vx_uint32 idx = j * ifm + i;
-                                offset = offset - (((vx_uint8*)weightsLogical)[idx] - TENSOR_TF_ZEROPOINT(weights)) * TENSOR_TF_ZEROPOINT(inputs);
-                            }
-                            ((vx_int32*)newBiasesLogical)[j] = offset;
-                        }
-                        depthwiseConvolutionLayer->base.temp_tensors[numTmpTensor++] = newBiases;
-                        depthwiseConvolutionLayer->base.num_temp_tensors = numTmpTensor;
-                    }
+                    newBiases = _mergeInputZeroPoint2Bias(node->graph, inputs, weights, biases);
+                    depthwiseConvolutionLayer->base.temp_tensors[numTmpTensor++] = newBiases;
+                    depthwiseConvolutionLayer->base.num_temp_tensors = numTmpTensor;
                 }
                 else
                 {
@@ -1720,6 +1940,7 @@ vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(vx_node node,
                                                                              downScaleSizeRounding,
                                                                              strideXvalue,
                                                                              strideYvalue,
+                                                                             scales,
                                                                              outputs);
 
                 if(padLeft)    vxReleaseScalar(&padLeft);
@@ -1804,5 +2025,6 @@ exit:
     return status;
 }
 #endif
+
 
 

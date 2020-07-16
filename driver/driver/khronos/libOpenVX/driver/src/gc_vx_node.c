@@ -65,6 +65,34 @@ VX_PRIVATE_API vx_node vxoNode_CreateGeneric(vx_graph graph, vx_kernel kernel)
     }
 
     node->kernel            = kernel;
+    if (kernel->signature.paramCount > 0)
+    {
+        vx_uint32 index, paramCount = kernel->signature.paramCount;
+        node->paramTable = vxAllocateAndZeroMemory(paramCount * sizeof(vx_reference));
+        if (node->paramTable == VX_NULL)
+        {
+            vxError("Error: out of memory at %s:%d\n", __FUNCTION__, __LINE__);
+            goto OnError;
+        }
+
+        node->patchLocation = vxAllocateAndZeroMemory(paramCount * sizeof(vx_uint32 *));
+        if (node->patchLocation == VX_NULL)
+        {
+            vxError("Error: out of memory at %s:%d\n", __FUNCTION__, __LINE__);
+            goto OnError;
+        }
+
+        for (index = 0; index < paramCount; index++)
+        {
+            node->patchLocation[index] = vxAllocateAndZeroMemory(VX_MAX_PLANES * sizeof(vx_uint32));
+            if (node->patchLocation[index] == VX_NULL)
+            {
+                vxError("Error: out of memory at %s:%d\n", __FUNCTION__, __LINE__);
+                goto OnError;
+            }
+        }
+        node->numParameters = paramCount;
+    }
     node->targetIndex       = kernel->targetIndex;
 
     /* Add the kernel ref from the node */
@@ -79,7 +107,7 @@ VX_PRIVATE_API vx_node vxoNode_CreateGeneric(vx_graph graph, vx_kernel kernel)
     node->cnnWaitEventID0    = 0xffffffff;
     node->cnnWaitEventID1    = 0xffffffff;
 
-    node->tensorVxcOptimize = vx_false_e;
+    node->vxcOptimize = vx_false_e;
 
     /* Add the node ref from the graph */
     vxoReference_Increment(&node->base, VX_REF_INTERNAL);
@@ -101,6 +129,11 @@ VX_PRIVATE_API vx_node vxoNode_CreateGeneric(vx_graph graph, vx_kernel kernel)
     vxoNode_Dump(node);
     gcmFOOTER_NO();
     return node;
+
+OnError:
+    vxoReference_Increment(&node->base, VX_REF_EXTERNAL);
+    gcmFOOTER_NO();
+    return (vx_node)vxoContext_GetErrorObject(graph->base.context, VX_ERROR_NO_RESOURCES);
 }
 
 VX_INTERNAL_API vx_node vxoNode_CreateSpecific(
@@ -127,14 +160,17 @@ VX_INTERNAL_API vx_node vxoNode_CreateSpecific(
         return (vx_node)kernel;
     }
     node = vxoNode_CreateGeneric(graph, kernel);
-
-    node->numParameters = paramCount;
-
     if (vxoReference_GetStatus((vx_reference)node) != VX_SUCCESS)
     {
         gcmFOOTER_NO();
         return node;
     }
+    if (kernel->signature.paramCount < paramCount)
+    {
+        vxError("Error: paramCount > kernel->paramCount at %s:%d\n", __FUNCTION__, __LINE__);
+        vxmASSERT(0);
+    }
+
     for (index = 0; index < paramCount; index++)
     {
         vx_status status = vxoNode_SetParameter(node, index, parameters[index]);
@@ -146,6 +182,7 @@ VX_INTERNAL_API vx_node vxoNode_CreateSpecific(
             return (vx_node)vxoContext_GetErrorObject(graph->base.context, status);
         }
     }
+    node->numParameters = paramCount;
 
     vxoKernel_ExternalRelease(&kernel);
     gcmFOOTER_NO();
@@ -429,6 +466,16 @@ VX_INTERNAL_CALLBACK_API void vxoNode_Destructor(vx_reference ref)
     vxmASSERT(vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE));
     vxmASSERT(node->kernel);
 
+    if (node->graph->gpuCount > 1)
+    {
+        /* release multiGPU operations memory*/
+        status = vxoMultiGpu_FreeMemory(node);
+        if (status != VX_SUCCESS)
+        {
+            vxError("failed to free memory for multiGPU\n");
+        }
+    }
+
     /* Wrapped user node need to deinitialize layer/op first */
     if (node->kernel->deinitializeWrapFunction != VX_NULL)
     {
@@ -478,6 +525,23 @@ VX_INTERNAL_CALLBACK_API void vxoNode_Destructor(vx_reference ref)
         node->paramTable[i] = VX_NULL;
     }
 
+    for (i = 0; i < node->kernel->signature.paramCount; i++)
+    {
+        if (node->patchLocation != NULL)
+        {
+            if (node->patchLocation[i] != NULL)
+            {
+                vxFree(node->patchLocation[i]);
+                node->patchLocation[i] = VX_NULL;
+            }
+        }
+    }
+    if (node->patchLocation != VX_NULL)
+    {
+        vxFree(node->patchLocation);
+        node->patchLocation = VX_NULL;
+    }
+
     if (node->kernelAttributes.localDataPtr != VX_NULL)
     {
         vxFree(node->kernelAttributes.localDataPtr);
@@ -524,6 +588,22 @@ VX_INTERNAL_CALLBACK_API void vxoNode_Destructor(vx_reference ref)
         }
 
         gcoOS_Free(gcvNULL, node->uniforms);
+    }
+    if (node->paramTable != VX_NULL)
+    {
+        vxFree(node->paramTable);
+    }
+    if (node->replicated_flags != VX_NULL)
+    {
+        vxFree(node->replicated_flags);
+    }
+    if (node->parentNodes)
+    {
+        vxFree(node->parentNodes);
+    }
+    if (node->childNodes)
+    {
+        vxFree(node->childNodes);
     }
     gcmFOOTER_NO();
 }
@@ -594,7 +674,7 @@ Exit:
 
 VX_PRIVATE_API vx_status vxoNode_Remove(vx_node *nodePtr)
 {
-    vx_status status = VX_FAILURE;
+    vx_status status = VX_ERROR_INVALID_REFERENCE;
     vx_node node;
 
     gcmHEADER_ARG("nodePtr=%p", nodePtr);
@@ -643,7 +723,7 @@ VX_INTERNAL_API vx_status vxoNode_SetParameter(vx_node node, vx_uint32 index, vx
         gcmFOOTER_NO();
         return VX_ERROR_INVALID_NODE;
     }
-    if (index >= node->kernel->signature.paramCount || index >= VX_MAX_PARAMETERS)
+    if (index >= node->kernel->signature.paramCount)
     {
         gcmFOOTER_NO();
         return VX_ERROR_INVALID_PARAMETERS;
@@ -672,6 +752,44 @@ VX_INTERNAL_API vx_status vxoNode_SetParameter(vx_node node, vx_uint32 index, vx
         gcmFOOTER_NO();
         return VX_ERROR_INVALID_VALUE;
     }
+
+    if (node->kernel->signature.paramCount > 0 && node->paramTable == VX_NULL)
+    {
+        node->paramTable = vxAllocateAndZeroMemory(node->kernel->signature.paramCount * sizeof(vx_reference));
+        if (node->paramTable == VX_NULL)
+        {
+            vxError("Error: out of memory at %s:%d\n", __FUNCTION__, __LINE__);
+            vxmASSERT(0);
+            gcmFOOTER_NO();
+            return VX_ERROR_NO_MEMORY;
+        }
+    }
+
+    if (node->kernel->signature.paramCount > 0 && node->patchLocation == VX_NULL)
+    {
+        vx_uint32 i = 0;
+        node->patchLocation = vxAllocateAndZeroMemory(node->kernel->signature.paramCount * sizeof(vx_uint32 *));
+        if (node->patchLocation == VX_NULL)
+        {
+            vxError("Error: out of memory at %s:%d\n", __FUNCTION__, __LINE__);
+            vxmASSERT(0);
+            gcmFOOTER_NO();
+            return VX_ERROR_NO_MEMORY;
+        }
+
+        for (i = 0; i < node->kernel->signature.paramCount; i++)
+        {
+            node->patchLocation[i] = vxAllocateAndZeroMemory(VX_MAX_PLANES * sizeof(vx_uint32));
+            if (node->patchLocation[i] == VX_NULL)
+            {
+                vxError("Error: out of memory at %s:%d\n", __FUNCTION__, __LINE__);
+                vxmASSERT(0);
+                gcmFOOTER_NO();
+                return VX_ERROR_NO_MEMORY;
+            }
+        }
+    }
+
     type = vxoReference_GetType(value);
 
     if (node->kernel->signature.dataTypeTable[index] != type)
@@ -732,10 +850,10 @@ VX_INTERNAL_API vx_status vxoNode_SetParameter(vx_node node, vx_uint32 index, vx
     }
     if (node->paramTable[index] != VX_NULL)
     {
-        char name_tmp[VX_MAX_REFERENCE_NAME];
-        strncpy(name_tmp, ((vx_reference)node->paramTable[index])->name, strnlen(((vx_reference)node->paramTable[index])->name, VX_MAX_REFERENCE_NAME));
+char name_tmp[VX_MAX_REFERENCE_NAME] = {0};
+        strncpy(name_tmp, ((vx_reference)node->paramTable[index])->name,strnlen(((vx_reference)node->paramTable[index])->name,VX_MAX_REFERENCE_NAME));
         vxoReference_Release(&node->paramTable[index], node->paramTable[index]->type, VX_REF_INTERNAL);
-        strncpy(value->name, name_tmp, strnlen(name_tmp, VX_MAX_REFERENCE_NAME));
+        strncpy(value->name, name_tmp, strnlen(name_tmp,VX_MAX_REFERENCE_NAME));
         vxmASSERT(strlen(name_tmp) < VX_MAX_REFERENCE_NAME);
     }
 
@@ -827,9 +945,25 @@ VX_INTERNAL_API vx_status vxoNode_SetParameter(vx_node node, vx_uint32 index, vx
         vxoBinaryGraph_SetParameter(node, index);
     }
 
+    /* for NBG cache mode update network's input/output */
+    if (1 == node->base.context->options.enableCacheBinaryGraph)
+    {
+        vx_uint32 i = 0;
+        vx_graph graph = node->graph;
+        vx_node node = VX_NULL;
+        /* only one node in loading NBG runtime */
+        for (i = 0; i < graph->nodeCount; i++)
+        {
+            node = graph->nodeTable[i];
+            if (node->kernel->enumeration == VX_KERNEL_IMPORT_FROM_FILE) {
+                vxoBinaryGraph_SetParameter(node, index);
+            }
+        }
+    }
+
     /* update binary graph input/output table if user set parameter again
       this is for generating binary graph */
-    if (1 == node->base.context->options.enableSaveBinary)
+    if ((1 == node->base.context->options.enableSaveBinary) || (1 == node->base.context->options.enableCacheBinaryGraph))
     {
         vxoBinaryGraph_UpdataIOPhsicalTable(node, index);
     }
@@ -858,7 +992,7 @@ VX_INTERNAL_API vx_parameter vxoNode_GetParameter(vx_node node, vx_uint32 index)
         return (vx_parameter)vxoContext_GetErrorObject(node->base.context, VX_ERROR_INVALID_NODE);
     }
 
-    if (index >= VX_MAX_PARAMETERS || index >= node->kernel->signature.paramCount)
+    if (index >= node->kernel->signature.paramCount)
     {
         gcmFOOTER_NO();
         return (vx_parameter)vxoContext_GetErrorObject(node->base.context, VX_ERROR_INVALID_PARAMETERS);
@@ -926,15 +1060,26 @@ VX_INTERNAL_API vx_status vxoNode_SetChildGraph(vx_node node, vx_graph graph)
         for (paramIndex = 0; paramIndex < signature1->paramCount; paramIndex++)
         {
             vx_signature signature2;
-            vx_uint32 graphParamIndex = graph->paramTable[paramIndex].index;
+            vx_uint32 graphParamIndex = 0, id = 0;
+            vx_graph_parameter_s *graphParam = graph->paramList;
+            while (graphParam)
+            {
+                if (id == paramIndex)
+                {
+                    break;
+                }
+                id++;
+                graphParam = graphParam->next;
+            }
 
-            if (graph->paramTable[paramIndex].node == VX_NULL)
+            if (graphParam == VX_NULL)
             {
                 vxInfo("No.%d parameter of the child graph %p refer to NULL node", paramIndex, graph);
                 continue;
             }
 
-            signature2 = &graph->paramTable[paramIndex].node->kernel->signature;
+            graphParamIndex = graphParam->index;
+            signature2 = &graphParam->node->kernel->signature;
 
             if (signature2->paramCount > signature1->paramCount)continue;
             if(paramIndex < signature2->paramCount){
@@ -1097,16 +1242,9 @@ VX_INTERNAL_API vx_status vxoNode_Replay(vx_node node)
 
 VX_INTERNAL_API vx_status vxoNode_Release(vx_node_ptr nodePtr)
 {
-    gctUINT32 gpuCount = 1;
     vx_status status = VX_SUCCESS;
     gcmHEADER_ARG("nodePtr=%p", nodePtr);
 
-    gcoVX_QueryCoreCount((*nodePtr)->graph->deviceID, &gpuCount);
-    if (gpuCount > 1)
-    {
-        /* release multiGPU operations memory*/
-        status |= vxoMultiGpu_FreeMemory(*nodePtr);
-    }
     status |= vxoReference_Release((vx_reference_ptr)nodePtr, VX_TYPE_NODE, VX_REF_EXTERNAL);
 
     gcmFOOTER_ARG("%d", status);
@@ -1273,6 +1411,12 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetNodeAttribute(vx_node node, vx_enum attr
 
     switch (attribute)
     {
+        case VX_NODE_ATTRIBUTE_WEIGHT_BIAS_CACHE:
+            {
+                node->kernelAttributes.isSetKernelVIP = *(vx_uint32 *)ptr > 0 ? vx_true_e : vx_false_e;
+                break;
+            }
+
         case VX_NODE_LOCAL_DATA_SIZE:
 
             if (!node->localDataChangeIsEnabled)
@@ -1322,7 +1466,6 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetNodeAttribute(vx_node node, vx_enum attr
 
             node->kernelAttributes.shaderParameter = *(vx_kernel_execution_parameters_t *)ptr;
             break;
-
 
         default:
             vxError("The attribute parameter, %d, is not supported", attribute);
@@ -1450,6 +1593,19 @@ VX_API_ENTRY vx_status VX_API_CALL vxReplicateNode(vx_graph graph, vx_node first
     /* set replicate flag for node */
     first_node->isReplicated = vx_true_e;
 
+    if (number_of_parameters > 0)
+    {
+        if (first_node->replicated_flags != VX_NULL) vxFree(first_node->replicated_flags);
+        first_node->replicated_flags = vxAllocateAndZeroMemory(number_of_parameters * gcmSIZEOF(vx_bool));
+        if (first_node->replicated_flags == VX_NULL)
+        {
+            vxError("Error: out of memory at %s:%d\n", __FUNCTION__, __LINE__);
+            vxmASSERT(0);
+            gcmFOOTER_NO();
+            return VX_ERROR_NO_MEMORY;
+        }
+    }
+
     for (n = 0; n < number_of_parameters; n++)
     {
         first_node->replicated_flags[n] = replicate[n];
@@ -1570,7 +1726,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetNodeTarget(vx_node node, vx_enum target_
     if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE))
     {
         gcmFOOTER_ARG("%d", status);
-        return VX_ERROR_INVALID_NODE;
+        return status;
     }
     context = vxGetContext((vx_reference)node);
 
@@ -1743,7 +1899,7 @@ VX_INTERNAL_API vx_status vxoNode_setTensorVxcOptimize(vx_node node)
 {
     if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE)) return VX_ERROR_INVALID_NODE;
 
-    node->tensorVxcOptimize = vx_true_e;
+    node->vxcOptimize = vx_true_e;
 
     return VX_SUCCESS;
 }
@@ -1752,7 +1908,7 @@ VX_INTERNAL_API vx_status vxoNode_resetTensorVxcOptimize(vx_node node)
 {
     if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE)) return VX_ERROR_INVALID_NODE;
 
-    node->tensorVxcOptimize = vx_false_e;
+    node->vxcOptimize = vx_false_e;
 
     return VX_SUCCESS;
 }

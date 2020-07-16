@@ -145,15 +145,41 @@ OnError:
 
 VX_PRIVATE_API vx_bool vxoNNSoftmax_SH_EVIS_Support_Ext(vx_node node, const vx_reference parameters[], vx_uint32 _num, vxnne_register_param reg_param, vx_bool evis)
 {
+    /*vx_status status = VX_SUCCESS;*/
+
     vx_tensor  inputs = (vx_tensor)parameters[0];
     vx_tensor  outputs = (vx_tensor)parameters[1];
     vx_enum    srcFormat = TENSOR_DATA_TYPE(inputs);
     vx_enum    dstFormat = TENSOR_DATA_TYPE(outputs);
+    vx_uint32  dims = TENSOR_DIM_NUM(inputs);
     vx_bool    enable_format = vx_false_e;
     vx_bool    enable_tf_quantize = vx_false_e;
+    /*vx_uint32  batchCount = TENSOR_SIZE_INDEX(inputs, 3);*/
+
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
 
     vxoLayer_VerificationHead(node, parameters, _num, reg_param);
+
+    switch (dims)
+    {
+    case 1:
+        /*batchCount = 1;*/
+        break;
+    case 2:
+        /*batchCount = TENSOR_VIEW_SIZE_INDEX(inputs, 1);*/
+        break;
+    case 3:
+        /*batchCount = 1;*/
+        break;
+    case 4:
+        /*batchCount = TENSOR_VIEW_SIZE_INDEX(inputs, 3);*/
+        break;
+    default:
+        vxError("Input tensor error dimension[%u]\n", dims);
+        /*status = VX_ERROR_INVALID_DIMENSION;*/
+        goto OnError;
+    }
+
 
     if(evis)
     {
@@ -203,7 +229,7 @@ VX_PRIVATE_API vx_bool vxoNNSoftmax_SH_EVIS_Support_Ext(vx_node node, const vx_r
     support = support && (enable_format || enable_tf_quantize);
 
     vxoLayer_VerificationFoot(node, parameters, _num, reg_param, &support);
-
+OnError:
     return support;
 }
 
@@ -261,8 +287,8 @@ VX_PRIVATE_API vx_status vxoNNSoftmax_SH_Initialize_Ext(vxnne_layer ops_layer, c
         }
 
         vx_nn_kernel_optimize_softmax_shape(shape_x, rank_x, axis, out_shape_x, &out_rank_x, &out_axis);
-        src = vxoTensor_ReshapeTensor(inputs, out_shape_x, out_rank_x);
-        dst = vxoTensor_ReshapeTensor(outputs, out_shape_x, out_rank_x);
+        src = vxoTensor_ReshapeTensor(inputs, out_shape_x, out_rank_x, VX_NULL);
+        dst = vxoTensor_ReshapeTensor(outputs, out_shape_x, out_rank_x, VX_NULL);
         softmaxLayer->base.temp_tensors[0] = src;
         softmaxLayer->base.temp_tensors[1] = dst;
         softmaxLayer->base.num_temp_tensors = 2;
@@ -390,6 +416,8 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint
     return status;
 }
 #endif
+
+
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
@@ -521,8 +549,8 @@ OnError:
 
         if(node->base.context->evisNoInst.supportEVIS)
         {
-            src = vxoTensor_ReshapeTensor(inputs, out_shape_x, out_rank_x);
-            dst = vxoTensor_ReshapeTensor(outputs, out_shape_x, out_rank_x);
+            src = vxoTensor_ReshapeTensor(inputs, out_shape_x, out_rank_x, VX_NULL);
+            dst = vxoTensor_ReshapeTensor(outputs, out_shape_x, out_rank_x, VX_NULL);
             softmaxLayer->base.temp_tensors[0] = src;
             softmaxLayer->base.temp_tensors[1] = dst;
             softmaxLayer->base.num_temp_tensors = 2;
@@ -812,8 +840,8 @@ VX_PRIVATE_API vx_status vxoNNSoftmax2_SH_Initialize_Ext(vxnne_layer ops_layer, 
         }
 
         vx_nn_kernel_optimize_softmax_shape(shape_x, rank_x, axis, out_shape_x, &out_rank_x, &out_axis);
-        src = vxoTensor_ReshapeTensor(inputs, out_shape_x, out_rank_x);
-        dst = vxoTensor_ReshapeTensor(outputs, out_shape_x, out_rank_x);
+        src = vxoTensor_ReshapeTensor(inputs, out_shape_x, out_rank_x, VX_NULL);
+        dst = vxoTensor_ReshapeTensor(outputs, out_shape_x, out_rank_x, VX_NULL);
         softmax2Layer->base.temp_tensors[0] = src;
         softmax2Layer->base.temp_tensors[1] = dst;
         softmax2Layer->base.num_temp_tensors = 2;
@@ -951,6 +979,7 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations2(vxnne_layer ops_layer, vx_uin
 }
 #endif
 
+
 VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer2_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
@@ -1060,8 +1089,8 @@ OnError:
 
         if(node->base.context->evisNoInst.supportEVIS)
         {
-            src = vxoTensor_ReshapeTensor(inputs, out_shape_x, out_rank_x);
-            dst = vxoTensor_ReshapeTensor(outputs, out_shape_x, out_rank_x);
+            src = vxoTensor_ReshapeTensor(inputs, out_shape_x, out_rank_x, VX_NULL);
+            dst = vxoTensor_ReshapeTensor(outputs, out_shape_x, out_rank_x, VX_NULL);
             softmax2Layer->base.temp_tensors[0] = src;
             softmax2Layer->base.temp_tensors[1] = dst;
             softmax2Layer->base.num_temp_tensors = 2;
@@ -1176,6 +1205,7 @@ OnError:
 exit:
     if (softmax2Layer) gcoOS_Free(gcvNULL, (gctPOINTER)softmax2Layer);
 #endif
+
     return status;
 }
 

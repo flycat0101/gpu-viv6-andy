@@ -127,8 +127,8 @@ VX_PRIVATE_API vx_status vxoNNL2NormalizeLayer_SW_Initialize(vxnne_layer ops_lay
     }
 
     vx_nn_kernel_optimize_softmax_shape(shape_x, rank_x, axis, out_shape_x, &out_rank_x, &out_axis);
-    src = vxoTensor_ReshapeTensor(inputs, out_shape_x, out_rank_x);
-    dst = vxoTensor_ReshapeTensor(outputs, out_shape_x, out_rank_x);
+    src = vxoTensor_ReshapeTensor(inputs, out_shape_x, out_rank_x, VX_NULL);
+    dst = vxoTensor_ReshapeTensor(outputs, out_shape_x, out_rank_x, VX_NULL);
     l2normalizeLayer->base.temp_tensors[0] = src;
     l2normalizeLayer->base.temp_tensors[1] = dst;
     l2normalizeLayer->base.num_temp_tensors = 2;
@@ -248,8 +248,8 @@ VX_PRIVATE_API vx_status vxoNNL2NormalizeLayer_SH_Initialize_Ext(vxnne_layer ops
     }
 
     vx_nn_kernel_optimize_softmax_shape(shape_x, rank_x, axis, out_shape_x, &out_rank_x, &out_axis);
-    src = vxoTensor_ReshapeTensor(inputs, out_shape_x, out_rank_x);
-    dst = vxoTensor_ReshapeTensor(outputs, out_shape_x, out_rank_x);
+    src = vxoTensor_ReshapeTensor(inputs, out_shape_x, out_rank_x, VX_NULL);
+    dst = vxoTensor_ReshapeTensor(outputs, out_shape_x, out_rank_x, VX_NULL);
     l2normalizeLayer->base.temp_tensors[0] = src;
     l2normalizeLayer->base.temp_tensors[1] = dst;
     l2normalizeLayer->base.num_temp_tensors = 2;
@@ -479,8 +479,8 @@ OnError:
     }
 
     ret = vx_nn_kernel_optimize_softmax_shape(shape_x, rank_x, axis, out_shape_x, &out_rank_x, &out_axis);
-    src = vxoTensor_ReshapeTensor(inputs, out_shape_x, out_rank_x);
-    dst = vxoTensor_ReshapeTensor(outputs, out_shape_x, out_rank_x);
+    src = vxoTensor_ReshapeTensor(inputs, out_shape_x, out_rank_x, VX_NULL);
+    dst = vxoTensor_ReshapeTensor(outputs, out_shape_x, out_rank_x, VX_NULL);
     l2normalizeLayer->base.temp_tensors[0] = src;
     l2normalizeLayer->base.temp_tensors[1] = dst;
     l2normalizeLayer->base.num_temp_tensors = 2;

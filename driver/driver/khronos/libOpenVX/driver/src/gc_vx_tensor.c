@@ -248,8 +248,8 @@ vxoTensor_CalculateSizesFromViewRegion(
     }
 }
 
-#define VX_MAX(a, b) (a) > (b) ? (a) : (b)
-#define VX_MIN(a, b) (a) < (b) ? (a) : (b)
+#define VX_MAX(a, b) ((a) > (b) ? (a) : (b))
+#define VX_MIN(a, b) ((a) < (b) ? (a) : (b))
 
 VX_PRIVATE_API vx_bool
 vxoTensor_MergeTwoViews(
@@ -272,7 +272,7 @@ vxoTensor_MergeTwoViews(
     for (i = 0; i < viewA->dimCount; i++)
     {
         viewOut->viewStarts[i] = VX_MAX(viewA->viewStarts[i], viewB->viewStarts[i]);
-        viewOut->viewEnds[i] = VX_MAX(1, VX_MIN(viewA->viewEnds[i], viewB->viewEnds[i]));
+        viewOut->viewEnds[i] = viewOut->viewStarts[i] + VX_MAX(1, VX_MIN(viewA->viewEnds[i]-viewA->viewStarts[i], (viewB->viewEnds[i]-viewB->viewStarts[i])));
     }
 
     for (i = viewA->dimCount; i < VX_CONTEXT_TENSOR_MAX_DIMENSION; i++)
@@ -396,18 +396,51 @@ vxoTensor_Create(
     if (vxoReference_GetStatus((vx_reference)tensor) != VX_SUCCESS) goto OnError;
 
     tensor->quantFormat = tensor_create_params->quant_format;
-    tensor->fixedPointPos = 0;
-    tensor->scale = 1.0f;
-    tensor->zeroPoint = 0;
 
-    if (tensor->quantFormat == VX_QUANT_AFFINE_SCALE)
+    TENSOR_POS(tensor) = 0;
+    TENSOR_TF_SCALE(tensor) = 1.0f;
+    TENSOR_TF_ZEROPOINT(tensor) = 0;
+
+    if (TENSOR_QUANT_TYPE(tensor) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL/* && (tensor_create_params->data_format == VX_TYPE_UINT8 || tensor_create_params->data_format == VX_TYPE_INT8)*/)
     {
-        tensor->scale = tensor_create_params->quant_data.affine.scale;
-        tensor->zeroPoint = tensor_create_params->quant_data.affine.zeroPoint;
+        vx_uint32 channelCount = 0;
+        TENSOR_TF_CHANNEL_DIMS(tensor)= tensor_create_params->quant_data.affinePerChannel.channelDim;
+        TENSOR_TF_SCALE_COUNT(tensor) = tensor_create_params->quant_data.affinePerChannel.scaleCount;
+
+        channelCount = viewRegion != VX_NULL ? viewRegion->viewEnds[TENSOR_TF_CHANNEL_DIMS(tensor)] - viewRegion->viewStarts[TENSOR_TF_CHANNEL_DIMS(tensor)] : uSizes[TENSOR_TF_CHANNEL_DIMS(tensor)];
+        if (channelCount != TENSOR_TF_SCALE_COUNT(tensor))
+        {
+            vxError("vxoTensor_Create: Invalid channel count");
+            goto OnError;
+        }
+
+        TENSOR_TF_SCALE_POINTER(tensor) = (vx_float32 *)vxAllocateAndZeroMemory(channelCount * sizeof(vx_float32));
+        if (TENSOR_TF_SCALE_POINTER(tensor) == VX_NULL)
+        {
+            vxError("vxoTensor_Create: Out of memory");
+            goto OnError;
+        }
+
+        gcoOS_MemCopy(TENSOR_TF_SCALE_POINTER(tensor), tensor_create_params->quant_data.affinePerChannel.scales, channelCount * sizeof(vx_float32));
+
+        TENSOR_TF_ZEROPOINT_POINTER(tensor) = (vx_int32 *)vxAllocateAndZeroMemory(channelCount * sizeof(vx_int32));
+        if (TENSOR_TF_ZEROPOINT_POINTER(tensor) == VX_NULL)
+        {
+            vxError("vxoTensor_Create: Out of memory");
+            goto OnError;
+        }
+
+        gcoOS_MemCopy(TENSOR_TF_ZEROPOINT_POINTER(tensor), tensor_create_params->quant_data.affinePerChannel.zeroPoint, channelCount * sizeof(vx_int32));
+
+    }
+    else if (tensor->quantFormat == VX_QUANT_AFFINE_SCALE)
+    {
+        TENSOR_TF_SCALE(tensor) = tensor_create_params->quant_data.affine.scale;
+        TENSOR_TF_ZEROPOINT(tensor) = tensor_create_params->quant_data.affine.zeroPoint;
     }
     else
     {
-        tensor->fixedPointPos = tensor_create_params->quant_data.dfp.fixed_point_pos;
+        TENSOR_POS(tensor) = tensor_create_params->quant_data.dfp.fixed_point_pos;
     }
 
     elementSize = vxoTensor_GetDataSizeByFormat(tensor_create_params->data_format);
@@ -423,7 +456,7 @@ vxoTensor_Create(
 
         if (tensor->quantFormat == VX_QUANT_AFFINE_SCALE)
         {
-            tensor->tensorBuffer->padZeorValue = tensor->zeroPoint;
+            tensor->tensorBuffer->padZeorValue = TENSOR_TF_ZEROPOINT(tensor);
         }
 
         tensor->tensorBuffer->memory.logicals[0] = VX_NULL;
@@ -520,7 +553,7 @@ vxoTensor_Create(
 
     tensor->tensorBuffer->bufRefCount++;
 
-    tensor->tensorBuffer->roundingMode = ((tensor->dataFormat == VX_TYPE_INT8) || (tensor->dataFormat == VX_TYPE_INT16))
+    tensor->tensorBuffer->roundingMode = ((tensor->dataFormat == VX_TYPE_UINT8)||(tensor->dataFormat == VX_TYPE_INT8) || (tensor->dataFormat == VX_TYPE_INT16)|| (tensor->dataFormat == VX_TYPE_BFLOAT16))
                                          ? VX_NN_ROUNDING_MODE_RTNE : VX_NN_ROUNDING_MODE_SIMPLE_ROUNDING;
 
     if (tensor->base.context->options.nnRoundingMode)
@@ -573,7 +606,7 @@ OnError:
 
     if (tensor != VX_NULL)
     {
-        vxoReference_Release((vx_reference_ptr)&tensor, VX_TYPE_TENSOR, VX_REF_EXTERNAL);
+        vxoReference_Release((vx_reference_ptr)&tensor, VX_TYPE_TENSOR, kind);
     }
 
     gcmFOOTER_NO();
@@ -785,6 +818,11 @@ vxoTensor_GetTensorBatchArrayBaseMemory(
     if (status != VX_SUCCESS) return status;
 
     strideIndex = (tensor->dimCount == 1) ? 0 : (tensor->dimCount - 1);
+
+    if (strideIndex > 3)
+    {
+        strideIndex = 3;
+    }
 
     if (logical != VX_NULL) *logical = logicalBase + batchIndex * tensor->strides[strideIndex];
     if (physical != VX_NULL) *physical = physicalBase + batchIndex * tensor->strides[strideIndex];
@@ -1916,7 +1954,31 @@ _CreateTensorFromView(
     tensor_create_params.sizes = TENSOR_SIZES(tensor);
     tensor_create_params.data_format = TENSOR_DATA_TYPE(tensor);
     tensor_create_params.quant_format = TENSOR_QUANT_TYPE(tensor);
-    if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+
+    if (TENSOR_QUANT_TYPE(tensor) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL/* && (tensor_create_params->data_format == VX_TYPE_UINT8 || tensor_create_params->data_format == VX_TYPE_INT8)*/)
+    {
+        vx_uint32 channelCount =  view != VX_NULL ? view->viewRegion.viewEnds[TENSOR_TF_CHANNEL_DIMS(tensor)] - view->viewRegion.viewStarts[TENSOR_TF_CHANNEL_DIMS(tensor)] : TENSOR_TF_CHANNEL_DIMS(tensor);
+        vx_uint32 channelOffset = view != VX_NULL ? view->viewRegion.viewStarts[TENSOR_TF_CHANNEL_DIMS(tensor)] : 0;
+        tensor_create_params.quant_data.affinePerChannel.channelDim = TENSOR_TF_CHANNEL_DIMS(tensor);
+        tensor_create_params.quant_data.affinePerChannel.scaleCount = channelCount;
+
+        tensor_create_params.quant_data.affinePerChannel.scales = (vx_float32 *)vxAllocateAndZeroMemory(channelCount * sizeof(vx_float32));
+        if (TENSOR_TF_SCALE_POINTER(tensor) == VX_NULL)
+        {
+            vxError("vxoTensor_Create: Out of memory");
+        }
+
+        gcoOS_MemCopy(tensor_create_params.quant_data.affinePerChannel.scales, TENSOR_TF_SCALE_POINTER(tensor) + channelOffset, channelCount * sizeof(vx_float32));
+
+        tensor_create_params.quant_data.affinePerChannel.zeroPoint = (vx_int32 *)vxAllocateAndZeroMemory(channelCount * sizeof(vx_int32));
+        if (TENSOR_TF_ZEROPOINT_POINTER(tensor) == VX_NULL)
+        {
+            vxError("vxoTensor_Create: Out of memory");
+        }
+
+        gcoOS_MemCopy(tensor_create_params.quant_data.affinePerChannel.zeroPoint, TENSOR_TF_ZEROPOINT_POINTER(tensor) + channelOffset, channelCount * sizeof(vx_int32));
+
+    }else if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
     {
         tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(tensor);
     }
@@ -1940,6 +2002,21 @@ _CreateTensorFromView(
                     tensor->base.isVirtual ? VX_TENSOR_SHARED | VX_TENSOR_VIRTUAL : VX_TENSOR_SHARED,
                     kind
                     );
+
+    if (TENSOR_QUANT_TYPE(tensor) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
+    {
+        if (tensor_create_params.quant_data.affinePerChannel.scales != VX_NULL)
+        {
+            vxFree(tensor_create_params.quant_data.affinePerChannel.scales);
+            tensor_create_params.quant_data.affinePerChannel.scales = VX_NULL;
+        }
+
+        if (tensor_create_params.quant_data.affinePerChannel.zeroPoint != VX_NULL)
+        {
+            vxFree(tensor_create_params.quant_data.affinePerChannel.zeroPoint);
+            tensor_create_params.quant_data.affinePerChannel.zeroPoint = VX_NULL;
+        }
+    }
 
     if (vxoReference_GetStatus((vx_reference)tensor) != VX_SUCCESS)
     {
@@ -2577,14 +2654,16 @@ _ReshapeTensor(
     vx_tensor    tensor,
     vx_int32*    num_of_dims,
     vx_uint32    sizes,
+    vx_uint32*   nChannelDim,
     vx_reference_kind_e kind
     )
 {
     vx_uint32 newDims[VX_CONTEXT_TENSOR_MAX_DIMENSION], offset = 0;
     vx_context context = GET_CONTEXT(tensor);
     vx_tensor_create_params_t tensor_create_params;
+    vx_tensor    reshapeTensor;
 
-    gcmHEADER_ARG("tensor=%p, num_of_dims=%p, sizes=0x%x, kind=0x%x", tensor, num_of_dims, sizes, kind);
+    gcmHEADER_ARG("tensor=%p, num_of_dims=%p, sizes=0x%x, nChannelDim=0x%x, kind=0x%x", tensor, num_of_dims, sizes, nChannelDim, kind);
 
     if (!vxoContext_IsValid(context))
     {
@@ -2607,7 +2686,69 @@ _ReshapeTensor(
     tensor_create_params.sizes = newDims;
     tensor_create_params.data_format = TENSOR_DATA_TYPE(tensor);
     tensor_create_params.quant_format = TENSOR_QUANT_TYPE(tensor);
-    if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+
+    if (TENSOR_QUANT_TYPE(tensor) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL/* && (tensor_create_params->data_format == VX_TYPE_UINT8 || tensor_create_params->data_format == VX_TYPE_INT8)*/)
+    {
+        vx_uint32 channelCount = TENSOR_TF_SCALE_COUNT(tensor);
+        vx_uint32 channelDim = TENSOR_TF_CHANNEL_DIMS(tensor);
+        if (nChannelDim == VX_NULL)
+        {
+            if (newDims[channelDim] != TENSOR_SIZE_INDEX(tensor, channelDim))
+            {
+                gcmFOOTER_NO();
+                vxError("vxReshapeTensor fail: channelDim changed");
+                return VX_NULL;
+            }
+        }
+        else
+        {
+            vx_uint32 src_elementCount = 1;
+            vx_uint32 dst_elementCount = 1;
+            vx_uint32 i, j;
+            if (newDims[*nChannelDim] != TENSOR_SIZE_INDEX(tensor, TENSOR_TF_CHANNEL_DIMS(tensor)))
+            {
+                gcmFOOTER_NO();
+                vxError("vxReshapeTensor fail: channel count changed");
+                return VX_NULL;
+            }
+            for (i = 0; i < TENSOR_TF_CHANNEL_DIMS(tensor); i++)
+            {
+                src_elementCount *= TENSOR_SIZE_INDEX(tensor, i);
+            }
+            for (j = 0; j < *nChannelDim; j++)
+            {
+                dst_elementCount *= newDims[j];
+            }
+            if (src_elementCount != dst_elementCount)
+            {
+                gcmFOOTER_NO();
+                vxError("vxReshapeTensor fail: newDims not legal");
+                return VX_NULL;
+            }
+            channelDim = *nChannelDim;
+            channelCount = newDims[*nChannelDim];
+        }
+
+        tensor_create_params.quant_data.affinePerChannel.channelDim = channelDim;
+        tensor_create_params.quant_data.affinePerChannel.scaleCount = channelCount;
+        tensor_create_params.quant_data.affinePerChannel.scales = (vx_float32 *)vxAllocateAndZeroMemory(channelCount * sizeof(vx_float32));
+        if (TENSOR_TF_SCALE_POINTER(tensor) == VX_NULL)
+        {
+            vxError("vxoTensor_Create: Out of memory");
+        }
+
+        gcoOS_MemCopy(tensor_create_params.quant_data.affinePerChannel.scales, TENSOR_TF_SCALE_POINTER(tensor), channelCount * sizeof(vx_float32));
+
+        tensor_create_params.quant_data.affinePerChannel.zeroPointCount = channelCount;
+        tensor_create_params.quant_data.affinePerChannel.zeroPoint = (vx_int32 *)vxAllocateAndZeroMemory(channelCount * sizeof(vx_int32));
+        if (TENSOR_TF_ZEROPOINT_POINTER(tensor) == VX_NULL)
+        {
+            vxError("vxoTensor_Create: Out of memory");
+        }
+
+        gcoOS_MemCopy(tensor_create_params.quant_data.affinePerChannel.zeroPoint, TENSOR_TF_ZEROPOINT_POINTER(tensor), channelCount * sizeof(vx_int32));
+
+    }else if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
     {
         tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(tensor);
     }
@@ -2625,7 +2766,7 @@ _ReshapeTensor(
     vxmASSERT(!tensor->base.isVirtual || vxoReference_GetType(tensor->base.scope) == VX_TYPE_GRAPH);
 
     gcmFOOTER_NO();
-    return vxoTensor_Create(
+    reshapeTensor = vxoTensor_Create(
                 context,
                 (vx_graph)(tensor->base.isVirtual ? tensor->base.scope : VX_NULL),
                 &tensor_create_params,
@@ -2636,16 +2777,40 @@ _ReshapeTensor(
                 tensor->base.isVirtual ? VX_TENSOR_SHARED | VX_TENSOR_VIRTUAL : VX_TENSOR_SHARED,
                 kind
                 );
+
+    if (reshapeTensor)
+    {
+        reshapeTensor->isReshaped = vx_true_e;
+    }
+
+    vxSetReferenceName((vx_reference)reshapeTensor, ((vx_reference)tensor)->name);
+
+    if (TENSOR_QUANT_TYPE(tensor) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL/* && (tensor_create_params->data_format == VX_TYPE_UINT8 || tensor_create_params->data_format == VX_TYPE_INT8)*/)
+    {
+        if(tensor_create_params.quant_data.affinePerChannel.scales != VX_NULL)
+        {
+            vxFree(tensor_create_params.quant_data.affinePerChannel.scales);
+            tensor_create_params.quant_data.affinePerChannel.scales = VX_NULL;
+        }
+
+        if(tensor_create_params.quant_data.affinePerChannel.zeroPoint != VX_NULL)
+        {
+            vxFree(tensor_create_params.quant_data.affinePerChannel.zeroPoint);
+            tensor_create_params.quant_data.affinePerChannel.zeroPoint = VX_NULL;
+        }
+    }
+    return reshapeTensor;
 }
 
 VX_INTERNAL_API vx_tensor
 vxoTensor_ReshapeTensor(
     vx_tensor    tensor,
     vx_int32*    num_of_dims,
-    vx_uint32    sizes
+    vx_uint32    sizes,
+    vx_uint32*   nChannelDim
     )
 {
-    return _ReshapeTensor(tensor, num_of_dims, sizes, VX_REF_INTERNAL);
+    return _ReshapeTensor(tensor, num_of_dims, sizes, nChannelDim, VX_REF_INTERNAL);
 }
 
 VX_API_ENTRY vx_tensor VX_API_CALL
@@ -2656,7 +2821,7 @@ vxReshapeTensor(
     )
 {
     gcmDUMP_API("$VX vxReshapeTensor: tensor=%p, num_of_dims=%p, sizes=0x%x", tensor, num_of_dims, sizes);
-    return _ReshapeTensor(tensor, num_of_dims, sizes, VX_REF_EXTERNAL);
+    return _ReshapeTensor(tensor, num_of_dims, sizes, VX_NULL, VX_REF_EXTERNAL);
 }
 
 VX_API_ENTRY vx_status VX_API_CALL
@@ -2780,11 +2945,25 @@ vxoTensor_Destructor(
             vxoTensor_FreeWrappedMemory(tensor);
         }
 
-        vxoTensor_ReleaseMemory(tensor);
+        if(!(TENSOR_MEMORY_SHARED(tensor)))
+            vxoTensor_ReleaseMemory(tensor);
 
         vxFree(tensor->tensorBuffer);
         tensor->tensorBuffer = VX_NULL;
     }
+
+    if (TENSOR_TF_SCALE_POINTER(tensor) != VX_NULL)
+    {
+        vxFree(TENSOR_TF_SCALE_POINTER(tensor));
+        TENSOR_TF_SCALE_POINTER(tensor) = VX_NULL;
+    }
+
+    if (TENSOR_TF_ZEROPOINT_POINTER(tensor) != VX_NULL)
+    {
+        vxFree(TENSOR_TF_ZEROPOINT_POINTER(tensor));
+        TENSOR_TF_ZEROPOINT_POINTER(tensor) = VX_NULL;
+    }
+
     gcmFOOTER_NO();
 }
 
@@ -3561,6 +3740,43 @@ vxoTensor_IsShared(
     return (vx_bool)(tensor1->tensorBuffer == tensor2->tensorBuffer);
 }
 
+VX_INTERNAL_API vx_bool
+vxoTensor_IsViewed(
+    vx_tensor tensor
+    )
+{
+    vx_bool ret = vx_false_e;
+
+    if (tensor->isViewed)
+    {
+        ret = vx_true_e;
+    }
+    else
+    {
+        vx_uint32 i;
+        vx_uint64 mulCurrent = 1, mulOrigin = 1;
+
+        for (i = 0; i < TENSOR_DIM_NUM(tensor); i++)
+        {
+            mulCurrent *= TENSOR_VIEW_SIZE_INDEX(tensor, i);
+        }
+
+        for (i = 0; i < TENSOR_ORIG_DIM_NUM(tensor); i++)
+        {
+            mulOrigin *= tensor->tensorBuffer->memory.dims[0][i];
+        }
+
+        vxmASSERT(mulCurrent <= mulOrigin);
+
+        if (mulCurrent < mulOrigin)
+        {
+            ret = vx_true_e;
+        }
+    }
+
+    return ret;
+}
+
 VX_INTERNAL_API void vxoTensor_FreeWrappedMemory(vx_tensor tensor)
 {
     vxmASSERT(tensor);
@@ -3621,17 +3837,143 @@ OnError:
     return vx_false_e;
 }
 
+VX_API_ENTRY vx_tensor VX_API_CALL vxCreateTensorFromHandle(vx_context context, vx_size num_of_dims, const vx_size *dims, vx_enum data_type, vx_int8 fixed_point_pos, const vx_size * stride, void * ptr, vx_enum memory_type)
+{
+    vx_tensor   tensor = VX_NULL;
+    vx_tensor_create_params_t tensor_create_params;
+    vx_uint32 i;
+    vx_uint32*  dimensions;
 
-VX_API_ENTRY vx_tensor VX_API_CALL vxCreateTensorFromHandle(
+    gcmHEADER_ARG("context=%p, num_of_dims=0x%x, dims=%p, data_type=0x%x, fixed_point_pos=0x%x, stride=0x%x, ptr=0x%x, memory_type=0x%x",
+        context, num_of_dims, dims, data_type, fixed_point_pos, stride, ptr, memory_type);
+    gcmDUMP_API("$VX vxCreateTensorFromHandle: context=%p, num_of_dims=0x%x, dims=%p, data_type=0x%x, fixed_point_pos=0x%x, stride=0x%x, ptr=0x%x, memory_type=0x%x",
+        context, num_of_dims, dims, data_type, fixed_point_pos, stride, ptr, memory_type);
+
+
+    if (!vxoContext_IsValid(context))
+    {
+        vxError("%s[%d]: Context is invalid!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
+
+    if (num_of_dims > VX_CONTEXT_TENSOR_MAX_DIMENSION)
+    {
+        vxError("%s[%d]: The tensor view dim num %d is out of range!\n", __FUNCTION__, __LINE__, num_of_dims);
+        vxAddLogEntry(&context->base, VX_ERROR_INVALID_DIMENSION, "%s[%d]: The tensor view dim num %d is out of range!\n", __FUNCTION__, __LINE__, num_of_dims);
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
+
+    if (!vxoTensor_DataFormatIsSupported(data_type))
+    {
+        vxError("%s[%d]: The tensor does not support data format %d", __FUNCTION__, __LINE__, data_type);
+        vxAddLogEntry(&context->base, VX_ERROR_INVALID_FORMAT, "%s[%d]: The tensor does not support data type %d", __FUNCTION__, __LINE__, data_type);
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
+
+    if (!vxIsValidImportType(memory_type))
+    {
+        gcmFOOTER_NO();
+        return (vx_tensor)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_FORMAT);
+    }
+
+    dimensions = (vx_uint32 *)vxAllocate(sizeof(vx_uint32) * num_of_dims);
+    for (i = 0; i < num_of_dims; i++)
+    {
+        vx_uint32 dimVal_uint32;
+        vx_size dimVal_vsize = dims[i];
+
+        gcmSAFECASTSIZET(dimVal_uint32, dimVal_vsize);
+
+        dimensions[i] = dimVal_uint32;
+    }
+
+    gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+    tensor_create_params.num_of_dims = (vx_uint32)num_of_dims;
+    tensor_create_params.sizes = dimensions;
+    tensor_create_params.data_format = data_type;
+    tensor_create_params.quant_format = (data_type == VX_TYPE_FLOAT16) ? 0 : VX_QUANT_DYNAMIC_FIXED_POINT;
+    if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        tensor_create_params.quant_data.dfp.fixed_point_pos = fixed_point_pos;
+    }
+
+
+    tensor = vxoTensor_CreateTensorEx(
+                context,
+                VX_NULL,
+                &tensor_create_params,
+                vx_false_e
+                );
+
+    if (vxoReference_GetStatus((vx_reference)tensor) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return tensor;
+    }
+    if (memory_type == VX_MEMORY_TYPE_HOST)
+    {
+        tensor->tensorBuffer->memory.wrapFlag  = gcvALLOC_FLAG_USERMEMORY;
+        tensor->tensorBuffer->memory.isDirty = vx_true_e;
+    }
+    else if(memory_type == VX_MEMORY_TYPE_DMABUF)
+    {
+        tensor->tensorBuffer->memory.wrapFlag  = gcvALLOC_FLAG_DMABUF;
+    }
+
+    tensor->tensorBuffer->memory.logicals[0] = (vx_uint8_ptr)ptr;
+
+    for (i = 0; i < (vx_uint32)num_of_dims; i++)
+    {
+        tensor->strides[i] = tensor->tensorBuffer->memory.strides[0][i] = (vx_uint32)stride[i];
+    }
+
+    for (i = (vx_uint32)num_of_dims; i < VX_CONTEXT_TENSOR_MAX_DIMENSION; i++)
+    {
+        tensor->strides[i] = tensor->tensorBuffer->memory.strides[0][i] = (vx_uint32)stride[num_of_dims-1] * (vx_uint32)dims[num_of_dims-1] ;
+    }
+
+    if (ptr && !vxoTensro_WrapUserMemory(tensor)) goto OnError;
+
+#if gcdDUMP
+    {
+        gctPOINTER logical;
+        vx_uint32 size, physical;
+        vxoTensor_GetTensorSize(tensor, &size);
+        vxoTensor_GetTensorViewMemory(tensor, &logical, &physical);
+
+        gcmDUMP(gcvNULL, "#[input]\n");
+        gcmDUMP_BUFFER(gcvNULL,
+                       gcvDUMP_BUFFER_MEMORY,
+                       physical,
+                       logical,
+                       0,
+                       size);
+    }
+#endif
+
+    gcmFOOTER_NO();
+    return tensor;
+
+OnError:
+    vxReleaseTensor(&tensor);
+    gcmFOOTER_NO();
+    return (vx_tensor)vxoContext_GetErrorObject(context, VX_ERROR_NO_RESOURCES);
+}
+
+VX_API_ENTRY vx_tensor VX_API_CALL vxCreateTensorFromHandle2(
         vx_context context, const vx_tensor_create_params_t* tensor_create_params, vx_size size_of_create_params, const vx_tensor_addressing addrs,
         void * const ptr, vx_enum import_type)
 {
     vx_tensor   tensor = VX_NULL;
     vx_uint32 i;
+    vx_uint32 dimCount = addrs[0].dimCount;
 
      gcmHEADER_ARG("context=%p, tensor_create_params=%p, size_of_create_params=0x%lx, addrs=%p, ptr=%p, import_type=0x%x",
          context, tensor_create_params, size_of_create_params, addrs, ptr, import_type);
-     gcmDUMP_API("$VX vxCreateTensorFromHandle: context=%p, tensor_create_params=%p, size_of_create_params=0x%lx, addrs=%p, ptr=%p, import_type=0x%x",
+     gcmDUMP_API("$VX vxCreateTensorFromHandleFor12: context=%p, tensor_create_params=%p, size_of_create_params=0x%lx, addrs=%p, ptr=%p, import_type=0x%x",
          context, tensor_create_params, size_of_create_params, addrs, ptr, import_type);
 
     if (!vxoContext_IsValid(context))
@@ -3680,12 +4022,34 @@ VX_API_ENTRY vx_tensor VX_API_CALL vxCreateTensorFromHandle(
 
     tensor->tensorBuffer->memory.logicals[0] = (vx_uint8_ptr)ptr;
 
-    for (i = 0;i < VX_CONTEXT_TENSOR_MAX_DIMENSION; i++)
+    for (i = 0; i < dimCount; i++)
     {
         tensor->strides[i] = tensor->tensorBuffer->memory.strides[0][i] = addrs[0].dimStridesUser[i];
     }
 
+    for (i = dimCount; i < VX_CONTEXT_TENSOR_MAX_DIMENSION; i++)
+    {
+        tensor->strides[i] = tensor->tensorBuffer->memory.strides[0][i] = addrs[0].dimStridesUser[dimCount-1] * addrs[0].dimSizesUser[dimCount-1] ;
+    }
+
     if (!vxoTensro_WrapUserMemory(tensor)) goto OnError;
+
+#if gcdDUMP
+    {
+        gctPOINTER logical;
+        vx_uint32 size, physical;
+        vxoTensor_GetTensorSize(tensor, &size);
+        vxoTensor_GetTensorViewMemory(tensor, &logical, &physical);
+
+        gcmDUMP(gcvNULL, "#[input]\n");
+        gcmDUMP_BUFFER(gcvNULL,
+                       gcvDUMP_BUFFER_MEMORY,
+                       physical,
+                       logical,
+                       0,
+                       size);
+    }
+#endif
 
     gcmFOOTER_NO();
     return tensor;
@@ -3705,10 +4069,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapTensorHandle(vx_tensor tensor, void* co
     gcmHEADER_ARG("tensor=%p, new_ptrs=%p, prev_ptrs=%p", tensor, new_ptrs, prev_ptrs);
     gcmDUMP_API("$VX vxSwapTensorHandle: tensor=%p, new_ptrs=%p, prev_ptrs=%p", tensor, new_ptrs, prev_ptrs);
 
-    if (tensor->base.context->options.enableSaveBinary)
-    {
-        oldPhysical = TENSOR_PHYSICAL_ADDR(tensor);
-    }
+    oldPhysical = TENSOR_PHYSICAL_ADDR(tensor);
 
     if (vxoTensor_IsValidTensor(tensor) == vx_true_e)
     {
@@ -3777,19 +4138,24 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapTensorHandle(vx_tensor tensor, void* co
         status = VX_ERROR_INVALID_REFERENCE;
     }
 
-    if (tensor->base.context->options.enableSaveBinary)
+    newPhysical = TENSOR_PHYSICAL_ADDR(tensor);
+    if ((tensor->base.context->options.enableSaveBinary) || (tensor->base.context->options.enableCacheBinaryGraph))
     {
-        newPhysical = TENSOR_PHYSICAL_ADDR(tensor);
         if (oldPhysical != newPhysical)
         {
             vxInfo("generate NBG, try to update input or output table, oldPhysical: 0x%08X, newPhysical: 0x%08X\n", oldPhysical, newPhysical);
-    /*        vxoBinaryGraph_UpdateInputOutputPhysicalTable(tensor->base.context, oldPhysical, newPhysical);*/
+            vxoBinaryGraph_UpdateInputOutputPhysicalTable(tensor->base.context, oldPhysical, newPhysical);
         }
+    }
+
+    /* import NBG or cache NBG feature */
+    if (tensor->base.context->options.enableLoadNBG)
+    {
+        vxoBinaryGraph_UpdateInputOuput(tensor->base.context, oldPhysical, newPhysical);
     }
 
     gcmFOOTER_ARG("%d", status);
     return status;
-
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxSwapTensor(vx_tensor tensor0, vx_tensor tensor1)
@@ -3823,6 +4189,20 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapTensor(vx_tensor tensor0, vx_tensor ten
     tensor0->tensorBuffer->memory.physicals[0] = tensor1->tensorBuffer->memory.physicals[0];
     tensor1->tensorBuffer->memory.logicals[0] = (vx_uint8_ptr)ptr;
     tensor1->tensorBuffer->memory.physicals[0] = physical;
+
+    if ((tensor0->base.context->options.enableSaveBinary) || (tensor0->base.context->options.enableCacheBinaryGraph))
+    {
+        if (TENSOR_PHYSICAL_ADDR(tensor0) != TENSOR_PHYSICAL_ADDR(tensor1))
+        {/* for generating NBG */
+            vxoBinaryGraph_UpdateInputOutputPhysicalTable(tensor0->base.context, TENSOR_PHYSICAL_ADDR(tensor0), TENSOR_PHYSICAL_ADDR(tensor1));
+        }
+    }
+
+    /* update input or output for loading NBG */
+    if (tensor0->base.context->options.enableLoadNBG)
+    {
+        vxoBinaryGraph_UpdateInputOuput(tensor0->base.context, TENSOR_PHYSICAL_ADDR(tensor0), TENSOR_PHYSICAL_ADDR(tensor1));
+    }
 
     gcmFOOTER_ARG("%d", status);
     return status;
@@ -4012,4 +4392,182 @@ VX_API_ENTRY vx_status VX_API_CALL vxFlushHandle(vx_reference ref)
     return status;
 }
 
+VX_API_ENTRY vx_status VX_API_CALL vxMapTensorPatch(vx_tensor tensor, vx_size number_of_dims, const vx_size * view_start, const vx_size * view_end, vx_map_id * map_id, vx_size * stride, void ** ptr, vx_enum usage, vx_enum mem_type)
+{
+    vx_status status = VX_FAILURE;
+    vx_uint8 *buf = NULL;
+    vx_size size;
+    vx_uint32 i;
+    vx_memory_map_extra_s extra;
+
+    /* bad parameters */
+    if ((view_start == NULL) || (view_end == NULL) || (map_id == NULL) || (ptr == NULL) ||
+        (stride == NULL))
+    {
+        status = VX_ERROR_INVALID_PARAMETERS;
+        goto exit;
+    }
+
+    /* bad references */
+    if (vxoTensor_IsValidTensor(tensor) == vx_false_e)
+    {
+        status = VX_ERROR_INVALID_REFERENCE;
+        goto exit;
+    }
+
+    /* determine if virtual before checking for memory */
+    if (tensor->base.isVirtual == vx_true_e)
+    {
+        if (tensor->base.accessible == vx_false_e)
+        {
+            /* User tried to access a "virtual" tensor. */
+            vxError("Can not access a virtual tensor\n");
+            status = VX_ERROR_OPTIMIZED_AWAY;
+            goto exit;
+        }
+    }
+    if (tensor->tensorBuffer->memory.logicals[0] == NULL)
+    {
+        if (usage != VX_WRITE_ONLY || vxoTensor_AllocateMemory(tensor) != VX_SUCCESS)
+        {
+            vxError("Tensor memory was allocated failed!\n");
+            status = VX_ERROR_NO_MEMORY;
+            goto exit;
+        }
+    }
+
+    if (tensor->dimCount < number_of_dims || number_of_dims == 0)
+    {
+        vxError("Invalid number of patch dimensions\n");
+        status = VX_ERROR_INVALID_PARAMETERS;
+        goto exit;
+
+    }
+
+    if (vxoTensor_CheckTensorViewSizes(tensor->dims, view_start, view_end, number_of_dims) != 0)
+    {
+        vxError("Invalid view\n");
+        status = VX_ERROR_INVALID_PARAMETERS;
+        goto exit;
+    }
+
+    stride[0] = vxoTensor_GetDataSizeByFormat(tensor->dataFormat);
+    for (i = 1; i < number_of_dims; i++)
+    {
+        stride[i] = stride[i - 1] * tensor->dims[i-1];
+    }
+    //vx_map_id * map_id, vx_size * stride, void ** ptr
+
+    if (tensor->dimCount < number_of_dims || number_of_dims == 0)
+    {
+        vxError("Invalid number of patch dimensions\n");
+        status = VX_ERROR_INVALID_PARAMETERS;
+        goto exit;
+
+    }
+
+    size = stride[0];
+    for (i = 0; i < number_of_dims; i++)
+    {
+        size *= view_start[i] - view_end[i];
+    }
+
+    memcpy(extra.tensor_data.start, view_start, sizeof(vx_size) * number_of_dims);
+    memcpy(extra.tensor_data.end, view_end, sizeof(vx_size) * number_of_dims);
+    memcpy(extra.tensor_data.stride, stride, sizeof(vx_size) * number_of_dims);
+    extra.tensor_data.number_of_dims = number_of_dims;
+
+    if (vx_true_e == vxoContext_MemoryMap(tensor->base.context, (vx_reference)tensor, size, usage, mem_type, 0, &extra, (void **)&buf, map_id))
+    {
+        /* use the addressing of the internal format */
+        *ptr = buf;
+        vxoReference_Increment(&tensor->base, VX_REF_EXTERNAL);
+        if((tensor->useInternalMem == vx_false_e) && ((usage == VX_READ_ONLY) || (usage == VX_READ_AND_WRITE)))
+        {
+            {
+                gcoOS_CacheInvalidate(gcvNULL, tensor->tensorBuffer->memory.wrappedNode[0], tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.wrappedSize[0]);
+            }
+        }
+        status = VX_SUCCESS;
+    }
+    else
+    {
+        vxError("failed to map image\n");
+        status = VX_FAILURE;
+    }
+
+exit:
+    vxError("returned %d\n", status);
+    return status;
+}
+
+VX_API_ENTRY vx_status VX_API_CALL vxUnmapTensorPatch(vx_tensor tensor, const vx_map_id map_id)
+{
+       vx_status status = VX_FAILURE;
+
+    gcmHEADER_ARG("tensor=%p, map_id=%p", tensor, map_id);
+    gcmDUMP_API("$VX vxUnmapTensorPatch: tensor=%p, map_id=%p", tensor, map_id);
+
+    /* bad references */
+    if (!vxoTensor_IsValidTensor(tensor))
+    {
+        status = VX_ERROR_INVALID_REFERENCE;
+        goto exit;
+    }
+
+    /* bad parameters */
+    if (vxoContext_FindMemoryMap(tensor->base.context, (vx_reference)tensor, map_id) != vx_true_e)
+    {
+        status = VX_ERROR_INVALID_PARAMETERS;
+        vxError("Invalid parameters to unmap tensor patch\n");
+        gcmFOOTER_ARG("%d", status);
+        return status;
+    }
+
+    {
+        vx_context       context = tensor->base.context;
+        vx_memory_map_s* map     = &context->memoryMaps[map_id];
+        vx_enum usage = map->usage;
+
+        if (map->used &&
+            map->ref == (vx_reference)tensor)
+        {
+            /* freeing mapping buffer */
+            vxoContext_MemoryUnmap(context, map_id);
+
+            vxoReference_Decrement(&tensor->base, VX_REF_EXTERNAL);
+
+            status = VX_SUCCESS;
+
+            if((tensor->useInternalMem == vx_false_e) && ((usage == VX_WRITE_ONLY) || (usage == VX_READ_AND_WRITE)))
+            {
+                gcoOS_CacheFlush(gcvNULL, tensor->tensorBuffer->memory.wrappedNode[0], tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.wrappedSize[0]);
+            }
+            else if((tensor->useInternalMem == vx_true_e) &&
+                    ((usage == VX_WRITE_ONLY) || (usage == VX_READ_AND_WRITE)) &&
+                    (tensor->tensorBuffer->memory.wrapFlag == gcvALLOC_FLAG_USERMEMORY))
+            {
+                {
+                    if(tensor->tensorBuffer->memory.nodePtrs[0] && (tensor->tensorBuffer->memory.nodePtrs[0]->logical != tensor->tensorBuffer->memory.logicals[0]))
+                    {
+                        vx_uint32 size = 0;
+                        vxoTensor_GetTensorSize(tensor, &size);
+                        if(size > 0)
+                            gcoOS_MemCopy(tensor->tensorBuffer->memory.nodePtrs[0]->logical, tensor->tensorBuffer->memory.logicals[0], (vx_size)size);
+                    }
+                }
+            }
+        }
+        else
+        {
+            vxError("failed to unmap tensor\n");
+            status = VX_FAILURE;
+        }
+    }
+
+exit:
+    gcmFOOTER_ARG("%d", status);
+    return status;
+ //   return VX_ERROR_NOT_SUPPORTED;
+}
 

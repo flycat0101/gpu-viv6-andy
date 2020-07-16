@@ -102,7 +102,7 @@ vx_status vxHistogram(vx_node node, vx_image src, vx_distribution dist, vx_refer
             vx_uint8 constantData[16] = {0, 32, 64, 96, 0, 0, 0, 0, 16, 16, 16, 16, 0, 0, 0, 0};
 
             gcoOS_MemCopy(&kernelContext->uniforms[kernelContext->uniform_num].uniform, constantData, sizeof(constantData));
-            kernelContext->uniforms[kernelContext->uniform_num].num = sizeof(constantData) / sizeof(vx_uint8);
+            kernelContext->uniforms[kernelContext->uniform_num].num = vxmLENGTH_OF(constantData);
             kernelContext->uniforms[kernelContext->uniform_num++].index = 3;
         }
         {
@@ -411,7 +411,7 @@ vx_status vxEqualizeHist_hist(vx_node node, vx_image src, vx_image hist, vx_scal
 
     gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData, sizeof(constantData));
     kernelContext->uniforms[0].index = 3;
-    kernelContext->uniforms[0].num = sizeof(constantData) / sizeof(vx_uint32);
+    kernelContext->uniforms[0].num = vxmLENGTH_OF(constantData);
 
     gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, &height, sizeof(height));
     kernelContext->uniforms[1].index       = 4;
@@ -541,7 +541,7 @@ vx_status vxEqualizeHist_lut(vx_node node, vx_image src, vx_image hist, vx_image
 
     gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData, sizeof(constantData));
     kernelContext->uniforms[0].index = 3;
-    kernelContext->uniforms[0].num = sizeof(constantData) / sizeof(vx_uint32);
+    kernelContext->uniforms[0].num = vxmLENGTH_OF(constantData);
 
     gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, &height, sizeof(height));
     kernelContext->uniforms[1].index       = 4;

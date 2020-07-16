@@ -26,15 +26,15 @@ VX_INTERNAL_API gctUINT64 gcfVX_PerfStart(vx_reference ref)
     return start;
 }
 
-VX_INTERNAL_API vx_uint32 gcfVX_PerfEnd(vx_reference ref, gctUINT64 start)
+VX_INTERNAL_API vx_uint64 gcfVX_PerfEnd(vx_reference ref, gctUINT64 start)
 {
-    vx_uint32 interval = 0;
+    vx_uint64 interval = 0;
 
     if(ref->context->options.enableCNNPerf)
     {
         gctUINT64 end;
         gcoOS_GetTime(&end);
-        interval = (vx_uint32)(end - start);
+        interval = (vx_uint64)(end - start);
     }
 
     return interval;
@@ -48,16 +48,19 @@ VX_INTERNAL_API vx_uint32 gcfVX_PerfEnd(vx_reference ref, gctUINT64 start)
 #define GCREG_SH_INSTRUCTION_TYPE_UNSIGNED32 0x5
 #define GCREG_SH_INSTRUCTION_TYPE_UNSIGNED16 0x6
 #define GCREG_SH_INSTRUCTION_TYPE_UNSIGNED8 0x7
+#define   GCREG_SH_INSTRUCTION_TYPE_BFLOAT16                                 0x8
+#define   GCREG_SH_INSTRUCTION_TYPE_SIGNED64                                 0xA
 
 static gceSTATUS _FillImageInfoFromFormat(vx_df_image Format, gcsVX_IMAGE_INFO_PTR Info)
 {
     gceSTATUS status = gcvSTATUS_OK;
     gctUINT32 format = 0;
 
-    gcmHEADER_ARG("Format=%d Info=%d", Format, Info);
+    gcmHEADER_ARG("Format=%d Info=%p", Format, Info);
 
     switch(Format)
     {
+    case VX_DF_IMAGE_U1:
     case VX_DF_IMAGE_U8:
     case VX_DF_IMAGE_YUV4:
     case VX_DF_IMAGE_NV21:
@@ -156,6 +159,14 @@ static gceSTATUS _FillImageInfoFromFormat(vx_df_image Format, gcsVX_IMAGE_INFO_P
             /*BUGBUG: Info->internalFormat = gcvSURF_YUY4;*/
             break;
 
+        case VX_DF_IMAGE_U1:
+            Info->width = (Info->width + 7) / 8;
+            Info->planes = 1;
+            Info->bpp = 8;
+            Info->componentCount = 1;
+            Info->internalFormat = gcvSURF_R8;
+            break;
+
         case VX_DF_IMAGE_U8:
             Info->planes = 1;
             Info->bpp = 8;
@@ -199,7 +210,7 @@ static vx_status _SetBorderMode(vx_enum border, gctUINT32 *viv_border)
 {
     gceSTATUS status = gcvSTATUS_OK;
 
-    gcmHEADER_ARG("border=%d viv_border=%d", border, viv_border);
+    gcmHEADER_ARG("border=%d viv_border=%p", border, viv_border);
 
     switch(border)
     {
@@ -229,7 +240,7 @@ static gceSTATUS _BindInstructions(
     gceSTATUS                       status = gcvSTATUS_OK;
     gcoVX_Hardware_Context          *hwContext = &C->params;
 
-    gcmHEADER_ARG("C=%d", C);
+    gcmHEADER_ARG("C=%p", C);
 
     _SetBorderMode(C->borders, &hwContext->borders);
 
@@ -260,7 +271,7 @@ static gceSTATUS _BindInstructions(
     gceSTATUS                       status = gcvSTATUS_OK;
     gcoVX_Hardware_Context          *hwContext = gcvNULL;
 
-    gcmHEADER_ARG("C=%d", C);
+    gcmHEADER_ARG("C=%p", C);
 
 #if gcdVX_OPTIMIZER
     {
@@ -492,7 +503,7 @@ gcfVX_GetImageInfo(
     vx_df_image format;
     gcsSURF_NODE_PTR node = gcvNULL;
 
-    gcmHEADER_ARG("Context=%d", *Context);
+    gcmHEADER_ARG("Context=%p", Context);
 
 #if gcdVX_OPTIMIZER
     _SetBorderMode(Context->borders, &Info->border);
@@ -674,7 +685,14 @@ gcfVX_GetImageInfoFromTensor(
         Info->internalFormat = gcvSURF_R32;
         Info->isFloat = gcvFALSE;
         break;
-
+    case VX_TYPE_BFLOAT16:
+        Info->format = 0x6;
+        Info->planes = 1;
+        Info->bpp = 16;
+        Info->componentCount = 1;
+        Info->internalFormat = gcvSURF_R16;
+        Info->isFloat = gcvFALSE;
+        break;
     default:
         status = gcvSTATUS_INVALID_ARGUMENT;
         goto OnError;
@@ -703,7 +721,7 @@ static gceSTATUS _GetInfo(gcoVX_Kernel_Context *Context)
     gcsVX_IMAGE_INFO_PTR global = gcvNULL;
     gcsSURF_NODE_PTR node = gcvNULL;
 
-    gcmHEADER_ARG("Context=%d", Context);
+    gcmHEADER_ARG("Context=%p", Context);
 
     Context->params.input_count = 0;
     Context->params.output_count = 0;
@@ -853,7 +871,7 @@ gceSTATUS gcfVX_BindObjects(
     gceSTATUS status = gcvSTATUS_OK;
     vx_uint32 i = 0;
 
-    gcmHEADER_ARG("Context=%d", Context);
+    gcmHEADER_ARG("Context=%p", Context);
 
     for(i = 0; i < Context->objects_num; i++)
     {
@@ -894,7 +912,7 @@ gceSTATUS gcfVX_Commit(
     gceSTATUS status = gcvSTATUS_OK;
     vx_uint32 i = 0;
 
-    gcmHEADER_ARG("Context=%d", Context);
+    gcmHEADER_ARG("Context=%p", Context);
 
     for(i = 0; i < Context->objects_num; i++)
     {
@@ -923,7 +941,7 @@ static gceSTATUS _SyncMemoryForOutPut(gcoVX_Kernel_Context *Context)
     gceSTATUS status = gcvSTATUS_OK;
     vx_uint32 i = 0, plane = 0;
 
-    gcmHEADER_ARG("Context=%d", Context);
+    gcmHEADER_ARG("Context=%p", Context);
 
     for(i = 0; i < Context->objects_num; i++)
     {
@@ -969,7 +987,7 @@ static gceSTATUS _RunKernel(gcoVX_Kernel_Context *Context)
 {
     gceSTATUS status = gcvSTATUS_OK;
 
-    gcmHEADER_ARG("Context=%d", Context);
+    gcmHEADER_ARG("Context=%p", Context);
 
     gcmASSERT(gcoVX_VerifyHardware());
     /* get infos from objects*/
@@ -1041,7 +1059,7 @@ gcfVX_Kernel(
 {
     gceSTATUS status;
 
-    gcmHEADER_ARG("Context=%d", Context);
+    gcmHEADER_ARG("Context=%p", Context);
 
     gcmONERROR(_RunKernel(Context));
 
@@ -1111,7 +1129,7 @@ gcfVX_CaptureState(
 {
     gceSTATUS status = gcvSTATUS_OK;
 
-    gcmHEADER_ARG("CaptureBuffer=0x%x InputSizeInByte=%d pOutputSizeInByte=0x%x Enabled=%d dropCommandEnabled=%d",
+    gcmHEADER_ARG("CaptureBuffer=%p InputSizeInByte=%d pOutputSizeInByte=%p Enabled=%d dropCommandEnabled=%d",
                    CaptureBuffer, InputSizeInByte, pOutputSizeInByte, Enabled, dropCommandEnabled);
 
     gcmASSERT(gcoVX_VerifyHardware());

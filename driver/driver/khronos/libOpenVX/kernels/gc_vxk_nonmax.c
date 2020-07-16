@@ -54,7 +54,7 @@ vx_status vxNonMaxSuppressionCanny(vx_node node, vx_image i_mag, vx_image i_ang,
 
     gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData, sizeof(constantData));
     kernelContext->uniforms[0].index = 3;
-    kernelContext->uniforms[0].num = sizeof(constantData) / sizeof(vx_uint32);
+    kernelContext->uniforms[0].num = vxmLENGTH_OF(constantData);
     kernelContext->uniform_num = 1;
 
     kernelContext->params.kernel   = gcvVX_KERNEL_NONMAXSUPPRESSION_CANNY;
@@ -146,7 +146,7 @@ vx_status vxEuclideanNonMax_Max(vx_node node, vx_image src, vx_scalar thr, vx_sc
             vx_int32 bin[4] = {1, src->width, src->height};
             gcoOS_MemCopy(&kernelContext->uniforms[kernelContext->uniform_num].uniform, bin, sizeof(bin));
             kernelContext->uniforms[kernelContext->uniform_num].index = 3;
-            kernelContext->uniforms[kernelContext->uniform_num].num = sizeof(bin) / sizeof(vx_int32);
+            kernelContext->uniforms[kernelContext->uniform_num].num = vxmLENGTH_OF(bin);
             kernelContext->uniform_num ++;
         }
 
@@ -203,7 +203,7 @@ vx_status vxEuclideanNonMax_Sort(vx_node node, vx_scalar point_count, vx_image p
 
     gcoOS_MemCopy(&kernelContext->uniforms[kernelContext->uniform_num].uniform, constantData, sizeof(constantData));
     kernelContext->uniforms[kernelContext->uniform_num].index = 3;
-    kernelContext->uniforms[kernelContext->uniform_num].num = sizeof(constantData) / sizeof(vx_int32);
+    kernelContext->uniforms[kernelContext->uniform_num].num = vxmLENGTH_OF(constantData);
     kernelContext->uniform_num ++;
 
     kernelContext->node = node;
@@ -259,7 +259,7 @@ vx_status vxEuclideanNonMaxSuppression_NonMax(vx_node node, vx_image arrays, vx_
         vx_int32 bin[4] = {30, -30, 1, -1};
         gcoOS_MemCopy(&kernelContext->uniforms[kernelContext->uniform_num].uniform, bin, sizeof(bin));
         kernelContext->uniforms[kernelContext->uniform_num].index = 3;
-        kernelContext->uniforms[kernelContext->uniform_num].num = sizeof(bin) / sizeof(vx_int32);
+        kernelContext->uniforms[kernelContext->uniform_num].num = vxmLENGTH_OF(bin);
         kernelContext->uniform_num ++;
     }
 

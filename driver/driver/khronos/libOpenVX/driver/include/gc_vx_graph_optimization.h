@@ -112,6 +112,7 @@ typedef enum _node_op_type_e
     OP_RELU1                    = 0x1<<15,
     OP_RELU6                    = 0x1<<16,
     OP_PRELU                    = 0x1<<17,
+    OP_LEAKYRELU                = 0x1<<18,
     OP_CONVOLUTION_RELU         = OP_CONVOLUTION | OP_RELU,
     OP_FULLYCONNECTED_RELU      = OP_FULLYCONNECTED | OP_RELU,
     OP_CONVOLUTION_POOLING      = OP_CONVOLUTION | OP_POOLING,

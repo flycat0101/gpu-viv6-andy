@@ -1627,6 +1627,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
     vx_uint32 stride_x = 1;
     vx_uint32 stride_y = 1;
     vx_int32 depth_mul = 0;
+    vx_uint32 mergedNodeCount = 0;
+    vx_int32 interZeroPoint[MERGED_NODE_COUNT_MAX] = {0};
+    vx_float32 interScale[MERGED_NODE_COUNT_MAX] = {0.f};
+    vx_enum interDataType[MERGED_NODE_COUNT_MAX] = {VX_TYPE_INVALID};
     vx_enum src_rank_mode = VX_TENSOR_RANK_WHCN;
     vx_enum convert_dst_format = VX_TYPE_CHAR;
     vx_int32 pad_const = TENSOR_TF_ZEROPOINT(inputs);
@@ -1634,6 +1638,9 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
     vx_reference    parameters[] = {
         (vx_reference)inputs,
         (vx_reference)weights_biases,
+        VX_NULL,
+        VX_NULL,
+        VX_NULL,
         VX_NULL,
         VX_NULL,
         VX_NULL,
@@ -1677,6 +1684,23 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
         depth_mul =  conv_ext.depth_multiplier;
         src_rank_mode = conv_ext.src_rank_mode;
         convert_dst_format = conv_ext.convert_dst_format;
+    }
+    else if (size_of_convolution_relu_pooling_params == sizeof(vx_nn_convolution_relu_pooling_params_ext3_t))
+    {
+        vx_nn_convolution_relu_pooling_params_ext3_t conv_ext = *((vx_nn_convolution_relu_pooling_params_ext3_t*)(convolution_relu_pooling_params));
+        stride_x = conv_ext.ext2.ext.stride_x;
+        stride_y = conv_ext.ext2.ext.stride_y;
+        depth_mul =  conv_ext.ext2.depth_multiplier;
+        src_rank_mode = conv_ext.ext2.src_rank_mode;
+        convert_dst_format = conv_ext.ext2.convert_dst_format;
+        mergedNodeCount = conv_ext.mergedNodeCount;
+        if(mergedNodeCount > 0)
+        {
+            gcoOS_MemCopy(interScale, conv_ext.interScale, sizeof(vx_float32) * mergedNodeCount);
+            gcoOS_MemCopy(interZeroPoint, conv_ext.interZeroPoint, sizeof(vx_int32) * mergedNodeCount);
+            gcoOS_MemCopy(interDataType, conv_ext.interDataType, sizeof(vx_enum) * mergedNodeCount);
+            vxmASSERT(mergedNodeCount <= MERGED_NODE_COUNT_MAX);
+        }
     }
     else if (size_of_convolution_relu_pooling_params != sizeof(vx_nn_convolution_relu_pooling_params_t))
     {
@@ -1867,6 +1891,44 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)parameters[22]), "%s[%d]: Get parameters[22] reference failed!\n", __FUNCTION__, __LINE__);
         gcmFOOTER_NO();
         return (vx_node)parameters[22];
+    }
+    if(mergedNodeCount > 0)
+    {
+        vx_array mergedScale = vxCreateArray(context, VX_TYPE_FLOAT32, mergedNodeCount);/*Scale*/
+        vx_array mergedZeroPoint = vxCreateArray(context, VX_TYPE_INT32, mergedNodeCount);/*ZeroPoint*/
+        vx_array mergedDataType = vxCreateArray(context, VX_TYPE_ENUM, mergedNodeCount);/*ZeroPoint*/
+
+        if (!vxoArray_AllocateMemory(mergedScale))
+        {
+            gcmFOOTER_NO();
+            return VX_NULL;
+        }
+        else
+        {
+            memcpy(mergedScale->memory.logicals[0], interScale, sizeof(vx_float32) * mergedNodeCount);
+            parameters[23]  = (vx_reference)mergedScale;
+        }
+
+        if (!vxoArray_AllocateMemory(mergedZeroPoint))
+        {
+            gcmFOOTER_NO();
+            return VX_NULL;
+        }
+        else
+        {
+            memcpy(mergedZeroPoint->memory.logicals[0], interZeroPoint, sizeof(vx_int32) * mergedNodeCount);
+            parameters[24]  = (vx_reference)mergedZeroPoint;
+        }
+        if (!vxoArray_AllocateMemory(mergedDataType))
+        {
+            gcmFOOTER_NO();
+            return VX_NULL;
+        }
+        else
+        {
+            memcpy(mergedDataType->memory.logicals[0], interDataType, sizeof(vx_enum) * mergedNodeCount);
+            parameters[25]  = (vx_reference)mergedDataType;
+        }
     }
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_CONVOLUTION_RELU_POOLING_LAYER2, parameters, vxmLENGTH_OF(parameters));
@@ -2392,6 +2454,51 @@ VX_API_ENTRY vx_node VX_API_CALL vxNormalizationLayer(
 
 }
 
+VX_API_ENTRY vx_node VX_API_CALL vxLocalResponseNormalizationLayer(
+    vx_graph graph,
+    vx_tensor inputs,
+    vx_enum type,
+    vx_size normalization_size,
+    vx_float32 alpha,
+    vx_float32 beta,
+    vx_float32 bias,
+    vx_tensor outputs)
+{
+    vx_context context = vxGetContext((vx_reference)graph);
+    vx_node    node;
+    vx_uint32 norm_size = 0;
+    vx_scalar type_s = vxCreateScalar(context, VX_TYPE_ENUM, &type);
+    vx_scalar norm_size_s = VX_NULL;
+    vx_scalar alpha_s = vxCreateScalar(context, VX_TYPE_INT32, &alpha);
+    vx_scalar beta_s = vxCreateScalar(context, VX_TYPE_INT32, &beta);
+    vx_scalar bias_s = vxCreateScalar(context, VX_TYPE_INT32, &bias);
+    vx_reference    parameters[] = {
+         (vx_reference)inputs,
+         (vx_reference)type_s,
+         VX_NULL,
+         (vx_reference)alpha_s,
+         (vx_reference)beta_s,
+         (vx_reference)bias_s,
+         (vx_reference)outputs
+    };
+    gcmHEADER_ARG("graph=%p, inputs=%p, type=0x%x, normalization_size=0x%lx, alpha=%f, beta=%f, outputs=%p", graph, inputs, type, normalization_size, alpha, beta, outputs);
+    gcmDUMP_API("$VX vxNormalizationLayer: graph=%p, inputs=%p, type=0x%x, normalization_size=0x%lx, alpha=%f, beta=%f, outputs=%p", graph, inputs, type, normalization_size, alpha, beta, outputs);
+
+    gcmSAFECASTSIZET(norm_size, normalization_size);
+    norm_size_s = vxCreateScalar(context, VX_TYPE_INT32, &norm_size);
+    parameters[2] = (vx_reference)norm_size_s;
+    node = vxoNode_CreateSpecific(graph, VX_KERNEL_LOCAL_RESPONSE_NORMALIZATION_LAYER, parameters, vxmLENGTH_OF(parameters));
+
+    vxReleaseScalar(&type_s);
+    vxReleaseScalar(&norm_size_s);
+    vxReleaseScalar(&alpha_s);
+    vxReleaseScalar(&beta_s);
+    vxReleaseScalar(&bias_s);
+    gcmFOOTER_NO();
+    return node;
+
+}
+
 VX_API_ENTRY vx_node VX_API_CALL vxActivationLayer(
     vx_graph graph,
     vx_tensor inputs,
@@ -2406,8 +2513,6 @@ VX_API_ENTRY vx_node VX_API_CALL vxActivationLayer(
     vx_scalar func_s      = VX_NULL;
     vx_scalar a_s         = VX_NULL;
     vx_scalar b_s         = VX_NULL;
-    vx_int32 a_int;
-    vx_int32 b_int;
 
     vx_reference    parameters[] = {
     (vx_reference)inputs,
@@ -2427,26 +2532,14 @@ VX_API_ENTRY vx_node VX_API_CALL vxActivationLayer(
         gcmFOOTER_NO();
         return (vx_node)func_s;
     }
-    if(a > gcvMAXINT32)
-        a_int = gcvMAXINT32;
-    else if(a < (vx_int32)gcvMININT32)
-        a_int = (vx_int32)gcvMININT32;
-    else
-        a_int = (vx_int32)a;
 
-    if(b > gcvMAXINT32)
-        b_int = gcvMAXINT32;
-    else if(b < (vx_int32)gcvMININT32)
-        b_int = (vx_int32)gcvMININT32;
-    else
-        b_int = (vx_int32)b;
-    a_s = vxCreateScalar(context, VX_TYPE_INT32, &a_int);
+    a_s = vxCreateScalar(context, VX_TYPE_FLOAT32, &a);
     if (vxoReference_GetStatus((vx_reference)a_s) != VX_SUCCESS)
     {
         gcmFOOTER_NO();
         return (vx_node)a_s;
     }
-    b_s = vxCreateScalar(context, VX_TYPE_INT32, &b_int);
+    b_s = vxCreateScalar(context, VX_TYPE_FLOAT32, &b);
     if (vxoReference_GetStatus((vx_reference)b_s) != VX_SUCCESS)
     {
         gcmFOOTER_NO();
@@ -5508,5 +5601,21 @@ VX_API_ENTRY vx_node VX_API_CALL vxCopyNode(vx_graph graph, vx_reference input, 
 
     gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_COPY, parameters, vxmLENGTH_OF(parameters));
+}
+
+VX_API_ENTRY vx_node VX_API_CALL vxWeightedAverageNode(vx_graph graph, vx_image input0, vx_scalar alpha, vx_image input1, vx_image output)
+{
+    vx_reference parameters[] = {
+        (vx_reference)input0,
+        (vx_reference)alpha,
+        (vx_reference)input1,
+        (vx_reference)output
+    };
+
+    gcmHEADER_ARG("graph=%p, input0=%p, alpha=%p, input1=%p, output=%p", graph, input0, alpha, input1, output);
+    gcmDUMP_API("$VX vxWeightedAverageKernelNode: graph=%p, input0=%p, alpha=%p, input1=%p, output=%p", graph, input0, alpha, input1, output);
+
+    gcmFOOTER_NO();
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_WEIGHTED_AVERAGE, parameters, vxmLENGTH_OF(parameters));
 }
 

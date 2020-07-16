@@ -60,7 +60,7 @@ VX_API_ENTRY vx_parameter VX_API_CALL vxGetKernelParameterByIndex(vx_kernel kern
         gcmFOOTER_NO();
         return VX_NULL;
     }
-    if (index >= VX_MAX_PARAMETERS || index >= kernel->signature.paramCount)
+    if (index >= kernel->signature.paramCount)
     {
         gcmFOOTER_NO();
         return (vx_parameter)vxoContext_GetErrorObject(kernel->base.context, VX_ERROR_INVALID_PARAMETERS);

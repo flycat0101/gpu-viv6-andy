@@ -33,15 +33,23 @@ EXTRA_INCVPATH += $(driver_root)/sdk/inc
 EXTRA_INCVPATH += $(driver_root)/arch/XAQ2/cmodel/inc
 EXTRA_INCVPATH += $(driver_root)/compiler/libVSC/include
 EXTRA_INCVPATH += $(driver_root)/hal/os/qnx/user
+ifeq ($(ORI_NNARCHPERF),1)
 EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/libarchmodel/include
+else
+EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/libarchmodelInterface/include
+endif
 EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/driver/include
 EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/kernels
+
 ifeq ($(USE_VXC_BINARY),1)
 EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/libkernel/libnngpu
 EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/libkernel/libnnvxc
 EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/libkernel/libovx12
 endif
-
+ifneq ($(ORI_NNARCHPERF),1)
+EXTRA_INCVPATH += $(driver_root)/arch/vipArchPerfMdl_dev/vipArchPerf
+EXTRA_INCVPATH += $(driver_root)/arch/vipArchPerfMdl_dev/libarchmodelSw/include
+endif
 # from libCL (trunk/driver/khronos/libCL/makefile.linux)
 # Core
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_target.o
@@ -123,8 +131,10 @@ SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_layer
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_gpu_layer.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_nn_util.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_nn_encoder.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_nn_wb.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_nn_command.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_binary.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_sys.o
 
 #SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/extension/gc_vxc_interface.o
 # Kernels
@@ -191,13 +201,21 @@ EXCLUDE_OBJS += $(addsuffix .o, $(notdir $(filter-out $(basename $(SOURCE_OBJECT
 
 include $(MKFILES_ROOT)/qmacros.mk
 
+#For original nnarchperf
+ifeq ($(ORI_NNARCHPERF),1)
 STATIC_LIBS += archmodelS
+else
+STATIC_LIBS += archmodelInterface
+endif
 $(foreach lib, $(STATIC_LIBS), $(eval LIBPREF_$(lib) = -Bstatic))
 $(foreach lib, $(STATIC_LIBS), $(eval LIBPOST_$(lib) = -Bdynamic))
 
 LIBS += $(STATIC_LIBS)
+ifeq ($(ORI_NNARCHPERF),1)
 LIBS += CLC VSC GAL
-
+else
+LIBS += CLC VSC GAL ArchModelSw
+endif
 #CCFLAGS += -DCL_USE_DEPRECATED_OPENCL_1_0_APIS
 #CCFLAGS += -DCL_USE_DEPRECATED_OPENCL_1_1_APIS
 #CCFLAGS += -DBUILD_OPENCL_12=1

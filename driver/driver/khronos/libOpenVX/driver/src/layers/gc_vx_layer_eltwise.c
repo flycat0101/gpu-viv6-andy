@@ -393,7 +393,7 @@ VX_PRIVATE_API vx_bool vxoNNTensorAdd_TP_Support(vx_node node, const vx_referenc
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
     swExe_flag = (TENSOR_DIM_NUM(output) > 4);
     support = support && vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_ADD);
-    support = support && vxnneIsTPSupportFormat(context, input0, VX_NULL, output);
+    support = support && vxnneIsTPSupportFormat(node->graph, input0, VX_NULL, output);
     support = support && (input0Format == input1Format);
     support = support && TENSOR_POS(input0) == TENSOR_POS(input1);
     support = support && TENSOR_QUANT_TYPE(input0) == TENSOR_QUANT_TYPE(input1);
@@ -478,7 +478,6 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint
     return status;
 }
 #endif
-
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorAdd_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
@@ -495,7 +494,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorAdd_Initializer(vx_node node, co
 
 OnError:
 #else
-
     vx_tensor input0   = (vx_tensor)parameters[0];
     vx_tensor input1   = (vx_tensor)parameters[1];
     vx_scalar policy   = (vx_scalar)parameters[2];
@@ -556,7 +554,7 @@ OnError:
     shExe_flag = format_flag  || enable_2d_tensor;
 
     if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_ADD) &&
-        vxnneIsTPSupportFormat(context, input0, VX_NULL, output) &&
+        vxnneIsTPSupportFormat(node->graph, input0, VX_NULL, output) &&
         (input0Format == input1Format) &&
         TENSOR_POS(input0) == TENSOR_POS(input1) &&
         TENSOR_QUANT_TYPE(input0) == TENSOR_QUANT_TYPE(input1) &&
@@ -706,7 +704,6 @@ exit:
     if (tensor_add_layer)
         gcoOS_Free(NULL, (gctPOINTER)tensor_add_layer);
 #endif
-
     return status;
 }
 
@@ -787,6 +784,7 @@ vx_status vxnneExecuteSWTensorSub(vxnne_operation operation)
 
     return VX_SUCCESS;
 }
+
 #if REGISTER_FRAME
 VX_PRIVATE_API vx_status vxoNNTensorSub_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
 {
@@ -1014,7 +1012,6 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations1(vxnne_layer ops_layer, vx_uin
     return status;
 }
 #endif
-
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorSub_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
@@ -1031,7 +1028,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorSub_Initializer(vx_node node, co
 
 OnError:
 #else
-
     vx_tensor input0   = (vx_tensor)parameters[0];
     vx_tensor input1   = (vx_tensor)parameters[1];
     vx_scalar policy   = (vx_scalar)parameters[2];
@@ -1171,7 +1167,6 @@ exit:
     if (tensor_sub_layer)
         gcoOS_Free(NULL, (gctPOINTER)tensor_sub_layer);
 #endif
-
     return status;
 }
 

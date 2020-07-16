@@ -56,11 +56,11 @@ vx_status vxTableLookup(vx_node node, vx_image src, vx_lut lut, vx_image dst)
 
         gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData, sizeof(constantData));
         kernelContext->uniforms[0].index       = 3;
-        kernelContext->uniforms[0].num         = sizeof(constantData) / sizeof(vx_uint32);
+        kernelContext->uniforms[0].num         = vxmLENGTH_OF(constantData);
 
         gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, bin, sizeof(bin));
         kernelContext->uniforms[1].index = 4;
-        kernelContext->uniforms[1].num = sizeof(bin) / sizeof(vx_uint8);
+        kernelContext->uniforms[1].num = vxmLENGTH_OF(bin);
         kernelContext->uniform_num = 2;
 
         kernelContext->params.kernel = gcvVX_KERNEL_TABLE_LOOKUP;
@@ -76,23 +76,23 @@ vx_status vxTableLookup(vx_node node, vx_image src, vx_lut lut, vx_image dst)
 
         gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData0, sizeof(constantData0));
         kernelContext->uniforms[0].index       = 3;
-        kernelContext->uniforms[0].num         = sizeof(constantData0) / sizeof(vx_uint32);
+        kernelContext->uniforms[0].num         = vxmLENGTH_OF(constantData0);
 
         gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, constantData1, sizeof(constantData1));
         kernelContext->uniforms[1].index       = 4;
-        kernelContext->uniforms[1].num         = sizeof(constantData1) / sizeof(vx_uint32);
+        kernelContext->uniforms[1].num         = vxmLENGTH_OF(constantData1);
 
         gcoOS_MemCopy(&kernelContext->uniforms[2].uniform, constantData2, sizeof(constantData2));
         kernelContext->uniforms[2].index       = 5;
-        kernelContext->uniforms[2].num         = sizeof(constantData2) / sizeof(vx_uint32);
+        kernelContext->uniforms[2].num         = vxmLENGTH_OF(constantData2);
 
         gcoOS_MemCopy(&kernelContext->uniforms[3].uniform, constantData3, sizeof(constantData3));
         kernelContext->uniforms[3].index       = 6;
-        kernelContext->uniforms[3].num         = sizeof(constantData3) / sizeof(vx_uint32);
+        kernelContext->uniforms[3].num         = vxmLENGTH_OF(constantData3);
 
         gcoOS_MemCopy(&kernelContext->uniforms[4].uniform, bin, sizeof(bin));
         kernelContext->uniforms[4].index = 7;
-        kernelContext->uniforms[4].num = sizeof(bin) / sizeof(vx_uint8);
+        kernelContext->uniforms[4].num = vxmLENGTH_OF(bin);
         kernelContext->uniform_num = 5;
 
         kernelContext->params.xstep = 8;

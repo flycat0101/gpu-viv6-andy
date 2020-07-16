@@ -91,7 +91,7 @@ vxoProfiler_Initialize(
         char* infoVersion = "1.3";
         char  infoRevision[255] = {'\0'};   /* read from hw */
         char  infoRenderer[255] = {'\0'};
-        char* infoDriver = "OpenVX 1.0.1";
+        char  infoDriver[32] = {'\0'};
         gceCHIPMODEL chipModel;
         gctUINT32 chipRevision;
         gctUINT offset = 0;
@@ -119,7 +119,9 @@ vxoProfiler_Initialize(
         gcoOS_StrCatSafe(infoRenderer, 9, "Vivante ");
         gcoOS_StrCatSafe(infoRenderer, 23, productName);
         gcmOS_SAFE_FREE(gcvNULL, productName);
-
+        offset = 0;
+        gcoOS_PrintStrSafe(infoDriver, gcmSIZEOF(infoDriver),
+                &offset, "OpenVX %u.%u", (VX_VERSION >> 8) & 0xFFU, VX_VERSION & 0xFFU);
         gcmWRITE_CONST(VPG_INFO);
 
         gcmWRITE_CONST(VPC_INFOCOMPANY);
@@ -180,6 +182,7 @@ vxoProfiler_Begin(
     {
         return status;
     }
+    gcoVX_Flush(gcvTRUE);
 
     gcoOS_GetTime(&context->profiler.frameStartTimeusec);
     gcoPROFILER_EnableCounters(context->halProfile, gcvCOUNTER_OP_FRAME);

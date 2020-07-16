@@ -14,5 +14,5 @@
 LIBRARY "libNNGPUBinary.dll"
 EXPORTS
 ; Framework API
-	GetBinaryPtr
+	GetGPUNNVXCBinaryPtr
 

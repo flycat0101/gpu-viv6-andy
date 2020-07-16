@@ -14,16 +14,48 @@
 #ifndef __GC_VX_BINARY_H__
 #define __GC_VX_BINARY_H__
 
-#define SH_COMMAND_ALIGN_SIZE             256
+/* set to 1, enable broker feature */
+#ifndef gcdUSE_BROKER
+#define gcdUSE_BROKER                     0
+#endif
+
+
+#define VX_MAX_SW_LAYER_NAME_LENGTH       64
 #define VX_MAX_LAYER_NAME_LENGTH          64
 #define VX_MAX_NAME_LEGTH                 64
-#define NN_MAX_DIMENSION                  4
-#define VX_MAX_NN_INOUT_PARAM_COUNT       1024
+#define VX_MAX_IO_NAME_LEGTH              64
+#define NN_MAX_DIMENSION                  6
+#define VX_MAX_NN_INOUT_PARAM_COUNT       2048
 #define VX_MAX_SH_OPERATION_STATE_SIZE    0xE00
 #define VX_MAX_NNTP_OPERATION_STATE_SIZE  0x200
 #define VX_MAX_INITIALIZE_COMMAND_SIZE    0xC00
 #define VX_MAX_SC_OPERATION_STATE_SIZE    0x400
 #define VX_MAX_WAIT_STATE_SIZE            0x200
+#define VX_MAX_TEMP_TENSORS_NUM           6144
+#define VX_MAX_SUPPORT_SWAP_TENSOR        8
+
+#if gcdUSE_BROKER
+#define VIPLILE_BROKER_LIB_NAME           "libVIPBroker.so"
+typedef vx_status (*vip_broker_func0)();
+typedef vx_status (*vip_broker_func1)(void *);
+typedef vx_status (*vip_broker_func2)(void *, void *, int);
+typedef vx_status (*vip_broker_func3)(void *, void *, int, int, void **);
+typedef vx_status (*vip_broker_func4)(void **, void *, unsigned int, unsigned int);
+typedef vx_status (*vip_broker_func5)(void *, void *);
+#endif
+
+typedef enum _vx_binary_query_inout_param_e
+{
+    VX_BINARY_QUERY_INOUT_NUM_OF_DIM        = 0,
+    VX_BINARY_QUERY_INOUT_DIMS              = 1,
+    VX_BINARY_QUERY_INOUT_DATA_FORMAT       = 2,
+    VX_BINARY_QUERY_INOUT_DATA_TYPE         = 3,
+    VX_BINARY_QUERY_INOUT_QUANT_FORMAT      = 4,
+    VX_BINARY_QUERY_INOUT_SCALE             = 5,
+    VX_BINARY_QUERY_INOUT_ZERO_POINT        = 6,
+    VX_BINARY_QUERY_INOUT_DFP               = 7,
+}
+vx_binary_query_inout_param_e;
 
 enum
 {
@@ -52,6 +84,13 @@ enum
     VX_BINARY_BUFFER_FORMAT_INT8   = 3, /* A 8 bit signed integer type of buffer data */
     VX_BINARY_BUFFER_FORMAT_UINT16 = 4, /* A 16 bit unsigned integer type of buffer data */
     VX_BINARY_BUFFER_FORMAT_INT16  = 5, /* A 16 signed integer type of buffer data */
+    VX_BINARY_BUFFER_FORMAT_CHAR   = 6, /*! \brief A char type of  data */
+    VX_BINARY_BUFFER_FORMAT_BFP16  = 7, /*! \brief A bfloat 16 type of  data */
+    VX_BINARY_BUFFER_FORMAT_INT32  = 8, /*! \brief A 32 bit integer type of  data */
+    VX_BINARY_BUFFER_FORMAT_UINT32 = 9, /*! \brief A 32 bit unsigned signed integer type of buffer */
+    VX_BINARY_BUFFER_FORMAT_INT64  = 10, /*! \brief A 64 bit signed integer type of  data */
+    VX_BINARY_BUFFER_FORMAT_UINT64 = 11, /*! \brief A 64 bit unsigned integer type of  data */
+    VX_BINARY_BUFFER_FORMAT_FP64   = 12, /*! \brief A 64 bit float type of buffer data */
 };
 
 enum
@@ -81,24 +120,12 @@ enum
     VX_BINARY_SOURCE_MISC_DYNAMIC_INPUT   = 6, /* source is misc dynamic input data */
     VX_BINARY_SOURCE_MISC_DYNAMIC_OUTPUT  = 7, /* source is misc dynamic output data */
     VX_BINARY_SOURCE_VIP_SRAM             = 8, /* VIP SRAM memory */
+
+    VX_BINARY_SOURCE_MULTIVIP_CHIPID      = 100, /* for multiVIP */
+    VX_BINARY_SOURCE_MULTIVIP_SYNC_CMDS   = 101,
     VX_BINARY_SOURCE_MAX,
 };
 
-enum
-{
-    VX_BINARY_DATA_FORMAT_FP32   = 0, /* A float type of buffer data */
-    VX_BINARY_DATA_FORMAT_FP16   = 1, /* A half float type of buffer data */
-    VX_BINARY_DATA_FORMAT_FP64   = 2, /* A double float type of  data */
-    VX_BINARY_DATA_FORMAT_UINT8  = 3, /* A 8 bit unsigned integer type of buffer data */
-    VX_BINARY_DATA_FORMAT_INT8   = 4, /* A 8 bit signed integer type of buffer data */
-    VX_BINARY_DATA_FORMAT_UINT16 = 5, /* A 16 bit unsigned integer type of buffer data */
-    VX_BINARY_DATA_FORMAT_INT16  = 6, /* A 16 signed integer type of buffer data */
-    VX_BINARY_DATA_FORMAT_CHAR   = 7, /* A char type of  data */
-    VX_BINARY_DATA_FORMAT_INT32  = 8, /* A 32 bit signed integer type of  data */
-    VX_BINARY_DATA_FORMAT_UINT32 = 9, /* A 32 bit unsigned integer type of  data */
-    VX_BINARY_DATA_FORMAT_INT64  = 10,/* A 64 bit signed integer type of  data */
-    VX_BINARY_DATA_FORMAT_UINT64 = 11,/* A 64 bit unsigned integer type of  data */
-};
 
 enum
 {
@@ -107,10 +134,18 @@ enum
     VX_BINARY_LOAD_STATUS_RUN = 2, /* binary running */
 };
 
+#if gcdUSE_BROKER
+typedef struct _broker_param_t {
+    void *buffer;
+    int size;
+} broker_param_t;
+#endif
+
 typedef enum _vx_binary_sw_operation_type_e
 {
     VX_BINARY_SW_OPERATION_NONE        = 0,
     VX_BINARY_SW_OPERATION_RPN         = 1,
+    VX_BINARY_SW_OPERATION_USER_CPU    = 2,
 }
 vx_binary_sw_operation_type_e;
 
@@ -127,9 +162,37 @@ typedef enum _vx_binary_operation_target_e
 }
 vx_binary_operation_target_e;
 
+typedef enum _vx_binary_patch_name_e
+{
+    VX_BINARY_PATCH_NAME_SCALE_NONE     = 0,
+    VX_BINARY_PATCH_NAME_SCALE_INPUT    = 1,
+    VX_BINARY_PATCH_NAME_SCALE_OUTPUT   = 2,
+    VX_BINARY_PATCH_NAME_SCALE_RATIO_X  = 3,
+    VX_BINARY_PATCH_NAME_SCALE_RATIO_Y  = 4,
+    VX_BINARY_PATCH_NAME_SCALE_OFFSET_X = 5,
+    VX_BINARY_PATCH_NAME_SCALE_OFFSET_Y = 6,
+}
+vx_binary_patch_name_e;
+
+/* layer buffer for sclaer engine layer */
+typedef struct _vx_binary_scale_layer_buffer_s
+{
+    vx_uint8_ptr                            buffer;
+    vx_uint32                               bufferPhy;
+    vx_uint32                               dimCount;
+    vx_uint32                               dims[NN_MAX_DIMENSION];
+    vx_enum                                 dataFormat;
+    vx_enum                                 dataType;
+    vx_enum                                 quantFormat;
+    vx_int32                                fixPointZeroPoint;
+    vx_float32                              tfScale;
+}
+vx_binary_scale_layer_buffer_s, *vx_binary_scale_layer_buffer;
+
 typedef struct _vx_binary_segment_base_s
 {
     vx_uint32           segmentType;
+    vx_char             name[64];
 }
 vx_binary_segment_base_s;
 
@@ -165,9 +228,44 @@ typedef struct _vx_binary_nn_layer_RPN_s
 }
 vx_binary_nn_layer_RPN_s;
 
-
+typedef struct _vx_binary_nn_layer_User_s
+{
+    vx_binary_segment_base_s                base;
+    vx_binary_layer_buffer                  buffers;
+    vx_uint32                               buffer_num;
+}
+vx_binary_nn_layer_User_s;
 
 /**************CPU Operation Layer Define End**********/
+
+typedef struct _vx_binary_nn_layer_scaler_s
+{
+    vx_binary_segment_base_s                base;
+    vx_image                                input;
+    vx_rectangle_t                          rect;
+    vx_scalar                               r_mean;
+    vx_scalar                               g_mean;
+    vx_scalar                               b_mean;
+    vx_scalar                               rgb_scale;
+    vx_scalar                               y_only;
+    vx_scalar                               output_rgb;
+
+    vx_binary_scale_layer_buffer_s          output_buf;
+
+    vx_uint32                               x_scale;
+    vx_uint32                               y_scale;
+
+    vx_uint16                               x_init_error;
+    vx_uint16                               y_init_error;
+    vx_uint16                               x_init_int_error;
+    vx_uint16                               y_init_int_error;
+    vx_uint32                               output_y_start;
+    vx_uint32                               output_y_end;
+
+    vx_uint32                               gpuId;
+    vx_bool                                 mGpuSync;
+}
+vx_binary_nn_layer_scaler_s;
 
 typedef struct _vx_binary_feature_database_s
 {
@@ -179,7 +277,8 @@ typedef struct _vx_binary_feature_database_s
 
     vx_uint8 core_count;         /* GPU core count */
 
-    vx_uint8 vsi_reserved1;
+    vx_uint8 device_id;          /* device index */
+
     vx_uint8 vsi_reserved2;
     vx_uint8 vsi_reserved3;
 
@@ -236,6 +335,13 @@ typedef struct _vx_binary_axi_sram_info_s
     vx_uint32                               sramSize;
 }
 vx_binary_axi_sram_info_s;
+
+typedef struct _vx_binary_vip_sram_info_s
+{
+    vx_uint32                               sramBase;
+    vx_uint32                               sramSize;
+}
+vx_binary_vip_sram_info_s;
 
 typedef struct _vx_binary_input_table_entrance
 {
@@ -343,6 +449,7 @@ typedef struct _vx_binary_layer_info_s
     vx_char                                layerName[VX_MAX_LAYER_NAME_LENGTH];
     vx_uint32                              layerId;
     vx_uint32                              operationCount;
+    vx_uint32                              uid;
 }
 vx_binary_layers_info_s;
 
@@ -378,6 +485,7 @@ vx_binary_sh_operation_info_s;
 typedef struct _vx_binary_sw_operation_info_s
 {
     vx_uint32                              swOperationType;
+    vx_char                                name[VX_MAX_SW_LAYER_NAME_LENGTH];
 }
 vx_binary_sw_operation_info_s;
 
@@ -389,6 +497,7 @@ typedef struct _vx_binary_patch_info_s
     vx_int32                               index;
     vx_uint32                              originalBaseAddress;
     vx_uint32                              transformation;
+    vx_uint32                              name;
 }
 vx_binary_patch_info_s;
 
@@ -409,6 +518,7 @@ typedef struct _vx_binary_input_output_info_s
     vx_int32                                fixedPointPos;
     vx_float32                              tfScale;
     vx_int32                                tfZeroPoint;
+    vx_char                                 name[VX_MAX_IO_NAME_LEGTH];
 }
 vx_binary_input_output_info_s;
 
@@ -431,8 +541,8 @@ vx_binary_layer_parameter_s;
 typedef struct _vx_binary_input_node_info_s
 {
     vx_node                                 node;
-    vx_uint32                               inputPhysical[VX_MAX_NN_INOUT_PARAM_COUNT];
-    vx_uint32                               paramIndex[VX_MAX_NN_INOUT_PARAM_COUNT];
+    vx_uint32                               *inputPhysical;
+    vx_uint32                               *paramIndex;
     vx_uint32                               count;
 }
 vx_binary_input_node_info_s;
@@ -449,7 +559,7 @@ typedef struct _vx_binary_save_s
     vx_uint32                                inputInPatchedPhysical[VX_MAX_NN_INOUT_PARAM_COUNT];
     vx_uint32                                inputInPatchedIndex[VX_MAX_NN_INOUT_PARAM_COUNT];
     vx_uint32                                inputInPatchedNum;
-    vx_binary_input_output_info_s            inputInfo[VX_MAX_NN_INOUT_PARAM_COUNT];
+    vx_binary_input_output_info_s            *inputInfo;
 
     vx_reference                             inputEntry[VX_MAX_NN_INOUT_PARAM_COUNT];
     vx_reference                             outputEntry[VX_MAX_NN_INOUT_PARAM_COUNT];
@@ -459,7 +569,7 @@ typedef struct _vx_binary_save_s
         vx_uint32                            size;
         vx_uint32                            tensorPhysical;
         vx_uint32                            LCDTIndex;
-    } tempTensorsPhysical[VX_MAX_TEMP_TENSORS];
+    } tempTensorsPhysical[VX_MAX_TEMP_TENSORS_NUM];
     vx_uint32                                numberOfTempTensorInfo;
 
     /* operation data info */
@@ -521,7 +631,7 @@ typedef struct _vx_binary_save_s
 
     vx_char                                  binaryFileName[256];
 
-    vx_binary_input_node_info_s              inputNode[VX_MAX_NN_INOUT_PARAM_COUNT];
+    vx_binary_input_node_info_s              *inputNode;
     vx_uint32                                inputNodeCount;
 
     vx_uint32                                savedOperationCount;
@@ -549,6 +659,18 @@ typedef struct _vx_binary_save_s
     vx_ptr                                   NBGBuffer;
     vx_uint32                                *NBGSize;
     vx_uint32                                NBGFileSize;
+    vx_uint32                                NBGInMemorySize;
+
+    vx_bool                                  supportDynInputShape;
+
+    vx_uint32                                tpOpNum;
+    vx_uint32                                nnOpNum;
+
+    vx_bool                                  saveScalerLayer;
+    vx_uint32                                saveInputCount;
+    vx_uint32                                saveOutputCount;
+
+    vx_uint32                               coreCountPerDevice[gcdMAX_MAJOR_CORE_COUNT];
 }
 vx_binary_save_s, *vx_binary_save;
 
@@ -589,6 +711,7 @@ typedef struct _vx_binary_fixed
     vx_binary_header_s                      header;
     vx_binary_memory_pool_info_s            poolTable;
     vx_binary_axi_sram_info_s               axiSramTable;
+    vx_binary_vip_sram_info_s               vipSramTable;
     vx_binary_entry_s                       layerTable;
     vx_binary_entry_s                       opeartionTable;
     vx_binary_entry_s                       LCDTable;
@@ -656,10 +779,29 @@ typedef struct _vx_binary_loader
     vx_binary_segment_s                     *segments;
     vx_uint32                               segmentsCount;
 
+    vx_bool                                 released;
+
     vx_binary_io_patch_info_s               *inputPatch;
     vx_binary_io_patch_info_s               *outputPatch;
 
     vx_uint32                               status;
+    void                                    *libUserLayerHandle;
+
+    /* for support update Scaler engine layer ROI */
+    vx_uint8_ptr                            scaleCommand;
+    vx_uint32                               scaleCommandSize;
+    vx_bool                                 scaleUpdateParam;
+    vx_binary_operation_info_s              scaleOp;
+    vx_binary_layer_parameter_s             scaleLayerParam;
+
+    /* for supporting swap tenor and swap tensor handle */
+    vx_uint32                               *inputPhyAddr[VX_MAX_SUPPORT_SWAP_TENSOR];
+    vx_uint32                               *inputPhyAddrCount;
+    vx_uint32                               *outputPhyAddr[VX_MAX_SUPPORT_SWAP_TENSOR];
+    vx_uint32                               *outputPhyAddrCount;
+
+    vx_uint32                               coreCountPerDevice[gcdMAX_MAJOR_CORE_COUNT];
+    vx_uint32                               *multiVIPSyncCmds;
 } vx_binary_loader_s;
 
 typedef struct _vx_binary_reader
@@ -679,6 +821,10 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_WrapNBGKernel(
 
 VX_INTERNAL_API vx_enum vxoBinaryGraph_ConvertToOVXDataType(
     vx_enum dataType
+    );
+
+VX_INTERNAL_API vx_status vxoBinaryGraph_SpecifyDeviceID(
+    vx_graph graph
     );
 
 VX_INTERNAL_API vx_status vxoBinaryGraph_GenerateStatesBuffer(
@@ -720,7 +866,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_ReleaseNBG(
     vx_binary_loader_s *binLoad
     );
 
-VX_INTERNAL_API void vxoBinaryGraph_SaveTPNNOperation(
+VX_INTERNAL_API vx_status vxoBinaryGraph_SaveTPNNOperation(
     vx_node node,
     vx_uint8_ptr cmdLogicalAddress,
     vx_uint32 cmdPhysicalAddress,
@@ -732,7 +878,10 @@ VX_INTERNAL_API void vxoBinaryGraph_SaveTPNNOperation(
     vxnne_tensor_info input,
     vxnne_tensor_info output,
     gctUINT32 inputPhyAddr,
-    gctUINT32 outputPhyAddr
+    gctUINT32 outputPhyAddr,
+    vx_op_param parameter,
+    vxnne_operation operation,
+    vx_uint32 cmdIndex
     );
 
 VX_INTERNAL_API vx_status vxoBinaryGraph_SaveShaderOperation(
@@ -756,6 +905,11 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveSWOperation(
     vxnne_operation operation
     );
 
+VX_INTERNAL_API vx_status vxoBinaryGraph_SaveScalerLayer(
+    vx_node node,
+    vxnne_operation operation
+    );
+
 VX_INTERNAL_API vx_status vxoBinaryGraph_SaveScalerOperation(
     vxnne_operation operation,
     gctUINT8_PTR stateBuffer,
@@ -773,6 +927,17 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_ReSaveInputAndPatchTable(
     vx_graph graph
     );
 
+VX_INTERNAL_API vx_status vxoBinaryGraph_UpdateInputOutputPhysicalTable(
+    vx_context context,
+    vx_uint32 oldPhysical,
+    vx_uint32 newPhysical
+    );
+
+VX_INTERNAL_API vx_status vxoBinaryGraph_UpdateInputOuput(
+    vx_context context,
+    vx_uint32 oldPhysical,
+    vx_uint32 newPhysical
+    );
 
 VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
     vx_graph graph
@@ -786,7 +951,21 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveNNTPStates(
     vx_node node,
     vx_uint32 cmdPhysical,
     gctUINT8 *captureBuffer,
-    vx_uint32 actualSize
+    vx_uint32 actualSize,
+    vx_uint32 gpuId,
+    vx_bool sync
+    );
+
+VX_INTERNAL_API vx_status vxoBinaryGraph_QueryInputOutputParamByIndex(
+    vx_binary_loader_s *binLoad,
+    vx_binary_input_output_info_s *ioPtr,
+    vx_int32 index,
+    vx_binary_query_inout_param_e param,
+    void *value
+    );
+
+VX_INTERNAL_API vx_status vxoBinaryGraph_StoreOperationPtr(
+    vxnne_operation operation
     );
 
 VX_INTERNAL_API void vxoBinaryGraph_CacheOrImport(
@@ -796,5 +975,26 @@ VX_INTERNAL_API void vxoBinaryGraph_ReleaseCache(
     vx_graph graph
     );
 
+#if gcdUSE_BROKER
+VX_INTERNAL_API vx_status vxoBinaryGraph_BrokerDestroy(
+    vx_context context
+    );
+
+VX_INTERNAL_API vx_status vxoBinaryGraph_BrokerInit(
+    vx_context context
+    );
+
+VX_INTERNAL_API vx_status vxoBinaryGraph_BrokerVerify(
+    vx_graph graph
+    );
+
+VX_INTERNAL_API vx_status vxoBinaryGraph_BrokerFinish(
+    vx_graph graph
+    );
+
+VX_INTERNAL_API vx_status vxoBinaryGraph_BrokerProcess(
+    vx_graph graph
+    );
+#endif
 #endif
 
