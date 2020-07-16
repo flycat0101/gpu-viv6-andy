@@ -6872,8 +6872,9 @@ VIR_Symbol_IsSymbolUnsupport(
     IN VIR_Symbol*          pSym
     );
 
+/* Check if a symbol can be indexing accessable, for now, only an array and a matrix can support this. */
 gctBOOL
-VIR_Symbol_NeedConsecutiveTemp(
+VIR_Symbol_IsIndexingAccessable(
     IN VIR_Shader*          pShader,
     IN VIR_Symbol*          pSym
     );
