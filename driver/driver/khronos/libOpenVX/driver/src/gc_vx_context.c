@@ -1047,7 +1047,7 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
     globalData->options.enableGraphDeleteSqueeze = 1;
     globalData->options.enableGraphWar1x1x1weight = 1;
     globalData->options.enableGraphAvgPoolandPWConv = 1;
-    globalData->options.enableGraphPtc = 0;
+    globalData->options.enableGraphPtc = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_GRAPH_TRANSFORM", &envctrl)) && envctrl)
     {
         vxoGlobalData_FetchOptionsForTransferGraph(globalData, envctrl);

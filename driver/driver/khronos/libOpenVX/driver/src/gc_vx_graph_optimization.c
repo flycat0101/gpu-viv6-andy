@@ -5751,6 +5751,15 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_pcq(vx_graph graph)
         vxoGraphOptimization_pcq_resetDeadChannel(node);
         weightData = vxoGraphOptimization_pcq_getFpWeightData(weight);
         vxoTensor_GetTensorElementCount(weight, &weightSize);
+#ifdef __ANDROID__
+        if(!vxoGraphOptimization_isV8((vx_reference)node))
+            goto exit;
+        if(VX_SUCCESS != vxoGraphOptimization_pcq_splitPerChannel(node))
+            goto exit;
+#else
+        vxoGraphOptimization_pcq_resetDeadChannel(node);
+        weightData = vxoGraphOptimization_pcq_getFpWeightData(weight);
+        vxoTensor_GetTensorElementCount(weight, &weightSize);
 
         /* check whether or not to requantize the weight to per tensor by the entropy*/
         quantizeEntropy = vxoGraphOptimization_pcq_optimizeEntropy(weightData, weightSize);
@@ -5764,16 +5773,16 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_pcq(vx_graph graph)
         else
         {
             /* requantized to per tensor */
-             vx_tensor newBias = VX_NULL;
-             vx_tensor newWeight = vxoGraphOptimization_pcq_perTensor(weight, weightData);
-             if(newWeight == VX_NULL)
-                 goto exit;
-             TENSOR_DATA_LIFETIME(newWeight) = TENSOR_DATA_LIFETIME(weight);
+            vx_tensor newBias = VX_NULL;
+            vx_tensor newWeight = vxoGraphOptimization_pcq_perTensor(weight, weightData);
+            if(newWeight == VX_NULL)
+                goto exit;
+            TENSOR_DATA_LIFETIME(newWeight) = TENSOR_DATA_LIFETIME(weight);
 
-             /*driver require bias' scale = input's scale * weight's scale*/
-             bias = (vx_tensor)node->paramTable[2];
-             if(bias)
-             {
+            /*driver require bias' scale = input's scale * weight's scale*/
+            bias = (vx_tensor)node->paramTable[2];
+            if(bias)
+            {
                 vx_float32 newScale = TENSOR_TF_SCALE(newWeight) * TENSOR_TF_SCALE((vx_tensor)node->paramTable[0]);
                 vx_tensor_create_params_t p = vxoGraphOptimization_createParamsForTensor(TENSOR_DIM_NUM(bias), TENSOR_SIZES(bias), VX_TYPE_INT32,
                                     VX_QUANT_AFFINE_SCALE, 0, 0, newScale);
@@ -5791,7 +5800,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_pcq(vx_graph graph)
                     vxnneSaveDataQuant((vx_type_e)TENSOR_DATA_TYPE(newBias), i, biasValue,
                         TENSOR_LOGICAL_ADDR(newBias), TENSOR_TF_ZEROPOINT(newBias), TENSOR_TF_SCALE(newBias), TENSOR_ROUNDING_MODE(newBias));
                 }
-             }
+            }
 
             vxoNode_SetParameter(node, 1, (vx_reference)newWeight);
             vxoNode_SetParameter(node, 2, (vx_reference)newBias);
@@ -5799,6 +5808,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_pcq(vx_graph graph)
             if(newBias) vxReleaseTensor(&newBias);
             if(newWeight) vxReleaseTensor(&newWeight);
         }
+#endif
 exit:
         if(weightData) vxFree(weightData);
     }
