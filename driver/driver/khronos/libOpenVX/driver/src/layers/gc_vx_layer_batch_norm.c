@@ -394,8 +394,8 @@ VX_PRIVATE_API vx_status vxoNNBatchNormalizationLayer_SH_EVIS_Initialize_Ext(vxn
         &batchnormLayer->batchnorm_sh_operation.base,
         0));
 
+    vxmONERROR(vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_NO_BATCH_BIT));
     vxmONERROR(vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_NO_BATCH_BIT));
-    vxmONERROR(vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 3, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_NO_BATCH_BIT));
 
     vxmONERROR(vxnneOperation_AddReference(&batchnormLayer->batchnorm_sh_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT));
     vxmONERROR(vxnneOperation_AddReference(&batchnormLayer->batchnorm_sh_operation.base, (vx_reference)weights, VXNNE_OPERATION_REFENRENCE_INPUT));
