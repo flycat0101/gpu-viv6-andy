@@ -32,7 +32,7 @@ extern GLuint fmtIndex2InputIndex[];
 #define __GL_PAGE_DIR_ENTRY(gc, linearAddr) (gctSIZE_T*)(*(gc->pageDirectoryBase + __GL_PDE_OFFSET(linearAddr)))
 #define __GL_PTE_OFFSET(linearAddr)     (((((gctSIZE_T)(linearAddr)) & pageTableMask) >> pageTableShift) * pageOffsetFactor)
 #define __GL_PTE_NOT_DIRTY(pteStatus)   ((((pteStatus) ^ 0x5) & 0x45) == 0x0)
-#define __GL_PTE_HASH_INDEX(addr)           (GLuint)(((GLuint64)((GLuint64 *)addr)) & 0x7fff)
+#define __GL_PTE_HASH_INDEX(addr)       (gctSIZE_T)(((gctSIZE_T)((gctSIZE_T *)addr)) & 0x7fff)
 #define __GL_PAGE_SIZE                  0x1000; /* 4KB */
 
 __GL_INLINE GLboolean __glPteInfoExistInHashTable(__GLcontext *gc, gctSIZE_T *ptePointer, __GLpteInfoHashTable *pteHashTable)
