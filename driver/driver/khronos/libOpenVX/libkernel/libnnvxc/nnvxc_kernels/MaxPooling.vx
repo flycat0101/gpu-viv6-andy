@@ -977,7 +977,7 @@ __kernel void vxcPooling_maxUint8knl13str1
     }
 }
 
-
+_viv_uniform int4 packedFP16Min;
 __kernel void vxcPooling_genMaxFp16toFp16(
     image2d_array_t   input,
     int               in_width,
@@ -997,13 +997,12 @@ __kernel void vxcPooling_genMaxFp16toFp16(
     gidx = gidx * stride.x - pad.x;
     gidy = gidy * stride.y - pad.y;
     int4 posin = (int4)(gidx, gidy, gidz, 0);
-    vxc_short8 valMin = {0xfbff,0xfbff,0xfbff,0xfbff,0xfbff,0xfbff,0xfbff,0xfbff};
     int4 bitExtractCoeff0 = (int4)(0x30201000, 0x70605040, 0x10101010, 0x10101010);
     int4 bitExtractCoeff1 = (int4)(0x40302010, 0x00706050, 0x10101010, 0x10101010);
     vxc_short8 src;
     vxc_half8 hfVal, hfMaxVal;
-    _viv_asm(COPY, hfVal, valMin, 16);
-    _viv_asm(COPY, hfMaxVal, valMin, 16);
+    _viv_asm(COPY, hfVal, packedFP16Min, 16);
+    _viv_asm(COPY, hfMaxVal, packedFP16Min, 16);
     if (kernelXis8x)
     {
         for (int x = 0; x <= kernelSize.x - 8; x += 8)
@@ -1032,7 +1031,7 @@ __kernel void vxcPooling_genMaxFp16toFp16(
             VXC_ReadImage2DArray(src, input, posin, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
             vxc_half8 hfSrc, hfSrcTmp;
             _viv_asm(COPY, hfSrc, src, 16);
-            _viv_asm(COPY, hfSrcTmp, valMin, 16);
+            _viv_asm(COPY, hfSrcTmp, packedFP16Min, 16);
             VXC_DP2x8(hfSrc, hfSrc, hfSrcTmp, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniFp16ExtractN_dp2x8);
             VXC_VertMax3_Half(hfVal, hfSrc, hfSrc, hfVal, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
         }
@@ -1044,10 +1043,7 @@ __kernel void vxcPooling_genMaxFp16toFp16(
         VXC_BitExtract(valTmp2, hfVal, hfVal, bitExtractCoeff1, VXC_MODIFIER_BIN(0, 0, 0));
         VXC_VertMax3_Half(hfMaxVal, valTmp1, valTmp2, hfMaxVal, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
     }
-    vxc_half8 minData, maxData;
-    _viv_asm(COPY, minData, packedGenMinData, 16);
-    _viv_asm(COPY, maxData, packedGenMaxData, 16);
-    VXC_Clamp_Half(hfMaxVal, hfMaxVal, minData, maxData, VXC_MODIFIER_CLAMP(0, 0, 0, 0));
+
     _viv_asm(COPY, src, hfMaxVal, 16);
     VXC_WriteImage2DArray(output, posout, src, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
 }
