@@ -1199,8 +1199,8 @@ struct __GLcontextRec
     ** They are used to be globals, since this is the thread safe driver, all globals are moved
     ** to gc context.
     */
-    GLuint64 *pageDirectoryBase;
-    GLuint64 fakePageTableEntry;
+    gctSIZE_T *pageDirectoryBase;
+    gctSIZE_T fakePageTableEntry;
     __GLvertexInfo *pCurrentInfoBufPtr;
     GLfloat *pVertexDataBufPtr;
 

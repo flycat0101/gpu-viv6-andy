@@ -77,7 +77,6 @@
 #define __GL_VERTEX_CACHE_BLOCK_SIZE        2000
 
 #define __GL_MAX_PTE_HASH_TABLE_SIZE        0x8000
-#define __GL_PTE_HASH_INDEX(addr)           (GLuint)(((GLuint64)((GLuint64 *)addr)) & 0x7fff)
 
 #define __GL_BEGIN_END_TAG_MASK         0x10
 #define __GL_DRAWARRAYS_TAG_MASK        0x100
@@ -339,7 +338,7 @@ typedef struct __GLvertexInfoRec {
     };
     union
     {
-        GLuint64 *ptePointer;
+        gctSIZE_T *ptePointer;
         GLint count;
     };
 } __GLvertexInfo;
@@ -348,13 +347,13 @@ typedef struct __GLpageTableEntryInfoRec {
     struct __GLpageTableEntryInfoRec *next;
     struct __GLpageTableEntryInfoRec *link;
     GLuint index;
-    GLuint64 *ptePointer;
+    gctSIZE_T *ptePointer;
 } __GLpageTableEntryInfo;
 
 typedef struct __GLpteInfoHashTableRec {
     __GLpageTableEntryInfo **hashTable;
     __GLpageTableEntryInfo *freeList;
-    GLuint64 *lastPtePtr[__GL_TOTAL_VERTEX_ATTRIBUTES];
+    gctSIZE_T *lastPtePtr[__GL_TOTAL_VERTEX_ATTRIBUTES];
 } __GLpteInfoHashTable;
 
 /*
