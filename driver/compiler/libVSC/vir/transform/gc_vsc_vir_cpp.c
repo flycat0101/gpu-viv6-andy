@@ -487,6 +487,7 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
     VIR_OpCode                      instOpcode = VIR_Inst_GetOpcode(inst);
     VIR_Operand                     *instDst = VIR_Inst_GetDest(inst);
     VIR_Instruction                 *defInst = gcvNULL;
+    VIR_TypeId                      srcOpndTypeId = VIR_Operand_GetTypeId(srcOpnd);
     gctBOOL                         srcOpndIsRelIndexing = (VIR_Operand_GetRelAddrMode(srcOpnd) != VIR_INDEXED_NONE);
     gctBOOL                         bCopyFromOutputParam = (VSC_CPP_GetFlag(cpp) & VSC_CPP_COPY_FROM_OUTPUT_PARAM);
     gctBOOL                         bHasUniqueDefInst = gcvFALSE;
@@ -735,6 +736,11 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                     }
                 }
 
+                if (VIR_TypeId_isPacked(srcOpndTypeId) && movSrcInfo.isVecConst)
+                {
+                    break;
+                }
+
                 /* update the DU, remove the usage of srcOpnd */
                 vscVIR_DeleteUsage(VSC_CPP_GetDUInfo(cpp),
                                    defInst,
@@ -751,13 +757,13 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                 VIR_Function_DupOperand(func, movSrc, &newSrc);
 
                 /* Use the component type for a immediate. */
-                if (VIR_Operand_isImm(newSrc))
+                if (VIR_Operand_isImm(newSrc) && !VIR_TypeId_isPacked(srcOpndTypeId))
                 {
-                    VIR_Operand_SetTypeId(newSrc, VIR_GetTypeComponentType(VIR_Operand_GetTypeId(srcOpnd)));
+                    VIR_Operand_SetTypeId(newSrc, VIR_GetTypeComponentType(srcOpndTypeId));
                 }
                 else
                 {
-                    VIR_Operand_SetTypeId(newSrc, VIR_Operand_GetTypeId(srcOpnd));
+                    VIR_Operand_SetTypeId(newSrc, srcOpndTypeId);
                 }
 
                 VIR_Operand_SetLShift(newSrc, VIR_Operand_GetLShift(srcOpnd));
@@ -835,7 +841,7 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                         VIR_Operand_SetTypeId(newSrc, VIR_GetTypeComponentType(VIR_Operand_GetTypeId(newSrc)));
                     }
                 }
-                else
+                else if (!VIR_TypeId_isPacked(srcOpndTypeId))
                 {
                     gcmASSERT(movSrcInfo.isImmVal);
                     VIR_Operand_SetSwizzle(newSrc, VIR_SWIZZLE_XXXX);
@@ -864,7 +870,7 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
             {
                 /* In the IR, there exists implict type conversion, thus we need to bail out if the types mismatch */
                 VIR_TypeId ty0 = VIR_Operand_GetTypeId(movDst);
-                VIR_TypeId ty1 = VIR_Operand_GetTypeId(srcOpnd);
+                VIR_TypeId ty1 = srcOpndTypeId;
 
                 if(!VIR_TypeId_isPrimitive(ty0)) {
                     ty0 = VIR_Type_GetBaseTypeId(VIR_Shader_GetTypeFromId(shader, ty0));
@@ -1287,7 +1293,7 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
 
                 /* duplicate movSrc */
                 {
-                    VIR_TypeId ty = VIR_Operand_GetTypeId(srcOpnd);
+                    VIR_TypeId ty = srcOpndTypeId;
 
                     VIR_Function_DupOperand(func, movSrc, &newSrc);
                     VIR_Operand_SetSwizzle(newSrc, newSwizzle);
