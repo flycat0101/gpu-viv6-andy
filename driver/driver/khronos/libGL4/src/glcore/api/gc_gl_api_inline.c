@@ -35,7 +35,7 @@ extern GLuint fmtIndex2InputIndex[];
 #define __GL_PTE_HASH_INDEX(addr)           (GLuint)(((GLuint64)((GLuint64 *)addr)) & 0x7fff)
 #define __GL_PAGE_SIZE                  0x1000; /* 4KB */
 
-__GL_INLINE GLboolean __glPteInfoExistInHashTable(__GLcontext *gc, GLuint64 *ptePointer, __GLpteInfoHashTable *pteHashTable)
+__GL_INLINE GLboolean __glPteInfoExistInHashTable(__GLcontext *gc, gctSIZE_T *ptePointer, __GLpteInfoHashTable *pteHashTable)
 {
     __GLpageTableEntryInfo *pteInfo;
     gctSIZE_T index;
