@@ -705,6 +705,11 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
                     batch > NN_IMAGE_XSIZE_MAX )
                     break;
             }
+            {
+                vx_tensor weight = (vx_tensor)node->paramTable[1];
+                if(VX_QUANT_AFFINE_SCALE_PER_CHANNEL == TENSOR_QUANT_TYPE(weight))
+                    break;
+            }
             if(VX_TENSOR_LIFE_TIME_STATIC == TENSOR_DATA_LIFETIME((vx_tensor)node->paramTable[1]) &&
                 VX_TENSOR_RANK_SN == TENSOR_RANK((vx_tensor)node->paramTable[1]) )
             {
