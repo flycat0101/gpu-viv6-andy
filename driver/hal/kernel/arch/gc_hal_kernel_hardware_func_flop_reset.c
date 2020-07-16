@@ -6442,7 +6442,7 @@ _ProgramTPKernel(
         gcvDUMP_BUFFER_KERNEL_COMMAND,
         bufferLogical,
         bufferAddress,
-        bytes
+        bufferBytes
         );
 #endif
 
