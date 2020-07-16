@@ -1286,6 +1286,7 @@ VSC_ErrCode vscVIR_CheckCstRegFileReadPortLimitation(VSC_SH_PASS_WORKER* pPassWo
                         VIR_Precision       precision;
                         VIR_TypeId          newTempRegTypeId, symTypeId;
                         gctBOOL             bUseSymType = gcvTRUE;
+                        gctBOOL             bIsPackedType = gcvFALSE;
 
                         opnd = VIR_Inst_GetSource(inst, j);
 
@@ -1359,6 +1360,8 @@ VSC_ErrCode vscVIR_CheckCstRegFileReadPortLimitation(VSC_SH_PASS_WORKER* pPassWo
                         newDstRegNo = 0;
                         precision = VIR_Operand_GetPrecision(opnd);
 
+                        bIsPackedType = VIR_TypeId_isPacked(VIR_Operand_GetTypeId(opnd));
+
                         /* For a virtual uniform of UBO, the type is always UINT_X4, so we need to use the type from operand. */
                         if (VIR_Symbol_GetUniformKind(pSym) == VIR_UNIFORM_VIRTUAL_FOR_UBO)
                         {
@@ -1368,7 +1371,9 @@ VSC_ErrCode vscVIR_CheckCstRegFileReadPortLimitation(VSC_SH_PASS_WORKER* pPassWo
                         /* if the symbol has the corresponding defInst and the operand has no indexing and relmode,
                             * use the dest symbol of the defInst in opnd to reduce a MOV instruction
                             */
-                        if (vscHTBL_DirectTestAndGet(replacedUniformSet, (void*)pSym, (void**)&pNewInsertedInst))
+                        if (!bIsPackedType
+                            &&
+                            vscHTBL_DirectTestAndGet(replacedUniformSet, (void*)pSym, (void**)&pNewInsertedInst))
                         {
                             VIR_Operand *dest = VIR_Inst_GetDest(pNewInsertedInst);
 
@@ -1438,7 +1443,11 @@ VSC_ErrCode vscVIR_CheckCstRegFileReadPortLimitation(VSC_SH_PASS_WORKER* pPassWo
                             }
 
                             /* Try to use the uniform type first so we can cover all channels. */
-                            if (bUseSymType)
+                            if (bIsPackedType)
+                            {
+                                newTempRegTypeId = VIR_TYPE_UINT_X4;
+                            }
+                            else if (bUseSymType)
                             {
                                 newTempRegTypeId = symTypeId;
                             }
@@ -1504,7 +1513,9 @@ VSC_ErrCode vscVIR_CheckCstRegFileReadPortLimitation(VSC_SH_PASS_WORKER* pPassWo
                             {
                                 VIR_Operand_SetRelIndexing(newOpnd, VIR_Operand_GetRelIndexing(opnd));
                             }
-                            if ((!VIR_Operand_GetIsConstIndexing(opnd)) &&
+
+                            if (!bIsPackedType &&
+                                (!VIR_Operand_GetIsConstIndexing(opnd)) &&
                                 (!VIR_Operand_GetMatrixConstIndex(opnd)) &&
                                 (VIR_Operand_GetRelAddrMode(opnd) == VIR_INDEXED_NONE))
                             {
