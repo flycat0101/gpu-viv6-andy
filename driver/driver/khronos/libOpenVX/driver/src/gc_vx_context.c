@@ -496,6 +496,13 @@ VX_PRIVATE_API void vxoGlobalData_FetchOptionsForTransferGraph(vx_global_data gl
 
 
     pos = gcvNULL;
+    if(gcoOS_StrStr(envctrl, "-perTenroConv:", &pos) && pos)
+    {
+        pos += sizeof("-perTenroConv:") - 1;
+        globalData->options.enableGraphPtc = atoi(pos);
+    }
+
+    pos = gcvNULL;
     if(gcoOS_StrStr(envctrl, "-WAR", &pos) && pos)
     {
         pos += sizeof("-WAR") -1;
@@ -1040,6 +1047,7 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
     globalData->options.enableGraphDeleteSqueeze = 1;
     globalData->options.enableGraphWar1x1x1weight = 1;
     globalData->options.enableGraphAvgPoolandPWConv = 1;
+    globalData->options.enableGraphPtc = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_GRAPH_TRANSFORM", &envctrl)) && envctrl)
     {
         vxoGlobalData_FetchOptionsForTransferGraph(globalData, envctrl);

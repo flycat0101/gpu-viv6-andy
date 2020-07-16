@@ -16,6 +16,8 @@
 #include <gc_vx_nn_wb.h>
 #include <gc_vx_nn_encoder.h>
 
+#define CONV_ENTROPY            (0.5f)
+#define DEPTHWISE_CONV_ENTROPY  (0.6f)
 #define _GC_OBJ_ZONE            gcdZONE_VX_GRAPH
 #define QUANT_BIT_WIDTH         (8)
 
@@ -136,6 +138,36 @@ VX_INTERNAL_API vx_reference vxoGraphOptimization_getOutputParameter(vx_node nod
     return output;
 }
 
+void swap(vx_float32 *a, vx_float32 *b)
+{
+    float temp;
+    temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+VX_INTERNAL_API void vxoGraphOptimization_quickSort(vx_float32 *data, vx_uint32 size, vx_uint32 begin, vx_uint32 end)
+{
+    int i, j;
+    if (begin < end) {
+        i = begin + 1;
+        j = end;
+        while (i < j) {
+            if(data[i] > data[begin]) {
+                swap(&data[i], &data[j]);
+                j--;
+            } else {
+                i++;
+            }
+        }
+        if (data[i] >= data[begin]) {
+            i--;
+        }
+        swap(&data[begin], &data[i]);
+        vxoGraphOptimization_quickSort(data, size, begin, i);
+        vxoGraphOptimization_quickSort(data, size, j, end);
+    }
+}
 VX_INTERNAL_API vx_uint32 vxoGraphOptimization_computeFinalKernelSize(vx_uint32 kernelsize, vx_uint32 stride)
 {
     vx_uint32 alignedWidth = ((kernelsize % stride == 0) ? kernelsize : (kernelsize + (stride - kernelsize % stride)));
@@ -1316,8 +1348,9 @@ VX_INTERNAL_API char * vxoGraphOptimization_getJsonStyleInfo(vx_graph graph)
         char layerName[20] = {0};
         vx_uint32 offset = 0;
         vx_node currentNode = nodeTable[idx];
+        vx_reference output = vxoGraphOptimization_getOutputParameter(currentNode);
 
-        gcoOS_PrintStrSafe(layerName, sizeof(layerName), &offset, "id_%d", currentNode->nodeID);
+        gcoOS_PrintStrSafe(layerName, sizeof(layerName), &offset, "id_%d_uid_%d", currentNode->nodeID, getUserIDFromOutputTensor(output));
 
         layer = vxoJson_CreateObject();
         vxoJson_AddItemToObject(layers,layerName,layer);
@@ -1369,6 +1402,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_LayerSwaping(vx_graph graph)
     for (nodeIndex = 0; nodeIndex < nodeCount; nodeIndex++)
     {
         vx_tensor leakyInput    = NULL;
+        vx_tensor leakyOutput   = VX_NULL;
         vx_tensor maxpoolOutput = NULL;
 
         leakyReluNode = graph->nodeTable[nodeIndex];
@@ -1386,8 +1420,11 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_LayerSwaping(vx_graph graph)
             continue;
 
         leakyInput     = (vx_tensor)leakyReluNode->paramTable[0];
+        leakyOutput    = (vx_tensor)vxoGraphOptimization_getOutputParameter(leakyReluNode);
         maxpoolOutput  = (vx_tensor)maxPoolNode->paramTable[maxPoolNode->numParameters - 1];
 
+        if(!vxoTensor_IsVirtualTensor(leakyOutput))
+            continue;
         {
             vx_tensor intermediaTensor = vxoGraphOptimization_cloneTensor(maxpoolOutput, graph, vxoTensor_IsVirtualTensor(maxpoolOutput));
             if(NULL == intermediaTensor)
@@ -1805,11 +1842,8 @@ VX_INTERNAL_API vx_node vxoGraphOptimization_transformConv(vx_graph graph, vx_te
         input, convOut, finalOutput, weight, bias, prelu_alpha, leakyRelu_perm);
     CHECK_NULL(wb);
 
-    if(depth_multiplier == 1)
-        node = vxConvolutionReluLayer(graph, input, wb, pad[0], pad[2], 0, overflow_policy, rounding_policy, down_scale_size_rounding, enable_relu, finalOutput);
-    else
-        node = vxConvolutionReluPoolingLayer2(graph, input, wb, (vx_nn_convolution_relu_pooling_params)&wb_params,
-            sizeof(wb_params), finalOutput);
+    node = vxConvolutionReluPoolingLayer2(graph, input, wb, (vx_nn_convolution_relu_pooling_params)&wb_params,
+        sizeof(wb_params), finalOutput);
 
     vxReleaseWeightsBiasesParameter(&wb);
     vxReleaseScalar(&vxPadConst);
@@ -5360,6 +5394,413 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_avgPoolAnd1x1Conv(vx_graph graph)
     return VX_SUCCESS;
 }
 
+/*convert quantized data to float data*/
+vx_float32* vxoGraphOptimization_pcq_getFpWeightData(vx_tensor perchannelWeight)
+{
+    vx_uint32 i = 0, cnt = 0;
+    vx_float32_ptr realData = VX_NULL;
+    vx_uint32 sliceCnt = 0;
+    vxmASSERT(perchannelWeight);
+
+    vxoTensor_GetTensorElementCount(perchannelWeight, &cnt);
+    realData = (vx_float32_ptr)vxAllocateAndZeroMemory(cnt * sizeof(vx_float32));
+    if(realData == VX_NULL)
+    {
+        vxError("fail to malloc memory\n");
+        return realData;
+    }
+    sliceCnt = cnt / TENSOR_TF_SCALE_COUNT(perchannelWeight);
+    for(i = 0; i < TENSOR_TF_SCALE_COUNT(perchannelWeight); i++)
+    {
+        vx_float32  scale   = TENSOR_TF_SCALES_WITH_INDEX(perchannelWeight, i);
+        vx_int32    zp      = TENSOR_TF_ZEROPOINTS_WITH_INDEX(perchannelWeight, i);
+        vx_uint32   k       = 0;
+        vx_uint8_ptr dataAddr = TENSOR_LOGICAL_ADDR(perchannelWeight) + i * sliceCnt * TENSOR_DATA_SIZE(perchannelWeight);
+
+        for(k = 0; k < sliceCnt; k++)
+        {
+            realData[k + sliceCnt * i] = vxnneGetDataQuant((vx_type_e)TENSOR_DATA_TYPE(perchannelWeight), k, dataAddr, zp, scale);
+        }
+    }
+    return realData;
+}
+
+/*convert quantized data to float data*/
+void vxoGraphOptimization_pcq_quantizeData2Tensor(vx_float32* fp32data, vx_tensor tensor)
+{
+    vx_uint32 i = 0, cnt = 0;
+    vx_uint8_ptr data = VX_NULL;
+    vxmASSERT(tensor);
+
+    vxoTensor_GetTensorElementCount(tensor, &cnt);
+    if(!vxoTensor_IsAllocated(tensor))
+        vxoTensor_AllocateMemory(tensor);
+
+    data = TENSOR_LOGICAL_ADDR(tensor);
+    for(i = 0; i < cnt; i++)
+    {
+        vxnneSaveDataQuant((vx_type_e)TENSOR_DATA_TYPE(tensor), i, fp32data[i], data,
+        TENSOR_TF_ZEROPOINT(tensor), TENSOR_TF_SCALE(tensor), TENSOR_ROUNDING_MODE(tensor));
+    }
+
+    return;
+}
+
+vx_float32 vxoGraphOptimization_pcq_optimizeEntropy(vx_float32 * weightData, vx_uint32 size)
+{
+    vx_uint32  i = 0;
+    vx_int32   j = 0, cnt = 0;
+    vx_float32 *noZeroData = (vx_float32 *)vxAllocateAndZeroMemory(sizeof(vx_float32) * size);
+    vx_float32 encoryp = 1.0f, sum = 0.0f;
+
+    if(noZeroData == VX_NULL)
+    {
+        vxError("fail to alloc memory");
+        goto exit;
+    }
+    for(i = 0; i < size; i++)
+    {
+        if(gcmABS(weightData[i]) < 1e-4f)
+            continue;
+        noZeroData[cnt++] = gcmABS(weightData[i]);
+    }
+
+    vxoGraphOptimization_quickSort(noZeroData, cnt, 0, cnt - 1);
+    for(j = 1; j < cnt + 1; j++)
+    {
+        encoryp += (2 * j - cnt - 1) * noZeroData[j - 1];
+        sum += noZeroData[j-1];
+    }
+    encoryp /=  (cnt * sum);
+
+exit:
+    if(noZeroData) vxFree(noZeroData);
+    return encoryp;
+}
+/*find the invalid channel of weight and reset the channel to 0,
+  and add the const value to bias*/
+vx_status vxoGraphOptimization_pcq_resetDeadChannel(vx_node node)
+{
+    vx_status   status      = VX_SUCCESS;
+    vx_uint32   i           = 0;
+    vx_uint32   weightCnt   = 0;
+    vx_uint32   sliceCnt    = 0;
+    vx_uint32   sliceSize   = 0;
+    vx_tensor   input       = (vx_tensor)node->paramTable[0];
+    vx_tensor   weight      = (vx_tensor)node->paramTable[1];
+    vx_tensor   bias        = (vx_tensor)node->paramTable[2];
+    vx_tensor   output      = (vx_tensor)vxoGraphOptimization_getOutputParameter(node);
+
+    vx_float32  inFpmax     = gcmMAX(0.0f, (255 - TENSOR_TF_ZEROPOINT(input)) * TENSOR_TF_SCALE(input));
+    vx_float32  inFpmin     = gcmMIN(0.0f, (0   - TENSOR_TF_ZEROPOINT(input)) * TENSOR_TF_SCALE(input));
+    vx_float32  outFpmax    = (255 - TENSOR_TF_ZEROPOINT(output)) * TENSOR_TF_SCALE(output);
+    vx_float32  outFpmin    = (0   - TENSOR_TF_ZEROPOINT(output)) * TENSOR_TF_SCALE(output);
+
+    vx_float32 *weightData  = vxoGraphOptimization_pcq_getFpWeightData(weight);
+    if(VX_NULL == weightData)
+    {
+        vxError("fail to alloc memory");
+        status = VX_FAILURE;
+        goto exit;
+    }
+
+    vxoTensor_GetTensorElementCount(weight, &weightCnt);
+    sliceCnt = weightCnt / TENSOR_TF_SCALE_COUNT(weight);
+    sliceSize = sliceCnt * TENSOR_DATA_SIZE(weight);
+
+    /*  compute the theoretical max and min of output, if max == min,
+        it can be considered that the channel's output is const value.
+        and we can add the const to bias*/
+    for(i = 0; i < TENSOR_TF_SCALE_COUNT(weight); i++)
+    {
+        vx_float32 cmax = 0.0f;
+        vx_float32 cmin = 0.0f;
+        vx_float32 plusSum = 0, minusSum = 0;
+        vx_uint32  j = 0;
+        vx_float32 *data = weightData + i * sliceSize;
+        vx_float32 biasData = ((vx_int32 *)TENSOR_LOGICAL_ADDR(bias))[i] * TENSOR_TF_SCALES_WITH_INDEX(bias, i);
+        for(j = 0; j < sliceCnt; j++)
+        {
+            if(data[j] > 0.f)
+                plusSum += data[j];
+            else
+                minusSum += data[j];
+        }
+        cmax = inFpmax * plusSum + inFpmin * minusSum + biasData;
+        cmin = inFpmin * plusSum + inFpmax * minusSum + biasData;
+
+        cmax = gcmMAX(gcmMIN(cmax, outFpmax), outFpmin);
+        cmin = gcmMAX(gcmMIN(cmin, outFpmax), outFpmin);
+        if(gcmABS(cmin -cmax) <= 1e-4f)
+        {
+            memset(TENSOR_LOGICAL_ADDR(weight) + i * sliceSize, 0, sliceSize);
+            vxnneSaveDataQuant((vx_type_e)TENSOR_DATA_TYPE(bias), i, cmax, TENSOR_LOGICAL_ADDR(bias),
+                TENSOR_TF_ZEROPOINTS_WITH_INDEX(bias, i), TENSOR_TF_SCALES_WITH_INDEX(bias, i), TENSOR_ROUNDING_MODE(bias));
+        }
+    }
+exit:
+    if(weightData) vxFree(weightData);
+    return status;
+}
+
+/*split per-channel conv to 2 parts:
+    1. covoluiton: In(u8) * weight(u8) + bias(null) = Out(fp16)
+    2. BatchNorm:  In(fp16) * scale(fp32) + offset(fp32: conv's bias) = Out(U8)
+*/
+vx_status vxoGraphOptimization_pcq_splitPerChannel(vx_node node)
+{
+    vx_status   status    = VX_SUCCESS;
+    vx_uint32   i         = 0;
+    vx_tensor   input     = (vx_tensor)node->paramTable[0];
+    vx_tensor   weight    = (vx_tensor)node->paramTable[1];
+    vx_tensor   bias      = (vx_tensor)node->paramTable[2];
+    vx_tensor   output    = (vx_tensor)vxoGraphOptimization_getOutputParameter(node);
+    vx_tensor   fpOutput  = VX_NULL;
+    vx_tensor   newWeight = VX_NULL;
+    vx_float32  newScale  = 1.0f / (TENSOR_TF_SCALE(input) *(vx_float32)pow(2.0f, 16));
+    vx_tensor_create_params_t p = vxoGraphOptimization_createParamsForTensor(TENSOR_DIM_NUM(weight), TENSOR_SIZES(weight), VX_TYPE_UINT8,
+        VX_QUANT_AFFINE_SCALE, TENSOR_POS(weight), 128, newScale);
+
+    /*create perTensor quantization weight,
+        1. convert I8 data to U8 and do not chage the memory data.
+        2. just change the new weight's scale to input's scale * pow(2,-16)
+    */
+    newWeight =  vxCreateTensor2(node->base.context, &p, sizeof(p));
+    if(VX_NULL == newWeight)
+    {
+        vxError("%s: fail to create tensor", __FUNCTION__);
+        status = VX_FAILURE;
+        goto fail;
+    }
+    status = vxoTensor_AllocateMemory(newWeight);
+    TENSOR_DATA_LIFETIME(newWeight) = TENSOR_DATA_LIFETIME(weight);
+    {
+        vx_uint8_ptr dstPtr = TENSOR_LOGICAL_ADDR(newWeight);
+        vx_int8_ptr srcPtr = (vx_int8_ptr)TENSOR_LOGICAL_ADDR(weight);
+        for(i =0; i < TENSOR_STRIDE_INDEX(newWeight, TENSOR_DIM_NUM(newWeight)); i++)
+        {
+            dstPtr[i] = srcPtr[i] + 128;
+        }
+    }
+
+    p = vxoGraphOptimization_createParamsForTensor(TENSOR_DIM_NUM(output), TENSOR_SIZES(output), VX_TYPE_FLOAT16, VX_QUANT_DYNAMIC_FIXED_POINT, 0, 0, 1.0f);
+    fpOutput = vxCreateTensor2(node->base.context, &p, sizeof(p));
+
+    /****************************************/
+    /*      create BN node                  */
+    /****************************************/
+    {
+        vx_tensor   scaleTensor     = VX_NULL;
+        vx_tensor   offsetTensor    = VX_NULL;
+        vx_tensor   meanTensor      = VX_NULL;
+        vx_tensor   varianceTensor  = VX_NULL;
+
+        vx_int32    *biasAddr   = VX_NULL;
+        vx_float32  *scaleAddr  = VX_NULL;
+        vx_float32  *offsetAddr = VX_NULL;
+        vx_float32  *meanAddr =  VX_NULL;
+        vx_float32  *varianceAddr =  VX_NULL;
+        vx_float32  exp16 = (vx_float32)pow(2.0f, 16.0f);
+
+        p = vxoGraphOptimization_createParamsForTensor(1, &(TENSOR_TF_SCALE_COUNT(weight)), VX_TYPE_FLOAT32, 0, 0, 0, 1.0f);
+        scaleTensor     = vxCreateTensor2(node->base.context, &p, sizeof(p));
+        offsetTensor    = vxCreateTensor2(node->base.context, &p, sizeof(p));
+        meanTensor      = vxCreateTensor2(node->base.context, &p, sizeof(p));
+        varianceTensor  = vxCreateTensor2(node->base.context, &p, sizeof(p));
+
+        vxoTensor_AllocateMemory(scaleTensor);
+        vxoTensor_AllocateMemory(offsetTensor);
+        vxoTensor_AllocateMemory(meanTensor);
+        vxoTensor_AllocateMemory(varianceTensor);
+
+        biasAddr   = (vx_int32 *)TENSOR_LOGICAL_ADDR(bias);
+        scaleAddr  = (vx_float32 *)TENSOR_LOGICAL_ADDR(scaleTensor);
+        offsetAddr = (vx_float32 *)TENSOR_LOGICAL_ADDR(offsetTensor);
+        meanAddr    = (vx_float32 *)TENSOR_LOGICAL_ADDR(meanTensor);
+        varianceAddr = (vx_float32 *)TENSOR_LOGICAL_ADDR(varianceTensor);
+
+        for(i = 0; i < TENSOR_TF_SCALE_COUNT(weight); i ++)
+        {
+            scaleAddr[i] = TENSOR_TF_SCALES_WITH_INDEX(weight, i) * exp16 * TENSOR_TF_SCALE(input);
+            offsetAddr[i] = biasAddr[i] * TENSOR_TF_SCALES_WITH_INDEX(bias, i) ;
+            meanAddr[i] = 0.0f;
+            varianceAddr[i] = 1.0f;
+        }
+        {
+            vx_node bnNode =  vxBatchNormalizationLayer(node->graph, 0, meanTensor, varianceTensor, scaleTensor, offsetTensor, fpOutput, output);
+            CHECK_NULL(bnNode);
+            vxReleaseNode(&bnNode);
+        }
+        if(scaleTensor) vxReleaseTensor(&scaleTensor);
+        if(offsetTensor) vxReleaseTensor(&offsetTensor);
+        if(meanTensor) vxReleaseTensor(&meanTensor);
+        if(varianceTensor) vxReleaseTensor(&varianceTensor);
+    }
+    vxoNode_SetParameter(node, 1, (vx_reference)newWeight);
+    vxoNode_SetParameter(node, 2, (vx_reference)VX_NULL);
+    bias->base.internalCount --;
+    node->paramTable[2] = VX_NULL;
+    {
+        vx_uint32 outputIndex = vxoGraphOptimization_getOutputIndex(node);
+        vxoNode_SetParameter(node, outputIndex, (vx_reference)fpOutput);
+    }
+
+fail:
+    if(fpOutput) vxReleaseTensor(&fpOutput);
+    if(newWeight) vxReleaseTensor(&newWeight);
+
+    return status;
+}
+
+/*requantize the weight to pertensor, according to its fpmax and fpmin*/
+vx_tensor vxoGraphOptimization_pcq_perTensor(vx_tensor weight, vx_float32 *weightData)
+{
+    vx_tensor   newWeight = VX_NULL;
+    vx_float32  fpMax = 0.0f, fpMin = 0.0f;
+    vx_uint32   i         = 0;
+    vx_uint32   size      = 0;
+
+    vx_tensor_create_params_t p = vxoGraphOptimization_createParamsForTensor(TENSOR_DIM_NUM(weight), TENSOR_SIZES(weight), VX_TYPE_UINT8,
+                                        VX_QUANT_AFFINE_SCALE, 0, 128, 1.0f);
+
+    vxoTensor_GetTensorElementCount(weight, &size);
+    for(i = 0; i < size; i++)
+    {
+        if(fpMax < weightData[i])
+            fpMax = weightData[i];
+        if(fpMin > weightData[i])
+            fpMin = weightData[i];
+    }
+
+    vxoGraphOptimization_getAsymQuantizeAttribute(VX_TYPE_UINT8, fpMax, fpMin, &p.quant_data.affine.scale, &p.quant_data.affine.zeroPoint);
+    newWeight = vxCreateTensor2(weight->base.context, &p, sizeof(p));
+    if(VX_NULL == newWeight){
+        goto exit;
+    }
+
+    vxoTensor_AllocateMemory(newWeight);
+    for(i = 0; i < size; i++)
+    {
+        vxnneSaveDataQuant((vx_type_e)TENSOR_DATA_TYPE(newWeight), i, weightData[i],
+            TENSOR_LOGICAL_ADDR(newWeight), TENSOR_TF_ZEROPOINT(newWeight), TENSOR_TF_SCALE(newWeight), TENSOR_ROUNDING_MODE(newWeight));
+    }
+
+exit:
+    return newWeight;
+}
+
+/*requantize per-channel weight to per-tensor weight*/
+VX_INTERNAL_API vx_bool vxoGraphOptimization_isDepthWiseConv(vx_node node)
+{
+    vx_bool isDWConv = vx_false_e;
+    vx_uint32 depth_multiplier = 0;
+
+    if(node->kernel->enumeration != VX_KERNEL_CONVOLUTION_LAYER)
+        return isDWConv;
+
+    vxoGraphOptimization_MergeConvolutionNodes_GetParmFromConv(node, VX_NULL, VX_NULL, VX_NULL, VX_NULL,
+        VX_NULL, VX_NULL, VX_NULL, VX_NULL, &depth_multiplier, VX_NULL, VX_NULL);
+
+    if(depth_multiplier == 1)
+        isDWConv = vx_true_e;
+
+    return isDWConv;
+}
+
+/*requantize per-channel weight to per-tensor weight*/
+VX_INTERNAL_API vx_status vxoGraphOptimization_pcq(vx_graph graph)
+{
+    vx_int32 nodeIndex;
+    vx_int32 nodeCount = graph->nodeCount;
+    vx_node* nodeTable = graph->nodeTable;
+
+    gcmHEADER_ARG("graph=%p", graph);
+    vxmASSERT(graph);
+
+    for (nodeIndex = 0; nodeIndex < nodeCount; nodeIndex++)
+    {
+        vx_node node = nodeTable[nodeIndex];
+        vx_tensor weight = NULL;
+        vx_tensor bias = VX_NULL;
+
+        /*judge whehter to do this feature by the threshold*/
+        vx_float32 quantizeEntropy = 0.0f;
+        vx_float32 threshold = CONV_ENTROPY;
+        vx_float32  *weightData = VX_NULL;
+        vx_uint32   weightSize  = 0;
+
+        if(node->kernel->enumeration != VX_KERNEL_CONVOLUTION_LAYER)
+            continue;
+
+        weight = (vx_tensor)node->paramTable[1];
+        if(weight->quantFormat != VX_QUANT_AFFINE_SCALE_PER_CHANNEL ||
+            gcvSTATUS_TRUE == gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT))
+            continue;
+
+        if(vxoGraphOptimization_isDepthWiseConv(node))
+            threshold = DEPTHWISE_CONV_ENTROPY;
+
+        vxoGraphOptimization_pcq_resetDeadChannel(node);
+        weightData = vxoGraphOptimization_pcq_getFpWeightData(weight);
+        vxoTensor_GetTensorElementCount(weight, &weightSize);
+
+        /* check whether or not to requantize the weight to per tensor by the entropy*/
+        quantizeEntropy = vxoGraphOptimization_pcq_optimizeEntropy(weightData, weightSize);
+        if(quantizeEntropy > threshold)
+        {
+            if(!vxoGraphOptimization_isV8((vx_reference)node))
+                goto exit;
+            if(VX_SUCCESS != vxoGraphOptimization_pcq_splitPerChannel(node))
+                goto exit;
+        }
+        else
+        {
+            /* requantized to per tensor */
+             vx_tensor newBias = VX_NULL;
+             vx_tensor newWeight = vxoGraphOptimization_pcq_perTensor(weight, weightData);
+             if(newWeight == VX_NULL)
+                 goto exit;
+             TENSOR_DATA_LIFETIME(newWeight) = TENSOR_DATA_LIFETIME(weight);
+
+             /*driver require bias' scale = input's scale * weight's scale*/
+             bias = (vx_tensor)node->paramTable[2];
+             if(bias)
+             {
+                vx_float32 newScale = TENSOR_TF_SCALE(newWeight) * TENSOR_TF_SCALE((vx_tensor)node->paramTable[0]);
+                vx_tensor_create_params_t p = vxoGraphOptimization_createParamsForTensor(TENSOR_DIM_NUM(bias), TENSOR_SIZES(bias), VX_TYPE_INT32,
+                                    VX_QUANT_AFFINE_SCALE, 0, 0, newScale);
+                vx_uint32 biasCnt = 0, i = 0;
+
+                newBias = vxCreateTensor2(node->base.context, &p, sizeof(p));
+                TENSOR_DATA_LIFETIME(newBias) = TENSOR_DATA_LIFETIME(bias);
+
+                vxoTensor_GetTensorElementCount(newBias, &biasCnt);
+                vxoTensor_AllocateMemory(newBias);
+                for(i = 0; i < biasCnt; i++)
+                {
+                    vx_float32 biasValue = vxnneGetDataQuant((vx_type_e)TENSOR_DATA_TYPE(bias), i,
+                        TENSOR_LOGICAL_ADDR(bias), TENSOR_TF_ZEROPOINTS_WITH_INDEX(bias, i), TENSOR_TF_SCALES_WITH_INDEX(bias, i));
+                    vxnneSaveDataQuant((vx_type_e)TENSOR_DATA_TYPE(newBias), i, biasValue,
+                        TENSOR_LOGICAL_ADDR(newBias), TENSOR_TF_ZEROPOINT(newBias), TENSOR_TF_SCALE(newBias), TENSOR_ROUNDING_MODE(newBias));
+                }
+             }
+
+            vxoNode_SetParameter(node, 1, (vx_reference)newWeight);
+            vxoNode_SetParameter(node, 2, (vx_reference)newBias);
+
+            if(newBias) vxReleaseTensor(&newBias);
+            if(newWeight) vxReleaseTensor(&newWeight);
+        }
+exit:
+        if(weightData) vxFree(weightData);
+    }
+    REMOVE_MERGED_NODE_FROM_GRAPH();
+    REBUILD_TOPOLOGY_GRAPH();
+    OPTIMIZATION_RESLUT();
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
+    return VX_SUCCESS;
+}
+
 VX_INTERNAL_API vx_status vxoGraphOptimization(vx_graph graph)
 {
     vx_status status = VX_SUCCESS;
@@ -5374,6 +5815,9 @@ VX_INTERNAL_API vx_status vxoGraphOptimization(vx_graph graph)
     {
         if(context->options.enableGraphDump)
             vxmONERROR(vxoGraphOptimization_dumpTopology(graph, "before_optimization_topology.json"));
+
+        if(context->options.enableGraphPtc)
+            vxoGraphOptimization_pcq(graph);
 
         if(context->options.enableGraphConvertTensorAdd)
             vxoGraphOptimization_TensorAdd2Conv(graph);
