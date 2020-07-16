@@ -458,6 +458,7 @@ VX_PRIVATE_API vx_bool vxoNNTensorStrideSlice_SH_EVIS_Support_Ext(vx_node node, 
     vx_enum   inputFormat           = TENSOR_DATA_TYPE(input);
     vx_enum   outputFormat          = TENSOR_DATA_TYPE(output);
     vx_uint32 batch                 = TENSOR_VIEW_DIM_NUM(input) > 3 ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
+    vx_uint32 batch_out             = TENSOR_VIEW_DIM_NUM(output) > 3 ? TENSOR_VIEW_SIZE_INDEX(output, 3) : 1;
     vx_bool   enable_sh_crop        = vx_false_e;
 
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
@@ -472,9 +473,9 @@ VX_PRIVATE_API vx_bool vxoNNTensorStrideSlice_SH_EVIS_Support_Ext(vx_node node, 
                             && (inputFormat != VX_TYPE_INT32 && outputFormat != VX_TYPE_INT32)
                             && gcoMATH_Absolute((vx_float32)stride[0]) == gcoMATH_Absolute((vx_float32)stride[1])
                             && gcoMATH_Absolute((vx_float32)stride[0]) == gcoMATH_Absolute((vx_float32)stride[2])
-                            && gcoMATH_Absolute((vx_float32)stride[0]) == 1 && batch == 1);
+                            && gcoMATH_Absolute((vx_float32)stride[0]) == 1 && batch == batch_out);
 
-    support = support && (((_IsSameType(input, output) && batch == 1) || enable_sh_crop) && (TENSOR_VIEW_SIZE_INDEX(input, 0) < IMG_MAX_WIDTH && TENSOR_VIEW_SIZE_INDEX(input, 1) < IMG_MAX_WIDTH)) ;
+    support = support && (((_IsSameType(input, output) && batch == batch_out) || enable_sh_crop) && (TENSOR_VIEW_SIZE_INDEX(input, 0) < IMG_MAX_WIDTH && TENSOR_VIEW_SIZE_INDEX(input, 1) < IMG_MAX_WIDTH)) ;
 
     if (evis &&
        ((inputFormat == VX_TYPE_FLOAT32 || inputFormat == VX_TYPE_INT32)
@@ -529,6 +530,7 @@ VX_PRIVATE_API vx_status vxoNNTensorStrideSlice_SH_EVIS_Initialize_Ext(vxnne_lay
     vx_enum   inputFormat           = TENSOR_DATA_TYPE(input);
     vx_enum   outputFormat          = TENSOR_DATA_TYPE(output);
     vx_uint32 batch                 = TENSOR_VIEW_DIM_NUM(input) > 3 ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
+    vx_uint32 batch_out             = TENSOR_VIEW_DIM_NUM(output) > 3 ? TENSOR_VIEW_SIZE_INDEX(output, 3) : 1;
     vx_bool   enable_sh_crop        = vx_false_e;
     vx_bool   enable_sh_reverse     = vx_false_e;
 
@@ -550,8 +552,8 @@ VX_PRIVATE_API vx_status vxoNNTensorStrideSlice_SH_EVIS_Initialize_Ext(vxnne_lay
                             && (inputFormat != VX_TYPE_INT32 && outputFormat != VX_TYPE_INT32)
                             && gcoMATH_Absolute((vx_float32)stride[0]) == gcoMATH_Absolute((vx_float32)stride[1])
                             && gcoMATH_Absolute((vx_float32)stride[0]) == gcoMATH_Absolute((vx_float32)stride[2])
-                            && gcoMATH_Absolute((vx_float32)stride[0]) == 1 && batch == 1);
-
+                            && gcoMATH_Absolute((vx_float32)stride[0]) == 1 && batch == batch_out);
+    batchCount = batch;
     vxmONERROR(vxoNNTensorStrideSlice_getReverseAxis(start, stop, stride, reverseAxis, &numOfAxis, input_size));
 
     enable_sh_reverse    = (vx_bool)(numOfAxis > 0 && numOfAxis < 4);
