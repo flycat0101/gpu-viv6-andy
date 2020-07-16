@@ -1059,6 +1059,7 @@ gbm_viv_surface_create(
 {
     gceSTATUS status;
     gctSTRING envctrl = gcvNULL;
+    gctSTRING envctrlbuf = gcvNULL;
     gctINT32 extraBufferCount = 0;
     uint32_t usage = GBM_BO_USE_SCANOUT;
     struct gbm_viv_surface *surf = calloc(1, sizeof(*surf));
@@ -1089,6 +1090,16 @@ gbm_viv_surface_create(
     else
     {
         surf->buffer_count = GBM_MAX_BUFFER;
+    }
+
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_GBM_MULTI_BUFFER", &envctrlbuf)) && envctrlbuf)
+    {
+        int buffer_count = atoi(envctrlbuf);
+
+        if (buffer_count > 0 && buffer_count <= GBM_MAX_BUFFER)
+        {
+            surf->buffer_count = buffer_count;
+        }
     }
 
     surf->base.gbm = gbm;
