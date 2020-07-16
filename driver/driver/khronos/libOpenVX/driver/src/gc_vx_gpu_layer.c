@@ -5621,7 +5621,7 @@ vxnne_shader_executable vxnneGetGPUFullyConnectedShaderExecutable(
 
     execution_parameters.globalWorkScale[0] = 1;
     execution_parameters.globalWorkScale[1] = 1;
-    execution_parameters.localWorkSize[0]  = 1;
+    execution_parameters.localWorkSize[0]  = 8;
     execution_parameters.localWorkSize[1]  = 1;
     execution_parameters.globalWorkSize[0] = gcmALIGN((num_units + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], execution_parameters.localWorkSize[0]);
     execution_parameters.globalWorkSize[1] = gcmALIGN((batch + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1], execution_parameters.localWorkSize[1]);
