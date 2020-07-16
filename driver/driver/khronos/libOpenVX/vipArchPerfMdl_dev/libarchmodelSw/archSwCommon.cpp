@@ -2176,7 +2176,7 @@ arch_status archCalculateArchPerf(
                             {
                                 int inTileXsize = x + kernelXSize - 1; inTileXsize = (inTileXsize < 0) ? 1: inTileXsize;
                                 int inTileYsize = y + kernelYSize - 1; inTileYsize = (inTileYsize < 0) ? 1: inTileYsize;
-                                if ((pArchNnConfig->unifiedFeature.maxTileSize >= 128) && (inTileXsize >= 128))
+                                if ((pArchNnConfig->unifiedFeature.maxTileSize >= 128) && (inTileXsize > 128))
                                 {   // then Max tile X size is bigger than 128, inTileXsize is not bigger than 128 for area reduction.
                                     continue;
                                 }
