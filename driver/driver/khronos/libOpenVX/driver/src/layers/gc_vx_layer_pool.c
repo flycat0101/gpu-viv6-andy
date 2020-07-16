@@ -507,14 +507,14 @@ VX_PRIVATE_API vx_bool vxoNNPooling_SH_EVIS_Support_Ext(vx_node node, const vx_r
 
         if (support)
         {
-            SETBIT(reg_param->flag, (avgPool_flag == vx_true_e)?1:0, 0);
-            SETBIT(reg_param->flag, (maxPool_flag == vx_true_e)?1:0, 1);
-            SETBIT(reg_param->flag, (enable_L2Pool_SH == vx_true_e)?1:0, 2);
-            SETBIT(reg_param->flag, (enable_downSampleSH == vx_true_e)?1:0, 3);
-            SETBIT(reg_param->flag, (avgPool_BF_flag == vx_true_e)?1:0, 4);
-            SETBIT(reg_param->flag, (enable_tf_avgPool == vx_true_e)?1:0, 5);
-            SETBIT(reg_param->flag, (enable_tf_quantize == vx_true_e)?1:0, 6);
-            SETBIT(reg_param->flag, (enable_int16_sh == vx_true_e)?1:0, 7);
+            SETBIT(reg_param->flag, (avgPool_flag == vx_true_e)? 1:0, 0);
+            SETBIT(reg_param->flag, (maxPool_flag == vx_true_e)? 1:0, 1);
+            SETBIT(reg_param->flag, (enable_L2Pool_SH == vx_true_e)? 1:0, 2);
+            SETBIT(reg_param->flag, (enable_downSampleSH == vx_true_e)? 1:0, 3);
+            SETBIT(reg_param->flag, (avgPool_BF_flag == vx_true_e)? 1:0, 4);
+            SETBIT(reg_param->flag, (enable_tf_avgPool == vx_true_e)? 1:0, 5);
+            SETBIT(reg_param->flag, (enable_tf_quantize == vx_true_e)? 1:0, 6);
+            SETBIT(reg_param->flag, (enable_int16_sh == vx_true_e)? 1:0, 7);
         }
     }
 
@@ -656,7 +656,7 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
 
     if(evis)
     {
-        if (enable_tf_avgPool)
+        if (enable_tf_avgPool || enable_L2Pool_SH)
         {
             vx_tensor mask          = NULL;
 
@@ -669,8 +669,18 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
                 goto OnError;
             }
 
-            shaderExecutable = vxnneGetTFAvgPoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TF_AVGPOOLING, &ops_layer->node->kernelAttributes.borderMode,
-            inputs, mask, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, VX_NN_ACTIVATION_NONE, outputs);
+            if (enable_tf_avgPool)
+            {
+                shaderExecutable = vxnneGetTFAvgPoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TF_AVGPOOLING,
+                    &ops_layer->node->kernelAttributes.borderMode, inputs, mask, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s,
+                    pool_pad_x_left, pool_pad_y_top, VX_NN_ACTIVATION_NONE, outputs);
+            }
+            else
+            {
+                shaderExecutable = vxnneGetL2PoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_L2POOLING,
+                    &ops_layer->node->kernelAttributes.borderMode, inputs, mask, pool_type_s, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s,
+                    pool_pad_x_left, pool_pad_y_top, rounding_s, VX_NN_ACTIVATION_NONE, outputs);
+            }
 
             if (batchCount > 1)
             {
@@ -694,9 +704,6 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
         }
         else if (maxPool_flag)
             shaderExecutable = vxnneGetMaxPoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_MAXPOOLING, &ops_layer->node->kernelAttributes.borderMode,
-            inputs, pool_type_s, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, VX_NN_ACTIVATION_NONE, outputs);
-        else if (enable_L2Pool_SH)
-            shaderExecutable = vxnneGetL2PoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_L2POOLING, &ops_layer->node->kernelAttributes.borderMode,
             inputs, pool_type_s, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, VX_NN_ACTIVATION_NONE, outputs);
         else if(avgPool_flag && enable_tf_quantize)
             shaderExecutable = vxnneGetAvgPooling_UInt8ShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_AVGPOOLING_UINT8, &ops_layer->node->kernelAttributes.borderMode,
