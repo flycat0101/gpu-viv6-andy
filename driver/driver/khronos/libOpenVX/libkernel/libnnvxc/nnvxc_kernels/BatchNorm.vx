@@ -1044,3 +1044,59 @@ __kernel void vxcBatchNorm_F32toBF16_Axis0_2D
 
     VXC_WriteImage(outputs, coord.xy, src0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 }
+
+_viv_uniform VXC_512Bits uniATimesBPlusC_2x8;
+__kernel void vxcBatchNorm_F16_F16_F16_toU8_2D
+    (
+    __read_only     image2d_array_t inputs,
+    __read_only     image2d_t       weights,
+    __read_only     image2d_array_t biases,
+    __write_only    image2d_array_t outputs
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(1), get_global_id(1));
+
+    vxc_short8 src0, src1;
+    vxc_half8 vec0, vec1, wb;
+    vxc_short8 vec2, vec3;
+    vxc_uchar16 dst;
+    VXC_ReadImage(src0, inputs,  coord.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, vec0, src0, 16);
+    VXC_ReadImage(src1, inputs,  coord.xy, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, vec1, src1, 16);
+    uint4 tmp = read_imageui(weights, coord.zw);
+    _viv_asm(COPY, wb, tmp, 16);
+
+    VXC_DP2x8(dst, vec0, wb, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1),  uniATimesBPlusC_2x8);
+    VXC_DP2x8(dst, vec1, wb, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniATimesBPlusC_2x8);
+
+    VXC_WriteImage(outputs, coord.xy, dst, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+}
+
+__kernel void vxcBatchNorm_F16_F16_F16_toU8
+    (
+    __read_only     image2d_array_t inputs,
+    __read_only     image2d_t       weights,
+    __read_only     image2d_array_t biases,
+    __write_only    image2d_array_t outputs
+    )
+{
+    int4 coord   = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+
+    vxc_short8 src0, src1;
+    vxc_half8 vec0, vec1, wb;
+    vxc_short8 vec2, vec3;
+    vxc_uchar16 dst;
+    VXC_ReadImage2DArray(src0, inputs,  coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, vec0, src0, 16);
+    VXC_ReadImage2DArray(src1, inputs,  coord, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, vec1, src1, 16);
+    uint4 tmp = read_imageui(weights, coord.zw);
+    _viv_asm(COPY, wb, tmp, 16);
+
+    VXC_DP2x8(dst, vec0, wb, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1),  uniATimesBPlusC_2x8);
+    VXC_DP2x8(dst, vec1, wb, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniATimesBPlusC_2x8);
+
+    VXC_WriteImage2DArray(outputs, coord, dst, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+}
+
