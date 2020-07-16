@@ -1125,6 +1125,9 @@ static void _DumpArray(
         _arrayType[DataType], ArrayName
         );
 
+    /* Disable _DumpArray to enable VG CTS run with debug driver */
+    return;
+
     gcmASSERT(Array != gcvNULL);
 
     if (Array == gcvNULL)
