@@ -255,16 +255,19 @@ _ShowRecord(
        )
 {
     static const char * recordTypes[gcvDB_NUM_TYPES] = {
-        "Unknown",
-        "VideoMemory",
-        "NonPaged",
-        "Signal",
-        "VidMemLock",
-        "Context",
-        "Idel",
-        "MapMemory",
-        "ShBuf",
-    };
+         "Unknown",
+         "VideoMemory",
+         "CommandBuffer",
+         "NonPaged",
+         "Contiguous",
+         "Signal",
+         "VidMemLock",
+         "Context",
+         "Idel",
+         "MapMemory",
+         "MapUserMemory",
+         "ShBuf",
+     };
 
     msg_buf_add_msg(File, "%-14s %3d %16p %16zu %16zu\n",
             recordTypes[Record->type],
@@ -304,52 +307,62 @@ _ShowRecords(
     return 0;
 }
 
+static const char * vidmemTypeStr[gcvVIDMEM_TYPE_COUNT] =
+{
+    "Generic",
+    "Index",
+    "Vertex",
+    "Texture",
+    "RenderTarget",
+    "Depth",
+    "Bitmap",
+    "TileStatus",
+    "Image",
+    "Mask",
+    "Scissor",
+    "HZ",
+    "ICache",
+    "TxDesc",
+    "Fence",
+    "TFBHeader",
+    "Command",
+};
+
+static const char * poolStr[gcvPOOL_NUMBER_OF_POOLS] =
+{
+    "Unknown",
+    "Default",
+    "Local",
+    "Internal",
+    "External",
+    "Unified",
+    "System",
+    "Sram",
+    "Virtual",
+    "User",
+    "Insram",
+    "Exsram",
+};
+
 static void
 _ShowCounters(
-        struct buf_msg *File,
-        gcsDATABASE_PTR Database
-         )
+       struct buf_msg *File,
+    gcsDATABASE_PTR Database
+    )
 {
     gctUINT i = 0;
 
-    static const char * surfaceTypes[gcvSURF_NUM_TYPES] = {
-        "Unknown",
-        "Index",
-        "Vertex",
-        "Texture",
-        "RenderTarget",
-        "Depth",
-        "Bitmap",
-        "TileStatus",
-        "Image",
-        "Mask",
-        "Scissor",
-        "HZ",
-        "ICache",
-        "TxDesc",
-        "Fence",
-        "TFBHeader",
-    };
-
-    static const char * poolTypes[gcvPOOL_NUMBER_OF_POOLS] = {
-        "Unknown",
-        "Default",
-        "Local",
-        "Internal",
-        "External",
-        "Unified",
-        "System",
-        "Virtual",
-        "User",
-    };
-
     static const char * otherCounterNames[] = {
         "AllocNonPaged",
+        "AllocContiguous",
+        "MapUserMemory",
         "MapMemory",
     };
 
     gcsDATABASE_COUNTERS * otherCounters[] = {
         &Database->nonPaged,
+        &Database->contiguous,
+        &Database->mapUserMemory,
         &Database->mapMemory,
     };
 
@@ -357,35 +370,35 @@ _ShowCounters(
 
     /* Print surface type counters. */
     msg_buf_add_msg(File, "%-16s %16lld %16lld %16lld\n",
-            "All-Types",
-            Database->vidMem.bytes,
-            Database->vidMem.maxBytes,
-            Database->vidMem.totalBytes);
+               "All-Types",
+               Database->vidMem.bytes,
+               Database->vidMem.maxBytes,
+               Database->vidMem.totalBytes);
 
-    for (i = 1; i < gcvSURF_NUM_TYPES; i++)
+    for (i = 1; i < gcvVIDMEM_TYPE_COUNT; i++)
     {
         msg_buf_add_msg(File, "%-16s %16lld %16lld %16lld\n",
-                surfaceTypes[i],
-                Database->vidMemType[i].bytes,
-                Database->vidMemType[i].maxBytes,
-                Database->vidMemType[i].totalBytes);
+                   vidmemTypeStr[i],
+                   Database->vidMemType[i].bytes,
+                   Database->vidMemType[i].maxBytes,
+                   Database->vidMemType[i].totalBytes);
     }
     msg_buf_add_msg(File, "\n");
 
     /* Print surface pool counters. */
     msg_buf_add_msg(File, "%-16s %16lld %16lld %16lld\n",
-            "All-Pools",
-            Database->vidMem.bytes,
-            Database->vidMem.maxBytes,
-            Database->vidMem.totalBytes);
+               "All-Pools",
+               Database->vidMem.bytes,
+               Database->vidMem.maxBytes,
+               Database->vidMem.totalBytes);
 
     for (i = 1; i < gcvPOOL_NUMBER_OF_POOLS; i++)
     {
         msg_buf_add_msg(File, "%-16s %16lld %16lld %16lld\n",
-                poolTypes[i],
-                Database->vidMemPool[i].bytes,
-                Database->vidMemPool[i].maxBytes,
-                Database->vidMemPool[i].totalBytes);
+                   poolStr[i],
+                   Database->vidMemPool[i].bytes,
+                   Database->vidMemPool[i].maxBytes,
+                   Database->vidMemPool[i].totalBytes);
     }
     msg_buf_add_msg(File, "\n");
 
@@ -393,10 +406,10 @@ _ShowCounters(
     for (i = 0; i < gcmCOUNTOF(otherCounterNames); i++)
     {
         msg_buf_add_msg(File, "%-16s %16lld %16lld %16lld\n",
-                otherCounterNames[i],
-                otherCounters[i]->bytes,
-                otherCounters[i]->maxBytes,
-                otherCounters[i]->totalBytes);
+                   otherCounterNames[i],
+                   otherCounters[i]->bytes,
+                   otherCounters[i]->maxBytes,
+                   otherCounters[i]->totalBytes);
     }
     msg_buf_add_msg(File, "\n");
 }
@@ -551,6 +564,92 @@ gc_dump_trigger_show(void *data)
     return 0;
 }
 
+static void
+_ShowVideoMemoryOldFormat(
+   struct buf_msg *File,
+    gcsDATABASE_PTR Database
+    )
+{
+    gctUINT i = 0;
+
+    static const char * otherCounterNames[] = {
+        "AllocNonPaged",
+        "AllocContiguous",
+        "MapUserMemory",
+        "MapMemory",
+    };
+
+    gcsDATABASE_COUNTERS * otherCounters[] = {
+        &Database->nonPaged,
+        &Database->contiguous,
+        &Database->mapUserMemory,
+        &Database->mapMemory,
+    };
+
+    msg_buf_add_msg(File, "%-16s %16s %16s %16s\n", "", "Current", "Maximum", "Total");
+
+    /* Print surface type counters. */
+    msg_buf_add_msg(File, "%-16s %16llu %16llu %16llu\n",
+               "All-Types",
+               Database->vidMem.bytes,
+               Database->vidMem.maxBytes,
+               Database->vidMem.totalBytes);
+
+    for (i = 1; i < gcvVIDMEM_TYPE_COUNT; i++)
+    {
+        msg_buf_add_msg(File, "%-16s %16llu %16llu %16llu\n",
+                   vidmemTypeStr[i],
+                   Database->vidMemType[i].bytes,
+                   Database->vidMemType[i].maxBytes,
+                   Database->vidMemType[i].totalBytes);
+    }
+    msg_buf_add_msg(File, "\n");
+
+    msg_buf_add_msg(File, "%-16s %16llu %16llu %16llu\n",
+               "All-Types",
+               Database->vidMem.bytes,
+               Database->vidMem.maxBytes,
+               Database->vidMem.totalBytes);
+
+    for (i = 1; i < gcvVIDMEM_TYPE_COUNT; i++)
+    {
+        msg_buf_add_msg(File, "%-16s %16llu %16llu %16llu\n",
+                   vidmemTypeStr[i],
+                   Database->vidMemType[i].bytes,
+                   Database->vidMemType[i].maxBytes,
+                   Database->vidMemType[i].totalBytes);
+    }
+    msg_buf_add_msg(File, "\n");
+
+    /* Print surface pool counters. */
+    msg_buf_add_msg(File, "%-16s %16llu %16llu %16llu\n",
+               "All-Pools",
+               Database->vidMem.bytes,
+               Database->vidMem.maxBytes,
+               Database->vidMem.totalBytes);
+
+    for (i = 1; i < gcvPOOL_NUMBER_OF_POOLS; i++)
+    {
+        msg_buf_add_msg(File, "%-16s %16llu %16llu %16llu\n",
+                   poolStr[i],
+                   Database->vidMemPool[i].bytes,
+                   Database->vidMemPool[i].maxBytes,
+                   Database->vidMemPool[i].totalBytes);
+    }
+    msg_buf_add_msg(File, "\n");
+
+    /* Print other counters. */
+    for (i = 0; i < gcmCOUNTOF(otherCounterNames); i++)
+    {
+        msg_buf_add_msg(File, "%-16s %16llu %16llu %16llu\n",
+                   otherCounterNames[i],
+                   otherCounters[i]->bytes,
+                   otherCounters[i]->maxBytes,
+                   otherCounters[i]->totalBytes);
+    }
+    msg_buf_add_msg(File, "\n");
+}
+
 int
 gc_vidmem_show(void *data)
 {
@@ -576,7 +675,7 @@ gc_vidmem_show(void *data)
             {
                 gckOS_GetProcessNameByPid(database->processID, gcmSIZEOF(name), name);
                 msg_buf_add_msg(m, "VidMem Usage (Process %d: %s):\n", database->processID, name);
-                _ShowCounters(m, database);
+                _ShowVideoMemoryOldFormat(m, database);
                 msg_buf_add_msg(m, "\n");
             }
         }
@@ -597,7 +696,7 @@ gc_vidmem_show(void *data)
 
         gckOS_GetProcessNameByPid(dumpProcess, gcmSIZEOF(name), name);
         msg_buf_add_msg(m, "VidMem Usage (Process %d: %s):\n", dumpProcess, name);
-        _ShowCounters(m, database);
+        _ShowVideoMemoryOldFormat(m, database);
     }
 
     return 0;
