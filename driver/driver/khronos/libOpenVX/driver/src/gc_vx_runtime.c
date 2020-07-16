@@ -79,7 +79,7 @@ VX_INTERNAL_API vx_ptr vxAllocate(vx_size size)
 
     if (gcmIS_ERROR(status))
     {
-        vxError("Failed to allocate enough memory");
+        vxError("Failed to allocate enough memory, size: %d\n", size);
         gcmFOOTER_ARG("%d", status);
         return VX_NULL;
     }

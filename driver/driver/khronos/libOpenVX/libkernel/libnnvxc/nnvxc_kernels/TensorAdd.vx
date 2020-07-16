@@ -313,3 +313,4 @@ __kernel void vxcTensorEltwise_F32AddF32ToBF16(
 
     VXC_WriteImage2DArray(output, coord, src, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 }
+

@@ -874,6 +874,7 @@ gcoHARDWARE_Lock(
     OUT gctPOINTER * Memory
     );
 
+/* Unlock a surface. */
 gceSTATUS
 gcoHARDWARE_LockAddCpuPhysicalAddr(
     IN gcsSURF_NODE_PTR Node,
@@ -3004,6 +3005,7 @@ typedef struct _vx_drv_option
     gctINT  tpZeroRunLen;
     gctUINT enableNNArchPerfPrint;
     gctUINT enableNNLayerDump;
+    gctUINT enableNNLayerDump_Int;
     gctUINT enableInterleave8;
     gctSTRING nnRoundingMode;
     gctSTRING vxcShaderSourcePath;
@@ -3056,8 +3058,33 @@ typedef struct _vx_drv_option
     gctUINT enableAllocateContigousMemForKernel;
     gctUINT enableNNTranspose;
     gctUINT disableTPNNEvis;
-
+    gctUINT kernelVIPSize;
+    gctUINT enableWBDump;
+    gctUINT commandBufferDump;
+    gctUINT enableBlockDump;
+    gctUINT enableWBShare;
     gctUINT vipTimeOut;
+    gctUINT disableVIPFinalRelease;
+    gctUINT enableNNCoefByPass;
+
+    /* graph batch count */
+    gctUINT graphBatchCount;
+    /* add env setting for DDR Burst */
+    gctUINT specificDDRLimitByBurst;
+    gctFLOAT ddrReadSustainedBw64BBurst;
+    gctFLOAT ddrReadSustainedBw128BBurst;
+    gctFLOAT ddrReadSustainedBw256BBurst;
+    gctFLOAT ddrMaskWriteSustainedBw64BBurst;
+    gctFLOAT ddrMaskWriteSustainedBw128BBurst;
+    gctFLOAT ddrMaskWriteSustainedBw256BBurst;
+    gctFLOAT ddrNonMaskWriteSustainedBw64BBurst;
+    gctFLOAT ddrNonMaskWriteSustainedBw128BBurst;
+    gctFLOAT ddrNonMaskWriteSustainedBw256BBurst;
+
+    gctUINT setCoreCount;
+    gctUINT use15bitsPostMultiply;
+    gctUINT enableMPSplitZ;
+    gctUINT enableLoadNBG;
 }
 vx_drv_option;
 
@@ -3097,7 +3124,8 @@ typedef union _vx_nn_cmd_split_info_union
         gctUINT32 inTileXInc;
         gctUINT32 inTileYInc;
         gctUINT32 inTileSequence;
-
+        gctUINT32 inWindowZStartOverfetch2;
+        gctUINT32 inWindowZEndOverfetch2;
         gctUINT32 outBaseAddress;
         gctUINT32 outLoop1Reset;
         gctUINT32 outLoop2Reset;
@@ -3148,7 +3176,8 @@ typedef union _vx_nn_cmd_split_info_union
         gctUINT32 inTileXInc;
         gctUINT32 inTileYInc;
         gctUINT32 inTileSequence;
-
+        gctUINT32 inWindowZStartOverfetch2;
+        gctUINT32 inWindowZEndOverfetch2;
         gctUINT32 outBaseAddress;
         gctUINT32 outLoop1Reset;
         gctUINT32 outLoop2Reset;
@@ -3222,11 +3251,17 @@ typedef union _vx_nn_cmd_info_union
         gctUINT32  roundingMode;
         gctUINT32  relu;
         gctINT32   nn_layer_flush;
+        gctUINT32  postMultiplierSign;
+        gctUINT32  negPostMultiplierSign;
+        gctUINT32  postShiftBits7;
+        gctUINT32  negPostShiftBits7;
         gctUINT32  postMultiplier;
+        gctUINT32  negPostMultiplier;
         gctUINT32  postMultiplierBit6to1;
         gctUINT32  postMultiplierBit14to7;
         gctUINT32  postMultiplierBit22to15;
         gctINT32   postShift;
+        gctINT32   negPostShift;
         gctUINT32  postShiftBit6to5;
         gctUINT32  wSize;
         gctUINT8   kernelDataType;
@@ -3262,12 +3297,29 @@ typedef union _vx_nn_cmd_info_union
         gctUINT8  kernelDataTypeMsb;
         gctUINT8  inImageDataTypeMsb;
         gctUINT8  outImageDataTypeMsb;
+        gctUINT8  kernelDataTypeBit3;
+        gctUINT8  inImageDataTypeBit3;
+        gctUINT8  outImageDataTypeBit3;
+        gctUINT8  nnAluFunction;
         gctUINT8  outImageCacheEvictPolicy;
         gctUINT32 noFlush;
         gctUINT8  hwDepthWise;
         gctUINT8  noZOffset;
+        gctUINT8  noBias;
         gctUINT8  perChannelPostMul;
         gctUINT8  pRelu;
+
+        gctUINT32 secInImageAddress;
+        gctUINT32 secInImageCircularBufSize;
+        gctUINT32 secInImageCircularBufEndAddrPlus1;
+        gctUINT32 nnCoefDecompressBypass;
+        gctUINT32  dwOutputZPBit1To0;
+        gctUINT32  dwCoefZPBit5To0;
+        gctUINT32  dwCoefZPBit7To6;
+        gctUINT8   secInImageTransposeChMinusOne;
+        gctUINT8   convolutionStride;
+        gctUINT32 nnClampMax;
+        gctUINT32 nnClampMin;
     }
     vx_nn_general_cmd_info;
 
@@ -3289,6 +3341,8 @@ typedef union _vx_nn_cmd_info_union
         gctUINT32 inTileXInc;
         gctUINT32 inTileYInc;
         gctUINT32 inTileSequence;
+        gctUINT32 inWindowZStartOverfetch2;
+        gctUINT32 inWindowZEndOverfetch2;
         gctUINT32 outBaseAddress;
         gctUINT32 outLoop1Reset;
         gctUINT32 outLoop2Reset;

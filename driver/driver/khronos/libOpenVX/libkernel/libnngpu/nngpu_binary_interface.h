@@ -20,5 +20,9 @@ typedef enum _nngpu_kernel_enum
 }
 nngpu_kernel_enum;
 
-typedef void * (*GetBinaryPtr_FUNC)(nngpu_kernel_enum, unsigned int *);
+#if gcdSTATIC_LINK
+void * GetGPUNNVXCBinaryPtr(nngpu_kernel_enum, unsigned int *);
+#else
+typedef void * (*GetGPUNNVXCBinaryPtr_FUNC)(nngpu_kernel_enum, unsigned int *);
+#endif
 #endif

@@ -294,7 +294,7 @@ VX_PRIVATE_API vx_status _ReshapeLSTMTensor4FC(
     }
     sizes[1] = batch_count;
 
-    output = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, 2);
+    output = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, 2, VX_NULL);
 
     *reshaped = output;
 
@@ -656,7 +656,7 @@ vx_status vxoLSTMLayer_Initialize(
     sizes[0] = output_element_num;
     sizes[1] = time_steps * batch;
     dim_num = 2;
-    output_reshape = vxoTensor_ReshapeTensor(outputs, (vx_int32_ptr)sizes, dim_num);
+    output_reshape = vxoTensor_ReshapeTensor(outputs, (vx_int32_ptr)sizes, dim_num, VX_NULL);
 
     layer->temp_tensors[layer->num_temp_tensors++] = output_reshape;
 
@@ -881,6 +881,7 @@ vx_status vxoLSTMLayer_Initialize(
                 status = VX_ERROR_NO_MEMORY;
                 goto OnError;
             }
+
             vxoTensor_GetTensorViewMemory(bias_zero[i], (vx_ptr_ptr)&bias_data, VX_NULL);
             vxoTensor_GetTensorElementCount(bias_zero[i], &bias_size);
             vxZeroMemory(bias_data, vxnneGetTypeSize(bias_format) * bias_size);
@@ -1155,6 +1156,18 @@ vx_status vxoLSTMLayer_Deinitialize(
     if (lstm_layer->sub_wb != VX_NULL)
     {
         vxReleaseWeightsBiasesParameter(&lstm_layer->sub_wb);
+    }
+
+    if (lstm_layer->mgpu_recurrent_wb)
+    {
+        vxFree(lstm_layer->mgpu_recurrent_wb);
+        lstm_layer->mgpu_recurrent_wb = VX_NULL;
+    }
+
+    if (lstm_layer->mgpu_wb != VX_NULL)
+    {
+        vxFree(lstm_layer->mgpu_wb);
+        lstm_layer->mgpu_wb = VX_NULL;
     }
 
     if (lstm_layer->operations3)

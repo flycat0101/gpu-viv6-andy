@@ -54,7 +54,8 @@ LOCAL_SRC_FILES := \
     driver/src/gc_vx_target.c \
     driver/src/gc_vx_tensor.c \
     driver/src/gc_vx_threshold.c \
-    driver/src/gc_vx_gpu_layer.c
+    driver/src/gc_vx_gpu_layer.c \
+    driver/src/gc_vx_sys.c
 
 # Operations
 LOCAL_SRC_FILES += \
@@ -105,6 +106,7 @@ LOCAL_SRC_FILES += \
     driver/src/gc_vx_internal_node_api.c \
     driver/src/gc_vx_nn_util.c \
     driver/src/gc_vx_nn_encoder.c \
+    driver/src/gc_vx_nn_wb.c \
     driver/src/gc_vx_nn_command.c \
 
 # Kernel
@@ -150,6 +152,7 @@ LOCAL_CFLAGS += \
     -DOPENVX_USE_DOT  \
     -DOPENVX_USE_TARGET
 
+ifeq ($(ORI_NNARCHPERF),1)
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/driver/include \
     $(LOCAL_PATH)/libarchmodel/include \
@@ -160,6 +163,20 @@ LOCAL_C_INCLUDES := \
     $(AQROOT)/hal/os/linux/user \
     $(AQROOT)/compiler/libVSC/include \
     $(AQARCH)/cmodel/inc
+else
+LOCAL_C_INCLUDES := \
+    $(LOCAL_PATH)/driver/include \
+    $(LOCAL_PATH)/libarchmodelInterface/include \
+    $(LOCAL_PATH)/kernels \
+    $(AQROOT)/sdk/inc \
+    $(AQROOT)/hal/inc \
+    $(AQROOT)/hal/user \
+    $(AQROOT)/hal/os/linux/user \
+    $(AQROOT)/compiler/libVSC/include \
+    $(AQARCH)/cmodel/inc \
+    $(AQROOT)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/vipArchPerf \
+    $(AQROOT)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/libarchmodelSw/include
+endif
 
 ifeq ($(USE_VXC_BINARY),1)
 LOCAL_C_INCLUDES += $(LOCAL_C_INCLUDES) \
@@ -174,15 +191,31 @@ endif
 LOCAL_LDFLAGS := \
     -Wl,-z,defs
 
+ifeq ($(ORI_NNARCHPERF),1)
 LOCAL_STATIC_LIBRARIES += \
     libarchmodel
+else
+LOCAL_STATIC_LIBRARIES += \
+    libarchmodelInterface
+endif
 
+ifeq ($(ORI_NNARCHPERF),1)
 LOCAL_SHARED_LIBRARIES := \
     liblog \
     libdl \
     libcutils \
     libVSC \
     libGAL \
+else
+LOCAL_SHARED_LIBRARIES := \
+    liblog \
+    libdl \
+    libcutils \
+    libVSC \
+    libGAL \
+    libNNArchPerf \
+    libarchmodelSw
+endif
 
 LOCAL_MODULE         := libOpenVX
 LOCAL_MODULE_TAGS    := optional
@@ -206,6 +239,7 @@ LOCAL_CFLAGS := \
     $(CFLAGS) \
     -DLOG_TAG=\"vxu\"
 
+ifeq ($(ORI_NNARCHPERF),1)
 LOCAL_C_INCLUDES := \
     $(AQROOT)/sdk/inc \
     $(AQROOT)/driver/khronos/libOpenVX/driver/include \
@@ -214,6 +248,19 @@ LOCAL_C_INCLUDES := \
     $(AQROOT)/hal/user \
     $(AQROOT)/hal/os/linux/user \
     $(AQROOT)/compiler/libVSC/include \
+    $(AQARCH)/../libNNArchPerf/libNNArchPerf
+else
+LOCAL_C_INCLUDES := \
+    $(AQROOT)/sdk/inc \
+    $(AQROOT)/driver/khronos/libOpenVX/driver/include \
+    $(AQROOT)/driver/khronos/libOpenVX/kernels \
+    $(AQROOT)/hal/inc \
+    $(AQROOT)/hal/user \
+    $(AQROOT)/hal/os/linux/user \
+    $(AQROOT)/compiler/libVSC/include \
+    $(AQROOT)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/vipArchPerf \
+    $(AQROOT)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/libarchmodelSw/include
+endif
 
 LOCAL_LDFLAGS := \
     -Wl,-z,defs
@@ -323,7 +370,17 @@ include $(BUILD_SHARED_LIBRARY)
 
 include $(AQROOT)/copy_installed_module.mk
 endif
-
+ 
+# libNNArchPerf
+ifeq ($(ORI_NNARCHPERF),1)
+include $(AQARCH)/../libNNArchPerf/libNNArchPerf/Android.mk
+else
+include $(AQROOT)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/vipArchPerf/Android.mk
+include $(AQROOT)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/libarchmodelSw/Android.mk
+endif
 # libarchmodel
+ifeq ($(ORI_NNARCHPERF),1)
 include $(AQROOT)/driver/khronos/libOpenVX/libarchmodel/Android.mk
-
+else
+include $(AQROOT)/driver/khronos/libOpenVX/libarchmodelInterface/Android.mk
+endif

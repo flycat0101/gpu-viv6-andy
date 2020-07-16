@@ -66,6 +66,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensorRounding_ValidateOutput(vx_node no
 {
     return VX_SUCCESS;
 }
+
 #if REGISTER_FRAME
 
 VX_PRIVATE_API vx_status vxoTensorRounding_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
@@ -266,7 +267,6 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint
 }
 
 #endif
-
 VX_PRIVATE_API vx_status VX_CALLBACK vxoTensorRounding_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;

@@ -145,6 +145,7 @@ VX_PRIVATE_API vx_pyramid vxoPyramid_Create(
         return (vx_pyramid)vxoContext_GetErrorObject(context, status);
     }
 
+    gcmFOOTER_NO();
     return pyramid;
 }
 

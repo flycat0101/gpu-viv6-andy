@@ -59,7 +59,7 @@ vx_status vxIntegralImage(vx_node node, vx_image src, vx_uint32 step, vx_image d
     gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData, sizeof(constantData));
 
     kernelContext->uniforms[0].index = 2;
-    kernelContext->uniforms[0].num = sizeof(constantData) / sizeof(vx_uint32);
+    kernelContext->uniforms[0].num = vxmLENGTH_OF(constantData);
     kernelContext->uniform_num = 1;
 
     kernelContext->params.step = step;

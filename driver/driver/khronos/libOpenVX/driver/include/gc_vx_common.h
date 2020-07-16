@@ -71,8 +71,11 @@
 #include "gc_vxk_common.h"
 
 #include <gc_vx_profiler.h>
-#ifdef USE_LIB_NN_ARCH_PERF
+#ifdef ORI_NNARCHPERF
 #include "nnArchPerfOri.h"
+#else
+#include "archSwPerf.h"
+#include "nnArchPerf.h"
 #endif
 
 
@@ -134,7 +137,7 @@
 #define VXM_FORCE_PER_OPERATION_IDLE      0
 
 #define TP_FC_Z_MAX         512
-
+#define MAX_TP_FC_KZ_SIZE  ((0x1 <<16) -64)
 #define NN_INTEGER_BIAS_BITS                27
 #define NN_INTEGER_BIAS_BITS_VIP_V7         32
 #define NN_INTEGER_BIAS_BITS_VIP_V7_INT16   48
@@ -163,6 +166,10 @@
 #define VX_REF_SIGNATURE_ALIVE              0xCD9CCD9C
 #define VX_REF_SIGNATURE_RELEASED           0xDEADDEAD
 
+#ifndef VX_MAX_STRUCT_NAME
+#define VX_MAX_STRUCT_NAME (64)
+#endif
+
 #define VX_MAX_PATH                         1024
 #define VX_MAX_REF_COUNT                    8192
 #define VX_MAX_NODE_COUNT                   2048
@@ -173,12 +180,9 @@
 #define VX_MAX_CONVOLUTION_DIM              15
 #define VX_INT_MAX_NONLINEAR_DIM            9
 #define VX_MAX_OPTICAL_FLOW_WINDOW_DIM      9
-#define VX_MAX_PARAMETERS                   48
 #define VX_MAX_NODES_IN_GRAPH               VX_MAX_NODE_COUNT
 #define VX_MAX_PLANES                       4
 #define VX_MAX_NODE_COUNT_ONE_BLOCK         16
-#define VX_MAX_NODE_PARENTS                 64
-#define VX_MAX_NODE_CHILDREN                64
 
 #define VX_HOST_CORE_COUNT                  1
 #define VX_MAX_DEVICES                      gcdMAX_3DGPU_COUNT
@@ -209,6 +213,7 @@
 #define VX_TRANSPOSE_MAX_INTERLEAVE_CH      16
 #define VX_TRANSPOSE_MAX_INTERLEAVE_1MULTI1_CH      9
 
+#define VX_GRAPH_COMMAND_BUFFER_SIZE        gcdCMD_BUFFER_SIZE
 #define IMG_MAX_WIDTH (65536)
 
 #define REGISTER_FRAME 1
@@ -228,7 +233,12 @@
 
 #define vxmBOOL_TO_STRING(b)                ((b) ? "true" : "false")
 
+#if defined(VX_VERSION ) && (VX_VERSION == VX_VERSION_1_1 )
 #define vxmIS_SCALAR(type)                  (VX_TYPE_INVALID < (type) && (type) < VX_TYPE_SCALAR_MAX)
+#else
+#define vxmIS_SCALAR(type)                  (VX_TYPE_INVALID < (type) && (type) <= VX_TYPE_VENDOR_STRUCT_END)
+#endif
+
 #define vxmIS_STRUCT(type)                  ((type) >= VX_TYPE_RECTANGLE && (type) < VX_TYPE_STRUCT_MAX)
 #define vxmIS_OBJECT(type)                  (((type) >= VX_TYPE_REFERENCE && (type) < VX_TYPE_OBJECT_MAX) || ((type) == VX_TYPE_PROGRAM))
 
@@ -315,7 +325,6 @@
                     } \
                 } \
                 while (gcvFALSE)
-
 #define vxmOPERATION_COUNT(layer)       gcmCOUNTOF(layer->operations)
 
 #define VX_GET_DATA_FROM_TENSOR(tensor, index) \
@@ -502,13 +511,21 @@ enum vx_kernel_internal_e
     VX_KERNEL_INTERNAL_MULTIPLY_2D_MATRIXES        = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x39,
 
     VX_KERNEL_INTERNAL_ROI_POOLING_RELU_LAYER      = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x3A,
+
+    VX_KERNEL_INTERNAL_IMAGE_CROP                  = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x3B,
+
+    VX_KERNEL_INTERNAL_MEAN_STDDEV                 = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x3C,
+
+    VX_KERNEL_INTERNAL_CONVOLVE5X5                 = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x3D,
+
+    VX_KERNEL_INTERNAL_WARP_AFFINE                 = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x3E,
 };
 
 
 enum vx_convolutional_network_pooling_internal_type_e
 {
-    /*! \brief first pixel pooling*/
-    VX_NN_POOLING_FFP = VX_ENUM_BASE(VX_ID_VIVANTE, VX_ENUM_NN_POOLING_TYPE) + 0x2,
+    /*! \brief first pixel pooling, stride 2*/
+    VX_NN_POOLING_FPP = VX_ENUM_BASE(VX_ID_VIVANTE, VX_ENUM_NN_POOLING_TYPE) + 0x2,
 };
 
 enum vx_convolutional_network_layer_internal_type_e
@@ -715,6 +732,25 @@ typedef union
     vx_size                                 s;
 
     vx_bool                                 b;
+
+    vx_rectangle_t                          rect;
+
+    vx_keypoint_t                           keypoint;
+
+    vx_coordinates2d_t                      coord2d;
+
+    vx_coordinates3d_t                      coord3d;
+
+    vx_coordinates2df_t                     coord2df;
+
+    vx_hog_t                                hog;
+
+    vx_hough_lines_p_t                      houghlines;
+
+    vx_line2d_t                             line2d;
+
+    vx_tensor_matrix_multiply_params_t      tensormatmulparam;
+
 }vx_scalar_data;
 
 typedef struct _vx_scalar
@@ -738,13 +774,13 @@ typedef struct _vx_signature_s
 {
     vx_uint32                               paramCount;
 
-    vx_enum                                 directionTable[VX_MAX_PARAMETERS];
+    vx_enum                                 *directionTable;
 
-    vx_enum                                 dataTypeTable[VX_MAX_PARAMETERS];
+    vx_enum                                 *dataTypeTable;
 
-    vx_enum                                 stateTable[VX_MAX_PARAMETERS];
+    vx_enum                                 *stateTable;
 
-    vx_bool                                 isStaticTable[VX_MAX_PARAMETERS];
+    vx_bool                                 *isStaticTable;
 }
 vx_signature_s;
 
@@ -826,6 +862,7 @@ typedef struct _vx_kernel_attribute_s
 #endif
 
     vx_bool                                 validRectReset;
+    vx_bool                                 isSetKernelVIP;
 }
 vx_kernel_attribute_s;
 
@@ -840,6 +877,17 @@ typedef enum
     VX_MULTIVIP_REFERENCE_END,
 }
 vx_multiVIP_reference_type_t;
+
+typedef enum
+{
+    VX_MULTIVIP_SPLIT_NONE = 0,
+    VX_MULTIVIP_SPLIT_X_AXIS,
+    VX_MULTIVIP_SPLIT_Y_AXIS,
+    VX_MULTIVIP_SPLIT_Z_AXIS,
+    VX_MULTIVIP_SPLIT_SPECIFY_NO,
+    VX_MULTIVIP_SPLIT_MAX,
+}
+vx_multiVIP_conv_split_axis_t;
 
 typedef struct _vx_tp_coomandInfo_s
 {
@@ -1076,6 +1124,7 @@ typedef struct _vx_shader_s
     gctUINT                 attributeCount;
 
     gctBOOL                 hasPrintf;
+    gctBOOL                 allocatedLocalMemory;
 
 }
 vx_shader_s;
@@ -1097,8 +1146,6 @@ typedef struct _vx_kernel
     vx_shader                               *kernelShader;
     vx_uint32                               kernelShaderCount;
     vx_uint32                               currShaderID;
-
-    vx_char                                 subname[VX_MAX_KERNEL_NAME];
 
     vx_signature_s                          signature;
 
@@ -1236,6 +1283,7 @@ typedef struct _vx_user_struct
 {
     vx_enum                                 type;
     vx_size                                 size;
+    vx_char                                 name[VX_MAX_STRUCT_NAME];
 }
 vx_user_struct_s;
 
@@ -1252,6 +1300,14 @@ typedef union _vx_memory_map_extra_s
         vx_size start;
         vx_size end;
     } array_data;
+
+    struct
+    {
+        vx_size start[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+        vx_size end[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+        vx_size stride[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+        vx_size number_of_dims;
+    } tensor_data;
 
 } vx_memory_map_extra_s;
 
@@ -1292,9 +1348,9 @@ typedef struct _vx_global_data_s
     gceSTATUS                               (*loadCompiler)(IN gcsHWCaps *HWCaps, IN gcePATCH_ID PatchId);
     gceSTATUS                               (*unloadCompiler)(void);
 
-#ifdef USE_LIB_NN_ARCH_PERF
     APMHandle                               apm;
-#endif
+    archSwLibHandle                         archSwLibHandle;
+
     vxnne_sram_s                            axiSRAM[MAX_GPU_CORE_COUNT];
     vxnne_sram_s                            vipSRAM;
 #if gcdUSE_VXC_BINARY
@@ -1307,6 +1363,14 @@ typedef struct _vx_global_data_s
     vx_drv_option                           options;
     vx_nn_config                            nnConfig;
 } vx_global_data_s, *vx_global_data;
+
+typedef struct _vx_wb_list
+{
+    vx_weights_biases_parameter             wb;
+    struct _vx_wb_list                      *next;
+} vx_wb_list_s, *vx_wb_list;
+
+#include <gc_vx_binary.h>
 
 typedef struct _vx_context
 {
@@ -1383,8 +1447,6 @@ typedef struct _vx_context
     vx_char                                 productName[32];
     vx_uint32                               pid;
     vx_uint32                               graphCount;
-    vx_ptr_ptr                              binaryGraphInitBuffer;
-    vx_uint32_ptr                           binaryGraphInitSize;
     vx_uint32                               SumTotalKernelBufferSize;
     vx_uint32                               CurrentContigousSize;
     vx_uint8_ptr*                           Logical;
@@ -1394,9 +1456,15 @@ typedef struct _vx_context
     /*COPY_FROM_GLOBAL_DATA*/
     vxnne_sram_s                            axiSRAM[MAX_GPU_CORE_COUNT];
     vxnne_sram_s                            vipSRAM;
+    vxnne_sram_s                            vipSRAMForKernel;
     vx_drv_option                           options;
     vx_nn_config                            nnConfig;
     /*end COPY_FROM_GLOBAL_DATA*/
+
+    vx_wb_list                              wbList;
+#if gcdUSE_BROKER
+    void *                                  libVIPBrokerHandle;
+#endif
 
 }
 vx_context_s;
@@ -1450,7 +1518,6 @@ typedef struct _vx_node_block_s
 vx_node_block_s;
 
 
-#include <gc_vx_binary.h>
 
 typedef struct _vx_node
 {
@@ -1460,7 +1527,7 @@ typedef struct _vx_node
 
     vx_kernel                               kernel;
 
-    vx_reference                            paramTable[VX_MAX_PARAMETERS];
+    vx_reference                            *paramTable;
 
     vx_status                               status;
 
@@ -1474,6 +1541,8 @@ typedef struct _vx_node
 
 
     vx_kernel_attribute_s                   kernelAttributes;
+
+    vx_char                                 kernelsubname[VX_MAX_KERNEL_NAME];
 
     vx_uint32                               targetIndex;
 
@@ -1514,13 +1583,13 @@ typedef struct _vx_node
 
     vx_bool                                 isReplicated;
 
-    vx_bool                                 replicated_flags[VX_MAX_PARAMETERS];
+    vx_bool                                 *replicated_flags;
 
     vx_bool                                 localDataChangeIsEnabled;
 
     vx_bool                                 localDataSetByImplementation;
 
-    vx_uint32                               patchLocation[VX_MAX_PARAMETERS][VX_MAX_PLANES];
+    vx_uint32                               **patchLocation;
     vxnne_sync_mode_e                       waitMode;
     vxnne_sync_mode_e                       wakeMode;
     gctUINT32                               semaWaitHandle;
@@ -1529,9 +1598,9 @@ typedef struct _vx_node
     vx_uint32                               id;
 
     vx_uint32                               numChildren;
-    vx_uint32                               childNodes[VX_MAX_NODE_CHILDREN];
+    vx_uint32                               *childNodes;
     vx_uint32                               numParents;
-    vx_uint32                               parentNodes[VX_MAX_NODE_PARENTS];
+    vx_uint32                               *parentNodes;
 
     vx_bool                                 merged;
     vx_node                                 replacedBy; /*record the nodeId that replace current node*/
@@ -1550,7 +1619,7 @@ typedef struct _vx_node
     vxnne_yuv2rgb_scale_operation           mGpuSCOperation;
     vx_uint32                               mGpuSCOpCnt;
 
-    vx_bool                                 tensorVxcOptimize;
+    vx_bool                                 vxcOptimize;
 }
 vx_node_s;
 
@@ -1561,6 +1630,7 @@ typedef struct vx_graph_parameter_s
     vx_node_s *                             node;
 
     vx_uint32                               index;
+    struct vx_graph_parameter_s             *next;
 }
 vx_graph_parameter_s;
 
@@ -1613,10 +1683,10 @@ typedef struct _vx_graph
     vx_bool                                 Initilized;
 
     vx_uint32                               paramCount;
-    vx_graph_parameter_s                    paramTable[VX_MAX_PARAMETERS];
+    vx_graph_parameter_s                    *paramList;
 
     vx_uint32                               headTensorCount;
-    vx_graph_parameter_s*                   headTensorCountTable;
+    vx_graph_parameter_s*                   headTensorList;
 
     vx_uint32                               inputCount;
     vx_reference                            *inputs;
@@ -1653,6 +1723,7 @@ typedef struct _vx_graph
     vx_uint32                               commandBufferSizeInByte;
 
     vxnne_execution_layer                   layer;
+    vxnne_execution_layer                   shaderCopyLayer;
 
     vx_binary_save                          binarySave;
 
@@ -1664,7 +1735,22 @@ typedef struct _vx_graph
 
     vx_uint32                               deviceID; /*the Device CoreId to run this graph*/
     vx_uint32                               graphID; /*graph ID in this owner context */
+    vx_uint32                               gpuCount; /*core count belongs to a device.*/
     vx_uint32                               peakAxiSramUsedSize;
+    vx_bool                                 shaderUsedLocalMemory;
+
+#if gcdUSE_BROKER
+    vip_broker_func1                        broker_run;
+    vip_broker_func2                        broker_set_input;
+    vip_broker_func2                        broker_set_output;
+    vx_uint8                                *nbgBuffer;
+    vx_uint32                               nbgSize;
+    void                                    *broker;
+    broker_param_t                          inputParam[128];
+    broker_param_t                          outputParam[128];
+    void                                    *input_buffer[128];
+    void                                    *output_buffer[128];
+#endif
 }
 vx_graph_s;
 
@@ -1707,6 +1793,9 @@ typedef struct _vx_memory_s
     vx_uint32                               dimCount;
     vx_int32                                dims[VX_MAX_PLANES][VX_CONTEXT_TENSOR_MAX_DIMENSION];
     vx_int32                                strides[VX_MAX_PLANES][VX_CONTEXT_TENSOR_MAX_DIMENSION];
+    /*! \brief The per ptr stride values in bits in the x-dimension. Used when
+     * the image data type is not a whole number of bytes (e.g. U1). */
+    vx_uint16                               stride_x_bits[VX_MAX_PLANES];
     vx_size                                 sizes[VX_MAX_PLANES];
 
     vx_bool                                 allocated;
@@ -1738,11 +1827,13 @@ typedef struct _vx_memory_s
 #define VXNNE_MEM_ID_INIT_VALUE   0xFFFFFFFF
     vx_uint32                               lastUseId;
     vx_uint32                               firstUseId;
+    vx_bool                                 ignoreLastUseId;
 
     vx_size                                 memOffset;
     vx_bool                                 memReverse;
     vx_bool                                 circular;
     vx_bool                                 isDirty;
+    vx_bool                                 sharedMem;
 
     vx_uint32                               offset[VX_MAX_PLANES];
 
@@ -1774,6 +1865,7 @@ typedef struct _vxnne_mem_request_s
     vx_memory   outputMemory[VX_MAX_MEM_REQUEST_OUTPUT];
     vx_memory_s kernelCache;
     vx_memory_s imageCache;
+    vx_memory_s tpTransposeBuffer;
     vx_memory_s transposeIn;
     vx_memory_s transposeOut;
 }
@@ -1942,6 +2034,7 @@ typedef struct _vx_tensor_t
 
     vx_view_region_s                        viewRegion; /* default is whole size */
     vx_bool                                 isViewed;
+    vx_bool                                 isReshaped;
     vx_uint32                               viewOffset;
 
     vx_tensor_buffer_s *                    tensorBuffer; /* shared by all related tensors */
@@ -1956,19 +2049,16 @@ typedef struct _vx_tensor_t
 
     vx_bool                                 alloced;
     vx_bool                                 brickMode;
-
-    vx_int8                                 fixedPointPos;
-
+    vx_tensor_quant_param                   quantData;
     vx_enum                                 dataFormat;
     vx_uint32                               elementSize;
 
-    vx_float32                              scale;
-    vx_int32                                zeroPoint;
     vx_enum                                 quantFormat;
 
     vx_enum                                 rank;
     vx_tensor                               reshape;
     vx_bool                                 useInternalMem;
+
 }
 vx_tensor_s;
 
@@ -2051,12 +2141,18 @@ typedef enum _vx_nn_feature_e
     VX_NN_FEATURE_COEF_COMPRESSION_ENHANCEMENT,
     VX_NN_FEATURE_TP_COMPRESSION_ENHANCEMENT,
     VX_NN_FEATURE_SCALER,
+    VX_NN_FEATURE_SCALER_4K,
     VX_NN_FEATURE_NN_DEPTHWISE_SUPPORT,
     VX_NN_FEATURE_VIP_DEC400,
     VX_NN_FEATURE_SHADER,
     VX_NN_TP_PARALLEL,
     VX_TP_FEATURE_FP32_BIAS,
     VX_NN_FEATURE_NN_TRANSPOSE,
+    VX_NN_FEATURE_FAST_FIRST_PIXEL_POOLING,
+    VX_NN_FEATURE_ASYMMETRIC_INT8,
+    VX_NN_FEATURE_OUTPUT_CONVERT_UINT8_INT8_TO_UINT16_INT16_FIX,
+    VX_NN_FEATURE_VIP_FINAL_RELEASE,
+    VX_NN_FEATURE_NN_COEF_DECOMPRESS_BYPASS,
     VX_NN_FEATURE_COUNT,
 }
 vx_nn_feature_e;
@@ -2074,7 +2170,7 @@ vx_nn_calculate_type_e;
 
 #define MAX_WEIGHT_BIAS_GROUPS  4
 #define MAX_ZGROUP_COUNT     128
-#define MAX_KZGROUP_COUNT  15
+#define MAX_KZGROUP_COUNT  16
 
 #define SW_TILING_FROM_DDR          0
 #define SW_TILING_FROM_AXI_SRAM     1
@@ -2089,235 +2185,6 @@ enum
     VX_SWTILING_OPTION_AB     = 2,
     VX_SWTILING_OPTION_TILING = 3,
 };
-
-typedef struct _vx_weights_biases_parameter_base_s
-{
-    vx_reference_s                           base;
-
-    vx_uint32                                weights_num_of_dims;
-    vx_uint32                                weights_sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION];
-    vx_uint32                                org_weights_sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION];
-    vx_enum                                  weights_data_format;
-    vx_enum                                  weights_quant_format;
-    vx_int8                                  weights_fixed_point_pos;
-
-    vx_uint32                                biases_num_of_dims;
-    vx_uint32                                biases_sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION];
-    vx_enum                                  biases_data_format;
-    vx_enum                                  biases_quant_format;
-    vx_int8                                  biases_fixed_point_pos;
-
-    vx_uint32                                strideX;
-    vx_uint32                                strideY;
-    vx_uint32                                pooling_size_x;
-    vx_uint32                                pooling_size_y;
-    vx_uint32                                pad_x_left;
-    vx_uint32                                pad_x_right;
-    vx_uint32                                pad_y_bottom;
-    vx_uint32                                pad_y_top;
-    vx_uint32                                pooling_stride;
-    vx_enum                                  down_scale_size_rounding;
-
-    vx_int8                                  setZeroLength;
-    vx_int32                                 inputZP;
-    vx_int32                                 coefZP;
-    vx_float32                               coefScale;
-    vx_float32                               biasScale;
-    vx_uint32                                skipValue;
-
-    vx_bool                                  nn_fc_batch_mode;
-    vx_bool                                  do_fisrt_pixel_pool;
-    vx_bool                                  do_1xN;
-    vx_bool                                  do_zdp_opt;
-    vx_bool                                  hw_depth_wise;
-    vx_bool                                  no_bias;
-
-    vx_uint32                                memory_pad;
-    vx_uint32                                memory_head_offset;
-
-    vx_size                                  tpFcStreamTotalSize;
-    vx_uint8_ptr                             zrlTpFcPtr;
-
-    vx_tensor                                origWeight;
-    vx_tensor                                origBias;
-    vx_tensor                                origAlpha;
-
-    /* need remove after mem optimization path is ok */
-    vx_uint8_ptr                             weightPtr;
-    vx_uint32_ptr                            biasPtr;
-
-    vx_uint8_ptr                             reshuffleWeightPtr;
-}
-vx_weights_biases_parameter_base_s;
-#define LOG_RUN_SIZE1 4    /*The 2nd set of run-length can have 1<<LOG_RUN_SIZE1 of run-length*/
-#define HUFFMAN_CODING_TYPE_NON_RUN_LEN 0
-#define HUFFMAN_CODING_TYPE_RUN_LEN 1
-#define MAX_RUNLEN_SIZE (2+(1<<LOG_RUN_SIZE1)) /*allow 18 run-length in maximum.*/
-
-typedef struct _vx_weights_biases_huffman_cfg_s
-{
-    vx_uint8                                  preEncode; /* true means using prevEncode, prediction from previous pixel*/
-    vx_uint8                                  codingType; /*false means no zero run length mode*/
-    vx_uint8                                  bit16Flag;
-    vx_uint8                                  fp16Flag;
-
-    vx_uint8                                 version; /*Version Number: Version.SubVersion, Now it is 1.0*/
-    vx_uint8                                 runLenTableSize;
-    vx_uint8                                 runLenTable[MAX_RUNLEN_SIZE];
-    vx_uint8                                 mapToHuffman[4]; /*8 mapping to Huffman Symbols, each bytes take 2 mapping*/
-    vx_int16                                 avgBias;  /*The bias for*/
-    vx_uint8                                 reserved;
-    vx_uint8                                 shiftBack;
-    vx_uint32                                cmpBitLength; /*number of Symbols in the stream*/
-}
-vx_weights_biases_huffman_cfg_s, *vx_weights_biases_huffman_cfg;
-
-#define WB_BASE(wb)                            (wb)->wb_base
-#define WB_BASE_WEIGHT_DIMS(wb)                (wb)->wb_base->weights_sizes
-#define WB_WEIGHT_DIM_NUM(wb)                  (wb)->wb_base->weights_num_of_dims
-#define WB_BIAS_DIM_NUM(wb)                    (wb)->wb_base->biases_num_of_dims
-#define WB_STRIDE_X(wb)                        (wb)->wb_base->strideX
-#define WB_STRIDE_Y(wb)                        (wb)->wb_base->strideY
-#define WB_PAD_LEFT(wb)                        (wb)->wb_base->pad_x_left
-#define WB_PAD_RIGHT(wb)                       (wb)->wb_base->pad_x_right
-#define WB_PAD_TOP(wb)                         (wb)->wb_base->pad_y_top
-#define WB_PAD_BOTTOM(wb)                      (wb)->wb_base->pad_y_bottom
-#define WB_POOLING_SIZE_X(wb)                  (wb)->wb_base->pooling_size_x
-#define WB_POOLING_SIZE_Y(wb)                  (wb)->wb_base->pooling_size_y
-#define WB_POOLING_STRIDE(wb)                  (wb)->wb_base->pooling_stride
-#define WB_WEIGHT_DATA_FORMAT(wb)              (wb)->wb_base->weights_data_format
-#define WB_WEIGHT_QUANT_FORMAT(wb)             (wb)->wb_base->weights_quant_format
-#define WB_BIAS_DATA_FORMAT(wb)                (wb)->wb_base->biases_data_format
-#define WB_BIAS_QUANT_FORMAT(wb)               (wb)->wb_base->biases_quant_format
-#define WB_WEIGHT_FPP(wb)                      (wb)->wb_base->weights_fixed_point_pos
-#define WB_WEIGHT_SCALE(wb)                    (wb)->wb_base->coefScale
-#define WB_WEIGHT_ZP(wb)                       (wb)->wb_base->coefZP
-#define WB_BIAS_FPP(wb)                        (wb)->wb_base->biases_fixed_point_pos
-#define WB_BIAS_SCALE(wb)                      (wb)->wb_base->biasScale
-#define WB_MEM_HEAD_OFFSET(wb)                 (wb)->wb_base->memory_head_offset
-#define WB_MEM_PAD(wb)                         (wb)->wb_base->memory_pad
-#define WB_WEIGHT_TENSOR(wb)                   (wb)->wb_base->origWeight
-#define WB_BIAS_TENSOR(wb)                     (wb)->wb_base->origBias
-#define WB_TP_FC_ZRL(wb)                       (wb)->wb_base->zrlTpFcPtr
-
-#define WB_KERNEL_X(wb)                        (wb)->weights_sizes[0]
-#define WB_KERNEL_Y(wb)                        (wb)->weights_sizes[1]
-#define WB_KERNEL_Z(wb)                        (wb)->weights_sizes[2]
-#define WB_KERNEL_Z_INDEX(wb, index)           (wb)->slice_array[index].kz_count
-#define WB_OUTPUT_Z_INDEX(wb, index)           (wb)->slice_array[index].z_count
-#define WB_ORG_KERNEL_X(wb)                    (wb)->wb_base->org_weights_sizes[0]
-#define WB_ORG_KERNEL_Y(wb)                    (wb)->wb_base->org_weights_sizes[1]
-
-#define WB_MEM_LOGICAL_BASE_ADDR(wb)           (wb)->memory.logicals[0]
-#define WB_MEM_PHYSICAL_BASE_ADDR(wb)          (wb)->memory.physicals[0]
-
-#define WB_MEM_LOGICAL_ADDR_INDEX(wb, index)   ((wb)->memory.logicals[0] + (wb)->slice_array[index].memory_offset)
-#define WB_MEM_PHYSICAL_ADDR_INDEX(wb, index)  ((wb)->memory.physicals[0] + (wb)->slice_array[index].memory_offset)
-#define WB_MEM_SIZE_INDEX(wb, index)           (wb)->slice_array[index].memory_size
-
-#define WB_RAW_DATA_SIZE(wb)                   ((wb)->memory_size - WB_MEM_HEAD_OFFSET(wb))
-
-#define WB_CONV_MEM_LOGICAL_ADDR(wb)           WB_MEM_LOGICAL_BASE_ADDR(wb)
-#define WB_CONV_MEM_PHYSICAL_ADDR(wb)          WB_MEM_PHYSICAL_BASE_ADDR(wb)
-
-#define WB_STREAM_OFFSET_INDEX(wb, index)      (wb)->slice_array[index].memory_offset
-#define WB_STREAM_SIZE_INDEX(wb, index)        (wb)->slice_array[index].kernel_stream_size
-#define WB_STREAM_ALIGN_SIZE_INDEX(wb, index)  (wb)->slice_array[index].kernel_align_stream_size
-
-#define WB_NON_ZERO_RATIO(wb)                  (wb)->non_zero_ratio
-#define WB_COMPRESS_RATIO(wb)                  (wb)->general_compression_ratio
-
-#define WB_CONV_STREAM_SIZE(wb)                WB_STREAM_SIZE_INDEX(wb, 0)
-#define WB_CONV_STREAM_ALIGN_SIZE(wb)          WB_STREAM_ALIGN_SIZE_INDEX(wb, 0)
-
-#define WB_PERF_INTERLEAVE_MODE(wb)            (wb)->archPerfHandle->resultInfo.interleaveMode
-#define WB_PERF_OUT_IMAGE_TILE_X(wb)           (wb)->archPerfHandle->resultInfo.outImageTileXSize
-#define WB_PERF_OUT_IMAGE_TILE_Y(wb)           (wb)->archPerfHandle->resultInfo.outImageTileYSize
-#define WB_PERF_KERNEL_PER_CORE(wb)            (wb)->archPerfHandle->resultInfo.kernelsPerCore
-#define WB_PERF_NN_CORE_COUNT(wb)              (wb)->archPerfHandle->resultInfo.nnCoreCount
-
-#define WB_IS_FIRST_PIXEL_POOL(wb)             (wb)->wb_base->do_fisrt_pixel_pool
-#define WB_IS_NN_FC_BATCH_MODE(wb)             (wb)->wb_base->nn_fc_batch_mode
-#define WB_IS_USE_TP_FC(wb)                    (wb)->use_tp_fc
-
-
-typedef struct _vx_weights_biases_z_offset_s
-{
-    vx_uint32 ptrOffset;
-    vx_uint32 bitOffset;
-}
-vx_weights_biases_z_offset_s, *vx_weights_biases_z_offset;
-
-typedef struct _vx_weights_biases_slice_s
-{
-    vx_uint32                                kz_count;
-    vx_uint32                                z_count;
-
-    vx_size                                  memory_offset;
-    vx_size                                  memory_size;
-
-    vx_size                                  kernel_orig_size;
-    vx_size                                  kernel_stream_size;
-    vx_size                                  kernel_align_stream_size;
-    vx_size                                  kernel_stream_full_cache_size;
-    vx_size                                  kernel_max_stream_size_percore;
-
-    vx_uint32                                non_zero_count;
-    vx_uint32                                reserve_weight_count;
-    vx_uint32                                all_count;
-}
-vx_weights_biases_slice_s, *vx_weights_biases_slice;
-
-typedef struct _vx_sub_wb_vdata
-{
-    vx_size                                  wb_memory_size;
-    vx_uint8_ptr                             wb_memory_ptr; /* For SW tiling vdata, save sub WB's kernel stream */
-    vx_uint32                                slice_num;
-    vx_weights_biases_slice                  slice_array; /*TP FC may split z or kz */
-    vx_uint32                                kernel_per_core;
-} vx_sub_wb_vdata_s, *vx_sub_wb_vdata;
-
-typedef struct _vx_weights_biases_parameter_s
-{
-    vx_reference_s                           base;
-
-    vx_weights_biases_parameter_base         wb_base;
-
-    vx_enum                                  layer_type;
-
-    vx_uint32                                weights_sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION];
-    vx_uint32                                biases_sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION];
-
-    vx_memory_s                              memory;
-    vx_size                                  memory_size;
-    vx_memory_s                              reserved_memory; /* for BW issue */
-
-    vx_uint32                                slice_num;
-    vx_uint32                                slice_z_num;
-    vx_uint32                                slice_kz_num;
-    vx_weights_biases_slice                  slice_array; /*TP FC may split z or kz */
-
-    vx_bool                                  use_tp_fc;
-
-    vx_weights_biases_z_offset               zOffsetHandle;
-    vx_uint32                                numOfVz;
-    vx_uint32                                orgZOffsetValue;
-
-    vx_float64                               non_zero_ratio;
-    vx_float64                               general_compression_ratio;
-    vx_float64                               max_per_core_compression_ratio;
-    vx_float64                               *max_per_core_per_vzgroup_nzr;
-
-    vx_arch_perf                             archPerfHandle;
-    vx_sub_wb_vdata                          sub_wb_vdata; /*save more sub wb info for vdata when SWTiling is on*/
-
-    vx_weights_biases_huffman_cfg            huffmanConfig;
-
-    vx_uint32                                mGpuWBCount;/* support multiVIP */
-    vx_weights_biases_parameter              *mGpuWBTable;
-}
-vx_weights_biases_parameter_s;
-
 
 typedef struct _vx_array
 {
@@ -2749,7 +2616,7 @@ typedef enum _vx_nn_round_mode_e
 vx_nn_round_mode_e;
 
 VX_INTERNAL_API gctUINT64 gcfVX_PerfStart(vx_reference ref);
-VX_INTERNAL_API vx_uint32 gcfVX_PerfEnd(vx_reference ref, gctUINT64 start);
+VX_INTERNAL_API vx_uint64 gcfVX_PerfEnd(vx_reference ref, gctUINT64 start);
 VX_INTERNAL_API vx_int32 vxoContext_GetUserStructIndex(vx_context context, vx_enum dataType);
 enum {
     VX_DEBUG_LEVEL_NONE = 0,
@@ -2766,7 +2633,6 @@ typedef enum viv_nn_pooling_type_e
     VIV_NN_POOLING_AVG         = 2,
     VIV_NN_POOLING_FIRST_PIXEL = 3
 }viv_nn_pooling_type_e;
-
 vx_status vxnneOperation_TP_Deinitialize(vxnne_operation_s *operation);
 
 vx_status vxnneOperation_AddReference(
@@ -2794,6 +2660,8 @@ typedef enum _vx_nn_support_type_e
 vx_nn_support_type_e;
 
 vx_bool vxoLayer_CheckSupport(vx_context context, vx_enum type, vx_enum format, vx_uint32_ptr flag);
+vx_bool vxoLayer_IsOutputTensorInTailNode(vx_graph graph, vx_tensor tensor);
+vx_bool vxoLayer_IsInputTensorInHeadNode(vx_graph graph, vx_tensor tensor);
 
 typedef struct _vxnne_register_param_s
 {

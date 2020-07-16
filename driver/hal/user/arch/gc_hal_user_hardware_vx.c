@@ -750,12 +750,15 @@ gcoHARDWAREVX_SetImageInfo(
             Physical, 4, 2, 1, gcvFALSE, 16, 0, (gctPOINTER)dataPtr, gcvUNIFORMCVT_NONE, gcSHADER_TYPE_CL, gcvFALSE));
 
         /* verify the input */
-        gcmDUMP_BUFFER(gcvNULL,
-                       gcvDUMP_BUFFER_MEMORY,
-                       Info->physicals[0],
-                       (gctPOINTER)(size_t)Info->logicals[0],
-                       0,
-                       Info->bytes * Info->arraySize);
+        if(Info->physicals[0] > Hardware->options.sRAMGPUVirtAddrs[0x00000001] && Info->logicals[0])
+        {
+            gcmDUMP_BUFFER(gcvNULL,
+                           gcvDUMP_BUFFER_MEMORY,
+                           Info->physicals[0],
+                           (gctPOINTER)(size_t)Info->logicals[0],
+                           0,
+                           Info->bytes * Info->arraySize);
+        }
 
     }
     else
@@ -2939,6 +2942,114 @@ gcoHARDWAREVX_SetInstructionType(
 }
 
 gceSTATUS
+gcoHARDWAREVX_IsEndOfBB(
+    IN gctUINT32                            Opcode,
+    OUT gcoVX_Instruction                   *Instruction
+)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER_ARG("Opcode=0x%x", Opcode);
+
+    if (Instruction != NULL)
+    {
+        gcoHARDWARE Hardware = NULL;
+        gcmGETHARDWARE(Hardware);
+
+
+
+        if (Hardware->features[gcvFEATURE_SH_END_OF_BB])
+        {
+            switch (Opcode)
+            {
+            case 0x09:
+            case 0x56:
+            case 0x0A:
+            case 0x0B:
+            case 0x0F:
+            case 0x31:
+            case 0x10:
+                Instruction->binary[1] = (((gctUINT32)(Instruction->binary[1]) & ~((gctUINT32)(((((1 ?
+ 10:3) - (0 ?
+ 10:3) + 1) == 32) ?
+ ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
+ 10:3) - (0 ?
+ 10:3) + 1))))) << (0 ?
+ 10:3))) | ((gctUINT32)((gctUINT32)(SETBITS(Instruction->binary[1], 3, 3, 1)) & ((((1 ?
+ 10:3) - (0 ?
+ 10:3) + 1) == 32) ?
+ ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
+ 10:3) - (0 ? 10:3) + 1))))) << (0 ? 10:3)));
+                break;
+            case 0x65:
+            case 0x66:
+            case 0x67:
+            case 0x68:
+            case 0x69:
+            case 0x6A:
+            case 0x6B:
+            case 0x6C:
+            case 0x46:
+                Instruction->binary[0] = (((gctUINT32)(Instruction->binary[0]) & ~((gctUINT32)(((((1 ?
+ 10:6) - (0 ?
+ 10:6) + 1) == 32) ?
+ ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
+ 10:6) - (0 ?
+ 10:6) + 1))))) << (0 ?
+ 10:6))) | ((gctUINT32)((gctUINT32)(SETBITS(Instruction->binary[0], 2, 2, 1)) & ((((1 ?
+ 10:6) - (0 ?
+ 10:6) + 1) == 32) ?
+ ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
+ 10:6) - (0 ? 10:6) + 1))))) << (0 ? 10:6)));
+                break;
+            case 0x32:
+            case 0x39:
+            case 0x33:
+            case 0x3A:
+            case 0x79:
+            case 0x34:
+            case 0x7A:
+            case 0x35:
+                Instruction->binary[0] = (((gctUINT32)(Instruction->binary[0]) & ~((gctUINT32)(((((1 ?
+ 10:6) - (0 ?
+ 10:6) + 1) == 32) ?
+ ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
+ 10:6) - (0 ?
+ 10:6) + 1))))) << (0 ?
+ 10:6))) | ((gctUINT32)((gctUINT32)(SETBITS(Instruction->binary[0], 2, 2, 1)) & ((((1 ?
+ 10:6) - (0 ?
+ 10:6) + 1) == 32) ?
+ ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
+ 10:6) - (0 ? 10:6) + 1))))) << (0 ? 10:6)));
+                break;
+            default:
+                if (Opcode != 0x16 &&
+                    Opcode != 0x24 &&
+                    Opcode != 0x14 &&
+                    Opcode != 0x15 &&
+                    Opcode != 0x17)
+                    Instruction->binary[0] = (((gctUINT32)(Instruction->binary[0]) & ~((gctUINT32)(((((1 ?
+ 10:6) - (0 ?
+ 10:6) + 1) == 32) ?
+ ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
+ 10:6) - (0 ?
+ 10:6) + 1))))) << (0 ?
+ 10:6))) | ((gctUINT32)((gctUINT32)(SETBITS(Instruction->binary[0], 2, 2, 1)) & ((((1 ?
+ 10:6) - (0 ?
+ 10:6) + 1) == 32) ?
+ ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
+ 10:6) - (0 ? 10:6) + 1))))) << (0 ? 10:6)));
+                break;
+            }
+        }
+    }
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
 gcoHARDWAREVX_AddOpcode(
     IN gctUINT32                            Opcode,
     IN gctUINT32                            Extended,
@@ -3009,6 +3120,8 @@ gcoHARDWAREVX_AddOpcode(
 
     if((gctUINT32)Type != GCREG_SH_INSTRUCTION_TYPE_INVALID)
         gcmONERROR(gcoHARDWAREVX_SetInstructionType(Type, Instruction));
+
+    gcmONERROR(gcoHARDWAREVX_IsEndOfBB(Opcode, Instruction));
 
 OnError:
     /* Return the status. */
@@ -34778,6 +34891,146 @@ gcoHARDWAREVX_LoadKernel(
         reserve, memory
         );
 
+    if (Hardware->features[gcvFEATURE_HALTI5])
+    {
+        {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1  <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ?
+ 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ?
+ 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ?
+ 25:16))) | (((gctUINT32) ((gctUINT32) (1 ) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ?
+ 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x5580) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
+
+
+        gcmSETSTATEDATA_NEW(
+            stateDelta, reserve, memory, gcvFALSE, 0x5580,
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 1:1) - (0 ?
+ 1:1) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 1:1) - (0 ?
+ 1:1) + 1))))))) << (0 ?
+ 1:1))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 1:1) - (0 ?
+ 1:1) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1)))
+            );
+
+        gcmENDSTATEBATCH_NEW(
+            reserve, memory
+        );
+    }
+    else
+    {
+        {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1  <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ?
+ 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ?
+ 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ?
+ 25:16))) | (((gctUINT32) ((gctUINT32) (1 ) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ?
+ 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x0218) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
+
+
+        gcmSETSTATEDATA_NEW(
+            stateDelta, reserve, memory, gcvFALSE, 0x0218,
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 12:12) - (0 ?
+ 12:12) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 12:12) - (0 ?
+ 12:12) + 1))))))) << (0 ?
+ 12:12))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 12:12) - (0 ?
+ 12:12) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:12) - (0 ? 12:12) + 1))))))) << (0 ? 12:12)))
+            );
+
+        gcmENDSTATEBATCH_NEW(
+            reserve, memory
+        );
+    }
     {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1  <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -35384,6 +35637,23 @@ gcoHARDWAREVX_InitVX(
  20:16) - (0 ?
  20:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 20:16) - (0 ? 20:16) + 1))))))) << (0 ? 20:16)));
+
+        if (Hardware->features[gcvFEATURE_MULTI_CLUSTER])
+        {
+            gctUINT attribCache = Hardware->features[gcvFEATURE_USC_FULLCACHE_FIX] ?
+                0x7 : 0x2;
+            uscConfig |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 11:8) - (0 ?
+ 11:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 11:8) - (0 ?
+ 11:8) + 1))))))) << (0 ?
+ 11:8))) | (((gctUINT32) ((gctUINT32) (attribCache) & ((gctUINT32) ((((1 ?
+ 11:8) - (0 ?
+ 11:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ? 11:8)));
+        }
+
         programUSC = gcvTRUE;
     }
 
@@ -35435,6 +35705,20 @@ gcoHARDWAREVX_InitVX(
  21:21) - (0 ?
  21:21) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 21:21) - (0 ? 21:21) + 1))))))) << (0 ? 21:21)));
+
+            if (Hardware->features[gcvFEATURE_MULTI_CLUSTER])
+            {
+                uscConfig |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 11:8) - (0 ?
+ 11:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 11:8) - (0 ?
+ 11:8) + 1))))))) << (0 ?
+ 11:8))) | (((gctUINT32) ((gctUINT32) (Hardware->options.uscAttribCacheRatio) & ((gctUINT32) ((((1 ?
+ 11:8) - (0 ?
+ 11:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ? 11:8)));
+            }
             programUSC = gcvTRUE;
         }
     }
@@ -35574,6 +35858,9 @@ gcoHARDWAREVX_TriggerAccelerator(
             enableSaveBinary |= atoi(envCache);
         }
     }
+#if gcdUSE_BROKER
+    enableSaveBinary = 1; /* bypass SRAM remap when VIPLite broker is enabled */
+#endif
     if (0 == enableSaveBinary)
     {
         gctUINT32 gpuVirtAddr = 0;
@@ -35791,7 +36078,7 @@ gcoHARDWAREVX_TriggerAccelerator(
     if (gcvVX_ACCELERATOR_NN == Type)
     {
         gctBOOL enableZDP3, enableZDP6, enableNNStride;
-        gctUINT disableZDPN, disableSWTiling, smallBatch, ddrBurstSize;
+        gctUINT disableZDPN, disableSWTiling, smallBatch, ddrBurstSize = 0;
 
         gctUINT NNconfig = 0;
 
@@ -35805,15 +36092,34 @@ gcoHARDWAREVX_TriggerAccelerator(
 
         if (!Hardware->config->parallelNoFix)
         {
-            smallBatch = Hardware->features[gcvFEATURE_NN_SMALLBATCH_PHASE1] ? 0x0 : 0x1;
+            smallBatch = (Hardware->features[gcvFEATURE_NN_SMALLBATCH_PHASE1] && Hardware->features[gcvFEATURE_NN_COMMAND_KERNEL_REQUEST_CONFICT_FIX])
+                         ? 0x0 : 0x1;
         }
         else
         {
             smallBatch = 0x0;
         }
 
-        ddrBurstSize = (gcoHAL_GetOption(gcvNULL, gcvOPTION_OVX_ENABLE_NN_DDR_BURST_SIZE_256B) && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DDR_BURST_LEN_256B))
-                       ? 0x2 : 0x0;
+        if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OVX_ENABLE_NN_DDR_BURST_SIZE_256B))
+        {
+            ddrBurstSize = 0x2;
+        }
+        else if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OVX_ENABLE_NN_DDR_BURST_SIZE_64B))
+        {
+            ddrBurstSize = 0x0;
+        }
+        else if (Hardware->config->nnConfig.customizedFeature.ddrKernelBurstSize == 256)
+        {
+            ddrBurstSize = 0x2;
+        }
+        else if (Hardware->config->nnConfig.customizedFeature.ddrKernelBurstSize == 64)
+        {
+            ddrBurstSize = 0x0;
+        }
+        else
+        {
+            gcmASSERT("unsupport ddrBurstSize" && 0);
+        }
 
         NNconfig |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:2) - (0 ?
@@ -36165,6 +36471,7 @@ gcoHARDWAREVX_TriggerAccelerator(
         }
         else if (Type == gcvVX_ACCELERATOR_TP)
         {
+
             if (EventId == 0)
             {
                 {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
@@ -36327,6 +36634,7 @@ gcoHARDWAREVX_TriggerAccelerator(
             0x042E,
             0x042F
         };
+
 #if gcdFRAMEINFO_STATISTIC
         {
             gctUINT32 drawID;
@@ -36341,7 +36649,9 @@ gcoHARDWAREVX_TriggerAccelerator(
                     enableSaveBinary |= atoi(envCache);
                 }
             }
-
+            #if gcdUSE_BROKER
+            enableSaveBinary = 1; /* bypass SRAM remap when VIPLite broker is enabled */
+            #endif
             if (0 == enableSaveBinary)
             {
                 gcoHAL_FrameInfoOps(gcvNULL,
@@ -36781,6 +37091,11 @@ gcoHARDWAREVX_ProgrammeNNEngine(
     else
     {
         layerType = 1;
+        if (info->kernelXSize != 1)
+        {
+            gcmPRINT("V7 target doesn't support MxN, kx: %d, ky: %d\n", info->kernelXSize, info->kernelYSize);
+            gcmASSERT(0);
+        }
         kernelXYSize = info->kernelYSize;
     }
 
@@ -37059,6 +37374,16 @@ gcoHARDWAREVX_ProgrammeNNEngine(
  31:19) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:19) - (0 ? 31:19) + 1))))))) << (0 ? 31:19)))
                          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:2) - (0 ?
+ 2:2) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 2:2) - (0 ?
+ 2:2) + 1))))))) << (0 ?
+ 2:2))) | (((gctUINT32) ((gctUINT32) (info->noBias) & ((gctUINT32) ((((1 ?
+ 2:2) - (0 ?
+ 2:2) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 2:2) - (0 ? 2:2) + 1))))))) << (0 ? 2:2)))
+                         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  3:3) - (0 ?
  3:3) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -37096,7 +37421,7 @@ gcoHARDWAREVX_ProgrammeNNEngine(
  ~0U : (~(~0U << ((1 ?
  24:18) - (0 ?
  24:18) + 1))))))) << (0 ?
- 24:18))) | (((gctUINT32) ((gctUINT32) (info->outImageTileXSize) & ((gctUINT32) ((((1 ?
+ 24:18))) | (((gctUINT32) ((gctUINT32) (info->outImageTileXSize & 0x7F) & ((gctUINT32) ((((1 ?
  24:18) - (0 ?
  24:18) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 24:18) - (0 ? 24:18) + 1))))))) << (0 ? 24:18)))
@@ -37406,7 +37731,17 @@ gcoHARDWAREVX_ProgrammeNNEngine(
  28:28))) | (((gctUINT32) ((gctUINT32) (info->slowOutput) & ((gctUINT32) ((((1 ?
  28:28) - (0 ?
  28:28) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 28:28) - (0 ? 28:28) + 1))))))) << (0 ? 28:28)));
+ ~0U : (~(~0U << ((1 ? 28:28) - (0 ? 28:28) + 1))))))) << (0 ? 28:28)))
+                            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1))))))) << (0 ?
+ 31:31))) | (((gctUINT32) ((gctUINT32) (info->kernelDataTypeBit3) & ((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ? 31:31)));
 
     /*25:0*/
 
@@ -37429,7 +37764,28 @@ gcoHARDWAREVX_ProgrammeNNEngine(
  30:30))) | (((gctUINT32) ((gctUINT32) (info->bFloat16Mode) & ((gctUINT32) ((((1 ?
  30:30) - (0 ?
  30:30) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 30:30) - (0 ? 30:30) + 1))))))) << (0 ? 30:30)));
+ ~0U : (~(~0U << ((1 ? 30:30) - (0 ? 30:30) + 1))))))) << (0 ? 30:30)))
+                         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1))))))) << (0 ?
+ 31:31))) | (((gctUINT32) ((gctUINT32) (info->inImageDataTypeBit3) & ((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ? 31:31)))
+                         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:28) - (0 ?
+ 29:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:28) - (0 ?
+ 29:28) + 1))))))) << (0 ?
+ 29:28))) | (((gctUINT32) ((gctUINT32) (info->dwOutputZPBit1To0) & ((gctUINT32) ((((1 ?
+ 29:28) - (0 ?
+ 29:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:28) - (0 ? 29:28) + 1))))))) << (0 ? 29:28)));
+
 
 
     /*GCREG_NN_INST_WORD20*/
@@ -37442,7 +37798,37 @@ gcoHARDWAREVX_ProgrammeNNEngine(
  25:0))) | (((gctUINT32) ((gctUINT32) (info->inImageCircularBufSize >> 6) & ((gctUINT32) ((((1 ?
  25:0) - (0 ?
  25:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 25:0) - (0 ? 25:0) + 1))))))) << (0 ? 25:0)));
+ ~0U : (~(~0U << ((1 ? 25:0) - (0 ? 25:0) + 1))))))) << (0 ? 25:0)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ?
+ 26:26))) | (((gctUINT32) ((gctUINT32) (info->outImageDataTypeBit3) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ? 26:26)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 30:30) - (0 ?
+ 30:30) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 30:30) - (0 ?
+ 30:30) + 1))))))) << (0 ?
+ 30:30))) | (((gctUINT32) ((gctUINT32) (info->convolutionStride) & ((gctUINT32) ((((1 ?
+ 30:30) - (0 ?
+ 30:30) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 30:30) - (0 ? 30:30) + 1))))))) << (0 ? 30:30)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:27) - (0 ?
+ 29:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:27) - (0 ?
+ 29:27) + 1))))))) << (0 ?
+ 29:27))) | (((gctUINT32) ((gctUINT32) (info->nnAluFunction) & ((gctUINT32) ((((1 ?
+ 29:27) - (0 ?
+ 29:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:27) - (0 ? 29:27) + 1))))))) << (0 ? 29:27)));
 
     /*25:0*/
     *(*Instruction)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -37454,7 +37840,17 @@ gcoHARDWAREVX_ProgrammeNNEngine(
  25:0))) | (((gctUINT32) ((gctUINT32) (info->inImageCircularBufEndAddrPlus1 >> 6) & ((gctUINT32) ((((1 ?
  25:0) - (0 ?
  25:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 25:0) - (0 ? 25:0) + 1))))))) << (0 ? 25:0)));
+ ~0U : (~(~0U << ((1 ? 25:0) - (0 ? 25:0) + 1))))))) << (0 ? 25:0)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:26) - (0 ?
+ 31:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:26) - (0 ?
+ 31:26) + 1))))))) << (0 ?
+ 31:26))) | (((gctUINT32) ((gctUINT32) (info->dwCoefZPBit5To0) & ((gctUINT32) ((((1 ?
+ 31:26) - (0 ?
+ 31:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:26) - (0 ? 31:26) + 1))))))) << (0 ? 31:26)));
 
     /*GCREG_NN_INST_WORD22*/
     *(*Instruction)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -37509,7 +37905,26 @@ gcoHARDWAREVX_ProgrammeNNEngine(
  ~0U : (~(~0U << ((1 ? 25:18) - (0 ? 25:18) + 1))))))) << (0 ? 25:18)));
 
     /*GCREG_NN_INST_WORD23*/
-    *(*Instruction)++ = 0;
+    *(*Instruction)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 24:2) - (0 ?
+ 24:2) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 24:2) - (0 ?
+ 24:2) + 1))))))) << (0 ?
+ 24:2))) | (((gctUINT32) ((gctUINT32) (info->negPostMultiplier) & ((gctUINT32) ((((1 ?
+ 24:2) - (0 ?
+ 24:2) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 24:2) - (0 ? 24:2) + 1))))))) << (0 ? 24:2)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:25) - (0 ?
+ 31:25) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:25) - (0 ?
+ 31:25) + 1))))))) << (0 ?
+ 31:25))) | (((gctUINT32) ((gctUINT32) (info->negPostShift) & ((gctUINT32) ((((1 ?
+ 31:25) - (0 ?
+ 31:25) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:25) - (0 ? 31:25) + 1))))))) << (0 ? 31:25)));
 
     /*GCREG_NN_INST_WORD24*/
     *(*Instruction)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -37554,6 +37969,109 @@ gcoHARDWAREVX_ProgrammeNNEngine(
  31:4) - (0 ?
  31:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:4) - (0 ? 31:4) + 1))))))) << (0 ? 31:4)));
+
+    /* GCREG_NN_INST_WORD26, NN_SECOND_INPUT_BASE_ADDRESS */
+    *(*Instruction)++ =  info->secInImageAddress;
+
+    /* GCREG_NN_INST_WORD27*/
+    *(*Instruction)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:0) - (0 ?
+ 25:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 25:0) - (0 ?
+ 25:0) + 1))))))) << (0 ?
+ 25:0))) | (((gctUINT32) ((gctUINT32) (info->secInImageCircularBufSize >> 6) & ((gctUINT32) ((((1 ?
+ 25:0) - (0 ?
+ 25:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 25:0) - (0 ? 25:0) + 1))))))) << (0 ? 25:0)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 27:26) - (0 ?
+ 27:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 27:26) - (0 ?
+ 27:26) + 1))))))) << (0 ?
+ 27:26))) | (((gctUINT32) ((gctUINT32) (info->dwCoefZPBit7To6) & ((gctUINT32) ((((1 ?
+ 27:26) - (0 ?
+ 27:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 27:26) - (0 ? 27:26) + 1))))))) << (0 ? 27:26)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) | (((gctUINT32) ((gctUINT32) (info->postMultiplierSign) & ((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 28:28) - (0 ? 28:28) + 1))))))) << (0 ? 28:28)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ?
+ 29:29))) | (((gctUINT32) ((gctUINT32) (info->negPostMultiplierSign) & ((gctUINT32) ((((1 ?
+ 29:29) - (0 ?
+ 29:29) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 30:30) - (0 ?
+ 30:30) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 30:30) - (0 ?
+ 30:30) + 1))))))) << (0 ?
+ 30:30))) | (((gctUINT32) ((gctUINT32) (info->postShiftBits7) & ((gctUINT32) ((((1 ?
+ 30:30) - (0 ?
+ 30:30) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 30:30) - (0 ? 30:30) + 1))))))) << (0 ? 30:30)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1))))))) << (0 ?
+ 31:31))) | (((gctUINT32) ((gctUINT32) (info->negPostShiftBits7) & ((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ? 31:31)));
+
+    /* GCREG_NN_INST_WORD28*/
+    *(*Instruction)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:0) - (0 ?
+ 25:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 25:0) - (0 ?
+ 25:0) + 1))))))) << (0 ?
+ 25:0))) | (((gctUINT32) ((gctUINT32) (info->secInImageCircularBufEndAddrPlus1 >> 6) & ((gctUINT32) ((((1 ?
+ 25:0) - (0 ?
+ 25:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 25:0) - (0 ? 25:0) + 1))))))) << (0 ? 25:0)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ?
+ 26:26))) | (((gctUINT32) ((gctUINT32) (info->nnCoefDecompressBypass) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ? 26:26)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1))))))) << (0 ?
+ 31:31))) | (((gctUINT32) ((gctUINT32) (info->outImageTileXSize >> 7) & ((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ? 31:31)));
+
+    /* GCREG_NN_INST_WORD29*/
+    *(*Instruction)++ = info->nnClampMax;
+
+    /* GCREG_NN_INST_WORD30*/
+    *(*Instruction)++ = info->nnClampMin;
 
      return gcvSTATUS_OK;
 
@@ -41713,31 +42231,6 @@ OnError:
     return status;
 
 }
-
-gceSTATUS
-gcoHARDWAREVX_CaptureInitState(
-    IN gcoHARDWARE  Hardware,
-    IN OUT gctPOINTER CaptureBuffer,
-    IN gctUINT32 InputSizeInByte,
-    IN OUT gctUINT32 *OutputSizeInByte
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-
-    gcmHEADER_ARG("Hardware=0x%x", Hardware);
-    if (Hardware == gcvNULL)
-    {
-        gcmONERROR(gcvSTATUS_INVALID_ADDRESS);
-    }
-
-    gcmONERROR(gcoBUFFER_CaptureInitState(Hardware->engine[gcvENGINE_RENDER].buffer,
-                                CaptureBuffer, InputSizeInByte, OutputSizeInByte));
-
-OnError:
-    gcmFOOTER();
-    return status;
-}
-
 #endif /*gcdUSE_VX*/
 
 

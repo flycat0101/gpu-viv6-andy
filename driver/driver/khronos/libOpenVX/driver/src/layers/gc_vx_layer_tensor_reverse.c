@@ -197,9 +197,9 @@ vx_status vxnneExecuteSWTensorReverse(struct _vxnne_operation_s *operation)
 
     case 3:
         tmp[0] = vxoTensor_CreateTensor(ctx, graph, &tensor_create_params, vx_false_e);
-        vxoTensor_AllocateMemory(tmp[0]);
+        vxmONERROR(vxoTensor_AllocateMemory(tmp[0]));
         tmp[1] = vxoTensor_CreateTensor(ctx, graph, &tensor_create_params, vx_false_e);
-        vxoTensor_AllocateMemory(tmp[1]);
+        vxmONERROR(vxoTensor_AllocateMemory(tmp[1]));
 
         status = CPUTensorReverse(input, tmp[0], ((vx_scalar)reverseOperation->axis[0])->value->n32);
         if (status != VX_SUCCESS)
@@ -217,9 +217,9 @@ vx_status vxnneExecuteSWTensorReverse(struct _vxnne_operation_s *operation)
 
     case 4:
         tmp[0] = vxoTensor_CreateTensor(ctx, graph, &tensor_create_params, vx_false_e);
-        vxoTensor_AllocateMemory(tmp[0]);
+        vxmONERROR(vxoTensor_AllocateMemory(tmp[0]));
         tmp[1] = vxoTensor_CreateTensor(ctx, graph, &tensor_create_params, vx_false_e);
-        vxoTensor_AllocateMemory(tmp[1]);
+        vxmONERROR(vxoTensor_AllocateMemory(tmp[1]));
 
         status = CPUTensorReverse(input, tmp[0], ((vx_scalar)reverseOperation->axis[0])->value->n32);
         if (status != VX_SUCCESS)
@@ -462,7 +462,7 @@ VX_PRIVATE_API vx_bool vxoNNTensorReverse_TP_Support(vx_node node, const vx_refe
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
     support = support && vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_REVERSE);
-    support = support && vxnneIsTPSupportFormat(context, input, VX_NULL, output);
+    support = support && vxnneIsTPSupportFormat(node->graph, input, VX_NULL, output);
 
     support = support && IsTPSupport_CheckOutPixel(node->base.context, input, output);
 
@@ -517,7 +517,7 @@ VX_PRIVATE_API vx_status vxoNNTensorReverse_TP_Initialize(vxnne_layer ops_layer,
     conv.pad_const = 0;
     conv.tpType = TP_REVERSE;
     conv.data_buff = gcvNULL;
-    conv.other_ref = (vx_reference)input;
+    conv.other_ref = (vx_reference)output;
     conv.tp_value = (vx_tp_value_cmd)vxAllocateAndZeroMemory(sizeof(vx_tp_value_cmd_s));
     conv.tp_value->u32[0] = numOfAxis;
     conv.tp_value->p8[0] = (vx_uint8_ptr)vxAllocateAndZeroMemory(sizeof(axis));
@@ -542,7 +542,6 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint
     return status;
 }
 #endif
-
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorReverse_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status  status     = VX_SUCCESS;
@@ -607,7 +606,7 @@ OnError:
                               VX_NULL);
 
         if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_REVERSE) &&
-            vxnneIsTPSupportFormat(context, input, VX_NULL, output))
+            vxnneIsTPSupportFormat(node->graph, input, VX_NULL, output))
         {
             vx_op_param_s conv = {0};
             vx_int32 axis[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};

@@ -13,6 +13,7 @@
 
 #include <gc_vx_common.h>
 #include <gc_vx_nn_util.h>
+#include <gc_vx_nn_wb.h>
 #include "gc_nn_arch_model.h"
 
 #define ENABLE_ARCH_MODEL_DUMP 0
@@ -2692,21 +2693,21 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
 
                 ComputeInputSize(
                      TENSOR_VIEW_SIZE_INDEX(convOp->outputs, 0),
-                     wb->weights_sizes[0],
-                     WB_PAD_LEFT(wb),
-                     WB_PAD_RIGHT(wb),
-                     WB_POOLING_SIZE_X(wb),
-                     WB_POOLING_STRIDE(wb),
+                     WB_KERNEL_X(wb),
+                     operation->parameter.pad_x_left,
+                     operation->parameter.pad_x_right,
+                     operation->parameter.pool_size_x,
+                     operation->parameter.pool_stride,
                      &outXSize,
                      1);
 
                 ComputeInputSize(
                      TENSOR_VIEW_SIZE_INDEX(convOp->outputs, 1),
-                     wb->weights_sizes[1],
-                     WB_PAD_TOP(wb),
-                     WB_PAD_BOTTOM(wb),
-                     WB_POOLING_SIZE_Y(wb),
-                     WB_POOLING_STRIDE(wb),
+                     WB_KERNEL_Y(wb),
+                     operation->parameter.pad_y_top,
+                     operation->parameter.pad_y_bottom,
+                     operation->parameter.pool_size_y,
+                     operation->parameter.pool_stride,
                      &outYSize,
                      1);
 
@@ -2714,8 +2715,8 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
                 opInfo[count]->opt     = operation;
                 opInfo[count]->op      = operation->operatorType;
                 opInfo[count]->target  = operation->target;
-                opInfo[count]->psize   = gcmMAX(WB_POOLING_SIZE_X(wb), 1);
-                opInfo[count]->pstride = WB_POOLING_SIZE_X(wb) ? 2 : 1;
+                opInfo[count]->psize   = gcmMAX(operation->parameter.pool_size_x, 1);
+                opInfo[count]->pstride = operation->parameter.pool_size_x ? operation->parameter.pool_stride : 1;
                 opInfo[count]->xpad    = convOp->pad_x_left;
                 opInfo[count]->ypad    = convOp->pad_y_top;
                 opInfo[count]->inputDataFormat = TENSOR_DATA_TYPE(convOp->inputs);
@@ -2723,9 +2724,9 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
                 opInfo[count]->outputDataFormat = TENSOR_DATA_TYPE(convOp->outputs);
                 opInfo[count]->outputDataSize   = TENSOR_DATA_SIZE(convOp->outputs) * 8;
                 opInfo[count]->weight_bias = wb;
-                opInfo[count]->kx = wb->weights_sizes[0];
-                opInfo[count]->ky = wb->weights_sizes[1];
-                opInfo[count]->kz = (operation->operatorType == VXNNE_OPERATOR_DEPTH_WISE_CONV && wb->wb_base->hw_depth_wise) ? wb->weights_sizes[3] : wb->weights_sizes[2];
+                opInfo[count]->kx = WB_KERNEL_X(wb);
+                opInfo[count]->ky = WB_KERNEL_Y(wb);
+                opInfo[count]->kz = (operation->operatorType == VXNNE_OPERATOR_DEPTH_WISE_CONV && WB_IS_DEPTH_WISE(wb)) ? WB_OUTPUT_Z(wb) : WB_KERNEL_Z(wb);
                 opInfo[count]->oz = TENSOR_VIEW_SIZE_INDEX(convOp->outputs, 2);
                 opInfo[count]->siz = opInfo[count]->oz;
                 opInfo[count]->inx = TENSOR_VIEW_SIZE_INDEX(convOp->orig_inputs, 0);
@@ -2798,7 +2799,7 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
                     wb = tpOp->weights_biases;
                     gcmASSERT(wb != NULL);
                     gcmASSERT(tpOp->weights_biases != NULL);
-                    opInfo[count]->kz = tpOp->weights_biases->weights_sizes[2];
+                    opInfo[count]->kz = WB_KERNEL_Z(tpOp->weights_biases);
                     opInfo[count]->oz = TENSOR_VIEW_SIZE_INDEX(tpOp->output, 2);
                     opInfo[count]->stridex = WB_STRIDE_X(wb);
                     opInfo[count]->stridey = WB_STRIDE_Y(wb);
@@ -2909,7 +2910,7 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
                         {
                             opInfo[count]->origoutx = 1;
                             opInfo[count]->origouty = 1;
-                            opInfo[count]->oz = wb->weights_sizes[3];
+                            opInfo[count]->oz = WB_OUTPUT_Z(wb);
                         }
                     }
 
@@ -2929,9 +2930,9 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
                     opInfo[count]->origy = TENSOR_VIEW_SIZE_INDEX(fcOp->inputs, 1);
                     opInfo[count]->origoutx = TENSOR_VIEW_SIZE_INDEX(fcOp->outputs, 0);
                     opInfo[count]->origouty = TENSOR_VIEW_SIZE_INDEX(fcOp->outputs, 1);
-                    opInfo[count]->oz = wb->weights_sizes[3];
-                    opInfo[count]->psize   = gcmMAX(WB_POOLING_SIZE_X(wb), 1);
-                    opInfo[count]->pstride = WB_POOLING_SIZE_X(wb) ? 2 : 1;
+                    opInfo[count]->oz = WB_OUTPUT_Z(wb);
+                    opInfo[count]->psize   = gcmMAX(operation->parameter.pool_size_x, 1);
+                    opInfo[count]->pstride = operation->parameter.pool_size_x ? operation->parameter.pool_stride : 1;
                 }
                 else
                 {
@@ -2942,12 +2943,12 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
                 opInfo[count]->opt     = operation;
                 opInfo[count]->op      = operation->operatorType;
                 opInfo[count]->target  = operation->target;
-                opInfo[count]->xpad    = WB_STRIDE_X(wb) > 1 ? 0 : ((-1) * WB_PAD_LEFT(wb));
-                opInfo[count]->ypad    = WB_STRIDE_Y(wb) > 1 ? 0 : ((-1) *  WB_PAD_TOP(wb));
+                opInfo[count]->xpad    = WB_STRIDE_X(wb) > 1 ? 0 : ((-1) * operation->parameter.pad_x_left);
+                opInfo[count]->ypad    = WB_STRIDE_Y(wb) > 1 ? 0 : ((-1) *  operation->parameter.pad_y_top);
                 opInfo[count]->weight_bias = wb;
                 opInfo[count]->kx = 1;
                 opInfo[count]->ky = 1;
-                opInfo[count]->kz = wb->weights_sizes[2];
+                opInfo[count]->kz = WB_KERNEL_Z(wb);
                 opInfo[count]->p3 = 0;
                 opInfo[count]->xsize = opInfo[count]->origoutx;
                 opInfo[count]->ysize = opInfo[count]->origouty;

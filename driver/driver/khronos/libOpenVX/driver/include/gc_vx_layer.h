@@ -32,9 +32,10 @@ extern "C" {
 #define VX_MAX_BLOCK_SEGMENT_COUNT          64
 
 #define VX_VIP_SRAM_IMAGE_STREAM_SIZE \
-    (context->nnConfig.fixedFeature.latencyHidingAtFullAxiBw * context->nnConfig.fixedFeature.axiBusWidth)
+    ((context->nnConfig.customizedFeature.vipSRAMSize == 2048) ? 2048 : (context->nnConfig.fixedFeature.latencyHidingAtFullAxiBw * context->nnConfig.fixedFeature.axiBusWidth))
 
 #define SW_TILING_DEBUG                     1
+#define SW_TILING_BRANCH                    1
 
 struct _vxnne_operation_s;
 struct _vxnne_layer_s;
@@ -43,10 +44,14 @@ struct _vx_node_block_s;
 struct _vxnne_tiling_rect_s;
 struct _vxnne_command_buffer_s;
 struct _vxnne_tiling_block_info_s;
+struct _vxnne_tiling_info_s;
 
 typedef struct _vxnne_mem_param_s *vxnne_mem_param;
 typedef struct _vxnne_mem_request_s *vxnne_mem_request;
 typedef struct _vx_arch_perf_s* vx_arch_perf;
+#ifndef ORI_NNARCHPERF
+typedef struct _arch_perf_s* arch_perf_type;
+#endif
 typedef struct _vx_weights_biases_parameter_base_s *vx_weights_biases_parameter_base;
 
 typedef vx_status (*vxnne_layer_dump_f)(struct _vxnne_layer_s* layer, int verbose, vx_uint32 format);
@@ -105,6 +110,7 @@ typedef enum vxnne_operation_target_e
     VXNNE_OPERATION_TARGET_TP,
     VXNNE_OPERATION_TARGET_SW,
     VXNNE_OPERATION_TARGET_SC, /* SCALER */
+    VXNNE_OPERATION_TARGET_NBG,
 }
 vxnne_operation_target_e;
 
@@ -451,6 +457,24 @@ typedef struct _vx_tp_value_cmd_s
 }
 vx_tp_value_cmd_s, *vx_tp_value_cmd;
 
+typedef struct _vx_preLoad_kernel_s
+{
+    vx_uint32    opIndex;
+    vx_uint32    size;
+    vx_uint32*   logical;
+    vx_int32     physical;
+}
+vx_preLoad_kernel_s, *vx_preLoad_kernel;
+
+typedef struct _vx_merge_param_s
+{
+    vx_uint32    mergedCount;
+    vx_float32   internalScale[MERGED_NODE_COUNT_MAX];
+    vx_int32     internalZp[MERGED_NODE_COUNT_MAX];
+    vx_enum      internalDataType[MERGED_NODE_COUNT_MAX];
+}
+vx_merge_param_s, *vx_merge_param;
+
 typedef struct _vx_op_param_s
 {
     vx_enum      pool_type;
@@ -458,6 +482,8 @@ typedef struct _vx_op_param_s
     vx_uint32    pool_size_y;
     vx_uint32    pool_stride;
     vx_bool      enable_relu;
+    vx_uint32    nn_strideX;
+    vx_uint32    nn_strideY;
     vx_enum      conv_rounding_type;
     vx_uint32    pad_x_left;
     vx_uint32    pad_x_right;
@@ -469,8 +495,8 @@ typedef struct _vx_op_param_s
     vx_uint32    pad_w_back;
     vx_enum      pad_mode;
     vx_int32     pad_const;
-    vx_size      dilationX;
-    vx_size      dilationY;
+    vx_uint32      dilationX;
+    vx_uint32      dilationY;
     /* for NN */
     vx_uint32    kernel_x;
     vx_uint32    kernel_y;
@@ -483,6 +509,7 @@ typedef struct _vx_op_param_s
     vx_uint32    kernelCacheStart;
     vx_uint32    kernelCacheSize;
     vx_enum      kernelCacheMode;
+
     vx_uint32    imageCacheStart;
     vx_uint32    imageCacheSize;
     vx_enum      imageCacheMode;
@@ -497,7 +524,16 @@ typedef struct _vx_op_param_s
     vx_enum      transposeOutMode;
     vx_uint8     transposeOutChannel;
 
+    /*preload kernel to VIPSRAM*/
+    vx_preLoad_kernel_s      kernelPreLoad;
+
+    /*node merge output scale and zp*/
+    vx_merge_param_s mergedParam;
+
     /* for TP */
+    vx_uint32 tpTransposeSize;
+    vx_uint32 tpTransposeStart;
+
     vx_enum          tpType;
     vx_tp_value_cmd  tp_value;
     vx_reference     other_ref;
@@ -560,6 +596,11 @@ typedef struct _vxnne_operation_s
     vx_bool                         bTransposeIn;
     vx_bool                         bTransposeOut;
 
+    struct _vxnne_tiling_info_s    *tilingInfo;
+    vx_uint32                       tilingYCount;
+    vx_uint32                       initY;
+    vx_uint32                       walked;
+
     vx_uint32                       esitimateKernelCacheSize;
     vx_uint32                       esitimateImageCacheSize;
 
@@ -599,6 +640,7 @@ typedef struct _vxnne_operation_s
     vx_uint32                       absoluteOperationID;
     vx_float64                      imgNonZeroRatio;
     vx_uint32                       gpuId;
+    vx_uint32                       mGpuSplitType;
     vx_bool                         mGpuSync;
     struct _vxnne_operation_s*      mGpuNext;
     struct _vxnne_operation_s*      mGpuHead;
@@ -617,8 +659,8 @@ typedef struct _vxnne_operation_info
     vx_tensor                       input;
     vx_tensor                       output;
     vx_weights_biases_parameter     weightsBiases;
-    vx_size                         dilationX;
-    vx_size                         dilationY;
+    vx_uint32                       dilationX;
+    vx_uint32                       dilationY;
 
     struct
     {
@@ -639,6 +681,8 @@ typedef struct _vxnne_operation_info
     vx_uint32                       poolSizeY;
     vx_uint32                       poolStrideX;
     vx_uint32                       poolStrideY;
+    vx_uint32                       nnStrideX;
+    vx_uint32                       nnStrideY;
     vx_uint32                       reshuffStrideX;
     vx_uint32                       reshuffStrideY;
     vx_enum                         padMode;
@@ -735,6 +779,7 @@ typedef struct _vxnne_tiling_order_info_s
 {
     vx_uint32                   opID;
     vx_uint32                   subID;
+    vxnne_operation             operation;
     vxnne_tiling_info           tilingInfo;
 }vxnne_tiling_order_info_s, *vxnne_tiling_order_info;
 
@@ -746,9 +791,11 @@ typedef struct _vxnne_segment_tiling_info_s
     vx_uint32                    N;
     vx_uint32                    estimateAxiSRAMUsed;
     vx_uint32                    estimateVipSRAMUsed;
+#if !SW_TILING_BRANCH
     vx_uint32                    tileXCount;
     vx_uint32                    tileYCount;
     vxnne_tiling_info            tilingInfo;
+#endif
     vx_uint32                    tilingOrderCount;
     vxnne_tiling_order_info      tilingOrderInfo;
 }vxnne_segment_tiling_info_s, *vxnne_segment_tiling_info;
@@ -887,6 +934,8 @@ typedef struct _vxnne_operation_command_s
         vx_uint32 kernelCacheStart;
         vx_uint32 kernelCacheSize;
         vx_enum   kernelCacheMode;
+        vx_uint32 tpTransposeSize;
+        vx_uint32 tpTransposeStart;
         vx_uint32 imageCacheStart;
         vx_uint32 imageCacheSize;
         vx_enum   imageCacheMode;
@@ -1028,6 +1077,26 @@ typedef struct _vxnne_convert_format_operation_s
 }
 vxnne_convert_format_operation_s, *vxnne_convert_format_operation;
 
+
+typedef struct _vxnne_copy_kernel_vip_operation_s
+{
+    vxnne_operation_s               base;
+    vx_tensor                       inputs;
+    vx_uint32                       copySize;
+    vx_tensor                       outputs;
+}
+vxnne_copy_kernel_vip_operation_s, *vxnne_copy_kernel_vip_operation;
+
+typedef struct _vxnne_kernel_copy_vip_layer_s
+{
+    vxnne_layer_s                                   base;
+    vxnne_operation                                 operations[2];
+    vxnne_copy_kernel_vip_operation_s               copy_operation;
+    vxnne_shader_operation_s                        copy_shader_operation;
+}
+vxnne_kernel_copy_vip_layer_s, *vxnne_kernel_copy_vip_layer;
+
+
 typedef struct _vxnne_brick_operation_s
 {
     vxnne_operation_s               base;
@@ -1093,6 +1162,8 @@ typedef struct _vxnne_convolution_relu_pooling_operation_s
     vx_enum                         conv_rounding_type;
     vx_bool                         enable_relu;
     vx_bool                         enable_pooling;
+    vx_uint32                       nn_strideX;
+    vx_uint32                       nn_strideY;
     vx_enum                         pool_type;
     vx_uint32                       pool_size_x;
     vx_uint32                       pool_size_y;
@@ -1105,6 +1176,10 @@ typedef struct _vxnne_convolution_relu_pooling_operation_s
     vx_weights_biases_parameter     swtWeightBiases;
 
     vx_performance_info_s           resultInfo;
+
+    vx_bool                         do_zdp_opt;
+    vx_bool                         do_1xN;
+    vx_bool                         do_fisrt_pixel_pool;
 }
 vxnne_convolution_relu_pooling_operation_s, *vxnne_convolution_relu_pooling_operation;
 
@@ -1203,12 +1278,15 @@ typedef struct _vxnne_prelu_sw_operation_s
 }
 vxnne_prelu_sw_operation_s, *vxnne_prelu_sw_operation;
 
+#define PRELU_CHANNEL_MAX                   16
+
 typedef struct _vxnne_prelu_layer_s
 {
     vxnne_layer_s                                   base;
-    vxnne_operation                                 operations[1];
+    vxnne_operation                                 operations[PRELU_CHANNEL_MAX];
     vxnne_prelu_sw_operation_s                      prelu_operation;
     vxnne_shader_operation_s                        prelu_sh_operation;
+    vxnne_tp_operation_s                            activation_tp_operation[PRELU_CHANNEL_MAX];
 }
 vxnne_prelu_layer_s, *vxnne_prelu_layer;
 
@@ -1307,7 +1385,7 @@ typedef struct _vxnne_pooling_layer_s
     vxnne_layer_s                                   base;
     vxnne_operation                                 operations[2];
     vxnne_pooling_operation_s                       pooling_sw_operation;
-    vxnne_pooling_operation_s                       pooling_nne_operation;
+    vxnne_convolution_relu_pooling_operation_s      pooling_nne_operation;
     vxnne_tp_operation_s                            pooling_tp_operation;
     vxnne_shader_operation_s                        pooling_tensorcopy_sh_operation;
     vxnne_shader_operation_s                        pooling_sh_operation;
@@ -2527,6 +2605,8 @@ typedef struct _vxnne_lstm_layer_s
     vxnne_lstm_hidden_unit                          hidden_units;
     vx_uint32                                       hidden_unit_num;
     vx_weights_biases_parameter                     sub_wb;
+    vx_weights_biases_parameter                     *mgpu_wb;
+    vx_weights_biases_parameter                     *mgpu_recurrent_wb;
 }
 vxnne_lstm_layer_s, *vxnne_lstm_layer;
 
@@ -2735,6 +2815,17 @@ vx_status vxnneOperation_ExecuteCommands(
     vxnne_command_buffer commandBuffer
     );
 
+vx_status vxnneOperation_WBDump(
+    vxnne_execution_layer   executionLayer,
+    vx_uint32 index
+    );
+
+vx_status  vxnneOperation_commandBufferDump(
+    vxnne_execution_layer executionLayer,
+    vx_uint32 opIndex
+    );
+
+
 vx_status vxnneOperation_NodeDump(
     vxnne_operation_command opCommand
     );
@@ -2777,7 +2868,9 @@ vx_uint32 caculate3DTileSize(
     vx_uint32 kernelY,
     vx_uint32 kernelZ,
     vx_uint32 dataFormat,
-    vx_uint32 interleaveMode
+    vx_uint32 interleaveMode,
+    vx_uint32 nnStrideX,
+    vx_uint32 nnStrideY
     );
 
 
@@ -2785,40 +2878,6 @@ vx_bool checkImageCacheMode(
     vx_uint32 outImageZSize,
     vx_uint32 kernelsPerCore,
     vx_uint32 nnCoreCount
-    );
-
-vx_status vxnneOperation_CaculateSRAMCache(
-    vx_context      context,
-    vxnne_operation operation,
-    vx_bool         enableImageCache,
-    vx_uint32*      kernelCacheSize,
-    vx_uint32*      kernelCacheStart,
-    vx_enum*        kernelCacheMode,
-    vx_uint32*      imageCacheSize,
-    vx_uint32*      imageCacheStart,
-    vx_enum*        imageCacheMode
-    );
-
-vx_weights_biases_parameter vxoWeightsBiases_Create(
-    vx_context                       context,
-    vx_weights_biases_parameter_base wb_base,
-    vx_uint32 *                      weight_dims,
-    vx_enum                          layer_type,
-    vx_bool                          first_time
-    );
-
-vx_status vxoWeightsBiases_Compress(
-    vx_context                       context,
-    vx_weights_biases_parameter      wb,
-    vx_uint32                        kernel_per_core,
-    vx_uint32 *                      pooling_output_dims,
-    vx_enum                          output_format,
-    vx_int32                         z_offset
-    );
-
-vx_status vxoWeightsBiases_Decompress(
-    vx_context                       context,
-    vx_weights_biases_parameter      wb
     );
 
 vx_status vxnneOperation_Initialize(
@@ -3422,6 +3481,7 @@ vxnne_shader_executable vxnneGemmShaderExecutable(
     vx_border_mode_t        *borderMode,
     vx_tensor               input,
     vx_tensor               weight,
+    vx_tensor               scales,
     vx_tensor               bias,
     vx_int32                fuseCode,
     vx_bool                 enable_2dTensor,
@@ -3571,6 +3631,31 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
     vx_tensor               inputs,
     vx_tensor               weights,
     vx_tensor               biases,
+    vx_scalar               padXLeft,
+    vx_scalar               padXRight,
+    vx_scalar               padYTop,
+    vx_scalar               padYBottom,
+    vx_enum                 padMode,
+    vx_scalar               padConstant,
+    vx_scalar               dilationX,
+    vx_scalar               dilationY,
+    vx_scalar               channel_multiplier,
+    vx_scalar               relu_s,
+    vx_scalar               pooling_s,
+    vx_scalar               poolingX,
+    vx_scalar               poolingY,
+    vx_scalar               downScaleSizeRounding,
+    vx_int32                strideXvalue,
+    vx_int32                strideYvalue,
+    vx_tensor               scales,
+    vx_tensor               outputs);
+
+vxnne_shader_executable vxnneGetDepthwiseConvNoBiasShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               inputs,
+    vx_tensor               weights,
     vx_scalar               padXLeft,
     vx_scalar               padXRight,
     vx_scalar               padYTop,
@@ -3948,6 +4033,7 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
     vx_tensor               input,
     vx_tensor               weight,
     vx_tensor               bias,
+    vx_tensor               scales,
     vx_tensor               output);
 
 vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
@@ -3967,6 +4053,7 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
     vx_scalar               downScaleSizeRounding,
     vx_int32                strideXvalue,
     vx_int32                strideYvalue,
+    vx_tensor               scales,
     vx_tensor               outputs);
 
 vxnne_shader_executable vxnneGetGPUDepth2SpaceShaderExecutable(

@@ -298,7 +298,7 @@ VX_PRIVATE_API vx_bool vxoNNReorgLayer_TP_Support(vx_node node, const vx_referen
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
-    support = support && vxnneIsTPSupportFormat(context, inputs, VX_NULL, outputs);
+    support = support && vxnneIsTPSupportFormat(node->graph, inputs, VX_NULL, outputs);
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
@@ -374,6 +374,8 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint
 }
 #endif
 
+
+
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNReorgLayer_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
@@ -381,7 +383,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNReorgLayer_Initializer(vx_node node, c
 
     vxnne_layer_imp_s registerReorgLayers[] = {/* Please DON'T adjust the order, it's importent */
         { "ReorgLayer NN", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
-        { "ReorgLayer TP", vxoNNReorgLayer_TP_Support, vxoNNReorgLayer_TP_Initialize, vxoNNCommon_Deinitialize },
+        { "ReorgLayer TP", vxoNNReorgLayer_TP_Support, vxoNNReorgLayer_TP_Initialize, VX_NULL },
         { "ReorgLayer SH EVIS", vxoNNReorgLayer_SH_Evis_Support, vxoNNReorgLayer_SH_EVIS_Initialize, VX_NULL },
         { "ReorgLayer SH F32", vxoNNReorgLayer_SH_Support, vxoNNReorgLayer_SH_Initialize, VX_NULL },
         { "ReorgLayer SW ", vxoNNCommon_Support, vxoNNReorgLayer_SW_Initialize, VX_NULL },
@@ -429,7 +431,7 @@ OnError:
                           reorgLayer->operations,
                           VX_NULL);
 
-    if (vxnneIsTPSupportFormat(context, inputs, VX_NULL, outputs) &&
+    if (vxnneIsTPSupportFormat(node->graph, inputs, VX_NULL, outputs) &&
         vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_REORG))
     {
         vx_op_param_s conv = {0};
@@ -539,6 +541,7 @@ OnError:
 exit:
     if (reorgLayer) gcoOS_Free(gcvNULL, (gctPOINTER)reorgLayer);
 #endif
+
     return status;
 }
 
@@ -766,7 +769,7 @@ vx_status vxnneReorg2_Batch2SpaceND(struct _vxnne_operation_s *operation)
     vx_tensor  inputs = (vx_tensor)reorgOperation->inputs;
     vx_tensor  strides = (vx_tensor)reorgOperation->stride;
     vx_tensor  outputs = (vx_tensor)reorgOperation->outputs;
-
+    vx_tensor  pad = (vx_tensor)reorgOperation->pad;
     vx_type_e  inputFormat = (vx_type_e)TENSOR_DATA_TYPE(inputs);
     vx_type_e  outputFormat = (vx_type_e)TENSOR_DATA_TYPE(outputs);
 
@@ -781,7 +784,13 @@ vx_status vxnneReorg2_Batch2SpaceND(struct _vxnne_operation_s *operation)
     const vx_int32 output_width = TENSOR_SIZE_INDEX(outputs, 0);  /* W */
     const vx_int32 output_height = TENSOR_SIZE_INDEX(outputs, 1); /* H */
     const vx_int32 output_depth = TENSOR_SIZE_INDEX(outputs, 2);  /* C */
+    const vx_int32 output_batch = TENSOR_SIZE_INDEX(outputs, 3);  /* N */
     const vx_int32 item_size = vxnneGetTypeSize((vx_type_e)TENSOR_DATA_TYPE(outputs));
+    /* need get from parameter*/
+    const vx_int32 crops_top = (vx_int32)VX_GET_DATA_FROM_TENSOR(pad, 2);
+    const vx_int32 crops_bottom = (vx_int32)VX_GET_DATA_FROM_TENSOR(pad, 3);
+    const vx_int32 crops_left = (vx_int32)VX_GET_DATA_FROM_TENSOR(pad, 0);
+    const vx_int32 crops_right = (vx_int32)VX_GET_DATA_FROM_TENSOR(pad, 1);
 
     vx_int32 in_h = 0, in_w = 0, in_d = 0, in_b = 0;
     vx_float32 data = .0f;
@@ -794,8 +803,14 @@ vx_status vxnneReorg2_Batch2SpaceND(struct _vxnne_operation_s *operation)
     block_w = block_size[0];
     block_h = block_size[1];
 
-    gcmASSERT(output_width == input_width * block_w);
-    gcmASSERT(output_height == input_height * block_h);
+    if(output_width + crops_left + crops_right != input_width * block_w)
+    {
+        gcmASSERT(0);
+    }
+    if(output_height + crops_bottom + crops_top != input_height * block_h)
+    {
+        gcmASSERT(0);
+    }
     /*gcmASSERT(input_batch == output_batch * block_w * block_h);*/
     if (output_depth != input_depth)
     {
@@ -842,19 +857,23 @@ vx_status vxnneReorg2_Batch2SpaceND(struct _vxnne_operation_s *operation)
     for (in_b = 0; in_b < input_batch; in_b++)
     {
         vx_int32 input_batch_index = in_b * input_height * input_width * input_depth;
-
         for (in_d = 0; in_d < input_depth; in_d++)
         {
             for (in_h = 0; in_h < input_height; ++in_h)
             {
                 for (in_w = 0; in_w < input_width; in_w++)
                 {
-                    vx_int32 out_w = in_w * block_w + (in_b % block_w);
-                    vx_int32 out_h = in_h * block_h + (in_b / block_h);
-                    vx_int32 out_b = in_b / (output_width * output_height);
+                    vx_int32 out_b = in_b % output_batch;
+                    vx_int32 spatial_offset= in_b / output_batch;
+                    vx_int32 out_h = in_h * block_h + spatial_offset / block_w - crops_top;
+                    vx_int32 out_w = in_w * block_w + spatial_offset % block_w - crops_left;
                     vx_int32 output_batch_index = out_b * output_height * output_width * output_depth;
-
                     vx_int32 out_index = out_w + out_h * output_width + in_d * output_height * output_width + output_batch_index;
+
+                    if (out_w < 0 || out_w >= output_width || out_h < 0 || out_h >= output_height)
+                    {
+                        continue;
+                    }
 
                     if (in_w < 0 || in_w >= input_width || in_h < 0 || in_h >= input_height)
                     {
@@ -988,17 +1007,20 @@ vx_status vxnneReorg2_Space2BatchND(struct _vxnne_operation_s *operation)
                     vx_int32 out_w = (in_w + pad_l) / block_w;
                     vx_int32 out_h = (in_h + pad_t) / block_h;
                     vx_int32 out_b = (in_w + pad_l) % block_w + ((in_h + pad_t) % block_h) * block_w;
-                    vx_int32 output_batch_index = out_b * output_height * output_width * output_depth;
+                    vx_int32 output_batch_index = out_b * output_height * output_width * output_depth * input_batch + in_b * output_height * output_width * output_depth;
 
                     vx_int32 out_index = out_w + out_h * output_width + in_d * output_height * output_width + output_batch_index;
 
                     if (in_w < 0 || in_w >= input_width || in_h < 0 || in_h >= input_height)
                     {
-                        memset(outputBase + out_index * item_size, 0, item_size);
+                        if (TENSOR_QUANT_TYPE(outputs) == VX_QUANT_AFFINE_SCALE)
+                            memset(outputBase + out_index * item_size, TENSOR_TF_ZEROPOINT(outputs), item_size);
+                        else
+                            memset(outputBase + out_index * item_size, 0, item_size);
                     }
                     else
                     {
-                        vx_int32 in_index = in_w + in_h * input_width + in_d * input_width * input_height;
+                        vx_int32 in_index = in_b * input_width * input_height * input_depth + in_w + in_h * input_width + in_d * input_width * input_height;
 
                         if (item_size == vxnneGetTypeSize((vx_type_e)TENSOR_DATA_TYPE(inputs)))
                         {
@@ -1223,7 +1245,7 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationTP(
     op_param->pool_stride = 1;
     op_param->enable_relu = vx_false_e;
     op_param->pad_mode    = VX_PAD_CONSTANT;
-    op_param->pad_const   = TENSOR_PAD_ZERO_VALUE(input);
+    op_param->pad_const   = 0;
     op_param->tpType      = tp_cmd_type;
     op_param->other_ref   = gcvNULL;
     op_param->data_buff   = gcvNULL;
@@ -1430,8 +1452,8 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationSH(
     {
         get_shuffle_channel_reshape_size(inputs, axis_s, out_shape, &out_rank, &axis_new);
         axis_new_s = vxCreateScalar(context, VX_TYPE_UINT32, &axis_new);
-        inTensor   = vxoTensor_ReshapeTensor(inputs, out_shape, out_rank);
-        outTensor  = vxoTensor_ReshapeTensor(outputs, out_shape, out_rank);
+        inTensor   = vxoTensor_ReshapeTensor(inputs, out_shape, out_rank, VX_NULL);
+        outTensor  = vxoTensor_ReshapeTensor(outputs, out_shape, out_rank, VX_NULL);
         batchCount      = out_rank > 3 ? out_shape[3] : 1;
     }
 
@@ -1595,6 +1617,7 @@ VX_PRIVATE_API vx_status vxoNNReorgLayer2_SW_Initialize(vxnne_layer ops_layer, c
             batch_count = 1;
         }
     }
+
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
     vxmONERROR(_InitializeReorg2OperationSW(reorg_layer,
@@ -1783,7 +1806,7 @@ VX_PRIVATE_API vx_bool vxoNNReorgLayer2_TP_Support(vx_node node, const vx_refere
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
-    support = support && (vxnneIsTPSupportFormat(node->base.context, inputs, VX_NULL, outputs) &&
+    support = support && (vxnneIsTPSupportFormat(node->graph, inputs, VX_NULL, outputs) &&
         !vxmIS_ERROR(_GetTPReorgCmdType(type, &tp_cmd_type)));
 
     if (type == VX_REORG_BATCH_TO_SPACE_ND)
@@ -1928,6 +1951,7 @@ OnError:
 #endif
 
 
+
 VX_PRIVATE_API vx_status VX_CALLBACK vxoReOrg2_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status                = VX_SUCCESS;
@@ -2004,7 +2028,7 @@ OnError:
 
     /* Choose acceleration path. */
     if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP) &&
-        vxnneIsTPSupportFormat(context, inputs, VX_NULL, outputs) &&
+        vxnneIsTPSupportFormat(node->graph, inputs, VX_NULL, outputs) &&
         !vxmIS_ERROR(_GetTPReorgCmdType(type, &tp_cmd_type)))
     {
         target = VXNNE_OPERATION_TARGET_TP;

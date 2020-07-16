@@ -459,7 +459,6 @@ VX_PRIVATE_API vx_bool vxoNNTensorReduceSum_SH_EVIS_Support_Ext(vx_node node, co
 
     if (support)
         reg_param->flag = axis;
-
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
     return support;
@@ -561,7 +560,7 @@ VX_PRIVATE_API vx_status vxoNNTensorReduceSum_SH_EVIS_Initialize_Ext(vxnne_layer
         reduceNode->base.temp_tensors[tmpTensorIndex++] = transTensor;
 
         if (vxoContext_IsFeatureAvailable(ops_layer->node->base.context, VX_NN_FEATURE_TP_TRANSPOSE) &&
-            vxnneIsTPSupportFormat(ops_layer->node->base.context, src, VX_NULL, transTensor))
+            vxnneIsTPSupportFormat(ops_layer->node->graph, src, VX_NULL, transTensor))
         {
             vx_op_param_s conv = {0};
             vx_uint32 dnum = 4;
@@ -966,7 +965,7 @@ OnError:
             reduceNode->base.temp_tensors[tmpTensorIndex++] = transTensor;
 
             if (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP_TRANSPOSE) &&
-                vxnneIsTPSupportFormat(context, src, VX_NULL, transTensor))
+                vxnneIsTPSupportFormat(node->graph, src, VX_NULL, transTensor))
             {
                 vx_op_param_s conv = {0};
                 vx_uint32 dnum = 4;

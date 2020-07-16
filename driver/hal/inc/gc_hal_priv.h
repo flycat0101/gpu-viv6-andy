@@ -252,6 +252,7 @@ typedef struct _gcsPLS
     gcsATOM_PTR                 globalFenceID;
 
     /* flag for memory profile */
+    gctHANDLE               mainThread;
     gctBOOL                 bMemoryProfile;
     gctPOINTER              profileLock;
     gctUINT32               allocCount;

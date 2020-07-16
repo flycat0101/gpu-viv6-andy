@@ -45,7 +45,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMul_Deinitializer(vx_node node, 
 
 vx_kernel_description_s internalkernel_NNTensorAdd = {
     VX_KERNEL_TENSOR_ADD,
-    "vivante.nn.tensor.add",
+    "org.khronos.openvx.tensor_add",
     vxoBaseKernel_NNTensorAdd,
     nn_TensorAdd_params, vxmLENGTH_OF(nn_TensorAdd_params),
     VX_NULL,
@@ -57,7 +57,7 @@ vx_kernel_description_s internalkernel_NNTensorAdd = {
 
 vx_kernel_description_s internalkernel_NNTensorSub = {
     VX_KERNEL_TENSOR_SUBTRACT,
-    "vivante.nn.tensor.sub",
+    "org.khronos.openvx.tensor_subtract",
     vxoBaseKernel_NNTensorSub,
     nn_TensorAdd_params, vxmLENGTH_OF(nn_TensorAdd_params),
     VX_NULL,
@@ -78,7 +78,7 @@ static vx_param_description_s nn_TensorMul_params[] = {
 
 vx_kernel_description_s internalkernel_NNTensorMul = {
     VX_KERNEL_TENSOR_MULTIPLY,
-    "vivante.nn.tensor.mul",
+    "org.khronos.openvx.tensor_multiply",
     vxoBaseKernel_NNTensorMul,
     nn_TensorMul_params, vxmLENGTH_OF(nn_TensorMul_params),
     VX_NULL,

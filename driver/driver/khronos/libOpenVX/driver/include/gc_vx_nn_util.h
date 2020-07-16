@@ -29,8 +29,18 @@
 #define F21_MANTISSA_SHIFT (23 - F21_EXPONENT_SHIFT)
 #define F21_MAX_EXPONENT (F16_EXPONENT_BITS << F21_EXPONENT_SHIFT)
 
+#define SE8M12_EXPONENT_SHIFT 12
+#define SE8M12_MANTISSA_BITS ((1 << SE8M12_EXPONENT_SHIFT) - 1)
+#define SE8M12_MANTISSA_SHIFT (23 - SE8M12_EXPONENT_SHIFT)
+#define SE8M12_MAX_EXPONENT (SE8M12_MANTISSA_BITS << SE8M12_EXPONENT_SHIFT)
 
-#define TP_LUT_BUFF_SIZE 1024
+#define BF16_EXPONENT_SHIFT 7
+#define BF16_MANTISSA_BITS ((1 << BF16_EXPONENT_SHIFT) - 1)
+#define BF16_MANTISSA_SHIFT (23 - BF16_EXPONENT_SHIFT)
+#define BF16_MAX_EXPONENT (BF16_MANTISSA_BITS << BF16_EXPONENT_SHIFT)
+
+#define TP_LUT_PARAM_SIZE 2
+#define TP_LUT_BUFF_SIZE (1024 + TP_LUT_PARAM_SIZE)
 
 #define FP32_MIN -3.402823466e+38F
 
@@ -133,6 +143,7 @@ vx_float32 Fp16toFp32(const vx_uint16 in);
 vx_int16 Fp32toFp16(vx_float32 val);
 vx_int8 Fp32toInt8_fc(vx_float32 val);
 vx_int8 Fp32toInt8(vx_float32 val, vx_int8 fixedPointPos, vx_int32 roundMode);
+vx_int8 Fp32toInt8_asym(vx_float32 val, vx_int32 zeroPoint, vx_float32 scale, vx_int32 roundMode);
 vx_int16 Fp32toInt16(vx_float32 val, vx_int8 fixedPointPos, vx_int32 roundMode);
 vx_float32 Int8toFp32(vx_int8 val, vx_int8 fixedPointPos);
 vx_float32 Int32toFp32(vx_int32 val, vx_int8 fixedPointPos);
@@ -170,12 +181,17 @@ vx_status vxnneSaveDataExt(vx_type_e format, vx_enum quant_format, vx_int32 inde
 vx_int32 vxoNNExternsionConvlutionRound(vx_float32 in, vx_enum round_type);
 void reshuffleData(vx_nn_reshuffle_s *src, vx_uint32 strideStepX, vx_uint32 strideStepY, vx_nn_reshuffle_s *dst);
 void initUndefinedHardwareConfig(vx_global_data globalData);
+void initArchModelConfig(vx_global_data globalData, APM_IN_PARAM_T *pInParam);
 vx_bool WeightBiasBufferAllocate(vx_context context, vx_weights_biases_parameter weight_bias, vx_size size);
 void writeBits(uint32_t **buffer, vx_uint32 *bitOffset, vx_uint32 data, vx_uint32 dataBits);
 void replaceBits(uint32_t **buffer, vx_uint32 *bitOffset, vx_uint32 data, vx_uint32 dataBits);
 vx_uint32 readBits(uint32_t **buffer, vx_uint32 *bitOffset, vx_uint32 dataBits);
 void packZeros(uint32_t **buffer, vx_uint32 *bitOffset, vx_uint32 alignedOffset);
 void _DataGeneralConvert(void* input_ptr, void* output_ptr, vx_uint32 input_size, vx_uint32 output_size);
+
+
+vx_int32 getUserIDFromOutputTensor(
+    vx_reference tensor);
 
 vx_int32 getHwPoolingType(vx_enum poolingType);
 vx_int32 getHWRoundingMode(vx_nn_round_mode_e roundingMode, vx_enum dataFormat, vx_bool isTP);
@@ -305,6 +321,7 @@ vx_status vxnnePoolingCpu(
 
 vx_status vxnnePoolingAvg(
     vx_uint8_ptr src,
+    vx_int32 type,
     vx_int8 srcFixPointPos,
     vx_type_e srcFormat,
     vx_int32 input_width,
@@ -367,12 +384,13 @@ vx_status vxnneLayer_Free(struct _vxnne_layer_s* layer);
 
 vx_bool vxnneIsNNSupportFormat(
     vx_context context,
+    vx_graph graph,
     vx_tensor inputTensor,
     vx_weights_biases_parameter wb,
     vx_tensor outputTensor);
 
 vx_bool vxnneIsTPSupportFormat(
-    vx_context context,
+    vx_graph graph,
     vx_tensor inputTensor,
     vx_weights_biases_parameter wb,
     vx_tensor outputTensor);
@@ -391,23 +409,7 @@ void vxnneGetKernelPatternBits(
     vx_uint32 oneNum,
     vx_uint32 zeroNum,
     vx_uint64 *kernelPatternBitPtr);
-
-void calculateArchPerfFromWB(
-    vx_context context,
-    vx_arch_perf perf,
-    vx_weights_biases_parameter wb,
-    vx_uint32 orig_input_dims[],
-    vx_uint32 output_dims[],
-    vx_enum output_format,
-    vx_int32* offsets,
-    vx_int32 flush,
-    vx_uint8 src_buf,
-    vx_uint8 dst_buf,
-    vx_uint8 kernel_buf,
-    vx_int32 cached_space,
-    vxnne_operation_target_e op_target,
-    vxnne_operator_e op_type);
-
+/* this function has been declared in libarchmodel, remove here */
 vx_uint8 MemPoolTypeToPerfType(
     vx_enum memPoolType);
 
@@ -446,6 +448,7 @@ vx_bool _IsSameType(
     );
 
 vx_uint32 caculateInputTransposeBufferSize(
+    vx_context context,
     vx_enum imageCacheMode,
     vx_uint32 outputTileXSize,
     vx_uint32 outputTileYSize,
@@ -455,12 +458,16 @@ vx_uint32 caculateInputTransposeBufferSize(
     vx_uint32 interleaveMode,
     vx_float32 ddrLatency,
     vx_uint32 transposeInChannel,
-    vx_enum dataFormat
+    vx_enum dataFormat,
+    vx_uint32 nnStrideX,
+    vx_uint32 nnStrideY
     );
 
 vx_uint32 caculateOutTransposeBufferSize(
+    vx_context context,
     vx_uint32 outputTileXSize,
     vx_uint32 outputTileYSize,
+    vxnne_convolution_relu_pooling_operation convOperation,
     vx_enum format
     );
 
@@ -475,6 +482,9 @@ vx_status vxnnePreLoadWeightsBiases(
     vx_uint32  size
     );
 
+vx_uint32  GetEsitimateWBSize(vx_weights_biases_parameter weightsBiases);
+vx_bool estimateNNTransposeSize(vx_context context, vx_graph graph);
+vx_status nnTransposeChannel(vx_context context, vx_graph graph);
 
 vx_bool vx_nn_kernel_optimize_softmax_shape
     (
@@ -489,6 +499,55 @@ vx_bool vx_nn_kernel_optimize_element_shape
     );
 
 
+vx_status patchNodeParamLocation(vx_node node);
+
+vx_uint32 getTPCoreCount(
+    vx_context context,
+    vx_enum tpType);
+
+VX_INTERNAL_API vx_status vxoGraph_caculateKernelSize(
+    vx_graph                      graph,
+    vx_weights_biases_parameter   wb,
+    vxnne_operation               operation,
+    vx_bool                       isWBReleased
+    );
+
+VX_INTERNAL_API vx_status vxoGraph_addShaderCopyKernelOperation(
+    vx_graph                      graph,
+    vx_node                       node,
+    vxnne_execution_layer         optLayer,
+    vx_weights_biases_parameter   wb,
+    vxnne_operation               operation
+    );
+
+vx_status InitshaderCopyOperation(
+    vx_graph                graph,
+    vxnne_block             block);
+vx_uint32 vxo_getMaxShaderCopyTensorCount(vx_graph graph);
+
+VX_INTERNAL_API vx_status vxoGraph_releaseShaderCopyOperation(
+    vxnne_execution_layer         optLayer
+    );
+
+VX_INTERNAL_API vx_status vxoGraph_addShaderCopyTensorOperation(
+    vx_graph                      graph,
+    vx_node                       node,
+    vxnne_execution_layer         optLayer,
+    vxnne_operation               operation
+    );
+
+VX_INTERNAL_API vx_tensor vxoTensor_CreateTensorFromWB(vx_graph graph, vx_weights_biases_parameter wb, vx_uint32 kernelCacheSize);
+VX_INTERNAL_API vx_tensor vxoTensor_CreateTensorFromCache(vx_graph graph, vx_uint32* sizes, vx_uint32 dimCount, vx_uint32 startAddress, vx_enum dataFormat);
+VX_INTERNAL_API vx_status shaderCopyLayer(vx_node node, vx_tensor input, vx_tensor output, vxnne_tensor_copy copyKernelLayer);
+
+vx_status getClampMaxAndMin(
+    vx_enum operationType,
+    vx_merge_param_s mergedParam,
+    vx_float32 alphaScale,
+    vx_float32 outScale,
+    vx_uint32 *clampMin,
+    vx_uint32 *clampMax);
+
 vx_sh_kernel_type_e getSHKernelType
     (
     vx_enum dtype
@@ -500,6 +559,14 @@ vx_bool IsTPSupport_CheckOutPixel
     vx_tensor inputs,
     vx_tensor outputs);
 
+vx_uint32 gcd(vx_uint32 a, vx_uint32 b);
+
+vx_status DoAlignForM(
+        vxnne_execution_layer   layer,
+        vx_uint32               start,
+        vx_uint32               count,
+        vx_uint32*              M
+        );
+
 #endif
-vx_status patchNodeParamLocation(vx_node node);
 

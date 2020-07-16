@@ -1063,8 +1063,8 @@ EXPORTS
     gcoVX_QueryDeviceCount
     gcoVX_QueryCoreCount
     gcoVX_QueryMultiCore
-    gcoVX_CaptureInitState
     gcoVX_SetHardwareType
+    gcoVX_MultiGPUSync
 
 !IF "$(VSIMULATOR_DEBUG)" == "1"
     gcoOS_UpdateSimulatorCallback

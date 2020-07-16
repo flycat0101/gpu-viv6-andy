@@ -14,5 +14,5 @@
 LIBRARY "libNNVXCBinary.dll"
 EXPORTS
 ; Framework API
-	GetBinaryPtr
+	GetVIPNNVXCBinaryPtr
 

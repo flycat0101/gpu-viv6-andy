@@ -1155,7 +1155,7 @@ gcfVX_LoadKernelArgValues(
         return gcvSTATUS_OK;
     }
 
-    gcmONERROR(gcoVX_QueryCoreCount(node->graph->deviceID, &gpuCount));
+    gpuCount = node->graph->gpuCount;
     gcmONERROR(gcUNIFORM_GetType(Arg->uniform, &type, &length));
 
     gcmONERROR(gcUNIFORM_GetFormat(Arg->uniform, &format, &isPointer));
@@ -1187,11 +1187,11 @@ gcfVX_LoadKernelArgValues(
                     context.params.borders = BorderMode->mode;
 #endif
                     gcmONERROR(gcfVX_GetImageInfo(&context, (vx_image)ref, &info, 0));
+
 #if REGISTER_FRAME
                     info.isVXC =  Kernel->states.programState.hints->useEvisInst;
 #else
-
-                    info.isVXC =  base->evisNoInst.supportEVIS ? gcvTRUE : gcvFALSE;
+                    info.isVXC = base->evisNoInst.supportEVIS ? gcvTRUE : gcvFALSE;
 #endif
 
                     gcmONERROR(gcfVX_SetUniformImageInfo(Arg->uniform, &info));
@@ -1226,6 +1226,7 @@ gcfVX_LoadKernelArgValues(
 
                     info.isVXC =  base->evisNoInst.supportEVIS ? gcvTRUE : gcvFALSE;
 #endif
+
 
                     gcmONERROR(gcfVX_SetUniformImageInfo(Arg->uniform, &info));
                 }
@@ -1268,7 +1269,6 @@ gcfVX_LoadKernelArgValues(
 #if REGISTER_FRAME
                     info.isVXC = Kernel->states.programState.hints->useEvisInst;
 #else
-
                     info.isVXC = base->evisNoInst.supportEVIS ? gcvTRUE : gcvFALSE;
 #endif
 
@@ -1295,7 +1295,6 @@ gcfVX_LoadKernelArgValues(
                         info.componentCount = Arg->components;
                     }
 #else
-
                     if (Arg->components > 1 && Arg->components <= 4 && base->evisNoInst.supportEVIS == gcvFALSE)
                     {
                         info.componentCount = Arg->components;
@@ -1556,7 +1555,7 @@ gcfVX_LoadKernelArgValues(
         gctUINT eachGPUWorkGroupSizes[gcdMAX_3DGPU_COUNT] = { 0 };
         gctUINT eachGPUWorkGroupNum[gcdMAX_3DGPU_COUNT][3] = { {0} };
         gctUINT eachGPUGroupCount, restGroupCount;
-        gctINT *datas[4] = {gcvNULL};
+        gctINT *datas[gcdMAX_3DGPU_COUNT] = {gcvNULL};
         gctUINT maxWorkGroupCount = (gctUINT) (GlobalWorkSize[0] / LocalWorkSize[0]);
         /* TODO - For 64-bit GPU. */
         /*size_t numGroups[3];*/
@@ -1880,7 +1879,7 @@ gcfVX_LoadKernelArgValues(
         gctUINT eachGPUWorkGroupSizes[gcdMAX_3DGPU_COUNT] = { 0 };
         gctUINT eachGPUWorkGroupIDOffsets[gcdMAX_3DGPU_COUNT][3] = { {0} };
         gctUINT eachGPUGroupCount, restGroupCount;
-        gctINT *datas[4] = {gcvNULL};
+        gctINT *datas[gcdMAX_3DGPU_COUNT] = {gcvNULL};
         gctUINT maxWorkGroupCount = (gctUINT) (GlobalWorkSize[0] / LocalWorkSize[0]);
 
         usedGpu = gpuCount;
@@ -2493,6 +2492,7 @@ gcfVX_AllocateKernelArgs(
                 }
                 else
                 {
+                    Kernel->allocatedLocalMemory = vx_true_e;
                     gcmONERROR(gcSHADER_GetLocalMemorySize(shader, &memAllocInfo->allocatedSize));
                     Kernel->localMemSize += memAllocInfo->allocatedSize;
                 }
@@ -2760,6 +2760,7 @@ gcfVX_ExecuteKernel(
 {
     gctUINT i;
     gceSTATUS status;
+
     gcmHEADER_ARG("Kernel=%p, NumArgs=0x%x, Args=%p, BorderMode=%p, batchID=0x%x, GlobalWorkOffset=%p, GlobalWorkScale=%p, GlobalWorkSize=%p, LocalWorkSize=%p",
         Kernel, NumArgs, Args, BorderMode, batchID, GlobalWorkOffset, GlobalWorkScale, GlobalWorkSize, LocalWorkSize);
     gcmASSERT(gcoVX_VerifyHardware());
@@ -2883,6 +2884,7 @@ gcfVX_CreateShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], gctBOOL
         gcOPT_SetFeature(FB_ENABLE_CONST_BORDER);
     }
 
+
     gcmONERROR(gcoVX_SetHardwareType(gcvHARDWARE_VIP));
     gcmONERROR(gcoVX_QueryMultiCore(&isMultiCore));
 
@@ -2967,11 +2969,10 @@ OnError:
         vxoShader_Free(kernel);
     }
 
-    if(pointer)
-{
-gcoOS_Free(gcvNULL, pointer);
-pointer = gcvNULL;
-}
+    if(pointer != gcvNULL)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, pointer);
+    }
 
     gcmFOOTER_ARG("%d", status);
     return status;
@@ -3269,12 +3270,12 @@ VX_INTERNAL_API vx_status vxoKernel_Initialize(
 #endif
     )
 {
+    vx_status status = VX_SUCCESS;
     vx_uint32 i;
 
     gcmHEADER_ARG("context=%p, kernel=%p, name=%s, kernelEnum=0x%x, program=%p, function=%p", context, kernel, name, kernelEnum, program, function);
 
     vxmASSERT(context);
-    vxmASSERT(paramCount <= VX_MAX_PARAMETERS);
 
     if (kernel == VX_NULL)
     {
@@ -3312,6 +3313,7 @@ VX_INTERNAL_API vx_status vxoKernel_Initialize(
 #endif
 
     kernel->attributes.isGPUKernel                  = vx_true_e;
+    kernel->attributes.isAllGPU                     = vx_true_e;
 
     if (kernel->program != VX_NULL)
     {
@@ -3329,6 +3331,24 @@ VX_INTERNAL_API vx_status vxoKernel_Initialize(
 
     }
 
+    if (paramCount > 0)
+    {
+        if (kernel->signature.directionTable == NULL)
+            kernel->signature.directionTable = vxAllocateAndZeroMemory(paramCount * gcmSIZEOF(vx_enum));
+        if (kernel->signature.directionTable == NULL) { status = VX_ERROR_NO_MEMORY; goto OnError; }
+
+        if (kernel->signature.dataTypeTable == NULL)
+            kernel->signature.dataTypeTable = vxAllocateAndZeroMemory(paramCount * gcmSIZEOF(vx_enum));
+        if (kernel->signature.dataTypeTable == NULL) { status = VX_ERROR_NO_MEMORY; goto OnError; }
+
+        if (kernel->signature.stateTable == NULL)
+            kernel->signature.stateTable = vxAllocateAndZeroMemory(paramCount * gcmSIZEOF(vx_enum));
+        if (kernel->signature.stateTable == NULL) { status = VX_ERROR_NO_MEMORY; goto OnError; }
+
+        if (kernel->signature.isStaticTable == NULL)
+            kernel->signature.isStaticTable = vxAllocateAndZeroMemory(paramCount * gcmSIZEOF(vx_bool));
+        if (kernel->signature.isStaticTable == NULL) { status = VX_ERROR_NO_MEMORY; goto OnError; }
+    }
     if (parameters != VX_NULL)
     {
         for (i = 0; i < paramCount; i++)
@@ -3344,6 +3364,29 @@ VX_INTERNAL_API vx_status vxoKernel_Initialize(
 
     gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
+
+OnError:
+    if (kernel->signature.directionTable)
+    {
+        vxFree(kernel->signature.directionTable);
+        kernel->signature.directionTable = NULL;
+    }
+    if (kernel->signature.dataTypeTable)
+    {
+        vxFree(kernel->signature.dataTypeTable);
+        kernel->signature.dataTypeTable = NULL;
+    }
+    if (kernel->signature.stateTable)
+    {
+        vxFree(kernel->signature.stateTable);
+        kernel->signature.stateTable = NULL;
+    }
+    if (kernel->signature.isStaticTable)
+    {
+        vxFree(kernel->signature.isStaticTable);
+        kernel->signature.isStaticTable = NULL;
+    }
+    return status;
 }
 
 VX_INTERNAL_API void vxoKernel_Dump(vx_kernel kernel)
@@ -3475,11 +3518,20 @@ VX_PRIVATE_API vx_status vxoKernel_Remove(vx_kernel kernel)
 
     if (kernel == NULL
         || !vxoReference_IsValidAndSpecific(&kernel->base, VX_TYPE_KERNEL)
-        || !kernel->isUserkernel)
+        || (!kernel->isUserkernel && !(kernel->enumeration == VX_KERNEL_IMPORT_FROM_FILE)))
     {
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
+
+     if (kernel->enumeration == VX_KERNEL_IMPORT_FROM_FILE)
+    {
+        /* release binary kernel*/
+        vx_binary_loader_s *binaryLoad = (vx_binary_loader_s*)(kernel->base.reserved);
+        vxoBinaryGraph_ReleaseNBG(binaryLoad);
+        gcmFOOTER_NO();
+    }
+
     if (kernel->base.context->targetCount > 0)
     {
         vx_uint32 t = 0, k = 0;
@@ -3573,11 +3625,6 @@ VX_INTERNAL_API vx_kernel vxoKernel_GetByEnumFromTarget(vx_context context, vx_t
         gcmFOOTER_NO();
         return VX_NULL;
     }
-    if (kernelEnum < VX_KERNEL_INVALID)
-    {
-        gcmFOOTER_NO();
-        return (vx_kernel)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
-    }
 
     if (target == VX_NULL || !target->enabled)
     {
@@ -3619,11 +3666,6 @@ VX_INTERNAL_API vx_kernel vxoKernel_GetByEnum(vx_context context, vx_enum kernel
     {
         gcmFOOTER_NO();
         return VX_NULL;
-    }
-    if (kernelEnum < VX_KERNEL_INVALID)
-    {
-        gcmFOOTER_NO();
-        return (vx_kernel)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
     }
 
     for (index = 0; index < context->targetCount; index++)
@@ -3894,7 +3936,7 @@ VX_API_ENTRY vx_kernel VX_API_CALL vxoKernel_Add(
 
     if (func_ptr == VX_NULL) goto ErrorExit;
 
-    if (num_params == 0 || num_params > VX_MAX_PARAMETERS) goto ErrorExit;
+    if (num_params == 0) goto ErrorExit;
 
     /* The initialize and de-initialize function can be null */
     if ((validate == NULL) && (input == NULL || output == NULL)) goto ErrorExit;
@@ -3983,7 +4025,7 @@ VX_API_ENTRY vx_kernel VX_API_CALL vxAddTilingKernel(
 
     if (flexible_func_ptr == VX_NULL && fast_func_ptr == VX_NULL) goto ErrorExit;
 
-    if (num_params == 0 || num_params > VX_MAX_PARAMETERS) goto ErrorExit;
+    if (num_params == 0) goto ErrorExit;
 
     /* The initialize and de-initialize function can be null */
     if (input == VX_NULL || output == VX_NULL) goto ErrorExit;
@@ -4262,29 +4304,30 @@ VX_INTERNAL_API vx_status vxoDumpOutput(vx_node node, const vx_reference paramet
 #endif
             )
         {
-            vx_uint8_ptr physical = 0, logical = 0;
+            vx_uint32 physical = gcvINVALID_ADDRESS;
+            vx_uint8_ptr logical = 0;
             vx_uint32 size = 0;
 
             switch(ref->type)
             {
             case VX_TYPE_IMAGE:
-                physical    = (vx_uint8_ptr)(((vx_image)ref)->memory.physicals[0]);
+                physical    = ((vx_image)ref)->memory.physicals[0];
                 logical     = ((vx_image)ref)->memory.logicals[0];
                 size        = (vx_uint32)(((vx_image)ref)->memory.strides[0][2] * ((vx_image)ref)->height);
                 break;
             case VX_TYPE_DISTRIBUTION:
-                physical    = (vx_uint8_ptr)(((vx_image)ref)->memory.physicals[0]);
+                physical    = ((vx_image)ref)->memory.physicals[0];
                 logical     = (vx_uint8_ptr)((vx_distribution)ref)->memAllocInfo.logical;
                 size        = ((vx_distribution)ref)->memAllocInfo.allocatedSize;
                 break;
             case VX_TYPE_LUT:
             case VX_TYPE_ARRAY:
-                physical    = (vx_uint8_ptr)(((vx_image)ref)->memory.physicals[0]);
+                physical    = ((vx_image)ref)->memory.physicals[0];
                 logical     = ((vx_array)ref)->memory.logicals[0];
                 size        = ((vx_array)ref)->memAllocInfo.allocatedSize;
                 break;
             case VX_TYPE_SCALAR:
-                physical    = (vx_uint8_ptr)(((vx_scalar)ref)->physical);
+                physical    = ((vx_scalar)ref)->physical;
                 size        = vxoScalar_GetTypeSize((vx_scalar)ref);
 
                 logical     = (vx_uint8_ptr)((vx_scalar)ref)->value;
@@ -4297,7 +4340,7 @@ VX_INTERNAL_API vx_status vxoDumpOutput(vx_node node, const vx_reference paramet
             /* Dump memory */
             gcmDUMP_BUFFER(gcvNULL,
                         gcvDUMP_BUFFER_VERIFY,
-                        (gctUINT32)physical,
+                        physical,
                         (gctPOINTER)logical,
                         0,
                         size);
@@ -4909,7 +4952,7 @@ VX_INTERNAL_API vx_status vxoProgramKernel_GetCurrentShaderID(vx_node node, gctU
         return VX_FAILURE;
     }
     gcoOS_StrCopySafe(kernelName, 256, _getShaderName(node->kernel->name, kernelMainName));
-    gcoOS_StrCatSafe(kernelName, 256, node->kernel->subname);
+    gcoOS_StrCatSafe(kernelName, 256, node->kernelsubname);
 
     for(i = 0; i < node->kernel->kernelShaderCount; i++)
     {
@@ -5368,7 +5411,10 @@ VX_INTERNAL_API vx_status VX_CALLBACK vxoProgramKernel_FunctionVX(vx_node node, 
     kernelShader = node->kernel->kernelShader[currentShaderID];
     node->kernel->currShaderID = currentShaderID;
 
-    status = vxoShader_SetCLParameters(kernelShader, (vx_reference*)parameters, paramCount, node->kernel->signature.dataTypeTable, VX_NULL, node->tensorVxcOptimize);
+    if (node->vxcOptimize)
+        status = vxoShader_SetParameters(kernelShader, (vx_reference*)parameters, paramCount, node->kernel->signature.dataTypeTable, VX_NULL);
+    else
+        status = vxoShader_SetCLParameters(kernelShader, (vx_reference*)parameters, paramCount, node->kernel->signature.dataTypeTable, VX_NULL, vx_false_e);
     if (status != VX_SUCCESS) goto OnError;
 
     for(i = 0; i < node->uniformCount; i++)
@@ -5582,7 +5628,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSelectKernelSubname(vx_node node, const vx_
     gcmHEADER_ARG("node=%p, subname=%s", node, subname);
     gcmDUMP_API("$VX vxSelectKernelSubname: node=%p, subname=%s", node, subname);
 
-    gcoOS_StrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, subname);
+    gcoOS_StrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, subname);
 
     gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
@@ -5701,6 +5747,26 @@ VX_INTERNAL_CALLBACK_API void vxoKernel_Destructor(vx_reference ref)
 
     gcmHEADER_ARG("ref=%p", ref);
 
+    if (vKernel->signature.directionTable)
+    {
+        vxFree(vKernel->signature.directionTable);
+        vKernel->signature.directionTable = NULL;
+    }
+    if (vKernel->signature.dataTypeTable)
+    {
+        vxFree(vKernel->signature.dataTypeTable);
+        vKernel->signature.dataTypeTable = NULL;
+    }
+    if (vKernel->signature.stateTable)
+    {
+        vxFree(vKernel->signature.stateTable);
+        vKernel->signature.stateTable = NULL;
+    }
+    if (vKernel->signature.isStaticTable)
+    {
+        vxFree(vKernel->signature.isStaticTable);
+        vKernel->signature.isStaticTable = NULL;
+    }
     for (i = 0; i < vKernel->kernelShaderCount*2; i++)
     {
         vxoShader_Free(vKernel->kernelShader[i]);
@@ -6074,17 +6140,23 @@ VX_API_ENTRY vx_kernel VX_API_CALL vxImportKernelFromURL(vx_context context, con
 
         for(i = 0; i < binaryLoad->fixed.header.inputCount; i++)
         {
-            vx_binary_input_output_info_s *inputs = binaryLoad->inputs;
-            vx_enum dataType = vxoBinaryGraph_ConvertToOVXDataType(inputs[i].dataType);
+            vx_uint32 nbgDataType = 0;
+            vx_enum dataType = 0;
+
+            vxoBinaryGraph_QueryInputOutputParamByIndex(binaryLoad, binaryLoad->inputs, i, VX_BINARY_QUERY_INOUT_DATA_TYPE, &nbgDataType);
+            dataType = vxoBinaryGraph_ConvertToOVXDataType(nbgDataType);
 
             status |= vxAddParameterToKernel(kernel, i, VX_INPUT,
                                              dataType, VX_PARAMETER_STATE_REQUIRED);
         }
         for(i = binaryLoad->fixed.header.inputCount; i < numParams; i++)
         {
-            vx_binary_input_output_info_s *outputs = binaryLoad->outputs;
+            vx_uint32 nbgDataType = 0;
+            vx_enum dataType = 0;
             vx_uint32 outIndex = i - binaryLoad->fixed.header.inputCount;
-            vx_enum dataType = vxoBinaryGraph_ConvertToOVXDataType(outputs[outIndex].dataType);
+            vxoBinaryGraph_QueryInputOutputParamByIndex(binaryLoad, binaryLoad->outputs, outIndex, VX_BINARY_QUERY_INOUT_DATA_TYPE, &nbgDataType);
+
+            dataType = vxoBinaryGraph_ConvertToOVXDataType(nbgDataType);
 
             status |= vxAddParameterToKernel(kernel, i, VX_OUTPUT,
                                              dataType, VX_PARAMETER_STATE_REQUIRED);

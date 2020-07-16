@@ -115,6 +115,7 @@ vx_status vxnneOpDebug_DumpOperation(vxnne_execution_layer layer, vx_int32 opInd
             "TP",
             "SW",
             "SC",
+            "NBG"
         };
 
         FILE* fp = fopen(layer->graph->base.context->options.enableOpsDebugInfo, "a+");

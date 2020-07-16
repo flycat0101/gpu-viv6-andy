@@ -65,6 +65,33 @@ VX_INTERNAL_API vx_uint32 vxoScalar_GetTypeSize(vx_scalar scalar)
     case VX_TYPE_BOOL:
         size = sizeof(vx_bool);
         break;
+    case VX_TYPE_RECTANGLE:
+        size = sizeof(vx_rectangle_t);
+        break;
+    case VX_TYPE_KEYPOINT:
+        size = sizeof(vx_keypoint_t);
+        break;
+    case VX_TYPE_COORDINATES2D:
+        size = sizeof(vx_coordinates2d_t);
+        break;
+    case VX_TYPE_COORDINATES3D:
+        size = sizeof(vx_coordinates3d_t);
+        break;
+    case VX_TYPE_COORDINATES2DF:
+        size = sizeof(vx_coordinates2df_t);
+        break;
+    case VX_TYPE_HOG_PARAMS:
+        size = sizeof(vx_hog_t);
+        break;
+    case VX_TYPE_HOUGH_LINES_PARAMS:
+        size = sizeof(vx_hough_lines_p_t);
+        break;
+    case VX_TYPE_LINE_2D:
+        size = sizeof(vx_line2d_t);
+        break;
+    case VX_TYPE_TENSOR_MATRIX_MULTIPLY_PARAMS:
+        size = sizeof(vx_tensor_matrix_multiply_params_t);
+        break;
     default:
         vxError("The value type of the scalar, %p->%d, is not supported", scalar, scalar->dataType);
         vxmASSERT(0);
@@ -162,9 +189,20 @@ VX_INTERNAL_API void vxoScalar_Dump(vx_scalar scalar)
                 vxmDUMP_SCALAR_VALUE("%s", vxmBOOL_TO_STRING(scalar->value->b));
                 break;
 
+           case VX_TYPE_RECTANGLE:
+           case VX_TYPE_KEYPOINT:
+           case VX_TYPE_COORDINATES2D:
+           case VX_TYPE_COORDINATES3D:
+           case VX_TYPE_COORDINATES2DF:
+           case VX_TYPE_HOG_PARAMS:
+           case VX_TYPE_HOUGH_LINES_PARAMS:
+           case VX_TYPE_LINE_2D:
+           case VX_TYPE_TENSOR_MATRIX_MULTIPLY_PARAMS:
+               break;
+
             default:
                 vxError("The value type of the scalar, %p->%d, is not supported", scalar, scalar->dataType);
-                 vxmASSERT(0);
+                vxmASSERT(0);
                 break;
         }
 
@@ -258,6 +296,42 @@ VX_PRIVATE_API vx_status vxoScalar_CommitValue(vx_scalar scalar, const void *ptr
                 scalar->value->b = *(vx_bool *)ptr;
                 break;
 
+           case VX_TYPE_RECTANGLE:
+               gcoOS_MemCopy(&(scalar->value->rect), ptr, sizeof(vx_rectangle_t));
+               break;
+
+           case VX_TYPE_KEYPOINT:
+               gcoOS_MemCopy(&(scalar->value->keypoint), ptr, sizeof(vx_keypoint_t));
+               break;
+
+           case VX_TYPE_COORDINATES2D:
+               gcoOS_MemCopy(&(scalar->value->coord2d), ptr, sizeof(vx_coordinates2d_t));
+               break;
+
+           case VX_TYPE_COORDINATES3D:
+               gcoOS_MemCopy(&(scalar->value->coord3d), ptr, sizeof(vx_coordinates3d_t));
+               break;
+
+           case VX_TYPE_COORDINATES2DF:
+               gcoOS_MemCopy(&(scalar->value->coord2df), ptr, sizeof(vx_coordinates2df_t));
+               break;
+
+           case VX_TYPE_HOG_PARAMS:
+               gcoOS_MemCopy(&(scalar->value->hog), ptr, sizeof(vx_hog_t));
+               break;
+
+           case VX_TYPE_HOUGH_LINES_PARAMS:
+               gcoOS_MemCopy(&(scalar->value->houghlines), ptr, sizeof(vx_hough_lines_p_t));
+               break;
+
+           case VX_TYPE_LINE_2D:
+               gcoOS_MemCopy(&(scalar->value->line2d), ptr, sizeof(vx_line2d_t));
+               break;
+
+           case VX_TYPE_TENSOR_MATRIX_MULTIPLY_PARAMS:
+               gcoOS_MemCopy(&(scalar->value->tensormatmulparam), ptr, sizeof(vx_tensor_matrix_multiply_params_t));
+               break;
+
             default:
                 vxReleaseMutex(scalar->base.lock);
 
@@ -318,6 +392,7 @@ VX_INTERNAL_API vx_scalar vxoScalar_Create(vx_context context, vx_enum dataType,
         gcmFOOTER_NO();
         return VX_NULL;
     }
+
     if (!vxmIS_SCALAR(dataType) && index == -1)
     {
         vxError("The value type, %d, is not a scalar type", dataType);
@@ -465,7 +540,15 @@ static vx_status gcoVX_ScalarToHostMem(vx_scalar scalar, void* user_ptr, vx_uint
         case VX_TYPE_ENUM:     *(vx_enum*)user_ptr     = scalar->value->e; break;
         case VX_TYPE_SIZE:     *(vx_size*)user_ptr     = scalar->value->s; break;
         case VX_TYPE_BOOL:     *(vx_bool*)user_ptr     = scalar->value->b; break;
-
+        case VX_TYPE_RECTANGLE: gcoOS_MemCopy(user_ptr, &(scalar->value->rect), sizeof(vx_rectangle_t)); break;
+        case VX_TYPE_KEYPOINT:  gcoOS_MemCopy(user_ptr, &(scalar->value->keypoint), sizeof(vx_keypoint_t)); break;
+        case VX_TYPE_COORDINATES2D: gcoOS_MemCopy(user_ptr, &(scalar->value->coord2d), sizeof(vx_coordinates2d_t)); break;
+        case VX_TYPE_COORDINATES3D: gcoOS_MemCopy(user_ptr, &(scalar->value->coord3d), sizeof(vx_coordinates3d_t)); break;
+        case VX_TYPE_COORDINATES2DF: gcoOS_MemCopy(user_ptr, &(scalar->value->coord2df), sizeof(vx_coordinates2df_t)); break;
+        case VX_TYPE_HOG_PARAMS: gcoOS_MemCopy(user_ptr, &(scalar->value->hog), sizeof(vx_hog_t)); break;
+        case VX_TYPE_HOUGH_LINES_PARAMS: gcoOS_MemCopy(user_ptr, &(scalar->value->houghlines), sizeof(vx_hough_lines_p_t)); break;
+        case VX_TYPE_LINE_2D:    gcoOS_MemCopy(user_ptr, &(scalar->value->line2d), sizeof(vx_line2d_t)); break;
+        case VX_TYPE_TENSOR_MATRIX_MULTIPLY_PARAMS: gcoOS_MemCopy(user_ptr, &(scalar->value->tensormatmulparam), sizeof(vx_tensor_matrix_multiply_params_t)); break;
         default:
             vxError("some case is not covered in %s\n", __FUNCTION__);
             status = VX_ERROR_NOT_SUPPORTED;
@@ -535,6 +618,40 @@ static vx_status gcoVX_HostMemToScalar(vx_scalar scalar, void* user_ptr, vx_uint
         case VX_TYPE_ENUM:     scalar->value->e = *(vx_enum*)user_ptr; break;
         case VX_TYPE_SIZE:     scalar->value->s = *(vx_size*)user_ptr; break;
         case VX_TYPE_BOOL:     scalar->value->b = *(vx_bool*)user_ptr; break;
+        case VX_TYPE_RECTANGLE:
+            gcoOS_MemCopy(&(scalar->value->rect), user_ptr, sizeof(vx_rectangle_t)); break;
+
+        case VX_TYPE_KEYPOINT:
+            gcoOS_MemCopy(&(scalar->value->keypoint), user_ptr, sizeof(vx_keypoint_t));
+            break;
+
+        case VX_TYPE_COORDINATES2D:
+            gcoOS_MemCopy(&(scalar->value->coord2d), user_ptr, sizeof(vx_coordinates2d_t));
+            break;
+
+        case VX_TYPE_COORDINATES3D:
+            gcoOS_MemCopy(&(scalar->value->coord3d), user_ptr, sizeof(vx_coordinates3d_t));
+            break;
+
+        case VX_TYPE_COORDINATES2DF:
+            gcoOS_MemCopy(&(scalar->value->coord2df), user_ptr, sizeof(vx_coordinates2df_t));
+            break;
+
+        case VX_TYPE_HOG_PARAMS:
+            gcoOS_MemCopy(&(scalar->value->hog), user_ptr, sizeof(vx_hog_t));
+            break;
+
+        case VX_TYPE_HOUGH_LINES_PARAMS:
+            gcoOS_MemCopy(&(scalar->value->houghlines), user_ptr, sizeof(vx_hough_lines_p_t));
+            break;
+
+        case VX_TYPE_LINE_2D:
+            gcoOS_MemCopy(&(scalar->value->line2d), user_ptr, sizeof(vx_line2d_t));
+            break;
+
+        case VX_TYPE_TENSOR_MATRIX_MULTIPLY_PARAMS:
+            gcoOS_MemCopy(&(scalar->value->tensormatmulparam), user_ptr, sizeof(vx_tensor_matrix_multiply_params_t));
+            break;
 
         default:
             vxError("some case is not covered in %s\n", __FUNCTION__);
@@ -690,6 +807,42 @@ VX_API_ENTRY vx_status VX_API_CALL vxReadScalarValue(vx_scalar scalar, void *ptr
 
             case VX_TYPE_BOOL:
                 *(vx_bool *)ptr = scalar->value->b;
+                break;
+
+            case VX_TYPE_RECTANGLE:
+                gcoOS_MemCopy(ptr, &(scalar->value->rect), sizeof(vx_rectangle_t));
+                break;
+
+            case VX_TYPE_KEYPOINT:
+                gcoOS_MemCopy(ptr, &(scalar->value->keypoint), sizeof(vx_keypoint_t));
+                break;
+
+            case VX_TYPE_COORDINATES2D:
+                gcoOS_MemCopy(ptr, &(scalar->value->coord2d), sizeof(vx_coordinates2d_t));
+                break;
+
+            case VX_TYPE_COORDINATES3D:
+                gcoOS_MemCopy(ptr, &(scalar->value->coord3d), sizeof(vx_coordinates3d_t));
+                break;
+
+            case VX_TYPE_COORDINATES2DF:
+                gcoOS_MemCopy(ptr, &(scalar->value->coord2df), sizeof(vx_coordinates2df_t));
+                break;
+
+            case VX_TYPE_HOG_PARAMS:
+                gcoOS_MemCopy(ptr, &(scalar->value->hog), sizeof(vx_hog_t));
+                break;
+
+            case VX_TYPE_HOUGH_LINES_PARAMS:
+                gcoOS_MemCopy(ptr, &(scalar->value->houghlines), sizeof(vx_hough_lines_p_t));
+                break;
+
+            case VX_TYPE_LINE_2D:
+                gcoOS_MemCopy(ptr, &(scalar->value->line2d), sizeof(vx_line2d_t));
+                break;
+
+            case VX_TYPE_TENSOR_MATRIX_MULTIPLY_PARAMS:
+                gcoOS_MemCopy(ptr, &(scalar->value->tensormatmulparam), sizeof(vx_tensor_matrix_multiply_params_t));
                 break;
 
             default:

@@ -256,8 +256,8 @@ VX_PRIVATE_API vx_status vxoNNTensorTrans_SH_Initialize_Ext(vxnne_layer ops_laye
 
         vxoElementOptimization_GetTensorShape(input, sizes, &dims);
 
-        src = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims);
-        dst = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims);
+        src = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims, VX_NULL);
+        dst = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims, VX_NULL);
 
         tensor_trans_layer->base.temp_tensors[0] = src;
         tensor_trans_layer->base.temp_tensors[1] = dst;
@@ -295,6 +295,9 @@ VX_PRIVATE_API vx_status vxoNNTensorTrans_SH_Initialize_Ext(vxnne_layer ops_laye
     }
     else if (shExe_flag)
     {
+        vx_bool   is_per_channel_quant = (vx_bool)(TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL );
+        vx_uint32 channelDim = TENSOR_TF_CHANNEL_DIMS(output);
+        vx_uint32 *nChannelDim = NULL;
         vx_uint32 width = 0;
         vx_uint32 height = 0;
         vx_uint32 depth = 0;
@@ -324,14 +327,14 @@ VX_PRIVATE_API vx_status vxoNNTensorTrans_SH_Initialize_Ext(vxnne_layer ops_laye
             size[2] = 1;
             size[3] = batch;
             dims = TENSOR_DIM_NUM(input);
-            src = vxoTensor_ReshapeTensor(input, size, dims);
+            src = vxoTensor_ReshapeTensor(input, size, dims, VX_NULL);
 
             size[0] = depth;
             size[1] = width * height;
             size[2] = 1;
             size[3] = batch;
             dims = TENSOR_DIM_NUM(input);
-            dst = vxoTensor_ReshapeTensor(output, size, dims);
+            dst = vxoTensor_ReshapeTensor(output, size, dims, VX_NULL);
 
             num = 2;
         }
@@ -341,13 +344,13 @@ VX_PRIVATE_API vx_status vxoNNTensorTrans_SH_Initialize_Ext(vxnne_layer ops_laye
             size[1] = height;
             size[2] = depth;
             dims = 3;
-            src = vxoTensor_ReshapeTensor(input, size, dims);
+            src = vxoTensor_ReshapeTensor(input, size, dims, VX_NULL);
 
             size[0] = height;
             size[1] = depth;
             size[2] = width;
             dims = 3;
-            dst = vxoTensor_ReshapeTensor(output, size, dims);
+            dst = vxoTensor_ReshapeTensor(output, size, dims, VX_NULL);
 
             num = 3;
         }
@@ -357,7 +360,7 @@ VX_PRIVATE_API vx_status vxoNNTensorTrans_SH_Initialize_Ext(vxnne_layer ops_laye
             size[1] = height * depth * batch;
             size[2] = 1;
             dims = 3;
-            src = vxoTensor_ReshapeTensor(input, size, dims);
+            src = vxoTensor_ReshapeTensor(input, size, dims, VX_NULL);
 
             size[0] = height * depth * batch;
             size[1] = width;
@@ -389,27 +392,33 @@ VX_PRIVATE_API vx_status vxoNNTensorTrans_SH_Initialize_Ext(vxnne_layer ops_laye
             size[2] = batch;
             size[3] = width;
             dims = 4;
-            src2 = vxoTensor_ReshapeTensor(dst, size, dims);
+            src2 = vxoTensor_ReshapeTensor(dst, size, dims, VX_NULL);
 
             dst2 = output;
             batchCount2 = width;
             num2 = 3;
         }
-        else if (pPerm[0] == 1 && pPerm[1] == 2 && pPerm[2] == 0 && width < IMG_MAX_WIDTH && height * depth < IMG_MAX_WIDTH)
+        else if (pPerm[0] == 1 && pPerm[1] == 2 && pPerm[2] == 0 && width < IMG_MAX_WIDTH && height * depth < IMG_MAX_WIDTH
+                 && (is_per_channel_quant && channelDim == 2))
         {
             size[0] = width;
             size[1] = height * depth;
             size[2] = 1;
             size[3] = batch;
             dims = TENSOR_DIM_NUM(input);
-            src = vxoTensor_ReshapeTensor(input, size, dims);
+            src = vxoTensor_ReshapeTensor(input, size, dims, VX_NULL);
 
             size[0] = height * depth;
             size[1] = width;
             size[2] = 1;
             size[3] = batch;
             dims = TENSOR_DIM_NUM(input);
-            dst = vxoTensor_ReshapeTensor(output, size, dims);
+            if (is_per_channel_quant && channelDim == 2)
+            {
+                channelDim = 1;
+                nChannelDim = &channelDim;
+            }
+            dst = vxoTensor_ReshapeTensor(output, size, dims, nChannelDim);
 
             num = 2;
         }
@@ -546,8 +555,10 @@ VX_PRIVATE_API vx_bool vxoNNTensorTrans_TP_Support(vx_node node, const vx_refere
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
     support =  support && (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_TRANSPOSE) &&
-                            vxnneIsTPSupportFormat(context, input, VX_NULL, output) &&
+                            vxnneIsTPSupportFormat(node->graph, input, VX_NULL, output) &&
                             (pnum->value->u32 > 1));
+
+    support = support && IsTPSupport_CheckOutPixel(node->base.context, input, output);
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
@@ -627,6 +638,8 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint
 }
 #endif
 
+
+
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorTrans_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
@@ -679,7 +692,7 @@ OnError:
                           VX_NULL);
 
     if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_TRANSPOSE) &&
-        vxnneIsTPSupportFormat(context, input, VX_NULL, output) &&
+        vxnneIsTPSupportFormat(node->graph, input, VX_NULL, output) &&
         (pnum->value->u32 > 1))
     {
         vx_op_param_s conv = {0};
@@ -799,8 +812,8 @@ OnError:
 
             vxoElementOptimization_GetTensorShape(input, sizes, &dims);
 
-            src     = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims);
-            dst     = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims);
+            src     = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims, VX_NULL);
+            dst     = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims, VX_NULL);
 
             tensor_trans_layer->base.temp_tensors[0] = src;
             tensor_trans_layer->base.temp_tensors[1] = dst;
@@ -870,14 +883,14 @@ OnError:
                 size[2] = 1;
                 size[3] = batch;
                 dims    = TENSOR_DIM_NUM(input);
-                src = vxoTensor_ReshapeTensor(input, size, dims);
+                src = vxoTensor_ReshapeTensor(input, size, dims, VX_NULL);
 
                 size[0] = depth;
                 size[1] = width * height;
                 size[2] = 1;
                 size[3] = batch;
                 dims    = TENSOR_DIM_NUM(input);
-                dst = vxoTensor_ReshapeTensor(output, size, dims);
+                dst = vxoTensor_ReshapeTensor(output, size, dims, VX_NULL);
 
                 num = 2;
             }
@@ -887,13 +900,13 @@ OnError:
                 size[1] = height;
                 size[2] = depth;
                 dims    = 3;
-                src = vxoTensor_ReshapeTensor(input, size, dims);
+                src = vxoTensor_ReshapeTensor(input, size, dims, VX_NULL);
 
                 size[0] = height;
                 size[1] = depth;
                 size[2] = width;
                 dims    = 3;
-                dst = vxoTensor_ReshapeTensor(output, size, dims);
+                dst = vxoTensor_ReshapeTensor(output, size, dims, VX_NULL);
 
                 num = 3;
             }
@@ -903,7 +916,7 @@ OnError:
                 size[1] = height * depth * batch;
                 size[2] = 1;
                 dims = 3;
-                src = vxoTensor_ReshapeTensor(input, size, dims);
+                src = vxoTensor_ReshapeTensor(input, size, dims, VX_NULL);
 
                 size[0] = height * depth * batch;
                 size[1] = width;
@@ -935,7 +948,7 @@ OnError:
                 size[2] = batch;
                 size[3] = width;
                 dims = 4;
-                src2 = vxoTensor_ReshapeTensor(dst, size, dims);
+                src2 = vxoTensor_ReshapeTensor(dst, size, dims, VX_NULL);
 
                 dst2 = output;
                 batchCount2 = width;
@@ -948,14 +961,14 @@ OnError:
                 size[2] = 1;
                 size[3] = batch;
                 dims    = TENSOR_DIM_NUM(input);
-                src = vxoTensor_ReshapeTensor(input, size, dims);
+                src = vxoTensor_ReshapeTensor(input, size, dims, VX_NULL);
 
                 size[0] = height * depth;
                 size[1] = width;
                 size[2] = 1;
                 size[3] = batch;
                 dims    = TENSOR_DIM_NUM(input);
-                dst = vxoTensor_ReshapeTensor(output, size, dims);
+                dst = vxoTensor_ReshapeTensor(output, size, dims, VX_NULL);
 
                 num = 2;
             }
@@ -1070,6 +1083,7 @@ exit:
     if (tensor_trans_layer)
         gcoOS_Free(NULL, (gctPOINTER)tensor_trans_layer);
 #endif
+
 
     return status;
 }

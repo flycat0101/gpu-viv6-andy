@@ -93,10 +93,14 @@ typedef struct _gcsNN_FIXED_FEATURE
     gctUINT  uscBanks;
     gctUINT  nnLanesPerOutCycle;
     gctUINT  maxOTNumber;
+    gctUINT  physicalVipSramWidthInByte;
     gctUINT  equivalentVipsramWidthInByte;
     gctUINT  shaderCoreCount;
     gctUINT  latencyHidingAtFullAxiBw;
     gctUINT  axiBusWidth;
+    gctUINT  nnMaxKXSize;
+    gctUINT  nnMaxKYSize;
+    gctUINT  nnMaxKZSize;
 } gcsNN_FIXED_FEATURE;
 
 /* Features can be customized from outside */
@@ -121,6 +125,7 @@ typedef struct _gcsNN_CUSTOMIZED_FEATURE
     gctUINT  nnWriteWithoutUSC;
     gctUINT  depthWiseSupport;
     gctUINT  vipVectorPrune;
+    gctUINT  ddrKernelBurstSize;
 } gcsNN_CUSTOMIZED_FEATURE;
 
 /* Features are unified (hardcoded) for hardwares */
@@ -228,6 +233,7 @@ gcsSystemInfo;
     gcvNULL, /* VX context lock    */ \
     gcvPATCH_NOTINIT,/* global patchID     */ \
     gcvNULL, /* global fenceID*/ \
+    gcvNULL, /* mainThreadHandle */ \
     gcvFALSE, /* memory profile flag */ \
     gcvNULL, /* profileLock;        */ \
     0, /* allocCount;         */ \

@@ -141,8 +141,8 @@ VX_PRIVATE_API vx_status vxoNNTensorSqueeze_SH_Initialize_Ext(vxnne_layer ops_la
 
     vxoElementOptimization_GetTensorShape(input, sizes, &dims);
 
-    src        = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims);
-    dst        = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims);
+    src        = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims, VX_NULL);
+    dst        = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims, VX_NULL);
 
     tensor_squeeze_layer->base.temp_tensors[0]  = src;
     tensor_squeeze_layer->base.temp_tensors[1]  = dst;
@@ -247,7 +247,9 @@ VX_PRIVATE_API vx_bool vxoNNTensorSqueeze_TP_Support(vx_node node, const vx_refe
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
     support = support && vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP);
-    support = support && vxnneIsTPSupportFormat(context, input, VX_NULL, output);
+    support = support && vxnneIsTPSupportFormat(node->graph, input, VX_NULL, output);
+
+    support = support && IsTPSupport_CheckOutPixel(node->base.context, input, output);
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
@@ -319,7 +321,6 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint
 }
 
 #endif
-
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorSqueeze_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
@@ -391,7 +392,7 @@ OnError:
     }
 
     if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP) &&
-        vxnneIsTPSupportFormat(context, input, VX_NULL, output))
+        vxnneIsTPSupportFormat(node->graph, input, VX_NULL, output))
     {
         vx_op_param_s conv = { 0 };
 
@@ -442,8 +443,8 @@ OnError:
 
             vxoElementOptimization_GetTensorShape(input, sizes, &dims);
 
-            src        = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims);
-            dst        = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims);
+            src        = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims, VX_NULL);
+            dst        = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims, VX_NULL);
 
             tensor_squeeze_layer->base.temp_tensors[0]  = src;
             tensor_squeeze_layer->base.temp_tensors[1]  = dst;
@@ -508,7 +509,6 @@ exit:
     if (tensor_squeeze_layer)
         gcoOS_Free(NULL, (gctPOINTER)tensor_squeeze_layer);
 #endif
-
     return status;
 }
 

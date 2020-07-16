@@ -591,7 +591,7 @@ VX_PRIVATE_API vx_status vxoNNTensorStrideSlice_SH_EVIS_Initialize_Ext(vxnne_lay
 
 
         if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_REVERSE) &&
-            vxnneIsTPSupportFormat(context, input, VX_NULL, tmpTensor))
+            vxnneIsTPSupportFormat(ops_layer->node->graph, input, VX_NULL, tmpTensor))
         {
             vx_op_param_s conv = {0};
             vx_int32 axis[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
@@ -792,14 +792,19 @@ VX_PRIVATE_API vx_bool vxoNNTensorStrideSlice_TP_Support(vx_node node, const vx_
     vx_scalar end_mask              = (vx_scalar)parameters[5];
     vx_scalar shrink_axis_mask      = (vx_scalar)parameters[6];
     vx_tensor output                = (vx_tensor)parameters[7];
-
+    vx_uint32 batch                 = TENSOR_VIEW_DIM_NUM(input) > 3 ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
+    vx_uint32 batch_o               = TENSOR_VIEW_DIM_NUM(output) > 3 ? TENSOR_VIEW_SIZE_INDEX(output, 3) : 1;
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_TP, VX_TYPE_INVALID, VX_NULL);
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
+    if (batch !=  batch_o && batch_o > 1)
+        support = vx_false_e;
 
     if (!support)return support;
 
-    support = support  && (vxnneIsTPSupportFormat(node->base.context, input, VX_NULL, output) && STRIDED_SLICE_CHECK_TP_SUPPORT);
+    support = support  && (vxnneIsTPSupportFormat(node->graph, input, VX_NULL, output) && STRIDED_SLICE_CHECK_TP_SUPPORT);
+
+    support = support && IsTPSupport_CheckOutPixel(node->base.context, input, output);
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
@@ -819,11 +824,12 @@ VX_PRIVATE_API vx_status vxoNNTensorStrideSlice_TP_Initialize(vxnne_layer ops_la
     vx_tensor output                = (vx_tensor)parameters[7];
 
     vx_uint32 batch                 = TENSOR_VIEW_DIM_NUM(input) > 3 ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
-    vx_uint32 batch_o               = TENSOR_VIEW_DIM_NUM(output) > 3 ? TENSOR_VIEW_SIZE_INDEX(output, 3) : 1;
+    vx_uint32 out_batch             = TENSOR_VIEW_DIM_NUM(output) > 3 ? TENSOR_VIEW_SIZE_INDEX(output, 3) : 1;
     vx_op_param_s conv = { 0 };
 
-    if (batch !=  batch_o)
+    if (batch != out_batch)
         batch = 1;
+
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
     conv.pad_x_left = 0;
@@ -877,6 +883,7 @@ VX_PRIVATE_API vx_status vxoNNTensorStrideSlice_TP_Initialize(vxnne_layer ops_la
     conv.tp_value->u32[6] = TENSOR_VIEW_SIZE_INDEX(begin_dims, 0) > 2 ? (vx_uint32)VX_GET_DATA_FROM_TENSOR(begin_dims, 2) : 0;
     conv.tp_value->u32[7] = TENSOR_VIEW_SIZE_INDEX(end_dims, 0) > 2 ? (vx_uint32)VX_GET_DATA_FROM_TENSOR(end_dims, 2) : 0;
     conv.tp_value->f32[0] = TENSOR_VIEW_SIZE_INDEX(stride_dims, 0) > 2 ? (vx_float32)VX_GET_DATA_FROM_TENSOR(stride_dims, 2) : 1;
+
     memcpy(&tensor_stride_slice_layer->tensor_stride_slice_tp_operation.base.parameter, &conv, sizeof(vx_op_param_s));
 
 OnError:
@@ -982,7 +989,7 @@ OnError:
     shExe_flag = (vx_bool)(((_IsSameType(input, output) && batch == 1) || enable_sh_crop) && (TENSOR_VIEW_SIZE_INDEX(input, 0) < IMG_MAX_WIDTH && TENSOR_VIEW_SIZE_INDEX(input, 1) < IMG_MAX_WIDTH)) ;
 
     if (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP) &&
-        vxnneIsTPSupportFormat(node->base.context, input, VX_NULL, output) && STRIDED_SLICE_CHECK_TP_SUPPORT
+        vxnneIsTPSupportFormat(node->graph, input, VX_NULL, output) && STRIDED_SLICE_CHECK_TP_SUPPORT
         )
     {
         vx_op_param_s conv = { 0 };
@@ -1078,7 +1085,7 @@ OnError:
 
 
             if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_REVERSE) &&
-                vxnneIsTPSupportFormat(context, input, VX_NULL, tmpTensor))
+                vxnneIsTPSupportFormat(node->graph, input, VX_NULL, tmpTensor))
             {
                 vx_op_param_s conv = {0};
                 vx_int32 axis[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};

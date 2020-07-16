@@ -12,6 +12,8 @@
 
 
 #include <gc_vx_common.h>
+#include <gc_vx_nn_wb.h>
+#include <gc_vx_nn_encoder.h>
 #include <layers/gc_vx_layer_fc.h>
 #include <ops/gc_vx_op_fc.h>
 
@@ -47,11 +49,11 @@ vx_status vxnneExecuteSWFullyConnected(struct _vxnne_operation_s *operation)
     vx_status   status                  = VX_SUCCESS;
     vx_uint32   dims                    = TENSOR_VIEW_DIM_NUM(inputs);
     vx_uint32   width                   = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
-    vx_uint32  height        = dims > 1 ? TENSOR_VIEW_SIZE_INDEX(inputs, 1) : 1;
-    vx_uint32  depth         = dims > 2 ? TENSOR_VIEW_SIZE_INDEX(inputs, 2) : 1;
-    vx_uint32  batch         = dims > 3 ? TENSOR_VIEW_SIZE_INDEX(inputs, 3) : 1;
-    vx_uint32  batchCount    = 1;
-    vx_enum overflow_policy = fullyConnectedOperation->overflow_policy->value->u16;
+    vx_uint32   height                  = dims > 1 ? TENSOR_VIEW_SIZE_INDEX(inputs, 1) : 1;
+    vx_uint32   depth                   = dims > 2 ? TENSOR_VIEW_SIZE_INDEX(inputs, 2) : 1;
+    vx_uint32   batch                   = dims > 3 ? TENSOR_VIEW_SIZE_INDEX(inputs, 3) : 1;
+    vx_uint32   batchCount              = 1;
+    vx_enum    overflow_policy          = fullyConnectedOperation->overflow_policy->value->u16;
 
     if (TENSOR_DIM_NUM(inputs) == 2)
     {
@@ -121,6 +123,7 @@ vx_status vxnneExecuteSWFullyConnected(struct _vxnne_operation_s *operation)
             }
             else
             {
+
                 result = madValue + biasValue;
             }
 
@@ -149,6 +152,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedReluLayer_ValidateOutput
 
     return VX_SUCCESS;
 }
+
 VX_PRIVATE_API vx_status vxnneExecuteSWfp16Clamp(struct _vxnne_operation_s *operation
     )
 {
@@ -156,7 +160,7 @@ VX_PRIVATE_API vx_status vxnneExecuteSWfp16Clamp(struct _vxnne_operation_s *oper
     vx_tensor input = (vx_tensor)(((vxnne_fully_connected_sw_operation_fp16)operation)->inputs);
     vx_tensor output = (vx_tensor)(((vxnne_fully_connected_sw_operation_fp16)operation)->outputs);
     vx_uint32 size = 0;
-    vx_uint32 index = (0x1 << MAX_KZGROUP_COUNT);
+    vx_uint32 index = MAX_TP_FC_KZ_SIZE;
     gctPOINTER inputLogical = VX_NULL;
     gctPOINTER outputLogical = VX_NULL;
     vx_uint32 inputPhysical = 0, outputPhysical = 0;
@@ -178,7 +182,7 @@ VX_PRIVATE_API vx_status vxnneExecuteSWfp16Clamp(struct _vxnne_operation_s *oper
         if(checkData == negativeZero)
             *(((vx_int16 *)outputLogical) + (index - 1)) = 0x0;
 
-        index += (0x1 << MAX_KZGROUP_COUNT);
+        index += MAX_TP_FC_KZ_SIZE;
     }
 
     checkData = (vx_int16)*(((vx_int16 *)inputLogical) + (elementCount - 1));
@@ -219,15 +223,16 @@ vx_status vxoNNFullyConnectedLayerInitializer(
     vx_bool   supportDataFormat2          = vx_false_e;
     vx_bool   supportDataFormat3          = vx_false_e;
     vx_enum   input_dataformat            = TENSOR_DATA_TYPE(inputs0);
-    vx_enum   weight_dataformat           = TENSOR_DATA_TYPE(weights_biases->wb_base->origWeight);
-    vx_enum   bias_dataformat             = weights_biases->wb_base->origBias ? TENSOR_DATA_TYPE(weights_biases->wb_base->origBias) : VX_TYPE_INVALID;
+    vx_enum   weight_dataformat           = TENSOR_DATA_TYPE(WB_WEIGHT_TENSOR(weights_biases));
+    vx_enum   bias_dataformat             = WB_BIAS_TENSOR(weights_biases) ? TENSOR_DATA_TYPE(WB_BIAS_TENSOR(weights_biases)) : VX_TYPE_INVALID;
     vx_enum   output_dataformat           = TENSOR_DATA_TYPE(outputs);
     vx_uint32 dims                        = TENSOR_VIEW_DIM_NUM(inputs0);
     vx_uint32 width                       = TENSOR_VIEW_SIZE_INDEX(inputs0, 0);
     vx_uint32 height                      = (dims > 1) ? TENSOR_VIEW_SIZE_INDEX(inputs0, 1) : 1;
     vx_uint32 depth                       = (dims > 2) ? TENSOR_VIEW_SIZE_INDEX(inputs0, 2) : 1;
-    vx_uint32 inputDims                   = width * height * depth;
+    vx_uint32 inputDim                    = width * height * depth;
     vx_uint32 op_index = 0;
+    vx_uint32 inputDims[VX_CONTEXT_TENSOR_MAX_DIMENSION];
     vx_uint32 tempTensorCount = 0;
     vx_tensor inputs = inputs0;
 
@@ -235,13 +240,13 @@ vx_status vxoNNFullyConnectedLayerInitializer(
     supportDataFormat1 = (vx_bool)(input_dataformat == VX_TYPE_INT8 && weight_dataformat == VX_TYPE_INT8 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_INT32) && output_dataformat == VX_TYPE_INT8);
     supportDataFormat2 = (vx_bool)(input_dataformat == VX_TYPE_INT16 && weight_dataformat == VX_TYPE_INT16 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_INT32) && output_dataformat == VX_TYPE_INT16);
     supportDataFormat3 = (vx_bool)(input_dataformat == VX_TYPE_UINT8 && weight_dataformat == VX_TYPE_UINT8 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_INT32) && output_dataformat == VX_TYPE_UINT8);
-    enable_shader      = (supportDataFormat0 || supportDataFormat1 || supportDataFormat2 || supportDataFormat3) && (inputDims < IMG_MAX_WIDTH);
+    enable_shader      = (supportDataFormat0 || supportDataFormat1 || supportDataFormat2 || supportDataFormat3) && (inputDim < IMG_MAX_WIDTH);
 
     if (TENSOR_DIM_NUM(inputs) == 2)
     {
         batchCount = TENSOR_SIZE_INDEX(inputs, 1);
-        if ((inputs->dims[0] != weights_biases->weights_sizes[2]) ||
-            (outputs->dims[0] != weights_biases->weights_sizes[3]))
+        if ((inputs->dims[0] != WB_KERNEL_Z(weights_biases)) ||
+            (outputs->dims[0] != WB_OUTPUT_Z(weights_biases)))
         {
             vxError("parameter is invalid at function %s, line %d\n", __FUNCTION__, __LINE__);
             vxmONERROR(VX_ERROR_INVALID_PARAMETERS);
@@ -250,9 +255,9 @@ vx_status vxoNNFullyConnectedLayerInitializer(
     else if (TENSOR_DIM_NUM(inputs) == 4)
     {
         batchCount = TENSOR_SIZE_INDEX(inputs, 3);
-        if (((inputs->dims[0] * inputs->dims[1] * inputs->dims[2]) != weights_biases->weights_sizes[2]) ||
-            ((outputs->dimCount == 4) && (outputs->dims[2] !=weights_biases->weights_sizes[3])) ||
-            ((outputs->dimCount == 2) && (outputs->dims[0] !=weights_biases->weights_sizes[3])))
+        if (((inputs->dims[0] * inputs->dims[1] * inputs->dims[2]) != WB_KERNEL_Z(weights_biases)) ||
+            ((outputs->dimCount == 4) && (outputs->dims[2] != WB_OUTPUT_Z(weights_biases))) ||
+            ((outputs->dimCount == 2) && (outputs->dims[0] != WB_OUTPUT_Z(weights_biases))))
         {
             vxError("parameter is invalid at function %s, line %d\n", __FUNCTION__, __LINE__);
             vxmONERROR(VX_ERROR_INVALID_PARAMETERS);
@@ -268,16 +273,52 @@ vx_status vxoNNFullyConnectedLayerInitializer(
         aligned64 = vx_false_e;
     }
 
+    if (TENSOR_DIM_NUM(inputs) == 1)
+    {
+        inputDims[0] = 1;
+        inputDims[1] = 1;
+        inputDims[2] = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
+    }
+    else if (TENSOR_DIM_NUM(inputs) == 2)
+    {
+        inputDims[0] = 1;
+        inputDims[1] = 1;
+        inputDims[2] = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
+        inputDims[3] = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
+    }
+    else
+    {
+        for (i = 0; i < TENSOR_DIM_NUM(inputs); i++)
+        {
+            inputDims[i] = TENSOR_VIEW_SIZE_INDEX(inputs, i);
+        }
+    }
+
     if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP) &&
-        vxnneIsTPSupportFormat(context, inputs, weights_biases, outputs) &&
-        weights_biases->use_tp_fc &&
-        WB_IS_NN_FC_BATCH_MODE(weights_biases) == vx_false_e &&
-        aligned64 && (VX_CONVERT_POLICY_SATURATE == overflow_policy))
+        vxnneIsTPSupportFormat(node->graph, inputs, weights_biases, outputs) &&
+        WB_OUTPUT_Z(weights_biases) > 1 &&
+        (inputDims[0] == 1 || inputDims[1] != 1) &&
+        aligned64 &&
+        !isInt64BiasOverflow(context, WB_WEIGHT_DATA_FORMAT(weights_biases), WB_BIAS_DATA_FORMAT(weights_biases), WB_OUTPUT_Z(weights_biases), WB_BIAS_TENSOR(weights_biases)))
+    {
+       vx_uint32 zOffset = 0;
+       vx_uint32 outputDims[2] = {TENSOR_VIEW_SIZE_INDEX(outputs, 0), TENSOR_VIEW_SIZE_INDEX(outputs, 1)};
+
+       calculateZOffset(outputDims, TENSOR_DATA_TYPE(outputs), 0, &zOffset);
+
+       /* try to compress original tp fc wb here */
+       vxmONERROR(weights_biases->compress(weights_biases, VXNNE_OPERATION_TARGET_TP, 0, zOffset));
+    }
+    else
+    {
+        /* pre-compress for original ddr nn wb */
+        vxmONERROR(weights_biases->compress(weights_biases, VXNNE_OPERATION_TARGET_NN, WB_OUTPUT_Z(weights_biases), TENSOR_STRIDE_INDEX(outputs, 2)));
+    }
+
+    if (WB_IS_TP_COMPRESS(weights_biases) && (VX_CONVERT_POLICY_SATURATE == overflow_policy))
     {
         vx_op_param conv = VX_NULL;
-        vx_uint32 kzgroup = weights_biases->weights_sizes[2] % weights_biases->slice_array[0].kz_count == 0 ?
- weights_biases->weights_sizes[2] / weights_biases->slice_array[0].kz_count :
- weights_biases->weights_sizes[2] / weights_biases->slice_array[0].kz_count + 1;
+        vx_uint32 kzgroup = WB_KERNEL_Z(weights_biases) % MAX_TP_FC_KZ_SIZE == 0 ? WB_KERNEL_Z(weights_biases) / MAX_TP_FC_KZ_SIZE : WB_KERNEL_Z(weights_biases) / MAX_TP_FC_KZ_SIZE + 1;
         vx_uint32 zoffset = 0;
 
         if(!gcoHAL_IsFeatureAvailable1(gcvNULL, gcFEATURE_BIT_TP_FC_FLOAT_LAST_PIXEL_NEGATIVE_0_FIX) && TENSOR_DATA_TYPE(inputs0) == VX_TYPE_FLOAT16 )
@@ -286,7 +327,7 @@ vx_status vxoNNFullyConnectedLayerInitializer(
             {
                 vx_node node = layer->node;
                 vxnne_shader_executable shaderExecutable;
-                vx_uint32 tp_fc_ksize = (0x1 << MAX_KZGROUP_COUNT);
+                vx_uint32 tp_fc_ksize = MAX_TP_FC_KZ_SIZE;
 
                 shaderExecutable = vxnneGetFC_TPCheckShaderExecutable(node->base.context, VXNNE_KERNEL_FC_TP_CHECK,
                                             &node->kernelAttributes.borderMode, inputs, tp_fc_ksize);
@@ -387,7 +428,7 @@ vx_status vxoNNFullyConnectedLayerInitializer(
         conv->pad_mode = VX_PAD_CONSTANT;
         conv->pad_const = 0;
 
-        conv->tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(weights_biases->slice_num * sizeof(vx_tp_value_cmd_s));
+        conv->tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(WB_TOTAL_SLICE_NUM(weights_biases) * sizeof(vx_tp_value_cmd_s));
 
         if (kzgroup == 1)
         {
@@ -395,11 +436,11 @@ vx_status vxoNNFullyConnectedLayerInitializer(
             conv->other_ref = (vx_reference)weights_biases;
             conv->data_buff = gcvNULL;
 
-            for (i = 0; i < weights_biases->slice_num; i++)
+            for (i = 0; i < WB_TOTAL_SLICE_NUM(weights_biases); i++)
             {
                 conv->tp_value[i].u32[0] = kzgroup;
                 conv->tp_value[i].u32[1] = zoffset;
-                zoffset += weights_biases->slice_array[i].z_count;
+                zoffset += WB_OUTPUT_Z_INDEX(weights_biases, i);
             }
 
             tp_operation0->input          = inputs;
@@ -416,7 +457,7 @@ vx_status vxoNNFullyConnectedLayerInitializer(
         else
         {
             vx_tensor tmpTensor;
-            vx_uint32 size = kzgroup * weights_biases->weights_sizes[3] * TENSOR_DATA_SIZE(outputs);
+            vx_uint32 size = kzgroup * WB_OUTPUT_Z(weights_biases) * TENSOR_DATA_SIZE(outputs);
             vx_uint32 kzoffset = 0, kzoffset2 = 0;
 
             vx_tensor_create_params_t tensor_create_params;
@@ -456,7 +497,7 @@ vx_status vxoNNFullyConnectedLayerInitializer(
             conv->other_ref = (vx_reference)weights_biases;
             conv->data_buff = gcvNULL;
 
-            for (i = 0; i < weights_biases->slice_num; i++)
+            for (i = 0; i < WB_TOTAL_SLICE_NUM(weights_biases); i++)
             {
                 conv->tp_value[i].e32[0] = 0;
                 conv->tp_value[i].u32[0] = kzgroup;
@@ -467,12 +508,12 @@ vx_status vxoNNFullyConnectedLayerInitializer(
                 if (i % kzgroup == kzgroup - 1)
                 {
                     kzoffset = kzoffset2 = 0;
-                    zoffset += weights_biases->slice_array[i].z_count;
+                    zoffset += WB_OUTPUT_Z_INDEX(weights_biases, i);
                 }
                 else
                 {
-                    kzoffset += weights_biases->slice_array[i].kz_count;
-                    kzoffset2 += weights_biases->weights_sizes[3];
+                    kzoffset += WB_KERNEL_Z_INDEX(weights_biases, i);
+                    kzoffset2 += WB_OUTPUT_Z(weights_biases);
                 }
             }
 
@@ -507,7 +548,7 @@ vx_status vxoNNFullyConnectedLayerInitializer(
             conv->tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(sizeof(vx_tp_value_cmd_s));
             conv->tp_value->e32[0] = 1;
             conv->tp_value->u32[0] = kzgroup;
-            conv->tp_value->u32[1] = weights_biases->weights_sizes[3];
+            conv->tp_value->u32[1] = WB_OUTPUT_Z(weights_biases);
 
             vxnneLayer_SetOperation(
                 layer,
@@ -523,7 +564,7 @@ vx_status vxoNNFullyConnectedLayerInitializer(
             layer->temp_tensors[0] = tmpTensor;
         }
     }
-    else if (vxnneIsNNSupportFormat(context, inputs, weights_biases, outputs) &&
+    else if (vxnneIsNNSupportFormat(context, node->graph, inputs, weights_biases, outputs) &&
         (nn_operation != VX_NULL) && (VX_CONVERT_POLICY_SATURATE == overflow_policy))
     {
         vx_op_param_s conv = {0};
@@ -537,7 +578,7 @@ vx_status vxoNNFullyConnectedLayerInitializer(
                                              VX_NULL,
                                              VX_NULL,
                                              batchCount,
-                                             NNE_COMMAND_SIZE * weights_biases->slice_num));
+                                             NNE_COMMAND_SIZE * WB_TOTAL_SLICE_NUM(weights_biases)));
 
         conv.pad_x_left = conv.pad_x_right = conv.pad_y_top = conv.pad_y_bottom = pad;
         conv.pad_mode = VX_PAD_CONSTANT;
@@ -573,7 +614,7 @@ vx_status vxoNNFullyConnectedLayerInitializer(
                 reshapeDimCount = inputs->dimCount;
             }
 
-            reshapeInput = vxoTensor_ReshapeTensor(inputs, reshapeSize, reshapeDimCount);
+            reshapeInput = vxoTensor_ReshapeTensor(inputs, reshapeSize, reshapeDimCount, VX_NULL);
 
             vxmASSERT(reshapeInput != VX_NULL);
 
@@ -595,7 +636,7 @@ vx_status vxoNNFullyConnectedLayerInitializer(
             for (i = 2; i < outputs->dimCount + 2; i++)
                 reshapeSize[i] = outputs->dims[i-2];
 
-            reshapeOutput = vxoTensor_ReshapeTensor(outputs, reshapeSize, outputs->dimCount + 2);
+            reshapeOutput = vxoTensor_ReshapeTensor(outputs, reshapeSize, outputs->dimCount + 2, VX_NULL);
 
             vxmASSERT(reshapeOutput != VX_NULL);
 
@@ -623,8 +664,8 @@ vx_status vxoNNFullyConnectedLayerInitializer(
                                                layer,
                                                inputs,
                                                1,
-                                               weights_biases->wb_base->origWeight,
-                                               weights_biases->wb_base->origBias,
+                                               WB_WEIGHT_TENSOR(weights_biases),
+                                               WB_BIAS_TENSOR(weights_biases),
                                                overflow_policy,
                                                0,
                                                enable_relu,
@@ -666,23 +707,19 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedReluLayer_Initializer(vx
         overflow_policy = overflow_policy_s->value->u32;
     }
 
-    if (!vxnneIsNNSupportFormat(context, inputs, weights_biases, outputs) &&
-        !vxnneIsTPSupportFormat(context, inputs, weights_biases, outputs))
+    if (!vxnneIsNNSupportFormat(context, node->graph, inputs, weights_biases, outputs) &&
+        !vxnneIsTPSupportFormat(node->graph, inputs, weights_biases, outputs))
     {
         vxError("hw not support this format. function %s line %d", __FUNCTION__, __LINE__);
         status = VX_ERROR_NOT_SUPPORTED;
         goto exit;
     }
 
-    if (overflow_policy_s)
-    {
-        overflow_policy = overflow_policy_s->value->u32;
-    }
 
     if (TENSOR_DIM_NUM(inputs) == 2)
     {
-        if ((inputs->dims[0] != weights_biases->weights_sizes[2]) ||
-            (outputs->dims[0] != weights_biases->weights_sizes[3]))
+        if ((inputs->dims[0] != WB_KERNEL_Z(weights_biases)) ||
+            (outputs->dims[0] != WB_OUTPUT_Z(weights_biases)))
         {
             vxError("parameter is invalid at function %s, line %d\n", __FUNCTION__, __LINE__);
             status = VX_ERROR_INVALID_PARAMETERS;
@@ -691,9 +728,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedReluLayer_Initializer(vx
     }
     else if (TENSOR_DIM_NUM(inputs) == 4)
     {
-        if (((inputs->dims[0] * inputs->dims[1] * inputs->dims[2]) != weights_biases->weights_sizes[2]) ||
-            ((outputs->dimCount == 4) && (outputs->dims[2] !=weights_biases->weights_sizes[3])) ||
-            ((outputs->dimCount == 2) && (outputs->dims[0] !=weights_biases->weights_sizes[3])))
+        if (((inputs->dims[0] * inputs->dims[1] * inputs->dims[2]) != WB_KERNEL_Z(weights_biases)) ||
+            ((outputs->dimCount == 4) && (outputs->dims[2] != WB_OUTPUT_Z(weights_biases))) ||
+            ((outputs->dimCount == 2) && (outputs->dims[0] != WB_OUTPUT_Z(weights_biases))))
         {
             vxError("parameter is invalid at function %s, line %d\n", __FUNCTION__, __LINE__);
             status = VX_ERROR_INVALID_PARAMETERS;
@@ -1102,7 +1139,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedLayer_Initializer(vx_nod
 
 OnError:
 #else
-
     vx_tensor  inputs                     = (vx_tensor)parameters[0];
     vx_tensor  weights                    = (vx_tensor)parameters[1];
     vx_tensor  biases                     = (vx_tensor)parameters[2];
@@ -1280,7 +1316,7 @@ OnError:
         vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
         vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_operation.base, (vx_reference)weights, VXNNE_OPERATION_REFENRENCE_INPUT);
         if (biases)
-            vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_operation.base, (vx_reference)biases, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_operation.base, (vx_reference)biases, VXNNE_OPERATION_REFENRENCE_INPUT);
         vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
     }
 
@@ -1290,6 +1326,7 @@ OnError:
 exit:
     if (fullyConnectedLayer) gcoOS_Free(gcvNULL, (gctPOINTER)fullyConnectedLayer);
 #endif
+
     return status;
 }
 

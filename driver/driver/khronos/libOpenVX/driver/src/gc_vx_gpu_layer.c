@@ -18,7 +18,6 @@
 #include <gc_vx_layer.h>
 #include <gc_vx_nn_util.h>
 
-#define IMG_MAX_WIDTH (65536)
 #define SHADER_THREAD_COUNT  (4)
 #define _vxcFILENAME_MAX 1024
 #define ALIGN_SIZE4 (4)
@@ -27,20 +26,18 @@
 #if gcdUSE_VXC_BINARY
 static void * getGPUKernelInfo(vx_context context, nngpu_kernel_enum type, vx_uint32_ptr len)
 {
-    gceSTATUS status = gcvSTATUS_OK;
-
-    GetBinaryPtr_FUNC funcHandle = VX_NULL;
-    status = gcoOS_GetProcAddress(gcvNULL, context->globalData->libNNGPUKernelHandle, "GetBinaryPtr", (gctPOINTER *)&funcHandle);
+#if gcdSTATIC_LINK
+    return GetGPUNNVXCBinaryPtr(type, len);
+#else
+    GetGPUNNVXCBinaryPtr_FUNC funcHandle = VX_NULL;
+    gceSTATUS status = gcoOS_GetProcAddress(gcvNULL, context->globalData->libNNGPUKernelHandle, "GetGPUNNVXCBinaryPtr", (gctPOINTER *)&funcHandle);
     if (status != gcvSTATUS_OK)
     {
         vxError("Can't get binary pointer!\n");
         return VX_NULL;
     }
-
-    void *ptr = funcHandle(type, len);
-
-    return ptr;
-
+    return funcHandle(type, len);
+#endif
 }
 #endif
 extern vx_char* loadSources(const vx_char *filename, vx_size *programSize);
@@ -175,14 +172,14 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
             sizes[2] = 1;
             sizes[3] = dims > 3 ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
 
-            input_rs = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims);
+            input_rs = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims, VX_NULL);
 
             sizes[0] = 1;
             sizes[1] = depth;
             sizes[2] = 1;
             sizes[3] = dims > 3 ? TENSOR_VIEW_SIZE_INDEX(output, 3) : 1;
 
-            output_rs = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims);
+            output_rs = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims, VX_NULL);
         }
         else if (filterValue[0] == 3 && filterValue[1] == 3)
         {
@@ -207,14 +204,14 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
                 sizes[2] = 1;
                 sizes[3] = dims > 3 ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
 
-                input_rs = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims);
+                input_rs = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims, VX_NULL);
 
                 sizes[0] = out_width;
                 sizes[1] = out_height * depth;
                 sizes[2] = 1;
                 sizes[3] = dims > 3 ? TENSOR_VIEW_SIZE_INDEX(output, 3) : 1;
 
-                output_rs = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims);
+                output_rs = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims, VX_NULL);
             }
         }
     }
@@ -711,8 +708,8 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
     {
         sizes[0]      = width;
         sizes[1]      = 1;
-        input_rs      = vxoTensor_ReshapeTensor(input, sizes, 2);
-        output_rs     = vxoTensor_ReshapeTensor(output, sizes, 2);
+        input_rs      = vxoTensor_ReshapeTensor(input, sizes, 2, VX_NULL);
+        output_rs     = vxoTensor_ReshapeTensor(output, sizes, 2, VX_NULL);
         enable_2d_img = vx_true_e;
         new_width     = width;
         new_height    = 1;
@@ -722,8 +719,8 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
         sizes[0]      = width * height;
         sizes[1]      = depth;
         sizes[2]      = 1;
-        input_rs      = vxoTensor_ReshapeTensor(input, sizes, 4);
-        output_rs     = vxoTensor_ReshapeTensor(output, sizes, 4);
+        input_rs      = vxoTensor_ReshapeTensor(input, sizes, 4, VX_NULL);
+        output_rs     = vxoTensor_ReshapeTensor(output, sizes, 4, VX_NULL);
         enable_2d_img = vx_true_e;
         new_width     = width * height;
         new_height    = depth;
@@ -733,8 +730,8 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
         sizes[0]      = width;
         sizes[1]      = height * depth;
         sizes[2]      = 1;
-        input_rs      = vxoTensor_ReshapeTensor(input, sizes, 4);
-        output_rs     = vxoTensor_ReshapeTensor(output, sizes, 4);
+        input_rs      = vxoTensor_ReshapeTensor(input, sizes, 4, VX_NULL);
+        output_rs     = vxoTensor_ReshapeTensor(output, sizes, 4, VX_NULL);
         enable_2d_img = vx_true_e;
         new_width     = width;
         new_height    = height * depth;
@@ -744,8 +741,8 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
         sizes[0]  = width;
         sizes[1]  = height;
         sizes[2]  = depth;
-        input_rs  = vxoTensor_ReshapeTensor(input, sizes, input_dims);
-        output_rs = vxoTensor_ReshapeTensor(output, sizes, input_dims);
+        input_rs  = vxoTensor_ReshapeTensor(input, sizes, input_dims, VX_NULL);
+        output_rs = vxoTensor_ReshapeTensor(output, sizes, input_dims, VX_NULL);
     }
 
     kernel = vxnneGetKernelShadersByEnum(context, kernelEnum);
@@ -1375,12 +1372,12 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
         sizes[0] = width;
         sizes[1] = height;
         sizes[2] = batch * depth;
-        input_rs = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, 3);
+        input_rs = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, 3, VX_NULL);
 
         sizes[0] = output_width;
         sizes[1] = output_height;
         sizes[2] = output_depth * output_batch;
-        output_rs = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 3);
+        output_rs = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 3, VX_NULL);
     }
     else if (pnum == 3 && perm[0] == 2 && perm[1] == 0 && perm[2] == 1 && (width * height < IMG_MAX_WIDTH))
     {
@@ -1390,13 +1387,13 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
         sizes[1] = depth;
         sizes[2] = 1;
         sizes[3] = batch;
-        input_rs = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims);
+        input_rs = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims, VX_NULL);
 
         sizes[0] = depth;
         sizes[1] = width * height;
         sizes[2] = 1;
         sizes[3] = batch;
-        output_rs = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims);
+        output_rs = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims, VX_NULL);
 
         pnum = 2;
 
@@ -1414,13 +1411,13 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
         sizes[1] = height * depth;
         sizes[2] = 1;
         sizes[3] = batch;
-        input_rs = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims);
+        input_rs = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims, VX_NULL);
 
         sizes[0] = height * depth;
         sizes[1] = width;
         sizes[2] = 1;
         sizes[3] = batch;
-        output_rs = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims);
+        output_rs = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims, VX_NULL);
 
         pnum = 2;
 
@@ -1977,7 +1974,7 @@ vxnne_shader_executable vxnneGetGPUEmbeddingLUTShaderExecutable(
     if(dims == 1)
     {
         rs_sizes[0] = width;
-        input_rs = vxoTensor_ReshapeTensor(input, rs_sizes, 2);
+        input_rs = vxoTensor_ReshapeTensor(input, rs_sizes, 2, VX_NULL);
     }
 
     input_count = rs_sizes[0];
@@ -2203,12 +2200,12 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
     {
         vx_int32 sizes[4] = {width * height, channels, 1, batch};
 
-        src = vxoTensor_ReshapeTensor(input, sizes, dims);
+        src = vxoTensor_ReshapeTensor(input, sizes, dims, VX_NULL);
 
         sizes[0] = out_width;
         sizes[1] = outputWidth * outputHeight;
 
-        dst = vxoTensor_ReshapeTensor(output, sizes, dims);
+        dst = vxoTensor_ReshapeTensor(output, sizes, dims, VX_NULL);
 
         enable_K1S1 = vx_true_e;
 
@@ -2299,7 +2296,7 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
                 if (useImage2DFlag)
                 {
                     vx_int32 sizes[4] = {out_width, outputWidth * outputHeight, 1, batch};
-                    dst = vxoTensor_ReshapeTensor(output, sizes, dims);
+                    dst = vxoTensor_ReshapeTensor(output, sizes, dims, VX_NULL);
                 }
                 output_width = vxCreateScalar(context, VX_TYPE_INT32, &outputWidth);
                 input_width = vxCreateScalar(context, VX_TYPE_INT32, &width);
@@ -2329,7 +2326,7 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
                 if (useImage2DFlag)
                 {
                     vx_int32 sizes[4] = {out_width, outputWidth * outputHeight, 1, batch};
-                    dst = vxoTensor_ReshapeTensor(output, sizes, dims);
+                    dst = vxoTensor_ReshapeTensor(output, sizes, dims, VX_NULL);
                 }
                 output_width = vxCreateScalar(context, VX_TYPE_INT32, &outputWidth);
                 input_width = vxCreateScalar(context, VX_TYPE_INT32, &width);
@@ -2359,7 +2356,7 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
                 if (useImage2DFlag)
                 {
                     vx_int32 sizes[4] = {out_width, outputWidth * outputHeight, 1, batch};
-                    dst = vxoTensor_ReshapeTensor(output, sizes, dims);
+                    dst = vxoTensor_ReshapeTensor(output, sizes, dims, VX_NULL);
                 }
                 output_width = vxCreateScalar(context, VX_TYPE_INT32, &outputWidth);
                 input_width = vxCreateScalar(context, VX_TYPE_INT32, &width);
@@ -2407,7 +2404,7 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
                 if (useImage2DFlag)
                 {
                     vx_int32 sizes[4] = {out_width, outputWidth * outputHeight, 1, batch};
-                    dst = vxoTensor_ReshapeTensor(output, sizes, dims);
+                    dst = vxoTensor_ReshapeTensor(output, sizes, dims, VX_NULL);
                 }
                 output_width = vxCreateScalar(context, VX_TYPE_INT32, &outputWidth);
                 input_width = vxCreateScalar(context, VX_TYPE_INT32, &width);
@@ -2476,7 +2473,7 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
                 if (useImage2DFlag)
                 {
                     vx_int32 sizes[4] = {out_width, outputWidth * outputHeight, 1, batch};
-                    dst = vxoTensor_ReshapeTensor(output, sizes, dims);
+                    dst = vxoTensor_ReshapeTensor(output, sizes, dims, VX_NULL);
                 }
                 if (width % 16 == 0 && stride_x == 2)
                 {
@@ -2519,7 +2516,7 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
                 if (useImage2DFlag)
                 {
                     vx_int32 sizes[4] = {out_width, outputWidth * outputHeight, 1, batch};
-                    dst = vxoTensor_ReshapeTensor(output, sizes, dims);
+                    dst = vxoTensor_ReshapeTensor(output, sizes, dims, VX_NULL);
                 }
                 output_width  = vxCreateScalar(context, VX_TYPE_INT32, &outputWidth);
                 input_width   = vxCreateScalar(context, VX_TYPE_INT32, &width);
@@ -2547,7 +2544,7 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
                 if (useImage2DFlag)
                 {
                     vx_int32 sizes[4] = {out_width, outputWidth * outputHeight, 1, batch};
-                    dst = vxoTensor_ReshapeTensor(output, sizes, dims);
+                    dst = vxoTensor_ReshapeTensor(output, sizes, dims, VX_NULL);
                 }
                 output_width = vxCreateScalar(context, VX_TYPE_INT32, &outputWidth);
                 input_width = vxCreateScalar(context, VX_TYPE_INT32, &width);
@@ -2597,7 +2594,7 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
                 if (useImage2DFlag)
                 {
                     vx_int32 sizes[4] = {out_width, outputWidth * outputHeight, 1, batch};
-                    dst = vxoTensor_ReshapeTensor(output, sizes, dims);
+                    dst = vxoTensor_ReshapeTensor(output, sizes, dims, VX_NULL);
                 }
                 output_width = vxCreateScalar(context, VX_TYPE_INT32, &outputWidth);
                 input_width = vxCreateScalar(context, VX_TYPE_INT32, &width);
@@ -2666,7 +2663,7 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
                 if (useImage2DFlag)
                 {
                     vx_int32 sizes[4] = {out_width, outputWidth * outputHeight, 1, batch};
-                    dst = vxoTensor_ReshapeTensor(output, sizes, dims);
+                    dst = vxoTensor_ReshapeTensor(output, sizes, dims, VX_NULL);
                 }
                 output_width = vxCreateScalar(context, VX_TYPE_INT32, &outputWidth);
                 input_width = vxCreateScalar(context, VX_TYPE_INT32, &width);
@@ -2697,7 +2694,7 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
                 if (useImage2DFlag)
                 {
                     vx_int32 sizes[4] = {out_width, outputWidth * outputHeight, 1, batch};
-                    dst = vxoTensor_ReshapeTensor(output, sizes, dims);
+                    dst = vxoTensor_ReshapeTensor(output, sizes, dims, VX_NULL);
                 }
                 output_width = vxCreateScalar(context, VX_TYPE_INT32, &outputWidth);
                 input_width = vxCreateScalar(context, VX_TYPE_INT32, &width);
@@ -2728,7 +2725,7 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
                 if (useImage2DFlag)
                 {
                     vx_int32 sizes[4] = {out_width, outputWidth * outputHeight, 1, batch};
-                    dst = vxoTensor_ReshapeTensor(output, sizes, dims);
+                    dst = vxoTensor_ReshapeTensor(output, sizes, dims, VX_NULL);
                 }
                 output_width = vxCreateScalar(context, VX_TYPE_INT32, &outputWidth);
                 input_width = vxCreateScalar(context, VX_TYPE_INT32, &width);
@@ -2779,7 +2776,7 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
                 if (useImage2DFlag)
                 {
                     vx_int32 sizes[4] = {out_width, outputWidth * outputHeight, 1, batch};
-                    dst = vxoTensor_ReshapeTensor(output, sizes, dims);
+                    dst = vxoTensor_ReshapeTensor(output, sizes, dims, VX_NULL);
                 }
                 output_width = vxCreateScalar(context, VX_TYPE_INT32, &outputWidth);
                 input_width = vxCreateScalar(context, VX_TYPE_INT32, &width);
@@ -3116,7 +3113,7 @@ vxnne_shader_executable vxnneGPUGemm_noBiasShaderExecutable(
     size[0] = kernel_x * kernel_y * ifm;
     size[1] = ofm;
     dims    = TENSOR_DIM_NUM(weight) == 1 ? 2 : TENSOR_DIM_NUM(weight);
-    weights = vxoTensor_ReshapeTensor(weight, size, dims);
+    weights = vxoTensor_ReshapeTensor(weight, size, dims, VX_NULL);
 
     borderMode->mode = VX_BORDER_CONSTANT;
     if (inputFormat == VX_TYPE_FLOAT16)
@@ -3301,7 +3298,9 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
     vx_tensor               input,
     vx_tensor               weight,
     vx_tensor               bias,
-    vx_tensor               output)
+    vx_tensor               scales,
+    vx_tensor               output
+    )
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
@@ -3347,6 +3346,14 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
     vx_uint32   element_cnt_input        = 0;
     vx_uint32   element_cnt_kernel       = 0;
     /*vx_float32  radio                    = 0;*/
+    vx_enum     weight_quant_type        = TENSOR_QUANT_TYPE(weight);
+    vx_enum     bias_quant_type          = TENSOR_QUANT_TYPE(bias);
+    vx_bool     is_per_channel_quant     = (vx_bool)(weight_quant_type == VX_QUANT_AFFINE_SCALE_PER_CHANNEL && bias_quant_type == VX_QUANT_AFFINE_SCALE_PER_CHANNEL);
+    vx_bool     is_asymmetric_quant      = (vx_bool)(weight_quant_type == VX_QUANT_AFFINE_SCALE && bias_quant_type == VX_QUANT_AFFINE_SCALE);
+    vx_uint32    weight_channelDim       = 1;
+    vx_uint32    *weight_nChannelDim     = is_per_channel_quant ? &weight_channelDim : NULL;
+    vx_uint32    bias_channelDim         = 0;
+    vx_uint32    *bias_nChannelDim       = is_per_channel_quant ? &bias_channelDim : NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input=%p, output=%p", context, kernelEnum, input, output);
 
@@ -3362,12 +3369,12 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
     size[0] = kernel_x * kernel_y * ifm;
     size[1] = ofm;
     dims    = TENSOR_DIM_NUM(weight) == 1 ? 2 : TENSOR_DIM_NUM(weight);
-    weights = vxoTensor_ReshapeTensor(weight, size, dims);
+    weights = vxoTensor_ReshapeTensor(weight, size, dims, weight_nChannelDim);
 
     size[0] = TENSOR_VIEW_SIZE_INDEX(bias, 0);
     size[1] = 1;
     dims    = TENSOR_DIM_NUM(bias) == 1 ? 2 : TENSOR_DIM_NUM(bias);
-    biases  = vxoTensor_ReshapeTensor(bias, size, dims);
+    biases  = vxoTensor_ReshapeTensor(bias, size, dims, bias_nChannelDim);
 
     enable_2d_img = (vx_bool)((width * height < IMG_MAX_WIDTH) && depth < IMG_MAX_WIDTH
         && is_static_weights_biases && (inputSize % 4 == 0));
@@ -3383,12 +3390,12 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
         size[0] = inputSize;
         size[1] = width * height;
         dims    = TENSOR_DIM_NUM(input);
-        inputs  = vxoTensor_ReshapeTensor(input, size, dims);
+        inputs  = vxoTensor_ReshapeTensor(input, size, dims, VX_NULL);
 
         size[0] = width * height;
         size[1] = depth;
         dims    = TENSOR_DIM_NUM(input);
-        outputs = vxoTensor_ReshapeTensor(output, size, dims);
+        outputs = vxoTensor_ReshapeTensor(output, size, dims, VX_NULL);
     }
 
     kernel = vxnneGetKernelShadersByEnum(context, kernelEnum);
@@ -3429,6 +3436,49 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
 
     cycle = vxCreateScalar(context, VX_TYPE_INT32, &inputSize);
 
+    if (TENSOR_QUANT_TYPE(weight) == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        vx_int8 weightFixPointPos = TENSOR_POS(weight);
+        if (weightFixPointPos > 0)
+        {
+            weight_scale = 1.0f / (1 << weightFixPointPos);
+        }
+        else
+        {
+            weight_scale = (vx_float32)(1 << (-weightFixPointPos));
+        }
+        weight_ZP = 0;
+        is_asymmetric_quant = vx_true_e;
+    }
+
+    if (TENSOR_QUANT_TYPE(input) == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        vx_int8 inFixPointPos = TENSOR_POS(input);
+        if (inFixPointPos > 0)
+        {
+            input_scale = 1.0f / (1 << inFixPointPos);
+        }
+        else
+        {
+            input_scale = (vx_float32)(1 << (-inFixPointPos));
+        }
+        input_ZP = 0;
+    }
+
+    if (TENSOR_QUANT_TYPE(output) == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        vx_int8 outFixPointPos = TENSOR_POS(output);
+        if (outFixPointPos > 0)
+        {
+            output_scale = (vx_float32)(1 << outFixPointPos);
+        }
+        else
+        {
+            output_scale = 1.0f / (1 << (-outFixPointPos));
+        }
+        output_ZP = 0;
+    }
+
     if (enable_reorgWeights)
     {
         if (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT32)
@@ -3464,10 +3514,11 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
         }
         else
         {
-            vx_reference parameters[8] = {(vx_reference)input, (vx_reference)weights, (vx_reference)biases, (vx_reference)output};
+            vx_reference parameters[9] = {(vx_reference)input, (vx_reference)weights, (vx_reference)biases, (vx_reference)output};
             vx_float32 uint8Scale  = input_scale * weight_scale * output_scale;
             vx_float32 outputZP = (vx_float32)output_ZP + 0.5f;
             vx_float32 weightZP = (vx_float32)weight_ZP;
+            vx_int32   param_num = is_per_channel_quant ? 9 : 8;
 
             scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &uint8Scale);
             zpWeight = vxCreateScalar(context, VX_TYPE_FLOAT32, &weightZP);
@@ -3477,6 +3528,7 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
             parameters[5] = (vx_reference)scaleIn;
             parameters[6] = (vx_reference)zpWeight;
             parameters[7] = (vx_reference)zpOut;
+            parameters[8] = (vx_reference)scales;
 
             if (enable_2d_img)
             {
@@ -3489,9 +3541,19 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
                 execution_parameters.globalWorkScale[0] = 8;
                 execution_parameters.globalWorkScale[1] = 8;
                 if (output_width % 4 == 0)
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_8x_Wpacked", borderMode);
+                {
+                    if (is_per_channel_quant)
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_sym_per_channel_2D_8x_Wpacked", borderMode);
+                    else
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_8x_Wpacked", borderMode);
+                }
                 else
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_8s_Wpacked", borderMode);
+                {
+                    if (is_per_channel_quant)
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_sym_per_channel_2D_8s_Wpacked", borderMode);
+                    else
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_8s_Wpacked", borderMode);
+                }
             }
 
             if (!shaderExecutable) goto OnError;
@@ -3501,8 +3563,10 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
             status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
             if (output_width % 4 == 0)
                 status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 3, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            if (is_per_channel_quant)
+                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 8, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
 
-            status |= vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 8);
+            status |= vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, param_num);
             if (status != VX_SUCCESS) goto OnError;
         }
     }
@@ -3573,10 +3637,11 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
         vx_float32 outZP        = (vx_float32)output_ZP;
         vx_float32 uint8_scale  = input_scale * weight_scale * output_scale;
         vx_float32 inputZP      = (vx_float32)input_ZP;
-        vx_float32 weightZP      = (vx_float32)weight_ZP;
+        vx_float32 weightZP     = (vx_float32)weight_ZP;
+        vx_uint32  param_num    = is_asymmetric_quant ? 9 : 10;
 
-        vx_reference parameters[9] = {(vx_reference)input, (vx_reference)weights, (vx_reference)biases, (vx_reference)cycle,
-                     (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)output};
+        vx_reference parameters[10] = {(vx_reference)input, (vx_reference)weights, (vx_reference)biases, (vx_reference)cycle,
+                     (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)output, (vx_reference)scales};
 
         scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &uint8_scale);
         zpIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &inputZP);
@@ -3602,43 +3667,48 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
 
             if (enable_2d_img)
             {
-                if (enable_small_kernel)
-                {
-                    execution_parameters.globalWorkScale[1] = 4;
-                    if (output_width % ALIGN_SIZE4 == 0)
-                    {
-                        execution_parameters.globalWorkScale[0] = 4;
-                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_4XS", borderMode);
-                        if (!shaderExecutable) goto OnError;
-
-                        status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 8, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-                        if (status != VX_SUCCESS) goto OnError;
-                    }
-                    else
-                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_4S", borderMode);
-                }
-                else if (enable_four_pixel)
+                if (enable_four_pixel)
                 {
                     execution_parameters.globalWorkScale[0] = 4;
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_4X", borderMode);
+
+                    if (is_asymmetric_quant)
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_4X", borderMode);
+                    else
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_sym_per_channel_2D_4X", borderMode);
                     if (!shaderExecutable) goto OnError;
-                    status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 8, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+
+                    status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 8, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+                    if (status != VX_SUCCESS) goto OnError;
                 }
                 else
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D", borderMode);
+                {
+                    if (is_asymmetric_quant)
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D", borderMode);
+                    else
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_sym_per_channel_2D", borderMode);
+                }
             }
             else
             {
                 if (enable_four_pixel)
                 {
                     execution_parameters.globalWorkScale[0] = 4;
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_4X", borderMode);
+                    if (is_asymmetric_quant)
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_4X", borderMode);
+                    else
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_sym_per_channel_4X", borderMode);
                     if (!shaderExecutable) goto OnError;
+
                     status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 8, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                     if (status != VX_SUCCESS) goto OnError;
                 }
                 else
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
+                {
+                    if (is_asymmetric_quant)
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
+                    else
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_sym_per_channel", borderMode);
+                }
             }
 
             if (!shaderExecutable) goto OnError;
@@ -3647,16 +3717,21 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
             status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
             if (enable_small_kernel)
                 status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            if (is_per_channel_quant)
+                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 9, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
 
             if (status != VX_SUCCESS) goto OnError;
         }
         else
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_non_static", borderMode);
+            if (is_asymmetric_quant)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_non_static", borderMode);
+            else
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_sym_per_channel_non_static", borderMode);
             if (!shaderExecutable) goto OnError;
         }
 
-        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 9);
+        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, param_num);
         if (status != VX_SUCCESS) goto OnError;
     }
     else if(inputFormat == VX_TYPE_INT16)
@@ -3807,6 +3882,7 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
     vx_scalar               downScaleSizeRounding,
     vx_int32                strideXvalue,
     vx_int32                strideYvalue,
+    vx_tensor               scales,
     vx_tensor               outputs)
 {
 #if !gcdUSE_VXC_BINARY
@@ -3834,12 +3910,12 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
     vx_int32      padRightv                  = padXRight->value->n32;
     vx_int32      padTopv                    = padYTop->value->n32;
     vx_int32      padBottomv                 = padYBottom->value->n32;
-    vx_uint32     inputZP                    = TENSOR_TF_ZEROPOINT(inputs);
-    vx_float32    inputScale                 = TENSOR_TF_SCALE(inputs);
-    vx_uint32     weightZP                   = TENSOR_TF_ZEROPOINT(weights);
-    vx_float32    weightScale                = TENSOR_TF_SCALE(weights);
-    vx_uint32     biasZP                     = biases ? TENSOR_TF_ZEROPOINT(biases) : 0;
-    vx_float32    biasScale                  = biases ? TENSOR_TF_SCALE(biases) : 0;
+    vx_uint32     inputZP                    = 0;
+    vx_float32    inputScale                 = 1.0f;
+    vx_uint32     weightZP                   = 0;
+    vx_float32    weightScale                = 1.0f;
+    vx_uint32     biasZP                     = 0;
+    vx_float32    biasScale                  = 1.0f;
     vx_uint32     outputZP                   = TENSOR_TF_ZEROPOINT(outputs);
     vx_float32    outputScale                = (vx_float32)1.0/TENSOR_TF_SCALE(outputs);
     vx_scalar     strideX                    = VX_NULL;
@@ -3871,11 +3947,16 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
     vx_scalar    outputHeight         = NULL;
     vx_scalar    heightDiff           = NULL;
     vx_size      thread_scale0        = 1;
+    vx_enum      weight_quant_type    = TENSOR_QUANT_TYPE(weights);
+    vx_enum      bias_quant_type      = biases != NULL ? TENSOR_QUANT_TYPE(biases) : VX_QUANT_NONE;
+    vx_bool      is_per_channel_quant = (vx_bool)(weight_quant_type == VX_QUANT_AFFINE_SCALE_PER_CHANNEL && bias_quant_type == VX_QUANT_AFFINE_SCALE_PER_CHANNEL);
     vx_int32     dilation_x           = dilationX->value->n32 + 1;
     vx_int32     dilation_y           = dilationY->value->n32 + 1;
     vx_scalar    dilateX              = NULL;
     vx_scalar    dilateY              = NULL;
     vx_uint32    paraNum              = 0;
+    vx_uint32    weight_channelDim    = 1;
+    vx_uint32    *weight_nChannelDim  = is_per_channel_quant ? &weight_channelDim : NULL;
     vx_bool      is_dilation_one      = (vx_bool)((1 == dilation_x) && (1 == dilation_y));
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, inputs=%p, outputs=%p", context, kernelEnum, inputs, outputs);
@@ -3894,16 +3975,34 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
             sizes[0] = width;
             sizes[1] = depth * height;
             dims    = TENSOR_DIM_NUM(inputs);
-            inputs_rs  = vxoTensor_ReshapeTensor(inputs, sizes, dims);
+            inputs_rs  = vxoTensor_ReshapeTensor(inputs, sizes, dims, VX_NULL);
 
             sizes[0] = output_width;
             sizes[1] = output_depth * output_height;
             dims    = TENSOR_DIM_NUM(outputs);
-            outputs_rs = vxoTensor_ReshapeTensor(outputs, sizes, dims);
+            outputs_rs = vxoTensor_ReshapeTensor(outputs, sizes, dims, VX_NULL);
         }
     }
 
-    if (biases)
+    if (VX_QUANT_AFFINE_SCALE == weight_quant_type)
+    {
+        weightZP      = TENSOR_TF_ZEROPOINT(weights);
+        weightScale   = TENSOR_TF_SCALE(weights);
+    }
+
+    if (VX_QUANT_AFFINE_SCALE == TENSOR_QUANT_TYPE(inputs))
+    {
+        inputZP       = TENSOR_TF_ZEROPOINT(inputs);
+        inputScale    = TENSOR_TF_SCALE(inputs);
+    }
+
+    if (VX_QUANT_AFFINE_SCALE == bias_quant_type)
+    {
+        biasZP       = TENSOR_TF_ZEROPOINT(biases);
+        biasScale    = TENSOR_TF_SCALE(biases);
+    }
+
+    if (biases && (!is_per_channel_quant))
     {
         if (fabs(inputScale*weightScale - biasScale) > 0.000001f || biasZP !=0)
         {
@@ -3912,13 +4011,16 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
         }
     }
 
-    if (biases != VX_NULL)
+    if (biases)
     {
-        is_static_weights_biases = (vx_bool)((TENSOR_DATA_LIFETIME(weights) == VX_TENSOR_LIFE_TIME_STATIC) && (TENSOR_DATA_LIFETIME(biases) == VX_TENSOR_LIFE_TIME_STATIC));
-        enable_adjust_biases     = (is_static_weights_biases && (TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE) && (TENSOR_QUANT_TYPE(biases) == VX_QUANT_AFFINE_SCALE));
-        enable_adjust_biases = enable_adjust_biases && (1 == dilation_x) && (1 == dilation_y);
+        is_static_weights_biases = (vx_bool)(CHECK_LIFETIME_IS_STATIC(weights) && CHECK_LIFETIME_IS_STATIC(biases));
     }
-
+    else
+    {
+        is_static_weights_biases = (vx_bool)(CHECK_LIFETIME_IS_STATIC(weights));
+    }
+    enable_adjust_biases = (is_static_weights_biases && (inputFormat == VX_TYPE_UINT8) && (3 == kernel_width) && (3 == kernel_height));
+    enable_adjust_biases = enable_adjust_biases && (1 == dilation_x) && (1 == dilation_y);
 
     strideX = vxCreateScalar(context, VX_TYPE_INT32, &strideXvalue);
     strideY = vxCreateScalar(context, VX_TYPE_INT32, &strideYvalue);
@@ -3933,7 +4035,7 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
         vx_int32  reSize[4] = {bias_w, bias_h, bias_c, bias_b};
 
         bias_dims = (bias_dims == 1) ? 2 : bias_dims;
-        reBiases  = vxoTensor_ReshapeTensor(biases, reSize, bias_dims);
+        reBiases  = vxoTensor_ReshapeTensor(biases, reSize, bias_dims, VX_NULL);
     }
 
     sizes[0] = kernel_width * kernel_height;
@@ -3945,7 +4047,7 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
     {
         sizes[1] = TENSOR_VIEW_SIZE_INDEX(weights, 2) * TENSOR_VIEW_SIZE_INDEX(weights, 3);
     }
-    reWeights = vxoTensor_ReshapeTensor(weights, sizes, 2);
+    reWeights = vxoTensor_ReshapeTensor(weights, sizes, 2, weight_nChannelDim);
 
     if (is_no_pad)
     {
@@ -4042,7 +4144,7 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
 
             if ((3 == kernel_width) && (3 == kernel_height) && enable_adjust_biases && is_dilation_one)
             {
-                if (1 == channel_multiplier->value->n32)
+                if ((1 == channel_multiplier->value->n32) && (!is_per_channel_quant))
                 {
                     if (enable_2d_img && enable_in_cast_format && is_no_pad
                        && ((1 == strideXvalue && 1 == strideYvalue) || (2 == strideXvalue && 2 == strideYvalue)))
@@ -4149,7 +4251,14 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
                 }
                 else
                 {
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_Quant8", borderMode);
+                    if (is_per_channel_quant)
+                    {
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_PerChannel_3x3_Quant8", borderMode);
+                    }
+                    else
+                    {
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_Quant8", borderMode);
+                    }
                 }
                 if (!shaderExecutable)
                 {
@@ -4186,19 +4295,42 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
             }
             else
             {
-               if (is_dilation_one)
-               {
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
-               }
-               else
-               {
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Dilation", borderMode);
-                    dilation_flag = vx_true_e;
+                if (is_per_channel_quant)
+                {
+                    if (is_dilation_one)
+                    {
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_PerChannel_Quant8", borderMode);
+                    }
+                    else
+                    {
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_PerChannel_Quant8_Dilation", borderMode);
+                        dilation_flag = vx_true_e;
+                    }
                 }
+                else
+                {
+                    if (is_dilation_one)
+                    {
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
+                    }
+                    else
+                    {
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Dilation", borderMode);
+                        dilation_flag = vx_true_e;
+                    }
+                }
+
+
+
                 if (!shaderExecutable)
                 {
                     goto OnError;
                 }
+            }
+
+            if (is_per_channel_quant)
+            {
+                weightZP = 0;
             }
 
             if (is_use_2d_fun)
@@ -4247,6 +4379,11 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
                 parameters[0] = (vx_reference)inputs_rs;
                 parameters[10] = (vx_reference)outputs_rs;
                 paraNum = 11;
+                if (is_per_channel_quant)
+                {
+                    parameters[paraNum++] = (vx_reference)scales;
+                }
+
                 if (dilation_flag)
                 {
                     parameters[paraNum++] = (vx_reference)dilateX;
@@ -4278,6 +4415,11 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
                 parameters[13] = (vx_reference)zpOut;
                 parameters[14] = (vx_reference)zpIn_int;
                 paraNum = 16;
+                if (is_per_channel_quant)
+                {
+                    parameters[paraNum++] = (vx_reference)scales;
+                }
+
                 if (dilation_flag)
                 {
                     parameters[paraNum++] = (vx_reference)dilateX;
@@ -4325,7 +4467,7 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
             status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, paraNum);
             if (status != VX_SUCCESS) goto OnError;
         }
-        else if (inputFormat == VX_TYPE_UINT8 && biases == VX_NULL)
+        else if (inputFormat == VX_TYPE_UINT8 && biases == VX_NULL && (!is_per_channel_quant))
         {
             vx_reference  parameters[18] = {(vx_reference)inputs, (vx_reference)reWeights, (vx_reference)channel_multiplier,
                                 (vx_reference)kernelX, (vx_reference)kernelY, (vx_reference)strideX, (vx_reference)strideY,
@@ -4364,6 +4506,12 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
 
             status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, paraNum);
             if (status != VX_SUCCESS) goto OnError;
+        }
+        else
+        {
+            vxError("not support format \n");
+            status = VX_FAILURE;
+            goto OnError;
         }
     }
 
@@ -4950,14 +5098,14 @@ vxnne_shader_executable vxnneGetGPUFloorShaderExecutable(
     if (in_dims == 1)
     {
         in_sizes[0] = TENSOR_VIEW_SIZE_INDEX(input, 0);
-        input_rs = vxoTensor_ReshapeTensor(input, in_sizes, 2);
+        input_rs = vxoTensor_ReshapeTensor(input, in_sizes, 2, VX_NULL);
         parameters[0] = (vx_reference)input_rs;
     }
 
     if (out_dims == 1)
     {
         out_sizes[0] = TENSOR_VIEW_SIZE_INDEX(output, 0);
-        output_rs = vxoTensor_ReshapeTensor(output, out_sizes, 2);
+        output_rs = vxoTensor_ReshapeTensor(output, out_sizes, 2, VX_NULL);
         parameters[2] = (vx_reference)output_rs;
     }
 
@@ -5148,28 +5296,28 @@ vxnne_shader_executable vxnneGetGPUFullyConnectedShaderExecutable(
     sizes[1]      = batch;
     sizes[2]      = 1;
     sizes[3]      = inBatch;
-    input_rs      = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, input_dims);
+    input_rs      = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, input_dims, VX_NULL);
 
     sizes[0]      = inputSize;
     sizes[1]      = num_units;
     sizes[2]      = 1;
     sizes[3]      = 1;
     weight_dims   = 2;
-    weight_rs     = vxoTensor_ReshapeTensor(weights, (vx_int32*)sizes, weight_dims);
+    weight_rs     = vxoTensor_ReshapeTensor(weights, (vx_int32*)sizes, weight_dims, VX_NULL);
 
     if (enable_bias)
     {
         sizes[0]      = num_units;
         sizes[1]      = 1;
         bias_dims     = 2;
-        bias_rs       = vxoTensor_ReshapeTensor(bias, (vx_int32*)sizes, bias_dims);
+        bias_rs       = vxoTensor_ReshapeTensor(bias, (vx_int32*)sizes, bias_dims, VX_NULL);
     }
 
     sizes[0]      = num_units;
     sizes[1]      = batch;
     sizes[2]      = 1;
     sizes[3]      = inBatch;
-    output_rs     = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, output_dims);
+    output_rs     = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, output_dims, VX_NULL);
 
     borderMode->mode = VX_BORDER_CONSTANT;
     if (input_format == VX_TYPE_FLOAT16)
@@ -5577,27 +5725,27 @@ vxnne_shader_executable vxnneGetGPUHashLUTShaderExecutable(
     {
         rs_sizes[0] = input_count;
         rs_sizes[1] = 1;
-        input_rs = vxoTensor_ReshapeTensor(input, rs_sizes, 2);
+        input_rs = vxoTensor_ReshapeTensor(input, rs_sizes, 2, VX_NULL);
         parameters[0] = (vx_reference)input_rs;
 
         rs_sizes[0] = key_count;
         rs_sizes[1] = 1;
-        key_rs = vxoTensor_ReshapeTensor(key, rs_sizes, 2);
+        key_rs = vxoTensor_ReshapeTensor(key, rs_sizes, 2, VX_NULL);
         parameters[1] = (vx_reference)key_rs;
 
         rs_sizes[0] = width;
         rs_sizes[1] = key_count;
-        value_rs = vxoTensor_ReshapeTensor(value, rs_sizes, 2);
+        value_rs = vxoTensor_ReshapeTensor(value, rs_sizes, 2, VX_NULL);
         parameters[2] = (vx_reference)value_rs;
 
         rs_sizes[0] = hit_count;
         rs_sizes[1] = 1;
-        hit_rs = vxoTensor_ReshapeTensor(hit, rs_sizes, 2);
+        hit_rs = vxoTensor_ReshapeTensor(hit, rs_sizes, 2, VX_NULL);
         parameters[3] = (vx_reference)hit_rs;
 
         rs_sizes[0] = width;
         rs_sizes[1] = input_count;
-        output_rs = vxoTensor_ReshapeTensor(output, rs_sizes, 2);
+        output_rs = vxoTensor_ReshapeTensor(output, rs_sizes, 2, VX_NULL);
         parameters[4] = (vx_reference)output_rs;
     }
 
@@ -6243,8 +6391,8 @@ vxnne_shader_executable vxnneGetGPUActivationShaderExecutable(
     {
         vx_int32 sizes[2] = {width, 1};
 
-        input_rs  = vxoTensor_ReshapeTensor(input, sizes, dims);
-        output_rs = vxoTensor_ReshapeTensor(output, sizes, dims);
+        input_rs  = vxoTensor_ReshapeTensor(input, sizes, dims, VX_NULL);
+        output_rs = vxoTensor_ReshapeTensor(output, sizes, dims, VX_NULL);
         paramChanged = vx_true_e;
     }
 
@@ -6255,8 +6403,8 @@ vxnne_shader_executable vxnneGetGPUActivationShaderExecutable(
         width = depth;
         height = batch;
         execution_parameters.workDim = 2;
-        input_rs  = vxoTensor_ReshapeTensor(input, sizes, 2);
-        output_rs = vxoTensor_ReshapeTensor(output, sizes, 2);
+        input_rs  = vxoTensor_ReshapeTensor(input, sizes, 2, VX_NULL);
+        output_rs = vxoTensor_ReshapeTensor(output, sizes, 2, VX_NULL);
         paramChanged = vx_true_e;
     }
 
@@ -6614,16 +6762,16 @@ vxnne_shader_executable vxnneGetGPUMaxPoolingShaderExecutable(
             && out_height * depth < IMG_MAX_WIDTH )
         {
             vx_uint32 sizes[4] = {1};
-                vx_uint32 dims = TENSOR_DIM_NUM(output);
+            vx_uint32 dims = TENSOR_DIM_NUM(output);
 
-                sizes[0] = out_width;
-                sizes[1] = out_height * depth;
-                sizes[2] = 1;
-                sizes[3] = dims > 3 ? TENSOR_VIEW_SIZE_INDEX(output, 3) : 1;
+            sizes[0] = out_width;
+            sizes[1] = out_height * depth;
+            sizes[2] = 1;
+            sizes[3] = dims > 3 ? TENSOR_VIEW_SIZE_INDEX(output, 3) : 1;
 
-                output_rs = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims);
-                enable_2d_image = vx_true_e;
-                paramNum = 3;
+            output_rs = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims, VX_NULL);
+            enable_2d_image = vx_true_e;
+            paramNum = 3;
 
             stride_y = vxCreateScalar(context, VX_TYPE_INT32, &out_height);
             parameters[1] = (vx_reference)output_rs;
@@ -6833,14 +6981,14 @@ vxnne_shader_executable vxnneGetGPUMaxPoolingShaderExecutable(
             sizes[2] = 1;
             sizes[3] = dims > 3 ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
 
-            input_rs = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims);
+            input_rs = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims, VX_NULL);
 
             sizes[0] = out_width;
             sizes[1] = out_height * depth;
             sizes[2] = 1;
             sizes[3] = dims > 3 ? TENSOR_VIEW_SIZE_INDEX(output, 3) : 1;
 
-            output_rs = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims);
+            output_rs = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims, VX_NULL);
             enable_2d_image = vx_true_e;
             paramNum = 4;
 
@@ -7503,8 +7651,8 @@ vxnne_shader_executable vxnneGetGPUSoftmaxShaderExecutable(
 
         inDims = 2;
         sizes[0] = in_width;
-        input_rs = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, inDims);
-        output_rs = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, inDims);
+        input_rs = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, inDims, VX_NULL);
+        output_rs = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, inDims, VX_NULL);
 
         input_ts = input_rs;
         output_ts = output_rs;
@@ -7877,7 +8025,7 @@ vxnne_shader_executable vxnneGetGPURnnShaderExecutable(
     if (bs_dims == 1)
     {
         bs_sizes[0] *= TENSOR_VIEW_SIZE_INDEX(bias, i);
-        bias_rs = vxoTensor_ReshapeTensor(bias, bs_sizes, bs_dims_rs);
+        bias_rs = vxoTensor_ReshapeTensor(bias, bs_sizes, bs_dims_rs, VX_NULL);
     }
 
     execution_parameters.globalWorkSize[0] = output_width;
@@ -7937,7 +8085,10 @@ vxnne_shader_executable vxnneGetGPURnnShaderExecutable(
         }
         else if(act == VX_NN_ACTIVATION_NONE)
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32", borderMode);
+            if (outputFormat == VX_TYPE_FLOAT16)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F32toF16", borderMode);
+            else
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32", borderMode);
         }
         else
         {
@@ -8175,7 +8326,7 @@ vxnne_shader_executable vxnneGetGPUTensorEltwiseShaderExecutable(
 
         dims = 2;
 
-        src0 = vxoTensor_ReshapeTensor(input0, sizes, dims);
+        src0 = vxoTensor_ReshapeTensor(input0, sizes, dims, VX_NULL);
         parameters[0] = (vx_reference)src0;
     }
 
@@ -8186,7 +8337,7 @@ vxnne_shader_executable vxnneGetGPUTensorEltwiseShaderExecutable(
 
         dims = 2;
 
-        src1 = vxoTensor_ReshapeTensor(input1, sizes, dims);
+        src1 = vxoTensor_ReshapeTensor(input1, sizes, dims, VX_NULL);
         parameters[1] = (vx_reference)src1;
     }
 
@@ -8197,7 +8348,7 @@ vxnne_shader_executable vxnneGetGPUTensorEltwiseShaderExecutable(
 
         dims = 2;
 
-        dst = vxoTensor_ReshapeTensor(output, sizes, dims);
+        dst = vxoTensor_ReshapeTensor(output, sizes, dims, VX_NULL);
         parameters[2] = (vx_reference)dst;
     }
 
@@ -8625,7 +8776,7 @@ vxnne_shader_executable vxnneGPULSTMUnitShaderExecutable(
     sizes[0]        = inputCount / batch;
     sizes[1]        = batch;
     dims            = 2;
-    input_rs        = vxoTensor_ReshapeTensor(input, sizes, dims);
+    input_rs        = vxoTensor_ReshapeTensor(input, sizes, dims, VX_NULL);
     parameters[0]   = (vx_reference)input_rs;
 
     borderMode->mode = VX_BORDER_CONSTANT;
@@ -8640,11 +8791,11 @@ vxnne_shader_executable vxnneGPULSTMUnitShaderExecutable(
         vx_int32 sizes[4]           = {w, 1, 1, 1};
 
         dims = 2;
-        cell2forget_weight_rs       = vxoTensor_ReshapeTensor(cell2forget_weight, sizes, dims);
-        cell2output_weight_rs       = vxoTensor_ReshapeTensor(cell2output_weight, sizes, dims);
+        cell2forget_weight_rs       = vxoTensor_ReshapeTensor(cell2forget_weight, sizes, dims, VX_NULL);
+        cell2output_weight_rs       = vxoTensor_ReshapeTensor(cell2output_weight, sizes, dims, VX_NULL);
         if (!enable_cifg)
         {
-            cell2input_weight_rs    = vxoTensor_ReshapeTensor(cell2input_weight, sizes, dims);
+            cell2input_weight_rs    = vxoTensor_ReshapeTensor(cell2input_weight, sizes, dims, VX_NULL);
 
             parameters[paramt_num++]           = (vx_reference)cell2input_weight_rs;
             parameters[paramt_num++]           = (vx_reference)cell2forget_weight_rs;
@@ -8965,7 +9116,7 @@ vxnne_shader_executable vxnneGetGPULSTMUnitProjectionShaderExecutable(
     parameters[paramNum++] = (vx_reference)weights;
     if (enable_bias)
     {
-        bias_rs       = vxoTensor_ReshapeTensor(bias, bias_sizes, bias_dims);
+        bias_rs       = vxoTensor_ReshapeTensor(bias, bias_sizes, bias_dims, VX_NULL);
         parameters[paramNum++] = (vx_reference)bias_rs;
     }
     if(projClipValue != 0.0f)
@@ -9173,7 +9324,7 @@ vxnne_shader_executable vxnneGetGPUBatch2SpaceShaderExecutable(
 
     if (output_dim == 4)
     {
-        output_rs        = vxoTensor_ReshapeTensor(output, sizes, 3);
+        output_rs        = vxoTensor_ReshapeTensor(output, sizes, 3, VX_NULL);
         parameters[7]    = (vx_reference)output_rs;
     }
 
@@ -9183,7 +9334,7 @@ vxnne_shader_executable vxnneGetGPUBatch2SpaceShaderExecutable(
         sizes[1] = input_height;
         sizes[2] = input_depth * input_batch;
         sizes[3] = 1;
-        input_rs        = vxoTensor_ReshapeTensor(input, sizes, 3);
+        input_rs        = vxoTensor_ReshapeTensor(input, sizes, 3, VX_NULL);
         parameters[0]    = (vx_reference)input_rs;
     }
 
@@ -9370,7 +9521,7 @@ vxnne_shader_executable vxnneGetGPUSpace2BatchShaderExecutable(
 
     if (output_dim == 4)
     {
-        output_rs        = vxoTensor_ReshapeTensor(output, sizes, 3);
+        output_rs        = vxoTensor_ReshapeTensor(output, sizes, 3, VX_NULL);
         parameters[3]    = (vx_reference)output_rs;
     }
 
@@ -9380,7 +9531,7 @@ vxnne_shader_executable vxnneGetGPUSpace2BatchShaderExecutable(
         sizes[1] = input_height;
         sizes[2] = input_depth * input_batch;
         sizes[3] = 1;
-        input_rs        = vxoTensor_ReshapeTensor(input, sizes, 3);
+        input_rs        = vxoTensor_ReshapeTensor(input, sizes, 3, VX_NULL);
         parameters[0]    = (vx_reference)input_rs;
     }
 
@@ -9539,14 +9690,14 @@ vxnne_shader_executable vxnneGetGPUShuffleChannelShaderExecutable(
         sizes[1] = output_width;
         sizes[2] = output_height * output_depth;
         sizes[3] = output_batch;
-        output_rs     = vxoTensor_ReshapeTensor(output, sizes, 4);
+        output_rs     = vxoTensor_ReshapeTensor(output, sizes, 4, VX_NULL);
         parameters[1] = (vx_reference)output_rs;
 
         sizes[0] = 1;
         sizes[1] = input_width;
         sizes[2] = input_height * input_depth;
         sizes[3] = input_batch;
-        input_rs      = vxoTensor_ReshapeTensor(input, sizes, 4);
+        input_rs      = vxoTensor_ReshapeTensor(input, sizes, 4, VX_NULL);
         parameters[0] = (vx_reference)input_rs;
 
         axis  = 1;
@@ -9815,7 +9966,7 @@ vxnne_shader_executable vxnneGetGPUTensorMeanAxisShaderExecutable(
         sizes[1]      = height;
         sizes[2]      = depth;
         sizes[3]      = batch;
-        src           = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims);
+        src           = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims, VX_NULL);
         parameters[0] = (vx_reference)src;
     }
 
@@ -9827,7 +9978,7 @@ vxnne_shader_executable vxnneGetGPUTensorMeanAxisShaderExecutable(
             sizes[1]      = height;
             sizes[2]      = depth;
             sizes[3]      = batch;
-            dst           = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 4);
+            dst           = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 4, VX_NULL);
             parameters[2] = (vx_reference)dst;
         }
     }
@@ -9839,7 +9990,7 @@ vxnne_shader_executable vxnneGetGPUTensorMeanAxisShaderExecutable(
             sizes[1]      = 1;
             sizes[2]      = depth;
             sizes[3]      = batch;
-            dst           = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 4);
+            dst           = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 4, VX_NULL);
             parameters[2] = (vx_reference)dst;
         }
     }
@@ -9851,7 +10002,7 @@ vxnne_shader_executable vxnneGetGPUTensorMeanAxisShaderExecutable(
             sizes[1]      = height;
             sizes[2]      = 1;
             sizes[3]      = batch;
-            dst           = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 4);
+            dst           = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 4, VX_NULL);
             parameters[2] = (vx_reference)dst;
         }
     }
@@ -10028,7 +10179,7 @@ vxnne_shader_executable vxnneGetGPUSvdfShaderExecutable(
     if (bs_dims == 1)
     {
         sizes[0] = TENSOR_VIEW_SIZE_INDEX(bias, 0);
-        bias_rs = vxoTensor_ReshapeTensor(bias, sizes, 2);
+        bias_rs = vxoTensor_ReshapeTensor(bias, sizes, 2, VX_NULL);
         parameters[1] = (vx_reference)bias_rs;
     }
 
@@ -10180,7 +10331,7 @@ vxnne_shader_executable vxnneGetGPUTensorPadShaderExecutable(
         vx_uint32 sizes[4] = {1, 1, 1, 1};
 
         sizes[0]    = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
-        src         = vxoTensor_ReshapeTensor(inputs, (vx_int32*)sizes, 2);
+        src         = vxoTensor_ReshapeTensor(inputs, (vx_int32*)sizes, 2, VX_NULL);
         parameters[0] = (vx_reference)src;
     }
 
@@ -10189,7 +10340,7 @@ vxnne_shader_executable vxnneGetGPUTensorPadShaderExecutable(
         vx_uint32 sizes[4] = {1, 1, 1, 1};
 
         sizes[0]    = TENSOR_VIEW_SIZE_INDEX(outputs, 0);
-        dst         = vxoTensor_ReshapeTensor(outputs, (vx_int32*)sizes, 2);
+        dst         = vxoTensor_ReshapeTensor(outputs, (vx_int32*)sizes, 2, VX_NULL);
         parameters[3] = (vx_reference)dst;
     }
 
@@ -10417,13 +10568,13 @@ vxnne_shader_executable vxnneGetGPUTensorPad2ShaderExecutable(
             padChn = pad_dims[6];
         }
 
-        src = vxoTensor_ReshapeTensor(inputs, sizes, 3);
+        src = vxoTensor_ReshapeTensor(inputs, sizes, 3, VX_NULL);
         parameters[0] = (vx_reference)src;
 
         sizes[0] = width;
         sizes[1] = height;
         sizes[2] = depth;
-        dst = vxoTensor_ReshapeTensor(outputs, sizes, 3);
+        dst = vxoTensor_ReshapeTensor(outputs, sizes, 3, VX_NULL);
         parameters[9] = (vx_reference)dst;
     }
 
@@ -10638,7 +10789,7 @@ vxnne_shader_executable vxnneGetGPUTensorCropShaderExecutable(
         vx_uint32 sizes[4] = {1, 1, 1, 1};
 
         sizes[0]    = TENSOR_VIEW_SIZE_INDEX(input, 0);
-        src         = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, 2);
+        src         = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, 2, VX_NULL);
         parameters[0] = (vx_reference)src;
     }
 
@@ -10647,7 +10798,7 @@ vxnne_shader_executable vxnneGetGPUTensorCropShaderExecutable(
         vx_uint32 sizes[4] = {1, 1, 1, 1};
 
         sizes[0]    = TENSOR_VIEW_SIZE_INDEX(output, 0);
-        dst         = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 2);
+        dst         = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 2, VX_NULL);
         parameters[1] = (vx_reference)dst;
     }
 
@@ -10789,7 +10940,7 @@ vxnne_shader_executable vxnneGetGPUTensorStridedSliceShaderExecutable(
         vx_uint32 sizes[4] = {1, 1, 1, 1};
 
         sizes[0]    = TENSOR_VIEW_SIZE_INDEX(input, 0);
-        src         = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, 2);
+        src         = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, 2, VX_NULL);
         parameters[0] = (vx_reference)src;
     }
 
@@ -10798,7 +10949,7 @@ vxnne_shader_executable vxnneGetGPUTensorStridedSliceShaderExecutable(
         vx_uint32 sizes[4] = {1, 1, 1, 1};
 
         sizes[0]    = TENSOR_VIEW_SIZE_INDEX(output, 0);
-        dst         = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 2);
+        dst         = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 2, VX_NULL);
         parameters[1] = (vx_reference)dst;
     }
 
@@ -10947,8 +11098,8 @@ vxnne_shader_executable vxnneGetGPUReverseShaderExecutable(
     if (dims == 1)
     {
         rs_sizes[0]   = width;
-        input_rs      = vxoTensor_ReshapeTensor(input, rs_sizes, 2);
-        output_rs     = vxoTensor_ReshapeTensor(output, rs_sizes, 2);
+        input_rs      = vxoTensor_ReshapeTensor(input, rs_sizes, 2, VX_NULL);
+        output_rs     = vxoTensor_ReshapeTensor(output, rs_sizes, 2, VX_NULL);
         parameters[0] = (vx_reference)input_rs;
         parameters[1] = (vx_reference)output_rs;
     }
@@ -11223,12 +11374,12 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
     size[0] = kernel_x * kernel_y * ifm;
     size[1] = ofm;
     dims    = TENSOR_DIM_NUM(weight) == 1 ? 2 : TENSOR_DIM_NUM(weight);
-    weights = vxoTensor_ReshapeTensor(weight, size, dims);
+    weights = vxoTensor_ReshapeTensor(weight, size, dims, VX_NULL);
 
     size[0] = depth;
     size[1] = 1;
     dims    = TENSOR_DIM_NUM(bias) == 1 ? 2 : TENSOR_DIM_NUM(bias);
-    biases  = vxoTensor_ReshapeTensor(bias, size, dims);
+    biases  = vxoTensor_ReshapeTensor(bias, size, dims, VX_NULL);
 
     enable_2d_img = (vx_bool)((width * height < IMG_MAX_WIDTH) && depth < IMG_MAX_WIDTH );
 
@@ -11259,13 +11410,13 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
         size[0] = width * height;
         size[1] = inputSize;
         dims    = TENSOR_DIM_NUM(input);
-        inputs  = vxoTensor_ReshapeTensor(input, size, dims);
+        inputs  = vxoTensor_ReshapeTensor(input, size, dims, VX_NULL);
 
         output_width = TENSOR_VIEW_SIZE_INDEX(output, 0) * TENSOR_VIEW_SIZE_INDEX(output, 1);
         size[0] = output_width;
         size[1] = depth;
         dims    = TENSOR_DIM_NUM(output);
-        outputs = vxoTensor_ReshapeTensor(output, size, dims);
+        outputs = vxoTensor_ReshapeTensor(output, size, dims, VX_NULL);
     }
 
     kernel = vxnneGetKernelShadersByEnum(context, kernelEnum);
@@ -11749,19 +11900,19 @@ vxnne_shader_executable vxnneGetGPUPReluShaderExecutable(
     if (dims == 1)
     {
         rs_sizes[0]   = width;
-        input_rs      = vxoTensor_ReshapeTensor(input, rs_sizes, 2);
+        input_rs      = vxoTensor_ReshapeTensor(input, rs_sizes, 2, VX_NULL);
     }
 
     if (oDims == 1)
     {
         rs_sizes[0]   = width;
-        output_rs     = vxoTensor_ReshapeTensor(output, rs_sizes, 2);
+        output_rs     = vxoTensor_ReshapeTensor(output, rs_sizes, 2, VX_NULL);
     }
 
     if(aSize != aWidth)
     {
         rs_sizes[0] = aSize;
-        alpha_rs     = vxoTensor_ReshapeTensor(alpha, rs_sizes, 2);
+        alpha_rs     = vxoTensor_ReshapeTensor(alpha, rs_sizes, 2, VX_NULL);
     }
 
     kernel = vxnneGetKernelShadersByEnum(context, kernelEnum);
@@ -12026,12 +12177,12 @@ vxnne_shader_executable vxnneGPUTensorCopyROIShaderExecutable(
                 size[0] = width;
                 size[1] = depth * height;
                 dims    = TENSOR_DIM_NUM(input);
-                inputs  = vxoTensor_ReshapeTensor(input, size, dims);
+                inputs  = vxoTensor_ReshapeTensor(input, size, dims, VX_NULL);
 
                 size[0] = output_width;
                 size[1] = output_depth * output_height;
                 dims    = TENSOR_DIM_NUM(output);
-                outputs = vxoTensor_ReshapeTensor(output, size, dims);
+                outputs = vxoTensor_ReshapeTensor(output, size, dims, VX_NULL);
             }
         }
 
@@ -12386,8 +12537,8 @@ vxnne_shader_executable vxnneGPUROIPoolShaderExecutable(
         rois_sizes[0] = rois_depth;
         rois_sizes[1] = rois_batch;
     }
-    input_rois_rs      = vxoTensor_ReshapeTensor(input_rois, rois_sizes, rois_dims);
-    output_rs          = vxoTensor_ReshapeTensor(output, dst_sizes, dst_dims);
+    input_rois_rs      = vxoTensor_ReshapeTensor(input_rois, rois_sizes, rois_dims, VX_NULL);
+    output_rs          = vxoTensor_ReshapeTensor(output, dst_sizes, dst_dims, VX_NULL);
     pool_width_s       = vxCreateScalar(context, VX_TYPE_INT32, &pool_width);
     pool_height_s      = vxCreateScalar(context, VX_TYPE_INT32, &pool_height);
     spatial_scale_s    = vxCreateScalar(context, VX_TYPE_FLOAT32, &spatial_scale);
@@ -12637,8 +12788,8 @@ vxnne_shader_executable vxnneGetGPULeakyReluShaderExecutable(
     {
         vx_int32 sizes[2] = {width, 1};
 
-        input_rs  = vxoTensor_ReshapeTensor(input, sizes, dims);
-        output_rs = vxoTensor_ReshapeTensor(output, sizes, dims);
+        input_rs  = vxoTensor_ReshapeTensor(input, sizes, dims, VX_NULL);
+        output_rs = vxoTensor_ReshapeTensor(output, sizes, dims, VX_NULL);
         paramChanged  = vx_true_e;
         enable_2d_img = vx_true_e;
         new_width     = width;
@@ -12911,7 +13062,7 @@ vxnne_shader_executable vxnneGetGPUSwishShaderExecutable(
         vx_uint32 sizes[4] = {1, 1, 1, 1};
 
         sizes[0]     = TENSOR_VIEW_SIZE_INDEX(input, 0);
-        src0          = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, 2);
+        src0          = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, 2, VX_NULL);
     }
 
     if(TENSOR_DIM_NUM(output) == 1)
@@ -12919,7 +13070,7 @@ vxnne_shader_executable vxnneGetGPUSwishShaderExecutable(
         vx_uint32 sizes[4] = {1, 1, 1, 1};
 
         sizes[0]    = TENSOR_VIEW_SIZE_INDEX(output, 0);
-        dst         = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 2);
+        dst         = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 2, VX_NULL);
     }
 
     borderMode->mode = VX_BORDER_REPLICATE;
@@ -13180,7 +13331,7 @@ vxnne_shader_executable vxnneGetGPUHSwishShaderExecutable(
         vx_uint32 sizes[4] = {1, 1, 1, 1};
 
         sizes[0]     = TENSOR_VIEW_SIZE_INDEX(input, 0);
-        src0          = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, 2);
+        src0          = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, 2, VX_NULL);
     }
 
     if(TENSOR_DIM_NUM(output) == 1)
@@ -13188,7 +13339,7 @@ vxnne_shader_executable vxnneGetGPUHSwishShaderExecutable(
         vx_uint32 sizes[4] = {1, 1, 1, 1};
 
         sizes[0]    = TENSOR_VIEW_SIZE_INDEX(output, 0);
-        dst         = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 2);
+        dst         = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 2, VX_NULL);
     }
 
     borderMode->mode = VX_BORDER_REPLICATE;
@@ -13433,8 +13584,8 @@ vxnne_shader_executable vxnneGetGPUBatchNormShaderExecutable(
         sizes[2] = 1;
         sizes[3] = batch;
 
-        input_rs = vxoTensor_ReshapeTensor(input, sizes, dims);
-        output_rs = vxoTensor_ReshapeTensor(output, sizes, dims);
+        input_rs = vxoTensor_ReshapeTensor(input, sizes, dims, VX_NULL);
+        output_rs = vxoTensor_ReshapeTensor(output, sizes, dims, VX_NULL);
 
         parameters[0] = (vx_reference)input_rs;
         parameters[3] = (vx_reference)output_rs;
@@ -13710,8 +13861,8 @@ vxnne_shader_executable vxnneGetGPUTensorLinearShaderExecutable(
         sizes[2] = 1;
         sizes[3] = batch;
 
-        input_rs = vxoTensor_ReshapeTensor(inputs, sizes, dims);
-        output_rs = vxoTensor_ReshapeTensor(outputs, sizes, dims);
+        input_rs = vxoTensor_ReshapeTensor(inputs, sizes, dims, VX_NULL);
+        output_rs = vxoTensor_ReshapeTensor(outputs, sizes, dims, VX_NULL);
 
         parameters[0] = (vx_reference)input_rs;
         parameters[1] = (vx_reference)output_rs;
@@ -13939,8 +14090,8 @@ vxnne_shader_executable vxnneGetGPUTensorTRShaderExecutable(
         sizes[2] = 1;
         sizes[3] = batch;
 
-        input_rs = vxoTensor_ReshapeTensor(inputs, sizes, dims);
-        output_rs = vxoTensor_ReshapeTensor(outputs, sizes, dims);
+        input_rs = vxoTensor_ReshapeTensor(inputs, sizes, dims, VX_NULL);
+        output_rs = vxoTensor_ReshapeTensor(outputs, sizes, dims, VX_NULL);
 
         parameters[0] = (vx_reference)input_rs;
         parameters[1] = (vx_reference)output_rs;

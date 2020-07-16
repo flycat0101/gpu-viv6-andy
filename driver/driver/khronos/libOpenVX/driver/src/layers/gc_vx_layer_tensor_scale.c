@@ -1259,7 +1259,8 @@ VX_PRIVATE_API vx_status vxoYUV2RGBScale_SW_Initialize(vxnne_layer ops_layer, co
     input_width  = image->region.start_x > image->region.end_x ? image->memory.dims[0][VX_DIM_X] : image->region.end_x - image->region.start_x;
     input_height = image->region.start_y > image->region.end_y ? image->memory.dims[0][VX_DIM_Y] : image->region.end_y - image->region.start_y;
 
-    vxmASSERT(input_rect_width <= input_width && input_rect_height <= input_height);
+    if((input_rect_width <= input_width && input_rect_height <= input_height) == 0)
+        vxmASSERT(0);
 
     output_width  = TENSOR_SIZE_INDEX(outputs, 0);
     output_height = TENSOR_SIZE_INDEX(outputs, 1);
@@ -1310,7 +1311,7 @@ VX_PRIVATE_API vx_bool vxoYUV2RGBScale_NN_Support(vx_node node, const vx_referen
     vx_array   rects                      = (vx_array)parameters[1];
 
     vx_rectangle_t rect;
-    /*vx_uint32 input_rect_width, input_rect_height;*/
+    vx_uint32 input_rect_width, /*input_rect_height,*/ input_width, input_height;
 
     vx_bool support = vx_true_e;
 
@@ -1336,10 +1337,15 @@ VX_PRIVATE_API vx_bool vxoYUV2RGBScale_NN_Support(vx_node node, const vx_referen
     if (rect.start_x > rect.end_x) rect.start_x = 0;
     if (rect.start_y > rect.end_y) rect.start_y = 0;
 
-    /*input_rect_width  = rect.end_x - rect.start_x;
-    input_rect_height = rect.end_y - rect.start_y;*/
+    input_rect_width  = rect.end_x - rect.start_x;
+    /*input_rect_height = rect.end_y - rect.start_y;*/
+
+    input_width  = image->region.start_x > image->region.end_x ? image->memory.dims[0][VX_DIM_X] : image->region.end_x - image->region.start_x;
+    input_height = image->region.start_y > image->region.end_y ? image->memory.dims[0][VX_DIM_Y] : image->region.end_y - image->region.start_y;
 
     support = support && vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SCALER);
+    support = support && input_width <= 4096 && input_height <= 4096;
+    support = support && (input_rect_width <= 1920 || vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SCALER_4K));
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
@@ -1391,7 +1397,8 @@ VX_PRIVATE_API vx_status vxoYUV2RGBScale_NN_Initialize(vxnne_layer ops_layer, co
     input_width  = image->region.start_x > image->region.end_x ? image->memory.dims[0][VX_DIM_X] : image->region.end_x - image->region.start_x;
     input_height = image->region.start_y > image->region.end_y ? image->memory.dims[0][VX_DIM_Y] : image->region.end_y - image->region.start_y;
 
-    vxmASSERT(input_rect_width <= input_width && input_rect_height <= input_height);
+    if((input_rect_width <= input_width && input_rect_height <= input_height) == 0)
+        vxmASSERT(0);
 
     output_width  = TENSOR_SIZE_INDEX(outputs, 0);
     output_height = TENSOR_SIZE_INDEX(outputs, 1);
@@ -1477,7 +1484,7 @@ OnError:
     vx_tensor  outputs                    = (vx_tensor)parameters[8];
 
     vx_rectangle_t rect;
-    vx_uint32 input_rect_width, input_rect_height, output_width, output_height, scale_x, scale_y;
+    vx_uint32 input_rect_width, input_rect_height, input_width, input_height, output_width, output_height, scale_x, scale_y;
 
     vxnne_yuv2rgb_scale_layer  yuv2rgb_scaleLayer = VX_NULL;
 
@@ -1527,13 +1534,20 @@ OnError:
     input_rect_width  = rect.end_x - rect.start_x;
     input_rect_height = rect.end_y - rect.start_y;
 
+    input_width  = image->region.start_x > image->region.end_x ? image->memory.dims[0][VX_DIM_X] : image->region.end_x - image->region.start_x;
+    input_height = image->region.start_y > image->region.end_y ? image->memory.dims[0][VX_DIM_Y] : image->region.end_y - image->region.start_y;
+
+    vxmASSERT(input_rect_width <= input_width && input_rect_height <= input_height);
+
     output_width  = TENSOR_SIZE_INDEX(outputs, 0);
     output_height = TENSOR_SIZE_INDEX(outputs, 1);
 
     scale_x = (input_rect_width << 15) / output_width;
     scale_y = (input_rect_height << 15) / output_height;
 
-    if (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SCALER))
+    if (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SCALER) &&
+        input_width <= 4096 && input_height <= 4096 &&
+        (input_rect_width <= 1920 || vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SCALER_4K)))
     {
         vxnneOperation_Initialize(
             &yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.base,

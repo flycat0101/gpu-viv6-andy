@@ -50,7 +50,7 @@ __kernel void upsample_padding_u8_to_s16
     VXC_DP2x8(src0, src, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniInsertZeroLo_2x8);
     VXC_DP2x8(src1, src, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniInsertZeroHi_2x8);
 
-    VXC_WriteImage(dst_image, coord.xy, src1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_WriteImage(dst_image, coord.xy, src0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
     VXC_WriteImage(dst_image, coord.zy, src1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 }
 

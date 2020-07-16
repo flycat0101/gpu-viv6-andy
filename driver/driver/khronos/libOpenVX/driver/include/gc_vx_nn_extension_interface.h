@@ -15,18 +15,6 @@
 #define _GC_VX_NN_EXTENSION_INTERFACE_H_
 
 
-VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromTensorsPRelu(
-    vx_enum     layer_type,
-    vx_uint32 * inputs_dims,
-    vx_uint32 * convolution_outputs_dims,
-    vx_uint32 * pool_outputs_dims,
-    const vx_nn_convolution_relu_pooling_params convolution_relu_pooling_params,
-    vx_size size_of_convolution_relu_pooling_params,
-    vx_weights_biases_parameter_optimizations_t *optimizations,
-    vx_size size_of_optimizations,
-    vx_tensor   weights,
-    vx_tensor   biases,
-    vx_tensor   alpha);
 
 #endif
 

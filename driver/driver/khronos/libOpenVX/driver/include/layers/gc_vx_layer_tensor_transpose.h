@@ -33,7 +33,7 @@ static vx_param_description_s nn_TensorTrans_params[] = {
 
 vx_kernel_description_s internalkernel_NNTensorTrans = {
     VX_KERNEL_TENSOR_TRANSPOSE,
-    "vivante.nn.tensor.transpose",
+    "org.khronos.openvx.tensor_transpose",
     vxoBaseKernel_NNTensorTrans,
     nn_TensorTrans_params, vxmLENGTH_OF(nn_TensorTrans_params),
     VX_NULL,

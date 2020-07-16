@@ -196,8 +196,8 @@ VX_PRIVATE_API vx_status vxoNNReshape_SH_Initialize_Ext(vxnne_layer ops_layer, c
 
     vxoElementOptimization_GetTensorShape(inputs, sizes, &dims);
 
-    input     = vxoTensor_ReshapeTensor(inputs, (vx_int32*)sizes, dims);
-    output     = vxoTensor_ReshapeTensor(outputs, (vx_int32*)sizes, dims);
+    input     = vxoTensor_ReshapeTensor(inputs, (vx_int32*)sizes, dims, VX_NULL);
+    output     = vxoTensor_ReshapeTensor(outputs, (vx_int32*)sizes, dims, VX_NULL);
 
     reshapeLayer->base.temp_tensors[0] = input;
     reshapeLayer->base.temp_tensors[1] = output;
@@ -316,7 +316,7 @@ VX_PRIVATE_API vx_bool vxoNNReshape_TP_Support(vx_node node, const vx_reference 
 
     vx_context           context          = vxGetContext((vx_reference)node);
 
-    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_TP, VX_TYPE_INVALID, VX_NULL);
+    vx_bool support = vxoLayer_CheckSupport(context, VX_NN_QUERY_TP, VX_TYPE_INVALID, VX_NULL);
     dimCount0    = TENSOR_VIEW_DIM_NUM(inputs);
     width0       = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
     height0      = (dimCount0 > 1) ? TENSOR_VIEW_SIZE_INDEX(inputs, 1) : 1;
@@ -334,7 +334,9 @@ VX_PRIVATE_API vx_bool vxoNNReshape_TP_Support(vx_node node, const vx_reference 
 
     support = support && vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP);
     support = support && (src_elementCount == dst_elementCount);
-    support = support && vxnneIsTPSupportFormat(context, inputs, VX_NULL, outputs);
+    support = support && vxnneIsTPSupportFormat(node->graph, inputs, VX_NULL, outputs);
+
+    support = support && IsTPSupport_CheckOutPixel(node->base.context, inputs, outputs);
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
@@ -372,8 +374,8 @@ VX_PRIVATE_API vx_status vxoNNReshape_TP_Initialize(vxnne_layer ops_layer, const
     sizes[2]   = gcmMIN(gcmMIN(width0, height0), depth0) * batch0;
     sizes[3]   = 1;
 
-    src     = vxoTensor_ReshapeTensor(inputs, sizes, 3);
-    dst     = vxoTensor_ReshapeTensor(outputs, sizes, 3);
+    src     = vxoTensor_ReshapeTensor(inputs, sizes, 3, VX_NULL);
+    dst     = vxoTensor_ReshapeTensor(outputs, sizes, 3, VX_NULL);
     reshapeLayer->base.temp_tensors[0]      = src;
     reshapeLayer->base.temp_tensors[1]      = dst;
     reshapeLayer->base.num_temp_tensors     = 2;
@@ -428,7 +430,6 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoReshape_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
-
     vx_status status = VX_SUCCESS;
 #if REGISTER_FRAME
     vxnne_layer_imp_s registerReshape[] = {/* Please DON'T adjust the order, it's importent */
@@ -526,7 +527,7 @@ OnError:
 
     if (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP) &&
         (src_elementCount == dst_elementCount) &&
-        vxnneIsTPSupportFormat(context, inputs, VX_NULL, outputs))
+        vxnneIsTPSupportFormat(node->graph, inputs, VX_NULL, outputs))
     {
         vx_tensor     src       = NULL;
         vx_tensor     dst       = NULL;
@@ -538,8 +539,8 @@ OnError:
         sizes[2]   = gcmMIN(gcmMIN(width0, height0), depth0) * batch0;
         sizes[3]   = 1;
 
-        src     = vxoTensor_ReshapeTensor(inputs, sizes, 3);
-        dst     = vxoTensor_ReshapeTensor(outputs, sizes, 3);
+        src     = vxoTensor_ReshapeTensor(inputs, sizes, 3, VX_NULL);
+        dst     = vxoTensor_ReshapeTensor(outputs, sizes, 3, VX_NULL);
         reshapeLayer->base.temp_tensors[0]      = src;
         reshapeLayer->base.temp_tensors[1]      = dst;
         reshapeLayer->base.num_temp_tensors     = 2;
@@ -585,8 +586,8 @@ OnError:
 
         vxoElementOptimization_GetTensorShape(inputs, sizes, &dims);
 
-        input     = vxoTensor_ReshapeTensor(inputs, (vx_int32*)sizes, dims);
-        output     = vxoTensor_ReshapeTensor(outputs, (vx_int32*)sizes, dims);
+        input     = vxoTensor_ReshapeTensor(inputs, (vx_int32*)sizes, dims, VX_NULL);
+        output     = vxoTensor_ReshapeTensor(outputs, (vx_int32*)sizes, dims, VX_NULL);
 
         reshapeLayer->base.temp_tensors[0] = input;
         reshapeLayer->base.temp_tensors[1] = output;
@@ -658,7 +659,6 @@ exit:
     if (reshapeLayer != NULL)
         gcoOS_Free(NULL, reshapeLayer);
 #endif
-
     return status;
 }
 

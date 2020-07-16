@@ -2816,6 +2816,7 @@ _FillInFeatureTable(
     Features[gcvFEATURE_TP_SIMPLE_INT16] = database->TP_SIMPLE_INT16;
     Features[gcvFEATURE_TP_REAL_INT16] = database->TP_REAL_INT16;
     Features[gcvFEATURE_NN_FIRST_PIXEL_POOLING] = database->NN_FIRST_PIXEL_POOLING;
+    Features[gcvFEATURE_NN_FAST_FIRST_PIXEL_POOLING] = 0;
     Features[gcvFEATURE_NN_STRIDE_SUPPORT] = database->NN_STRIDE_SUPPORT;
     Features[gcvFEATURE_NN_XYDP6] = database->NN_XYDP6;
     Features[gcvFEATURE_NN_XYDP0] = database->NN_XYDP0;
@@ -2850,11 +2851,12 @@ _FillInFeatureTable(
     Features[gcvFEATURE_USC_EVICT_CTRL_FIFO_FLOP_RESET_FIX] = database->USC_EVICT_CTRL_FIFO_FLOP_RESET_FIX;
     Features[gcvFEATURE_NEGATIVE_POST_SHIFT_FIX] = database->NEGATIVE_POST_SHIFT_FIX;
     Features[gcvFEATURE_NN_COMMAND_KERNEL_REQUEST_CONFICT_FIX] = database->NN_COMMAND_KERNEL_REQUEST_CONFICT_FIX;
-    Features[gcvFEATURE_DDR_BURST_LEN_256B] = database->DDR_BURST_LEN_256B;
     Features[gcvFEATURE_NN_LEAKY_RELU] = database->NN_LEAKY_RELU;
     Features[gcvFEATURE_NN_PRELU] = database->NN_PRELU;
     Features[gcvFEATURE_NN_NATIVE_STRIDE_TWO] = database->NN_NATIVE_STRIDE_TWO;
     Features[gcvFEATURE_NN_TENSOR_ADD] = database->NN_TENSOR_ADD;
+    Features[gcvFEATURE_SMALL_BATCH_FLOPS_RESET_FIX] = database->SMALL_BATCH_FLOPS_RESET_FIX;
+    Features[gcvFEATURE_SMALL_BATCH_DISBLE_FIX] = database->SMALL_BATCH_DISBLE_FIX;
 
     Features[gcvFEATURE_IMAGE_LS_NO_FULLMASK_FIX] = gcvFALSE;
     Features[gcvFEATURE_BLT_YUV_OUTPUT] = database->BLT_YUV_OUTPUT;
@@ -2890,6 +2892,7 @@ _FillInFeatureTable(
     Features[gcvFEATURE_KERNEL_PER_CORE_LESS_THAN_THIRD_COEF_BUFF_DEPTH_FIX] = database->KERNEL_PER_CORE_LESS_THAN_THIRD_COEF_BUFF_DEPTH_FIX;
     Features[gcvFEATURE_NN_PER_CHANNEL_QUANT] = database->NN_PER_CHANNEL_QUANT;
     Features[gcvFEATURE_NN_PER_CHANNEL_QUANT_ASYM] = database->NN_PER_CHANNEL_QUANT_ASYM;
+    Features[gcvFEATURE_NN_FLOAT_POST_MULT] = database->NN_FLOAT_POST_MULT;
     Features[gcvFEATURE_NN_NO_Z_LOCATION_OFFSET] = database->NN_NO_Z_LOCATION_OFFSET;
     Features[gcvFEATURE_NN_KERNEL_SIZE_WASTE_IN_PARTIAL_MODE_FIX] = database->KERNEL_SIZE_WASTE_IN_PARTIAL_MODE_FIX;
     Features[gcvFEATURE_USC_BOTTLENECK_FIX] = database->USC_BOTTLENECK_FIX;
@@ -2900,12 +2903,43 @@ _FillInFeatureTable(
     Features[gcvFEATURE_TP_REORDER_LAYER_SUSPEND_FIX] = database->TP_REORDER_LAYER_SUSPEND_FIX;
     Features[gcvFEATURE_KERNEL_VIP_SRAM_READ_BW_LIMITATION_FIX] = database->KERNEL_VIP_SRAM_READ_BW_LIMITATION_FIX;
     Features[gcvFEATURE_IMG_POP_PIPELINE_PAUSE_FIX] = database->IMG_POP_PIPELINE_PAUSE_FIX;
+    Features[gcvFEATURE_VIP_HW_FINAL_RELEASE] = database->VIP_HW_FINAL_RELEASE;
     Features[gcvFEATURE_NN_SLOW_OUTPUT] = database->NN_SLOW_OUTPUT;
     Features[gcvFEATURE_NO_NARROW_POST_PROCESS_PIPE] = database->NO_NARROW_POST_PROCESS_PIPE;
     Features[gcvFEATURE_TP_NN_PROBE] = database->TP_NN_PROBE;
     Features[gcvFEATURE_VIP_DEC400] = database->VIP_DEC400;
-    Features[gcFEATURE_BIT_TP_FC_FLOAT_LAST_PIXEL_NEGATIVE_0_FIX] = database->TP_FC_FLOAT_LAST_PIXEL_NEGATIVE_0_FIX;
+    Features[gcvFEATURE_NN_ASYMMETRIC_INT8] = database->NN_ASYMMETRIC_INT8;
+    Features[gcvFEATURE_DEPTHWISE_NEIGHBOR_IMG_DATA_TRANSFER_NOT_EFFICIENT_FIX] = database->DEPTHWISE_NEIGHBOR_IMG_DATA_TRANSFER_NOT_EFFICIENT_FIX;
 
+    Features[gcFEATURE_BIT_NN_COMPRESSION_BYPASSS] = database->NN_COMPRESSION_BYPASSS;
+    Features[gcFEATURE_BIT_BFLOAT_COEF_COMPRESSION_ZERO_COEFBIT14_INVERSE] = database->BFLOAT_COEF_COMPRESSION_ZERO_COEFBIT14_INVERSE;
+    Features[gcFEATURE_BIT_BFP_COEF_AUTO_PAD_INCOMPLETE_ZERO_IN_KZ_PLANE] = database->BFP_COEF_AUTO_PAD_INCOMPLETE_ZERO_IN_KZ_PLANE;
+    Features[gcFEATURE_BIT_TP_KERNEL_1BYTE_ALGIN] = database->TP_KERNEL_1BYTE_ALGIN;
+    Features[gcFEATURE_PREPROCESS_IMG_BUF_640BYTE_LIMIT] = database->PREPROCESS_IMG_BUF_640BYTE_LIMIT;
+    Features[gcFEATURE_BIT_TPLITE_BFLOAT16] = database->TPLITE_BFLOAT16;
+    Features[gcFEATURE_BIT_DEPTHWISE_16BIT_FORMAT] = database->DEPTHWISE_SUPPORT_16BIT_FORMAT;
+    Features[gcvFEATURE_OUTPUT_CONVERT_UINT8_INT8_TO_UINT16_INT16_FIX] = database->OUTPUT_CONVERT_UINT8_INT8_TO_UINT16_INT16_FIX;
+    Features[gcvFEATURE_IMG_ADDR_NOT_WRAP_IF_OVER_OCB_ADDR_FIX] = database->IMG_ADDR_NOT_WRAP_IF_OVER_OCB_ADDR_FIX;
+
+    Features[gcFEATURE_BIT_V8_SINGLE_PORT_ACCUMULATION_BUFFER_RW_CONFICT_ZERO_SKIP_PERF_FIX] = database->V8_SINGLE_PORT_ACCUMULATION_BUFFER_RW_CONFICT_ZERO_SKIP_PERF_FIX;
+    Features[gcFEATURE_BIT_V8_ACCUMLATION_READ_OUT_HAS_BUBBLES_PERF_FIX] = database->V8_ACCUMLATION_READ_OUT_HAS_BUBBLES_PERF_FIX;
+    Features[gcFEATURE_BIT_BURST_COLLECT_DUMMY_DATA_WASTE_CYCLES_FIX] = database->BURST_COLLECT_DUMMY_DATA_WASTE_CYCLES_FIX;
+
+    Features[gcFEATURE_BIT_TP_ACCESS_VIPSRAM_OT_IS_ONE_FIX] = database->TP_ACCESS_VIPSRAM_OT_IS_ONE_FIX;
+    Features[gcFEATURE_BIT_NN_IN_TILE_DATA_IS_ALL_PAD_FIX] = database->NN_IN_TILE_DATA_IS_ALL_PAD_FIX;
+    Features[gcFEATURE_BIT_USE_SINGLE_PORT_VIPSRAM] = database->USE_SINGLE_PORT_VIPSRAM;
+    Features[gcFEATURE_VALUE_DDR_KERNEL_BURST_SIZE] = database->DDR_KERNEL_BURST_SIZE;
+    Features[gcFEATURE_BIT_TILE_ACCESS_CAPABILITY] = database->TILE_ACCESS_CAPABILITY;
+    Features[gcFEATURE_BIT_FAST_DP3_PREPROCESSOR] = database->FAST_DP3_PREPROCESSOR;
+
+    Features[gcvFEATURE_BIT_INIMG_NOT_64BYTE_ALIGN_CACHELINE_MODE_FIX] = database->INIMG_NOT_64BYTE_ALIGN_CACHELINE_MODE_FIX;
+    Features[gcFEATURE_BIT_TP_FC_FLOAT_LAST_PIXEL_NEGATIVE_0_FIX] = database->TP_FC_FLOAT_LAST_PIXEL_NEGATIVE_0_FIX;
+    Features[gcFEATURE_BIT_INIMAGE_2DTILE_NOT_LESS_160PIXEL_FIX] = database->INIMAGE_2DTILE_NOT_LESS_160PIXEL_FIX;
+
+    Features[gcFEATURE_TP_REORDER_INTILE_X_SIZE_512_FIX] = database->TP_REORDER_INTILE_X_SIZE_512_FIX;
+    Features[gcFEATURE_NN_WASET_COEF_READ_WRITE_BANDWIDTH_128BYTE_VIPSRAM_IN_FULL_PATIAL_CACHE_MODE] = database->NN_WASET_COEF_READ_WRITE_BANDWIDTH_128BYTE_VIPSRAM_IN_FULL_PATIAL_CACHE_MODE;
+    Features[gcvFEATURE_NN_FLOAT32_IO] = database->NN_FLOAT32_IO;
+    Features[gcvFEATURE_TP_FLOAT32_IO] = database->TP_FLOAT32_IO;
     /* AIGPU */
     Features[gcvFEATURE_AI_GPU] = database->AI_GPU;
 
@@ -3251,12 +3285,20 @@ if (smallBatch){    Config->vsConstBase  = 0xD000;
     Config->nnConfig.fixedFeature.uscBanks                       = featureDatabase->USC_BANKS;
     Config->nnConfig.fixedFeature.nnLanesPerOutCycle             = featureDatabase->NN_LANES_PER_OUT_CYCLE;
     Config->nnConfig.fixedFeature.maxOTNumber                    = featureDatabase->MAX_OT_NUMBER;
+    Config->nnConfig.fixedFeature.physicalVipSramWidthInByte     = featureDatabase->PHYSICAL_VIP_SRAM_WIDTH_IN_BYTE;
     Config->nnConfig.fixedFeature.equivalentVipsramWidthInByte   = featureDatabase->EQUIVALENT_VIP_SRAM_WIDTH_INBYTE;
     Config->nnConfig.fixedFeature.latencyHidingAtFullAxiBw       = featureDatabase->LATENCY_HIDING_AT_FULL_AXI_BW;
     Config->nnConfig.fixedFeature.axiBusWidth                    = featureDatabase->AXI_BUS_WIDTH;
+    Config->nnConfig.fixedFeature.nnMaxKXSize = featureDatabase->NN_KERNEL_X_SIZE;
+    Config->nnConfig.fixedFeature.nnMaxKYSize = featureDatabase->NN_KERNEL_Y_SIZE;
+    Config->nnConfig.fixedFeature.nnMaxKZSize = featureDatabase->NN_KERNEL_Z_SIZE;
 
+    Config->nnConfig.customizedFeature.ddrKernelBurstSize = featureDatabase->DDR_KERNEL_BURST_SIZE;
     Config->nnConfig.customizedFeature.vipSRAMSize = featureDatabase->VIP_SRAM_SIZE;
     Config->nnConfig.customizedFeature.axiSRAMSize = featureDatabase->AXI_SRAM_SIZE;
+
+    /* change maxTileSize value and init here */
+    Config->nnConfig.unifiedFeature.maxTileSize = featureDatabase->MAX_TILE_X_SIZE;
 
 #ifndef __QNXNTO__
     {
@@ -37296,6 +37338,7 @@ gcoHARDWARE_GetProductName(
     gctUINT32 chipID;
     gctBOOL    vipIntegerOnly = gcvFALSE;
     gctBOOL    noChipIDInclude = gcvFALSE;
+    gctBOOL    isV8 = (Hardware->features[gcvFEATURE_NN_XYDP0] == 1) ? 1 : 0;
     gctPOINTER pointer;
     gctSTRING  chipNameBase;
 
@@ -37395,9 +37438,11 @@ gcoHARDWARE_GetProductName(
             }
 
             /* Don't put chipID in the produce name for some products*/
-            if (((type == 5) && ((grade == 1) || (grade == 4))) /*VIPNN or VIPNano */
+            if (!isV8
+            &&  (((type == 5) && ((grade == 1) || (grade == 4))) /*VIPNN or VIPNano */
             ||  (type == 8)  /* VIPPico */
             ||  (grade == 1)) /* other products for now */
+            )
             {
                 noChipIDInclude = gcvTRUE;
             }
@@ -37553,15 +37598,28 @@ gcoHARDWARE_GetProductName(
                     if (aux == 0)
                     {
                         gctUINT32 cc_count = Hardware->config->ecoID >> 24;
+                        if (isV8)
+                        {
+                            cc_count = cc_count / Hardware->config->coreCount;
+                            cc_count >>= 1;
+                        }
                         switch (cc_count)
                         {
                         case 1:  gcoOS_StrCatSafe(chipNameBase, 32, "-N"); break;
                         case 2:  gcoOS_StrCatSafe(chipNameBase, 32, "-S"); break;
                         case 3:  gcoOS_StrCatSafe(chipNameBase, 32, "-S+"); break;
                         case 4:  gcoOS_StrCatSafe(chipNameBase, 32, "-D"); break;
-                        case 6:  gcoOS_StrCatSafe(chipNameBase, 32, "-D+"); break;
+                        case 5:
+                        case 6:
+                        case 7:  gcoOS_StrCatSafe(chipNameBase, 32, "-D+"); break;
                         case 8:  gcoOS_StrCatSafe(chipNameBase, 32, "-Q"); break;
-                        case 12: gcoOS_StrCatSafe(chipNameBase, 32, "-Q+"); break;
+                        case 9:
+                        case 10:
+                        case 11:
+                        case 12:
+                        case 13:
+                        case 14:
+                        case 15: gcoOS_StrCatSafe(chipNameBase, 32, "-Q+"); break;
                         case 16: gcoOS_StrCatSafe(chipNameBase, 32, "-O"); break;
                         case 24: gcoOS_StrCatSafe(chipNameBase, 32, "-O+"); break;
                         case 32: gcoOS_StrCatSafe(chipNameBase, 32, "-H"); break;

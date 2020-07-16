@@ -635,7 +635,9 @@ gcoVX_InvokeThreadWalker(
                     enableSaveBinary |= atoi(envCache);
                 }
             }
-
+#if gcdUSE_BROKER
+            enableSaveBinary = 1; /* bypass SRAM remap when VIPLite broker is enabled */
+#endif
             if (0 == enableSaveBinary)
             {
                 gctUINT32 gpuVirtAddr = 0;
@@ -706,6 +708,7 @@ gcoVX_InvokeThreadWalker(
             gcmONERROR(gcoHARDWARE_InvokeThreadWalkerCL(hardware, Info));
         }
     }
+
 
     if (currentApi != gcvAPI_OPENCL && currentApi != 0 )
     {
@@ -1772,34 +1775,6 @@ OnError:
 }
 
 gceSTATUS
-gcoVX_CaptureInitState(
-    IN OUT gctPOINTER *CaptureBuffer,
-    IN gctUINT32 InputSizeInByte,
-    IN OUT gctUINT32_PTR OutputSizeInByte,
-    IN gctUINT32 deviceCount
-    )
-{
-    gcsTLS_PTR  tls = gcvNULL;
-    gceSTATUS status = gcvSTATUS_OK;
-    gctUINT32 i = 0;
-
-    gcmHEADER();
-    gcmONERROR(gcoOS_GetTLS( &tls));
-
-    gcmONERROR(gcoVX_SetHardwareType(gcvHARDWARE_VIP));
-
-    for (i = 0; i < deviceCount; i++)
-    {
-        gcoHARDWAREVX_CaptureInitState(tls->engineVX->hardwares[i], CaptureBuffer[i],
-                                       InputSizeInByte, &OutputSizeInByte[i]);
-    }
-
-OnError:
-    gcmFOOTER();
-    return status;
-}
-
-gceSTATUS
 gcoVX_SetRemapAddress(
     IN gctUINT32 remapStart,
     IN gctUINT32 remapEnd,
@@ -2038,5 +2013,15 @@ gceSTATUS gcoVX_GetEvisNoInstFeatureCap(
     return status;
 }
 
+gceSTATUS gcoVX_MultiGPUSync(
+    OUT gctUINT32_PTR *Memory
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER();
 
+    status = gcoHARDWARE_MultiGPUSync(gcvNULL, Memory);
+    gcmFOOTER();
+    return status;
+}
 #endif /* gcdUSE_VX */

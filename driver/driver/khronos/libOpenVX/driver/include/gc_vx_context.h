@@ -79,8 +79,7 @@ VX_INTERNAL_API void vxoContext_MemoryUnmap(vx_context context, vx_map_id map_id
 VX_INTERNAL_API vx_bool vxoContext_IsFeatureAvailable(vx_context context, vx_nn_feature_e feature);
 VX_INTERNAL_API vx_bool vxoGlobalData_IsFeatureAvailable(vx_global_data globalData, vx_nn_feature_e feature);
 
-VX_INTERNAL_API vx_status vxoContext_CaptureInitState(vx_context context);
-
+VX_INTERNAL_API vx_status vxoContext_initializeSRAM(vx_context context);
 EXTERN_C_END
 
 #endif /* __GC_VX_CONTEXT_H__ */

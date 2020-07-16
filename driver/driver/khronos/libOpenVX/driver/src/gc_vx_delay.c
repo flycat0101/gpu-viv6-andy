@@ -123,8 +123,36 @@ VX_INTERNAL_API vx_delay vxoDelay_Create(vx_context context, vx_reference exempl
 
             case VX_TYPE_SCALAR:
                 {
-                    vx_scalar scalar = (vx_scalar )exemplar;
+                    vx_scalar scalar = (vx_scalar)exemplar;
                     ref = (vx_reference)vxCreateScalar(context, scalar->dataType, VX_NULL);
+                }
+                break;
+
+            case VX_TYPE_OBJECT_ARRAY:
+                {
+                    vx_object_array objarray = (vx_object_array)exemplar;
+                    if (objarray->itemCount != 0)
+                    {
+                        ref = (vx_reference)vxCreateObjectArray(context, objarray->itemsTable[0], objarray->itemCount);
+                    }
+                    else
+                    {
+                        vxReleaseDelay(&delay);
+                    }
+                }
+                break;
+
+            case VX_TYPE_TENSOR:
+                {
+                    vx_tensor tensor = (vx_tensor)exemplar;
+                    vx_uint32 i;
+                    vx_size   dimensions[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+                    for (i = 0; i < tensor->dimCount; i++)
+                    {
+                        dimensions[i] = tensor->dims[i];
+                    }
+                    ref = (vx_reference)vxCreateTensor(context, tensor->dimCount, dimensions, tensor->dataFormat,
+                        tensor->quantFormat == VX_QUANT_DYNAMIC_FIXED_POINT ? tensor->quantData.dfp.fixed_point_pos : 0);
                 }
                 break;
 
@@ -350,6 +378,8 @@ VX_API_ENTRY vx_delay VX_API_CALL vxCreateDelay(vx_context context, vx_reference
         case VX_TYPE_PYRAMID:
         case VX_TYPE_THRESHOLD:
         case VX_TYPE_SCALAR:
+        case VX_TYPE_OBJECT_ARRAY:
+        case VX_TYPE_TENSOR:
             break;
 
         case VX_TYPE_CONTEXT:

@@ -15,6 +15,7 @@
 */
 #define VX_CONVERT_POLICY_WRAP_ENABLE 1
 
+#define VX_13_NN_COMPATIBLITY 1
 /*
  VX_L2NORM_AXIS_PARAMETER_SUPPORT is used to declare that L2NORMALIZE can support axis parameter
  [value]

@@ -320,8 +320,8 @@ VX_PRIVATE_API vx_status vxoNNTensorCopy_SH_Initialize_Ext(vxnne_layer ops_layer
         reg_param->ptr = VX_NULL;
     }
 
-    input = vxoTensor_ReshapeTensor(src, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
-    output = vxoTensor_ReshapeTensor(dst, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+    input = vxoTensor_ReshapeTensor(src, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims, VX_NULL);
+    output = vxoTensor_ReshapeTensor(dst, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims, VX_NULL);
 
     copyNode->base.temp_tensors[0] = input;
     copyNode->base.temp_tensors[1] = output;
@@ -404,12 +404,12 @@ VX_PRIVATE_API vx_bool vxoNNTensorCopy_TP_Support(vx_node node, const vx_referen
     vx_tensor  dst = (vx_tensor)parameters[1];
     vx_context context = vxGetContext((vx_reference)node);
 
-    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_TP, VX_TYPE_INVALID, VX_NULL);
+    vx_bool support = vxoLayer_CheckSupport(context, VX_NN_QUERY_TP, VX_TYPE_INVALID, VX_NULL);
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
     support = support && (TENSOR_VIEW_SIZE_INDEX(dst, 0) * TENSOR_VIEW_SIZE_INDEX(dst, 1) * TENSOR_VIEW_SIZE_INDEX(dst, 2) > 1);
-    support = support && vxnneIsTPSupportFormat(context, src, VX_NULL, dst);
+    support = support && vxnneIsTPSupportFormat(node->graph, src, VX_NULL, dst);
 
     if (support)
     {
@@ -440,6 +440,8 @@ VX_PRIVATE_API vx_bool vxoNNTensorCopy_TP_Support(vx_node node, const vx_referen
             support = support && (srcDimCount == dstDimCount);
         }
     }
+
+    support = support && IsTPSupport_CheckOutPixel(node->base.context, src, dst);
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
@@ -532,6 +534,8 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint
     return status;
 }
 #endif
+
+
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorCopy_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status  status                     = VX_SUCCESS;
@@ -657,7 +661,7 @@ OnError:
 
         if (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP) &&
             (TENSOR_VIEW_SIZE_INDEX(dst, 0) * TENSOR_VIEW_SIZE_INDEX(dst, 1) * TENSOR_VIEW_SIZE_INDEX(dst, 2) > 1) &&
-            vxnneIsTPSupportFormat(context, src, VX_NULL, dst))
+            vxnneIsTPSupportFormat(node->graph, src, VX_NULL, dst))
         {
             vx_op_param_s conv = {0};
 
@@ -699,8 +703,8 @@ OnError:
                 vx_tensor input      = NULL;
                 vx_tensor output     = NULL;
 
-                input     = vxoTensor_ReshapeTensor(src, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
-                output     = vxoTensor_ReshapeTensor(dst, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+                input     = vxoTensor_ReshapeTensor(src, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims, VX_NULL);
+                output     = vxoTensor_ReshapeTensor(dst, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims, VX_NULL);
 
                 copyNode->base.temp_tensors[0] = input;
                 copyNode->base.temp_tensors[1] = output;
@@ -763,6 +767,7 @@ OnError:
 exit:
     if(copyNode) gcoOS_Free(NULL, (gctPOINTER)copyNode);
 #endif
+
     return status;
 
 }
