@@ -781,16 +781,15 @@ vx_status checkGetDataFactor(vx_uint32 data, vx_uint32 *factor, vx_uint32 minLim
     return status;
 }
 
-vx_bool checkOutputTensorDoAlu(vx_tensor src, vx_tensor dst)
+vx_bool checkOutputTensorDoAlu(vx_tensor src, vx_tensor dst, vx_bool is_evis)
 {
     vx_enum    srcFormat             = TENSOR_DATA_TYPE(src);
     vx_enum    srcQFormat            = TENSOR_QUANT_TYPE(src);
     vx_enum    dstFormat             = TENSOR_DATA_TYPE(dst);
     vx_enum    dstQFormat            = TENSOR_QUANT_TYPE(dst);
-    vx_context context               = vxoContext_GetFromReference((vx_reference)src);
     vx_bool    formatCheck           = vx_false_e;
 
-    if(context->evisNoInst.supportEVIS)
+    if(is_evis)
     {
         formatCheck = (vx_bool)(srcFormat == VX_TYPE_FLOAT16);
     }
@@ -1442,10 +1441,12 @@ void initUndefinedHardwareConfig(vx_global_data globalData)
             /*total latency*/globalData->nnConfig.derivedFeature.totalLatency,
             /*max soc out standing */(float)globalData->nnConfig.customizedFeature.maxSocOTNumber
         };
-        archHAL_CHIPIDENTITY archChipDentity = {0};
+        archHAL_CHIPIDENTITY archChipDentity;
         APM_IN_PARAM_T inParam;
-        gcsHAL_CHIPIDENTITY chipIdentity = {0};
+        gcsHAL_CHIPIDENTITY chipIdentity;
+        memset(&archChipDentity,0,sizeof(archHAL_CHIPIDENTITY));
         memset(&inParam,0,sizeof(APM_IN_PARAM_T));
+        memset(&chipIdentity,0,sizeof(gcsHAL_CHIPIDENTITY));
         gcoHAL_QueryChipIdentityEx(VX_NULL, sizeof(gcsHAL_CHIPIDENTITY), &chipIdentity);
         inParam.chipDef.ChipID = (vx_uint32)chipIdentity.chipModel;
         inParam.chipDef.ChipVersion = chipIdentity.chipRevision;

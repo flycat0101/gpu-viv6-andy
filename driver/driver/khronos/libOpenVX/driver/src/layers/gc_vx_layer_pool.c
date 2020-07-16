@@ -451,7 +451,7 @@ VX_PRIVATE_API vx_bool vxoNNPooling_SH_EVIS_Support_Ext(vx_node node, const vx_r
         vx_bool enable_L2Pool_SH           = vx_false_e;
         vx_bool generic_flag               = vx_false_e;
         vx_bool maxPool_BF_flag            = vx_false_e;
-        vx_bool enable_outputALU           = checkOutputTensorDoAlu(inputs, outputs);
+        vx_bool enable_outputALU           = checkOutputTensorDoAlu(inputs, outputs, evis);
         vx_bool enable_downSampleSH        = (vx_bool)(stride_x == 2 && (stride_x == stride_y) && poolSizeXValue == 1 && poolSizeYValue == 1 && (!enable_outputALU));
         vx_bool enable_tf_avgPool          = (vx_bool)(pool_pad_x_left || pool_pad_x_right ||pool_pad_y_top || pool_pad_y_bottom);
 
@@ -2193,7 +2193,7 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
             vx_bool enable_L2Pool_SH           = vx_false_e;
             vx_bool generic_flag               = vx_false_e;
             vx_bool maxPool_BF_flag            = vx_false_e;
-            vx_bool enable_outputALU           = checkOutputTensorDoAlu(inputs, outputs);
+            vx_bool enable_outputALU           = checkOutputTensorDoAlu(inputs, outputs, node->base.context->evisNoInst.supportEVIS);
             vx_bool enable_downSampleSH        = (vx_bool)(stride_x == 2 && (stride_x == stride_y) && poolSizeXValue == 1 && poolSizeYValue == 1 && (!enable_outputALU));
             vx_bool enable_tf_avgPool          = (vx_bool)(pool_pad_x_left || pool_pad_x_right ||pool_pad_y_top || pool_pad_y_bottom);
 

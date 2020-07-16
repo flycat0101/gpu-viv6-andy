@@ -314,7 +314,7 @@ VX_PRIVATE_API vx_bool vxoNNTensorReverse_SH_Support_Ext(vx_node node, const vx_
 
     axFlag = vx_true_e;
 
-    dataFormat_flag = (vx_bool)(!checkOutputTensorDoAlu(input, output));
+    dataFormat_flag = (vx_bool)(!checkOutputTensorDoAlu(input, output, evis));
     for (i = 0; i <numOfAxis; i++)
     {
        if(((vx_scalar)parameters[i + 2])->value->n32 == 3)
@@ -578,7 +578,7 @@ OnError:
 
         axFlag = vx_true_e;
 
-        dataFormat_flag = (vx_bool)(!checkOutputTensorDoAlu(input, output));
+        dataFormat_flag = (vx_bool)(!checkOutputTensorDoAlu(input, output, node->base.context->evisNoInst.supportEVIS));
         for (i = 0; i <numOfAxis; i++)
         {
            if(((vx_scalar)parameters[i + 2])->value->n32 == 3)
