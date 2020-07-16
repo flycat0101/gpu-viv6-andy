@@ -893,21 +893,19 @@ static vx_param_description_s basekernel_multiply_params[] = {
     {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
-/*VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Multiply(vx_node node, const vx_reference *parameters, vx_uint32 num);*/
-VX_PRIVATE_API vx_status VX_CALLBACK vxoMultiply_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Multiply(vx_node node, const vx_reference *parameters, vx_uint32 num);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoMultiply_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoMultiply_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
 vx_kernel_description_s basekernel_multiply = {
     VX_KERNEL_MULTIPLY,
     "org.khronos.openvx.multiply",
-    NULL,
+    vxoBaseKernel_Multiply,
     basekernel_multiply_params, vxmLENGTH_OF(basekernel_multiply_params),
     NULL,
     vxoMultiply_ValidateInput,
     vxoMultiply_ValidateOutput,
-    vxoMultiply_Initialize,
     NULL,
-    {"multiply.vx"},
+    NULL,
 };
 
 static vx_param_description_s basekernel_add_subtract_params[] = {

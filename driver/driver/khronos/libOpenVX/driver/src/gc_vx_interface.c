@@ -39,7 +39,6 @@ static ovx12_vxc_kernel_enum getOvx12VXCKernelEnum(vx_enum kernelID)
         case VX_KERNEL_NON_MAX_SUPPRESSION:             type = non_max_suppression;     break;
         case VX_KERNEL_MATCH_TEMPLATE:                  type = match_template;          break;
         case VX_KERNEL_LBP:                             type = lbp;                     break;
-        case VX_KERNEL_MULTIPLY:                        type = multiply;                break;
         case VX_KERNEL_INTERNAL_SCHARR3x3:              type = scharr3x3;               break;
         case VX_KERNEL_GAUSSIAN_3x3:                    type = gaussian_3x3;            break;
         case VX_KERNEL_INTERNAL_HOUGH_MAKEPOINTS:       type = makepoints;              break;
@@ -5230,292 +5229,44 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Not(vx_node node, const vx_re
     gcmFOOTER_NO();
     return vxNot(node, inputImage, outputImage);
 }
-VX_PRIVATE_API vx_status VX_CALLBACK vxoMultiply_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num)
-{
-                                                /*workdim, globel offset, globel scale    local size, globel size,*/
-    vx_kernel_execution_parameters_t shaderParam = {2, {0, 0, 0}, {1, 1, 0}, {0, 0, 0}, {0, 0, 0}};
-    vx_uint32   width               = 0;
-    vx_uint32   height              = 0;
-    vx_image    input0              = (vx_image)parameters[0];
-    vx_image    input1              = (vx_image)parameters[1];
-    vx_image    output              = (vx_image)parameters[5];
-    vx_df_image src0_format         = 0;
-    vx_df_image src1_format         = 0;
-    vx_df_image dst_format          = 0;
-    vx_uint32   offset              = 0;
-    vx_status   status              = VX_FAILURE;
-    vx_float32  scale               = 0;
-    vx_uint16   mulitplier          = 1;
-    vx_int8     postShift           = 0;
-    vx_enum     overflow_policy     = -1;
-    vx_enum     rounding_policy     = -1;
-    vx_float32  logs                = 2.0f;
-    vx_float32  logr                = 1.0f;
 
-    char kernelName[1024];
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Multiply(vx_node node, const vx_reference *parameters, vx_uint32 num)
+{
+    vx_status status = VX_FAILURE;
+    vx_image  inputImage0;
+    vx_image  inputImage1;
+    vx_scalar scale_param;
+    vx_scalar opolicy_param;
+    vx_scalar rpolicy_param;
+    vx_image  outputImage;
+    vx_bool is_replicated = vx_false_e;
 
     gcmHEADER_ARG("node=%p, parameters=%p, num=0x%x", node, parameters, num);
 
-    status = vxoLoadVxKernelShader(node->base.context, node, "multiply.vx");
+    if (num != 6)
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
+    inputImage0   = (vx_image)parameters[0];
+    inputImage1   = (vx_image)parameters[1];
+    scale_param   = (vx_scalar)parameters[2];
+    opolicy_param = (vx_scalar)parameters[3];
+    rpolicy_param = (vx_scalar)parameters[4];
+    outputImage   = (vx_image)parameters[5];
 
-    if (status != VX_SUCCESS)
+    status = vxQueryNode(node, VX_NODE_IS_REPLICATED, &is_replicated, sizeof(is_replicated));
+
+    if (VX_SUCCESS != status)
     {
         gcmFOOTER_ARG("%d", status);
         return status;
     }
 
-    status = vxQueryImage(input0, VX_IMAGE_FORMAT, &src0_format, sizeof(src0_format));
-    status |= vxQueryImage(input0, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-    status |= vxQueryImage(input0, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
-
-    status |= vxQueryImage(input1, VX_IMAGE_FORMAT, &src1_format, sizeof(src1_format));
-    status |= vxQueryImage(output, VX_IMAGE_FORMAT, &dst_format, sizeof(dst_format));
-
-    status |= vxReadScalarValue((vx_scalar)parameters[2], &scale);
-    status |= vxReadScalarValue((vx_scalar)parameters[3], &overflow_policy);
-    status |= vxReadScalarValue((vx_scalar)parameters[4], &rounding_policy);
-
-    if (status != VX_SUCCESS)
-    {
-        gcmFOOTER_ARG("%d", status);
-        return status;
-    }
-
-#define MULTIPLY_EPS 0.00001f
-#define ROUNDF(x) floor(x + MULTIPLY_EPS)
-    getFP32M0AndN(scale, &mulitplier, &postShift);
-
-    if (scale > 0)
-    {
-        logs = -gcoMATH_Log2(scale);
-        logr = (vx_float32)ROUNDF(logs);
-    }
-
-    switch (src0_format)
-    {
-    case VX_DF_IMAGE_U8:
-        gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_U8Mul");
-        break;
-    case VX_DF_IMAGE_S16:
-        gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_I16Mul");
-        break;
-    default:
-        break;
-    }
-
-    switch (src1_format)
-    {
-    case VX_DF_IMAGE_U8:
-        gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "U8to");
-        break;
-    case VX_DF_IMAGE_S16:
-        gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "I16to");
-        break;
-    default:
-        break;
-    }
-
-    switch (dst_format)
-    {
-    case VX_DF_IMAGE_U8:
-        gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "U8");
-        break;
-    case VX_DF_IMAGE_S16:
-        gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "I16");
-        break;
-    default:
-        break;
-    }
-
-    switch (overflow_policy)
-    {
-    case VX_CONVERT_POLICY_WRAP:
-        gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_WRA");
-        break;
-    case VX_CONVERT_POLICY_SATURATE:
-        gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_SAT");
-        break;
-    default:
-        break;
-    }
-
-    switch (rounding_policy)
-    {
-    case VX_ROUND_POLICY_TO_ZERO:
-        gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_RTZ");
-        break;
-    case VX_ROUND_POLICY_TO_NEAREST_EVEN:
-        gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_RTE");
-        break;
-    default:
-        break;
-    }
-
-    if ((logs - logr < MULTIPLY_EPS) && (src0_format != VX_DF_IMAGE_U8 || src1_format != VX_DF_IMAGE_U8))
-    {
-        gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_OPT");
-    }
-
-    vxStrCopySafe(node->kernelsubname, VX_MAX_KERNEL_NAME, kernelName);
-
-    if ((logs - logr < MULTIPLY_EPS) && (src0_format != VX_DF_IMAGE_U8 || src1_format != VX_DF_IMAGE_U8))
-    {
-        vx_uint32 uniA_Times_B_2x8[16] = {
-            0x11111111, // TCfg
-            0x00000000, // ASelt
-            0x03020100, 0x07060504, // ABin
-            0x11111111, // BSelt
-            0x03020100, 0x07060504, // BBin
-            0x00000400, // AccumType, ConstantType, and PostShift
-            0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
-        };
-
-        postShift = (vx_int8)ROUNDF(logs);
-        uniA_Times_B_2x8[7] |= (postShift & 0x1F);
-
-        status = vxSetNodeUniform(node, "uniA_Times_B_2x8", 1, uniA_Times_B_2x8);
-        if (status != VX_SUCCESS)
-        {
-            gcmFOOTER_ARG("%d", status);
-            return status;
-        }
-    }
-    else if (src0_format == VX_DF_IMAGE_S16 && src1_format == VX_DF_IMAGE_S16
-        && dst_format == VX_DF_IMAGE_S16 && overflow_policy == VX_CONVERT_POLICY_WRAP)
-    {
-        vx_uint32 uniDataToF32_0_4x4[16] = {
-            0x01010101, // TCfg
-            0x00000000, // ASelt
-            0x00010000, 0x00030002, // ABin
-            0x02020202, // BSelt
-            0x00000000, 0x00000000, // BBin
-            0x00000600, // AccumType, ConstantType, and PostShift
-            0x00000001, 0x00000000, 0x00000001, 0x00000000, 0x00000001, 0x00000000, 0x00000001, 0x00000000 // Constant
-        };
-        vx_uint32 uniDataToF32_1_4x4[16] = {
-            0x01010101, // TCfg
-            0x00000000, // ASelt
-            0x00050004, 0x00070006, // ABin
-            0x02020202, // BSelt
-            0x00000000, 0x00000000, // BBin
-            0x00000300, // AccumType, ConstantType, and PostShift
-            0x00000001, 0x00000000, 0x00000001, 0x00000000, 0x00000001, 0x00000000, 0x00000001, 0x00000000 // Constant
-        };
-        vx_uint32 uniExtract_8Bin_2x8[16] = {
-            0x33333333, // TCfg
-            0x11110000, // ASelt
-            0x03020100, 0x03020100, // ABin
-            0x00000000, // BSelt
-            0x00000000, 0x00000000, // BBin
-            0x00002400, // AccumType, ConstantType, and PostShift
-            0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
-        };
-
-        vx_uint32 i_scale = *(vx_uint32*)&scale + 1;
-        scale = *(float*)&i_scale;
-
-        status = vxSetNodeUniform(node, "uniDataToF32_0_4x4", 1, uniDataToF32_0_4x4);
-        status |= vxSetNodeUniform(node, "uniDataToF32_1_4x4", 1, uniDataToF32_1_4x4);
-        status |= vxSetNodeUniform(node, "uniExtract_8Bin_2x8", 1, uniExtract_8Bin_2x8);
-        if (status != VX_SUCCESS)
-        {
-            gcmFOOTER_ARG("%d", status);
-            return status;
-        }
-    }
-    else if (src0_format == VX_DF_IMAGE_U8 && src1_format == VX_DF_IMAGE_U8)
-    {
-        vx_uint32 i = 0;
-        vx_uint32 uniA_Times_B_2x8[16] = {
-            0x11111111, // TCfg
-            0x00000000, // ASelt
-            0x03020100, 0x07060504, // ABin
-            0x11111111, // BSelt
-            0x03020100, 0x07060504, // BBin
-            0x00000400, // AccumType, ConstantType, and PostShift
-            0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
-        };
-        vx_uint32 uniA_Times_F32_2x8[16] = {
-            0x11111111, // TCfg
-            0x00000000, // ASelt
-            0x03020100, 0x07060504, // ABin
-            0x22222222, // BSelt
-            0x00000000, 0x00000000, // BBin
-            0x00000600, // AccumType, ConstantType, and PostShift
-            0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
-        };
-
-        uniA_Times_F32_2x8[7] |= (postShift & 0x1F);
-
-        for (i = 8; i < 16; i ++)
-        {
-            uniA_Times_F32_2x8[i] = mulitplier;
-        }
-
-        status = vxSetNodeUniform(node, "uniA_Times_B_2x8", 1, uniA_Times_B_2x8);
-        status |= vxSetNodeUniform(node, "uniA_Times_F32_2x8", 1, uniA_Times_F32_2x8);
-        if (status != VX_SUCCESS)
-        {
-            gcmFOOTER_ARG("%d", status);
-            return status;
-        }
-    }
-    else if ((src0_format == VX_DF_IMAGE_S16 || src0_format == VX_DF_IMAGE_U8)
-           && (src1_format == VX_DF_IMAGE_S16 || src1_format == VX_DF_IMAGE_U8)
-           && (dst_format == VX_DF_IMAGE_S16  || dst_format == VX_DF_IMAGE_U8) )
-    {
-        vx_uint32 uniA_Times_B_0_4x4[16] = {
-            0x01010101, // TCfg
-            0x00000000, // ASelt
-            0x00010000, 0x00030002, // ABin
-            0x01010101, // BSelt
-            0x00010000, 0x00030002, // BBin
-            0x00000400, // AccumType, ConstantType, and PostShift
-            0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
-        };
-        vx_uint32 uniA_Times_B_1_4x4[16] = {
-            0x01010101, // TCfg
-            0x00000000, // ASelt
-            0x00050004, 0x00070006, // ABin
-            0x01010101, // BSelt
-            0x00050004, 0x00070006, // BBin
-            0x00000400, // AccumType, ConstantType, and PostShift
-            0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
-        };
-        vx_uint32 uniExtract_8Bin_2x8[16] = {
-            0x33333333, // TCfg
-            0x11110000, // ASelt
-            0x03020100, 0x03020100, // ABin
-            0x00000000, // BSelt
-            0x00000000, 0x00000000, // BBin
-            0x00002400, // AccumType, ConstantType, and PostShift
-            0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
-        };
-
-        status = vxSetNodeUniform(node, "uniA_Times_B_0_4x4", 1, uniA_Times_B_0_4x4);
-        status |= vxSetNodeUniform(node, "uniA_Times_B_1_4x4", 1, uniA_Times_B_1_4x4);
-        status |= vxSetNodeUniform(node, "uniExtract_8Bin_2x8", 1, uniExtract_8Bin_2x8);
-        if (status != VX_SUCCESS)
-        {
-            gcmFOOTER_ARG("%d", status);
-            return status;
-        }
-    }
-    else
-    {
-        vxError("The format [0x%x, 0x%x, 0x%x]is not supported in ovx1.2 kernel!\n", src0_format, src1_format, dst_format);
-    }
-
-    shaderParam.globalWorkScale[0] = 8;
-    shaderParam.globalWorkScale[1] = 1;
-    shaderParam.globalWorkSize[0]  = (width + shaderParam.globalWorkScale[0] - 1) / shaderParam.globalWorkScale[0];
-    shaderParam.globalWorkSize[1]  = height;
-
-    status |= vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
-
-    gcmFOOTER_ARG("%d", status);
-    return status;
+    gcmFOOTER_NO();
+    return vxMultiply(node, inputImage0, inputImage1, scale_param, opolicy_param, rpolicy_param, outputImage);
 }
+
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoMultiply_ValidateInput(vx_node node, vx_uint32 index)
 {
