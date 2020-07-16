@@ -208,7 +208,6 @@ __kernel void vxcL2Pooling_global_uint8
     vxc_uchar16 src0, src1, src2, src3;
     vxc_float4 sumVec;
 
-    float4 filter = read_imagef(mask, coord.xy);
     float sum = 0;
     do
     {
@@ -228,18 +227,12 @@ __kernel void vxcL2Pooling_global_uint8
     } while (coord.z < pool_size);
 
     sum += NInputZPSquare;
-    sum = sum * filter.x;
     if (enable_uint8_format)
     {
         sum = sum * uint8Scale;
         sum = sqrt(sum);
         sum += output_ZP;
         unsigned char dst = convert_uchar_rte(sum);
-        unsigned char min, max;
-        _viv_asm(COPY, min, minData, 4);
-        _viv_asm(COPY, max, maxData, 4);
-        dst = max(dst, min);
-        dst = min(dst, max);
         VXC_WriteImage(output, coord.xy, dst, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
     }
     else
@@ -250,11 +243,6 @@ __kernel void vxcL2Pooling_global_uint8
         sum = sqrt(sum);
         _viv_asm(CONV, tmp, sum);
         _viv_asm(COPY, dst, tmp, 2);
-        short min, max;
-        _viv_asm(COPY, min, minData, 4);
-        _viv_asm(COPY, max, maxData, 4);
-        dst = max(dst, min);
-        dst = min(dst, max);
         VXC_WriteImage(output, coord.xy, dst, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
     }
 }
@@ -271,7 +259,7 @@ __kernel void vxcL2Pooling_global_fp16
     vxc_half8  vec0, vec1, vec2, vec3;
     vxc_float4 sumVec;
     float sum = 0;
-    float4 filter = read_imagef(mask, coord.xy);
+
     do
     {
         VXC_ReadImage(src0, input, coord.zy, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
@@ -292,18 +280,12 @@ __kernel void vxcL2Pooling_global_fp16
         sum = sum + dot(sumVec, one);
     } while (coord.z < pool_size);
 
-    sum = sum * filter.x;
     if (enable_uint8_format)
     {
         sum = sum * genericL2Scale;
         sum = sqrt(sum);
         sum += output_ZP;
         unsigned char dst = convert_uchar_rte(sum);
-        unsigned char min, max;
-        _viv_asm(COPY, min, minData, 4);
-        _viv_asm(COPY, max, maxData, 4);
-        dst = max(dst, min);
-        dst = min(dst, max);
         VXC_WriteImage(output, coord.xy, dst, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
     }
     else
@@ -314,11 +296,6 @@ __kernel void vxcL2Pooling_global_fp16
         sum = sqrt(sum);
         _viv_asm(CONV, tmp, sum);
         _viv_asm(COPY, dst, tmp, 2);
-        short min, max;
-        _viv_asm(COPY, min, minData, 4);
-        _viv_asm(COPY, max, maxData, 4);
-        dst = max(dst, min);
-        dst = min(dst, max);
         VXC_WriteImage(output, coord.xy, dst, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
     }
 }

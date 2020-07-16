@@ -82,7 +82,7 @@ float4 exponential(float4 x, float coeff)
         prob = exponential(prob, scaleLogE) * probSum_log.xxxx; \
         prob = prob * OUT_SCALE + OUT_OFFSET; \
         _viv_asm(conv_mode, vec1, prob); \
-        VXC_DP2x8(dst, vec0, vec1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvertInt32toUint8_2x8); \
+        VXC_DP2x8(dst, vec0, vec1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), uniConvertInt32toUint8_2x8); \
         write_fun(output, coord, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
         coord.x += 8; \
     }
@@ -159,11 +159,11 @@ CONV, 1, 0, VXC_VertMax3_Integer, VXC_HorzMax3_Integer)
     { \
         read_fun(val0, input,  coord, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
         _viv_asm(COPY, img_val0, val0, 16); \
-        VXC_DP4x4(prob, img_val0, val, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniGetSubData0to3_4x4); \
+        VXC_DP4x4(prob, img_val0, val, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 1), uniGetSubData0to3_4x4); \
         prob = exponential(prob, scaleLogE) * probSum_log.xxxx; \
         write_imagef(output, coord, prob); \
         coord.x += 4; \
-        VXC_DP4x4(prob, img_val0, val, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniGetSubData4to7_4x4); \
+        VXC_DP4x4(prob, img_val0, val, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 1), uniGetSubData4to7_4x4); \
         prob = exponential(prob, scaleLogE) * probSum_log.xxxx; \
         write_imagef(output, coord, prob); \
         coord.x += 4; \
@@ -303,7 +303,7 @@ _viv_uniform VXC_512Bits uniExtractHalf4_4x4;
         vxc_half4 tmp; \
         vxc_short4 dst; \
         _viv_asm(CONV, vec, prob); \
-        VXC_DP4x4(tmp, vec, vec, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniExtractHalf4_4x4); \
+        VXC_DP4x4(tmp, vec, vec, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 1), uniExtractHalf4_4x4); \
         _viv_asm(COPY, dst, tmp, 8); \
         write_fun(output, coord, dst, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0)); \
         coord.x += 4; \
@@ -472,7 +472,7 @@ __kernel void softmax_axis0_##src_name##to##dst_name##_AXSIZE2_2D \
     save_type dst; \
     _viv_asm(CONV_RTE, vect0, data0); \
     _viv_asm(CONV_RTE, vect1, data1); \
-    VXC_DP2x8(tmp, vect0, vect1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExtractABAB_2x8); \
+    VXC_DP2x8(tmp, vect0, vect1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), uniExtractABAB_2x8); \
     _viv_asm(COPY, dst, tmp, 16); \
     VXC_WriteImage(output, coord.xy, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1)); \
 }

@@ -21611,7 +21611,7 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
         }
 
         parameters[0] = (vx_reference)input_rs;
-        parameters[2] = (vx_reference)output_rs;
+        parameters[3] = (vx_reference)output_rs;
     }
     else if (pad_left != 0 || pad_top != 0 || height != in_height || width != in_width)
     {
@@ -21672,11 +21672,9 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
 
     if (globalPooling_flag && inputFormat == VX_TYPE_UINT8)
     {
-        vx_int32     minData                = 0;
-        vx_int32     maxData                = 0;
         vx_int32     enable_uint8_format    = outputFormat == VX_TYPE_UINT8 ? 1 : 0;
         vx_uint32    input_2ZP              = input_ZP * 2;
-        vx_float32   uint8Scale             = scaleIn * scaleIn/ (float)(scaleOut * scaleOut);
+        vx_float32   uint8Scale             = scaleIn * scaleIn/ (float)(kernel_size_x * kernel_size_y * scaleOut * scaleOut);
         vx_float32   uint8ZP_out            = (vx_float32)output_ZP;
         vx_int32     pool_size              = gcmALIGN_SAFE(kernel_size_x * kernel_size_y, 32);
         vx_float32   NInputZPSquare         = (vx_float32)input_ZP * input_ZP * pool_size;
@@ -21690,30 +21688,10 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
             0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
         };
 
-        if (outputFormat == VX_TYPE_UINT8)
-        {
-            vx_uint8     minVal    = 0;
-            vx_uint8     maxVal    = 0;
-            calculateActivationRangeUInt8(activation, TENSOR_TF_SCALE(output), TENSOR_TF_ZEROPOINT(output), &minVal, &maxVal, 0, 65536);
-
-            minData = (vx_int32)minVal;
-            maxData = (vx_int32)maxVal;
-        }
-        else
-        {
-            vx_int16     minVal                = 0;
-            vx_int16     maxVal                = 0;
-            calculateActivationRangeFloat16(activation, &minVal, &maxVal);
-            minData = (vx_int32)minVal;
-            maxData = (vx_int32)maxVal;
-        }
-
         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_global_uint8", borderMode);
         if (!shaderExecutable) goto OnError;
 
         status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniAcc8BinSquareUInt8_16x1", 1, uniAcc8BinSquareUInt8_16x1);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "minData", 1, &minData);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "maxData", 1, &maxData);
         if (status != VX_SUCCESS) goto OnError;
 
         status = vxnneShaderExecutable_SetUniform(shaderExecutable, "input_2ZP", 1, &input_2ZP);
@@ -21726,12 +21704,10 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
     }
     else if (globalPooling_flag && inputFormat == VX_TYPE_FLOAT16)
     {
-        vx_int32     minData                = 0;
-        vx_int32     maxData                = 0;
         vx_int32     enable_uint8_format    = outputFormat == VX_TYPE_UINT8 ? 1 : 0;
         vx_float32   uint8ZP_out            = (vx_float32)output_ZP;
         vx_int32     pool_size              = gcmALIGN_SAFE(kernel_size_x * kernel_size_y, 32);
-        vx_float32   genericL2Scale         = (vx_float32)1.0 / (vx_float32)(scaleOut * scaleOut);
+        vx_float32   genericL2Scale         = (vx_float32)1.0 / (vx_float32)(kernel_size_x * kernel_size_y * scaleOut * scaleOut);
         vx_uint32 uniAcc8BinSquareFp16_16x1[16] = {
             0x00005555, // TCfg
             0x00000000, // ASelt
@@ -21742,30 +21718,10 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
             0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
         };
 
-        if (outputFormat == VX_TYPE_UINT8)
-        {
-            vx_uint8     minVal    = 0;
-            vx_uint8     maxVal    = 0;
-            calculateActivationRangeUInt8(activation, TENSOR_TF_SCALE(output), TENSOR_TF_ZEROPOINT(output), &minVal, &maxVal, 0, 65536);
-
-            minData = (vx_int32)minVal;
-            maxData = (vx_int32)maxVal;
-        }
-        else
-        {
-            vx_int16     minVal                = 0;
-            vx_int16     maxVal                = 0;
-            calculateActivationRangeFloat16(activation, &minVal, &maxVal);
-            minData = (vx_int32)minVal;
-            maxData = (vx_int32)maxVal;
-        }
-
         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_global_fp16", borderMode);
         if (!shaderExecutable) goto OnError;
 
         status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniAcc8BinSquareFp16_16x1", 1, uniAcc8BinSquareFp16_16x1);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "minData", 1, &minData);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "maxData", 1, &maxData);
         if (status != VX_SUCCESS) goto OnError;
 
         status = vxnneShaderExecutable_SetUniform(shaderExecutable, "genericL2Scale", 1, &genericL2Scale);
