@@ -11753,31 +11753,39 @@ VIR_Symbol_IsSymbolUnsupport(
     return gcvFALSE;
 }
 
+/* Check if a symbol can be indexing accessable, for now, only an array and a matrix can support this. */
 gctBOOL
-VIR_Symbol_NeedConsecutiveTemp(
+VIR_Symbol_IsIndexingAccessable(
     IN VIR_Shader*          pShader,
     IN VIR_Symbol*          pSym
     )
 {
-    gctINT                  regCount = VIR_Type_GetRegCount(pShader, VIR_Symbol_GetType(pSym), gcvFALSE);
+    VIR_Type*               pSymType = VIR_Symbol_GetType(pSym);
 
-    if (regCount <= 1)
+    if (VIR_Symbol_isVreg(pSym) && VIR_Symbol_GetVregVariable(pSym))
     {
-        /* Check the variable to see if it need the consecutive temp. */
-        if (VIR_Symbol_isVreg(pSym))
-        {
-            VIR_Symbol*     pVarSym = VIR_Symbol_GetVregVariable(pSym);
-
-            if (pVarSym)
-            {
-                regCount = VIR_Type_GetRegCount(pShader, VIR_Symbol_GetType(pVarSym), gcvFALSE);
-            }
-        }
+        return VIR_Symbol_IsIndexingAccessable(pShader, VIR_Symbol_GetVregVariable(pSym));
     }
 
-    if (regCount > 1)
+    if (VIR_Type_isMatrix(pSymType) || VIR_Type_isArray(pSymType))
     {
         return gcvTRUE;
+    }
+    else if (VIR_Type_isStruct(pSymType))
+    {
+        VIR_SymIdList*      pFields = VIR_Type_GetFields(pSymType);
+        gctUINT             i;
+
+        for (i = 0; i < VIR_IdList_Count(pFields); i++)
+        {
+            VIR_Id          id       = VIR_IdList_GetId(pFields, i);
+            VIR_Symbol*     pFieldSym = VIR_Shader_GetSymFromId(pShader, id);
+
+            if (VIR_Symbol_IsIndexingAccessable(pShader, pFieldSym))
+            {
+                return gcvTRUE;
+            }
+        }
     }
 
     return gcvFALSE;

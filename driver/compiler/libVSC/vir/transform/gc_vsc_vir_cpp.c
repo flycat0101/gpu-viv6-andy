@@ -3252,7 +3252,7 @@ VSC_ErrCode VIR_SCPP_PerformOnBB(
             VSC_HASH_ITERATOR iter;
             VSC_DIRECT_HNODE_PAIR pair;
 
-            if (!VIR_Symbol_NeedConsecutiveTemp(shader, destSym))
+            if (!VIR_Symbol_IsIndexingAccessable(shader, destSym))
             {
                 vscHTBLIterator_Init(&iter, defsTable);
                 for(pair = vscHTBLIterator_DirectFirst(&iter);
@@ -3324,9 +3324,9 @@ VSC_ErrCode VIR_SCPP_PerformOnBB(
             {
                 srcIndexing = gcvTRUE;
             }
-            if(!VIR_Symbol_NeedConsecutiveTemp(shader, destSym) &&
+            if(!VIR_Symbol_IsIndexingAccessable(shader, destSym) &&
                VIR_Operand_isSymbol(src) &&
-               !VIR_Symbol_NeedConsecutiveTemp(shader, VIR_Operand_GetSymbol(src)) &&
+               !VIR_Symbol_IsIndexingAccessable(shader, VIR_Operand_GetSymbol(src)) &&
                (VIR_Operand_GetRelIndexing(src) == 0) &&
                _VIR_SCPP_NeedToUpdateCopy(pDuInfo, shader, instIter))
             {
