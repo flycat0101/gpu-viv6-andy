@@ -511,6 +511,7 @@ _VIR_LoopInfo_Init(
     VIR_LoopInfo_SetLoopHead(loopInfo, loopHead);
     VIR_LoopInfo_SetLoopEnd(loopInfo, loopEnd);
     VIR_LoopInfo_SetParentIterationCount(loopInfo, -1);
+    VIR_LoopInfo_SetIterationCount(loopInfo, -1);
     VIR_LoopInfo_SetBackJmpInInstSet(loopInfo, (VIR_Inst_GetId(BB_GET_START_INST(loopHead)) < VIR_Inst_GetId(BB_GET_START_INST(loopEnd))));
 }
 
@@ -2734,6 +2735,7 @@ VIR_LoopOpts_Init(
     VIR_LoopOpts_SetHWsupportPerCompDepForLS(loopOpts, pHwCfg->hwFeatureFlags.supportPerCompDepForLS);
     VIR_LoopOpts_SetOuterLoopFirst(loopOpts, gcvFALSE);
     VIR_LoopOpts_SetCurInvariantCodeMotionCount(loopOpts, 0);
+    VIR_LoopOpts_SetCalculateIterationCountOnly(loopOpts, gcvFALSE);
 
 OnError:
     return errCode;
@@ -2908,6 +2910,46 @@ VIR_LoopOpts_DetectNaturalLoops(
 
 OnError:
     return errCode;
+}
+
+gctBOOL
+VIR_LoopOpts_IsBBInLoop(
+    VIR_LoopOpts*       pLoopOpts,
+    VIR_BASIC_BLOCK*    pBB,
+    VIR_LoopInfo**      ppLoopInfo
+    )
+{
+    gctBOOL             bFound = gcvFALSE;
+    VIR_LoopInfoMgr*    pLoopInfoMgr = VIR_LoopOpts_GetLoopInfoMgr(pLoopOpts);
+    VIR_LoopInfo*       pLoopInfo;
+    VSC_UL_ITERATOR     iter;
+
+    if (pLoopInfoMgr == gcvNULL)
+    {
+        return bFound;
+    }
+
+    vscULIterator_Init(&iter, VIR_LoopInfoMgr_GetLoopInfos(pLoopInfoMgr));
+    for (pLoopInfo = (VIR_LoopInfo*)vscULIterator_First(&iter);
+         pLoopInfo != gcvNULL;
+         pLoopInfo = (VIR_LoopInfo*)vscULIterator_Next(&iter))
+    {
+        if (_VIR_LoopInfo_BBIsInLoop(pLoopInfo, pBB))
+        {
+            bFound = gcvTRUE;
+            break;
+        }
+    }
+
+    if (bFound)
+    {
+        if (ppLoopInfo != gcvNULL)
+        {
+            *ppLoopInfo = pLoopInfo;
+        }
+    }
+
+    return bFound;
 }
 
 gctBOOL
@@ -4922,23 +4964,6 @@ _VIR_LoopInfo_StaticallyUnroll(
         ON_ERROR0(errCode);
     }   /* now loop order is loopInfo, newBB0, newBB1, newBB2, newBB3.... */
 
-    /* Copy the parent statically iteration count. */
-    if(VIR_LoopInfo_GetChildLoopCount(loopInfo))
-    {
-        VSC_UL_ITERATOR iter;
-        VSC_UNI_LIST_NODE_EXT* node;
-
-        vscULIterator_Init(&iter, VIR_LoopInfo_GetChildLoopSet(loopInfo));
-        for(node = CAST_ULN_2_ULEN(vscULIterator_First(&iter));
-            node != gcvNULL;
-            node = CAST_ULN_2_ULEN(vscULIterator_Next(&iter)))
-        {
-            VIR_LoopInfo* childLoopInfo = (VIR_LoopInfo*)vscULNDEXT_GetContainedUserData(node);
-
-            VIR_LoopInfo_SetParentIterationCount(childLoopInfo, (gctINT)(copyCount + 1));
-        }
-    }
-
     /* orgnize unrolled loop */
     {
         VIR_BB* bb = loopHead;
@@ -5446,13 +5471,16 @@ _VIR_LoopInfo_PerformLoopUnrollingOnLoop(
     VIR_Shader*     pShader = VIR_LoopInfo_GetShader(loopInfo);
     gctBOOL bHasChildLoop = (VIR_LoopInfo_GetChildLoopCount(loopInfo) != 0);
     VSC_HASH_TABLE* processedLoopInfos = VIR_LoopOpts_GetProcessedLoopInfos(loopOpts);
+    gctBOOL bCalculateIterationCountOnly = VIR_LoopOpts_GetCalculateIterationCountOnly(loopOpts);
 
     if (vscHTBL_DirectTestAndGet(processedLoopInfos, (void *)loopInfo, gcvNULL))
     {
         return errCode;
     }
+
     /* check shader instrs number, early quit if shader program is too large */
-    if (VIR_Shader_GetTotalInstructionCount(pShader) > VIR_LoopOpts_GetAllowedInstNumAfterUnroll(loopOpts))
+    if (!bCalculateIterationCountOnly &&
+        VIR_Shader_GetTotalInstructionCount(pShader) > VIR_LoopOpts_GetAllowedInstNumAfterUnroll(loopOpts))
     {
         errCode = vscHTBL_DirectSet(processedLoopInfos, (void *)loopInfo, gcvNULL);
         return errCode;
@@ -5508,6 +5536,34 @@ _VIR_LoopInfo_PerformLoopUnrollingOnLoop(
        VIR_LoopInfo_GetLowbound(loopInfo) != gcvNULL)
     {
         gctINT iterations = _VIR_LoopInfo_ComputeConstLoopIterations(loopInfo);
+
+        if (iterations > 0)
+        {
+            /* Set the iteration count. */
+            VIR_LoopInfo_SetIterationCount(loopInfo, iterations);
+
+            /* Copy the parent statically iteration count. */
+            if(VIR_LoopInfo_GetChildLoopCount(loopInfo))
+            {
+                VSC_UL_ITERATOR iter;
+                VSC_UNI_LIST_NODE_EXT* node;
+
+                vscULIterator_Init(&iter, VIR_LoopInfo_GetChildLoopSet(loopInfo));
+                for(node = CAST_ULN_2_ULEN(vscULIterator_First(&iter));
+                    node != gcvNULL;
+                    node = CAST_ULN_2_ULEN(vscULIterator_Next(&iter)))
+                {
+                    VIR_LoopInfo* childLoopInfo = (VIR_LoopInfo*)vscULNDEXT_GetContainedUserData(node);
+
+                    VIR_LoopInfo_SetParentIterationCount(childLoopInfo, iterations);
+                }
+            }
+        }
+
+        if (bCalculateIterationCountOnly)
+        {
+            return errCode;
+        }
 
         if(_VIR_LoopInfo_MatchIterationFactor(loopInfo, iterations))
         {
@@ -5975,6 +6031,31 @@ _VIR_MaxInvariantCodeMotionCount(
     return maxInvariantCodeCount;
 }
 
+VSC_ErrCode
+VIR_LoopOpts_CalculateIterationCountOnly(
+    VIR_LoopOpts*       pLoopOpts
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    gctBOOL             bOriginalMode = VIR_LoopOpts_GetCalculateIterationCountOnly(pLoopOpts);
+    gctBOOL             bChanged = gcvFALSE;
+
+    /* Set calculate only. */
+    VIR_LoopOpts_SetCalculateIterationCountOnly(pLoopOpts, gcvTRUE);
+
+    errCode = vscVIR_BuildDOMTreePerCFG(VIR_Function_GetCFG(VIR_LoopOpts_GetFunc(pLoopOpts)));
+    ON_ERROR(errCode, "Fail to build the DOM tree.");
+
+    errCode = _VIR_LoopOpts_PerformSpecOptOnLoops(pLoopOpts, _VIR_LoopInfo_PerformLoopUnrollingOnLoop, gcvTRUE, &bChanged);
+    ON_ERROR(errCode, "Fail to perform loop unrolling.");
+
+    /* Reset the mode. */
+    VIR_LoopOpts_SetCalculateIterationCountOnly(pLoopOpts, bOriginalMode);
+
+OnError:
+    return errCode;
+}
+
 DEF_QUERY_PASS_PROP(VIR_LoopOpts_PerformOnShader)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_LL;
@@ -5985,7 +6066,6 @@ DEF_QUERY_PASS_PROP(VIR_LoopOpts_PerformOnShader)
     pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
 
 }
-
 
 DEF_SH_NECESSITY_CHECK(VIR_LoopOpts_PerformOnShader)
 {

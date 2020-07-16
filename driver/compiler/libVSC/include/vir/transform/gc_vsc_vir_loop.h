@@ -36,6 +36,7 @@ typedef struct VIR_LOOPOPTS
     gctUINT curInvariantCodeMotionCount;
     gctBOOL hwsupportPerCompDepForLS;
     gctBOOL outerLoopFirst;
+    gctBOOL bCalculateIterationCountOnly;
 } VIR_LoopOpts;
 
 #define VIR_LoopOpts_GetShader(lo)                        ((lo)->shader)
@@ -66,6 +67,8 @@ typedef struct VIR_LOOPOPTS
 #define VIR_LoopOpts_SetHWsupportPerCompDepForLS(lo, b)   ((lo)->hwsupportPerCompDepForLS = (b))
 #define VIR_LoopOpts_SetOuterLoopFirst(lo, b)             ((lo)->outerLoopFirst = (b))
 #define VIR_LoopOpts_GetOuterLoopFirst(lo)                ((lo)->outerLoopFirst)
+#define VIR_LoopOpts_SetCalculateIterationCountOnly(lo, b)((lo)->bCalculateIterationCountOnly = (b))
+#define VIR_LoopOpts_GetCalculateIterationCountOnly(lo)   ((lo)->bCalculateIterationCountOnly)
 
 /* Loop info mgr. */
 struct VIR_LOOPINFOMGR
@@ -231,7 +234,10 @@ typedef struct VIR_LOOPINFO
     VIR_BASIC_BLOCK*        loopEnd;
     gctBOOL                 bBackJmpInInstSet;
     struct VIR_LOOPINFO*    parentLoop;
-    gctINT                  parentIterationCount;   /* If parent loop have been statically unrolling, save the iteration count. */
+    /* If parent loop have been statically unrolling, save the iteration count. */
+    gctINT                  parentIterationCount;
+    /* The iteration count for this loop. */
+    gctINT                  iterationCount;
     VSC_UNI_LIST            childLoopSet;
     VSC_UNI_LIST            bbSet;
     VSC_UNI_LIST            breakBBSet;
@@ -263,6 +269,8 @@ typedef struct VIR_LOOPINFO
 #define VIR_LoopInfo_SetParentLoop(l, p)            ((l)->parentLoop = (p))
 #define VIR_LoopInfo_GetParentIterationCount(l)     ((l)->parentIterationCount)
 #define VIR_LoopInfo_SetParentIterationCount(l, p)  ((l)->parentIterationCount = (p))
+#define VIR_LoopInfo_GetIterationCount(l)           ((l)->iterationCount)
+#define VIR_LoopInfo_SetIterationCount(l, p)        ((l)->iterationCount = (p))
 #define VIR_LoopInfo_GetChildLoopSet(l)             (&(l)->childLoopSet)
 #define VIR_LoopInfo_GetChildLoopCount(l)           (vscUNILST_GetNodeCount(&(l)->childLoopSet))
 #define VIR_LoopInfo_GetBBSet(l)                    (&(l)->bbSet)
@@ -398,6 +406,13 @@ VIR_LoopInfo_BBIterator_Next(
     );
 
 gctBOOL
+VIR_LoopOpts_IsBBInLoop(
+    VIR_LoopOpts*       pLoopOpts,
+    VIR_BASIC_BLOCK*    pBB,
+    VIR_LoopInfo**      ppLoopInfo
+    );
+
+gctBOOL
 VIR_LoopOpts_IsBBHeadBlockOfOneLoop(
     VIR_LoopOpts*       pLoopOpts,
     VIR_BASIC_BLOCK*    pBB,
@@ -414,6 +429,11 @@ VSC_ErrCode
 VIR_LoopOpts_PerformLoopUnrollingOnShader(
     VIR_LoopOpts* loopOpts,
     gctBOOL* changed
+    );
+
+VSC_ErrCode
+VIR_LoopOpts_CalculateIterationCountOnly(
+    VIR_LoopOpts* pLoopOpts
     );
 
 VSC_ErrCode
