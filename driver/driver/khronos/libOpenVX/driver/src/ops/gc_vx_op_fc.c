@@ -1415,12 +1415,12 @@ vx_status vxoFCOperationSH_Initialize(
     if (node->base.context->evisNoInst.supportEVIS)
     {
         shaderExecutable = vxnneGetFullyConnectedShaderExecutable(node->base.context, VXNNE_KERNEL_FULLYCONNECTED,
-                                    &node->kernelAttributes.borderMode, inputs, weights, biases, activation, overflow_policy, outputs);
+                                    &node->kernelAttributes.borderMode, inputs, weights, biases, activation, overflow_policy, VX_NULL, outputs);
     }
     else
     {
         shaderExecutable = vxnneGetGPUFullyConnectedShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_FULLYCONNECTED,
-                                    &node->kernelAttributes.borderMode, 0, inputs, weights, biases, activation, outputs);
+                                    &node->kernelAttributes.borderMode, 0, inputs, weights, biases, activation, VX_NULL, outputs);
     }
     if (!shaderExecutable)
     {

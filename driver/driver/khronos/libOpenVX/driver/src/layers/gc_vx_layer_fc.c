@@ -102,14 +102,29 @@ vx_status vxnneExecuteSWFullyConnected(struct _vxnne_operation_s *operation)
             {
                 inputValue  = vxnneGetDataExt((vx_type_e)srcType, srcQntType, j + b * inputCount, (vx_uint8_ptr)inputsBaseLogicalAddr, inputFpPos, TENSOR_TF_ZEROPOINT(inputs), TENSOR_TF_SCALE(inputs));
                 weightValue = vxnneGetDataExt((vx_type_e)weightsType, weightsQntType, inputCount * i + j, (vx_uint8_ptr)weightsBaseLogicalAddr, weightFpPos, TENSOR_TF_ZEROPOINT(weights), TENSOR_TF_SCALE(weights));
-
+                if(TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL &&
+                    (TENSOR_DATA_TYPE(weights) == VX_TYPE_UINT8 || TENSOR_DATA_TYPE(weights) == VX_TYPE_INT8))
+                {
+                    weightValue = vxnneGetDataExt((vx_type_e)weightsType, weightsQntType, inputCount * i + j, (vx_uint8_ptr)weightsBaseLogicalAddr, weightFpPos, TENSOR_TF_ZEROPOINTS_WITH_INDEX(weights, i), TENSOR_TF_SCALES_WITH_INDEX(weights,i));
+                }
+                else
+                {
+                    weightValue = vxnneGetDataExt((vx_type_e)weightsType, weightsQntType, inputCount * i + j, (vx_uint8_ptr)weightsBaseLogicalAddr, weightFpPos, TENSOR_TF_ZEROPOINT(weights), TENSOR_TF_SCALE(weights));
+                }
                 madValue += inputValue * weightValue;
             }
 
             if (biases)
             {
-                biasValue = vxnneGetDataExt((vx_type_e)biasesType, TENSOR_QUANT_TYPE(biases), i, (vx_uint8_ptr)biasesBaseLogicalAddr, biasFpPos, TENSOR_TF_ZEROPOINT(biases), TENSOR_TF_SCALE(biases));
 
+                if (TENSOR_DATA_TYPE(biases) == VX_TYPE_INT32 && TENSOR_QUANT_TYPE(biases) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
+                {
+                    biasValue = vxnneGetDataExt((vx_type_e)biasesType, TENSOR_QUANT_TYPE(biases), i, (vx_uint8_ptr)biasesBaseLogicalAddr, biasFpPos, TENSOR_TF_ZEROPOINTS_WITH_INDEX(biases,i), TENSOR_TF_SCALES_WITH_INDEX(biases,i));
+                }
+                else
+                {
+                    biasValue = vxnneGetDataExt((vx_type_e)biasesType, TENSOR_QUANT_TYPE(biases), i, (vx_uint8_ptr)biasesBaseLogicalAddr, biasFpPos, TENSOR_TF_ZEROPOINT(biases), TENSOR_TF_SCALE(biases));
+                }
             }
             else
             {
@@ -899,7 +914,6 @@ VX_PRIVATE_API vx_bool vxoNNFullyConnectedLayer_SH_EVIS_Support_Ext(vx_node node
     vx_tensor  weights                    = (vx_tensor)parameters[1];
     vx_tensor  biases                     = (vx_tensor)parameters[2];
     vx_tensor  outputs                    = (vx_tensor)parameters[node->numParameters - 1];
-
     vx_sh_kernel_type_e input_type        = getSHKernelType(TENSOR_DATA_TYPE(inputs));
     vx_sh_kernel_type_e weight_type       = getSHKernelType(TENSOR_DATA_TYPE(weights));
     vx_sh_kernel_type_e bias_type         = getSHKernelType(biases ? TENSOR_DATA_TYPE(biases) : VX_TYPE_INVALID);
@@ -910,6 +924,10 @@ VX_PRIVATE_API vx_bool vxoNNFullyConnectedLayer_SH_EVIS_Support_Ext(vx_node node
     vx_uint32 height                      = (dims > 1) ? TENSOR_VIEW_SIZE_INDEX(inputs, 1) : 1;
     vx_uint32 depth                       = (dims > 2) ? TENSOR_VIEW_SIZE_INDEX(inputs, 2) : 1;
     vx_uint32 inputDims                   = dims > 2 ? width * height * depth : width;
+    vx_bool   is_w_sym_per_channel_quant  = (vx_bool)(TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL);
+    vx_bool   is_b_sym_per_channel_quant  = biases == NULL ? vx_false_e : (vx_bool)(TENSOR_QUANT_TYPE(biases) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL);
+    vx_bool   is_sym_per_channel_quant    = is_w_sym_per_channel_quant && is_b_sym_per_channel_quant;
+
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
@@ -936,6 +954,9 @@ VX_PRIVATE_API vx_bool vxoNNFullyConnectedLayer_SH_EVIS_Support_Ext(vx_node node
         case _PACK_FC_SH_KEY(U8, U8, U8, F16):
             support = (vx_bool)(inputDims < IMG_MAX_WIDTH);
             break;
+        case _PACK_FC_SH_KEY(U8, I8, I32, U8):
+            support = (vx_bool)(inputDims < IMG_MAX_WIDTH && is_sym_per_channel_quant);
+            break;
         default:
             support = vx_false_e;
             break;
@@ -958,6 +979,9 @@ VX_PRIVATE_API vx_bool vxoNNFullyConnectedLayer_SH_EVIS_Support_Ext(vx_node node
         case _PACK_FC_SH_KEY(U8, U8, INVALID, I16):
         case _PACK_FC_SH_KEY(U8, U8, I32, I16):
             support = vx_true_e;
+            break;
+        case _PACK_FC_SH_KEY(U8, I8, I32, U8):
+            support = (vx_bool)(is_sym_per_channel_quant);
             break;
         default:
             support = vx_false_e;
@@ -990,6 +1014,28 @@ VX_PRIVATE_API vx_bool vxoNNFullyConnectedLayer_SH_EVIS_Support(vx_node node, co
     return support;
 }
 
+VX_PRIVATE_API vx_tensor _createTensorFromData(vx_graph graph, vx_tensor_create_params_t params, vx_uint8_ptr data)
+{
+    vx_tensor tensor = VX_NULL;
+    vx_uint8_ptr input_base_ptr = VX_NULL;
+    vx_uint32 tensor_size = 0;
+
+    tensor = vxoTensor_CreateTensor2(vxGetContext((vx_reference)graph), &params, sizeof(vx_tensor_create_params_t));
+    if (vxoTensor_AllocateMemory(tensor) != VX_SUCCESS)
+    {
+        vxError("vxoTensor_AllocateMemory fail at function %s, line %d", __FUNCTION__, __LINE__);
+        return VX_NULL;
+    }
+
+    vxoTensor_GetTensorSize(tensor, &tensor_size);
+
+    input_base_ptr = TENSOR_LOGICAL_ADDR(tensor);
+    memcpy(input_base_ptr, data, tensor_size);
+
+    return tensor;
+}
+
+
 VX_PRIVATE_API vx_status vxoNNFullyConnectedLayer_SH_EVIS_Initialize_Ext(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis)
 {
     vx_status status = VX_SUCCESS;
@@ -1014,7 +1060,9 @@ VX_PRIVATE_API vx_status vxoNNFullyConnectedLayer_SH_EVIS_Initialize_Ext(vxnne_l
     vxnne_shader_executable shaderExecutable = VX_NULL;
     vx_bool enable_cast_format = vx_false_e;
     vx_tensor input_rs = NULL;
+    vx_tensor scales     = NULL;
     vx_tensor weights_rs = NULL;
+    vx_uint32     numTmpTensor  = 0;
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
@@ -1051,15 +1099,62 @@ VX_PRIVATE_API vx_status vxoNNFullyConnectedLayer_SH_EVIS_Initialize_Ext(vxnne_l
         weights_rs = weights;
     }
 
+    if (TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
+    {
+        vx_tensor_create_params_t params;
+        vx_enum        input_quant      = TENSOR_QUANT_TYPE(inputs);
+        vx_uint32      channelCount     = TENSOR_TF_SCALE_COUNT(weights);
+        vx_uint32      sizes[2]         = {channelCount, 1};
+        vx_float32_ptr scales_data_ptr  = VX_NULL;
+        vx_enum        ouput_quant_type = TENSOR_QUANT_TYPE(outputs);
+        vx_float32     input_scales     = 1;
+        vx_uint32      idx              = 0;
+
+        if (input_quant == VX_QUANT_AFFINE_SCALE)
+            input_scales = TENSOR_TF_SCALE(inputs);
+
+        scales_data_ptr = (vx_float32 *)vxAllocateAndZeroMemory(channelCount * sizeof(vx_float32));
+        if (scales_data_ptr == VX_NULL)
+        {
+            status = VX_ERROR_NO_MEMORY;
+            vxError("allocate memory fail at function %s line %d", __FUNCTION__, __LINE__);
+            goto OnError;
+        }
+        gcoOS_MemCopy(scales_data_ptr, TENSOR_TF_SCALE_POINTER(weights), channelCount * sizeof(vx_float32));
+
+        for (idx = 0; idx < channelCount; idx++)
+        {
+            scales_data_ptr[idx] *= input_scales;
+            if (ouput_quant_type == VX_QUANT_AFFINE_SCALE)
+                scales_data_ptr[idx] /= TENSOR_TF_SCALE(outputs);
+        }
+
+        gcoOS_MemFill(&params, 0, sizeof(vx_tensor_create_params_t));
+
+        params.num_of_dims = 2;
+        params.sizes = sizes;
+        params.data_format = VX_TYPE_FLOAT32;
+
+        scales = _createTensorFromData(ops_layer->node->graph, params, (vx_uint8_ptr)scales_data_ptr);
+        fullyConnectedLayer->base.temp_tensors[numTmpTensor++] = scales;
+        fullyConnectedLayer->base.num_temp_tensors = numTmpTensor;
+        if (scales_data_ptr)
+        {
+            vxFree(scales_data_ptr);
+            scales_data_ptr = VX_NULL;
+        }
+    }
+
+
     if(evis)
     {
         shaderExecutable = vxnneGetFullyConnectedShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_FULLYCONNECTED,
-            &ops_layer->node->kernelAttributes.borderMode, input_rs, weights, biases, VX_NN_ACTIVATION_NONE, overflow_policy, outputs);
+            &ops_layer->node->kernelAttributes.borderMode, input_rs, weights, biases, VX_NN_ACTIVATION_NONE, overflow_policy, scales, outputs);
     }
     else
     {
         shaderExecutable = vxnneGetGPUFullyConnectedShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_FULLYCONNECTED,
-            &ops_layer->node->kernelAttributes.borderMode, enable_cast_format, input_rs, weights_rs, biases, VX_NN_ACTIVATION_NONE, outputs);
+            &ops_layer->node->kernelAttributes.borderMode, enable_cast_format, input_rs, weights_rs, biases, VX_NN_ACTIVATION_NONE, scales, outputs);
     }
 
     if (!shaderExecutable)

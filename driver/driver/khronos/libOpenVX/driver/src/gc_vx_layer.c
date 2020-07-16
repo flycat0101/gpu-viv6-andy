@@ -6532,6 +6532,7 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
     vx_tensor               bias,
     vx_int32                activation,
     vx_uint32               overflow_policy,
+    vx_tensor               scales,
     vx_tensor               output)
 {
 #define _PACK_FC_SH_KEY(IN_TYPE, WEIGHT_TYPE, BIAS_TYPE, OUT_TYPE) \
@@ -6545,7 +6546,7 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
     vxnne_shader_executable shaderExecutable = VX_NULL;
     vxnne_kernel_shaders        kernel;
     vx_kernel_execution_parameters_t execution_parameters = {2, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-    vx_reference parameters[5]   = {(vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)output};
+    vx_reference parameters[6]   = {(vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL};
     vx_scalar     dRelu_s        = NULL;
     vx_int32      dRelu          = 0;
     vx_bool       enable_bias    = (bias == NULL) ? vx_false_e : vx_true_e;
@@ -6590,7 +6591,12 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
     vx_sh_kernel_type_e bias_type         = getSHKernelType(bias ? TENSOR_DATA_TYPE(bias) : VX_TYPE_INVALID);
     vx_sh_kernel_type_e output_type       = getSHKernelType(TENSOR_DATA_TYPE(output));
     vx_uint32 key                         = _PACK_FC_SH_KEY(input_type, weight_type, bias_type, output_type);
-
+    vx_enum       weight_quant_type          = TENSOR_QUANT_TYPE(weights);
+    vx_enum       bias_quant_type            = bias ? TENSOR_QUANT_TYPE(bias) : VX_QUANT_NONE;
+    vx_bool       is_per_channel_quant       = (vx_bool)(weight_quant_type == VX_QUANT_AFFINE_SCALE_PER_CHANNEL && bias_quant_type == VX_QUANT_AFFINE_SCALE_PER_CHANNEL);
+    vx_uint32     weight_channelDim          = 1;
+    vx_uint32    *weight_nChannelDim         = is_per_channel_quant ? &weight_channelDim : NULL;
+    vx_uint32     param_num                  = is_per_channel_quant ? 6 : paramNum;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
          context, kernelEnum, borderMode, input, output);
@@ -6645,7 +6651,7 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
     sizes[2]      = 1;
     sizes[3]      = 1;
     weight_dims   = 2;
-    weight_rs     = vxoTensor_ReshapeTensor(weights, (vx_int32*)sizes, weight_dims, VX_NULL);
+    weight_rs     = vxoTensor_ReshapeTensor(weights, (vx_int32*)sizes, weight_dims, weight_nChannelDim);
 
     if (enable_bias)
     {
@@ -6670,6 +6676,7 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
     }
     parameters[paramIdx ++] = (vx_reference)dRelu_s;
     parameters[paramIdx ++] = (vx_reference)output_rs;
+    parameters[paramIdx ++] = (vx_reference)scales;
 
     if (enable_bias)
     {
@@ -6790,7 +6797,7 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
         status = vxBuildProgram(program, "-cl-viv-vx-extension");
         if (status != VX_SUCCESS) goto OnError;
 
-        kernel = vxnneAddKernelShadersInProgram(context, "vxcFullyConnected", program, paramNum, kernelEnum);
+        kernel = vxnneAddKernelShadersInProgram(context, "vxcFullyConnected", program, param_num, kernelEnum);
         if (!kernel) goto OnError;
 
         vxReleaseProgram(&program);
@@ -6945,6 +6952,48 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
             if (status != VX_SUCCESS) goto OnError;
         }
         break;
+    case _PACK_FC_SH_KEY(U8, I8, I32, U8):
+        {
+            if (is_per_channel_quant)
+            {
+                vx_uint32  inputSize_aln64 = 0;
+                vx_uint32  packedZ0        = (input_ZP << 24) | (input_ZP << 16) | (input_ZP << 8) | (input_ZP);
+                vx_float32 outputZP        = (vx_float32)output_ZP;
+                vx_uint32  uniAccQ1MulQ2_16x1[16] = {
+                    0x55555555, // TCfg
+                    0x00000000, // ASelt
+                    0x76543210, 0xfedcba98, // ABin
+                    0x55555555, // BSelt
+                    0x76543210, 0xfedcba98, // BBin
+                    0x00000400, // AccumType, ConstantType, and PostShift
+                    0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
+                };
+                vx_uint32 uniAccQaMulZb_16x2[16] = {
+                    0xaaaaaaaa, 0xaaaaaaaa, // TCfg
+                    0x8a418820, 0xc5a92839, 0xca307b9a, 0x38bdab49, 0xffbbcdeb, // BinSelect
+                    0x00000700, // AccumType, ConstantType, and PostShift
+                    packedZ0, packedZ0, packedZ0, packedZ0, packedZ0, packedZ0, packedZ0, packedZ0 // Constant
+                };
+
+                inputSize_aln64   = gcmALIGN(inputSize, 64);
+                if (inputSize_aln64 == inputSize)
+                    borderMode->mode = VX_BORDER_REPLICATE;
+
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8_I8to_U8_Perchannel", borderMode);
+
+                if (!shaderExecutable) goto OnError;
+
+                status = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniAccQ1MulQ2_16x1", 1, uniAccQ1MulQ2_16x1);
+                status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniAccQaMulZb_16x2", 1, uniAccQaMulZb_16x2);
+                if (status != VX_SUCCESS) goto OnError;
+
+                status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "inputSize_aln64", 1, &inputSize_aln64);
+                status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outputZP", 1, &outputZP);
+                status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "overflow_mode", 1, &overflow_mode);
+                if (status != VX_SUCCESS) goto OnError;
+            }
+        }
+        break;
     case _PACK_FC_SH_KEY(U8, U8, INVALID, U8):
     case _PACK_FC_SH_KEY(U8, U8, INVALID, I16):
     case _PACK_FC_SH_KEY(U8, U8, INVALID, F16):
@@ -7058,7 +7107,7 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
 
 #undef _PACK_FC_SH_KEY
 
-    status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, paramNum);
+    status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, param_num);
     if (status != VX_SUCCESS) goto OnError;
 
     execution_parameters.globalWorkOffset[0] = 0;
