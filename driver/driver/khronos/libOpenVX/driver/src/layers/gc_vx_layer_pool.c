@@ -269,7 +269,7 @@ VX_PRIVATE_API vx_status vxoNNPooling_SW_Initialize(vxnne_layer ops_layer, const
     vx_scalar  stride_y_s                = (vx_scalar)parameters[10];
     vx_tensor  outputs                    = (vx_tensor)parameters[num-1];
 
-    vx_uint32  batchCount    = TENSOR_SIZE_INDEX(inputs, 3);
+    vx_uint32  batchCount    = 1;
 
     vx_uint32 pool_pad_x_left = poolPadXLeftScalar->value->u32;
     vx_uint32 pool_pad_x_right = poolPadXRightScalar->value->u32;
@@ -365,6 +365,8 @@ VX_PRIVATE_API vx_bool vxoNNPooling_SH_EVIS_Support_Ext(vx_node node, const vx_r
     vx_uint32 pool_pad_x_right  = poolPadXRightScalar->value->u32;
     vx_uint32 pool_pad_y_top    = poolPadYTopScalar->value->u32;
     vx_uint32 pool_pad_y_bottom = poolPadYBottomScalar->value->u32;
+    vx_bool   is_cross_width_read   = vx_false_e;
+    vx_uint32  limit_len             = 8;
 
     inputsWidth   = TENSOR_SIZE_INDEX(inputs, 0);
     inputsHeight  = TENSOR_SIZE_INDEX(inputs, 1);
@@ -372,6 +374,16 @@ VX_PRIVATE_API vx_bool vxoNNPooling_SH_EVIS_Support_Ext(vx_node node, const vx_r
     outputsWidth  = TENSOR_VIEW_SIZE_INDEX(outputs, 0);
     outputsHeight = TENSOR_VIEW_SIZE_INDEX(outputs, 1);
     /*outputsDepth  = TENSOR_VIEW_SIZE_INDEX(outputs, 2);*/
+
+
+    if ((VX_TYPE_INT8 == inputFormat) || (VX_TYPE_UINT8 == inputFormat))
+    {
+        limit_len = 16;
+    }
+
+    is_cross_width_read = (vx_bool)((pool_pad_x_left > 0) && (pool_pad_x_right > 0)
+        && ((inputsWidth + pool_pad_x_left) < limit_len)
+        && (inputsWidth < (poolSizeXValue - 1)));
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
@@ -409,14 +421,17 @@ VX_PRIVATE_API vx_bool vxoNNPooling_SH_EVIS_Support_Ext(vx_node node, const vx_r
 
     if(evis)
     {
-        dataFormat_AvgPool_flag[0] = (vx_bool)(inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16);
-        dataFormat_AvgPool_flag[1] = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 &&
-            (outputFormat == VX_TYPE_INT16 || outputFormat == VX_TYPE_INT8 || outputFormat == VX_TYPE_UINT8));
-        dataFormat_AvgPool_flag[2] = (vx_bool)(inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8);
-        dataFormat_AvgPool_flag[3] = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16);
-        dataFormat_AvgPool_flag[4] = (vx_bool)(inputFormat == VX_TYPE_INT16);
-        dataFormat_AvgPool_flag[5] = (vx_bool)(inputFormat == VX_TYPE_UINT8 );
-        avgPool_BF_flag            = (vx_bool)(inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16);
+        if (is_cross_width_read == vx_false_e)
+        {
+            dataFormat_AvgPool_flag[0] = (vx_bool)(inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16);
+            dataFormat_AvgPool_flag[1] = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 &&
+                (outputFormat == VX_TYPE_INT16 || outputFormat == VX_TYPE_INT8 || outputFormat == VX_TYPE_UINT8));
+            dataFormat_AvgPool_flag[2] = (vx_bool)(inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8);
+            dataFormat_AvgPool_flag[3] = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16);
+            dataFormat_AvgPool_flag[4] = (vx_bool)(inputFormat == VX_TYPE_INT16);
+            dataFormat_AvgPool_flag[5] = (vx_bool)(inputFormat == VX_TYPE_UINT8 );
+            avgPool_BF_flag            = (vx_bool)(inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16);
+        }
     }
     else
     {
@@ -463,18 +478,21 @@ VX_PRIVATE_API vx_bool vxoNNPooling_SH_EVIS_Support_Ext(vx_node node, const vx_r
 
         if(evis)
         {
-            dataformat_MaxPool_flag[0]         = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT8)
-                                                        && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_INT8));
-            dataformat_MaxPool_flag[1]         = (vx_bool)(inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16);
-            dataformat_MaxPool_flag[2]         = (vx_bool)(inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8);
-            dataformat_MaxPool_flag[3]         = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16);
-            dataformat_MaxPool_flag[4]         = (vx_bool)(inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8);
-            dataformat_MaxPool_flag[5]         = (vx_bool)(inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16);
-            enable_L2Pool_SH                   = (vx_bool)(((inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16)
-                                                        || ((inputFormat == VX_TYPE_FLOAT16  || inputFormat == VX_TYPE_UINT8)
-                                                        && (outputFormat == VX_TYPE_FLOAT16  || outputFormat == VX_TYPE_UINT8)))
-                                                        && (poolTypeValue == VX_NN_POOLING_L2));
-            maxPool_BF_flag                    = (vx_bool)(inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16);
+            if (is_cross_width_read == vx_false_e)
+            {
+                dataformat_MaxPool_flag[0]         = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT8)
+                                                            && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_INT8));
+                dataformat_MaxPool_flag[1]         = (vx_bool)(inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16);
+                dataformat_MaxPool_flag[2]         = (vx_bool)(inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8);
+                dataformat_MaxPool_flag[3]         = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16);
+                dataformat_MaxPool_flag[4]         = (vx_bool)(inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8);
+                dataformat_MaxPool_flag[5]         = (vx_bool)(inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16);
+                enable_L2Pool_SH                   = (vx_bool)(((inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16)
+                                                            || ((inputFormat == VX_TYPE_FLOAT16  || inputFormat == VX_TYPE_UINT8)
+                                                            && (outputFormat == VX_TYPE_FLOAT16  || outputFormat == VX_TYPE_UINT8)))
+                                                            && (poolTypeValue == VX_NN_POOLING_L2));
+                maxPool_BF_flag                    = (vx_bool)(inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16);
+            }
         }
         else
         {

@@ -10159,6 +10159,8 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
         }
         else if (outputFormat2 == VX_TYPE_FLOAT16)
         {
+            vx_uint32 packedFP16Min[4] = {0xfbfffbff, 0xfbfffbff, 0xfbfffbff, 0xfbfffbff};
+
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_genMaxFp16toFp16", borderMode);
             if (!shaderExecutable) goto OnError;
 
@@ -10168,8 +10170,7 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "kernelXis8x", 1, &kernelXis8x);
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "kernelXremain", 1, &kernelXremain);
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniFp16ExtractN_dp2x8", 1, uniFp16ExtractN_dp2x8);
-            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "packedGenMinData", 1, packedMinData);
-            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "packedGenMaxData", 1, packedMaxData);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "packedFP16Min", 1, packedFP16Min);
             if (status != VX_SUCCESS) goto OnError;
 
             status = vxnneShaderExecutable_GetMaxWorkGroupSize(shaderExecutable, &maxWorkGroupSize);
