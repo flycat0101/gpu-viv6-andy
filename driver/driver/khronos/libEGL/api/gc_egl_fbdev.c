@@ -103,11 +103,10 @@ struct _FBDisplay
     gctBOOL                 serverSide;
     struct _FBFunctions     functions;
     gctBOOL                 useVFB;
-    
+
     /* FSL: external resolve and special PAN timing. */
     gctBOOL                 fbPrefetch;
     gctUINT32               bufferStatus;
-
 };
 
 /* Structure that defines a window. */

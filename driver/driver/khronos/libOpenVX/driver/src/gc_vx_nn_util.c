@@ -5529,6 +5529,7 @@ vx_status vxo_updateSwapHandle(vx_graph graph)
                         //if(((vx_tensor)executionLayer->swapHandle[j]->ref)->tensorBuffer->memory.physicals[0] + offset + executionLayer->swapHandle[j]->u.offset[k]!= (executionLayer->swapHandle[j]->orgAddress))
                         {
                             vxInfo("\n NN/TP: pre_physical:0x%08X, new_physical:0x%08X \n", *(executionLayer->swapHandle[j]->cmdAddr[k]), (vx_uint32)(((vx_tensor)executionLayer->swapHandle[j]->ref)->tensorBuffer->memory.physicals[0] + executionLayer->swapHandle[j]->u.offset[k]));
+
                             *(executionLayer->swapHandle[j]->cmdAddr[k]) = (vx_uint32)(((vx_tensor)executionLayer->swapHandle[j]->ref)->tensorBuffer->memory.physicals[0] + executionLayer->swapHandle[j]->u.offset[k]);
                         }
                     }

@@ -1,0 +1,15 @@
+{
+    global:
+        CreateAPModel;
+        APMCalcNNCycleCountBandWidth;
+        APMCalcTPCycleCountCore;
+        APMCalcImageInterleaveMode;
+        APMCalcNumOfKernel;
+        APMCalcKernelCachePercentage;
+        APMCalcImageIdealCacheInPixel;
+        APMSetManualFeatures;
+        DestroyAPModel;
+    local:
+        *;
+};
+

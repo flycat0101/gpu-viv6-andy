@@ -1,0 +1,27 @@
+{
+    global:
+        archSwLibDeInit;
+        archSwLibInit;
+        archPredictPerfFillLayer;
+        archPredictPerfAnalysing;
+        archGetPerfResult;
+        archPredictPerf;
+        archIsFeatureAvailable;
+        archCalculateArchPerf;
+        archFillOpInfo;
+        archSetManualFeatures;
+        deInitArchOpInfo;
+        initArchOpInfo;
+        initArchGraphInfo;
+        deInitArchGraphInfo;
+        optimizeGraph;
+        optimizeGraph_recoverPosition;
+        initOptimizeGraphInfo;
+        deInitOptimizeGraphInfo;
+        archSwLibInitFromDriver;
+        archSwLibDeInitFromDriver;
+        updateAxiSram;
+    local:
+        *;
+};
+

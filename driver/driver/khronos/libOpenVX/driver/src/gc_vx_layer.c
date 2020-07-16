@@ -8470,7 +8470,7 @@ vxnne_shader_executable vxnneGetAvgPooling_Int16ShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "Uni16x1_Sum16", 1, Uni16x1_Sum16);
         if (status != VX_SUCCESS) goto OnError;
     }
-    else if ( inputFormat == VX_TYPE_INT16 && outputFormat== VX_TYPE_INT16
+    else if (inputFormat == VX_TYPE_INT16 && outputFormat== VX_TYPE_INT16
            && kernel_size_x == 2 && kernel_size_y == 2 && stride_v == 2 && (stride_y == stride_v))
     {
         vx_uint32 UniS16AddDiv4toFloat_dp4x4[16] = {
@@ -8495,7 +8495,7 @@ vxnne_shader_executable vxnneGetAvgPooling_Int16ShaderExecutable(
         execution_parameters.globalWorkScale[1]  = out_height;
         execution_parameters.globalWorkScale[2]  = 1;
     }
-    else if ( inputFormat == VX_TYPE_INT16 && outputFormat== VX_TYPE_INT16
+    else if (inputFormat == VX_TYPE_INT16 && outputFormat== VX_TYPE_INT16
            && kernel_size_x == 5 && kernel_size_y == 5 && stride_v == 2  && (stride_y == stride_v))
     {
         vx_uint32 Uni16x2_Add_K5S2[16] = {

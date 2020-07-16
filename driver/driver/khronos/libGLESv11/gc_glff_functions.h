@@ -11,7 +11,6 @@
 *****************************************************************************/
 
 
-
 #define __GLES11_API_ENTRIES(esApiMacro) \
     esApiMacro(ActiveTexture), \
     esApiMacro(AlphaFuncx), \
