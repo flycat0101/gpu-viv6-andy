@@ -7,6 +7,7 @@ _viv_uniform int padTop;
 _viv_uniform int padLeft;
 _viv_uniform int in_chn_num;
 _viv_uniform int out_chn_num;
+_viv_uniform int padConstVal;
 _viv_uniform VXC_512Bits uniExtract1Int32toInt16_2x8;
 
 __kernel void vxcTensorPad2_Const16Bits_chn(
@@ -42,7 +43,7 @@ __kernel void vxcTensorPad2_Const16Bits_chn(
     else
     {
         vxc_short8 src0;
-        VXC_DP2x8(src0, constData, constData, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtract1Int32toInt16_2x8);
+        VXC_DP2x8(src0, padConstVal, padConstVal, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtract1Int32toInt16_2x8);
         VXC_WriteImage2DArray(output, coord_out, src0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
         coord_out.y++;
         VXC_WriteImage2DArray(output, coord_out, src0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
@@ -85,8 +86,8 @@ __kernel void vxcTensorPad2_Const8Bits_chn(
     else
     {
         vxc_char16 src0;
-        VXC_DP2x8(src0, constData, constData, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtract1Int32toInt16_2x8);
-        VXC_DP2x8(src0, constData, constData, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniExtract1Int32toInt16_2x8);
+        VXC_DP2x8(src0, padConstVal, padConstVal, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtract1Int32toInt16_2x8);
+        VXC_DP2x8(src0, padConstVal, padConstVal, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniExtract1Int32toInt16_2x8);
         VXC_WriteImage2DArray(output, coord_out, src0, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
         coord_out.y++;
         VXC_WriteImage2DArray(output, coord_out, src0, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
@@ -130,7 +131,7 @@ __kernel void vxcTensorPad2_Const16Bits_whc(
     else
     {
         vxc_short8 src0;
-        VXC_DP2x8(src0, constData, constData, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtract1Int32toInt16_2x8);
+        VXC_DP2x8(src0, padConstVal, padConstVal, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtract1Int32toInt16_2x8);
         VXC_WriteImage2DArray(output, coord_out, src0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
         coord_out.y++;
         VXC_WriteImage2DArray(output, coord_out, src0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
@@ -173,8 +174,8 @@ __kernel void vxcTensorPad2_Const8Bits_whc(
     else
     {
         vxc_char16 src0;
-        VXC_DP2x8(src0, constData, constData, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtract1Int32toInt16_2x8);
-        VXC_DP2x8(src0, constData, constData, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniExtract1Int32toInt16_2x8);
+        VXC_DP2x8(src0, padConstVal, padConstVal, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtract1Int32toInt16_2x8);
+        VXC_DP2x8(src0, padConstVal, padConstVal, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniExtract1Int32toInt16_2x8);
         VXC_WriteImage2DArray(output, coord_out, src0, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
         coord_out.y++;
         VXC_WriteImage2DArray(output, coord_out, src0, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));

@@ -16229,6 +16229,7 @@ vx_kernel_description_s *target_kernels[] = {
     &internalkernel_NNReorgLayer,
     &internalkernel_NNDeConvolutionLayer,
     &internalkernel_NNL2NormalizeLayer,
+    &internalkernel_NNL2NormalizeLayer2,
     &internalkernel_NNTensorCopy,
     &internalkernel_NNConvolutionReluPoolingCnnLayer2,
     &internalkernel_NNPoolingLayer2,

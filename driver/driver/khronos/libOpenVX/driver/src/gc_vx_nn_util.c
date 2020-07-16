@@ -548,17 +548,25 @@ void getFP32M0AndN(vx_float32 mult, vx_uint16 *M0, vx_int8 *N)
     vx_uint32 postShift         = 0;
     vx_int8   tmpPostShift      = 0;
 
-    tmpMultiply         = (uintMult & 0x7FFFFF) >> 8;
-    *M0                 = (vx_uint16)((1U << 15) + tmpMultiply);
+    if (gcmABS(mult  - 0.0) < 1e-5 )
+    {
+        *M0 = 0;
+        *N = 0;
+    }
+    else
+    {
+        tmpMultiply         = (uintMult & 0x7FFFFF) >> 8;
+        *M0                 = (vx_uint16)((1U << 15) + tmpMultiply);
 
-    exp                 = (uintMult & 0x7F800000) >> 23; /* postShift is Scale's exp*/
-    tmpPostShift        = 15 - ((vx_int8)exp - 127);
-    postShift           = tmpPostShift & 0x1F;
-    tmpPostShift        = tmpPostShift >> 5;
-    postShiftBit6to5    = tmpPostShift & 3;
+        exp                 = (uintMult & 0x7F800000) >> 23; /* postShift is Scale's exp*/
+        tmpPostShift        = 15 - ((vx_int8)exp - 127);
+        postShift           = tmpPostShift & 0x1F;
+        tmpPostShift        = tmpPostShift >> 5;
+        postShiftBit6to5    = tmpPostShift & 3;
 
-    *N = (vx_int8)(((postShiftBit6to5 << 5) | (postShift & 0x1F)));
-    *N = (((vx_int32)*N << 25) >> 25);
+        *N = (vx_int8)(((postShiftBit6to5 << 5) | (postShift & 0x1F)));
+        *N = (((vx_int32)*N << 25) >> 25);
+    }
 }
 
 void calculateActivationRangeFloat16(vx_int32 activation, vx_int16* act_min, vx_int16* act_max)
@@ -574,7 +582,8 @@ void calculateActivationRangeFloat16(vx_int32 activation, vx_int16* act_min, vx_
     else if (activation == VX_NN_ACTIVATION_RELU6) {
         *act_min = Fp32toFp16(0.0);
         *act_max = Fp32toFp16(6.0);
-    } else if (activation == VX_NN_ACTIVATION_RELU1)
+    }
+    else if (activation == VX_NN_ACTIVATION_RELU1)
     {
         *act_min = Fp32toFp16(-1.0);
         *act_max = Fp32toFp16(1.0);
@@ -611,23 +620,25 @@ void calculateActivationRangeInt16(vx_int32 activation, vx_int8 fixedPointPos, v
     }
 }
 
-void calculateActivationRangeInt8(vx_int32 activation, vx_int8 fixedPointPos, vx_int8* act_min, vx_int8* act_max, vx_int32 roundMode)
+void calculateActivationRangeInt8(vx_int32 activation, vx_float32 scale, vx_int32 zp, vx_int8* act_min, vx_int8* act_max, vx_int32 roundMode)
 {
     const vx_int8 qmin = 0x80;
     const vx_int8 qmax = 0x7F;
 
     if (activation == VX_NN_ACTIVATION_RELU)
     {
-        *act_min = gcmMAX(qmin, Fp32toInt8(0.0, fixedPointPos, roundMode));
+        *act_min = gcmMAX(qmin, Fp32toInt8_asym(0.0, zp, scale, roundMode));
         *act_max = qmax;
     }
-    else if (activation == VX_NN_ACTIVATION_RELU6) {
-        *act_min = gcmMAX(qmin, Fp32toInt8(0.0, fixedPointPos, roundMode));
-        *act_max = gcmMIN(qmax, Fp32toInt8(6.0, fixedPointPos, roundMode));
-    } else if (activation == VX_NN_ACTIVATION_RELU1)
+    else if (activation == VX_NN_ACTIVATION_RELU6)
     {
-        *act_min = gcmMAX(qmin, Fp32toInt8(-1.0, fixedPointPos, roundMode));
-        *act_max = gcmMIN(qmax, Fp32toInt8(1.0, fixedPointPos, roundMode));
+        *act_min = gcmMAX(qmin, Fp32toInt8_asym(0.0, zp, scale, roundMode));
+        *act_max = gcmMIN(qmax, Fp32toInt8_asym(6.0, zp, scale, roundMode));
+    }
+    else if (activation == VX_NN_ACTIVATION_RELU1)
+    {
+        *act_min = gcmMAX(qmin, Fp32toInt8_asym(-1.0, zp, scale, roundMode));
+        *act_max = gcmMIN(qmax, Fp32toInt8_asym(1.0, zp, scale, roundMode));
     }
     else
     {
@@ -5994,6 +6005,46 @@ vx_bool vx_nn_kernel_optimize_element_shape
 
     return ret;
 } /* vx_nn_kernel_optimize_element_shape() */
+
+
+/** Map data type to gpu internal dtype. */
+vx_sh_kernel_type_e getSHKernelType
+    (
+    vx_enum dtype
+    )
+{
+    switch(dtype )
+    {
+    case VX_TYPE_INVALID:
+        return INVALID;
+    case VX_TYPE_INT8:
+        return I8;
+    case VX_TYPE_BOOL8:
+        return BOOL8;
+    case VX_TYPE_INT16:
+        return I16;
+    case VX_TYPE_INT32:
+        return I32;
+    case VX_TYPE_INT64:
+        return I64;
+    case VX_TYPE_UINT8:
+        return U8;
+    case VX_TYPE_UINT16:
+        return U16;
+    case VX_TYPE_UINT32:
+        return U32;
+    case VX_TYPE_FLOAT16:
+        return F16;
+    case VX_TYPE_BFLOAT16:
+        return BF16;
+    case VX_TYPE_FLOAT32:
+        return F32;
+    default:
+        vxError("error data type %d\n", dtype);
+        break;
+    }
+    return I8;
+} /* getSHKernelType() */
 
 vx_bool IsTPSupport_CheckOutPixel(vx_context context, vx_tensor inputs, vx_tensor outputs)
 {

@@ -29,12 +29,24 @@ vx_status vxnneExecuteSWFullyConnected(struct _vxnne_operation_s *operation)
     vx_uint32 i = 0, j = 0, b = 0;
     vx_uint32 inputCount, outputCount;
     vx_float32 madValue, inputValue, weightValue, biasValue = 0.0f;
-    vx_enum srcType, dstType, weightsType, biasesType =  VX_TYPE_INVALID, outputRoundingMode;
-    vx_int8 inputFpPos = 0, weightFpPos = 0, biasFpPos = 0, outputFpPos = 0;
-    vx_float32 result = 0.0f;
-    vx_status status = VX_SUCCESS;
-    vx_uint32 dims = TENSOR_VIEW_DIM_NUM(inputs);
-    vx_uint32  width         = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
+    vx_enum     srcType                 = TENSOR_DATA_TYPE(inputs);
+    vx_enum     srcQntType              = TENSOR_QUANT_TYPE(inputs);
+    vx_enum     weightsType             = TENSOR_DATA_TYPE(weights);
+    vx_enum     weightsQntType          = TENSOR_QUANT_TYPE(weights);
+    vx_enum     dstType                 = TENSOR_DATA_TYPE(outputs);
+    vx_enum     dstQntType              = TENSOR_QUANT_TYPE(outputs);
+    vx_enum     biasesType              = biases ? TENSOR_DATA_TYPE(biases) : VX_TYPE_INVALID;
+    vx_enum     biasesQntType           = biases ? TENSOR_QUANT_TYPE(biases) : VX_QUANT_NONE;
+
+    vx_enum     outputRoundingMode      = TENSOR_ROUNDING_MODE(outputs);
+    vx_int8     inputFpPos              = 0;
+    vx_int8     weightFpPos             = 0;
+    vx_int8     biasFpPos               = 0;
+    vx_int8     outputFpPos             = 0;
+    vx_float32  result                  = 0.0f;
+    vx_status   status                  = VX_SUCCESS;
+    vx_uint32   dims                    = TENSOR_VIEW_DIM_NUM(inputs);
+    vx_uint32   width                   = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
     vx_uint32  height        = dims > 1 ? TENSOR_VIEW_SIZE_INDEX(inputs, 1) : 1;
     vx_uint32  depth         = dims > 2 ? TENSOR_VIEW_SIZE_INDEX(inputs, 2) : 1;
     vx_uint32  batch         = dims > 3 ? TENSOR_VIEW_SIZE_INDEX(inputs, 3) : 1;
@@ -50,9 +62,6 @@ vx_status vxnneExecuteSWFullyConnected(struct _vxnne_operation_s *operation)
         batchCount = TENSOR_SIZE_INDEX(inputs, 3);
     }
 
-    srcType = TENSOR_DATA_TYPE(inputs);
-    dstType = TENSOR_DATA_TYPE(outputs);
-    weightsType = TENSOR_DATA_TYPE(weights);
     vxoTensor_GetTensorViewMemory(inputs, &inputsBaseLogicalAddr, VX_NULL);
     vxoTensor_GetTensorViewMemory(outputs, &outputsBaseLogicalAddr, VX_NULL);
     vxoTensor_GetTensorViewMemory(weights, &weightsBaseLogicalAddr, VX_NULL);
@@ -65,17 +74,23 @@ vx_status vxnneExecuteSWFullyConnected(struct _vxnne_operation_s *operation)
     batch         = dims > 3 ? TENSOR_VIEW_SIZE_INDEX(outputs, 3) : 1;
     outputCount = (vx_uint32)(width * height * depth * batch) / batchCount;
 
-    inputFpPos = TENSOR_POS(inputs);
-    weightFpPos = TENSOR_POS(weights);
-    outputFpPos = TENSOR_POS(outputs);
-    outputRoundingMode = TENSOR_ROUNDING_MODE(outputs);
+    if (srcQntType == VX_QUANT_DYNAMIC_FIXED_POINT)
+        inputFpPos = TENSOR_POS(inputs);
+
+    if (weightsQntType == VX_QUANT_DYNAMIC_FIXED_POINT)
+        weightFpPos = TENSOR_POS(weights);
+
+    if (dstQntType == VX_QUANT_DYNAMIC_FIXED_POINT)
+        outputFpPos = TENSOR_POS(outputs);
 
     if (biases)
     {
-        biasesType = TENSOR_DATA_TYPE(biases);
         vxoTensor_GetTensorViewMemory(biases, &biasesBaseLogicalAddr, VX_NULL);
-        biasFpPos = TENSOR_POS(biases);
+
+        if (biasesQntType == VX_QUANT_DYNAMIC_FIXED_POINT)
+            biasFpPos = TENSOR_POS(biases);
     }
+
     for (b = 0; b < batchCount; b ++)
     {
         for (i = 0; i < outputCount; i++)
@@ -83,77 +98,22 @@ vx_status vxnneExecuteSWFullyConnected(struct _vxnne_operation_s *operation)
             madValue = 0.0;
             for (j = 0; j < inputCount; j++)
             {
-                if (biases)
-                {
-                    if (((srcType == VX_TYPE_FLOAT16) && (weightsType == VX_TYPE_FLOAT16) && (biasesType == VX_TYPE_FLOAT32)) ||
-                        ((srcType == VX_TYPE_FLOAT32) && (weightsType == VX_TYPE_FLOAT32) && (biasesType ==  VX_TYPE_FLOAT32)) ||
-                        ((srcType == VX_TYPE_INT8) && (weightsType == VX_TYPE_INT8) && (biasesType == VX_TYPE_INT32 || biasesType == VX_TYPE_FLOAT32)) ||
-                        ((srcType == VX_TYPE_INT16) && (weightsType == VX_TYPE_INT16) && (biasesType == VX_TYPE_INT32 || biasesType == VX_TYPE_INT64 || biasesType == VX_TYPE_FLOAT32)) ||
-                        ((srcType == VX_TYPE_UINT8) && (weightsType == VX_TYPE_UINT8) && (biasesType ==  VX_TYPE_UINT8)))
-                    {
-                        inputValue  = vxnneGetDataExt((vx_type_e)srcType, TENSOR_QUANT_TYPE(inputs), j + b * inputCount, (vx_uint8_ptr)inputsBaseLogicalAddr, inputFpPos, TENSOR_TF_ZEROPOINT(inputs), TENSOR_TF_SCALE(inputs));
-                        weightValue = vxnneGetDataExt((vx_type_e)weightsType, TENSOR_QUANT_TYPE(weights), inputCount * i + j, (vx_uint8_ptr)weightsBaseLogicalAddr, weightFpPos, TENSOR_TF_ZEROPOINT(weights), TENSOR_TF_SCALE(weights));
-                        madValue += inputValue * weightValue;
-                    }
-                    else if((srcType == VX_TYPE_UINT8) && (weightsType == VX_TYPE_UINT8) && (biasesType == VX_TYPE_INT32 || biasesType == VX_TYPE_FLOAT32) && TENSOR_QUANT_TYPE(inputs) == VX_QUANT_AFFINE_SCALE)
-                    {
-                        inputValue  = vxnneGetDataQuant((vx_type_e)srcType, j + b * inputCount, (vx_uint8_ptr)inputsBaseLogicalAddr, TENSOR_TF_ZEROPOINT(inputs), TENSOR_TF_SCALE(inputs));
-                        weightValue = vxnneGetDataQuant((vx_type_e)weightsType, inputCount * i + j, (vx_uint8_ptr)weightsBaseLogicalAddr, TENSOR_TF_ZEROPOINT(weights), TENSOR_TF_SCALE(weights));
-                        madValue += inputValue * weightValue;
-                    }
-                    else
-                    {
-                        /* other format not surpport now */
-                        vxError("can't support this input data format\n");
-                        gcmASSERT(0);
-                    }
-                }
-                else
-                {
-                    if (((srcType == VX_TYPE_FLOAT16) && (weightsType == VX_TYPE_FLOAT16)) ||
-                        ((srcType == VX_TYPE_FLOAT32) && (weightsType == VX_TYPE_FLOAT32)) ||
-                        ((srcType == VX_TYPE_INT8) && (weightsType == VX_TYPE_INT8)) ||
-                        ((srcType == VX_TYPE_INT16) && (weightsType == VX_TYPE_INT16)) ||
-                        ((srcType == VX_TYPE_UINT8) && (weightsType == VX_TYPE_UINT8)))
-                    {
-                        inputValue  = vxnneGetDataExt((vx_type_e)srcType, TENSOR_QUANT_TYPE(inputs), j + b * inputCount, (vx_uint8_ptr)inputsBaseLogicalAddr, inputFpPos, TENSOR_TF_ZEROPOINT(inputs), TENSOR_TF_SCALE(inputs));
-                        weightValue = vxnneGetDataExt((vx_type_e)weightsType, TENSOR_QUANT_TYPE(weights), inputCount * i + j, (vx_uint8_ptr)weightsBaseLogicalAddr, weightFpPos, TENSOR_TF_ZEROPOINT(weights), TENSOR_TF_SCALE(weights));
+                inputValue  = vxnneGetDataExt((vx_type_e)srcType, srcQntType, j + b * inputCount, (vx_uint8_ptr)inputsBaseLogicalAddr, inputFpPos, TENSOR_TF_ZEROPOINT(inputs), TENSOR_TF_SCALE(inputs));
+                weightValue = vxnneGetDataExt((vx_type_e)weightsType, weightsQntType, inputCount * i + j, (vx_uint8_ptr)weightsBaseLogicalAddr, weightFpPos, TENSOR_TF_ZEROPOINT(weights), TENSOR_TF_SCALE(weights));
 
-
-                        madValue += inputValue * weightValue;
-                    }
-                    else if((srcType == VX_TYPE_UINT8) && (weightsType == VX_TYPE_UINT8) && (biasesType == VX_TYPE_INT32 || biasesType == VX_TYPE_FLOAT32) && TENSOR_QUANT_TYPE(inputs) == VX_QUANT_AFFINE_SCALE)
-                    {
-                        inputValue  = vxnneGetDataQuant((vx_type_e)srcType, j + b * inputCount, (vx_uint8_ptr)inputsBaseLogicalAddr, TENSOR_TF_ZEROPOINT(inputs), TENSOR_TF_SCALE(inputs));
-                        weightValue = vxnneGetDataQuant((vx_type_e)weightsType, inputCount * i + j, (vx_uint8_ptr)weightsBaseLogicalAddr, TENSOR_TF_ZEROPOINT(weights), TENSOR_TF_SCALE(weights));
-
-                        madValue += inputValue * weightValue;
-                    }
-                    else
-                    {
-                        /* other format not surpport now */
-                        vxError("can't support this input data format\n");
-                        gcmASSERT(0);
-                    }
-                }
+                madValue += inputValue * weightValue;
             }
 
-            if (biases && (biasesType == VX_TYPE_FLOAT32 || biasesType == VX_TYPE_INT32 || biasesType == VX_TYPE_INT64 || biasesType == VX_TYPE_UINT8))
-
+            if (biases)
             {
-
                 biasValue = vxnneGetDataExt((vx_type_e)biasesType, TENSOR_QUANT_TYPE(biases), i, (vx_uint8_ptr)biasesBaseLogicalAddr, biasFpPos, TENSOR_TF_ZEROPOINT(biases), TENSOR_TF_SCALE(biases));
 
             }
-            else if (!biases)
+            else
             {
                 biasValue = 0;
             }
-            else
-            {
-                vxError("can't support this bias data format\n");
-                gcmASSERT(0);
-            }
+
 
             if (overflow_policy == VX_CONVERT_POLICY_WRAP)
             {
@@ -873,6 +833,8 @@ OnError:
 
 VX_PRIVATE_API vx_bool vxoNNFullyConnectedLayer_SH_EVIS_Support_Ext(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis)
 {
+#define _PACK_FC_SH_KEY(IN_TYPE, WEIGHT_TYPE, BIAS_TYPE, OUT_TYPE) \
+    (IN_TYPE | (WEIGHT_TYPE << 8) | (BIAS_TYPE << 16) | (OUT_TYPE << 24) )
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
 
     vx_tensor  inputs                     = (vx_tensor)parameters[0];
@@ -880,14 +842,11 @@ VX_PRIVATE_API vx_bool vxoNNFullyConnectedLayer_SH_EVIS_Support_Ext(vx_node node
     vx_tensor  biases                     = (vx_tensor)parameters[2];
     vx_tensor  outputs                    = (vx_tensor)parameters[node->numParameters - 1];
 
-    vx_bool   supportDataFormat0          = vx_false_e;
-    vx_bool   supportDataFormat1          = vx_false_e;
-    vx_bool   supportDataFormat2          = vx_false_e;
-    vx_bool   supportDataFormat3          = vx_false_e;
-    vx_enum   input_type                  = TENSOR_DATA_TYPE(inputs);
-    vx_enum   weight_type                 = TENSOR_DATA_TYPE(weights);
-    vx_enum   bias_type                   = biases ? TENSOR_DATA_TYPE(biases) : VX_TYPE_INVALID;
-    vx_enum   output_type                 = TENSOR_DATA_TYPE(outputs);
+    vx_sh_kernel_type_e input_type        = getSHKernelType(TENSOR_DATA_TYPE(inputs));
+    vx_sh_kernel_type_e weight_type       = getSHKernelType(TENSOR_DATA_TYPE(weights));
+    vx_sh_kernel_type_e bias_type         = getSHKernelType(biases ? TENSOR_DATA_TYPE(biases) : VX_TYPE_INVALID);
+    vx_sh_kernel_type_e output_type       = getSHKernelType(TENSOR_DATA_TYPE(outputs));
+    vx_uint32 key                         = _PACK_FC_SH_KEY(input_type, weight_type, bias_type, output_type);
     vx_uint32 dims                        = TENSOR_VIEW_DIM_NUM(inputs);
     vx_uint32 width                       = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
     vx_uint32 height                      = (dims > 1) ? TENSOR_VIEW_SIZE_INDEX(inputs, 1) : 1;
@@ -898,23 +857,53 @@ VX_PRIVATE_API vx_bool vxoNNFullyConnectedLayer_SH_EVIS_Support_Ext(vx_node node
 
     if(evis)
     {
-        supportDataFormat0 = (vx_bool)(input_type == VX_TYPE_FLOAT16 && weight_type == VX_TYPE_FLOAT16 && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_FLOAT32) && output_type == VX_TYPE_FLOAT16);
-        supportDataFormat1 = (vx_bool)(input_type == VX_TYPE_INT8 && weight_type == VX_TYPE_INT8 && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_INT32) && output_type == VX_TYPE_INT8);
-        supportDataFormat2 = (vx_bool)(input_type == VX_TYPE_INT16 && weight_type == VX_TYPE_INT16
-                             && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_INT32 || bias_type == VX_TYPE_INT64 || bias_type == VX_TYPE_INT16) && output_type == VX_TYPE_INT16);
-        supportDataFormat3 = (vx_bool)(input_type == VX_TYPE_UINT8 && weight_type == VX_TYPE_UINT8
-                             && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_INT32 || bias_type == VX_TYPE_UINT8)
-                             && (output_type == VX_TYPE_UINT8 || output_type == VX_TYPE_INT16 || output_type == VX_TYPE_FLOAT16));
-        support = support && (supportDataFormat0 || supportDataFormat1 || supportDataFormat2 || supportDataFormat3) && (inputDims < IMG_MAX_WIDTH);
+        switch (key)
+        {
+        case _PACK_FC_SH_KEY(F16, F16, INVALID, F16):
+        case _PACK_FC_SH_KEY(F16, F16, F32, F16):
+        case _PACK_FC_SH_KEY(I8, I8, INVALID, I8):
+        case _PACK_FC_SH_KEY(I8, I8, I32, I8):
+        case _PACK_FC_SH_KEY(I16, I16, INVALID, I8):
+        case _PACK_FC_SH_KEY(I16, I16, I32, I16):
+        case _PACK_FC_SH_KEY(I16, I16, I64, I16):
+        case _PACK_FC_SH_KEY(U8, U8, INVALID, U8):
+        case _PACK_FC_SH_KEY(U8, U8, INVALID, I16):
+        case _PACK_FC_SH_KEY(U8, U8, INVALID, F16):
+        case _PACK_FC_SH_KEY(U8, U8, I32, U8):
+        case _PACK_FC_SH_KEY(U8, U8, I32, I16):
+        case _PACK_FC_SH_KEY(U8, U8, I32, F16):
+        case _PACK_FC_SH_KEY(U8, U8, U8, U8):
+        case _PACK_FC_SH_KEY(U8, U8, U8, I16):
+        case _PACK_FC_SH_KEY(U8, U8, U8, F16):
+            support = (vx_bool)(inputDims < IMG_MAX_WIDTH);
+            break;
+        default:
+            support = vx_false_e;
+            break;
+        }
     }
     else
     {
-        supportDataFormat0 = (vx_bool)((input_type == VX_TYPE_FLOAT16 && weight_type == VX_TYPE_FLOAT16 && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_FLOAT32) && output_type == VX_TYPE_FLOAT16) ||
-                                        (input_type == VX_TYPE_FLOAT32 && weight_type == VX_TYPE_FLOAT32 && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_FLOAT32) && output_type == VX_TYPE_FLOAT32));
-        supportDataFormat3 = (vx_bool)(input_type == VX_TYPE_UINT8 && weight_type == VX_TYPE_UINT8 && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_INT32) && output_type == VX_TYPE_UINT8);
-        supportDataFormat2 = (vx_bool)(input_type == VX_TYPE_UINT8 && weight_type == VX_TYPE_UINT8 && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_INT32) &&
-                                      ((output_type == VX_TYPE_INT32) || (output_type == VX_TYPE_FLOAT32) || (output_type == VX_TYPE_FLOAT16) || (output_type == VX_TYPE_INT16)));
-        support = support && (supportDataFormat0 || supportDataFormat3 || supportDataFormat2);
+        switch (key)
+        {
+        case _PACK_FC_SH_KEY(F16, F16, INVALID, F16):
+        case _PACK_FC_SH_KEY(F16, F16, F32, F16):
+        case _PACK_FC_SH_KEY(F32, F32, INVALID, F32):
+        case _PACK_FC_SH_KEY(F32, F32, F32, F32):
+        case _PACK_FC_SH_KEY(U8, U8, INVALID, U8):
+        case _PACK_FC_SH_KEY(U8, U8, I32, U8):
+        case _PACK_FC_SH_KEY(U8, U8, INVALID, I32):
+        case _PACK_FC_SH_KEY(U8, U8, I32, I32):
+        case _PACK_FC_SH_KEY(U8, U8, INVALID, F16):
+        case _PACK_FC_SH_KEY(U8, U8, I32, F16):
+        case _PACK_FC_SH_KEY(U8, U8, INVALID, I16):
+        case _PACK_FC_SH_KEY(U8, U8, I32, I16):
+            support = vx_true_e;
+            break;
+        default:
+            support = vx_false_e;
+            break;
+        }
     }
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
