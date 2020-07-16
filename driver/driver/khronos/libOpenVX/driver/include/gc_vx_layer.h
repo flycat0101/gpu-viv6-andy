@@ -1402,6 +1402,7 @@ typedef struct _vxnne_normalization_operation_s
     vx_float32                       alpha;
     vx_float32                       beta;
     vx_float32                       bias;
+    vx_int32                         axis;
     vx_tensor                        outputs;
 }
 vxnne_normalization_operation_s, * vxnne_normalization_operation;
@@ -3163,6 +3164,30 @@ vxnne_shader_executable vxnneGetNormalizationUint8ShaderExecutable(
     vx_float32              bias,
     vx_tensor               output
     );
+vxnne_shader_executable vxnneGetNormalizationAxis0ShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_scalar               type_s,
+    vx_scalar               norm_size_s,
+    vx_scalar               alpha_s,
+    vx_scalar               beta_s,
+    vx_float32              bias,
+    vx_tensor               output
+    );
+vxnne_shader_executable vxnneGetNormalizationAxis1ShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_scalar               type_s,
+    vx_scalar               norm_size_s,
+    vx_scalar               alpha_s,
+    vx_scalar               beta_s,
+    vx_float32              bias,
+    vx_tensor               output
+    );
 vxnne_shader_executable vxnneGetReorgShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
@@ -4161,6 +4186,30 @@ vxnne_shader_executable vxnneGetGPUL2PoolingShaderExecutable(
     );
 
 vxnne_shader_executable vxnneGetGPUNormalizationShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_scalar               type_s,
+    vx_scalar               norm_size_s,
+    vx_scalar               alpha_s,
+    vx_scalar               beta_s,
+    vx_scalar               bias,
+    vx_tensor               output);
+
+vxnne_shader_executable vxnneGetGPUNormalizationAxis0ShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_scalar               type_s,
+    vx_scalar               norm_size_s,
+    vx_scalar               alpha_s,
+    vx_scalar               beta_s,
+    vx_scalar               bias,
+    vx_tensor               output);
+
+vxnne_shader_executable vxnneGetGPUNormalizationAxis1ShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
