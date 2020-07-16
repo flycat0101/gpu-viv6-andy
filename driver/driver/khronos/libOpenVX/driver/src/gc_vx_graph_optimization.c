@@ -1311,7 +1311,9 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_storeNodeInfo(vx_node node, vxcJS
     for(i = 0; i < node->numParents; i++)
     {
         vx_uint32 offset = 0;
-        gcoOS_PrintStrSafe(buf, sizeof(buf), &offset, "@id_%d:out0", node->graph->nodeTable[ node->parentNodes[i] ]->nodeID);
+        vx_node parentNode = node->graph->nodeTable[ node->parentNodes[i] ];
+        vx_reference output = vxoGraphOptimization_getOutputParameter(parentNode);
+        gcoOS_PrintStrSafe(buf, sizeof(buf), &offset, "@id_%d_uid_%d:out0", parentNode->nodeID, getUserIDFromOutputTensor(output));
         name = vxoJson_CreateString(buf);
         CHECK_NULL(name);
         vxoJson_AddItemToArray(inputs,name);
