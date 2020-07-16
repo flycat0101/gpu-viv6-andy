@@ -11805,7 +11805,7 @@ vxnne_shader_executable vxnneGetNormalizationUint8ShaderExecutable(
         {
             if(outputFormat == VX_TYPE_UINT8)
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_AcrossMapsGenUint8toUint8", borderMode);
-            if(outputFormat == VX_TYPE_INT8)
+            else if(outputFormat == VX_TYPE_INT8)
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_AcrossMapsGenInt8toInt8", borderMode);
             else if(outputFormat == VX_TYPE_FLOAT16)
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_AcrossMapsGenUint8toFp16", borderMode);
@@ -28124,7 +28124,7 @@ vxnne_shader_executable vxnneGetTensorPad2ShaderExecutable(
         /* register an shader kernel */
 #if gcdUSE_VXC_BINARY
         vx_uint32 len;
-        void * ptr = getVXCKernelInfo(context, TensorPad, &len);
+        void * ptr = getVXCKernelInfo(context, TensorPad2, &len);
         program = vxCreateProgramWithBinary(context, ptr, len);
 #else
         char path[_vxcFILENAME_MAX];
