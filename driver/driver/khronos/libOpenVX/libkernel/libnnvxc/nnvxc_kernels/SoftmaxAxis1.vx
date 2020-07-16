@@ -67,7 +67,7 @@ float4 exponential(float4 x, float coeff)
         data0 = exponential(data0, scaleLogE) * sum1; \
         data0 = data0 * OUT_SCALE + OUT_OFFSET; \
         _viv_asm(conv_mode, dst1, data0); \
-        VXC_DP2x8(vect, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvertInt32toUint8_2x8); \
+        VXC_DP2x8(vect, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), uniConvertInt32toUint8_2x8); \
         write_fun(output, coord, vect, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
         coord.y++; \
     } \
@@ -305,7 +305,7 @@ __kernel void softmax_axis1_BF16toBF16(
         data0 = data0 - max_hi;
         data0 = exponential(data0, scaleLogE) * sum1;
         _viv_asm(COPY, dst1, data0, 16);
-        VXC_DP2x8(dst, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExtractOddData_2x8);
+        VXC_DP2x8(dst, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), uniExtractOddData_2x8);
         VXC_WriteImage2DArray(output, coord, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
         coord.y++;
     }
@@ -458,7 +458,7 @@ __kernel void softmax_axis1_BF16toF16_2D(
         data0 = data0 - max_hi;
         data0 = exponential(data0, scaleLogE) * sum1;
         _viv_asm(CONV, dst1, data0);
-        VXC_DP2x8(vec0, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExtractHalf8_2x8);
+        VXC_DP2x8(vec0, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), uniExtractHalf8_2x8);
         vxc_short8 vect;
         _viv_asm(COPY, vect, vec0, 16);
         VXC_WriteImage(output, coord, vect, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
