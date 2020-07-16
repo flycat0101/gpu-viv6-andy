@@ -1,0 +1,123 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2020 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# Linux build file for user HAL layer.
+#
+
+################################################################################
+# Include common definitions.
+
+include $(AQROOT)/makefile.linux.def
+
+################################################################################
+# Define target module name.
+
+ifeq ($(gcdSTATIC_LINK), 1)
+  STATIC            := 1
+  TARGET_MODULE     := $(OBJ_DIR)/libNNArchPerf.a
+else
+  DYNAMIC           := 1
+  TARGET_MODULE     := $(OBJ_DIR)/libNNArchPerf.so
+  TARGET_SONAME     := libNNArchPerf.so
+endif
+
+################################################################################
+# Installation directory
+
+INSTALL_DIR         := $(SDK_DIR)/drivers
+
+################################################################################
+# Supply additional include directories.
+
+INCLUDE := -I$(AQROOT)/hal/inc \
+
+CFLAGS += $(INCLUDE)
+
+################################################################################
+# Add extra flags for object files.
+
+ifneq ($(USE_ARMCC), 1)
+  CFLAGS += -fPIC -Wall -fno-builtin
+endif
+
+################################################################################
+# Define flags for the linker.
+
+ifneq ($(USE_ARMCC), 1)
+  LDFLAGS += -Wl,--version-script=libNNArchPerf.map
+endif
+
+ifeq ($(USE_ARMCC),1)
+  LDFLAGS += --shared -L--soname=,$(TARGET_SONAME)
+else
+  LDFLAGS += -Wall -Wl,-z,defs -shared -Wl,-soname,$(TARGET_SONAME)
+endif
+
+
+# Supply necessary libraries.
+LIBS += -lm -lpthread -ldl -lrt
+LIBS += -lstdc++
+
+################################################################################
+# Describe object files.
+
+OBJECTS := $(OBJ_DIR)/nnArchPerf.o \
+
+
+################################################################################
+# Define targets.
+
+.PHONY: all clean install extra_install prebuild
+
+all: prebuild $(TARGET_MODULE)
+
+clean:
+	@rm -rf $(OBJ_DIR)
+
+install: all
+	@mkdir -p $(INSTALL_DIR)
+	@-cp $(TARGET_MODULE) $(INSTALL_DIR)
+
+prebuild:
+	@cp -f $(AQROOT)/hal/inc/gc_feature_database.h ./
+
+################################################################################
+# Module rules.
+
+ifeq ($(STATIC),1)
+$(TARGET_MODULE): $(OBJECTS)
+	@echo "  ARCHIVE \033[1m$(notdir $@)\033[0m"
+	@$(AR) -r -c $@ $(OBJECTS)
+ifneq ($(USE_ARMCC),1)
+	@$(RANLIB) $@
+endif
+endif
+
+ifeq ($(DYNAMIC),1)
+$(TARGET_MODULE): $(OBJECTS)
+	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
+	@$(CC) $(LDFLAGS) -o $@ $(OBJECTS) $(LIBS)
+endif
+
+################################################################################
+# Object rules.
+
+$(OBJ_DIR)/%.o: %.cpp
+	@echo "  COMPILE $(abspath $<)"
+	@mkdir -p $(OBJ_DIR)
+	@$(CC) -c $(CFLAGS) -MMD -o $@ $<
+
+# object dependencies.
+-include $(OBJECTS:.o=.d)
+

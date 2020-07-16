@@ -699,7 +699,6 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                     }
                     break;
                 }
-
                 /* if movDst has 1+ usage, no benefit to copy propagation since more mova/ldarr are generated */
                 if (!vscVIR_DoesDefInstHaveUniqueUsageInst(VSC_CPP_GetDUInfo(cpp),
                                                            defInst, gcvTRUE,
@@ -791,6 +790,7 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                                 VIR_Swizzle_GetChannel(movSrcSwizzle, channel));
                         }
                     }
+
                     /*
                     ** We must also update the used components because after Peephole,
                     ** the enable count of dest may change.
@@ -808,6 +808,7 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                             if (lastChannel == -1)
                             {
                                 gctUINT8 i;
+
                                 for (i = 0; i < channel; i++)
                                 {
                                     VIR_Swizzle_SetChannel(newSwizzle, i, lastSwizzle);
@@ -1132,13 +1133,10 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                         }
                         next = VIR_Inst_GetNext(next);
                     }
-
                     if (invalidCase)
                     {
                         break;
-
                     }
-
                 }
                 else
                 {
@@ -1156,7 +1154,6 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                         }
                         break;
                     }
-
                     else
                     {
                         /* no call between defInst and inst */
@@ -1183,6 +1180,7 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                             }
                             vscHTBL_Reset(visitSet);
                         }
+
                         {
                             /* no redefine of movSrc between defInst and inst */
                             VIR_Instruction *redefInst = gcvNULL;
@@ -1216,7 +1214,6 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                     if (movEnable & (1 << channel))
                     {
                         VIR_Swizzle_SetChannel(channelMapping, channel, VIR_Swizzle_GetChannel(movSrcSwizzle, channel));
-
                     }
                 }
 
@@ -1229,7 +1226,7 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                     if (instEnable & (1 << channel))
                     {
                         lastSwizzle = VIR_Swizzle_GetChannel(channelMapping, VIR_Swizzle_GetChannel(instSrcSwizzle, channel));
- 
+
                         VIR_Swizzle_SetChannel(newSwizzle, channel, lastSwizzle);
 
                         /* It is the first enable component. Set the prev-unenable components. */
@@ -1244,7 +1241,6 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                         }
                         lastChannel = (gctINT8)channel;
                     }
-
                     /* Use the swizzle of last enable component. */
                     else if (lastChannel != -1)
                     {

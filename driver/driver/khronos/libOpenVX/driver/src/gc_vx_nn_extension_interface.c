@@ -1907,8 +1907,8 @@ vxnne_kernel_shaders vxnneAddKernelShadersInProgram(vx_context context, vx_char*
     return kernel;
 }
 
-
 extern vx_bool vxoGetDataDivisors(vx_uint32 input_value, vx_uint32 *divisors, vx_uint32 gcd);
+
 vx_bool vxoElementOptimization_GetTensorShape(vx_tensor input, vx_uint32 sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION], vx_uint32 * num_of_dims)
 {
     vx_status status            = VX_SUCCESS;
@@ -1921,8 +1921,7 @@ vx_bool vxoElementOptimization_GetTensorShape(vx_tensor input, vx_uint32 sizes[V
     for (i = 0; i < VX_CONTEXT_TENSOR_MAX_DIMENSION; i++)
     {
         sizes[i] = 1;
-   }
-
+    }
 
     if (element_count < IMG_MAX_WIDTH)
     {
@@ -1952,7 +1951,6 @@ vx_bool vxoElementOptimization_GetTensorShape(vx_tensor input, vx_uint32 sizes[V
 
 vx_status vxnneExecuteSWBrickMode(struct _vxnne_operation_s *operation)
 {
-
     vxnne_brick_operation           brickModeOperation   = (vxnne_brick_operation)operation;
 
     vx_tensor inputs = (vx_tensor)brickModeOperation->inputs;
@@ -2013,6 +2011,7 @@ vx_status vxnneExecuteSWBrickMode(struct _vxnne_operation_s *operation)
             for (j = 0; j < numOfImageTileX; j++)
             {
                 vx_uint32 offsetDist = (j + i * numOfImageTileX) * distSize;
+
                 for (z = 0; z < input_z; z++)
                 {
                     vx_uint32 dstX = 0, dstY = 0;
@@ -2053,12 +2052,12 @@ vx_status vxnneExecuteSWBrickMode(struct _vxnne_operation_s *operation)
                                 if (inputs->isViewed)
                                     srcOffsetSize = ((inX + inputs->viewRegion.viewStarts[0]) + input_width * ((inY + inputs->viewRegion.viewStarts[1]) + input_height * (z + inputs->viewRegion.viewStarts[2]))) * vxnneGetTypeSize((vx_type_e)TENSOR_DATA_TYPE(inputs));
 
-
                                 else
                                     srcOffsetSize = (inX + input_width * (inY + input_height * z)) * vxnneGetTypeSize((vx_type_e)TENSOR_DATA_TYPE(inputs));
                                 dstOffserSize = (dstX + tempX * (dstY + tempY * z)) * vxnneGetTypeSize((vx_type_e)TENSOR_DATA_TYPE(inputs));
                                 input_ptr = inputs->tensorBuffer->memory.logicals[0] + srcOffsetSize;
                                 output_ptr = temp_buffer + dstOffserSize + offsetDist;
+
                                 if (TENSOR_DATA_TYPE(inputs) == VX_TYPE_FLOAT16)
                                     *(vx_uint16*)output_ptr = *(vx_uint16*)input_ptr;
                                 else if (TENSOR_DATA_TYPE(inputs) == VX_TYPE_INT8)
@@ -2161,7 +2160,6 @@ vx_status vxnneExecuteSWBrickMode(struct _vxnne_operation_s *operation)
                                 if (inX < 0 || inY < 0 || inX >= (vx_int32)input_width || inY >= (vx_int32)input_height)
                                     continue;
 
-
                                 if (inputs->isViewed)
                                     srcOffsetSize = ((inX + inputs->viewRegion.viewStarts[0]) + input_width * ((inY + inputs->viewRegion.viewStarts[1]) + input_height * (z + inputs->viewRegion.viewStarts[2]))) * vxnneGetTypeSize((vx_type_e)TENSOR_DATA_TYPE(inputs));
 
@@ -2200,7 +2198,7 @@ vx_status vxnneExecuteSWBrickMode(struct _vxnne_operation_s *operation)
 
                             if (dstY >= tempY || dstY >= input_height)
                                 dstY = 0;
- 
+
                             for (x = 0; x < tempX; x++)
                             {
 
@@ -2711,6 +2709,7 @@ vx_status vxnneExecuteSWBrickMode(struct _vxnne_operation_s *operation)
 
 }
 
+
 vx_status vxnneExecutionLayer_Create(vx_graph graph, vxnne_execution_layer* executionLayer)
 {
     vxnne_execution_layer layer = VX_NULL;
@@ -2956,7 +2955,6 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
                 }
             }
 
-
             if ((graph->binarySave) && (operation->engineSync.waitCnt > 0) && (i > 0))
             {
                 status = gcfVX_CaptureState(gcvNULL, 0, &actualSize, gcvFALSE, gcvFALSE);
@@ -3105,6 +3103,7 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
             vxoProfiler_End((vx_reference)executionLayer->graph);
 #endif
         }
+
         if (node->kernel->isUserkernel)
         {
             vxoNode_DisableVirtualAccessible(node);
@@ -3162,6 +3161,7 @@ vx_status vxnneExecutionLayer_Deinitialize(vxnne_layer layer)
         executionLayer->opIndicesNum    = 0;
         executionLayer->opIndices       = gcvNULL;
     }
+
     if (executionLayer->operations)
     {
         /* free opertions */
@@ -3172,6 +3172,7 @@ vx_status vxnneExecutionLayer_Deinitialize(vxnne_layer layer)
 
     return VX_SUCCESS;
 }
+
 
 VX_PRIVATE_API
 vx_status vxnneUserOperation_Execute(
