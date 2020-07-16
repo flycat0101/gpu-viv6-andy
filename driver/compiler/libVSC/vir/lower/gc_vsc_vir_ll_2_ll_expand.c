@@ -5077,7 +5077,15 @@ _long_ulong_first_logical_op(
     IN VIR_Operand        *Opnd
     )
 {
-    return VIR_Lower_SetLongUlongInstType(Context, Inst, gcvNULL);
+    gctUINT srcNum = VIR_OPCODE_GetSrcOperandNum(VIR_Inst_GetOpcode(Inst));
+    gctBOOL res = VIR_Lower_SetLongUlongInstType(Context, Inst, gcvNULL); /* update dest type */
+    gctUINT i;
+    for (i  = 0; i < srcNum; i++)
+    {
+        /*update src type from long/ulong to dest type */
+        VIR_Lower_SetLongUlongInstType(Context, Inst, VIR_Inst_GetSource(Inst, i));
+    }
+    return res;
 }
 
 static gctBOOL
@@ -5094,6 +5102,7 @@ _long_ulong_second_logical_op(
     VIR_SymId     symId;
     VIR_Operand   *opnd;
     gctUINT     rowOffset;
+    gctUINT     i, srcNum = VIR_OPCODE_GetSrcOperandNum(VIR_Inst_GetOpcode(Inst));
 
     tyId = VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst));
     gcmASSERT(VIR_GetTypeRows(tyId) > 1);
@@ -5138,7 +5147,11 @@ _long_ulong_second_logical_op(
     _long_ulong_first_logical_op(Context,
                                  Inst,
                                  Opnd);
-
+    /*update src type from long/ulong to dest type */
+    for (i  = 0; i < srcNum; i++)
+    {
+        VIR_Lower_SetLongUlongInstType(Context, Inst, VIR_Inst_GetSource(Inst, i));
+    }
     return gcvTRUE;
 }
 
