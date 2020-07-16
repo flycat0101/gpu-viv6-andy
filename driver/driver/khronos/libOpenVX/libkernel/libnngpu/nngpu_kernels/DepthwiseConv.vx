@@ -398,7 +398,7 @@ __kernel void gpuDepthwiseConv_PerChannel_3x3_Quant8(
     int4  tmp1 = {0};
     int4 biasData;
     float4 pixel = {0.0}, weightValue = {0.0};
-    float4 scaleVal = read_imagef(scales, coord_in.zw);
+    float4 scaleVal = read_imagef(scales, coord_out.zw);
 
     biasData = convert_int(read_imagei(bias, (int2)(z, 0)));
     sum = biasData.x;
@@ -1225,7 +1225,7 @@ __kernel void gpuDepthwiseConv_PerChannel_Quant8(
     int4  weightTmp = {0};
     int4 biasData;
     float pixel = 0.0, weightValue = 0.0;
-    float4 scaleVal = read_imagef(scales, coord_in.zw);
+    float4 scaleVal = read_imagef(scales, coord_out.zw);
 
     inyEnd = min(inyEnd, inputHeight);
     inxEnd = min(inxEnd, inputWeight);
@@ -1296,7 +1296,7 @@ __kernel void gpuDepthwiseConv_PerChannel_Quant8_Dilation(
     int4  weightTmp = {0};
     int4 biasData;
     float pixel = 0.0, weightValue = 0.0;
-    float4 scaleVal = read_imagef(scales, coord_in.zw);
+    float4 scaleVal = read_imagef(scales, coord_out.zw);
 
     inyEnd = min(inyEnd, inputHeight);
     inxEnd = min(inxEnd, inputWeight);
