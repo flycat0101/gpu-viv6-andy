@@ -3488,9 +3488,9 @@ static slsINTRINSIC_BUILTIN_FUNCTION CommonIntrinsicBuiltInFunctions[] =
     {{slvEXTENSION1_ES_31},    "texelFetch", gcvNULL, _GenTexelFetchCode,             T_IVEC4,  ANY,  3, {T_ISAMPLER2DMS,          T_IVEC2,     T_INT},                                        {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_texelFetch_for_MSAA, "_viv_texelFetch_int", {0}, {0}},
     {{slvEXTENSION1_ES_31},    "texelFetch", gcvNULL, _GenTexelFetchCode,             T_UVEC4,  ANY,  3, {T_USAMPLER2DMS,          T_IVEC2,     T_INT},                                        {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_texelFetch_for_MSAA, "_viv_texelFetch_uint", {0}, {0}},
 
-    {{slvEXTENSION1_ES_31 | slvEXTENSION1_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY},    "texelFetch", gcvNULL, _GenTexelFetchCode,    T_VEC4,  ANY,   3, {T_SAMPLER2DMSARRAY,    T_IVEC3,   T_INT},  {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_texelFetch_for_MSAA, "_viv_texelFetch_float_array", {0}, {0}},
-    {{slvEXTENSION1_ES_31 | slvEXTENSION1_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY},    "texelFetch", gcvNULL, _GenTexelFetchCode,    T_IVEC4, ANY,   3, {T_ISAMPLER2DMSARRAY,   T_IVEC3,   T_INT},  {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_texelFetch_for_MSAA, "_viv_texelFetch_int_array", {0}, {0}},
-    {{slvEXTENSION1_ES_31 | slvEXTENSION1_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY},    "texelFetch", gcvNULL, _GenTexelFetchCode,    T_UVEC4,  ANY,  3, {T_USAMPLER2DMSARRAY,   T_IVEC3,   T_INT},  {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_texelFetch_for_MSAA, "_viv_texelFetch_uint_array", {0}, {0}},
+    {{slvEXTENSION1_ES_32 | slvEXTENSION1_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY},    "texelFetch", gcvNULL, _GenTexelFetchCode,    T_VEC4,  ANY,   3, {T_SAMPLER2DMSARRAY,    T_IVEC3,   T_INT},  {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_texelFetch_for_MSAA, "_viv_texelFetch_float_array", {0}, {0}},
+    {{slvEXTENSION1_ES_32 | slvEXTENSION1_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY},    "texelFetch", gcvNULL, _GenTexelFetchCode,    T_IVEC4, ANY,   3, {T_ISAMPLER2DMSARRAY,   T_IVEC3,   T_INT},  {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_texelFetch_for_MSAA, "_viv_texelFetch_int_array", {0}, {0}},
+    {{slvEXTENSION1_ES_32 | slvEXTENSION1_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY},    "texelFetch", gcvNULL, _GenTexelFetchCode,    T_UVEC4,  ANY,  3, {T_USAMPLER2DMSARRAY,   T_IVEC3,   T_INT},  {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_texelFetch_for_MSAA, "_viv_texelFetch_uint_array", {0}, {0}},
 
     /* ES 3.1 Image Functions */
     /* Image size functions. */
