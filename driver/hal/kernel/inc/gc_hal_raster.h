@@ -1099,6 +1099,20 @@ gco2D_NatureRotateTranslation(
     OUT gceSURF_ROTATION * DstRotation
     );
 
+/* Set source endian mode. */
+gceSTATUS
+gco2D_SetSourceEndianMode(
+    IN gco2D Engine,
+    IN gceENDIAN_MODE eEndianMode
+    );
+
+/* Set target endian mode. */
+gceSTATUS
+gco2D_SetTargetEndianMode(
+    IN gco2D Engine,
+    IN gceENDIAN_MODE eEndianMode
+    );
+
 #ifdef __cplusplus
 }
 #endif
