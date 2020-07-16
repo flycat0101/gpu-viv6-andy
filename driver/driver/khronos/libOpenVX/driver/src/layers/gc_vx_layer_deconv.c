@@ -685,7 +685,7 @@ VX_PRIVATE_API vx_status vxnneExecuteSWDeConv_ReshuffleWeights(struct _vxnne_ope
 
             opt.inputZeroPoint = TENSOR_TF_ZEROPOINT(inputs);
             opt.zrl = -1;
-            opt.outputFormat = weight_format;
+            opt.outputFormat = TENSOR_DATA_TYPE(deconvOperation->outputs);
 
             deconvOperation->weights_biaes = vxoCreateWeightsBiasesParameterFromTensors(
                                 vxGetContext((vx_reference)deconvOperation->weights),
