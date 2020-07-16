@@ -496,9 +496,9 @@ VX_PRIVATE_API void vxoGlobalData_FetchOptionsForTransferGraph(vx_global_data gl
 
 
     pos = gcvNULL;
-    if(gcoOS_StrStr(envctrl, "-perTenroConv:", &pos) && pos)
+    if(gcoOS_StrStr(envctrl, "-pcq:", &pos) && pos)
     {
-        pos += sizeof("-perTenroConv:") - 1;
+        pos += sizeof("-pcq:") - 1;
         globalData->options.enableGraphPtc = atoi(pos);
     }
 
