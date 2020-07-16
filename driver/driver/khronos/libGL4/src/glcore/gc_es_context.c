@@ -93,6 +93,7 @@ extern void __glInitImmedOutsideEntries(__GLdispatchTable *dispatch);
 extern void __glInitImmedVertexInfoEntries(__GLdispatchTable *dispatch);
 extern void __glInitImmedNoVertInfoEntries(__GLdispatchTable *dispatch);
 extern GLvoid __glFreeImmedVertexCacheBuffer( __GLcontext *gc );
+extern GLboolean __glFreeImmedCacheInVideoMemory(__GLcontext *gc);
 #endif
 
 extern __GLformatInfo __glFormatInfoTable[];
