@@ -122,6 +122,50 @@ _VIR_CFO_PerformPatternTransformationOnFunction(
                     }
                 }
             }
+            /* jmp compare is constant: convert to jmp or delete directly */
+            else if ((opcode == VIR_OP_JMPC || opcode == VIR_OP_JMP_ANY) && VIR_Inst_CanGetConditionResult(inst))
+            {
+                gctBOOL checkingResult = VIR_Inst_EvaluateConditionResult(inst, gcvNULL);
+                if(VSC_UTILS_MASK(VSC_OPTN_CFOOptions_GetTrace(options), VSC_OPTN_CFOOptions_TRACE_PATTERN_DETAIL))
+                {
+                    VIR_Dumper* dumper = VIR_CFO_GetDumper(cfo);
+
+                    VIR_LOG(dumper, "found jmp with constant value :\n");
+                    VIR_Inst_Dump(dumper, inst);
+                }
+                if (checkingResult)
+                {
+                    /* change instruction to jmp*/
+                    gctUINT i;
+                    /* TODO:: update du information */
+                    VIR_Inst_SetOpcode(inst, VIR_OP_JMP);
+                    VIR_Inst_SetConditionOp(inst, VIR_COP_ALWAYS);
+                    for (i = 0; i < VIR_Inst_GetSrcNum(inst); i++)
+                    {
+                        VIR_Inst_FreeSource(inst, i);
+                    }
+                    VIR_Inst_SetSrcNum(inst, 0);
+                    if(VSC_UTILS_MASK(VSC_OPTN_CFOOptions_GetTrace(options), VSC_OPTN_CFOOptions_TRACE_PATTERN_DETAIL))
+                    {
+                        VIR_Dumper* dumper = VIR_CFO_GetDumper(cfo);
+                        VIR_LOG(dumper, "change to :\n");
+                        VIR_Inst_Dump(dumper, inst);
+                    }
+                }
+                else
+                {
+                    VIR_Instruction* nextInst = VIR_Inst_GetNext(inst);
+                    /* delete inst update du information */
+                    vscVIR_DeleteInstructionWithDu(gcvNULL, func, inst, &VIR_CFO_GetInvalidCfg(cfo));
+                    inst = nextInst;
+                    if(VSC_UTILS_MASK(VSC_OPTN_CFOOptions_GetTrace(options), VSC_OPTN_CFOOptions_TRACE_PATTERN_DETAIL))
+                    {
+                        VIR_Dumper* dumper = VIR_CFO_GetDumper(cfo);
+                        VIR_LOG(dumper, "remove instruction :\n");
+                    }
+                 }
+                break;
+            }
             else if(opcode == VIR_OP_JMPC)
             {
                 VIR_Label* labelJmpc = VIR_Operand_GetLabel(VIR_Inst_GetDest(inst));
