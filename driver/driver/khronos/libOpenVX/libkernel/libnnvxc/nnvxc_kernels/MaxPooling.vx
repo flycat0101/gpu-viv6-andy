@@ -1006,7 +1006,7 @@ __kernel void vxcPooling_genMaxFp16toFp16(
     _viv_asm(COPY, hfMaxVal, valMin, 16);
     if (kernelXis8x)
     {
-        for (int x = 0; x < kernelSize.x; x += 8)
+        for (int x = 0; x <= kernelSize.x - 8; x += 8)
         {
             for (int y = 0; y < kernelSize.y; y++)
             {
@@ -1078,7 +1078,7 @@ __kernel void vxcPooling_genMaxInt16toInt16(
     _viv_asm(COPY, hfMaxVal, valMin, 16);
     if (kernelXis8x)
     {
-        for (int x = 0; x < kernelSize.x; x += 8)
+        for (int x = 0; x <= kernelSize.x - 8; x += 8)
         {
             for (int y = 0; y < kernelSize.y; y++)
             {
@@ -1167,7 +1167,7 @@ __kernel void vxcPooling_genMaxUint8toUint8(
     int4 bitExtractCoeff1 = (int4)(0x20181008, 0x00383028, 0x08080808, 0x08080808);
     if (kernelXis8x)
     {
-        for (int x = 0; x < kernelSize.x; x += 8)
+        for (int x = 0; x <= kernelSize.x - 8; x += 8)
         {
             posin.y = gidy;
             VXC_ReadImage2DArray(val, input, posin, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
@@ -1244,7 +1244,7 @@ __kernel void vxcPooling_genMaxInt8toInt8(
 
     if (kernelXis8x)
     {
-        for (int x = 0; x < kernelSize.x; x += 8)
+        for (int x = 0; x <= kernelSize.x - 8; x += 8)
         {
             posin.y = gidy;
             VXC_ReadImage2DArray(val, input, posin, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
