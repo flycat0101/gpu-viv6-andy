@@ -1784,7 +1784,7 @@ _setConstBorderValue(
 
     VIR_Operand_SetLvalue(src0, 0);
     VIR_Operand_SetUniform(src0, uniform, shader);
-    /* set swizzle by dest's type: U8 => .x, U16 => .y, U32 => .z, F32 => .w */
+    /* set swizzle by dest's type: U8 => .x, U16/FP16 => .y, U32 => .z, F32 => .w */
     compTyId = VIR_GetTypeComponentType(tyId);
     switch(compTyId) {
     case VIR_TYPE_UINT8:
@@ -1793,6 +1793,7 @@ _setConstBorderValue(
         break;
     case VIR_TYPE_UINT16:
     case VIR_TYPE_INT16:
+    case VIR_TYPE_FLOAT16:
         swizzle = VIR_SWIZZLE_YYYY;
         break;
     case VIR_TYPE_UINT32:
@@ -1810,6 +1811,34 @@ _setConstBorderValue(
     VIR_Operand_SetTypeId(src0, tyId);
 
     return gcvTRUE;
+}
+
+static gctBOOL
+_changeFP16ToU16ForEvisClamp(
+    IN VIR_Operand*         pOpnd
+    )
+{
+    VIR_TypeId              opndTypeId = VIR_Operand_GetTypeId(pOpnd);
+    VIR_TypeId              componentTy  = VIR_GetTypeComponentType(opndTypeId);
+    VIR_TypeId              newTypeId = VIR_TYPE_VOID;
+    gctUINT                 componentCount = VIR_GetTypePackedComponents(opndTypeId);
+
+    if (componentTy == VIR_TYPE_FLOAT16)
+    {
+        if (VIR_TypeId_isPacked(opndTypeId))
+        {
+            newTypeId = VIR_TypeId_ComposePackedNonOpaqueType(VIR_TYPE_UINT16, componentCount);
+        }
+        else
+        {
+            newTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_UINT16, componentCount, 1);
+        }
+        VIR_Operand_SetTypeId(pOpnd, newTypeId);
+
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
 }
 
 static gctBOOL
@@ -1831,7 +1860,7 @@ _setEvisConstBorderValue(
         gcmASSERT(0);
     }
 
-    /* set swizzle by dest's type: U8 => .x, U16 => .y, U32 => .z, F32 => .w */
+    /* set swizzle by dest's type: U8 => .x, U16/FP16 => .y, U32 => .z, F32 => .w */
     compTyId = VIR_GetTypeComponentType(tyId);
     switch(compTyId)
     {
@@ -1841,6 +1870,7 @@ _setEvisConstBorderValue(
         break;
     case VIR_TYPE_UINT16:
     case VIR_TYPE_INT16:
+    case VIR_TYPE_FLOAT16:
         swizzle = VIR_SWIZZLE_YYYY;
         break;
     case VIR_TYPE_UINT32:
@@ -1863,6 +1893,30 @@ _setEvisConstBorderValue(
     return gcvTRUE;
 }
 
+static gctBOOL
+_setEvisConstBorderValueForEvisClamp(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    if (_setEvisConstBorderValue(Context, Inst, Opnd))
+    {
+        gctBOOL               bSupportVX2 = ((VIR_PatternLowerContext *)Context)->hwCfg->hwFeatureFlags.supportEVISVX2;
+
+        gcmASSERT(VIR_Inst_GetOpcode(Inst) == VIR_OP_MOV);
+
+        /* Only a VX2 chip can support EVIS_CLAMP.f16, we need to convert it to EVIS_CLAMP.u16 for a non-VX2 chip. */
+        if (!bSupportVX2)
+        {
+            _changeFP16ToU16ForEvisClamp(VIR_Inst_GetDest(Inst));
+            _changeFP16ToU16ForEvisClamp(VIR_Inst_GetSource(Inst, 0));
+        }
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
 
 static gctBOOL
 _setEvisConstBorderValueModifier(
@@ -1871,7 +1925,8 @@ _setEvisConstBorderValueModifier(
     IN VIR_Operand        *Opnd
     )
 {
-    VIR_OpCode    opCode = VIR_Inst_GetOpcode(Inst);
+    VIR_OpCode            opCode = VIR_Inst_GetOpcode(Inst);
+    gctBOOL               bSupportVX2 = ((VIR_PatternLowerContext *)Context)->hwCfg->hwFeatureFlags.supportEVISVX2;
 
     /* clear boolean bit in modifier */
     {
@@ -1890,6 +1945,16 @@ _setEvisConstBorderValueModifier(
         newVal = VXC_MODIFIER_BIN(startBin, endBin, 0);
         VIR_Operand_SetEvisModifier(modifier, newVal);
     }
+
+    /* Only a VX2 chip can support EVIS_CLAMP.f16, we need to convert it to EVIS_CLAMP.u16 for a non-VX2 chip. */
+    if (!bSupportVX2)
+    {
+        _changeFP16ToU16ForEvisClamp(VIR_Inst_GetDest(Inst));
+        _changeFP16ToU16ForEvisClamp(VIR_Inst_GetSource(Inst, 0));
+        _changeFP16ToU16ForEvisClamp(VIR_Inst_GetSource(Inst, 1));
+        _changeFP16ToU16ForEvisClamp(VIR_Inst_GetSource(Inst, 2));
+    }
+
     return gcvTRUE;
 }
 
@@ -2232,7 +2297,7 @@ static VIR_PatternMatchInst _vxImgLoadPatInst1[] = {
 
 static VIR_PatternReplaceInst _vxImgLoadRepInst1[] = {
     { VIR_OP_F2I, 0, 0, {  -1, 3, 0 ,0 }, {_setIntegerType_EnableXY } },
-    { VIR_OP_MOV, 0, 0, {  -2, 1, 0, 0 }, {_setEvisConstBorderValue } },
+    { VIR_OP_MOV, 0, 0, {  -2, 1, 0, 0 }, {_setEvisConstBorderValueForEvisClamp } },
     { VIR_OP_VX_CLAMP, 0, 0, {  1, -2, -2, -2, 5 }, {_setEvisConstBorderValueModifier } },
     { VIR_OP_VX_IMG_LOAD, 0, 0, {  1, 2, -1, 4, 5 }, { 0 } },
 };
@@ -2251,7 +2316,7 @@ static VIR_PatternMatchInst _vxImgLoadPatInst3[] = {
 };
 
 static VIR_PatternReplaceInst _vxImgLoadRepInst3[] = {
-    { VIR_OP_MOV, 0, 0, {  -1, 1, 0, 0 }, {_setEvisConstBorderValue } },
+    { VIR_OP_MOV, 0, 0, {  -1, 1, 0, 0 }, {_setEvisConstBorderValueForEvisClamp } },
     { VIR_OP_VX_CLAMP, 0, 0, {  1, -1, -1, -1, 5 }, {_setEvisConstBorderValueModifier } },
     { VIR_OP_VX_IMG_LOAD, 0, 0, {  1, 2, 3, 4, 5 }, { 0 } },
 };
@@ -2291,7 +2356,7 @@ static VIR_PatternMatchInst _vxImgLoad3DPatInst1[] = {
 
 static VIR_PatternReplaceInst _vxImgLoad3DRepInst1[] = {
     { VIR_OP_F2I, 0, 0, { -1, 3, 0 ,0 }, {_setIntegerType_EnableXYZ } },
-    { VIR_OP_MOV, 0, 0, {  -2, 1, 0, 0 }, {_setEvisConstBorderValue } },
+    { VIR_OP_MOV, 0, 0, {  -2, 1, 0, 0 }, {_setEvisConstBorderValueForEvisClamp } },
     { VIR_OP_VX_CLAMP, 0, 0, {  1, -2, -2, -2, 5 }, {_setEvisConstBorderValueModifier } },
     { VIR_OP_VX_IMG_LOAD_3D, 0, 0, {  1, 2, -1, 4, 5 }, { 0 } },
 };
@@ -2310,7 +2375,7 @@ static VIR_PatternMatchInst _vxImgLoad3DPatInst3[] = {
 };
 
 static VIR_PatternReplaceInst _vxImgLoad3DRepInst3[] = {
-    { VIR_OP_MOV, 0, 0, {  -1, 1, 0, 0 }, {_setEvisConstBorderValue } },
+    { VIR_OP_MOV, 0, 0, {  -1, 1, 0, 0 }, {_setEvisConstBorderValueForEvisClamp } },
     { VIR_OP_VX_CLAMP, 0, 0, {  1, -1, -1, -1, 5 }, {_setEvisConstBorderValueModifier } },
     { VIR_OP_VX_IMG_LOAD_3D, 0, 0, { 1, 2, 3, 4, 5 }, { 0 } },
 };
