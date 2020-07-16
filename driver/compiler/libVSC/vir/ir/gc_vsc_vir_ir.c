@@ -20183,7 +20183,7 @@ VIR_Shader_GetWorkGroupSizeInfo(
     maxWorkGroupSize = VIR_Shader_GetMaxWorkGroupSizeSetByDriver(pShader);
     if (maxWorkGroupSize == 0)
     {
-        maxWorkGroupSize = pHwCfg ? pHwCfg->maxWorkGroupSize : 1024;
+        maxWorkGroupSize = pHwCfg ? pHwCfg->maxWorkGroupSize : GetHWMaxWorkGroupSize();
     }
 
     maxWorkGroupSize = vscMAX(minWorkGroupSize, maxWorkGroupSize);
