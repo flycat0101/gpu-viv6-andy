@@ -11374,14 +11374,14 @@ VkResult halti5_setTxTileStatus(
 
     for (hwSamplerNo = 0; txDescDirty; hwSamplerNo++, txDescDirty >>= 1)
     {
-        int32_t texTSSlot = -1;
-        uint32_t j = 0;
-        imgv = chipCommand->imgvWithTS[hwSamplerNo];
-        img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, imgv->createInfo.image);
-        pRanges = &imgv->createInfo.subresourceRange;
-
         if (chipCommand->texHasTileStatus[hwSamplerNo])
         {
+            int32_t texTSSlot = -1;
+            uint32_t j = 0;
+            imgv = chipCommand->imgvWithTS[hwSamplerNo];
+            img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, imgv->createInfo.image);
+            pRanges = &imgv->createInfo.subresourceRange;
+
             if (chipCommand->texTileStatusSlotIndex[hwSamplerNo] == -1)
             {
                 for (j = 0; j < gcdSAMPLER_TS; j++)
@@ -11755,6 +11755,7 @@ VkResult halti5_setTxTileStatus(
     }
 
     /* clear dirty bit now */
+    chipCommand->txDescDirty = 0;
     chipCommand->texTileStatusSlotDirty = 0;
     cmdBuf->curScrachBufIndex += (uint32_t)(pCmdBuffer - pCmdBufferBegin);
 OnError:
