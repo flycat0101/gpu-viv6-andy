@@ -6534,6 +6534,8 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
     vx_uint32               overflow_policy,
     vx_tensor               output)
 {
+#define _PACK_FC_SH_KEY(IN_TYPE, WEIGHT_TYPE, BIAS_TYPE, OUT_TYPE) \
+    (IN_TYPE | (WEIGHT_TYPE << 8) | (BIAS_TYPE << 16) | (OUT_TYPE << 24) )
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
     char *programSources     = NULL;
@@ -6548,8 +6550,6 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
     vx_int32      dRelu          = 0;
     vx_bool       enable_bias    = (bias == NULL) ? vx_false_e : vx_true_e;
     vx_enum       output_format  = TENSOR_DATA_TYPE(output);
-    vx_enum       input_format   = TENSOR_DATA_TYPE(input);
-    vx_enum       weights_format = TENSOR_DATA_TYPE(weights);
     vx_enum       bias_format    = enable_bias ? TENSOR_DATA_TYPE(bias) : VX_TYPE_INVALID;
     vx_uint32     input_dims     = TENSOR_DIM_NUM(input);
     vx_uint32     batch0         = (input_dims > 3) ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
@@ -6585,6 +6585,12 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
     vx_uint32     paramIdx       = 0;
     vx_float32    bias_ZP        = 0.0f;
     vx_uint32     overflow_mode  = 1;
+    vx_sh_kernel_type_e input_type        = getSHKernelType(TENSOR_DATA_TYPE(input));
+    vx_sh_kernel_type_e weight_type       = getSHKernelType(TENSOR_DATA_TYPE(weights));
+    vx_sh_kernel_type_e bias_type         = getSHKernelType(bias ? TENSOR_DATA_TYPE(bias) : VX_TYPE_INVALID);
+    vx_sh_kernel_type_e output_type       = getSHKernelType(TENSOR_DATA_TYPE(output));
+    vx_uint32 key                         = _PACK_FC_SH_KEY(input_type, weight_type, bias_type, output_type);
+
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
          context, kernelEnum, borderMode, input, output);
@@ -6790,140 +6796,165 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
         vxReleaseProgram(&program);
     }
 
-    if (input_format == VX_TYPE_FLOAT16 && weights_format == VX_TYPE_FLOAT16  && (bias_format == VX_TYPE_FLOAT16 || enable_bias == vx_false_e)  && output_format == VX_TYPE_FLOAT16)
+    switch (key)
     {
-        vx_int32 input_size_align32 = 0;
-        vx_uint32 uniAccF16MulFp16_16x1[16] = {
-            0x00005555, // TCfg
-            0x00000000, // ASelt
-            0x76543210, 0x00000000, // ABin
-            0x00005555, // BSelt
-            0x76543210, 0x00000000, // BBin
-            0x00000400, // AccumType, ConstantType, and PostShift
-            0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
-        };
-        vx_uint32 uniFp16toFp32_16x1[16] = {
-            0x00000001, // TCfg
-            0x00000000, // ASelt
-            0x00000000, 0x00000000, // ABin
-            0x00000002, // BSelt
-            0x00000000, 0x00000000, // BBin
-            0x00000100, // AccumType, ConstantType, and PostShift
-            0x00003c00, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
-        };
-
-        if (enable_bias && bias_format == VX_TYPE_FLOAT16)
+    case _PACK_FC_SH_KEY(F16, F16, F16, F16):
+    case _PACK_FC_SH_KEY(F16, F16, INVALID, F16):
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_fp16_all", borderMode);
+            vx_int32 input_size_align32 = 0;
+            vx_uint32 uniAccF16MulFp16_16x1[16] = {
+                0x00005555, // TCfg
+                0x00000000, // ASelt
+                0x76543210, 0x00000000, // ABin
+                0x00005555, // BSelt
+                0x76543210, 0x00000000, // BBin
+                0x00000400, // AccumType, ConstantType, and PostShift
+                0x00000000, 0x00000000, 0x00000000, 0x00000000,
+                0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
+            };
+            vx_uint32 uniFp16toFp32_16x1[16] = {
+                0x00000001, // TCfg
+                0x00000000, // ASelt
+                0x00000000, 0x00000000, // ABin
+                0x00000002, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00000100, // AccumType, ConstantType, and PostShift
+                0x00003c00, 0x00000000, 0x00000000, 0x00000000,
+                0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
+            };
+
+            if (bias)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F16_F16_F16_toF16", borderMode);
+                if (!shaderExecutable) goto OnError;
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F16_F16_toF16", borderMode);
+                if (!shaderExecutable) goto OnError;
+            }
+
+            status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniAccF16MulFp16_16x1", 1, uniAccF16MulFp16_16x1);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniFp16toFp32_16x1", 1, uniFp16toFp32_16x1);
+            if (status != VX_SUCCESS) goto OnError;
+
+            input_size_align32   = gcmALIGN(inputSize, 32);
+            status = vxnneShaderExecutable_SetUniform(shaderExecutable, "input_size_align32", 1, &input_size_align32);
+            if (status != VX_SUCCESS) goto OnError;
+        }
+        break;
+    case _PACK_FC_SH_KEY(F16, F16, F32, F16):
+        {
+            vx_uint32 uniMulAcc[16] = {
+                0x00005555, // TCfg
+                0x00000000, // ASelt
+                0x76543210, 0x00000000, // ABin
+                0x00005555, // BSelt
+                0x76543210, 0x00000000, // BBin
+                0x00000400, // AccumType, ConstantType, and PostShift
+                0x00000000, 0x00000000, 0x00000000, 0x00000000,
+                0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
+            };
+
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F16_F16_F32_toF16", borderMode);
             if (!shaderExecutable) goto OnError;
+
+            status = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniMulAcc", 1, uniMulAcc);
+            if (status != VX_SUCCESS) goto OnError;
+
+            inputSize   = gcmALIGN(inputSize, 32);
+            status = vxnneShaderExecutable_SetUniform(shaderExecutable, "Cycles", 1, &inputSize);
+            if (status != VX_SUCCESS) goto OnError;
         }
-        else
+        break;
+    case _PACK_FC_SH_KEY(I8, I8, INVALID, I8):
+    case _PACK_FC_SH_KEY(I8, I8, I32, I8):
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_fp16_noBias", borderMode);
+            vx_uint32 uniMulAcc_Int8[16] = {
+                0x55555555, // TCfg
+                0x00000000, // ASelt
+                0x76543210, 0xfedcba98, // ABin
+                0x55555555, // BSelt
+                0x76543210, 0xfedcba98, // BBin
+                0x00000400, // AccumType, ConstantType, and PostShift
+                0x00000000, 0x00000000, 0x00000000, 0x00000000,
+                0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
+            };
+
+            if (bias)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I8_I8_I32_toI8", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I8_I8_toI8", borderMode);
+            }
             if (!shaderExecutable) goto OnError;
+
+            status = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniMulAcc_Int8", 1, uniMulAcc_Int8);
+            if (status != VX_SUCCESS) goto OnError;
+
+            inputSize   = gcmALIGN(inputSize, 64);
+            status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "Cycles", 1, &inputSize);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "in_scale", 1, &in_scale);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "overflow_mode", 1, &overflow_mode);
+            if (status != VX_SUCCESS) goto OnError;
         }
-
-        status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniAccF16MulFp16_16x1", 1, uniAccF16MulFp16_16x1);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniFp16toFp32_16x1", 1, uniFp16toFp32_16x1);
-        if (status != VX_SUCCESS) goto OnError;
-
-        input_size_align32   = gcmALIGN(inputSize, 32);
-        status = vxnneShaderExecutable_SetUniform(shaderExecutable, "input_size_align32", 1, &input_size_align32);
-        if (status != VX_SUCCESS) goto OnError;
-    }
-    else if (input_format == VX_TYPE_FLOAT16 && weights_format == VX_TYPE_FLOAT16 && bias_format == VX_TYPE_FLOAT32  && output_format == VX_TYPE_FLOAT16)
-    {
-        vx_uint32 uniMulAcc[16] = {
-            0x00005555, // TCfg
-            0x00000000, // ASelt
-            0x76543210, 0x00000000, // ABin
-            0x00005555, // BSelt
-            0x76543210, 0x00000000, // BBin
-            0x00000400, // AccumType, ConstantType, and PostShift
-            0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
-        };
-
-        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_NoRelu", borderMode);
-        if (!shaderExecutable) goto OnError;
-
-        status = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniMulAcc", 1, uniMulAcc);
-        if (status != VX_SUCCESS) goto OnError;
-
-        inputSize   = gcmALIGN(inputSize, 32);
-        status = vxnneShaderExecutable_SetUniform(shaderExecutable, "Cycles", 1, &inputSize);
-        if (status != VX_SUCCESS) goto OnError;
-    }
-    else if (input_format == VX_TYPE_INT8 &&  weights_format ==  VX_TYPE_INT8 && (bias_format == VX_TYPE_INT32 || enable_bias == vx_false_e)  && output_format == VX_TYPE_INT8)
-    {
-        vx_uint32 uniMulAcc_Int8[16] = {
-            0x55555555, // TCfg
-            0x00000000, // ASelt
-            0x76543210, 0xfedcba98, // ABin
-            0x55555555, // BSelt
-            0x76543210, 0xfedcba98, // BBin
-            0x00000400, // AccumType, ConstantType, and PostShift
-            0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
-        };
-
-        if (enable_bias == vx_false_e)
+        break;
+    case _PACK_FC_SH_KEY(I16, I16, INVALID, I16):
+    case _PACK_FC_SH_KEY(I16, I16, I32, I16):
+    case _PACK_FC_SH_KEY(I16, I16, I64, I16):
+    case _PACK_FC_SH_KEY(I16, I16, I64, F16):
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_NoReluInt8_noBias", borderMode);
+            vx_uint32 uniMulAccInt16_16x1[16] = {
+                0x00005555, // TCfg
+                0x00000000, // ASelt
+                0x76543210, 0x00000000, // ABin
+                0x00005555, // BSelt
+                0x76543210, 0x00000000, // BBin
+                0x00000400, // AccumType, ConstantType, and PostShift
+                0x00000000, 0x00000000, 0x00000000, 0x00000000,
+                0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
+            };
+
+            if (bias == NULL)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I16_I16_toI16", borderMode);
+            }
+            else if (bias_format == VX_TYPE_INT64 && output_format == VX_TYPE_INT16 )
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I16_I16_I64_toI16", borderMode);
+            }
+            else if (bias_format == VX_TYPE_INT64 && output_format == VX_TYPE_FLOAT16 )
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I16_I16_I64_toF16", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I16_I16_I32_toI16", borderMode);
+            }
+            if (!shaderExecutable) goto OnError;
+
+            status = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniMulAccInt16_16x1", 1, uniMulAccInt16_16x1);
+            if (status != VX_SUCCESS) goto OnError;
+
+            inputSize   = gcmALIGN(inputSize, 32);
+            status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "Cycles", 1, &inputSize);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "in_scale", 1, &in_scale);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "overflow_mode", 1, &overflow_mode);
+            if (status != VX_SUCCESS) goto OnError;
         }
-        else
+        break;
+    case _PACK_FC_SH_KEY(U8, U8, INVALID, U8):
+    case _PACK_FC_SH_KEY(U8, U8, INVALID, I16):
+    case _PACK_FC_SH_KEY(U8, U8, INVALID, F16):
+    case _PACK_FC_SH_KEY(U8, U8, I32, U8):
+    case _PACK_FC_SH_KEY(U8, U8, I32, I16):
+    case _PACK_FC_SH_KEY(U8, U8, I32, F16):
+    case _PACK_FC_SH_KEY(U8, U8, U8, U8):
+    case _PACK_FC_SH_KEY(U8, U8, U8, I16):
+    case _PACK_FC_SH_KEY(U8, U8, U8, F16):
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_NoReluInt8", borderMode);
-        }
-        if (!shaderExecutable) goto OnError;
-
-        status = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniMulAcc_Int8", 1, uniMulAcc_Int8);
-        if (status != VX_SUCCESS) goto OnError;
-
-        inputSize   = gcmALIGN(inputSize, 64);
-        status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "Cycles", 1, &inputSize);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "in_scale", 1, &in_scale);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "overflow_mode", 1, &overflow_mode);
-        if (status != VX_SUCCESS) goto OnError;
-    }
-    else if (input_format == VX_TYPE_INT16 &&  weights_format ==  VX_TYPE_INT16 && output_format == VX_TYPE_INT16
-            && (bias_format == VX_TYPE_INT32 || bias_format == VX_TYPE_INT16 || bias_format == VX_TYPE_INT64))
-    {
-        vx_uint32 uniMulAccInt16_16x1[16] = {
-            0x00005555, // TCfg
-            0x00000000, // ASelt
-            0x76543210, 0x00000000, // ABin
-            0x00005555, // BSelt
-            0x76543210, 0x00000000, // BBin
-            0x00000400, // AccumType, ConstantType, and PostShift
-            0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
-        };
-
-        if (enable_bias == vx_false_e)
-        {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_NoReluI16_noBias", borderMode);
-        }
-        else if (bias_format == VX_TYPE_INT32 || bias_format == VX_TYPE_INT16)
-        {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_NoReluI16", borderMode);
-        }
-        else
-        {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_NoReluI16_BI64", borderMode);
-        }
-        if (!shaderExecutable) goto OnError;
-
-        status = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniMulAccInt16_16x1", 1, uniMulAccInt16_16x1);
-        if (status != VX_SUCCESS) goto OnError;
-
-        inputSize   = gcmALIGN(inputSize, 32);
-        status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "Cycles", 1, &inputSize);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "in_scale", 1, &in_scale);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "overflow_mode", 1, &overflow_mode);
-        if (status != VX_SUCCESS) goto OnError;
-    }
-    else if (input_format == VX_TYPE_UINT8 &&  weights_format ==  VX_TYPE_UINT8
-            && (bias_format == VX_TYPE_INT32 || bias_format == VX_TYPE_UINT8 || enable_bias == vx_false_e)
-            && (output_format == VX_TYPE_UINT8 || output_format == VX_TYPE_INT16 || output_format == VX_TYPE_FLOAT16))
-    {
         vx_uint32  inputSize_aln64 = 0;
         vx_float32 minValue        = 0;
         vx_float32 maxValue        = 0;
@@ -7014,15 +7045,18 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "overflow_mode", 1, &overflow_mode);
         if (enable_bias)
         {
-            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "is_bias_uint8", 1, &is_bias_uint8);
+                status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "is_bias_uint8", 1, &is_bias_uint8);
+            }
+            if (status != VX_SUCCESS) goto OnError;
         }
-        if (status != VX_SUCCESS) goto OnError;
-    }
-    else
-    {
+        break;
+    default:
         vxError("input or output's format is not support");
         goto OnError;
+        break;
     }
+
+#undef _PACK_FC_SH_KEY
 
     status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, paramNum);
     if (status != VX_SUCCESS) goto OnError;
