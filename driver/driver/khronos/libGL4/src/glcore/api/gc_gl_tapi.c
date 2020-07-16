@@ -1035,7 +1035,7 @@ __GL_INLINE void __glTexCoord2fv_Info(__GLcontext *gc, GLuint unit, GLfloat *v)
         vtxinfo->offsetDW = (GLushort)(current - gc->input.vertexDataBuffer);
         vtxinfo->appDataPtr = (GLuint *)v;
         vtxinfo->ptePointer = __glGetPageTableEntryPointer(gc, v);
-        __glClearPageTableEntryDirty(gc, (GLuint64 *)vtxinfo->ptePointer, __GL_INPUT_TEX0_INDEX + unit);
+        __glClearPageTableEntryDirty(gc, vtxinfo->ptePointer, __GL_INPUT_TEX0_INDEX + unit);
     }
     else
     {
@@ -1080,7 +1080,7 @@ __GL_INLINE void __glTexCoord2fv_Info(__GLcontext *gc, GLuint unit, GLfloat *v)
             vtxinfo->offsetDW = (GLushort)(current - gc->input.vertexDataBuffer);
             vtxinfo->appDataPtr = (GLuint *)v;
             vtxinfo->ptePointer = __glGetPageTableEntryPointer(gc, v);
-            __glClearPageTableEntryDirty(gc, (GLuint64 *)vtxinfo->ptePointer, __GL_INPUT_TEX0_INDEX + unit);
+            __glClearPageTableEntryDirty(gc, vtxinfo->ptePointer, __GL_INPUT_TEX0_INDEX + unit);
         }
         else if (gc->input.preVertexFormat != 0 &&
             (gc->input.preVertexFormat & (tc3fMask | tc4fMask)) == 0)
@@ -1167,7 +1167,7 @@ __GL_INLINE void __glTexCoord3fv_Info(__GLcontext *gc, GLuint unit, GLfloat *v)
         vtxinfo->offsetDW = (GLushort)(current - gc->input.vertexDataBuffer);
         vtxinfo->appDataPtr = (GLuint *)v;
         vtxinfo->ptePointer = __glGetPageTableEntryPointer(gc, v);
-        __glClearPageTableEntryDirty(gc, (GLuint64 *)vtxinfo->ptePointer, __GL_INPUT_TEX0_INDEX + unit);
+        __glClearPageTableEntryDirty(gc, vtxinfo->ptePointer, __GL_INPUT_TEX0_INDEX + unit);
     }
     else
     {
@@ -1213,7 +1213,7 @@ __GL_INLINE void __glTexCoord3fv_Info(__GLcontext *gc, GLuint unit, GLfloat *v)
             vtxinfo->offsetDW = (GLushort)(current - gc->input.vertexDataBuffer);
             vtxinfo->appDataPtr = (GLuint *)v;
             vtxinfo->ptePointer = __glGetPageTableEntryPointer(gc, v);
-            __glClearPageTableEntryDirty(gc, (GLuint64 *)vtxinfo->ptePointer, __GL_INPUT_TEX0_INDEX + unit);
+            __glClearPageTableEntryDirty(gc, vtxinfo->ptePointer, __GL_INPUT_TEX0_INDEX + unit);
         }
         else if (gc->input.preVertexFormat != 0 &&
             (gc->input.preVertexFormat & (tc2fMask | tc4fMask)) == 0)
@@ -1348,7 +1348,7 @@ __GL_INLINE void __glTexCoord4fv_Info(__GLcontext *gc, GLuint unit, GLfloat *v)
             vtxinfo->offsetDW = (GLushort)(current - gc->input.vertexDataBuffer);
             vtxinfo->appDataPtr = (GLuint *)v;
             vtxinfo->ptePointer = __glGetPageTableEntryPointer(gc, v);
-            __glClearPageTableEntryDirty(gc, (GLuint64 *)vtxinfo->ptePointer, __GL_INPUT_TEX0_INDEX + unit);
+            __glClearPageTableEntryDirty(gc, vtxinfo->ptePointer, __GL_INPUT_TEX0_INDEX + unit);
         }
         else if (gc->input.preVertexFormat != 0 &&
             (gc->input.preVertexFormat & (tc2fMask | tc3fMask)) == 0)
