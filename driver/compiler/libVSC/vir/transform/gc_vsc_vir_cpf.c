@@ -1335,11 +1335,14 @@ _VSC_CPF_FoldConst(
     gctUINT8            channel;
     gctBOOL             folded = gcvFALSE;
     VIR_TypeId          updateDstType; /*update int8/int16 to int32*/
+    gctBOOL             bIsPackInst = gcvFALSE;
+
     dstOpnd = VIR_Inst_GetDest(pInst);
     gcmASSERT(dstOpnd != gcvNULL);
     dstType = VIR_Operand_GetTypeId(dstOpnd);
     dstEnable = VIR_Operand_GetEnable(dstOpnd);
     dstEnableChannelCount = VIR_Enable_Channel_Count(dstEnable);
+    bIsPackInst = VIR_TypeId_isPacked(dstType);
 
     regNo = _VSC_CPF_GetVRegNo(pInst, dstOpnd);
 
@@ -1409,9 +1412,13 @@ _VSC_CPF_FoldConst(
         VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
         VIR_Inst_SetConditionOp(pInst, VIR_COP_ALWAYS);
         VIR_Inst_SetSrcNum(pInst, 1);
+        if (bIsPackInst)
+        {
+            VIR_Inst_SetFlag(pInst, VIR_INSTFLAG_PACKEDMODE);
+        }
         folded = gcvTRUE;
     }
-    else if (gcUseFullNewLinker(VSC_CPF_GetHwCfg(pCPF)->hwFeatureFlags.hasHalti2))
+    else
     {
         /* const vec case */
         VIR_ConstVal    new_const_val;
@@ -1420,6 +1427,8 @@ _VSC_CPF_FoldConst(
         VIR_Swizzle     new_swizzle;
         gctUINT8        constChannel = 0;
         gctUINT8        lastEnableChannel = 0;
+        gctUINT         prevValue = 0;
+        gctBOOL         bHasValidValue = gcvFALSE, bAllEqualValue = gcvTRUE;
 
         memset(&new_const_val, 0, sizeof(VIR_ConstVal));
 
@@ -1448,6 +1457,16 @@ _VSC_CPF_FoldConst(
                     default:
                         gcmASSERT(gcvFALSE);
                 }
+                if (bHasValidValue)
+                {
+                    if (prevValue != new_const_val.vecVal.u32Value[constChannel])
+                    {
+                        bAllEqualValue = gcvFALSE;
+                    }
+                }
+                bHasValidValue = gcvTRUE;
+                prevValue = new_const_val.vecVal.u32Value[constChannel];
+
                 lastEnableChannel = channel;
             }
             else
@@ -1457,53 +1476,96 @@ _VSC_CPF_FoldConst(
             constChannel++;
         }
 
-        /*always use int32/uint32 to represent integer const value */
-        updateDstType = VIR_GetTypeComponentType(dstType);
-        if (updateDstType == VIR_TYPE_UINT8 || updateDstType == VIR_TYPE_UINT16)
+        /* We can just use a immediate value if all enabled components are the same value. */
+        if (bAllEqualValue)
         {
-            updateDstType = VIR_TYPE_UINT32;
-        }
-        else if (updateDstType == VIR_TYPE_INT8 || updateDstType == VIR_TYPE_INT16)
-        {
-            updateDstType = VIR_TYPE_INT32;
-        }
-        /* Update the source type. */
-        dstType = VIR_TypeId_ComposeNonOpaqueType(updateDstType,
-                                                  lastEnableChannel + 1,
-                                                  1);
+            /* For a pack MOV, we only need to get the valid bits. */
+            if (bIsPackInst)
+            {
+                switch (VIR_GetTypeSize(VIR_GetTypeComponentType(dstType)))
+                {
+                case 2:
+                    prevValue = prevValue & 0xFFFF;
+                    break;
 
-        if (lastEnableChannel == 0)
-        {
-            new_swizzle = VIR_SWIZZLE_XXXX;
-        }
-        else if (lastEnableChannel == 1)
-        {
-            new_swizzle = VIR_SWIZZLE_XYYY;
-        }
-        else if (lastEnableChannel == 1)
-        {
-            new_swizzle = VIR_SWIZZLE_XYZZ;
-        }
-        else
-        {
-            new_swizzle = VIR_SWIZZLE_XYZW;
-        }
+                case 1:
+                    prevValue = prevValue & 0xFF;
+                    break;
 
-        VIR_Shader_AddConstant(VSC_CPF_GetShader(pCPF),
-                               dstType, &new_const_val, &new_const_id);
-        new_const = VIR_Shader_GetConstFromId(VSC_CPF_GetShader(pCPF), new_const_id);
-        new_const->type = dstType;
-        VIR_Operand_SetConstId(srcOpnd, new_const_id);
-        VIR_Operand_SetOpKind(srcOpnd, VIR_OPND_CONST);
-        VIR_Operand_SetMatrixConstIndex(srcOpnd, 0); /* reset matrixConstIndex for srcOpnd's type which is vector or matrix */
-        VIR_Operand_SetSwizzle(srcOpnd, new_swizzle);
-        VIR_Operand_SetTypeId(srcOpnd, new_const->type);
-        VIR_Operand_ClrOneModifier(srcOpnd, VIR_MOD_ABS);
-        VIR_Operand_ClrOneModifier(srcOpnd, VIR_MOD_NEG);
-        VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
-        VIR_Inst_SetConditionOp(pInst, VIR_COP_ALWAYS);
-        VIR_Inst_SetSrcNum(pInst, 1);
-        folded = gcvTRUE;
+                default:
+                    break;
+                }
+            }
+            VIR_Operand_SetImmUint(srcOpnd, prevValue);
+            VIR_Operand_SetOpKind(srcOpnd, VIR_OPND_IMMEDIATE);
+            VIR_Operand_SetTypeId(srcOpnd, dstType);
+            VIR_Operand_ClrOneModifier(srcOpnd, VIR_MOD_ABS);
+            VIR_Operand_ClrOneModifier(srcOpnd, VIR_MOD_NEG);
+            VIR_Operand_SetMatrixConstIndex(srcOpnd, 0); /* reset matrixConstIndex for vector/matrix type*/
+            VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
+            VIR_Inst_SetConditionOp(pInst, VIR_COP_ALWAYS);
+            VIR_Inst_SetSrcNum(pInst, 1);
+            if (bIsPackInst)
+            {
+                VIR_Inst_SetFlag(pInst, VIR_INSTFLAG_PACKEDMODE);
+            }
+            folded = gcvTRUE;
+        }
+        else if (gcUseFullNewLinker(VSC_CPF_GetHwCfg(pCPF)->hwFeatureFlags.hasHalti2))
+        {
+
+            /*always use int32/uint32 to represent integer const value */
+            updateDstType = VIR_GetTypeComponentType(dstType);
+            if (updateDstType == VIR_TYPE_UINT8 || updateDstType == VIR_TYPE_UINT16)
+            {
+                updateDstType = VIR_TYPE_UINT32;
+            }
+            else if (updateDstType == VIR_TYPE_INT8 || updateDstType == VIR_TYPE_INT16)
+            {
+                updateDstType = VIR_TYPE_INT32;
+            }
+            /* Update the source type. */
+            dstType = VIR_TypeId_ComposeNonOpaqueType(updateDstType,
+                                                      lastEnableChannel + 1,
+                                                      1);
+
+            if (lastEnableChannel == 0)
+            {
+                new_swizzle = VIR_SWIZZLE_XXXX;
+            }
+            else if (lastEnableChannel == 1)
+            {
+                new_swizzle = VIR_SWIZZLE_XYYY;
+            }
+            else if (lastEnableChannel == 1)
+            {
+                new_swizzle = VIR_SWIZZLE_XYZZ;
+            }
+            else
+            {
+                new_swizzle = VIR_SWIZZLE_XYZW;
+            }
+
+            VIR_Shader_AddConstant(VSC_CPF_GetShader(pCPF),
+                                   dstType, &new_const_val, &new_const_id);
+            new_const = VIR_Shader_GetConstFromId(VSC_CPF_GetShader(pCPF), new_const_id);
+            new_const->type = dstType;
+            VIR_Operand_SetConstId(srcOpnd, new_const_id);
+            VIR_Operand_SetOpKind(srcOpnd, VIR_OPND_CONST);
+            VIR_Operand_SetMatrixConstIndex(srcOpnd, 0); /* reset matrixConstIndex for srcOpnd's type which is vector or matrix */
+            VIR_Operand_SetSwizzle(srcOpnd, new_swizzle);
+            VIR_Operand_SetTypeId(srcOpnd, new_const->type);
+            VIR_Operand_ClrOneModifier(srcOpnd, VIR_MOD_ABS);
+            VIR_Operand_ClrOneModifier(srcOpnd, VIR_MOD_NEG);
+            VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
+            VIR_Inst_SetConditionOp(pInst, VIR_COP_ALWAYS);
+            VIR_Inst_SetSrcNum(pInst, 1);
+            if (bIsPackInst)
+            {
+                VIR_Inst_SetFlag(pInst, VIR_INSTFLAG_PACKEDMODE);
+            }
+            folded = gcvTRUE;
+        }
     }
 
     if (folded)
@@ -1901,7 +1963,7 @@ _VSC_CPF_PropagateConst(
 }
 
 static void
-_VSC_CPF_EvaluateConst(
+_VSC_CPF_EvaluateConstSingleChannel(
     VIR_Instruction*    pInst,
     VSC_CPF_Const       *constVal,
     VSC_CPF_Const       *resultVal,
@@ -2258,8 +2320,126 @@ _VSC_CPF_EvaluateConst(
     resultVal->type = dstType;
 }
 
+static gctUINT
+_VSC_CPF_GetNumOfBits(
+    gctUINT             data,
+    gctUINT             start,
+    gctUINT             count
+    )
+{
+    // Handle special case when Count == 0
+    // because ~0ULL cannot be shifted 64 bits.
+    if (count > 0)
+    {
+        gctUINT mask = (gctUINT)(~0ULL >> (64 - count));
+
+        return (data >> start) & mask;
+    }
+    else
+    {
+        return 0;
+    }
+}
+
+/* Use it to emulate the HW reg. */
+typedef union _VSC_CPF_EMULATE_REG
+{
+    gctUINT     bin32[4];
+    gctUINT16   bin16[8];
+    gctUINT8    bin8[16];
+} VSC_CPF_EmulateReg;
+
 static gctBOOL
-_VSC_CPF_isAssignmentOpcode(
+_VSC_CPF_EvaluateConstAllChannel(
+    VIR_Instruction*    pInst,
+    VSC_CPF_Const*      pConstVal,
+    VSC_CPF_Const*      pResultVal,
+    VSC_CPF_LATTICE*    pSrcLattice
+    )
+{
+    VIR_OpCode          opCode = VIR_Inst_GetOpcode(pInst);
+    VIR_PrimitiveTypeId dstType = VIR_TYPE_VOID;
+    gctUINT             i;
+
+    _VSC_CPF_typeToChannelType(VIR_Operand_GetTypeId(VIR_Inst_GetDest(pInst)), &dstType);
+
+    switch (opCode)
+    {
+    case VIR_OP_SWIZZLE:
+        {
+            gctUINT             swizzle;
+            VSC_CPF_EmulateReg  destReg;
+            VSC_CPF_EmulateReg  src0Reg, src1Reg, src2Reg;
+            gctUINT16           writeMask;
+
+            for (i = 0; i < 4; i++)
+            {
+                src0Reg.bin32[i] = (*(pConstVal + i * VIR_MAX_SRC_NUM)).value;
+                src1Reg.bin32[i] = (*(pConstVal + i * VIR_MAX_SRC_NUM + 1)).value;
+                src2Reg.bin32[i] = (*(pConstVal + i * VIR_MAX_SRC_NUM + 2)).value;
+            }
+
+            if (dstType == VIR_TYPE_INT8 || dstType == VIR_TYPE_UINT8)
+            {
+                for (i = 0; i < 16; i++)
+                {
+                    swizzle = _VSC_CPF_GetNumOfBits(src1Reg.bin32[i / 8], (i * 4) % 32, 4);
+
+                    destReg.bin8[i] = src0Reg.bin8[swizzle];
+                }
+            }
+            else if (dstType == VIR_TYPE_INT16 || dstType == VIR_TYPE_UINT16)
+            {
+                for (i = 0; i < 8; i++)
+                {
+                    swizzle = _VSC_CPF_GetNumOfBits(src1Reg.bin32[0], i * 4, 3);
+
+                    destReg.bin16[i] = src0Reg.bin16[swizzle];
+                }
+            }
+            else if (dstType == VIR_TYPE_INT32 || dstType == VIR_TYPE_UINT32)
+            {
+                for (i = 0; i < 4; i++)
+                {
+                    swizzle = _VSC_CPF_GetNumOfBits(src1Reg.bin32[0], i * 4, 2);
+
+                    destReg.bin32[i] = src0Reg.bin32[swizzle];
+                }
+            }
+            else
+            {
+                gcmASSERT(gcvFALSE);
+                return gcvFALSE;
+            }
+
+            writeMask = src2Reg.bin16[0];
+            if (writeMask != 0xFFFF)
+            {
+                return gcvFALSE;
+            }
+
+            for (i = 0; i < 4; i++)
+            {
+                (*(pResultVal + i)).value = destReg.bin32[i];
+            }
+        }
+        break;
+
+    default:
+        gcmASSERT(gcvFALSE);
+        return gcvFALSE;
+    }
+
+    for (i = 0; i < 4; i++)
+    {
+        (*(pResultVal + i)).type = dstType;
+    }
+
+    return gcvTRUE;
+}
+
+static gctBOOL
+_VSC_CPF_isComponentWiseAssignmentOpcode(
     VIR_OpCode      opcode
     )
 {
@@ -2297,6 +2477,19 @@ _VSC_CPF_isAssignmentOpcode(
     {
         return gcvTRUE;
     }
+    return gcvFALSE;
+}
+
+static gctBOOL
+_VSC_CPF_isUnComponentWiseAssignmentOpcode(
+    VIR_OpCode      opcode
+    )
+{
+    if (opcode == VIR_OP_SWIZZLE)
+    {
+        return gcvTRUE;
+    }
+
     return gcvFALSE;
 }
 
@@ -2450,9 +2643,10 @@ _VSC_CPF_PerformOnInst(
     gctBOOL             analysisOnly
     )
 {
-    VSC_ErrCode errCode    = VSC_ERR_NONE;
-    VIR_OpCode  opcode = VIR_Inst_GetOpcode(pInst);
-    VIR_ConditionOp conditionOp = VIR_Inst_GetConditionOp(pInst);
+    VSC_ErrCode         errCode    = VSC_ERR_NONE;
+    VIR_OpCode          opcode = VIR_Inst_GetOpcode(pInst);
+    VIR_ConditionOp     conditionOp = VIR_Inst_GetConditionOp(pInst);
+    gctBOOL             bComponentWiseAssign = gcvFALSE, bUnComponentWiseAssign = gcvFALSE;
 
     /* We don't support PACKED type now, skip it. */
     if (VIR_OPCODE_hasDest(opcode))
@@ -2463,7 +2657,9 @@ _VSC_CPF_PerformOnInst(
 
         if (pDstOpnd != gcvNULL && _VSC_CPF_GetVRegNo(pInst, pDstOpnd) != VIR_INVALID_ID)
         {
-            if (VIR_TypeId_isPacked(VIR_Operand_GetTypeId(pDstOpnd)))
+            if (VIR_TypeId_isPacked(VIR_Operand_GetTypeId(pDstOpnd))
+                &&
+                opcode != VIR_OP_SWIZZLE)
             {
                 dstEnable = VIR_Operand_GetEnable(pDstOpnd);
                 for (channel = 0; channel < VIR_CHANNEL_NUM; channel++ )
@@ -2496,7 +2692,12 @@ _VSC_CPF_PerformOnInst(
         }
     }
 
-    if (_VSC_CPF_isAssignmentOpcode(opcode) && conditionOp != VIR_COP_ALLMSB && conditionOp != VIR_COP_ANYMSB)
+    bComponentWiseAssign = _VSC_CPF_isComponentWiseAssignmentOpcode(opcode);
+    bUnComponentWiseAssign = _VSC_CPF_isUnComponentWiseAssignmentOpcode(opcode);
+
+    if ((bComponentWiseAssign && conditionOp != VIR_COP_ALLMSB && conditionOp != VIR_COP_ANYMSB)
+        ||
+        bUnComponentWiseAssign)
     {
         gctUINT i;
         VIR_Operand *srcOpnd = gcvNULL;
@@ -2510,17 +2711,16 @@ _VSC_CPF_PerformOnInst(
         {
             gctBOOL evaluable[VIR_CHANNEL_NUM] = {gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE};
             VSC_CPF_Const resultVal[VIR_CHANNEL_NUM];
+            VSC_CPF_Const vecVal[VIR_CHANNEL_NUM][VIR_MAX_SRC_NUM];
+            VSC_CPF_LATTICE srcLattic[VIR_CHANNEL_NUM][VIR_MAX_SRC_NUM];
+
+            memset(vecVal, 0, sizeof(VSC_CPF_Const) * VIR_CHANNEL_NUM * VIR_MAX_SRC_NUM);
+            memset(srcLattic, 0, sizeof(VSC_CPF_LATTICE) * VIR_CHANNEL_NUM * VIR_MAX_SRC_NUM);
 
             /* for each channel, check whether all src is constant.
                if yes, then set the dst's corresponding channel to be constant */
             for (channel = 0; channel < VIR_CHANNEL_NUM; channel++ )
             {
-                VSC_CPF_Const vecVal[VIR_MAX_SRC_NUM];
-                VSC_CPF_LATTICE srcLattic[VIR_MAX_SRC_NUM] =
-                    {VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE};
-
-                memset(vecVal, 0, sizeof(VSC_CPF_Const) * VIR_MAX_SRC_NUM);
-
                 if (!(dstEnable & (1 << channel)))
                 {
                     continue;
@@ -2534,13 +2734,14 @@ _VSC_CPF_PerformOnInst(
                         VIR_Operand_ContainsConstantValue(srcOpnd))
                     {
                         gctBOOL isConst;
-                        isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, srcOpnd, channel, 0, tmpFlow, &vecVal[i], &srcLattic[i]);
+                        isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, srcOpnd, channel, 0, tmpFlow, &vecVal[channel][i], &srcLattic[channel][i]);
                         if(!isConst)
                         {
                             gcmASSERT(_VSC_CPF_GetVRegNo(pInst, srcOpnd) != VIR_INVALID_ID);
                             if(!_VSC_CPF_SourceChannelCouldBeNonConst(pCPF, srcBBId, pInst, i, channel, tmpFlow))
                             {
                                 evaluable[channel] = gcvFALSE;
+                                allChannelConst = gcvFALSE;
                                 break;
                             }
                         }
@@ -2548,17 +2749,38 @@ _VSC_CPF_PerformOnInst(
                     else
                     {
                         evaluable[channel] = gcvFALSE;
+                        allChannelConst = gcvFALSE;
                         break;
                     }
                 }
 
-                if (evaluable[channel])
+                if (bComponentWiseAssign)
                 {
-                    _VSC_CPF_EvaluateConst(pInst, &vecVal[0], &resultVal[channel], &srcLattic[0]);
+                    if (evaluable[channel])
+                    {
+                        _VSC_CPF_EvaluateConstSingleChannel(pInst, &vecVal[channel][0], &resultVal[channel], &srcLattic[channel][0]);
+                    }
                 }
-                else
+            }
+
+            /* For a uncomponentwise instruction, we calcualte the result after get the constant data of all channels. */
+            if (bUnComponentWiseAssign)
+            {
+                /* We can only calculate the result when all channels are constant. */
+                if (allChannelConst)
                 {
-                    allChannelConst = gcvFALSE;
+                    if (!_VSC_CPF_EvaluateConstAllChannel(pInst, (VSC_CPF_Const*)vecVal, resultVal, (VSC_CPF_LATTICE*)srcLattic))
+                    {
+                        allChannelConst = gcvFALSE;
+                    }
+                }
+
+                if (!allChannelConst)
+                {
+                    for (channel = 0; channel < VIR_CHANNEL_NUM; channel++)
+                    {
+                        evaluable[channel] = gcvFALSE;
+                    }
                 }
             }
 
