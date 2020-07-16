@@ -1186,7 +1186,7 @@ GLvoid GL_APIENTRY __glim_TexParameterf(__GLcontext *gc, GLenum target, GLenum p
 {
     GLuint targetIdx;
     __GLtextureObject *activeTex;
-    GLfloat tmpf[4];
+    GLfloat tmpf[4] = {0.0f};
     __GLimageUser *imageUserList;
 
     __GL_HEADER();
@@ -1312,7 +1312,7 @@ GLvoid GL_APIENTRY __glim_TexParameteriv(__GLcontext *gc, GLenum target, GLenum 
 {
     GLuint targetIdx;
     __GLtextureObject *activeTex;
-    GLfloat tmpf[4];
+    GLfloat tmpf[4] = {0.0f};
     __GLimageUser *imageUserList;
 
     __GL_HEADER();
@@ -1418,7 +1418,7 @@ GLvoid GL_APIENTRY __glim_TexParameteri(__GLcontext *gc, GLenum target, GLenum p
 {
     GLuint targetIdx;
     __GLtextureObject *activeTex;
-    GLfloat tmpf[4];
+    GLfloat tmpf[4] = {0.0f};
     __GLimageUser *imageUserList;
 
     __GL_HEADER();
@@ -3194,7 +3194,7 @@ GLvoid GL_APIENTRY __glim_TexParameterIiv(__GLcontext *gc, GLenum target, GLenum
 {
     GLuint targetIdx;
     __GLtextureObject *activeTex;
-    GLfloat tmpf[4];
+    GLfloat tmpf[4] = {0.0f};
     __GLimageUser *imageUserList;
 
     __GL_HEADER();
@@ -3264,7 +3264,7 @@ GLvoid GL_APIENTRY __glim_TexParameterIuiv(__GLcontext *gc, GLenum target, GLenu
 {
     GLuint targetIdx;
     __GLtextureObject *activeTex;
-    GLfloat tmpf[4];
+    GLfloat tmpf[4] = {0.0f};
     __GLimageUser *imageUserList;
 
     __GL_HEADER();
@@ -3803,7 +3803,7 @@ GLvoid GL_APIENTRY __glim_TexEnvfv(__GLcontext *gc, GLenum target, GLenum pname,
 
 GLvoid GL_APIENTRY __glim_TexEnvf(__GLcontext *gc, GLenum target, GLenum pname, GLfloat f)
 {
-    GLfloat tmpf[4];
+    GLfloat tmpf[4] = {0.0f};
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
     /* Accept only enumerants that correspond to single values */
@@ -3819,7 +3819,7 @@ GLvoid GL_APIENTRY __glim_TexEnvf(__GLcontext *gc, GLenum target, GLenum pname, 
 
 GLvoid GL_APIENTRY __glim_TexEnviv(__GLcontext *gc, GLenum target, GLenum pname, const GLint *pv)
 {
-    GLfloat tmpf[4];
+    GLfloat tmpf[4] = {0.0f};
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
     if (pname == GL_TEXTURE_ENV_COLOR) {
@@ -3836,7 +3836,7 @@ GLvoid GL_APIENTRY __glim_TexEnviv(__GLcontext *gc, GLenum target, GLenum pname,
 
 GLvoid GL_APIENTRY __glim_TexEnvi(__GLcontext *gc, GLenum target, GLenum pname, GLint i)
 {
-    GLfloat tmpf[4];
+    GLfloat tmpf[4] = {0.0f};
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
     /* Accept only enumerants that correspond to single values */

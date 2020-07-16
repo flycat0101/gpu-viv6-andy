@@ -28,16 +28,17 @@ extern GLuint fmtIndex2InputIndex[];
 #define pageTableShift 12
 #define pageOffsetFactor 2
 
-#define __GL_PDE_OFFSET(linearAddr)     (((((GLuint64)(linearAddr)) & pageDirectoryMask) >> pageDirectoryShift))
-#define __GL_PAGE_DIR_ENTRY(gc, linearAddr) (GLuint64*)(*(gc->pageDirectoryBase + __GL_PDE_OFFSET(linearAddr)))
-#define __GL_PTE_OFFSET(linearAddr)     (((((GLuint64)(linearAddr)) & pageTableMask) >> pageTableShift) * pageOffsetFactor)
+#define __GL_PDE_OFFSET(linearAddr)     (((((gctSIZE_T)(linearAddr)) & pageDirectoryMask) >> pageDirectoryShift))
+#define __GL_PAGE_DIR_ENTRY(gc, linearAddr) (gctSIZE_T*)(*(gc->pageDirectoryBase + __GL_PDE_OFFSET(linearAddr)))
+#define __GL_PTE_OFFSET(linearAddr)     (((((gctSIZE_T)(linearAddr)) & pageTableMask) >> pageTableShift) * pageOffsetFactor)
 #define __GL_PTE_NOT_DIRTY(pteStatus)   ((((pteStatus) ^ 0x5) & 0x45) == 0x0)
+#define __GL_PTE_HASH_INDEX(addr)           (GLuint)(((GLuint64)((GLuint64 *)addr)) & 0x7fff)
 #define __GL_PAGE_SIZE                  0x1000; /* 4KB */
 
 __GL_INLINE GLboolean __glPteInfoExistInHashTable(__GLcontext *gc, GLuint64 *ptePointer, __GLpteInfoHashTable *pteHashTable)
 {
     __GLpageTableEntryInfo *pteInfo;
-    GLuint index;
+    gctSIZE_T index;
 
     index = __GL_PTE_HASH_INDEX(ptePointer);
     pteInfo = pteHashTable->hashTable[index];
@@ -69,17 +70,17 @@ __GL_INLINE GLboolean __glPteInfoExistInHashTable(__GLcontext *gc, GLuint64 *pte
     return GL_FALSE;
 }
 
-__GL_INLINE GLvoid __glClearPageTableEntryDirty(__GLcontext *gc, GLuint64 *ptePointer, GLuint inputIdx)
+__GL_INLINE GLvoid __glClearPageTableEntryDirty(__GLcontext *gc, gctSIZE_T *ptePointer, GLuint inputIdx)
 {
     GLboolean pteExist;
 
     /* Quick compare of the current ptePointer with the previous ptePointer */
-    if (ptePointer == (GLuint64 *)gc->input.pteInfo.lastPtePtr[inputIdx])
+    if (ptePointer == gc->input.pteInfo.lastPtePtr[inputIdx])
     {
         return;
     }
 
-    gc->input.pteInfo.lastPtePtr[inputIdx] = (GLuint64 *)ptePointer;
+    gc->input.pteInfo.lastPtePtr[inputIdx] = ptePointer;
 
     pteExist = __glPteInfoExistInHashTable(gc, ptePointer, &gc->input.pteInfo);
 
@@ -109,9 +110,9 @@ __GL_INLINE void __glClearPteInfoHashTable(__GLcontext *gc, __GLpteInfoHashTable
 }
 
 
-__GL_INLINE GLuint64 * __glGetPageTableEntryPointer(__GLcontext *gc, GLfloat *v)
+__GL_INLINE gctSIZE_T * __glGetPageTableEntryPointer(__GLcontext *gc, GLfloat *v)
 {
-    GLuint64 *pageTableBase, *ptePointer;
+    gctSIZE_T *pageTableBase, *ptePointer;
 
     if (gc->flags & __GL_USE_FAKE_PAGE_TABLE_ENTRY )
     {

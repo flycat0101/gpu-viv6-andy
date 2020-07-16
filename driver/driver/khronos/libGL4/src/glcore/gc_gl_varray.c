@@ -284,7 +284,7 @@ GLvoid APIENTRY __glImmedDrawArrays_Color_V3F(__GLcontext *gc, GLenum mode, GLin
         __GLvertexArrayState *pV = &gc->vertexArray.boundVAO->vertexArray;
         GLfloat *pColor, *pVertex, *buf;
         __GLvertexInfo *vtxinfo;
-        GLuint64 *pteVerPtr, *lastPteVerPtr;
+        gctSIZE_T *pteVerPtr, *lastPteVerPtr;
         GLint i;
 
         /* Save __GL_DRAWARRAYS_*_TAG in gc->input.vertexInfoBuffer.
@@ -516,7 +516,7 @@ GLvoid APIENTRY __glImmedDrawArrays_Normal_V3F(__GLcontext *gc, GLenum mode, GLi
         __GLvertexArrayState *pV = &gc->vertexArray.boundVAO->vertexArray;
         GLfloat *pNormal, *pVertex, *buf;
         __GLvertexInfo *vtxinfo;
-        GLuint64 *pteVerPtr, *lastPteVerPtr;
+        gctSIZE_T *pteVerPtr, *lastPteVerPtr;
         GLint i;
 
         /* Save __GL_DRAWARRAYS_*_TAG in gc->input.vertexInfoBuffer.
@@ -735,7 +735,7 @@ GLvoid APIENTRY __glImmedDrawArrays_V3F(__GLcontext *gc, GLenum mode, GLint firs
     {
         __GLvertexArrayState *pV = &gc->vertexArray.boundVAO->vertexArray;
         GLfloat *pVertex, *buf;
-        GLuint64 *pteVerPtr, *lastPteVerPtr;
+        gctSIZE_T *pteVerPtr, *lastPteVerPtr;
         __GLvertexInfo *vtxinfo;
         GLint i;
 
@@ -996,7 +996,7 @@ GLvoid APIENTRY __glImmedDrawArrays_N3F_V3F(__GLcontext *gc, GLenum mode, GLint 
     {
         __GLvertexArrayState *pV = &gc->vertexArray.boundVAO->vertexArray;
         GLfloat *pNormal = NULL, *pVertex, *buf;
-        GLuint64 *pteNorPtr, *pteVerPtr, *lastPteNorPtr, *lastPteVerPtr;
+        gctSIZE_T *pteNorPtr, *pteVerPtr, *lastPteNorPtr, *lastPteVerPtr;
         __GLvertexInfo *vtxinfo;
         GLint i;
 
@@ -1275,8 +1275,8 @@ GLvoid APIENTRY __glImmedDrawArrays_T2F_N3F_V3F(__GLcontext *gc, GLenum mode, GL
     {
         __GLvertexArrayState *pV = &gc->vertexArray.boundVAO->vertexArray;
         GLfloat *pTexture, *pNormal = NULL, *pVertex, *buf;
-        GLuint64 *pteTexPtr, *pteNorPtr, *pteVerPtr;
-        GLuint64 *lastPteTexPtr, *lastPteNorPtr, *lastPteVerPtr;
+        gctSIZE_T *pteTexPtr, *pteNorPtr, *pteVerPtr;
+        gctSIZE_T *lastPteTexPtr, *lastPteNorPtr, *lastPteVerPtr;
         __GLvertexInfo *vtxinfo;
         GLint i;
 
@@ -1585,7 +1585,7 @@ GLvoid APIENTRY __glImmedDrawElements_V3F(__GLcontext *gc, GLenum mode, GLsizei 
     {
         __GLvertexArrayState *pV = &gc->vertexArray.boundVAO->vertexArray;
         GLfloat *pVertex, *buf;
-        GLuint64 *pteVerPtr;
+        gctSIZE_T *pteVerPtr;
         __GLvertexInfo *vtxinfo;
         GLint i, index = 0, pteExist;
 
@@ -1875,7 +1875,7 @@ GLvoid APIENTRY __glImmedDrawElements_N3F_V3F(__GLcontext *gc, GLenum mode, GLsi
     {
         __GLvertexArrayState *pV = &gc->vertexArray.boundVAO->vertexArray;
         GLfloat *pNormal, *pVertex, *buf;
-        GLuint64 *pteNorPtr, *pteVerPtr;
+        gctSIZE_T *pteNorPtr, *pteVerPtr;
         __GLvertexInfo *vtxinfo;
         GLint i, index = 0, pteExist;
 
@@ -2214,7 +2214,7 @@ GLvoid APIENTRY __glImmedDrawElements_T2F_N3F_V3F(__GLcontext *gc, GLenum mode, 
     {
         __GLvertexArrayState *pV = &gc->vertexArray.boundVAO->vertexArray;
         GLfloat *pTexture, *pNormal, *pVertex, *buf;
-        GLuint64 *pteTexPtr, *pteNorPtr, *pteVerPtr;
+        gctSIZE_T *pteTexPtr, *pteNorPtr, *pteVerPtr;
         __GLvertexInfo *vtxinfo;
         GLint i, index = 0, pteExist;
 
