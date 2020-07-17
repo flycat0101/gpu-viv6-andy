@@ -16,7 +16,6 @@
 
 #include "gc_vsc.h"
 #include "vir/analysis/gc_vsc_vir_dfa.h"
-#include "vir/transform/gc_vsc_vir_loop.h"
 
 BEGIN_EXTERN_C()
 
@@ -259,21 +258,8 @@ typedef struct VIR_REG_ALLOC_LINEAR_SCAN
     VIR_HwRegId                 resRegister;
 
     gctBOOL                     needBoundsCheck;   /* for Robust OOB check HW and OOB check enabled */
-
-    /* Whether register spilling weight has been computed. */
-    gctBOOL                     bWeightComputed;
-
-    gctBOOL                     bHasLoopOpts;
-
-    /* The loop opts. */
-    VIR_LoopOpts                loopOpts;
-
-    /* The usage hash table. */
-    VSC_HASH_TABLE              *pUsageIdxHash;
-
     /* the offset for next spill, it starts from 0 */
     gctUINT                     spillOffset;
-
     /* reserved HW register for base address, bounds info, offset, or threadIndex
        baseRegister.x base address for spill
        if bounds check:
@@ -290,7 +276,6 @@ typedef struct VIR_REG_ALLOC_LINEAR_SCAN
                                                   * threadIndex got from the atomic add */
 
     gctBOOL                     bReservedMovaReg;
-
     /* reserved HW register for saving MOVA src0 if
        LDARR spill base  */
     gctUINT                     movaRegCount;
@@ -389,12 +374,6 @@ typedef struct VIR_REG_ALLOC_LINEAR_SCAN
 #define VIR_RA_LS_SetEnableDebug(ra, h)             ((ra)->bEnableDebug = (h))
 #define VIR_RA_LS_GetDeadInstSet(ra)                ((ra)->pDeadInstSet)
 #define VIR_RA_LS_SetDeadInstSet(ra, h)             ((ra)->pDeadInstSet = (h))
-#define VIR_RA_LS_GetWeightComputed(ra)             ((ra)->bWeightComputed)
-#define VIR_RA_LS_SetWeightComputed(ra, h)          ((ra)->bWeightComputed = (h))
-#define VIR_RA_LS_GetHasLoopOpts(ra)                ((ra)->bHasLoopOpts)
-#define VIR_RA_LS_SetHasLoopOpts(ra, h)             ((ra)->bHasLoopOpts = (h))
-#define VIR_RA_LS_GetLoopOpts(ra)                   ((ra)->loopOpts)
-#define VIR_RA_LS_SetLoopOpts(ra, l)                ((ra)->loopOpts = (l))
 
 extern VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
     IN VSC_SH_PASS_WORKER* pPassWorker);

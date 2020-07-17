@@ -1428,14 +1428,9 @@ static gctBOOL _VIR_RA_LS_Init(
 
     pRA->resRegister = VIR_INVALID_ID;
 
-    VIR_RA_LS_SetWeightComputed(pRA, gcvFALSE);
-    VIR_RA_LS_SetHasLoopOpts(pRA, gcvFALSE);
-    pRA->pUsageIdxHash = gcvNULL;
-
     /* for register spills */
     /* the offset where the next spill should be */
     pRA->spillOffset = (pShader->vidmemSizeOfSpill + 15) & ~ (gctUINT)0x0F;
-
     /* reserved HW register for base address, offset, or threadIndex
        baseRegister.x base address for spill
        if bounds check:
@@ -1502,7 +1497,6 @@ static gctBOOL _VIR_RA_LS_Init(
 
     memset(&pRA->checkRedefinedResInfo, 0, sizeof(VSC_CHECK_REDEFINED_RES));
     pRA->checkRedefinedResInfo.pMM = pMM;
-
     return gcvTRUE;
 }
 
@@ -1613,11 +1607,6 @@ static void _VIR_RA_LS_Final(
     VIR_RA_LS_SetDumper(pRA, gcvNULL);
     VIR_RA_ColorPool_Finalize(VIR_RA_LS_GetColorPool(pRA));
     _VIR_RA_FlaseDepReg_Finalize(pRA);
-
-    if (pRA->pUsageIdxHash != gcvNULL)
-    {
-        vscHTBL_Destroy(pRA->pUsageIdxHash);
-    }
 
     if (pRA->bReservedMovaReg)
     {
@@ -5096,153 +5085,6 @@ gctBOOL _VIR_RA_LS_isSpillable(
     return gcvTRUE;
 }
 
-/* The heuristic for choosing spill: choose smallest weight to spill. */
-static VSC_ErrCode
-_VIR_RA_LS_computeWeight(
-    VIR_RA_LS*                  pRA,
-    VIR_Function*               pFunc)
-{
-    VSC_ErrCode                 errCode = VSC_ERR_NONE;
-    VIR_LIVENESS_INFO*          pLvInfo = VIR_RA_LS_GetLvInfo(pRA);
-    VIR_Shader*                 pShader = VIR_RA_LS_GetShader(pRA);
-    VIR_Dumper*                 pDumper = VIR_RA_LS_GetDumper(pRA);
-    VSC_OPTN_RAOptions*         pOption = VIR_RA_LS_GetOptions(pRA);
-    gctUINT                     webIdx, defIdx;
-    VIR_RA_LS_Liverange*        pLR;
-    VIR_WEB*                    pWeb;
-    VIR_DEF*                    pDef;
-    VIR_LoopOpts*               pLoopOpts = &VIR_RA_LS_GetLoopOpts(pRA);
-    VSC_OPTN_LoopOptsOptions    loopOptions;
-    gctBOOL                     bNeedCheckLoop = VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_HAS_LOOP);
-    gctBOOL                     bDetectLoop = gcvFALSE;
-
-    /* Detect the loops first. */
-    if (bNeedCheckLoop)
-    {
-        memset(&loopOptions, 0, sizeof(VSC_OPTN_LoopOptsOptions));
-
-        /* Initialize the loopOpts. */
-        errCode = VIR_LoopOpts_Init(pLoopOpts,
-                                    pLvInfo->pDuInfo,
-                                    pShader,
-                                    pFunc,
-                                    &loopOptions,
-                                    pDumper,
-                                    VIR_RA_LS_GetMM(pRA),
-                                    pRA->pHwCfg);
-        ON_ERROR(errCode, "Fail to initialize the loop opts.");
-
-        /* Initialize and detect all LOOPs. */
-        if (VIR_LoopOpts_NewLoopInfoMgr(pLoopOpts) == gcvNULL)
-        {
-            errCode = VSC_ERR_OUT_OF_MEMORY;
-            ON_ERROR(errCode, "Fail to allocate NewLoopInfoMgr.");
-        }
-
-        errCode = VIR_LoopOpts_DetectNaturalLoops(pLoopOpts, &bDetectLoop);
-        ON_ERROR(errCode, "Fail to detect natural loops.");
-
-        if (bDetectLoop)
-        {
-            /* Compute the loop body and some other information, we need to call these after add a new loopInfo. */
-            errCode = VIR_LoopOpts_ComputeLoopBodies(pLoopOpts);
-            ON_ERROR(errCode, "Fail to compute the loop bodies.");
-            VIR_LoopOpts_ComputeLoopTree(pLoopOpts);
-            VIR_LoopOpts_IdentifyBreakContinues(pLoopOpts);
-
-            /* Calculate the iteration count. */
-            errCode = VIR_LoopOpts_CalculateIterationCountOnly(pLoopOpts);
-            ON_ERROR(errCode, "Fail to Calculate the iteration count.");
-        }
-
-        VIR_RA_LS_SetHasLoopOpts(pRA, gcvTRUE);
-    }
-
-    for (webIdx = 0; webIdx < VIR_RA_LS_GetNumWeb(pRA); webIdx++)
-    {
-        pLR = _VIR_RA_LS_Web2LR(pRA, webIdx);
-        pWeb = GET_WEB_BY_IDX(&pLvInfo->pDuInfo->webTable, webIdx);
-        if (pLR->liveFunc == pFunc)
-        {
-            /* Just use the usage count as the weight value. */
-            gctUINT                     usageCount = 0;
-            VSC_HASH_TABLE*             pUsageIdxHash = pRA->pUsageIdxHash;
-            VSC_DU_ITERATOR             duIter;
-            VIR_DU_CHAIN_USAGE_NODE*    pUsageNode;
-            VIR_USAGE*                  pUsage;
-            VIR_LoopInfo*               pLoopInfo;
-            gctINT                      iterationCount;
-            gctINT                      defaultIterationCount = 4;
-
-            errCode = vscHTBL_CreateOrInitialize(VIR_RA_LS_GetMM(pRA),
-                                                 (VSC_HASH_TABLE ** )&pUsageIdxHash,
-                                                 vscHFUNC_DefaultPtr,
-                                                 vscHKCMP_Default,
-                                                 64);
-            ON_ERROR(errCode, "Fail to create or initialize the hash table.");
-
-            /* find all defs */
-            defIdx = pWeb->firstDefIdx;
-            while (VIR_INVALID_DEF_INDEX != defIdx)
-            {
-                pDef = GET_DEF_BY_IDX(&pLvInfo->pDuInfo->defTable, defIdx);
-                VSC_DU_ITERATOR_INIT(&duIter, &pDef->duChain);
-
-                /* Only count one for all channels within one source operand. */
-                for (pUsageNode = VSC_DU_ITERATOR_FIRST(&duIter); pUsageNode != gcvNULL; pUsageNode = VSC_DU_ITERATOR_NEXT(&duIter))
-                {
-                    if (!vscHTBL_DirectTestAndGet(pUsageIdxHash, (void *)(gctUINTPTR_T)pUsageNode->usageIdx, gcvNULL))
-                    {
-                        pUsage = GET_USAGE_BY_IDX(&pLvInfo->pDuInfo->usageTable, pUsageNode->usageIdx);
-                        iterationCount = 1;
-
-                        /* Check if this usage is within any LOOP. */
-                        if (bDetectLoop
-                            &&
-                            !VIR_IS_IMPLICIT_USAGE_INST(pUsage->usageKey.pUsageInst))
-                        {
-                            if (VIR_LoopOpts_IsBBInLoop(pLoopOpts, VIR_Inst_GetBasicBlock(pUsage->usageKey.pUsageInst), &pLoopInfo))
-                            {
-                                iterationCount = VIR_LoopInfo_GetIterationCount(pLoopInfo) > 0 ? VIR_LoopInfo_GetIterationCount(pLoopInfo) : defaultIterationCount;
-
-                                while (VIR_LoopInfo_GetParentLoop(pLoopInfo))
-                                {
-                                    pLoopInfo = VIR_LoopInfo_GetParentLoop(pLoopInfo);
-                                    iterationCount *= (VIR_LoopInfo_GetIterationCount(pLoopInfo) > 0 ? VIR_LoopInfo_GetIterationCount(pLoopInfo) : defaultIterationCount);
-                                };
-                            }
-                        }
-
-                        usageCount += iterationCount;
-                        vscHTBL_DirectSet(pUsageIdxHash, (void *)(gctUINTPTR_T)pUsageNode->usageIdx, gcvNULL);
-                    }
-                }
-
-                defIdx = pDef->nextDefInWebIdx;
-            }
-
-            pLR->weight = (gctFLOAT)(pWeb->numOfDef + usageCount);
-        }
-    }
-
-    if (bNeedCheckLoop)
-    {
-        VIR_LoopOpts_DeleteLoopInfoMgr(pLoopOpts);
-    }
-
-    if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption),
-        VSC_OPTN_RAOptions_TRACE_ASSIGN_COLOR))
-    {
-        VIR_LOG(pDumper, "\n============== weighted liverange list [%s] ==============\n",
-            VIR_Shader_GetSymNameString(pShader, VIR_Function_GetSymbol(pFunc)));
-        VIR_RS_LS_DumpSortedLRTable(pRA, pFunc, gcvTRUE);
-        VIR_LOG_FLUSH(pDumper);
-    }
-
-OnError:
-    return errCode;
-}
-
 /* choose a candidate LR in active LR list to spill or
    choose the LR that is going to be colored to spill
    return ERR if there is no suitable LR to spill */
@@ -5261,13 +5103,6 @@ _VIR_RA_LS_SpillRegister(
     VIR_RA_LS_Liverange *pTmpLR, *pPrev;
 
     invalidColor = InvalidColor;
-
-    /* First time we need to compute the weight for each LR. */
-    if (VIR_RA_LS_GetWeightComputed(pRA) == gcvFALSE)
-    {
-        _VIR_RA_LS_computeWeight(pRA, pFunc);
-        VIR_RA_LS_SetWeightComputed(pRA, gcvTRUE);
-    }
 
     /* choose a spill candidate based on heuristics - weight and etc */
     pPrev = VIR_RA_LS_GetActiveLRHead(pRA);
@@ -7140,6 +6975,67 @@ VSC_ErrCode _VIR_RA_LS_SortLRTable(
     }
 
     return retValue;
+}
+
+/* the heuristic for choosing spill: choose smallest weight to spill
+   weight = lengh of live range / number of def and use
+*/
+void
+_VIR_RA_LS_computeWeight(
+    VIR_RA_LS       *pRA,
+    VIR_Function    *pFunc)
+{
+    VIR_LIVENESS_INFO       *pLvInfo = VIR_RA_LS_GetLvInfo(pRA);
+    VIR_Shader              *pShader = VIR_RA_LS_GetShader(pRA);
+    VIR_Dumper              *pDumper = VIR_RA_LS_GetDumper(pRA);
+    VSC_OPTN_RAOptions      *pOption = VIR_RA_LS_GetOptions(pRA);
+
+    gctUINT                 webIdx, defIdx, usageCount = 0;
+    VIR_RA_LS_Liverange     *pLR;
+    VIR_WEB                 *pWeb;
+    VIR_DEF                 *pDef;
+
+    for (webIdx = 0; webIdx < VIR_RA_LS_GetNumWeb(pRA); webIdx++)
+    {
+        pLR = _VIR_RA_LS_Web2LR(pRA, webIdx);
+        pWeb = GET_WEB_BY_IDX(&pLvInfo->pDuInfo->webTable, webIdx);
+        if (pLR->liveFunc == pFunc)
+        {
+            VIR_RA_LS_Interval *deadInterval = gcvNULL;
+            gctUINT deadInterval_len = 0;
+            gctUINT liveInterval_len = pLR->endPoint - pLR->startPoint;
+            /* find all defs */
+            defIdx = pWeb->firstDefIdx;
+            while (VIR_INVALID_DEF_INDEX != defIdx)
+            {
+                pDef = GET_DEF_BY_IDX(&pLvInfo->pDuInfo->defTable, defIdx);
+                usageCount += DU_CHAIN_GET_USAGE_COUNT(&pDef->duChain);
+                defIdx = pDef->nextDefInWebIdx;
+            }
+
+            /* reverse weight computation, the weight value is large if live range is short and more reference
+             * if live range is long and less used, it will be selected spilled first
+             * consider deadInterval range especially for multi-inlined function, which temp variables
+             * will be used in a range and in multi places
+             */
+            for (deadInterval = pLR->deadIntervals; deadInterval != gcvNULL;
+                 deadInterval = deadInterval->next)
+            {
+                deadInterval_len += deadInterval->endPoint - deadInterval->startPoint;
+            }
+            liveInterval_len = (liveInterval_len - deadInterval_len > 0) ? liveInterval_len - deadInterval_len : 1;
+            pLR->weight = (gctFLOAT)(pWeb->numOfDef + usageCount) / (gctFLOAT)(liveInterval_len);
+        }
+    }
+
+    if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption),
+        VSC_OPTN_RAOptions_TRACE_ASSIGN_COLOR))
+    {
+        VIR_LOG(pDumper, "\n============== weighted liverange list [%s] ==============\n",
+            VIR_Shader_GetSymNameString(pShader, VIR_Function_GetSymbol(pFunc)));
+        VIR_RS_LS_DumpSortedLRTable(pRA, pFunc, gcvTRUE);
+        VIR_LOG_FLUSH(pDumper);
+    }
 }
 
 /* ===========================================================================
@@ -12856,17 +12752,12 @@ static VSC_ErrCode _VIR_RA_LS_PerformOnFunction_Pre(
     retValue = _VIR_RA_LS_SortLRTable(pRA, pFunc);
     CHECK_ERROR(retValue, "_VIR_RA_LS_SortLRTable");
 
-    VIR_RA_LS_SetWeightComputed(pRA, gcvFALSE);
-    VIR_RA_LS_SetHasLoopOpts(pRA, gcvFALSE);
+    /* compute weight for each LR */
+    _VIR_RA_LS_computeWeight(pRA, pFunc);
 
     /* Assign the colors for the generate registers. */
     retValue = _VIR_RA_LS_AssignColorsForGeneralReg(pRA, pFunc, reservedDataReg);
     CHECK_ERROR(retValue, "Fail to assign colors for the generate registers.");
-
-    if (VIR_RA_LS_GetHasLoopOpts(pRA))
-    {
-        VIR_LoopOpts_Final(&VIR_RA_LS_GetLoopOpts(pRA));
-    }
 
     return retValue;
 }
@@ -13769,8 +13660,6 @@ DEF_QUERY_PASS_PROP(VIR_RA_LS_PerformTempRegAlloc)
     pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
     pPassProp->passFlag.resCreationReq.s.bNeedWeb = gcvTRUE;
     pPassProp->passFlag.resCreationReq.s.bNeedLvFlow = gcvTRUE;
-    /* We need CFG to check the loop. */
-    pPassProp->passFlag.resCreationReq.s.bNeedCfg = gcvTRUE;
 }
 
 DEF_SH_NECESSITY_CHECK(VIR_RA_LS_PerformTempRegAlloc)
