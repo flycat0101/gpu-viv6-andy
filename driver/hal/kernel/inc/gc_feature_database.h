@@ -53,7 +53,7 @@
 *****************************************************************************/
 
 
-/*Auto created on 2020-07-07 10:04*/
+/*Auto created on 2020-07-17 11:02*/
 #ifndef _gc_feature_database_h_
 #define _gc_feature_database_h_
 
@@ -724,6 +724,7 @@ typedef struct
     gctUINT32 XY_OFFSET_LIMITATION_FIX:1;
     gctUINT32 NN_NONZERO_MIRROR_BORDER:1;
     gctUINT32 IMAGE_PARTIAL_CACHE:1;
+    gctUINT32 NN_REMOVE_POOLING:1;
 } gcsFEATURE_DATABASE;
 
 static gcsFEATURE_DATABASE gChipInfo[] = {
@@ -1393,6 +1394,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* gc320_5303 */
     {
@@ -2060,6 +2062,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* gc320_5341 */
     {
@@ -2727,6 +2730,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* gc355_v121_rc5 */
     {
@@ -3394,6 +3398,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* gc400_4645 */
     {
@@ -4061,6 +4066,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* gc520l_5341_rc1b */
     {
@@ -4728,6 +4734,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* gc520l_5341_rc1c */
     {
@@ -5395,6 +5402,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* gc520l_5341_rc1i */
     {
@@ -6062,6 +6070,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* gc7000nanoultra_4_6_5_rc3a */
     {
@@ -6729,6 +6738,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* gc7000nanoultra_4_6_5_rc3e */
     {
@@ -7396,6 +7406,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* gc880_5106 */
     {
@@ -8063,6 +8074,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* gc2000_5108 */
     {
@@ -8730,6 +8742,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* gc2000_ffff5450 */
     {
@@ -9397,6 +9410,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* gc7000L_5514 */
     {
@@ -10064,6 +10078,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* gc7000XSVX_6008 */
     {
@@ -10731,6 +10746,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* gc7000XSVX_6009 */
     {
@@ -11398,6 +11414,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* gc7000XSVX_6009 */
     {
@@ -12065,6 +12082,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* gc7000UL_6200 */
     {
@@ -12732,6 +12750,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* GCNANOULTRA31 */
     {
@@ -13399,6 +13418,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* GCNANOULTRA31 */
     {
@@ -14066,6 +14086,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* gc7000ULN_v122 */
     {
@@ -14733,6 +14754,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* gc7000ULN_v123 */
     {
@@ -15400,6 +15422,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* gc7000ULN_v123 */
     {
@@ -16067,6 +16090,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* gc7000L_DEC400 */
     {
@@ -16734,6 +16758,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* gc7000L_DEC400 */
     {
@@ -17401,6 +17426,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* gc8200_6305_pid0x70 */
     {
@@ -18068,6 +18094,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x0, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x0, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* vipnano-si+ */
     {
@@ -18735,6 +18762,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x1, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x1, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
     /* vipnano-si+ */
     {
@@ -19402,6 +19430,7 @@ static gcsFEATURE_DATABASE gChipInfo[] = {
         0x1, /* gcFEATURE_BIT_XY_OFFSET_LIMITATION_FIX */
         0x1, /* gcFEATURE_BIT_NN_NONZERO_MIRROR_BORDER */
         0x0, /* gcFEATURE_BIT_IMAGE_PARTIAL_CACHE */
+        0x0, /* gcFEATURE_BIT_NN_REMOVE_POOLING */
     },
 };
 
