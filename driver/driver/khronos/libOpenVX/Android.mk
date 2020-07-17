@@ -152,6 +152,10 @@ LOCAL_CFLAGS += \
     -DOPENVX_USE_DOT  \
     -DOPENVX_USE_TARGET
 
+#For original nnarchperf
+LOCAL_CFLAGS += \
+    -DUSE_LIB_NN_ARCH_PERF
+
 ifeq ($(ORI_NNARCHPERF),1)
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/driver/include \
@@ -162,7 +166,8 @@ LOCAL_C_INCLUDES := \
     $(AQROOT)/hal/user \
     $(AQROOT)/hal/os/linux/user \
     $(AQROOT)/compiler/libVSC/include \
-    $(AQARCH)/cmodel/inc
+    $(AQARCH)/cmodel/inc \
+    $(AQARCH)/../libNNArchPerf/libNNArchPerf
 else
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/driver/include \
@@ -206,6 +211,7 @@ LOCAL_SHARED_LIBRARIES := \
     libcutils \
     libVSC \
     libGAL \
+    libNNArchPerf
 else
 LOCAL_SHARED_LIBRARIES := \
     liblog \
@@ -370,7 +376,7 @@ include $(BUILD_SHARED_LIBRARY)
 
 include $(AQROOT)/copy_installed_module.mk
 endif
- 
+
 # libNNArchPerf
 ifeq ($(ORI_NNARCHPERF),1)
 include $(AQARCH)/../libNNArchPerf/libNNArchPerf/Android.mk

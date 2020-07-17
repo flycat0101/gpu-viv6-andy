@@ -202,6 +202,7 @@ else
 LIBS += $(AQROOT)/driver/khronos/libOpenVX/libarchmodelInterface/$(OBJ_DIR)/libarchmodelInterface.a
 LIBS += -l ArchModelSw
 endif
+LIBS += -l NNArchPerf
 LIBS += -l dl -l pthread -lm
 
 ################################################################################
