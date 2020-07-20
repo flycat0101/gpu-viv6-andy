@@ -1,21 +1,94 @@
-/****************************************************************************
-*
-*    Copyright (c) 2005 - 2020 by Vivante Corp.  All rights reserved.
-*
-*    The material in this file is confidential and contains trade secrets
-*    of Vivante Corporation. This is proprietary information owned by
-*    Vivante Corporation. No part of this work may be disclosed,
-*    reproduced, copied, transmitted, or used in any way for any purpose,
-*    without the express written permission of Vivante Corporation.
-*
-*****************************************************************************/
 
-
-#ifndef __NN_VXC_BINARY_INTERFACE_H__
-#define __NN_VXC_BINARY_INTERFACE_H__
+#ifndef __NNVXC_BINARY_INTERFACE_H__
+#define __NNVXC_BINARY_INTERFACE_H__
 
 typedef enum _nnvxc_kernel_enum
 {
+    TensorScale,
+    TensorLinear,
+    L2NormAxis2,
+    TensorTranspose,
+    AvgPooling,
+    Tensor2Row,
+    RPNNms,
+    Space2Depth,
+    BatchNorm,
+    Tensor2DAdd,
+    Batch2Space,
+    LayerNorm,
+    TensorConvFormat,
+    TensorMeanAxis,
+    AvgPooling_Int16,
+    LSTMUnit,
+    LSTMUnitHiddenOut,
+    ShuffleChannel,
+    LSTMUnitStateOutExt,
+    SoftmaxAxis2,
+    PRelu,
+    AvgPooling_UInt8,
+    ROIRect2ROIList,
+    HorzMaxPool,
+    Floor,
+    LeakyRelu,
+    MeanStddevNorm,
+    FC_TPCheck,
+    TensorAdd,
+    NormalizationAxis0,
+    Depth2Space,
+    TensorCrop,
+    LSTMUnitHiddenOut_Packed,
+    Gemm_noBias,
+    Space2Batch,
+    PreTreatedRect,
+    TensorExpand,
+    DepthwiseConvNoBias,
+    RPNRetrieve,
+    Reorg,
+    MaxPooling,
+    ResizeNearestNeighbor,
+    LSTMUnitHiddenOutExt,
+    TFAvgPooling,
+    LSTMUnitLayerNormStateOut,
+    DepthwiseConv,
+    RPNRegression,
+    TensorAddMeanStddevNorm,
+    Svdf,
+    TensorStridedSlice,
+    Reverse,
+    Normalization,
+    EmbeddingLUT,
+    DeConvolution,
+    VertMaxPool,
+    Gemm,
+    Reshuffle,
+    TensorPad,
+    TensorDiv,
+    LSTMUnitProjection,
+    TensorCopy,
+    HashLUT,
+    L2NormAxis0,
+    NormalizationUint8,
+    TensorPadSym,
+    TensorPadRef,
+    Rnn,
+    Swish,
+    L2NormAxis1,
+    TensorAbs,
+    L2Pooling,
+    HSwish,
+    RPNSoftMax,
+    ROIPool,
+    SoftmaxAxis1,
+    FullyConnected,
+    TensorMul,
+    TensorMulSatRTE,
+    RPNSort,
+    SoftmaxAxis0,
+    LSTMLayer,
+    NormalizationAxis1,
+    TensorPad2,
+    Activation,
+    TensorTR,
     NNVXC_KERNEL_NUM /*NNVXC_KERNEL_NUM should be the last item in the enum*/
 }
 nnvxc_kernel_enum;
