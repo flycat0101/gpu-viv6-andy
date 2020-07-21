@@ -137,7 +137,7 @@ endif
 LDLIBS := -L$(SDK_DIR)/drivers -L$(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR) -lEGL -ldl
 
 ifeq ($(EGL_API_WL),1)
-  LDLIBS += -L$(WAYLAND_DIR)/lib -lwayland-client -lwayland-cursor -lpthread
+  LDLIBS += -L$(WAYLAND_DIR)/lib -lwayland-client -lwayland-cursor -lwayland-egl -lpthread
 else
   ifeq ($(EGL_API_DRI), 1)
     LDLIBS += -L$(ROOTFS)/usr/lib -lXdamage -lXfixes -lXext -lXau -lXdmcp -lX11

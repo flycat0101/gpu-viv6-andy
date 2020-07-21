@@ -29,9 +29,6 @@ else
   TARGET_MODULE    := $(OBJ_DIR)/libEGL.so.1.5
   TARGET_SONAME    := libEGL.so.1
   TARGET_LINKS     := libEGL.so.1 libEGL.so
-ifeq ($(EGL_API_WL),1)
-  TARGET_LINKS     += libwayland-egl.so.1.0.0 libwayland-egl.so.1 libwayland-egl.so
-endif
 endif
 
 ################################################################################
@@ -162,7 +159,7 @@ ifeq ($(EGL_API_X),1)
 endif
 
 ifeq ($(EGL_API_WL),1)
-  LDLIBS += -L$(WAYLAND_DIR)/lib -lwayland-server -lwayland-client
+  LDLIBS += -L$(WAYLAND_DIR)/lib -lwayland-server -lwayland-client -lwayland-egl
 else
   ifeq ($(EGL_API_DRI),1)
     LDLIBS += -L$(ROOTFS)/usr/lib -lX11 -lXext -ldrm
@@ -212,7 +209,6 @@ endif
 
 ifeq ($(EGL_API_WL),1)
   OBJECTS += $(OBJ_DIR)/gc_egl_wayland.o \
-             $(OBJ_DIR)/wayland-egl.o \
              $(OBJ_DIR)/gc_egl_wayland_server.o \
              $(OBJ_DIR)/wayland-viv-protocol.o \
              $(OBJ_DIR)/linux-explicit-synchronization-unstable-v1-protocol.o
