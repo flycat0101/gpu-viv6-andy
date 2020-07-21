@@ -56,7 +56,7 @@
 #ifndef __VIVNATE_DRM_H__
 #define __VIVNATE_DRM_H__
 
-#include <drm.h>
+#include <uapi/drm/drm.h>
 
 #if defined(__cplusplus)
 extern "C" {
